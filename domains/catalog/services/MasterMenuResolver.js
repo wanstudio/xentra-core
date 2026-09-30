@@ -101,7 +101,7 @@ class MasterMenuResolver {
     return ids.map(id => resolved.get(String(id)) || null).filter(Boolean);
   }
 
-  static resolveBranchMenu({ brandId, branchId, productIds = null }) {
+  static resolveBranchMenu({ brandId, branchId, productIds = null, includeInactiveCategories = false }) {
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
     if (!branchId) throw new Error('BRANCH_CONTEXT_REQUIRED');
 
@@ -109,19 +109,40 @@ class MasterMenuResolver {
       ? asUniqueStrings(productIds)
       : this._listAdoptedProductIds(brandId, branchId);
 
+    // Customer resolution only offers active Branch Categories. Management surfaces (Merchant
+    // App Menu) ask for all of them so they can list the inactive ones in their own tab.
+    const categories = repository.listBranchCategoriesForMenu({
+      brandId,
+      branchId,
+      activeOnly: !includeInactiveCategories
+    });
+
     if (!adopted.length) {
-      return { categories: repository.listBranchCategoriesForMenu({ brandId, branchId }), products: [] };
+      return { categories, products: [] };
     }
 
     const productRows = repository.findMasterProducts({ brandId, productIds: adopted, activeOnly: true });
     const states = repository.findBranchProductStates({ brandId, branchId, productIds: adopted });
-    const categoryRows = repository.findBranchProductCategoryMemberships({ branchId, productIds: adopted });
+    const membershipRows = repository.findBranchProductCategoryMemberships({ branchId, productIds: adopted });
     const stateMap = new Map(states.map(row => [String(row.product_id), row]));
-    const categoryMap = indexRows(categoryRows);
+
+    // A deactivated Branch Category stops being offered, and so do the products grouped only
+    // under inactive categories. A product with no Branch Category at all is not deactivated —
+    // it is simply uncategorised — so it stays. Only the customer path drops products; the
+    // management surfaces keep seeing everything.
+    const isActiveMembership = row => !(row.is_active === 0 || row.is_active === false);
+    const categorisedIds = new Set(membershipRows.map(row => String(row.product_id)));
+    const activeCategorisedIds = new Set(membershipRows.filter(isActiveMembership).map(row => String(row.product_id)));
+    const categoryMap = indexRows(membershipRows.filter(isActiveMembership));
     const resolved = this._composeProducts({ brandId, products: productRows, branchStates: stateMap, categoryMap });
 
-    const productList = adopted.map(id => resolved.get(String(id)) || null).filter(Boolean).filter(item => stateMap.has(String(item.product_id)));
-    return { categories: repository.listBranchCategoriesForMenu({ brandId, branchId }), products: productList };
+    const productList = adopted.map(id => resolved.get(String(id)) || null).filter(Boolean).filter(item => stateMap.has(String(item.product_id))).filter(item => {
+      if (includeInactiveCategories) return true;
+      const id = String(item.product_id);
+      if (!categorisedIds.has(id)) return true;
+      return activeCategorisedIds.has(id);
+    });
+    return { categories, products: productList };
   }
 
   static _listAdoptedProductIds(brandId, branchId) {

@@ -33,7 +33,7 @@ const CATALOG_CLIENT_JS_PATH = path.join(ROOT, 'apps/merchant-shared/js/catalog-
 const BRANCH_CATALOG_JS_PATH = path.join(ROOT, 'apps/merchant-app/assets/js/branch-catalog-ui.js');
 
 const BM_ROUTES = [
-  'hari-ini', 'pesanan', 'meja', 'menu', 'promo', 'stok', 'staff', 'reports', 'jam-operasional'
+  'hari-ini', 'pesanan', 'meja', 'menu', 'promo', 'stok', 'staff', 'reports', 'jam-operasional', 'pengaturan'
 ];
 
 test('MERCHANT APP — standalone branch manager surface', async (t) => {

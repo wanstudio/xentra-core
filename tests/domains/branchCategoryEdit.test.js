@@ -253,3 +253,57 @@ test('CATEGORY EDIT 4 — Validation and error handling', async () => {
   assert.strictEqual(dataNoData.success, false);
   assert.strictEqual(dataNoData.error, 'Gambar kategori wajib diunggah.');
 });
+
+test('CATEGORY EDIT 5 — status-only update changes is_active without touching the name', async () => {
+  const token = await loginOwner();
+  const catId = 'bc_test_status_' + Date.now();
+
+  db.prepare(`
+    INSERT INTO branch_categories (id, brand_id, branch_id, name, slug, sort_order, is_active)
+    VALUES (?, ?, ?, 'Kategori Tetap', 'kategori-tetap', 99, 1)
+  `).run(catId, BRAND, BRANCH_ID);
+
+  // A status-only payload carries no name at all, so name validation must not run.
+  const res = await request(`/api/v1/admin/branches/${BRANCH_ID}/categories/${catId}`, {
+    method: 'PATCH',
+    headers: { Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ is_active: 0 })
+  });
+
+  assert.strictEqual(res.status, 200);
+  const data = await res.json();
+  assert.strictEqual(data.success, true);
+  assert.strictEqual(data.category.is_active, 0);
+  assert.strictEqual(data.category.name, 'Kategori Tetap', 'name must be preserved');
+
+  const row = db.prepare('SELECT name, slug, is_active FROM branch_categories WHERE id = ?').get(catId);
+  assert.strictEqual(row.is_active, 0);
+  assert.strictEqual(row.name, 'Kategori Tetap');
+  assert.strictEqual(row.slug, 'kategori-tetap');
+});
+
+test('CATEGORY EDIT 6 — rename and status can be changed together', async () => {
+  const token = await loginOwner();
+  const catId = 'bc_test_both_' + Date.now();
+
+  db.prepare(`
+    INSERT INTO branch_categories (id, brand_id, branch_id, name, slug, sort_order, is_active)
+    VALUES (?, ?, ?, 'Nama Sebelum', 'nama-sebelum', 99, 1)
+  `).run(catId, BRAND, BRANCH_ID);
+
+  const res = await request(`/api/v1/admin/branches/${BRANCH_ID}/categories/${catId}`, {
+    method: 'PATCH',
+    headers: { Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ name: 'Nama Sesudah', is_active: 0 })
+  });
+
+  assert.strictEqual(res.status, 200);
+  const data = await res.json();
+  assert.strictEqual(data.category.name, 'Nama Sesudah');
+  assert.strictEqual(data.category.slug, 'nama-sesudah');
+  assert.strictEqual(data.category.is_active, 0);
+
+  const row = db.prepare('SELECT name, slug, is_active FROM branch_categories WHERE id = ?').get(catId);
+  assert.strictEqual(row.name, 'Nama Sesudah');
+  assert.strictEqual(row.is_active, 0);
+});

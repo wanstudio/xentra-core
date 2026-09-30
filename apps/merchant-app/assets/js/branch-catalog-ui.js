@@ -720,6 +720,17 @@
   var _bceCropSpec = null;
   var _bceCurrentCat = null;   // Active category being edited
 
+  // Drives the Aktif/Nonaktif control inside the category modal. The selected value is kept in
+  // the hidden #bce-is-active input so the submit handler has a single source to read.
+  function updateBranchCategoryStatusUI(isActive) {
+    var activeVal = Boolean(isActive);
+    if ($('bce-is-active')) $('bce-is-active').value = activeVal ? '1' : '0';
+    var btnActive = $('bce-btn-activate');
+    var btnInactive = $('bce-btn-deactivate');
+    if (btnActive) btnActive.disabled = activeVal;
+    if (btnInactive) btnInactive.disabled = !activeVal;
+  }
+
   window.openBranchCategoryCreateModal = function () {
     _bceSelectedFile = null;
     _bceCropSpec = null;
@@ -732,6 +743,11 @@
     if (titleEl) titleEl.textContent = 'Tambah Kategori Cabang';
     var saveBtn = $('btn-save-branch-category-edit');
     if (saveBtn) saveBtn.textContent = 'Tambah Kategori';
+
+    // A category being created has nothing to deactivate yet.
+    var statusSection = $('bce-status-section');
+    if (statusSection) statusSection.style.display = 'none';
+    updateBranchCategoryStatusUI(true);
 
     var previewImg = $('bce-image-preview');
     var previewMono = $('bce-image-preview-mono');
@@ -758,6 +774,10 @@
     var saveBtn = $('btn-save-branch-category-edit');
     if (saveBtn) saveBtn.textContent = 'Simpan';
 
+    var statusSection = $('bce-status-section');
+    if (statusSection) statusSection.style.display = 'flex';
+    updateBranchCategoryStatusUI(!(cat && (cat.is_active === 0 || cat.is_active === false)));
+
     var previewImg = $('bce-image-preview');
     var previewMono = $('bce-image-preview-mono');
     if (cat && cat.image_url) {
@@ -783,6 +803,22 @@
   };
 
   (function initBranchCategoryEditModal() {
+    var btnActive = $('bce-btn-activate');
+    if (btnActive) {
+      btnActive.addEventListener('click', function (e) {
+        e.preventDefault();
+        updateBranchCategoryStatusUI(true);
+      });
+    }
+
+    var btnInactive = $('bce-btn-deactivate');
+    if (btnInactive) {
+      btnInactive.addEventListener('click', function (e) {
+        e.preventDefault();
+        updateBranchCategoryStatusUI(false);
+      });
+    }
+
     var fileInput = $('bce-image-file');
     if (fileInput) {
       fileInput.addEventListener('change', function () {
@@ -869,8 +905,9 @@
             }
             targetCatId = createData.category && createData.category.id;
           } else {
-            // 1. Rename existing
-            var renameRes = await CatalogClient.updateBranchCategory(activeBranchId, catId, { name: newName });
+            // 1. Rename existing and/or change its active state
+            var statusVal = $('bce-is-active') ? Number($('bce-is-active').value) : 1;
+            var renameRes = await CatalogClient.updateBranchCategory(activeBranchId, catId, { name: newName, is_active: statusVal });
             var renameData = {};
             try {
               renameData = await renameRes.json();
@@ -914,8 +951,30 @@
 
           showToast(catId ? '✅ Kategori berhasil diperbarui!' : '✅ Kategori cabang berhasil dibuat!');
           closeBranchCategoryEditModal();
-          if (typeof hooks.refreshBMMenu === 'function' && isBranchManager()) {
+
+          // Reflect the change in the in-memory lists immediately, so the category bar and the
+          // status filter respond on the spot instead of waiting for the background refresh.
+          var statusNumber = $('bce-is-active') ? Number($('bce-is-active').value) : 1;
+          if (catId) {
+            if (currentBranchCatalogData && Array.isArray(currentBranchCatalogData.categories)) {
+              var localCat = currentBranchCatalogData.categories.find(function (c) { return String(c.id) === String(catId); });
+              if (localCat) { localCat.name = newName; localCat.is_active = statusNumber; }
+            }
+            var sharedState = window._bmMenuState;
+            if (sharedState && Array.isArray(sharedState.categories)) {
+              var sharedCat = sharedState.categories.find(function (c) { return String(c.id) === String(catId); });
+              if (sharedCat) { sharedCat.name = newName; sharedCat.is_active = statusNumber; }
+            }
+            if (typeof window.renderBMMenuCategoriesBar === 'function') {
+              window.renderBMMenuCategoriesBar();
+            }
+          }
+
+          // Then refresh from the server in the background.
+          if (typeof hooks.refreshBMMenu === 'function') {
             hooks.refreshBMMenu();
+          } else if (typeof window.loadBMMenu === 'function') {
+            window.loadBMMenu();
           }
           if (typeof loadInlineBranchCatalog === 'function') {
             loadInlineBranchCatalog();

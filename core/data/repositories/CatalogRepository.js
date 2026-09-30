@@ -49,11 +49,13 @@ class CatalogRepository {
     `, [branchId, productId, brandId]);
   }
 
-  findBranchCategories({ branchId, brandId }) {
+  findBranchCategories({ branchId, brandId, activeOnly = true }) {
+    const activeFilter = activeOnly ? 'AND (is_active = 1 OR is_active IS NULL)' : '';
     return this.db.queryMany(`
-      SELECT id, brand_id, branch_id, name, slug, image_url, sort_order, media_id
+      SELECT id, brand_id, branch_id, name, slug, image_url, sort_order, media_id,
+             COALESCE(is_active, 1) as is_active
       FROM branch_categories
-      WHERE branch_id = ? AND brand_id = ?
+      WHERE branch_id = ? AND brand_id = ? ${activeFilter}
       ORDER BY sort_order ASC, name ASC
     `, [branchId, brandId]);
   }

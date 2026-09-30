@@ -323,6 +323,7 @@ router.get('/admin/branches/:id/catalog', requireAuth(['owner', 'brand_manager',
 
     const branchCategories = db.prepare(`
       SELECT bc.id, bc.brand_id, bc.branch_id, bc.name, bc.slug, bc.image_url, bc.sort_order,
+        COALESCE(bc.is_active, 1) AS is_active,
         (SELECT COUNT(*) FROM branch_product_categories bpc WHERE bpc.branch_category_id = bc.id) AS product_count
       FROM branch_categories bc
       WHERE bc.branch_id = ? AND bc.brand_id = ?
@@ -526,14 +527,16 @@ router.post('/admin/branches/:id/adopt', requireAuth(['owner', 'brand_manager', 
     const primaryBranchCategoryId = null;
 
     // Insert or adopt branch_products (override columns start NULL = inherit master).
+    // stock starts NULL = physical stock not managed yet, so adoption is not read as 0/habis.
     db.prepare(`
       INSERT INTO branch_products (
-        branch_id, product_id, branch_category_id, price, is_available
-      ) VALUES (?, ?, NULL, ?, 1)
+        branch_id, product_id, branch_category_id, price, is_available, stock
+      ) VALUES (?, ?, NULL, ?, 1, NULL)
       ON CONFLICT(branch_id, product_id) DO UPDATE SET
         branch_category_id = NULL,
         price = excluded.price,
         is_available = 1,
+        stock = NULL,
         updated_at = datetime('now')
     `).run(
       req.params.id,
@@ -971,30 +974,43 @@ router.patch('/admin/branches/:id/categories/:catId', requireAuth(['owner', 'bra
       }
     }
 
-    const name = String((req.body && req.body.name) || '').trim();
-    if (!name) return res.status(400).json({ success: false, error: 'Nama kategori wajib diisi.' });
-    if (name.length > 40) {
-      return res.status(400).json({ success: false, error: 'Nama kategori maksimal 40 karakter.' });
-    }
-
-    const cat = db.prepare('SELECT id FROM branch_categories WHERE id = ? AND branch_id = ? AND brand_id = ?')
+    const cat = db.prepare('SELECT id, name, slug, COALESCE(is_active, 1) AS is_active FROM branch_categories WHERE id = ? AND branch_id = ? AND brand_id = ?')
       .get(req.params.catId, req.params.id, req.brand_id);
     if (!cat) return res.status(404).json({ success: false, error: 'Kategori cabang tidak ditemukan.' });
 
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    // Partial update: the caller may send name, is_active, or both. Name validation only runs
+    // when a name is actually being changed, so a status-only toggle does not require the name.
+    let newName = cat.name;
+    let newSlug = cat.slug;
+    let newActive = cat.is_active;
+
+    if (req.body && req.body.name !== undefined) {
+      const name = String(req.body.name).trim();
+      if (!name) return res.status(400).json({ success: false, error: 'Nama kategori wajib diisi.' });
+      if (name.length > 40) {
+        return res.status(400).json({ success: false, error: 'Nama kategori maksimal 40 karakter.' });
+      }
+      newName = name;
+      newSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    }
+
+    if (req.body && req.body.is_active !== undefined) {
+      newActive = req.body.is_active ? 1 : 0;
+    }
+
     try {
-      db.prepare("UPDATE branch_categories SET name = ?, slug = ?, updated_at = datetime('now') WHERE id = ?")
-        .run(name, slug, req.params.catId);
+      db.prepare("UPDATE branch_categories SET name = ?, slug = ?, is_active = ?, updated_at = datetime('now') WHERE id = ?")
+        .run(newName, newSlug, newActive, req.params.catId);
     } catch (e) {
       if (String(e).includes('no such column')) {
         db.prepare("UPDATE branch_categories SET name = ?, slug = ? WHERE id = ?")
-          .run(name, slug, req.params.catId);
+          .run(newName, newSlug, req.params.catId);
       } else {
         throw e;
       }
     }
 
-    res.json({ success: true, category: { id: req.params.catId, name, slug } });
+    res.json({ success: true, category: { id: req.params.catId, name: newName, slug: newSlug, is_active: newActive } });
   } catch (err) {
     console.error('[API Error PATCH /admin/branches/:id/categories/:catId]:', err);
     res.status(500).json({ success: false, error: err.message });

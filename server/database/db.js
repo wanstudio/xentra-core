@@ -1489,6 +1489,7 @@ function initSchema(targetDb) {
       slug TEXT NOT NULL,
       image_url TEXT,
       sort_order INTEGER DEFAULT 0,
+      is_active INTEGER DEFAULT 1,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
@@ -2009,6 +2010,9 @@ function initSchema(targetDb) {
   // and have Home read the same persisted value. Idempotent — safe on existing DBs.
   try { targetDb.exec('ALTER TABLE branch_categories ADD COLUMN image_url TEXT;'); } catch (e) {}
   try { targetDb.exec("ALTER TABLE branch_categories ADD COLUMN updated_at TEXT DEFAULT (datetime('now'));"); } catch (e) {}
+  // Branch Category active state: a Merchant deactivates a branch-owned selling group so it
+  // stops being offered. Existing rows are treated as active. Idempotent — safe on existing DBs.
+  try { targetDb.exec('ALTER TABLE branch_categories ADD COLUMN is_active INTEGER DEFAULT 1;'); } catch (e) {}
 
   // M:N BRANCH PRODUCT CATEGORIES (PHASE 3):
   // Safe creation and data migration from legacy branch_products.branch_category_id

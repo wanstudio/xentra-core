@@ -142,6 +142,51 @@
       status.dataset.bound = '1';
       status.addEventListener('change', onBMMenuFilterChange);
     }
+
+    // The visible filter dropdown writes into the hidden native select above, which stays the
+    // single source of the filter value. Follows docs/decisions/xentra-dropdown-style-guide-v1.md.
+    var dd = $('bm-menu-filter-dropdown');
+    var ddTrigger = $('btn-bm-menu-filter-trigger');
+    var ddMenu = $('bm-menu-filter-menu');
+    var ddLabel = $('bm-menu-filter-current-label');
+
+    if (dd && ddTrigger && !ddTrigger.dataset.bound) {
+      ddTrigger.dataset.bound = '1';
+      ddTrigger.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var isOpen = dd.classList.toggle('open');
+        ddTrigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      });
+
+      if (ddMenu) {
+        Array.prototype.forEach.call(ddMenu.querySelectorAll('.x-occ-dropdown-item'), function (item) {
+          item.addEventListener('click', function (e) {
+            e.stopPropagation();
+            Array.prototype.forEach.call(ddMenu.querySelectorAll('.x-occ-dropdown-item'), function (el) {
+              var isSelected = el === item;
+              el.classList.toggle('active', isSelected);
+              el.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+            });
+            if (ddLabel) {
+              var labelSpan = item.querySelector('span');
+              ddLabel.textContent = labelSpan ? labelSpan.textContent : (item.getAttribute('data-value') || '');
+            }
+            dd.classList.remove('open');
+            ddTrigger.setAttribute('aria-expanded', 'false');
+
+            if (status) status.value = item.getAttribute('data-value') || 'all';
+            onBMMenuFilterChange();
+          });
+        });
+      }
+
+      document.addEventListener('click', function (e) {
+        if (!dd.contains(e.target)) {
+          dd.classList.remove('open');
+          ddTrigger.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
   }
 
   if (document.readyState === 'loading') {
@@ -214,6 +259,8 @@
     }
   }
   window.loadBMMenu = loadBMMenu;
+  window.renderBMMenuCategoriesBar = renderBMMenuCategoriesBar;
+  window._bmMenuState = _bmMenuState;
 
   function updateBMMenuStats(products) {
     var total = (products || []).length;
@@ -264,6 +311,7 @@
     });
 
     if (!categories.length) {
+      bar.classList.add('is-empty');
       bar.innerHTML = '<div class="x-menu-empty-state">' +
         (_bmMenuState.categoryStatusFilter === 'inactive'
           ? 'Belum ada kategori nonaktif.'
@@ -271,6 +319,8 @@
         '</div>';
       return;
     }
+
+    bar.classList.remove('is-empty');
 
     bar.innerHTML = categories.map(function (cat) {
       var count = (_bmMenuState.products || []).filter(function (p) {
@@ -404,10 +454,14 @@
 
     if ($('bm-menu-stat-total')) $('bm-menu-stat-total').textContent = filtered.length;
 
+    var detailPanel = document.querySelector('.x-menu-detail-list-panel');
     if (!filtered.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-muted">Belum ada menu dalam kategori ini.</td></tr>';
+      if (detailPanel) detailPanel.classList.add('is-empty');
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-muted"><div class="x-menu-empty-state">Belum ada menu dalam kategori ini.</div></td></tr>';
       return;
     }
+
+    if (detailPanel) detailPanel.classList.remove('is-empty');
 
     tbody.innerHTML = filtered.map(function (p, index) {
       var isAvail = (p.is_available === 1 || p.is_available === true);

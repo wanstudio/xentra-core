@@ -27,7 +27,10 @@ function registerAdminBranchMenuRoutes(router, deps = {}) {
 
       const menu = resolver.resolveBranchMenu({
         brandId: req.brand_id,
-        branchId
+        branchId,
+        // The Merchant App menu must also see deactivated Branch Categories, otherwise its
+        // "Nonaktif" tab has nothing to list and the category could not be reactivated.
+        includeInactiveCategories: true
       });
 
       const branch = db.prepare(

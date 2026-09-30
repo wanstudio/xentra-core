@@ -232,7 +232,8 @@ class MasterMenuCompositionRepository {
     if (!ids.length) return [];
     const placeholders = ids.map(() => '?').join(',');
     return this.db.queryMany(
-      `SELECT bpc.product_id, bpc.branch_category_id, bc.name, bc.slug, bc.sort_order
+      `SELECT bpc.product_id, bpc.branch_category_id, bc.name, bc.slug, bc.sort_order,
+              COALESCE(bc.is_active, 1) AS is_active
        FROM branch_product_categories bpc
        JOIN branch_categories bc
          ON bc.id = bpc.branch_category_id
@@ -243,11 +244,13 @@ class MasterMenuCompositionRepository {
     );
   }
 
-  listBranchCategoriesForMenu({ branchId, brandId }) {
+  listBranchCategoriesForMenu({ branchId, brandId, activeOnly = false }) {
+    const activeFilter = activeOnly ? 'AND (is_active = 1 OR is_active IS NULL)' : '';
     return this.db.queryMany(
-      `SELECT id, brand_id, branch_id, name, slug, image_url, sort_order, media_id
+      `SELECT id, brand_id, branch_id, name, slug, image_url, sort_order, media_id,
+              COALESCE(is_active, 1) AS is_active
        FROM branch_categories
-       WHERE branch_id = ? AND brand_id = ?
+       WHERE branch_id = ? AND brand_id = ? ${activeFilter}
        ORDER BY sort_order ASC, name ASC, id ASC`,
       [branchId, brandId]
     );

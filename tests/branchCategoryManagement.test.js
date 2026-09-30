@@ -353,3 +353,47 @@ test('12. A rename + image change is immediately reflected in the Home-facing ca
   assert.strictEqual(menuCat.name, 'Chain After');
   assert.strictEqual(menuCat.image_url, imgData.category.image_url);
 });
+
+test('13. The branch catalog exposes is_active for every category', async () => {
+  const auth = await loginOwner();
+  const created = await createCategory(auth, BARAT, 'Kategori Dengan Status');
+  const catId = created.category.id;
+
+  const res = await mockFetch(`/api/v1/admin/branches/${BARAT}/catalog`, { headers: auth });
+  const data = await res.json();
+  assert.strictEqual(data.success, true);
+
+  const row = data.categories.find((c) => c.id === catId);
+  assert.ok(row, 'the created category must appear in the catalog');
+  assert.strictEqual(row.is_active, 1, 'a newly created category is active');
+
+  await mockFetch(`/api/v1/admin/branches/${BARAT}/categories/${catId}`, {
+    method: 'PATCH',
+    headers: auth,
+    body: JSON.stringify({ is_active: 0 })
+  });
+
+  const afterRes = await mockFetch(`/api/v1/admin/branches/${BARAT}/catalog`, { headers: auth });
+  const afterData = await afterRes.json();
+  const afterRow = afterData.categories.find((c) => c.id === catId);
+  assert.strictEqual(afterRow.is_active, 0, 'the catalog must report the deactivated state');
+});
+
+test('14. A deactivated category leaves the Home-facing catalog category list', async () => {
+  const auth = await loginOwner();
+  const created = await createCategory(auth, BARAT, 'Kategori Akan Nonaktif');
+  const catId = created.category.id;
+
+  await mockFetch(`/api/v1/admin/branches/${BARAT}/categories/${catId}`, {
+    method: 'PATCH',
+    headers: auth,
+    body: JSON.stringify({ is_active: 0 })
+  });
+
+  const menu = CatalogService.getMenu({ brand_id: BRAND, branch_id: BARAT });
+  assert.strictEqual(
+    menu.categories.some((c) => c.id === catId),
+    false,
+    'a deactivated category must not be offered by the branch menu read path'
+  );
+});
