@@ -596,6 +596,14 @@ test('API Platform routes: implementation is isolated from api.js', () => {
   }
 });
 
+test('API Branch Menu routes: canonical display-name override is isolated in admin-branch-menu.js', () => {
+  const api = fs.readFileSync(require.resolve('../server/routes/api'), 'utf8');
+  const branchMenu = fs.readFileSync(require.resolve('../server/routes/admin-branch-menu'), 'utf8');
+  const route = "router.patch('/admin/branches/:id/menu/:productId/display-name'";
+  assert.ok(branchMenu.includes(route), route + ' must live in admin-branch-menu.js');
+  assert.equal(api.includes(route), false, route + ' must not remain inline in api.js');
+});
+
 test('API Branch catalog routes: implementation is isolated from api.js', () => {
   const api = fs.readFileSync(require.resolve('../server/routes/api'), 'utf8');
   const branchCatalog = fs.readFileSync(require.resolve('../server/routes/admin-branch-catalog'), 'utf8');
