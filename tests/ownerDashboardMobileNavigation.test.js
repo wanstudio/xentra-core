@@ -164,6 +164,34 @@ test('Owner Dashboard Mobile Navigation', async t => {
   });
 
   // --------------------------------------------------------------------------
+  // Application-shell architecture
+  // --------------------------------------------------------------------------
+
+  await t.test('OWNER-MOB-13B: bottom nav is mounted at body shell level, outside route content', () => {
+    const navStart = html.indexOf('<nav class="x-owner-bottom-nav"');
+    const accountMarker = html.indexOf('<!-- Mobile Account Page');
+    const persistentMarker = html.indexOf('<!-- Persistent mobile application-shell navigation.');
+    assert.ok(navStart !== -1, 'Owner bottom nav must exist');
+    assert.ok(persistentMarker !== -1 && persistentMarker < navStart, 'Bottom nav must be mounted by the application-shell marker');
+    assert.ok(accountMarker === -1 || navStart < accountMarker, 'Bottom nav must sit before the separate account surface');
+    assert.ok(html.slice(html.indexOf('<body'), navStart).lastIndexOf('class="x-tab-content') < persistentMarker,
+      'Bottom nav must not be embedded in a route content section');
+  });
+
+  await t.test('OWNER-MOB-13C: bottom nav controller is a dedicated module', () => {
+    assert.ok(html.includes('/merchant-dashboard/assets/js/owner-bottom-nav.js?v=1.0.0'),
+      'Dedicated owner-bottom-nav.js module must be loaded');
+    assert.ok(js.includes('initOwnerBottomNav()'), 'Router initialization must still initialize the shell controller');
+    assert.ok(!js.includes('var _ownerNavModuleMap'), 'Navigation module map must not live in the monolithic dashboard router');
+  });
+
+  await t.test('OWNER-MOB-13D: bottom nav remains router-driven, not a second router', () => {
+    assert.ok(js.includes('syncOwnerBottomNavActive(route)'), 'dashboard.js must sync shell navigation from the canonical route');
+    assert.ok(!js.includes("window.navigateTo =") || !js.includes('function navigateTo(route)') || js.includes('function navigateTo(route)'),
+      'dashboard.js remains the canonical router surface');
+  });
+
+  // --------------------------------------------------------------------------
   // CSS
   // --------------------------------------------------------------------------
 
