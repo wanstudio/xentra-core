@@ -36,7 +36,20 @@ Products carry lightweight current-state markers:
 Detailed migration evidence is stored in product_menu_migrations.
 The Product row stores current state; the migration table stores the reconciliation/audit record.
 
+## 5A. Legacy source and deterministic mapping
+
+For Master Product migration, the semantic legacy source is the Master Product's existing `products.name`.
+`branch_products.product_name`, `product_description`, and `product_image_url` are Branch-scoped compatibility snapshots and must not be used to infer Master composition.
+
+The migrator may use a conservative lexical mapping against the active Brand Master vocabulary:
+- a Flavor or Level is selectable only when its normalized full name occurs as a whole-word phrase in the legacy Product name;
+- for a single-valued Flavor/Level, equally long top matches are ambiguous and produce `needs_review`;
+- all deterministic Complement matches may be proposed in deterministic length/order order;
+- no component name is invented, inferred semantically, or taken from another Brand.
+
+The mapping is a migration suggestion, not a claim that free text was semantically authoritative.
 ## 5. Automatic conversion rule
+
 The engine is deterministic and conservative.
 It may inspect Product + canonical relations, validate Brand integrity, recognize an already-populated canonical composition, and mark that Product migrated when its canonical structure is valid.
 It MUST NOT invent Flavor, Complement, or Level from ambiguous free text.
