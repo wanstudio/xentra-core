@@ -160,6 +160,13 @@ test('Customer catalog exposes structured Pedas intensity for four-dot presentat
   assert.ok(css.includes('.x-product-menu-indicator-dot.is-filled'));
 });
 
+test('Customer catalog route uses Master resolver for both branch and brand-wide reads', () => {
+  const route = fs.readFileSync(path.resolve(__dirname, '../../server/routes/catalog.js'), 'utf8');
+  assert.ok(route.includes('MasterMenuResolver.resolveBranchMenu'));
+  assert.ok(route.includes('MasterMenuResolver.resolveMasterMenu'));
+  assert.ok(route.includes('menu_indicator_level: p.indicator_level'));
+});
+
 // ── PRODUCTS ENDPOINT: brand-wide (NOT branch-scoped) ──
 
 test('/products endpoint returns brand-wide products (not branch-scoped)', async () => {
