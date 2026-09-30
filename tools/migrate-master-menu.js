@@ -14,6 +14,7 @@ async function main() {
   const brandId = readArg('--brand');
   const productId = readArg('--product');
   const verify = process.argv.includes('--verify');
+  const apply = process.argv.includes('--apply');
 
   if (!brandId) {
     throw new Error(
@@ -24,8 +25,8 @@ async function main() {
   const result = productId
     ? (verify
       ? ProductMenuMigrationService.verifyProduct({ brandId, productId })
-      : ProductMenuMigrationService.reconcileProduct({ brandId, productId }))
-    : ProductMenuMigrationService.reconcileBrand({ brandId, verify });
+      : ProductMenuMigrationService.reconcileProduct({ brandId, productId, apply, persistReport: apply }))
+    : ProductMenuMigrationService.reconcileBrand({ brandId, verify, apply, persistReport: apply });
 
   process.stdout.write(JSON.stringify(result, null, 2) + '\n');
 }
