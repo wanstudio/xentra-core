@@ -468,19 +468,20 @@ Requirements:
 
 ## 15. Legacy boundary
 
-The following are legacy/quarantined for Menu:
+The following remain legacy/quarantined for Menu:
 
-- `branch_products.name_override`;
 - `branch_products.description_override`;
 - `branch_products.image_override`;
 - legacy snapshot fields `product_name`, `product_description`, `product_image_url`;
-- `PATCH /admin/branches/:id/products/:productId/override`;
-- Branch Product Override editor UI;
+- `PATCH /admin/branches/:id/products/:productId/override` for compatibility callers;
+- legacy Branch Product Override editor UI;
 - `branch_products.branch_category_id` as a parallel category authority.
 
 These may remain temporarily for compatibility and migration.
 
 They must not be extended, reused as the new DTO source, or used to satisfy new Menu feature requirements.
+
+Exception: `branch_products.name_override` is **not** legacy anymore. It is governed exclusively by the locked Branch Customer Display Name Override contract in §8.
 
 The existing POS `options_config` contract is explicitly **not** legacy.
 
