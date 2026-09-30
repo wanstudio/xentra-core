@@ -51,7 +51,7 @@
     if (config && typeof config.getRoute === 'function') {
       return canonicalize(config.getRoute());
     }
-    return canonicalize((window.location.hash || '').replace(/^#\\/?/, '').trim()) || canonicalize(defaultRoute());
+    return canonicalize((window.location.hash || '').replace(/^#\/?/, '').trim()) || canonicalize(defaultRoute());
   }
 
   function render(route) {
@@ -82,14 +82,6 @@
       route: normalizedRoute,
       stack: normalizedStack
     };
-  }
-
-  function sameStack(a, b) {
-    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
-    for (var i = 0; i < a.length; i++) {
-      if (a[i] !== b[i]) return false;
-    }
-    return true;
   }
 
   function isPrefix(prefix, full) {
