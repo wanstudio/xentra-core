@@ -499,13 +499,18 @@
     var isFinanceRoute = !isPlatform && (route === 'finance' || route.indexOf('finance/') === 0);
     var financeSubtab = isFinanceRoute ? (route.indexOf('finance/') === 0 ? route.split('finance/')[1] : 'overview') : 'overview';
 
+    var isMarketingEditor = !isPlatform && (route === 'marketing/promotions/new' || /^marketing\/promotions\/[^/]+\/edit$/.test(route) || route === 'marketing/banners/new' || /^marketing\/banners\/[^/]+\/edit$/.test(route));
+    var marketingEditorType = route.indexOf('marketing/promotions/') === 0 ? 'promotion' : (route.indexOf('marketing/banners/') === 0 ? 'banner' : null);
+    var marketingEditorId = isMarketingEditor && route.indexOf('/edit') !== -1 ? route.split('/')[2] : null;
     var isMarketingRoute = !isPlatform && (route === 'marketing' || route.indexOf('marketing/') === 0);
     var marketingSubtab = isMarketingRoute ? (route.indexOf('marketing/') === 0 ? route.split('marketing/')[1] : 'promotions') : 'promotions';
+    if (isMarketingEditor) marketingSubtab = marketingEditorType === 'banner' ? 'banners' : 'promotions';
 
     var isSettingsRoute = !isPlatform && (route === 'settings' || route.indexOf('settings/') === 0);
     var settingsSubtab = isSettingsRoute ? (route.indexOf('settings/') === 0 ? route.split('settings/')[1] : 'business/profile') : 'business/profile';
 
     var metaKey = (isProductDetail || isProductEditor) ? 'catalog/products' : (isBranchEditor ? 'branches' : (isBranchDetail ? 'branches' : (isOrderDetail ? 'orders' : (isCustomerDetail ? 'customers/:id' : (isTeamRoute ? ('team/' + teamSubtab) : (isReportsRoute ? 'reports' : (isFinanceRoute ? ('finance/' + financeSubtab) : (isMarketingRoute ? ('marketing/' + marketingSubtab) : (isSettingsRoute ? ('settings/' + settingsSubtab) : route))))))));
+    if (isMarketingEditor) metaKey = 'marketing/' + marketingSubtab;
     var meta = metaDict[metaKey] || metaDict[route] || metaDict['overview'];
     var tabId = meta.tab;
     var isCatalogChild = !isPlatform && route.indexOf('catalog/') === 0;
@@ -561,6 +566,18 @@
     document.querySelectorAll('.x-tab-content').forEach(function (section) {
       section.classList.toggle('active', section.id === 'tab-' + tabId);
     });
+    if (isMarketingEditor) {
+      document.querySelectorAll('.x-marketing-subview').forEach(function (view) { view.style.display = 'none'; });
+      var promoPage = $('marketing-promotion-editor-view');
+      var bannerPage = $('marketing-banner-editor-view');
+      if (promoPage) promoPage.style.display = marketingEditorType === 'promotion' ? 'block' : 'none';
+      if (bannerPage) bannerPage.style.display = marketingEditorType === 'banner' ? 'block' : 'none';
+    } else {
+      var promoPage2 = $('marketing-promotion-editor-view');
+      var bannerPage2 = $('marketing-banner-editor-view');
+      if (promoPage2) promoPage2.style.display = 'none';
+      if (bannerPage2) bannerPage2.style.display = 'none';
+    }
 
     // 5. Update topbar title
     var titleEl = $('dash-page-title');
@@ -627,8 +644,12 @@
     if (tabId === 'finance') {
       switchFinanceSection(financeSubtab, false);
     }
-    if (tabId === 'marketing') {
+    if (tabId === 'marketing' && !isMarketingEditor) {
       switchMarketingSection(marketingSubtab, false);
+    }
+    if (isMarketingEditor) {
+      if (marketingEditorType === 'promotion' && typeof mountPromotionEditorPage === 'function') mountPromotionEditorPage();
+      if (marketingEditorType === 'banner' && typeof mountMarketingBannerEditorPage === 'function') mountMarketingBannerEditorPage();
     }
     if (tabId === 'settings') {
       switchSettingsSection(settingsSubtab, false);
