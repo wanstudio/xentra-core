@@ -96,7 +96,7 @@ const report = {
     invalid_scalar_category_rows: invalidScalarCategories.length
   },
   legacy_data: {
-    name_overrides: count("SELECT COUNT(*) count FROM branch_products WHERE name_override IS NOT NULL AND trim(name_override) <> ''"),
+    display_name_overrides: count("SELECT COUNT(*) count FROM branch_products WHERE name_override IS NOT NULL AND trim(name_override) <> ''"),
     description_overrides: count("SELECT COUNT(*) count FROM branch_products WHERE description_override IS NOT NULL AND trim(description_override) <> ''"),
     image_overrides: count("SELECT COUNT(*) count FROM branch_products WHERE image_override IS NOT NULL AND trim(image_override) <> ''"),
     branch_price_divergence: priceDivergence.length

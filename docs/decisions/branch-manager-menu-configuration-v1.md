@@ -16,7 +16,7 @@ The business boundary is:
 
 This is an explicit clarification/reconciliation of the existing Master Catalog + Branch selling-catalog model. It is **not** permission for Branch Manager to become a Master Product manager.
 
-> **ARCHITECTURE RECONCILIATION (2026-09-29):** This Branch Manager authority remains valid for **adoption, Branch Category classification, availability, and stock**, but it does **not** grant any authority over Master Menu composition. The forward Menu contract is `docs/decisions/xentra-master-menu-composition-branch-adoption-contract-v1.md`. Legacy Branch Product name/description/image/price override behavior is quarantined under `docs/decisions/xentra-menu-legacy-quarantine-v1.md` and must not be used as new Menu behavior.
+> **ARCHITECTURE RECONCILIATION (2026-09-30):** This Branch Manager authority remains valid for **adoption, Branch Category classification, availability, stock**, plus the narrow **Customer Display Name Override** described in the forward Menu contract. It does **not** grant authority over Master Menu composition. The forward Menu contract is `docs/decisions/xentra-master-menu-composition-branch-adoption-contract-v1.md`. Legacy Branch Product description/image/price override behavior remains quarantined; `branch_products.name_override` is reserved for the optional Customer-facing display-name override only.
 
 
 ## Branch Manager capabilities

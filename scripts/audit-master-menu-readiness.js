@@ -30,7 +30,7 @@ const report = {
   },
   branch_adoption: {
     total_adoptions: count('SELECT COUNT(*) count FROM branch_products'),
-    legacy_name_overrides: count("SELECT COUNT(*) count FROM branch_products WHERE name_override IS NOT NULL AND trim(name_override) <> ''"),
+    branch_display_name_overrides: count("SELECT COUNT(*) count FROM branch_products WHERE name_override IS NOT NULL AND trim(name_override) <> ''"),
     legacy_description_overrides: count("SELECT COUNT(*) count FROM branch_products WHERE description_override IS NOT NULL AND trim(description_override) <> ''"),
     legacy_image_overrides: count("SELECT COUNT(*) count FROM branch_products WHERE image_override IS NOT NULL AND trim(image_override) <> ''"),
     legacy_branch_prices: count('SELECT COUNT(*) count FROM branch_products WHERE price IS NOT NULL'),

@@ -159,6 +159,9 @@ test('Customer catalog exposes structured Pedas intensity for four-dot presentat
   const css = fs.readFileSync(path.resolve(__dirname, '../../apps/customer-pwa/assets/css/home.css'), 'utf8');
   assert.ok(css.includes('.x-product-menu-indicator-dot.is-filled'));
   assert.ok(css.includes('border: 1.5px solid #ef4444'), 'Inactive Pedas dots must use red outline');
+  const nameColor = css.slice(css.indexOf('.x-product-name {'), css.indexOf('.x-product-subtitle {'));
+  const rasaColor = css.slice(css.indexOf('.x-product-subtitle {'), css.indexOf('.x-product-description {'));
+  assert.ok(nameColor.includes('color: #111;') && rasaColor.includes('color: #111;'), 'Rasa must use the same title color as Kategori');
 });
 
 test('Customer catalog route uses Master resolver for both branch and brand-wide reads', () => {

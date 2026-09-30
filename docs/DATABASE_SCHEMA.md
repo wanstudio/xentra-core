@@ -368,7 +368,7 @@ CREATE TABLE branch_products (
 
 - `product_id` → FK to Master Product (provenance; CASCADE DELETE if master deleted).
 - `branch_category_id` → FK to **Branch-owned** category (NOT Master Category).
-- `name_override` → Branch override for product name. **NULL = inherit live master** (propagation); non-NULL = branch value wins via `COALESCE(bp.name_override, p.name)`.
+- `name_override` → Optional **Customer-facing Branch display-name override**. **NULL = inherit live Master presentation**; non-NULL = Branch-specific Customer title. It does not change `branch_products.product_id` or Master Product identity.
 - `description_override` → Same override semantics as `name_override` for description.
 - `image_override` → Same override semantics for image URL.
 - `product_name` / `product_description` / `product_image_url` → **Legacy snapshot columns**. Kept for backward compatibility. Not read by `CatalogService`. Migration: if legacy value differs from current master → promoted to override column; if identical → override stays NULL.

@@ -340,6 +340,107 @@ describe('BM Phase 3 — M:N Category Membership + RBAC + Branch Scope', () => {
     assert.ok(adopted.category_ids.length >= 2, 'Must have at least 2 categories assigned');
   });
 
+  it('P3-09: Branch customer display-name override is optional and falls back to Master', async () => {
+    const token = seedStaffSession({ role: 'branch_manager', branchId: BRANCH_A_ID });
+    const productId = 'prod_p3_test_1';
+
+    db.prepare('UPDATE branch_products SET name_override = NULL WHERE branch_id = ? AND product_id = ?')
+      .run(BRANCH_A_ID, productId);
+
+    const fallbackRes = await request('GET', '/api/v1/admin/branches/' + BRANCH_A_ID + '/menu', null, { Authorization: `Bearer ${token}` });
+    assert.equal(fallbackRes.status, 200);
+    const fallbackProduct = (fallbackRes.body.adopted_products || []).find(p => p.product_id === productId);
+    assert.ok(fallbackProduct);
+    assert.equal(fallbackProduct.title, 'Makanan Master');
+    assert.equal(fallbackProduct.display_name_override, null);
+
+    const overrideRes = await request('PATCH', '/api/v1/admin/branches/' + BRANCH_A_ID + '/menu/' + productId + '/display-name', {
+      name: 'Es Teh Jumbo'
+    }, { Authorization: `Bearer ${token}` });
+    assert.equal(overrideRes.status, 200);
+    assert.equal(overrideRes.body.display_name_override, 'Es Teh Jumbo');
+    assert.equal(overrideRes.body.display_name, 'Es Teh Jumbo');
+
+    const customerRes = await request('GET', '/api/v1/catalog/menu?branch_id=' + BRANCH_A_ID);
+    assert.equal(customerRes.status, 200);
+    const customerProduct = (customerRes.body.all_products || []).find(p => p.id === productId);
+    assert.ok(customerProduct);
+    assert.equal(customerProduct.menu_title, 'Es Teh Jumbo');
+    assert.equal(customerProduct.menu_subtitle, null);
+    assert.equal(Object.prototype.hasOwnProperty.call(customerProduct, 'display_name_override'), false);
+
+    const clearRes = await request('PATCH', '/api/v1/admin/branches/' + BRANCH_A_ID + '/menu/' + productId + '/display-name', {
+      name: null
+    }, { Authorization: `Bearer ${token}` });
+    assert.equal(clearRes.status, 200);
+    assert.equal(clearRes.body.display_name_override, null);
+
+    const clearedCustomerRes = await request('GET', '/api/v1/catalog/menu?branch_id=' + BRANCH_A_ID);
+    assert.equal(clearedCustomerRes.status, 200);
+    const clearedProduct = (clearedCustomerRes.body.all_products || []).find(p => p.id === productId);
+    assert.ok(clearedProduct);
+    assert.equal(clearedProduct.menu_title, 'Makanan Master');
+    assert.equal(clearedProduct.menu_subtitle, null);
+  });
+
+  it('P3-09: Branch customer display-name override is optional and falls back to Master', async () => {
+    const token = seedStaffSession({ role: 'branch_manager', branchId: BRANCH_A_ID });
+
+    const productId = 'prod_p3_display_name';
+    db.prepare(`
+      INSERT OR REPLACE INTO products (id, brand_id, category_id, name, slug, description, price, is_active, sort_order)
+      VALUES (?, ?, ?, 'Master Minuman', 'master-minuman', 'Master desc', 18000, 1, 99)
+    `).run(productId, BRAND_ID, CATEGORY_ID);
+
+    db.prepare(`
+      INSERT OR REPLACE INTO branch_products (branch_id, product_id, price, stock, is_available, name_override)
+      VALUES (?, ?, 18000, 10, 1, NULL)
+    `).run(BRANCH_A_ID, productId);
+
+    db.prepare(`
+      INSERT OR IGNORE INTO product_flavors (product_id, flavor_id)
+      VALUES (?, ?)
+    `).run(productId, FLAVOR_ID);
+
+    const fallbackRes = await request('GET', '/api/v1/admin/branches/' + BRANCH_A_ID + '/menu', null, token);
+    assert.equal(fallbackRes.status, 200);
+    const fallbackProduct = (fallbackRes.data.adopted_products || []).find(p => p.product_id === productId);
+    assert.ok(fallbackProduct);
+    assert.equal(fallbackProduct.title, CATEGORY_NAME);
+    assert.equal(fallbackProduct.subtitle, FLAVOR_NAME);
+    assert.equal(fallbackProduct.display_name_override, null);
+
+    const overrideRes = await request('PATCH', '/api/v1/admin/branches/' + BRANCH_A_ID + '/menu/' + productId + '/display-name', {
+      name: 'Es Teh Jumbo'
+    }, token);
+    assert.equal(overrideRes.status, 200);
+    assert.equal(overrideRes.data.display_name_override, 'Es Teh Jumbo');
+
+    const customerRes = await request('GET', '/api/v1/catalog/menu?branch_id=' + BRANCH_A_ID);
+    assert.equal(customerRes.status, 200);
+    const customerProduct = (customerRes.data.all_products || []).find(p => p.id === productId);
+    assert.ok(customerProduct);
+    assert.equal(customerProduct.menu_title, 'Es Teh Jumbo');
+    assert.equal(customerProduct.menu_subtitle, null);
+    assert.equal(Object.prototype.hasOwnProperty.call(customerProduct, 'display_name_override'), false);
+
+    const clearRes = await request('PATCH', '/api/v1/admin/branches/' + BRANCH_A_ID + '/menu/' + productId + '/display-name', {
+      name: null
+    }, token);
+    assert.equal(clearRes.status, 200);
+    assert.equal(clearRes.data.display_name_override, null);
+
+    const clearedCustomerRes = await request('GET', '/api/v1/catalog/menu?branch_id=' + BRANCH_A_ID);
+    assert.equal(clearedCustomerRes.status, 200);
+    const clearedProduct = (clearedCustomerRes.data.all_products || []).find(p => p.id === productId);
+    assert.equal(clearedProduct.menu_title, CATEGORY_NAME);
+    assert.equal(clearedProduct.menu_subtitle, FLAVOR_NAME);
+
+    db.prepare('DELETE FROM product_flavors WHERE product_id = ?').run(productId);
+    db.prepare('DELETE FROM branch_products WHERE branch_id = ? AND product_id = ?').run(BRANCH_A_ID, productId);
+    db.prepare('DELETE FROM products WHERE id = ?').run(productId);
+  });
+
   it('P3-08: PATCH /admin/branches/:id/products/:productId/override supports category_ids array atomically', async () => {
     const token = seedStaffSession({ role: 'branch_manager', branchId: BRANCH_A_ID });
 

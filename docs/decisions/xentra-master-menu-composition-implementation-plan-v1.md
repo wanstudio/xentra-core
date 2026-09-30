@@ -54,19 +54,32 @@ The repository audit found:
 - `ProductOptionsModel` + `products.options_config` are an established, separate POS Variant/Add-on contract.
 - `PricingPolicyModel`, Inventory, Order, RBAC, and audit boundaries already exist and should remain separate.
 
-### Legacy paths that conflict with the new Menu model
+### Legacy paths that remain quarantined
 
-- `branch_products.name_override`
+The following remain compatibility/legacy infrastructure and are not part of the new Master Menu composition model:
+
 - `branch_products.description_override`
 - `branch_products.image_override`
 - `branch_products.product_name`
 - `branch_products.product_description`
 - `branch_products.product_image_url`
 - `branch_products.price` for branch-authored Menu pricing
-- `PATCH /admin/branches/:id/products/:productId/override`
+- `PATCH /admin/branches/:id/products/:productId/override` except for compatibility callers
 - legacy Branch Product Override editor UI
 - `branch_products.branch_category_id` as a parallel category authority
-- Customer `CatalogService` currently resolves legacy overrides
+- Customer `CatalogService` legacy resolution
+
+### Canonical Branch Customer Display Name Override
+
+`branch_products.name_override TEXT NULL` is explicitly approved as the optional Customer-facing display-name override for an adopted Master Product.
+
+Contract:
+- same `product_id` / Master Product identity;
+- non-empty string overrides the Customer menu title for that Branch;
+- `NULL` means inherit live Master presentation;
+- clearing the input writes `NULL`;
+- no Master composition data is copied or modified;
+- canonical transport: `PATCH /admin/branches/:id/menu/:productId/display-name`.
 - current catalog tests contain explicit legacy override expectations
 
 These paths are now quarantined. They may be touched only for compatibility/migration work.
@@ -548,7 +561,7 @@ Stop and resolve a contract issue before coding onward when:
 - Checkout final verification resolves structured Master Menu Composition and ignores legacy Branch Menu price overrides for the forward path.
 - Order item persistence already accepts and stores `menu_snapshot`.
 - Merchant/Owner Branch Menu clients now use the canonical `/admin/branches/:id/menu` read model.
-- Legacy Branch Menu edit actions are removed from active card actions.
+- Legacy Branch Menu content edit actions remain removed from active card actions; the Merchant Menu now exposes the separately governed Customer Display Name Override action.
 
 ### Compatibility remains intentional
 

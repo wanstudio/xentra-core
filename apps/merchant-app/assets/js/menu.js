@@ -232,7 +232,7 @@
         var categories = Array.isArray(product.categories) ? product.categories : [];
         return Object.assign({}, product, {
           product_id: product.product_id || product.id,
-          product_name: product.master && product.master.name ? product.master.name : (product.product_name || product.name || ''),
+          product_name: product.display_name_override || (product.master && product.master.name ? product.master.name : (product.product_name || product.name || '')),
           category_ids: categories.map(function (cat) { return String(cat.id); }),
           categories: categories,
           menu_composition: comp,
@@ -516,6 +516,13 @@
 
           XentraActionMenu.open(actionTrigger, [
             {
+              label: 'Ubah Nama Tampil',
+              icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16"/><path d="M4 12h10"/><path d="M4 18h7"/></svg>',
+              onClick: function () {
+                openBMProductDisplayNameEditor(product);
+              }
+            },
+            {
               label: 'Hapus dari Cabang',
               icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 15H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>',
               destructive: true,
@@ -527,6 +534,87 @@
         });
       }
     });
+  }
+
+  async function openBMProductDisplayNameEditor(product) {
+    var branchId = getBMTargetBranchId();
+    if (!branchId || !product || !product.product_id) return;
+
+    var currentOverride = product.display_name_override != null
+      ? String(product.display_name_override)
+      : '';
+    var masterName = product.master && product.master.name
+      ? String(product.master.name)
+      : String(product.name || product.title || 'Produk');
+    var currentDisplay = product.title || masterName;
+
+    if (!window.XentraPresentation || typeof window.XentraPresentation.open !== 'function') {
+      showToast('❌ Presentation shell tidak tersedia.');
+      return;
+    }
+
+    var wrap = document.createElement('div');
+    wrap.innerHTML =
+      '<div style="padding:4px 0;">' +
+        '<div style="font-size:12px;color:#64748b;margin-bottom:6px;">Nama Master</div>' +
+        '<div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:14px;">' + esc(masterName) + '</div>' +
+        '<label for="bm-display-name-input" style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:7px;">Nama yang tampil ke customer</label>' +
+        '<input id="bm-display-name-input" class="x-input" type="text" value="' + esc(currentOverride) + '" maxlength="100" autocomplete="off">' +
+        '<div style="font-size:11px;color:#64748b;margin-top:7px;">Kosongkan untuk otomatis mengikuti nama Master.</div>' +
+        '<div style="font-size:11px;color:#94a3b8;margin-top:4px;">Saat override diisi, nama ini menggantikan judul Customer untuk cabang ini saja.</div>' +
+        '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">' +
+          '<button type="button" class="x-btn-secondary" data-action="cancel">Batal</button>' +
+          '<button type="button" class="x-btn-primary" data-action="save">Simpan</button>' +
+        '</div>' +
+      '</div>';
+    var content = wrap.firstElementChild;
+    var field = wrap.querySelector('#bm-display-name-input');
+
+    window.XentraPresentation.open({
+      id: 'merchant-product-display-name',
+      type: 'bottom-sheet',
+      title: 'Nama Tampil Customer',
+      content: content,
+      dismissible: true
+    });
+
+    function closeSheet() {
+      if (window.XentraPresentation && window.XentraPresentation.isOpen('merchant-product-display-name')) {
+        window.XentraPresentation.close('merchant-product-display-name');
+      }
+    }
+
+    wrap.querySelector('[data-action="cancel"]').addEventListener('click', closeSheet);
+    wrap.querySelector('[data-action="save"]').addEventListener('click', async function () {
+      var saveBtn = wrap.querySelector('[data-action="save"]');
+      var value = field.value.trim();
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Menyimpan...';
+
+      try {
+        var res = await window.XentraCatalogClient.updateBranchProductDisplayName(branchId, product.product_id, value || null);
+        var data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || data.message || 'Gagal menyimpan nama tampil.');
+        }
+        closeSheet();
+        showToast(value ? '✅ Nama customer cabang diperbarui.' : '✅ Nama dikembalikan ke Master.');
+        await loadBMMenu();
+      } catch (err) {
+        showToast('❌ ' + ((err && err.message) || 'Gagal menyimpan nama tampil.'));
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Simpan';
+      }
+    });
+
+    setTimeout(function () {
+      if (field) {
+        field.focus();
+        field.select();
+      }
+    }, 0);
+
+    return { currentDisplay: currentDisplay };
   }
 
   async function toggleBMProductAvailability(productId, nextVal) {
