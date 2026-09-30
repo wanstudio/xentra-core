@@ -305,6 +305,17 @@ Existing domain ownership, role, scope, and KDS boundaries are not superseded.
 
 **LOCKED — THIS ADDENDUM IS THE DESIGN SOURCE OF TRUTH FOR THE XENTRA MERCHANT APP.**
 
+### 🔒 30 September 2026 — Customer Display Name Override
+
+In Merchant Menu, an adopted Master Product may expose one optional **Nama Tampil Customer** action.
+
+- Merchant enters a branch-specific display string only when the branch needs a different customer-facing name.
+- Empty/cleared value is persisted as `NULL` and automatically inherits the live Master presentation.
+- The field is presentation-only and does not change Master Product identity or composition.
+- The same Master Product (`branch_products.product_id`) remains the source of all Master data.
+- The canonical mutation endpoint is `PATCH /admin/branches/:id/menu/:productId/display-name`.
+- The edit interaction uses the shared Bottom Sheet presentation primitive.
+
 ---
 
 # 🔒 MENU & STOCK UX PLANNING — VISUAL LANGUAGE + REUSABLE UI CONTRACT v1
