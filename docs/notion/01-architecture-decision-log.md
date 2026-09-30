@@ -1,5 +1,28 @@
 <!-- SNAPSHOT FROM NOTION — source page: 01-architecture-decision-log; fetched 2026-09-05 -->
 
+## 🔒 LOCKED — Master Menu Migration Lifecycle: Expand → Migrate → Verify → Contract (2026-09-30)
+
+Xentra may temporarily store legacy Menu state and canonical Master Menu Composition state in the same database during migration.
+
+Locked rules:
+- canonical Master Menu Composition is the only source of truth for new Menu UI, APIs, and features;
+- legacy fields/tables are compatibility/history and migration input only;
+- do not create permanent legacy/new duplicate business columns as co-equal authorities;
+- Products carry lightweight menu_schema_version and menu_migration_status state;
+- product_menu_migrations stores reconciliation evidence and canonical fingerprint;
+- ambiguous legacy free text is never guessed into Flavor, Complement, or Level;
+- unresolved data becomes needs_review until Owner explicitly resolves it;
+- canonical Product composition saves move the Product to schema version 2 / migrated atomically with the composition transaction;
+- migration is idempotent and restartable;
+- legacy removal is a separate Contract phase after data verification and consumer audit.
+
+Canonical lifecycle:
+
+Expand → Migrate/Backfill → Verify → Switch reads/writes to canonical → Prove zero legacy consumers → Contract
+
+Implementation authority:
+docs/decisions/xentra-menu-expand-migrate-verify-contract-v1.md
+
 # 🔶 ARCHITECTURE NOTICE — Master Menu Composition Direction (2026-09-29)
 
 **Forward Menu architecture is now defined separately from the historical Branch Catalog Override/Snapshot model.** Owner creates reusable Master Menu data and assembles Master Products; Merchant only adopts/selects which Master Products the Branch sells. The legacy Branch name/description/image override path is quarantined and must not be extended for new Menu work.

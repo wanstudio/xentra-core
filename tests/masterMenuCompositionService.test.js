@@ -69,6 +69,41 @@ test('Inactive components cannot be selected into a new composition', () => {
   db.prepare('UPDATE menu_levels SET is_active = 1 WHERE id = ?').run(LEVEL);
 });
 
+test('Existing inactive relations remain saveable but inactive replacements are rejected', () => {
+  MasterMenuCompositionService.saveComposition({
+    brandId: BRAND_A, productId: PRODUCT, categoryId: CATEGORY_A,
+    flavorId: FLAVOR, complementIds: [COMPLEMENT_1], levelId: LEVEL
+  });
+
+  db.prepare('UPDATE menu_flavors SET is_active = 0 WHERE id = ?').run(FLAVOR);
+  db.prepare('UPDATE menu_complements SET is_active = 0 WHERE id = ?').run(COMPLEMENT_1);
+  db.prepare('UPDATE menu_levels SET is_active = 0 WHERE id = ?').run(LEVEL);
+
+  const preserved = MasterMenuCompositionService.saveComposition({
+    brandId: BRAND_A, productId: PRODUCT, categoryId: CATEGORY_A,
+    flavorId: FLAVOR, complementIds: [COMPLEMENT_1], levelId: LEVEL
+  });
+  assert.equal(preserved.flavor.id, FLAVOR);
+  assert.deepEqual(preserved.complements.map(c => c.id), [COMPLEMENT_1]);
+  assert.equal(preserved.level.id, LEVEL);
+
+  db.prepare('INSERT OR IGNORE INTO menu_flavors (id, brand_id, name, slug, is_active) VALUES (?, ?, 'Fresh', 'fresh', 0)')
+    .run('mmc_service_inactive_new_flavor', BRAND_A);
+  assert.throws(() => MasterMenuCompositionService.saveComposition({
+    brandId: BRAND_A, productId: PRODUCT, categoryId: CATEGORY_A,
+    flavorId: 'mmc_service_inactive_new_flavor'
+  }), /MASTER_FLAVOR_INACTIVE/);
+
+  db.prepare('DELETE FROM menu_flavors WHERE id = ?').run('mmc_service_inactive_new_flavor');
+  db.prepare('UPDATE menu_flavors SET is_active = 1 WHERE id = ?').run(FLAVOR);
+  db.prepare('UPDATE menu_complements SET is_active = 1 WHERE id = ?').run(COMPLEMENT_1);
+  db.prepare('UPDATE menu_levels SET is_active = 1 WHERE id = ?').run(LEVEL);
+  MasterMenuCompositionService.saveComposition({
+    brandId: BRAND_A, productId: PRODUCT, categoryId: CATEGORY_A,
+    flavorId: null, complementIds: [], levelId: null
+  });
+});
+
 test('Cross-brand component selection is rejected', () => {
   db.prepare("INSERT OR IGNORE INTO menu_flavors (id, brand_id, name, slug, is_active) VALUES ('mmc_service_foreign_flavor', ?, 'Foreign', 'foreign', 1)").run(BRAND_B);
   assert.throws(() => MasterMenuCompositionService.saveComposition({

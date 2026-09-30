@@ -5,6 +5,21 @@
 **Authority:** `docs/decisions/xentra-master-menu-composition-branch-adoption-contract-v1.md`  
 **Legacy boundary:** `docs/decisions/xentra-menu-legacy-quarantine-v1.md`
 
+**Migration lifecycle:** `docs/decisions/xentra-menu-expand-migrate-verify-contract-v1.md`
+
+### Migration engine execution boundary — 2026-09-30
+
+The existing normalized Master Menu Composition schema is now paired with a first-class Product Menu migration lifecycle.
+
+- `products.menu_schema_version` and `products.menu_migration_status` track the current migration state.
+- `product_menu_migrations` stores reconciliation evidence and canonical fingerprints.
+- `ProductMenuMigrationService` and `tools/migrate-master-menu.js` provide explicit, repeatable reconciliation/verification.
+- A canonical composition save advances the Product to schema version 2 / migrated inside the same transaction.
+- Ambiguous legacy free text is never guessed into structured Master components.
+- Legacy removal remains a separate Contract gate.
+
+Migration lifecycle: **Expand → Migrate/Backfill → Verify → Switch reads/writes to canonical → Contract**.
+
 ## 1. Goal
 
 Migrate Xentra Menu from the legacy Branch Override/Snapshot model to one coherent architecture:

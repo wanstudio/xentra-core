@@ -233,7 +233,30 @@ test('PHASE 1: OWNER DASHBOARD CATALOG IMPLEMENTATION', async (t) => {
       assert.ok(res.body.product && res.body.product.id === createdProductId);
     });
 
-    await t2.test('2.5 Toggle Master Product availability', async () => {
+    await t2.test('2.5 Product options save is idempotent', async () => {
+      const body = { options_config: { version: 1, groups: [] } };
+
+      const first = await makeRequest(server, {
+        method: 'PUT',
+        path: '/api/v1/admin/products/' + createdProductId + '/options',
+        headers: { Authorization: 'Bearer ' + ownerToken }
+      }, body);
+
+      assert.strictEqual(first.status, 200);
+      assert.strictEqual(first.body.success, true);
+
+      const second = await makeRequest(server, {
+        method: 'PUT',
+        path: '/api/v1/admin/products/' + createdProductId + '/options',
+        headers: { Authorization: 'Bearer ' + ownerToken }
+      }, body);
+
+      assert.strictEqual(second.status, 200);
+      assert.strictEqual(second.body.success, true);
+      assert.deepStrictEqual(second.body.options_config, { version: 1, groups: [] });
+    });
+
+    await t2.test('2.6 Toggle Master Product availability', async () => {
       const res = await makeRequest(server, {
         method: 'PATCH',
         path: `/api/v1/admin/products/${createdProductId}/toggle`,

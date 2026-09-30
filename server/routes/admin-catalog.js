@@ -303,17 +303,24 @@ router.put('/admin/products/:id/options', requireAuth(['owner', 'brand_manager']
 
     const ProductOptionsModel = require('../../domains/catalog/models/ProductOptionsModel');
     const config = ProductOptionsModel.validateConfig(req.body && req.body.options_config);
-    const stmt = db.prepare(`
+    db.prepare(`
       UPDATE products
       SET options_config = ?, updated_at = datetime('now')
       WHERE id = ? AND brand_id = ?
     `).run(JSON.stringify(config), product.id, req.brand_id);
 
-    if (!stmt || stmt.changes === 0) {
-      return res.status(400).json({ success: false, error: 'Konfigurasi option tidak berubah.' });
-    }
+    // PUT is idempotent: saving an unchanged option configuration is still a
+    // successful save operation.
+    const saved = db.prepare(
+      'SELECT id, name, options_config FROM products WHERE id = ? AND brand_id = ?'
+    ).get(product.id, req.brand_id);
 
-    res.json({ success: true, product_id: product.id, product_name: product.name, options_config: config });
+    res.json({
+      success: true,
+      product_id: saved.id,
+      product_name: saved.name,
+      options_config: ProductOptionsModel.normalizeConfig(saved.options_config)
+    });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
   }
