@@ -2165,6 +2165,19 @@
     });
   }
 
+  function renderMasterProductSpiceIndicator(levelValue) {
+    var raw = Number(levelValue || 0);
+    if (!Number.isFinite(raw) || raw <= 0) return '';
+    var level = Math.max(1, Math.min(4, Math.floor(raw)));
+    var html = '<div class="x-master-product-spice-indicator" aria-label="Level Pedas ' + level + ' dari 4">' +
+      '<span class="x-master-product-spice-label">Pedas</span>' +
+      '<span class="x-master-product-spice-dots" aria-hidden="true">';
+    for (var i = 1; i <= 4; i += 1) {
+      html += '<span class="x-master-product-spice-dot' + (i <= level ? ' is-filled' : '') + '"></span>';
+    }
+    return html + '</span></div>';
+  }
+
   function renderMasterProductsTable() {
     var tbody = $('master-products-table-body');
     if (!tbody) return;
@@ -2199,7 +2212,10 @@
             '<a href="#catalog/products/' + prod.id + '" style="font-weight:700;color:var(--text-main);text-decoration:none;display:inline-block;" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">' + esc(prod.name) + '</a>',
             '<p class="text-muted" style="font-size:12px;max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:2px 0 0;">' + esc(prod.description || '') + '</p>',
           '</td>',
-          '<td><span class="x-badge x-badge-info">' + esc(catName) + '</span></td>',
+          '<td>' +
+            '<span class="x-badge x-badge-info">' + esc(catName) + '</span>' +
+            renderMasterProductSpiceIndicator(prod.level_sort_order) +
+          '</td>',
           '<td><strong>' + formatMoney(prod.price) + '</strong>' + (prod.regular_price > prod.price ? ' <del class="text-muted" style="font-size:11px;">' + formatMoney(prod.regular_price) + '</del>' : '') + '</td>',
           '<td>' + modeBadge + '</td>',
           '<td>' + toggleSwitch + '</td>',
@@ -4633,8 +4649,8 @@ async function loadMenusView() {
           }
 
           showToast('✅ Produk master berhasil disimpan!');
-          loadMasterProducts();
-          navigateTo('catalog/products/' + encodeURIComponent(savedId), { history: 'replace' });
+          await loadMasterProducts();
+          navigateTo('catalog/products', { history: 'replace' });
         } catch (err) {
           showToast('❌ ' + ((err && err.message) || 'Gagal menyimpan menu.'));
         }
