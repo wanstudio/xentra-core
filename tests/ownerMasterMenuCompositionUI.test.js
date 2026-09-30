@@ -192,7 +192,7 @@ test('Master Product uses a dedicated page editor and contextual quick-add modal
   assert.ok(JS.includes('function loadProductEditorPage(productId)'));
   assert.ok(JS.includes("navigateTo('catalog/products/new')"));
   assert.ok(JS.includes("navigateTo('catalog/products/' + encodeURIComponent(id) + '/edit')"));
-  assert.ok(HTML.includes('id="modal-master-reference-quick-add"'));
+  assert.ok(HTML.includes('id="master-reference-editor"'));
   assert.ok(HTML.includes('id="master-reference-quick-add-type"'));
   assert.ok(HTML.includes('id="master-reference-quick-add-name"'));
   assert.ok(HTML.includes('id="master-reference-quick-add-id"'));
