@@ -174,7 +174,7 @@ test('Owner Dashboard Mobile Navigation', async t => {
     const prefix = html.slice(0, navStart);
     const stack = [];
     const voidTags = new Set(['area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr']);
-    const tokenRe = /<!--\\s*\\[\\s\\S\\]*?-->|<\\/?([a-zA-Z0-9-]+)(?:\\s[^<>]*?)?>/g;
+    const tokenRe = /<!--[\\s\\S]*?-->|<\\/?([a-zA-Z0-9-]+)(?:\\s[^<>]*?)?>/g;
     for (const match of prefix.matchAll(tokenRe)) {
       const raw = match[0];
       const tag = match[1];
