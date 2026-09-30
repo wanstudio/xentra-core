@@ -107,6 +107,33 @@
   }
   var escapeHtml = esc;
 
+  function openExistingCardInPresentation(modalId, shellId, type) {
+    var backdrop = $(modalId);
+    if (!backdrop || !window.XentraPresentation) return false;
+    var card = backdrop.querySelector('.x-modal-card');
+    if (!card) return false;
+    window.XentraPresentation.open({
+      id: shellId,
+      type: type,
+      content: card,
+      dismissible: true
+    });
+    return true;
+  }
+
+  async function confirmFeatureAction(id, title, message, okLabel) {
+    if (window.XentraPresentation && typeof window.XentraPresentation.confirm === 'function') {
+      return await window.XentraPresentation.confirm({
+        id: id,
+        title: title,
+        message: message,
+        okLabel: okLabel || 'Lanjutkan',
+        cancelLabel: 'Batal'
+      });
+    }
+    return window.confirm(message);
+  }
+
   function showToast(message, type) {
     var container = $('x-toast-container');
     if (!container) return;
@@ -6920,7 +6947,7 @@ async function loadMenusView() {
       branchSelect.disabled = false;
     }
 
-    $('modal-user').style.display = 'flex';
+    openExistingCardInPresentation('modal-user', 'team-user-editor', 'bottom-sheet');
   }
   window.openCreateUserModal = openCreateUserModal;
 
@@ -6966,12 +6993,16 @@ async function loadMenusView() {
       branchSelect.disabled = false;
     }
 
-    $('modal-user').style.display = 'flex';
+    openExistingCardInPresentation('modal-user', 'team-user-editor', 'bottom-sheet');
   }
   window.openEditUser = openEditUser;
 
   function closeUserModal() {
-    $('modal-user').style.display = 'none';
+    if (window.XentraPresentation && window.XentraPresentation.isOpen('team-user-editor')) {
+      window.XentraPresentation.close('team-user-editor');
+    } else {
+      $('modal-user').style.display = 'none';
+    }
   }
   window.closeUserModal = closeUserModal;
 
@@ -7039,7 +7070,7 @@ async function loadMenusView() {
     };
 
     if (!willActivate) {
-      var confirmed = confirm('Nonaktifkan akun "' + name + '"? Staf ini tidak akan bisa login sampai diaktifkan kembali.');
+      var confirmed = await confirmFeatureAction('disable-user', 'Nonaktifkan Akun', 'Nonaktifkan akun "' + name + '"? Staf ini tidak akan bisa login sampai diaktifkan kembali.', 'Nonaktifkan');
       if (!confirmed) {
         revert();
         return;
@@ -7072,7 +7103,7 @@ async function loadMenusView() {
   window.toggleUserStatus = toggleUserStatus;
 
   async function disableUser(userId, name) {
-    if (!confirm('Nonaktifkan akun "' + name + '"? Staf ini tidak akan bisa login sampai diaktifkan kembali.')) return;
+    if (!await confirmFeatureAction('disable-user-action', 'Nonaktifkan Akun', 'Nonaktifkan akun "' + name + '"? Staf ini tidak akan bisa login sampai diaktifkan kembali.', 'Nonaktifkan')) return;
     try {
       var res = await adminFetch(API_BASE + '/admin/users/' + userId + '/disable', {
         method: 'POST',
@@ -7111,10 +7142,7 @@ async function loadMenusView() {
   window.enableUser = enableUser;
 
   async function deleteUser(userId, name) {
-    var confirmed = confirm(
-      'Hapus anggota "' + name + '"?\n\n' +
-      'Anggota akan kehilangan akses ke dashboard dan tim ini. Tindakan ini tidak dapat dibatalkan.'
-    );
+    var confirmed = await confirmFeatureAction('delete-user', 'Hapus Anggota Tim', 'Hapus anggota "' + name + '"? Anggota akan kehilangan akses ke dashboard dan tim ini. Tindakan ini tidak dapat dibatalkan.', 'Hapus');
     if (!confirmed) return;
 
     try {
@@ -7136,7 +7164,7 @@ async function loadMenusView() {
   window.deleteUser = deleteUser;
 
   async function resetUserPassword(userId, name) {
-    if (!confirm('Generate token reset password untuk "' + name + '"? Token hanya ditampilkan sekali.')) return;
+    if (!await confirmFeatureAction('reset-user-password', 'Reset Password', 'Generate token reset password untuk "' + name + '"? Token hanya ditampilkan sekali.', 'Generate Token')) return;
     try {
       var res = await adminFetch(API_BASE + '/admin/users/' + userId + '/reset-password', {
         method: 'POST',
@@ -7146,7 +7174,7 @@ async function loadMenusView() {
       if (data.success && data.reset_token) {
         $('reset-password-user-name').value = name;
         $('reset-password-token').value = data.reset_token;
-        $('modal-reset-password').style.display = 'flex';
+        openExistingCardInPresentation('modal-reset-password', 'team-reset-password', 'dialog');
       } else {
         showToast('Gagal: ' + (data.error || 'Terjadi kesalahan.'));
       }
@@ -7157,7 +7185,11 @@ async function loadMenusView() {
   window.resetUserPassword = resetUserPassword;
 
   function closeResetPasswordModal() {
-    $('modal-reset-password').style.display = 'none';
+    if (window.XentraPresentation && window.XentraPresentation.isOpen('team-reset-password')) {
+      window.XentraPresentation.close('team-reset-password');
+    } else {
+      $('modal-reset-password').style.display = 'none';
+    }
   }
   window.closeResetPasswordModal = closeResetPasswordModal;
 
@@ -7297,12 +7329,16 @@ async function loadMenusView() {
     }
 
     handleInviteRoleChange();
-    $('modal-invite-user').style.display = 'flex';
+    openExistingCardInPresentation('modal-invite-user', 'team-invite-editor', 'bottom-sheet');
   }
   window.openInviteUserModal = openInviteUserModal;
 
   function closeInviteUserModal() {
-    $('modal-invite-user').style.display = 'none';
+    if (window.XentraPresentation && window.XentraPresentation.isOpen('team-invite-editor')) {
+      window.XentraPresentation.close('team-invite-editor');
+    } else {
+      $('modal-invite-user').style.display = 'none';
+    }
   }
   window.closeInviteUserModal = closeInviteUserModal;
 
@@ -8591,6 +8627,22 @@ async function loadMenusView() {
     window.XentraActionMenu.open(trigger, actions);
   }
 
+  function mountMarketingBannerEditorPage() {
+    var backdrop = $('modal-marketing-banner');
+    var page = $('marketing-banner-editor-view');
+    if (!backdrop || !page) return;
+    var card = backdrop.querySelector('.x-modal-card');
+    if (!card) return;
+    page.appendChild(card);
+    card.classList.add('x-feature-page-surface');
+    card.style.maxWidth = 'none';
+    card.style.width = '100%';
+    card.style.maxHeight = 'none';
+    card.style.height = 'auto';
+    card.style.borderRadius = '14px';
+    backdrop.style.display = 'none';
+  }
+
   function openMarketingBannerCreate() {
     _marketingBannerEditor = {
       mode: 'create',
@@ -8613,7 +8665,8 @@ async function loadMenusView() {
     setMarketingBannerEditorMode('create');
 
     var modal = $('modal-marketing-banner');
-    if (modal) modal.style.display = 'flex';
+    navigateTo('marketing/banners/new');
+    mountMarketingBannerEditorPage();
   }
   window.openMarketingBannerCreate = openMarketingBannerCreate;
 
@@ -8643,7 +8696,8 @@ async function loadMenusView() {
       setMarketingBannerEditorMode('edit');
 
       var modal = $('modal-marketing-banner');
-      if (modal) modal.style.display = 'flex';
+      navigateTo('marketing/banners/' + encodeURIComponent(bannerId) + '/edit');
+    mountMarketingBannerEditorPage();
     } catch (err) {
       showToast('❌ ' + (err.message || 'Gagal membuka Banner.'));
     }
@@ -8759,8 +8813,22 @@ async function loadMenusView() {
   }
 
   function closeMarketingBannerModal() {
-    var modal = $('modal-marketing-banner');
-    if (modal) modal.style.display = 'none';
+    var backdrop = $('modal-marketing-banner');
+    var page = $('marketing-banner-editor-view');
+    var card = backdrop && backdrop.querySelector('.x-modal-card');
+    if (!card && page) card = page.querySelector('.x-modal-card');
+    if (card && backdrop) {
+      backdrop.appendChild(card);
+      card.classList.remove('x-feature-page-surface');
+      card.style.maxWidth = '760px';
+      card.style.width = '100%';
+      card.style.maxHeight = '92vh';
+      card.style.height = 'auto';
+      card.style.borderRadius = '14px';
+      backdrop.style.display = 'none';
+    }
+    if (page) page.style.display = 'none';
+    navigateTo('marketing/banners');
   }
   window.closeMarketingBannerModal = closeMarketingBannerModal;
 
@@ -9350,13 +9418,17 @@ async function loadMenusView() {
       meta.innerHTML = lines.join('');
     }
 
-    if (modal) modal.style.display = 'flex';
+    openExistingCardInPresentation('modal-marketing-banner-preview', 'marketing-banner-preview', 'dialog');
   }
   window.openMarketingBannerPreview = openMarketingBannerPreview;
 
   function closeMarketingBannerPreview() {
-    var modal = $('modal-marketing-banner-preview');
-    if (modal) modal.style.display = 'none';
+    if (window.XentraPresentation && window.XentraPresentation.isOpen('marketing-banner-preview')) {
+      window.XentraPresentation.close('marketing-banner-preview');
+    } else {
+      var modal = $('modal-marketing-banner-preview');
+      if (modal) modal.style.display = 'none';
+    }
   }
   window.closeMarketingBannerPreview = closeMarketingBannerPreview;
 
@@ -9482,14 +9554,17 @@ async function loadMenusView() {
       }
     }
 
-    var modal = $('modal-marketing-banner-assignment');
-    if (modal) modal.style.display = 'flex';
+    openExistingCardInPresentation('modal-marketing-banner-assignment', 'marketing-banner-assignment', 'bottom-sheet');
   }
   window.openMarketingBannerAssignmentEditor = openMarketingBannerAssignmentEditor;
 
   function closeMarketingBannerAssignmentModal() {
-    var modal = $('modal-marketing-banner-assignment');
-    if (modal) modal.style.display = 'none';
+    if (window.XentraPresentation && window.XentraPresentation.isOpen('marketing-banner-assignment')) {
+      window.XentraPresentation.close('marketing-banner-assignment');
+    } else {
+      var modal = $('modal-marketing-banner-assignment');
+      if (modal) modal.style.display = 'none';
+    }
   }
   window.closeMarketingBannerAssignmentModal = closeMarketingBannerAssignmentModal;
 
@@ -10234,6 +10309,22 @@ async function loadMenusView() {
     }
   }
 
+  function mountPromotionEditorPage() {
+    var backdrop = $('modal-mkt-promotion');
+    var page = $('marketing-promotion-editor-view');
+    if (!backdrop || !page) return;
+    var card = backdrop.querySelector('.x-modal-card');
+    if (!card) return;
+    page.appendChild(card);
+    card.classList.add('x-feature-page-surface');
+    card.style.maxWidth = 'none';
+    card.style.width = '100%';
+    card.style.maxHeight = 'none';
+    card.style.height = 'auto';
+    card.style.borderRadius = '14px';
+    backdrop.style.display = 'none';
+  }
+
   async function openCreatePromotionModal() {
     var user = getStoredUser();
     if (!user || user.role !== 'owner') {
@@ -10269,7 +10360,8 @@ async function loadMenusView() {
       $('mkt-promo-icon-status').style.color = '#64748b';
     }
 
-    modal.style.display = 'flex';
+    navigateTo('marketing/promotions/new');
+    mountPromotionEditorPage();
 
     await ensureMarketingDependenciesLoaded();
     renderPromoProductOptions(null);
@@ -10346,7 +10438,8 @@ async function loadMenusView() {
       selectedBranchIds = promo.scopes.map(function (s) { return s.branch_id; });
     }
 
-    modal.style.display = 'flex';
+    navigateTo('marketing/promotions/' + encodeURIComponent(promoId) + '/edit');
+    mountPromotionEditorPage();
 
     await ensureMarketingDependenciesLoaded();
     renderPromoProductOptions(targetProdId);
@@ -10358,8 +10451,22 @@ async function loadMenusView() {
   window.openEditPromotionModal = openEditPromotionModal;
 
   function closePromotionModal() {
-    var modal = $('modal-mkt-promotion');
-    if (modal) modal.style.display = 'none';
+    var backdrop = $('modal-mkt-promotion');
+    var page = $('marketing-promotion-editor-view');
+    var card = backdrop && backdrop.querySelector('.x-modal-card');
+    if (!card && page) card = page.querySelector('.x-modal-card');
+    if (card && backdrop) {
+      backdrop.appendChild(card);
+      card.classList.remove('x-feature-page-surface');
+      card.style.maxWidth = '760px';
+      card.style.width = '100%';
+      card.style.maxHeight = '92vh';
+      card.style.height = 'auto';
+      card.style.borderRadius = '14px';
+      backdrop.style.display = 'none';
+    }
+    if (page) page.style.display = 'none';
+    navigateTo('marketing/promotions');
   }
   window.closePromotionModal = closePromotionModal;
 
