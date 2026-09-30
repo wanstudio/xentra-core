@@ -9099,6 +9099,19 @@ body:not(.x-merchant-app) .x-owner-mobile-page-sub {
 }
 
 @media (max-width: 768px) {
+  /* Every Owner secondary page uses the same page-level shell as
+     Kategori and Produk Master: the Back/title block is not a card. */
+  .x-owner-child-page-shell.x-card-panel {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: 4px 0 10px !important;
+  }
+
+  .x-owner-child-page-header-row {
+    padding: 4px 0 10px !important;
+  }
+
   .x-owner-child-mobile-header {
     margin-bottom: 14px;
   }
