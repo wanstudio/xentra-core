@@ -107,37 +107,44 @@ test('Legacy Master Product edit hydrates structured composition from the old ti
   assert.ok(HTML.includes('id="master-legacy-migration-detail"'));
 });
 
-test('Master Product composition uses native selectable chip controls', () => {
+test('Master Product composition uses the correct control type per field', () => {
   const start = HTML.indexOf('<section id="tab-catalog-products"');
   const end = HTML.indexOf('<!-- TAB: CATALOG / MENUS', start);
   const section = HTML.slice(start, end);
 
-  for (const id of ['prod-category-chips', 'prod-flavor-chips', 'prod-complements-editor', 'prod-level-chips']) {
-    assert.ok(section.includes('id="' + id + '"'), 'Missing chip control: ' + id);
-  }
+  // Category and Flavor are single-select native dropdowns with contextual + buttons.
+  assert.ok(section.includes('<select id="prod-category" class="x-input" required>'));
+  assert.ok(section.includes('<select id="prod-flavor" class="x-input">'));
+  assert.ok(section.includes('id="btn-add-master-category-from-product"'));
+  assert.ok(section.includes('id="btn-add-master-flavor-from-product"'));
+  assert.ok(section.includes('class="x-master-select-with-add"'));
+  assert.ok(section.includes('class="x-master-select-add"'));
 
-  assert.ok(section.includes('class="x-master-choice-grid"'));
+  // Complement is the only multi-select chip grid.
+  assert.ok(section.includes('id="prod-complements-editor"'));
   assert.ok(section.includes('class="x-master-choice-grid x-master-complement-grid"'));
-  assert.ok(section.includes('class="x-master-choice-grid x-master-level-grid"'));
 
-  // Native selects remain only as hidden state/validation compatibility;
-  // the visible interaction is the chip surface.
-  assert.ok(section.includes('class="x-input x-master-native-select"'));
-  assert.ok(JS.includes('function renderMasterChoiceGrid('));
-  assert.ok(JS.includes('data-master-choice-id'));
-  assert.ok(JS.includes('data-master-complement-id'));
-  assert.ok(JS.includes('class="x-master-choice-chip x-master-choice-add"'));
+  // Level Pedas is a horizontal progressive selector, not a dropdown.
+  assert.ok(section.includes('id="prod-level-chips"'));
+  assert.ok(section.includes('aria-label="Pilih Level Pedas"'));
+  assert.ok(section.includes('<input type="hidden" id="prod-level"'));
+  assert.ok(!section.includes('<select id="prod-level"'));
+  assert.ok(JS.includes('function renderMasterLevelSelector('));
+  assert.ok(JS.includes('data-master-level-id'));
   assert.ok(CSS.includes('.x-master-choice-chip.is-selected'));
-  assert.ok(CSS.includes('.x-master-native-select'));
+  assert.ok(CSS.includes('.x-master-spice-level'));
+  assert.ok(CSS.includes('.x-master-spice-level-segment.is-filled'));
 });
-
-test('Master Product editor keeps Flavor optional and exposes multi-select complements plus Level dropdown', () => {
+ 
+test('Master Product editor keeps Flavor optional and exposes multi-select complements plus horizontal Level Pedas selector', () => {
   const start = HTML.indexOf('<section id="tab-catalog-products"');
   const end = HTML.indexOf('<!-- TAB: CATALOG / MENUS', start);
   const section = HTML.slice(start, end);
   assert.ok(section.includes('<select id="prod-flavor" class="x-input">'));
   assert.ok(!section.includes('<select id="prod-flavor" class="x-input" required>'));
   assert.ok(section.includes('id="prod-complements-editor"'));
+  assert.ok(section.includes('id="prod-level-chips"'));
+  assert.ok(!section.includes('<select id="prod-level"'));
   assert.ok(section.includes('id="prod-level"'));
   assert.ok(JS.includes("adminFetch(API_BASE + '/admin/menu/components/complement'"));
   assert.ok(JS.includes("adminFetch(API_BASE + '/admin/menu/components/level'"));
