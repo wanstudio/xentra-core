@@ -8,10 +8,12 @@ const path = require('node:path');
 const HTML_PATH = path.join(__dirname, '../apps/merchant-dashboard/index.html');
 const CSS_PATH = path.join(__dirname, '../apps/merchant-shared/css/dashboard.css');
 const JS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/js/dashboard.js');
+const NAV_JS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/js/owner-bottom-nav.js');
 
 const html = fs.readFileSync(HTML_PATH, 'utf8');
 const css = fs.readFileSync(CSS_PATH, 'utf8');
 const js = fs.readFileSync(JS_PATH, 'utf8');
+const navJs = fs.readFileSync(NAV_JS_PATH, 'utf8');
 
 test('Owner Dashboard Mobile Navigation', async t => {
 
@@ -167,28 +169,40 @@ test('Owner Dashboard Mobile Navigation', async t => {
   // Application-shell architecture
   // --------------------------------------------------------------------------
 
-  await t.test('OWNER-MOB-13B: bottom nav is mounted at body shell level, outside route content', () => {
+  await t.test('OWNER-MOB-13B: bottom nav is a direct child of body, outside route content', () => {
     const navStart = html.indexOf('<nav class="x-owner-bottom-nav"');
-    const accountMarker = html.indexOf('<!-- Mobile Account Page');
-    const persistentMarker = html.indexOf('<!-- Persistent mobile application-shell navigation.');
-    assert.ok(navStart !== -1, 'Owner bottom nav must exist');
-    assert.ok(persistentMarker !== -1 && persistentMarker < navStart, 'Bottom nav must be mounted by the application-shell marker');
-    assert.ok(accountMarker === -1 || navStart < accountMarker, 'Bottom nav must sit before the separate account surface');
-    assert.ok(html.slice(html.indexOf('<body'), navStart).lastIndexOf('class="x-tab-content') < persistentMarker,
-      'Bottom nav must not be embedded in a route content section');
+    const prefix = html.slice(0, navStart);
+    const stack = [];
+    const voidTags = new Set(['area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr']);
+    const tokenRe = /<!--\\s*\\[\\s\\S\\]*?-->|<\\/?([a-zA-Z0-9-]+)(?:\\s[^<>]*?)?>/g;
+    for (const match of prefix.matchAll(tokenRe)) {
+      const raw = match[0];
+      const tag = match[1];
+      if (!tag || raw.indexOf('<!--') === 0) continue;
+      const name = tag.toLowerCase();
+      if (raw.indexOf('</') === 0) {
+        const idx = stack.lastIndexOf(name);
+        if (idx >= 0) stack.splice(idx, 1);
+      } else if (!voidTags.has(name) && raw.slice(-2) !== '/>') {
+        stack.push(name);
+      }
+    }
+    assert.deepEqual(stack, ['html', 'body'],
+      'Bottom nav must be mounted directly under <body>, not inside a route/page container');
   });
 
   await t.test('OWNER-MOB-13C: bottom nav controller is a dedicated module', () => {
     assert.ok(html.includes('/merchant-dashboard/assets/js/owner-bottom-nav.js?v=1.0.0'),
       'Dedicated owner-bottom-nav.js module must be loaded');
-    assert.ok(js.includes('initOwnerBottomNav()'), 'Router initialization must still initialize the shell controller');
+    assert.ok(navJs.includes('function initOwnerBottomNav()'), 'Dedicated module must own bottom-nav initialization');
+    assert.ok(navJs.includes('function syncOwnerBottomNavActive('), 'Dedicated module must own bottom-nav active-state sync');
+    assert.ok(navJs.includes('window.navigateTo(btn.dataset.route)'), 'Dedicated module must delegate to the canonical router');
     assert.ok(!js.includes('var _ownerNavModuleMap'), 'Navigation module map must not live in the monolithic dashboard router');
   });
 
-  await t.test('OWNER-MOB-13D: bottom nav remains router-driven, not a second router', () => {
-    assert.ok(js.includes('syncOwnerBottomNavActive(route)'), 'dashboard.js must sync shell navigation from the canonical route');
-    assert.ok(!js.includes("window.navigateTo =") || !js.includes('function navigateTo(route)') || js.includes('function navigateTo(route)'),
-      'dashboard.js remains the canonical router surface');
+  await t.test('OWNER-MOB-13D: dashboard router remains the single navigation authority', () => {
+    assert.ok(js.includes('syncOwnerBottomNavActive(route)'), 'dashboard.js must consume shell navigation state from the canonical route');
+    assert.ok(navJs.includes('window.navigateTo(btn.dataset.route)'), 'Bottom nav must call the existing router, not implement a second router');
   });
 
   // --------------------------------------------------------------------------
