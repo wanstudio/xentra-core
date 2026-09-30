@@ -85,6 +85,45 @@ class MasterMenuCompositionService {
     }
   }
 
+  static ensureDefaultLevels({ brandId }) {
+    if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
+
+    const defaults = [
+      { name: '1 — Tidak Pedas', sortOrder: 1 },
+      { name: '2 — Pedas Sedang', sortOrder: 2 },
+      { name: '3 — Pedas Banget', sortOrder: 3 }
+    ];
+
+    const existing = repository.listComponents({
+      brandId,
+      type: 'level',
+      activeOnly: false
+    });
+
+    // Only provision the system defaults when a brand has no Level master at all.
+    // Existing custom Level data is never overwritten or mixed with defaults.
+    if (existing.length) return existing;
+
+    defaults.forEach(function(item) {
+      try {
+        this.createComponent({
+          brandId,
+          type: 'level',
+          name: item.name,
+          sortOrder: item.sortOrder
+        });
+      } catch (err) {
+        if (!/MENU_COMPONENT_ALREADY_EXISTS/i.test(String(err && err.message))) throw err;
+      }
+    }, this);
+
+    return repository.listComponents({
+      brandId,
+      type: 'level',
+      activeOnly: false
+    });
+  }
+
   static toggleComponent({ brandId, type, componentId }) {
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
     const normalizedType = normalizeType(type);
