@@ -82,7 +82,16 @@ Removal is a separate acceptance phase after migration, verification, consumer a
 The migration engine is explicit. It does not run automatically during ordinary production startup and it does not seed demo data.
 Operator entry point:
 ~~~
+# read-only audit / dry-run (default)
 node tools/migrate-master-menu.js --brand <brand-id>
+
+# inspect one Product
+node tools/migrate-master-menu.js --brand <brand-id> --product <product-id>
+
+# apply deterministic candidates
+node tools/migrate-master-menu.js --brand <brand-id> --apply
+
+# verify Products already on canonical schema
 node tools/migrate-master-menu.js --brand <brand-id> --verify
 ~~~
 
