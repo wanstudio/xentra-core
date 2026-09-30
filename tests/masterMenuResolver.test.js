@@ -61,6 +61,40 @@ test('Branch resolver contains adopted Product and Branch Category but no legacy
   assert.equal(Object.prototype.hasOwnProperty.call(p, 'image_override'), false);
 });
 
+test('Branch display-name override is optional and only changes Customer title', () => {
+  db.prepare('UPDATE branch_products SET name_override = NULL WHERE branch_id = ? AND product_id = ?').run(BRANCH, PRODUCT);
+
+  const fallback = MasterMenuResolver.resolveBranchMenu({
+    brandId: BRAND,
+    branchId: BRANCH,
+    exposeBranchPresentationOverrides: true
+  }).products[0];
+  assert.equal(fallback.title, 'Ayam Tulang Lunak');
+  assert.equal(fallback.subtitle, 'Lombok Ijo');
+  assert.equal(fallback.display_name_override, null);
+
+  db.prepare('UPDATE branch_products SET name_override = ? WHERE branch_id = ? AND product_id = ?')
+    .run('Es Teh Jumbo', BRANCH, PRODUCT);
+
+  const overridden = MasterMenuResolver.resolveBranchMenu({
+    brandId: BRAND,
+    branchId: BRANCH,
+    exposeBranchPresentationOverrides: true
+  }).products[0];
+  assert.equal(overridden.title, 'Es Teh Jumbo');
+  assert.equal(overridden.subtitle, null);
+  assert.equal(overridden.display_name_override, 'Es Teh Jumbo');
+
+  const customerScoped = MasterMenuResolver.resolveBranchMenu({
+    brandId: BRAND,
+    branchId: BRANCH
+  }).products[0];
+  assert.equal(Object.prototype.hasOwnProperty.call(customerScoped, 'display_name_override'), false);
+
+  db.prepare('UPDATE branch_products SET name_override = NULL WHERE branch_id = ? AND product_id = ?')
+    .run(BRANCH, PRODUCT);
+});
+
 test('Resolver derives Level intensity from historical Level name when sort order is absent', () => {
   db.prepare("UPDATE menu_levels SET sort_order = NULL WHERE id = ?").run(LEVEL);
   const rows = MasterMenuResolver.resolveMasterProducts({ brandId: BRAND, productIds: [PRODUCT] });
