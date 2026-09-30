@@ -208,6 +208,23 @@ test('Owner Dashboard Mobile Navigation', async t => {
   // --------------------------------------------------------------------------
   // CSS
   // --------------------------------------------------------------------------
+  await t.test('OWNER-MOB-15: dense Owner routes have touch-first mobile surface rules', () => {
+    assert.ok(css.includes('#orders-list-view .x-table thead'), 'Orders mobile table must transform into cards');
+    assert.ok(css.includes('#customers-list-view .x-data-table thead'), 'Customers mobile table must transform into cards');
+    assert.ok(css.includes('#tab-settings .settings-sidebar'), 'Settings must have a dedicated mobile navigation surface');
+    assert.ok(css.includes('#tab-reports .x-filter-bar'), 'Reports filters must have mobile layout rules');
+    assert.ok(css.includes('#tab-marketing .x-stat-grid'), 'Marketing KPI grid must have mobile layout rules');
+    assert.ok(css.includes('#tab-branches .x-branches-grid'), 'Branches must use a single-column mobile card grid');
+  });
+
+  await t.test('OWNER-MOB-16: mobile route content reserves shell space', () => {
+    assert.ok(
+      css.includes('body:not(.x-merchant-app) .x-dash-main') &&
+      css.includes('padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px))'),
+      'Owner route content must reserve space for the persistent bottom navigation'
+    );
+  });
+
 
   await t.test('OWNER-MOB-14: CSS defines .x-owner-bottom-nav hidden by default', () => {
     assert.ok(css.includes('.x-owner-bottom-nav') && css.includes('display: none'),
