@@ -15,9 +15,9 @@ const migrationRepository = new ProductMenuMigrationRepository();
 function normalizeLegacyMenuText(value) {
   return String(value == null ? '' : value).toLowerCase()
     .replace(/&/g, ' dan ')
-    .replace(/[+\\/|,_-]+/g, ' ')
-    .replace(/[^a-z0-9\\s]/g, ' ')
-    .replace(/\\s+/g, ' ')
+    .replace(/[+|,_-]+/g, ' ')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
