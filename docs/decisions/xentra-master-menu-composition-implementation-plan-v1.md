@@ -561,7 +561,7 @@ Stop and resolve a contract issue before coding onward when:
 - Checkout final verification resolves structured Master Menu Composition and ignores legacy Branch Menu price overrides for the forward path.
 - Order item persistence already accepts and stores `menu_snapshot`.
 - Merchant/Owner Branch Menu clients now use the canonical `/admin/branches/:id/menu` read model.
-- Legacy Branch Menu edit actions are removed from active card actions.
+- Legacy Branch Menu content edit actions remain removed from active card actions; the Merchant Menu now exposes the separately governed Customer Display Name Override action.
 
 ### Compatibility remains intentional
 
