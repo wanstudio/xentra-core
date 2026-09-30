@@ -41,6 +41,9 @@ function resolveProductView({ product, flavor, complements, level, branchState =
     subtitle: activeFlavor ? activeFlavor.name : null,
     detail: activeComplements.map(c => c.name),
     indicator: activeLevel ? activeLevel.name : null,
+    // Structured intensity value for Customer presentation. The legacy
+    // indicator string remains in the DTO for compatibility with old consumers.
+    indicator_level: activeLevel ? Number(activeLevel.sort_order) || null : null,
     image: normalizeImage(product),
     image_url: normalizeImage(product),
     media_id: product.media_id || null,
