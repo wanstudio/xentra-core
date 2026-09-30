@@ -303,9 +303,26 @@ Merchant may not change:
 - Master Product image/content;
 - Master Product price or Pricing Policy.
 
-There is no canonical Branch Menu Composition editor.
+### 🔒 Branch Customer Display Name Override — 30 September 2026
 
-There is no canonical `name_override`, `description_override`, or `image_override` path in the new Menu architecture.
+Merchant may optionally set a **Customer Display Name Override** for an adopted Master Product.
+
+Persistence:
+`branch_products.name_override TEXT NULL`
+
+Rules:
+- `branch_products.product_id` remains the reference to the same Master Product.
+- The override is **presentation-only for Customer Menu** and does not modify Master Product identity or Master composition.
+- A non-empty string replaces the Customer menu title for that Branch.
+- `NULL` / cleared value means the Customer automatically falls back to the live Master presentation.
+- When the override is active, the Master Rasa subtitle is suppressed because the override is the complete Customer-facing name.
+- The override is scoped to one Branch; other Branches remain independent.
+- Merchant cannot use this field to change Kategori, Rasa, Kelengkapan, Level, image, price, or any other Master data.
+
+Canonical transport:
+`PATCH /admin/branches/:id/menu/:productId/display-name`
+
+There is no canonical Branch Menu Composition editor. `description_override` and `image_override` remain legacy-quarantined compatibility fields.
 
 ## 9. Branch Category is a separate classification layer
 
