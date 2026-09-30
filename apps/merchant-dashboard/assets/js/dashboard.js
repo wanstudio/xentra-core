@@ -3205,6 +3205,20 @@
 
   var _productEditorLoadSeq = 0;
 
+  function setProductEditorLoading(isLoading, message) {
+    var view = $('product-editor-view');
+    var status = $('product-editor-loading');
+    var statusText = $('product-editor-loading-text');
+    if (view) {
+      view.setAttribute('aria-busy', isLoading ? 'true' : 'false');
+    }
+    if (status) {
+      status.style.display = isLoading ? 'flex' : 'none';
+      status.setAttribute('aria-hidden', isLoading ? 'false' : 'true');
+    }
+    if (statusText && message) statusText.textContent = message;
+  }
+
   function resetProductEditorForAdd() {
     $('modal-product-title').textContent = 'Tambah Produk Master Baru';
     $('prod-editor-breadcrumb').textContent = 'Tambah Produk';
@@ -3260,10 +3274,17 @@
   async function loadProductEditorPage(productId) {
     var requestSeq = ++_productEditorLoadSeq;
     showProductEditorSection();
+    setProductEditorLoading(true, productId ? 'Memuat data produk...' : 'Menyiapkan editor Produk Master...');
 
     if (!productId) {
       resetProductEditorForAdd();
-      await loadMasterMenuComponents();
+      try {
+        await loadMasterMenuComponents();
+      } finally {
+        if (requestSeq === _productEditorLoadSeq) {
+          setProductEditorLoading(false);
+        }
+      }
       return;
     }
 
@@ -3287,12 +3308,20 @@
       if (categoryData.success) state.categories = categoryData.categories || [];
       var prod = productData.product;
       populateProductEditorForm(prod);
+
+      setProductEditorLoading(true, 'Memuat komposisi dan opsi penjualan...');
       await loadMasterMenuComposition(prod.id, prod.name);
+      if (requestSeq !== _productEditorLoadSeq) return;
+
       await loadProductOptionsEditor(prod.id);
     } catch (err) {
       if (requestSeq !== _productEditorLoadSeq) return;
       console.error('[Product Editor Load Error]:', err);
       showToast('❌ Gagal memuat editor Produk Master.');
+    } finally {
+      if (requestSeq === _productEditorLoadSeq) {
+        setProductEditorLoading(false);
+      }
     }
   }
 
