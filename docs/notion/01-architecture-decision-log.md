@@ -25,7 +25,7 @@ docs/decisions/xentra-menu-expand-migrate-verify-contract-v1.md
 
 # 🔶 ARCHITECTURE NOTICE — Master Menu Composition Direction (2026-09-29)
 
-**Forward Menu architecture is now defined separately from the historical Branch Catalog Override/Snapshot model.** Owner creates reusable Master Menu data and assembles Master Products; Merchant only adopts/selects which Master Products the Branch sells. The legacy Branch name/description/image override path is quarantined and must not be extended for new Menu work.
+**Forward Menu architecture is now defined separately from the historical Branch Catalog Override/Snapshot model.** Owner creates reusable Master Menu data and assembles Master Products; Merchant only adopts/selects which Master Products the Branch sells. The legacy Branch description/image override paths remain quarantined. The narrow **Branch Customer Display Name Override** is now an explicit canonical presentation exception: optional, Branch-scoped, stored in `branch_products.name_override`, with NULL/cleared meaning live Master fallback.
 
 Forward contract:
 `docs/decisions/xentra-master-menu-composition-branch-adoption-contract-v1.md`
