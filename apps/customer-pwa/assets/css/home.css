@@ -2048,10 +2048,10 @@
 
 .x-detail-image-wrap {
   width: 100%;
-  aspect-ratio: 16 / 10;
-  max-height: 210px;
-  min-height: 140px;
-  margin-bottom: 12px;
+  aspect-ratio: 1 / 1;
+  max-height: none;
+  min-height: 0;
+  margin-bottom: 14px;
   border-radius: var(--x-radius-md, 14px);
   overflow: hidden;
   background: var(--x-gray-bg, #fafafa);
@@ -2066,7 +2066,7 @@
 }
 
 .x-detail-body {
-  padding: 0 2px;
+  padding: 0 20px;
 }
 
 .x-detail-name {
@@ -2074,7 +2074,7 @@
   font-size: 18px;
   line-height: 1.3;
   font-weight: 800;
-  color: var(--x-charcoal, #222222);
+  color: #111111;
   word-break: break-word;
 }
 
@@ -2088,7 +2088,7 @@
 
 .x-detail-subtitle {
   margin: 0 0 8px;
-  color: var(--x-gray-600, #555555);
+  color: #111111;
   font-size: 18px;
   line-height: 1.3;
   font-weight: 800;
