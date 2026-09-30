@@ -5057,6 +5057,13 @@ input[type="file"].x-input,
    OWNER DASHBOARD — Mobile Bottom Navigation & Focus Selector
    Owner-specific mobile shell: 5-item bottom nav + Focus scope top bar
    ========================================================================== */
+/*
+ * ARCHITECTURE CONTRACT:
+ * - This nav is application-shell chrome, not page content.
+ * - It must be a direct child of <body>, never inside .x-tab-content.
+ * - Route ownership remains in dashboard.js; this component only renders
+ *   navigation state and delegates clicks to the single canonical router.
+ */
 .x-owner-bottom-nav {
   display: none;
 }
@@ -5349,9 +5356,10 @@ input[type="file"].x-input,
   .x-hub-arrow { color: #c7c7cc; flex-shrink: 0; }
 
   /* Content area top and bottom spacers for fixed topbar and owner bottom nav */
-  .x-dash-main {
+  /* Owner mobile application shell: route content scrolls independently from persistent chrome. */
+  body:not(.x-merchant-app) .x-dash-main {
     padding-top: max(68px, calc(68px + env(safe-area-inset-top, 0px))) !important;
-    padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px)) !important;
   }
 
   /* Owner Command Center on Mobile */
