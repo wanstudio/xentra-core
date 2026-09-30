@@ -44,3 +44,12 @@ test('PRES-05: Master Reference business/API flow remains in feature controller'
   assert.ok(dashboardJs.includes('meta.payload(name)'));
   assert.ok(dashboardJs.includes('renderMasterReferenceList(type)'));
 });
+
+test('PRES-06: destructive confirmation uses generic Dialog presentation, not feature-coupled modal', () => {
+  assert.ok(shellJs.includes('confirm: confirm'));
+  assert.ok(shellJs.includes("type: 'dialog'"));
+  assert.ok(shellJs.includes('data-confirm-ok'));
+  assert.ok(dashboardJs.includes("id: 'delete-master-reference'"));
+  assert.ok(dashboardJs.includes("id: 'delete-master-product'"));
+  assert.ok(!dashboardJs.includes("confirm('Hapus ' + noun"));
+});
