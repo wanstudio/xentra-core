@@ -9014,84 +9014,139 @@ input[type="file"].x-input,
 
 
 /* ==========================================================================
-   OWNER MOBILE — CATALOG CHILD PAGE HEADER
-   Shared visual pattern for Kategori, Produk Master, Menu Cabang, and future
-   sibling Catalog pages. Navigation behavior stays in the route layer.
+   OWNER — SHARED CHILD PAGE HEADER
+   One presentation pattern for all secondary/focused pages:
+   chevron-left + title + subtitle. Navigation semantics live in the router.
    ========================================================================== */
-.x-owner-mobile-page-header {
+.x-owner-child-mobile-header {
+  display: block;
   min-width: 0;
+  margin: 0 0 16px;
+}
+
+.x-owner-child-legacy-nav {
+  display: none !important;
+}
+
+.x-owner-child-mobile-header .x-owner-mobile-page-title,
+body:not(.x-merchant-app) .x-owner-mobile-page-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.25;
+  font-weight: 800;
+  color: #111827;
+}
+
+.x-owner-mobile-page-title > span:first-of-type {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.x-owner-mobile-page-back,
+.x-title-back-btn.x-owner-mobile-page-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 12px;
+  background: #f1f5f9;
+  color: #334155;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.x-owner-mobile-page-back:hover {
+  background: #e2e8f0;
+}
+
+.x-owner-mobile-page-back:active {
+  transform: scale(.96);
+}
+
+.x-owner-mobile-page-back:focus-visible {
+  outline: 2px solid #111827;
+  outline-offset: 2px;
+}
+
+.x-owner-page-back-icon {
+  display: block;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+}
+
+.x-owner-child-mobile-header .x-owner-mobile-page-sub,
+body:not(.x-merchant-app) .x-owner-mobile-page-sub {
+  margin: 4px 0 0 48px !important;
+  padding: 0 !important;
+  font-size: 12px !important;
+  line-height: 1.4 !important;
+  font-weight: 500 !important;
+  text-align: left !important;
+  color: #747c83 !important;
 }
 
 @media (max-width: 768px) {
+  .x-owner-child-mobile-header {
+    margin-bottom: 14px;
+  }
+
+  .x-owner-child-mobile-header .x-owner-mobile-page-title,
   body:not(.x-merchant-app) .x-owner-mobile-page-title {
-    display: flex !important;
-    align-items: center !important;
-    gap: 8px !important;
-    margin: 0 !important;
-    min-width: 0;
     font-size: 18px;
     line-height: 1.25;
-    font-weight: 800;
-    color: #111827;
   }
 
-  body:not(.x-merchant-app) .x-owner-mobile-page-title > span:first-of-type {
-    min-width: 0;
+  .x-owner-mobile-page-back,
+  .x-title-back-btn.x-owner-mobile-page-back {
+    flex-basis: 40px;
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    border-radius: 12px !important;
   }
 
-  body:not(.x-merchant-app) .x-owner-mobile-page-back,
-  body:not(.x-merchant-app) .x-title-back-btn.x-owner-mobile-page-back {
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    flex: 0 0 30px;
-    width: 30px !important;
-    height: 30px !important;
-    min-width: 30px !important;
-    padding: 0 !important;
-    border: 0 !important;
-    border-radius: 50% !important;
-    background: #f1f5f9 !important;
-    color: #334155 !important;
-    cursor: pointer !important;
-    margin: 0 !important;
-  }
-
-  body:not(.x-merchant-app) .x-owner-mobile-page-back:active {
-    transform: scale(.96);
-  }
-
-  body:not(.x-merchant-app) .x-owner-mobile-page-back:focus-visible {
-    outline: 2px solid #111827;
-    outline-offset: 2px;
-  }
-
-  body:not(.x-merchant-app) .x-owner-page-back-icon {
-    display: block;
+  .x-owner-page-back-icon {
     width: 18px;
     height: 18px;
-    flex: 0 0 18px;
   }
 
+  .x-owner-child-mobile-header .x-owner-mobile-page-sub,
   body:not(.x-merchant-app) .x-owner-mobile-page-sub {
-    margin: 0 0 0 38px !important;
-    padding: 0 !important;
+    margin-left: 48px !important;
     font-size: 12px !important;
-    line-height: 1.4 !important;
-    font-weight: 500 !important;
-    text-align: left !important;
-    color: #747c83 !important;
   }
 
-  /* Menu Cabang keeps the live branch badge, but it should not overpower the
-     page title on a narrow viewport. */
+  /* Focused editors come from legacy modal cards. Their mobile page shell
+     owns the title/back affordance, so hide the modal-only title row here. */
+  body:not(.x-merchant-app) .x-feature-page-surface > .x-modal-header {
+    display: none !important;
+  }
+
+  body:not(.x-merchant-app) .x-feature-page-surface {
+    border-radius: 14px;
+  }
+
   body:not(.x-merchant-app) #tab-catalog-menus #menus-context-badge {
     flex: 0 0 auto;
     font-size: 10px;
     padding: 3px 7px;
   }
 
-  body:not(.x-merchant-app) #tab-catalog-menus .x-owner-mobile-page-header {
+  body:not(.x-merchant-app) #tab-catalog-menus .x-owner-child-mobile-header {
     min-width: 0;
   }
 }
+
