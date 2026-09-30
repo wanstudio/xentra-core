@@ -40,11 +40,22 @@ test('Default Master Levels are provisioned only for brands without levels', () 
   assert.deepEqual(first.map(row => row.name), [
     '1 — Tidak Pedas',
     '2 — Pedas Sedang',
-    '3 — Pedas Banget'
+    '3 — Pedas Banget',
+    '4 — Super Pedas'
   ]);
 
   const second = MasterMenuCompositionService.ensureDefaultLevels({ brandId: BRAND_B });
   assert.deepEqual(second.map(row => row.id), first.map(row => row.id));
+
+  // Existing legacy three-level system defaults are upgraded by adding only
+  // the missing fourth level; no existing name is renamed or deleted.
+  db.prepare('DELETE FROM menu_levels WHERE brand_id = ?').run(BRAND_B);
+  db.prepare("INSERT INTO menu_levels (id, brand_id, name, slug, sort_order, is_active) VALUES ('mmc_service_old_level_1', ?, '1 — Tidak Pedas', '1-tidak-pedas', 1, 1)").run(BRAND_B);
+  db.prepare("INSERT INTO menu_levels (id, brand_id, name, slug, sort_order, is_active) VALUES ('mmc_service_old_level_2', ?, '2 — Pedas Sedang', '2-pedas-sedang', 2, 1)").run(BRAND_B);
+  db.prepare("INSERT INTO menu_levels (id, brand_id, name, slug, sort_order, is_active) VALUES ('mmc_service_old_level_3', ?, '3 — Pedas Banget', '3-pedas-banget', 3, 1)").run(BRAND_B);
+  const upgraded = MasterMenuCompositionService.ensureDefaultLevels({ brandId: BRAND_B });
+  assert.equal(upgraded.length, 4);
+  assert.equal(upgraded.filter(row => row.name === '4 — Super Pedas').length, 1);
 
   db.prepare('DELETE FROM menu_levels WHERE brand_id = ?').run(BRAND_B);
 });
