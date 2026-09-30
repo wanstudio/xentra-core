@@ -172,6 +172,38 @@ test('Adding a Master Complement from Product Editor auto-selects it', () => {
   assert.ok(handler.includes('renderMasterMenuSelectors();'));
 });
 
+test('Product Editor separates POS options into a dedicated card', () => {
+  const start = HTML.indexOf('<section id="tab-catalog-products"');
+  const end = HTML.indexOf('<!-- TAB: CATALOG / MENUS', start);
+  const section = HTML.slice(start, end);
+
+  assert.strictEqual((section.match(/id="form-product"/g) || []).length, 1,
+    'Product Editor must keep one canonical product form');
+
+  const mainStart = section.indexOf('x-product-editor-main-card');
+  const posStart = section.indexOf('x-product-editor-pos-card');
+  assert.ok(mainStart >= 0 && posStart > mainStart,
+    'POS options card must be a separate visual section after the main Product card');
+
+  const mainCard = section.slice(mainStart, posStart);
+  assert.ok(mainCard.includes('id="prod-category"'));
+  assert.ok(mainCard.includes('id="prod-flavor"'));
+  assert.ok(mainCard.includes('id="prod-complements-editor"'));
+  assert.ok(mainCard.includes('id="prod-level-chips"'));
+  assert.ok(mainCard.includes('id="prod-price"'));
+  assert.ok(!mainCard.includes('id="prod-options-editor"'),
+    'POS options editor must not live inside the Product Master card');
+
+  const posCard = section.slice(posStart);
+  assert.ok(posCard.includes('id="prod-options-editor"'));
+  assert.ok(posCard.includes('id="btn-prod-options-add-group"'));
+  assert.ok(posCard.includes('Opsi Penjualan POS'));
+  assert.ok(posCard.includes('khusus saat penjualan melalui POS'));
+
+  assert.ok(section.includes('x-product-editor-actions'),
+    'Form actions remain outside both cards as the page-level form footer');
+});
+
 test('Master Product editor keeps Flavor optional and exposes multi-select complements plus horizontal Level Pedas selector', () => {
   const start = HTML.indexOf('<section id="tab-catalog-products"');
   const end = HTML.indexOf('<!-- TAB: CATALOG / MENUS', start);
