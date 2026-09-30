@@ -59,7 +59,7 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
 
     location / {
-        proxy_pass http://127.0.0.1:3000;
+        proxy_pass http://127.0.0.1:3001;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -72,7 +72,7 @@ server {
     }
 
     location ~* \.(jpg|jpeg|png|gif|ico|css|js|woff2|ttf|svg)$ {
-        proxy_pass http://127.0.0.1:3000;
+        proxy_pass http://127.0.0.1:3001;
         proxy_set_header Host $host;
         expires 7d;
         add_header Cache-Control "public, immutable";
@@ -142,7 +142,7 @@ pm2 logs xentra-core --lines 50
 
 ### Health check fail
 ```bash
-curl -v http://127.0.0.1:3000/health
+curl -v http://127.0.0.1:3001/health
 pm2 logs xentra-core --lines 20
 ```
 
