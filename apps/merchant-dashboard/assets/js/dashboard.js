@@ -3203,8 +3203,12 @@
     renderMasterMenuCustomerPreview();
   }
 
-  window.openAddProduct = function () {
+  var _productEditorLoadSeq = 0;
+
+  function resetProductEditorForAdd() {
     $('modal-product-title').textContent = 'Tambah Produk Master Baru';
+    $('prod-editor-breadcrumb').textContent = 'Tambah Produk';
+    $('prod-editor-subtitle').textContent = 'Susun identitas, harga, foto, dan komposisi Master Menu.';
     $('prod-id').value = '';
     $('prod-name').value = '';
     $('prod-price').value = '';
@@ -3215,60 +3219,96 @@
     toggleRangeFields();
     $('prod-desc').value = '';
     _productImageFile = null;
+    _productCropSpec = null;
     var fileInput = $('prod-image-file');
     if (fileInput) fileInput.value = '';
     setProductImagePreview('', false);
-    renderMasterMenuCustomerPreview();
+    clearLegacyMenuMigrationNotice();
     _productOptionsDraft = [];
     renderProductOptionsEditor();
     populateProductCategorySelect();
     _masterMenuSelected = { flavor_id: '', complement_ids: [], level_id: '' };
     renderMasterMenuSelectors();
     renderMasterMenuCustomerPreview();
-    $('modal-product').style.display = 'flex';
-    loadMasterMenuComponents();
-  };
+  }
 
-  window.openEditProduct = function (id) {
-    var prod = state.products.find(function (p) { return String(p.id) === String(id); });
-    if (!prod) return;
-
+  function populateProductEditorForm(prod) {
     $('modal-product-title').textContent = 'Edit Produk: ' + prod.name;
+    $('prod-editor-breadcrumb').textContent = prod.name;
+    $('prod-editor-subtitle').textContent = 'Periksa dan perbarui data Master Menu.';
     $('prod-id').value = prod.id;
-    $('prod-name').value = prod.name;
+    $('prod-name').value = prod.name || '';
     populateProductCategorySelect();
-    $('prod-category').value = prod.category_id;
-    $('prod-price').value = prod.price;
-    $('prod-regular-price').value = prod.regular_price || prod.price;
+    $('prod-category').value = prod.category_id || '';
+    $('prod-price').value = prod.price != null ? prod.price : '';
+    $('prod-regular-price').value = prod.regular_price || prod.price || '';
     $('prod-pricing-mode').value = prod.pricing_mode || 'lock';
     $('prod-min-price').value = prod.min_price || '';
     $('prod-max-price').value = prod.max_price || '';
     toggleRangeFields();
     $('prod-desc').value = prod.description || '';
     _productImageFile = null;
+    _productCropSpec = null;
     var fileInput = $('prod-image-file');
     if (fileInput) fileInput.value = '';
     var existingImage = prod.image || prod.image_url || '';
     setProductImagePreview(existingImage, existingImage !== '');
     _productOptionsDraft = normalizeProductOptionsDraft(prod.options_config);
     renderProductOptionsEditor();
-    $('modal-product').style.display = 'flex';
-    loadMasterMenuComposition(prod.id, prod.name);
-    loadProductOptionsEditor(prod.id);
+  }
+
+  async function loadProductEditorPage(productId) {
+    var requestSeq = ++_productEditorLoadSeq;
+    showProductEditorSection();
+
+    if (!productId) {
+      resetProductEditorForAdd();
+      await loadMasterMenuComponents();
+      return;
+    }
+
+    try {
+      var results = await Promise.all([
+        adminFetch(API_BASE + '/admin/products/' + encodeURIComponent(productId), { headers: getAuthHeaders() })
+          .then(function(res) { return res.json(); }),
+        adminFetch(API_BASE + '/admin/categories', { headers: getAuthHeaders() })
+          .then(function(res) { return res.json(); })
+      ]);
+      if (requestSeq !== _productEditorLoadSeq) return;
+
+      var productData = results[0];
+      var categoryData = results[1];
+      if (!productData.success || !productData.product) {
+        showToast('❌ ' + (productData.error || 'Produk tidak ditemukan.'));
+        navigateTo('catalog/products');
+        return;
+      }
+
+      if (categoryData.success) state.categories = categoryData.categories || [];
+      var prod = productData.product;
+      populateProductEditorForm(prod);
+      await loadMasterMenuComposition(prod.id, prod.name);
+      await loadProductOptionsEditor(prod.id);
+    } catch (err) {
+      if (requestSeq !== _productEditorLoadSeq) return;
+      console.error('[Product Editor Load Error]:', err);
+      showToast('❌ Gagal memuat editor Produk Master.');
+    }
+  }
+
+  window.openAddProduct = function () {
+    navigateTo('catalog/products/new');
+  };
+
+  window.openEditProduct = function (id) {
+    if (!id) return;
+    navigateTo('catalog/products/' + encodeURIComponent(id) + '/edit');
   };
 
   window.closeProductModal = function () {
-    $('modal-product').style.display = 'none';
-    _productImageFile = null;
+    _productEditorLoadSeq++;
+    navigateTo('catalog/products');
   };
-
-  function toggleRangeFields() {
-    var ppm = $('prod-pricing-mode');
-    var prf = $('prod-range-fields');
-    if (!ppm || !prf) return;
-    var isRange = ppm.value === 'range';
-    prf.style.display = isRange ? 'flex' : 'none';
-  }
 
   window.toggleStock = async function (id) {
     try {
@@ -3482,6 +3522,22 @@
     var prodPricingMode = $('prod-pricing-mode');
     if (prodPricingMode) {
       prodPricingMode.addEventListener('change', toggleRangeFields);
+    }
+
+    var btnBackFromProductEditor = $('btn-back-from-product-editor');
+    if (btnBackFromProductEditor && !btnBackFromProductEditor.dataset.bound) {
+      btnBackFromProductEditor.dataset.bound = 'true';
+      btnBackFromProductEditor.addEventListener('click', function () {
+        navigateTo('catalog/products');
+      });
+    }
+
+    var btnCancelProductEditor = $('btn-cancel-product-editor');
+    if (btnCancelProductEditor && !btnCancelProductEditor.dataset.bound) {
+      btnCancelProductEditor.dataset.bound = 'true';
+      btnCancelProductEditor.addEventListener('click', function () {
+        navigateTo('catalog/products');
+      });
     }
 
     // Master Products Add buttons
@@ -3723,11 +3779,8 @@
           }
 
           showToast('✅ Produk master berhasil disimpan!');
-          window.closeProductModal();
           loadMasterProducts();
-          if (_catalogState.activeDetailProductId) {
-            loadProductDetailView(_catalogState.activeDetailProductId);
-          }
+          navigateTo('catalog/products/' + encodeURIComponent(savedId));
         } catch (err) {
           showToast('Gagal menyimpan menu.');
         }
