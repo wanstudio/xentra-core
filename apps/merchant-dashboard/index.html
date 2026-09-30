@@ -3684,29 +3684,7 @@
       </section>
 
       <!-- Owner Mobile Bottom Navigation (Exactly 5 modules: Beranda, Bisnis, Pesanan, Keuangan, Lainnya) -->
-      <nav class="x-owner-bottom-nav" id="x-owner-bottom-nav" aria-label="Navigasi Utama Mobile Owner">
-        <button type="button" class="x-owner-nav-item active" data-tab-module="beranda" data-route="overview" aria-current="page">
-          <img src="/merchant-dashboard/assets/icons/fa7-solid_home.svg" alt="" width="24" height="24" aria-hidden="true">
-          <span>Beranda</span>
-        </button>
-        <button type="button" class="x-owner-nav-item" data-tab-module="bisnis" data-route="business">
-          <img src="/merchant-dashboard/assets/icons/ic_round-business-center-new.svg" alt="" width="24" height="24" aria-hidden="true">
-          <span>Bisnis</span>
-        </button>
-        <button type="button" class="x-owner-nav-item" data-tab-module="pesanan" data-route="orders">
-          <img src="/merchant-dashboard/assets/icons/fluent_task-list-rectangle-28-filled.svg" alt="" width="24" height="24" aria-hidden="true">
-          <span>Pesanan</span>
-        </button>
-        <button type="button" class="x-owner-nav-item" data-tab-module="keuangan" data-route="finance">
-          <img src="/merchant-dashboard/assets/icons/reicon_wallet-money-filled.svg" alt="" width="24" height="24" aria-hidden="true">
-          <span>Keuangan</span>
-        </button>
-        <button type="button" class="x-owner-nav-item" data-tab-module="lainnya" data-route="more">
-          <img src="/merchant-dashboard/assets/icons/reicon_menu-board-filled.svg" alt="" width="24" height="24" aria-hidden="true">
-          <span>Lainnya</span>
-        </button>
-      </nav>
-
+      
     </main>
 
 
@@ -4791,6 +4769,31 @@
     </div>
   </div>
 
+
+  <!-- Persistent mobile application-shell navigation. Must stay outside route/page sections. -->
+<nav class="x-owner-bottom-nav" id="x-owner-bottom-nav" aria-label="Navigasi Utama Mobile Owner">
+        <button type="button" class="x-owner-nav-item active" data-tab-module="beranda" data-route="overview" aria-current="page">
+          <img src="/merchant-dashboard/assets/icons/fa7-solid_home.svg" alt="" width="24" height="24" aria-hidden="true">
+          <span>Beranda</span>
+        </button>
+        <button type="button" class="x-owner-nav-item" data-tab-module="bisnis" data-route="business">
+          <img src="/merchant-dashboard/assets/icons/ic_round-business-center-new.svg" alt="" width="24" height="24" aria-hidden="true">
+          <span>Bisnis</span>
+        </button>
+        <button type="button" class="x-owner-nav-item" data-tab-module="pesanan" data-route="orders">
+          <img src="/merchant-dashboard/assets/icons/fluent_task-list-rectangle-28-filled.svg" alt="" width="24" height="24" aria-hidden="true">
+          <span>Pesanan</span>
+        </button>
+        <button type="button" class="x-owner-nav-item" data-tab-module="keuangan" data-route="finance">
+          <img src="/merchant-dashboard/assets/icons/reicon_wallet-money-filled.svg" alt="" width="24" height="24" aria-hidden="true">
+          <span>Keuangan</span>
+        </button>
+        <button type="button" class="x-owner-nav-item" data-tab-module="lainnya" data-route="more">
+          <img src="/merchant-dashboard/assets/icons/reicon_menu-board-filled.svg" alt="" width="24" height="24" aria-hidden="true">
+          <span>Lainnya</span>
+        </button>
+      </nav>
+
   <!-- Mobile Account Page (GoBiz / Xentra style) -->
   <section class="x-mobile-account-page" id="x-mobile-account-page" aria-hidden="true">
     <div class="x-mobile-account-statusbar-spacer"></div>
@@ -4861,6 +4864,7 @@
   <script src="/merchant-shared/js/crop-editor.js?v=1.0.1"></script>
   <script src="/merchant-shared/js/catalog-client.js?v=1.0.1"></script>
   <script src="/merchant-dashboard/assets/js/branch-catalog-ui.js?v=1.0.0"></script>
-  <script src="/dashboard/assets/js/dashboard.js?v=3.0.41"></script>
+  <script src="/merchant-dashboard/assets/js/owner-bottom-nav.js?v=1.0.0"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=3.0.42"></script>
 </body>
 </html>
