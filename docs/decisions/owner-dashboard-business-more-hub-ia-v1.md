@@ -190,15 +190,19 @@ Ini tidak mengubah keputusan bahwa Produk Master adalah tempat assembly. Halaman
 
 
 
-## UPDATE — Kategori Page: 2 Tabs Kategori | Rasa
-**29 September 2026**
+## UPDATE — Kategori Page: 4 Master Menu Tabs
+**30 September 2026**
 
 The Owner Kategori management page now uses exactly two local tabs:
 
-Kategori | Rasa
+Kategori | Rasa | Kelengkapan | Level
 
 Each tab renders its master-reference list as compact cards. Every card exposes an overflow action menu with Edit and Hapus.
 
-Kategori uses /admin/categories. Rasa uses /admin/menu/components/flavor.
+Kategori uses /admin/categories. Rasa, Kelengkapan, and Level use /admin/menu/components/:type.
 
-The Product Master editor remains the assembly workspace and keeps contextual + quick-add for Kategori/Rasa. The Category page is only for managing existing master values.
+Kelengkapan is the reusable multi-select detail vocabulary for Product Master. Level is the reusable single-select customer indicator vocabulary. When a brand has no Level master rows, the system provisions the standard values 1 — Tidak Pedas, 2 — Pedas Sedang, and 3 — Pedas Banget; existing custom Level rows are never overwritten.
+
+The Product Master editor remains the assembly workspace: Kategori is required; Rasa is optional and single-select; Kelengkapan is optional and multi-select; Level is optional and single-select. POS selling options remain a separate POS-only configuration, not part of the Customer PWA composition.
+
+The Category page is the central master-reference management page for all four vocabularies.
