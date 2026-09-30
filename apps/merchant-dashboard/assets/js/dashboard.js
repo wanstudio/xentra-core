@@ -8149,18 +8149,21 @@ async function loadMenusView() {
   });
 
   // Canonical Back behavior for Owner secondary/child pages.
-  // A child only goes one level up its app-managed navigation stack. Direct/deep
-  // links at stack index 0 return to the Business root.
+  // Resolve the current app-managed parent and replace the current entry.
+  // This avoids raw browser-history traversal, which may contain unrelated
+  // entries in a PWA/mobile session.
   window.goBackFromChildPage = function () {
     var state = window.history && window.history.state;
     var ownerState = state && state[OWNER_NAV_STATE_KEY];
+    var currentRoute = ownerState && ownerState.route
+      ? canonicalizeOwnerRoute(ownerState.route)
+      : canonicalizeOwnerRoute(getCurrentRoute() || '');
+    var parentRoute = ownerState && ownerState.parentRoute
+      ? canonicalizeOwnerRoute(ownerState.parentRoute)
+      : null;
 
-    if (
-      ownerState &&
-      Number(ownerState.index || 0) > 0 &&
-      ownerState.parentRoute
-    ) {
-      window.history.back();
+    if (parentRoute && parentRoute !== currentRoute) {
+      navigateTo(parentRoute, { history: 'root' });
       return;
     }
 
