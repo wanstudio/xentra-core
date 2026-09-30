@@ -289,3 +289,14 @@ Any change to the target structure, domain ownership, app boundary, migration se
 - production-risk impact.
 
 No implementation commit may silently redefine this architecture.
+
+
+## 🔒 LOCKED ADDENDUM — Presentation Shell vs Feature Context v1 — 2026-09-30
+
+Xentra's frontend architecture separates reusable **presentation shells** from **feature contexts**. Page, Bottom Sheet, Dialog/Modal, Overlay, Side Sheet/Panel, and applicable Picker shells are presentation mechanisms. Feature contexts such as Category Editor, Flavor Editor, Product Editor, Branch Editor, Promo Editor, and Customer Editor remain independent and are composed into the appropriate shell.
+
+Shells own presentation lifecycle/placement behavior; feature contexts own task state, validation, and domain actions. Do not duplicate feature logic when presentation changes, do not encode presentation into feature names, and do not create a second generic UI framework. Reuse mature Xentra primitives first.
+
+This is an application/UI composition rule and does not change Core authority, domain boundaries, RBAC, routing authority, or business state machines.
+
+Canonical detailed decision: `docs/decisions/xentra-presentation-shell-vs-feature-context-v1.md`.
