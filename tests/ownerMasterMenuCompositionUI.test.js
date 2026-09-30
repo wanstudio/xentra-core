@@ -8,6 +8,7 @@ const path = require('node:path');
 const ROOT = path.resolve(__dirname, '..');
 const HTML = fs.readFileSync(path.join(ROOT, 'apps/merchant-dashboard/index.html'), 'utf8');
 const JS = fs.readFileSync(path.join(ROOT, 'apps/merchant-dashboard/assets/js/dashboard.js'), 'utf8');
+const CSS = fs.readFileSync(path.join(ROOT, 'apps/merchant-shared/css/dashboard.css'), 'utf8');
 
 test('Owner Kategori/Rasa loading is independent and stale-safe', () => {
   const start = JS.indexOf('async function loadMasterCategoriesPage()');
@@ -178,12 +179,20 @@ test('Product editor routes cleanly between list, detail, add, and edit', () => 
   assert.ok(JS.includes("navigateTo('catalog/products/' + encodeURIComponent(savedId))"));
 });
 
-test('New Product form does not introduce legacy branch override composition fields', () => {
-  const start = HTML.indexOf('<!-- MODAL: ADD / EDIT PRODUCT -->');
-  const end = HTML.indexOf('<!-- MODAL: MASTER MENU COMPONENT MANAGER -->', start);
-  assert.ok(start >= 0 && end > start, 'Product modal boundaries must exist');
-  const form = HTML.slice(start, end);
+test('Master Product editor stays inside Catalog Products tab and remains mobile-safe', () => {
+  const tabStart = HTML.indexOf('<section id="tab-catalog-products"');
+  const tabEnd = HTML.indexOf('<!-- TAB: CATALOG / MENUS', tabStart);
+  const editorStart = HTML.indexOf('<section id="product-editor-view"');
+  const editorEnd = HTML.indexOf('</section>', editorStart);
+  assert.ok(tabStart >= 0 && tabEnd > tabStart, 'Catalog Products tab must exist');
+  assert.ok(editorStart > tabStart && editorEnd > editorStart && editorEnd < tabEnd,
+    'Product editor must be contained inside Catalog Products tab');
+  assert.ok(!HTML.includes('id="modal-product"'), 'Legacy product modal must be removed');
+  assert.ok(CSS.includes('#product-editor-view.x-card-panel'), 'Product editor needs dedicated responsive page styles');
+  assert.ok(CSS.includes('#product-editor-view #prod-options-editor [style*="grid-template-columns"]'),
+    'Dynamic POS option grids must collapse on mobile');
   for (const legacyField of ['name_override', 'description_override', 'image_override', 'branch_category_id']) {
+    const form = HTML.slice(editorStart, editorEnd);
     assert.ok(!form.includes(legacyField), 'Legacy field leaked into Owner Master Product UI: ' + legacyField);
   }
 });
