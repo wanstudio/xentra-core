@@ -1378,7 +1378,7 @@
         '<article class="x-product' + (unavailable ? ' x-product-unavailable' : '') + '" data-product-card="' + UI.escape(String(product.id)) + '">' +
         '<div class="x-product-info">' +
         '  <div class="x-product-name">' + UI.escape(menuTitle) + '</div>' +
-        (menuSubtitle ? '  <div class="x-product-description">' + UI.escape(menuSubtitle) + '</div>' : '') +
+        (menuSubtitle ? '  <div class="x-product-subtitle">' + UI.escape(menuSubtitle) + '</div>' : '') +
         (menuDetail.length ? '  <div class="x-product-description">' + UI.escape(menuDetail.join(' · ')) + '</div>' : '') +
         renderCustomerSpiceIndicator(product.menu_indicator_level) +
         (!menuSubtitle && !menuDetail.length && legacyDesc ? '  <div class="x-product-description">' + UI.escape(legacyDesc) + '</div>' : '') +
@@ -1661,7 +1661,7 @@
       imgHtml +
       '    <div class="x-detail-body">' +
       '      <h3 class="x-detail-name">' + UI.escape(menuTitle) + '</h3>' +
-      (menuSubtitle ? '      <div class="x-detail-desc">' + UI.escape(menuSubtitle) + '</div>' : '') +
+      (menuSubtitle ? '      <div class="x-detail-subtitle">' + UI.escape(menuSubtitle) + '</div>' : '') +
       (menuDetail.length ? '      <div class="x-detail-desc">' + UI.escape(menuDetail.join(' · ')) + '</div>' : '') +
       renderCustomerSpiceIndicator(product.menu_indicator_level) +
       branchLabelHtml +
