@@ -2389,7 +2389,7 @@
   }
   function openEditMasterReference(type, id) {
     var meta = MASTER_REFERENCE_META[type];
-    var content = $('modal-master-reference-quick-add');
+    var content = $('master-reference-editor');
     if (!meta || !content || !window.XentraPresentation) return;
 
     var row = referenceRows(type).find(function(item) { return String(item.id) === String(id); });
@@ -2503,7 +2503,7 @@
 
   function openMasterReferenceQuickAdd(type) {
     var meta = MASTER_REFERENCE_META[type];
-    var content = $('modal-master-reference-quick-add');
+    var content = $('master-reference-editor');
     if (!meta || !content || !window.XentraPresentation) return;
 
     $('master-reference-quick-add-type').value = type;
