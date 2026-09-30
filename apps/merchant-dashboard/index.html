@@ -1799,8 +1799,12 @@
           <div class="x-master-choice-label-row">
             <label style="margin:0;">Kelengkapan <span class="text-muted">(Detail Customer)</span></label>
           </div>
-          <div id="prod-complements-editor" class="x-master-choice-grid x-master-complement-grid" role="group" aria-label="Pilih Kelengkapan"></div>
-          <div id="prod-complements-empty" class="text-muted x-master-choice-empty">Belum ada Master Kelengkapan.</div>
+          <div id="prod-complements-editor" class="x-master-choice-grid x-master-complement-grid" role="group" aria-label="Pilih Kelengkapan">
+            <button type="button" class="x-master-choice-chip x-master-choice-add" data-master-choice-add="1" aria-label="Tambah Kelengkapan">
+              <span aria-hidden="true">+</span><span>Tambah</span>
+            </button>
+          </div>
+          <div id="prod-complements-empty" class="text-muted x-master-choice-empty" hidden aria-hidden="true"></div>
         </div>
 
         <div class="x-form-group x-master-choice-group">
