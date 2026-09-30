@@ -34,17 +34,29 @@ Merchant does not author or override that composition.
 
 The following are **legacy/non-canonical** for the new Menu architecture:
 
-### Branch Product content overrides
+### Branch Product legacy content overrides
 
 ```
-branch_products.name_override
 branch_products.description_override
 branch_products.image_override
 ```
 
-These fields MUST NOT be used for new Customer Menu composition work.
+These legacy fields MUST NOT be used for new Customer Menu composition work. They remain temporarily for compatibility and migration only.
 
-They may remain temporarily for compatibility and migration only.
+### Reclassified canonical field — Branch Customer Display Name
+
+`branch_products.name_override TEXT NULL` is now a narrow canonical presentation field.
+
+It is optional and scoped to one Branch adoption:
+- non-empty string → Customer title override for that Branch;
+- `NULL` / cleared → inherit the live Master Customer presentation;
+- `branch_products.product_id` remains the Master Product reference;
+- no new Product or Master composition is created.
+
+Canonical transport:
+`PATCH /admin/branches/:id/menu/:productId/display-name`
+
+This reclassification does not activate `description_override` or `image_override`.
 
 ### Legacy Branch override UI
 
