@@ -648,6 +648,23 @@ The repository is executing the locked Master Menu Composition migration.
 **Execution plan:** `docs/decisions/xentra-master-menu-composition-implementation-plan-v1.md`  
 **Legacy boundary:** `docs/decisions/xentra-menu-legacy-quarantine-v1.md`
 
+**Migration lifecycle:** `docs/decisions/xentra-menu-expand-migrate-verify-contract-v1.md`
+
+### Locked migration implementation
+
+The Menu migration is now a first-class repository capability, not a page-level patch.
+
+- `products.menu_schema_version` and `products.menu_migration_status` track the lightweight current lifecycle state.
+- `product_menu_migrations` stores reconciliation evidence, attempts, errors, timestamps, and the canonical fingerprint.
+- `ProductMenuMigrationService` provides inspection, reconciliation, verification, and brand-wide batch operations.
+- `tools/migrate-master-menu.js` is the explicit operator entry point; ordinary application startup does not run migration.
+- Canonical Product composition saves record schema version 2 / migrated state in the same transaction as the structured relations.
+- Legacy free text is never auto-guessed into Flavor, Complement, or Level.
+
+Migration lifecycle is locked as:
+
+**Expand → Migrate/Backfill → Verify → Switch reads/writes to canonical → Contract**
+
 ### Completed
 
 1. Forward contract locked.
@@ -660,8 +677,8 @@ The repository is executing the locked Master Menu Composition migration.
 8. Customer branch catalog switched to structured Master Menu resolver.
 9. Customer PWA renders Kategori/Rasa/Kelengkapan/Level from the resolved DTO.
 10. Checkout final verification uses the structured Master Menu resolver and stores the immutable `menu_snapshot` already supported by Order persistence.
-11. Readiness audit and deterministic legacy reconciliation tooling added.
-12. Relevant regression/contract tests added or reconciled.
+11. Migration lifecycle contract locked and implemented as a reusable Product Menu migration engine.
+12. Deterministic reconciliation/verification tooling and migration lifecycle regression tests added.
 
 ### Compatibility boundary
 
