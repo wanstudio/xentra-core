@@ -310,12 +310,19 @@ class MasterMenuCompositionRepository {
       throw new Error('MASTER_PRODUCT_NOT_FOUND');
     }
 
+    const currentCategoryId = product.category_id == null ? null : String(product.category_id);
     const category = this.db.queryOne(
-      'SELECT id FROM categories WHERE id = ? AND brand_id = ? AND (is_active = 1 OR is_active IS NULL)',
+      'SELECT id, is_active FROM categories WHERE id = ? AND brand_id = ?',
       [categoryId, brandId]
     );
     if (!category) {
       throw new Error('MASTER_CATEGORY_REQUIRED_OR_INVALID');
+    }
+    // An inactive category may remain attached to an existing product so an
+    // edit/save does not become impossible. Selecting an inactive category
+    // that was not already attached is still rejected.
+    if (category.is_active === 0 && String(categoryId) !== currentCategoryId) {
+      throw new Error('MASTER_CATEGORY_INACTIVE');
     }
 
     const normalizedFlavorId = flavorId == null || flavorId === '' ? null : String(flavorId);
@@ -324,14 +331,28 @@ class MasterMenuCompositionRepository {
       (Array.isArray(complementIds) ? complementIds : []).map(v => String(v || '').trim()).filter(Boolean)
     ));
 
+    const currentFlavor = this.db.queryOne(
+      'SELECT flavor_id FROM product_flavors WHERE product_id = ? LIMIT 1',
+      [productId]
+    );
+    const currentFlavorId = currentFlavor ? String(currentFlavor.flavor_id) : null;
+
     if (normalizedFlavorId) {
       const row = this.db.queryOne(
         'SELECT id, is_active FROM menu_flavors WHERE id = ? AND brand_id = ?',
         [normalizedFlavorId, brandId]
       );
       if (!row) throw new Error('MASTER_FLAVOR_INVALID');
-      if (row.is_active === 0) throw new Error('MASTER_FLAVOR_INACTIVE');
+      if (row.is_active === 0 && String(normalizedFlavorId) !== currentFlavorId) {
+        throw new Error('MASTER_FLAVOR_INACTIVE');
+      }
     }
+
+    const currentComplementRows = this.db.queryMany(
+      'SELECT complement_id FROM product_complements WHERE product_id = ?',
+      [productId]
+    );
+    const currentComplementIds = new Set(currentComplementRows.map(row => String(row.complement_id)));
 
     for (const id of normalizedComplementIds) {
       const row = this.db.queryOne(
@@ -339,8 +360,16 @@ class MasterMenuCompositionRepository {
         [id, brandId]
       );
       if (!row) throw new Error('MASTER_COMPLEMENT_INVALID');
-      if (row.is_active === 0) throw new Error('MASTER_COMPLEMENT_INACTIVE');
+      if (row.is_active === 0 && !currentComplementIds.has(String(id))) {
+        throw new Error('MASTER_COMPLEMENT_INACTIVE');
+      }
     }
+
+    const currentLevel = this.db.queryOne(
+      'SELECT level_id FROM product_levels WHERE product_id = ? LIMIT 1',
+      [productId]
+    );
+    const currentLevelId = currentLevel ? String(currentLevel.level_id) : null;
 
     if (normalizedLevelId) {
       const row = this.db.queryOne(
@@ -348,7 +377,9 @@ class MasterMenuCompositionRepository {
         [normalizedLevelId, brandId]
       );
       if (!row) throw new Error('MASTER_LEVEL_INVALID');
-      if (row.is_active === 0) throw new Error('MASTER_LEVEL_INACTIVE');
+      if (row.is_active === 0 && String(normalizedLevelId) !== currentLevelId) {
+        throw new Error('MASTER_LEVEL_INACTIVE');
+      }
     }
 
     this.db.exec('BEGIN IMMEDIATE');
