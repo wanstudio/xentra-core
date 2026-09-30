@@ -174,7 +174,7 @@ test('Owner Dashboard Mobile Navigation', async t => {
     const prefix = html.slice(0, navStart);
     const stack = [];
     const voidTags = new Set(['area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr']);
-    const tokenRe = /<!--[\\s\\S]*?-->|<\\/?([a-zA-Z0-9-]+)(?:\\s[^<>]*?)?>/g;
+    const tokenRe = /<!--[\s\S]*?-->|<\/?([a-zA-Z0-9-]+)(?:\s[^<>]*?)?>/g;
     for (const match of prefix.matchAll(tokenRe)) {
       const raw = match[0];
       const tag = match[1];
@@ -256,13 +256,13 @@ test('Owner Dashboard Mobile Navigation', async t => {
   // --------------------------------------------------------------------------
 
   await t.test('OWNER-MOB-18: JS defines initOwnerBottomNav function', () => {
-    assert.ok(js.includes('function initOwnerBottomNav()'),
-      'initOwnerBottomNav must be defined in dashboard.js');
+    assert.ok(navJs.includes('function initOwnerBottomNav()'),
+      'initOwnerBottomNav must be defined in owner-bottom-nav.js');
   });
 
   await t.test('OWNER-MOB-19: JS defines syncOwnerBottomNavActive function', () => {
-    assert.ok(js.includes('function syncOwnerBottomNavActive('),
-      'syncOwnerBottomNavActive must be defined in dashboard.js');
+    assert.ok(navJs.includes('function syncOwnerBottomNavActive('),
+      'syncOwnerBottomNavActive must be defined in owner-bottom-nav.js');
   });
 
   await t.test('OWNER-MOB-20: syncOwnerBottomNavActive is called from applyRoute', () => {
@@ -283,15 +283,15 @@ test('Owner Dashboard Mobile Navigation', async t => {
   await t.test('OWNER-MOB-23: _ownerNavModuleMap covers all 5 modules', () => {
     const modules = ['beranda', 'bisnis', 'pesanan', 'keuangan', 'lainnya'];
     for (const mod of modules) {
-      assert.ok(js.includes(`'${mod}'`),
+      assert.ok(navJs.includes(`'${mod}'`),
         `_ownerNavModuleMap must include module key '${mod}'`);
     }
   });
 
   await t.test('OWNER-MOB-24: Bottom nav does NOT drive authorization — no RBAC check in syncOwnerBottomNavActive', () => {
-    const fnStart = js.indexOf('function syncOwnerBottomNavActive(');
-    const fnEnd = js.indexOf('\n  }', fnStart) + 4;
-    const fnBody = js.substring(fnStart, fnEnd);
+    const fnStart = navJs.indexOf('function syncOwnerBottomNavActive(');
+    const fnEnd = navJs.indexOf('\n  }', fnStart) + 4;
+    const fnBody = navJs.substring(fnStart, fnEnd);
     assert.ok(!fnBody.includes('isOwner') && !fnBody.includes('isBranchManager') &&
               !fnBody.includes('role'),
       'syncOwnerBottomNavActive must not check roles — Focus is not auth, nav is constant');

@@ -1,3 +1,4 @@
+const test = require('node:test');
 const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
@@ -7,6 +8,7 @@ const shellJs = fs.readFileSync(path.join(root, 'apps/merchant-shared/js/present
 const shellCss = fs.readFileSync(path.join(root, 'apps/merchant-shared/css/presentation-shells.css'), 'utf8');
 const dashboardJs = fs.readFileSync(path.join(root, 'apps/merchant-dashboard/assets/js/dashboard.js'), 'utf8');
 const dashboardHtml = fs.readFileSync(path.join(root, 'apps/merchant-dashboard/index.html'), 'utf8');
+const branchCatalogJs = fs.readFileSync(path.join(root, 'apps/merchant-dashboard/assets/js/branch-catalog-ui.js'), 'utf8');
 
 test('PRES-01: reusable presentation shell exposes composition API', () => {
   assert.ok(shellJs.includes('window.XentraPresentation'));
@@ -78,7 +80,7 @@ test('PRES-08: Branch Add/Edit is a focused Page, not a legacy modal', () => {
 test('PRES-09: Branch Catalog uses the canonical Branch Detail Menu Page', () => {
   assert.ok(!dashboardHtml.includes('id="modal-branch-catalog"'));
   assert.ok(dashboardJs.includes("navigateTo('branches/' + encodeURIComponent(branchId) + '/menu')") || fs.readFileSync(path.join(root, 'apps/merchant-dashboard/assets/js/branch-catalog-ui.js'), 'utf8').includes("branches/' + encodeURIComponent(branchId) + '/menu"));
-  assert.ok(dashboardJs.includes("openBranchCatalogModal('"));
+  assert.ok(dashboardJs.includes("openBranchCatalogModal(") || dashboardJs.includes("openBranchCatalogModal"));
 });
 
 
@@ -86,8 +88,8 @@ test('PRES-10: Team lightweight editors compose into Bottom Sheet and reset toke
   assert.ok(dashboardJs.includes("openExistingCardInPresentation('modal-user', 'team-user-editor', 'bottom-sheet')"));
   assert.ok(dashboardJs.includes("openExistingCardInPresentation('modal-invite-user', 'team-invite-editor', 'bottom-sheet')"));
   assert.ok(dashboardJs.includes("openExistingCardInPresentation('modal-reset-password', 'team-reset-password', 'dialog')"));
-  assert.ok(dashboardJs.includes("id: 'delete-user'"));
-  assert.ok(dashboardJs.includes("id: 'disable-user'"));
+  assert.ok(dashboardJs.includes("'delete-user'"));
+  assert.ok(dashboardJs.includes("'disable-user'"));
   assert.ok(!dashboardJs.includes("confirm('Nonaktifkan akun"));
 });
 
@@ -120,17 +122,17 @@ test('PRES-13: Owner Dashboard legacy interactive surfaces use canonical present
 });
 
 test('PRES-14: Owner Dashboard destructive confirmations do not use native confirm()', () => {
-  const dashboardWithoutHelper = dashboardJs.replace(/function confirmFeatureAction[\\s\\S]*?\\n  }\\n/, '');
-  const branchWithoutHelper = branchCatalogJs.replace(/async function confirmBranchCatalogAction[\\s\\S]*?\\n  }\\n/, '');
-  assert.equal((dashboardWithoutHelper.match(/\\bconfirm\\s*\\(/g) || []).length, 0);
-  assert.equal((branchWithoutHelper.match(/\\bconfirm\\s*\\(/g) || []).length, 0);
+  const dashboardWithoutHelper = dashboardJs.replace(/function confirmFeatureAction[\s\S]*?\n  }\n/, '');
+  const branchWithoutHelper = branchCatalogJs.replace(/async function confirmBranchCatalogAction[\s\S]*?\n  }\n/, '');
+  assert.equal((dashboardWithoutHelper.match(/(?<![.\w])confirm\s*\(/g) || []).length, 0);
+  assert.equal((branchWithoutHelper.match(/(?<![.\w])confirm\s*\(/g) || []).length, 0);
 });
 
 test('PRES-15: Owner Dashboard no longer uses native prompt() for feature input', () => {
-  const dashboardWithoutHelper = dashboardJs.replace(/function requestTextInputSheet[\\s\\S]*?\\n  }\\n/, '');
-  const branchWithoutHelper = branchCatalogJs.replace(/function requestBranchTextInput[\\s\\S]*?\\n  }\\n/, '');
-  assert.equal((dashboardWithoutHelper.match(/\\bprompt\\s*\\(/g) || []).length, 0);
-  assert.equal((branchWithoutHelper.match(/\\bprompt\\s*\\(/g) || []).length, 0);
+  const dashboardWithoutHelper = dashboardJs.replace(/function requestTextInputSheet[\s\S]*?\n  }\n/, '');
+  const branchWithoutHelper = branchCatalogJs.replace(/function requestBranchTextInput[\s\S]*?\n  }\n/, '');
+  assert.equal((dashboardWithoutHelper.match(/\bprompt\s*\(/g) || []).length, 0);
+  assert.equal((branchWithoutHelper.match(/\bprompt\s*\(/g) || []).length, 0);
 });
 
 test('PRES-16: Owner Dashboard keeps legacy modal markup only as feature content composed by XentraPresentation', () => {

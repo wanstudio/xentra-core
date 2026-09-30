@@ -18,6 +18,8 @@ test('CLIENT OWNER DASHBOARD — Interaction, Navigation & Mobile Shell', async 
   const js = fs.readFileSync(JS_PATH, 'utf8');
   const sharedJs = fs.readFileSync(SHARED_JS_PATH, 'utf8');
   const branchCatalogJs = fs.readFileSync(BRANCH_CATALOG_JS_PATH, 'utf8');
+  const ownerBottomNavJs = fs.readFileSync(path.join(__dirname, '../apps/merchant-dashboard/assets/js/owner-bottom-nav.js'), 'utf8');
+  const presentationShellsJs = fs.readFileSync(path.join(__dirname, '../apps/merchant-shared/js/presentation-shells.js'), 'utf8');
   const css = fs.readFileSync(CSS_PATH, 'utf8');
 
   // index.html loads merchant-shared js before dashboard.js; mirror that order.
@@ -25,6 +27,8 @@ test('CLIENT OWNER DASHBOARD — Interaction, Navigation & Mobile Shell', async 
     win.eval(sharedJs);
     win.eval(fs.readFileSync(CATALOG_CLIENT_JS_PATH, 'utf8'));
     win.eval(branchCatalogJs);
+    win.eval(ownerBottomNavJs);
+    win.eval(presentationShellsJs);
     win.eval(js);
   }
 

@@ -549,7 +549,7 @@
     var isSettingsRoute = !isPlatform && (route === 'settings' || route.indexOf('settings/') === 0);
     var settingsSubtab = isSettingsRoute ? (route.indexOf('settings/') === 0 ? route.split('settings/')[1] : 'business/profile') : 'business/profile';
 
-    var metaKey = (isProductDetail || isProductEditor) ? 'catalog/products' : (isBranchEditor ? 'branches' : (isBranchDetail ? 'branches' : (isOrderDetail ? 'orders' : (isCustomerDetail ? 'customers/:id' : (isTeamRoute ? ('team/' + teamSubtab) : (isReportsRoute ? 'reports' : (isFinanceRoute ? ('finance/' + financeSubtab) : (isMarketingRoute ? ('marketing/' + marketingSubtab) : (isSettingsRoute ? ('settings/' + settingsSubtab) : route))))))));
+    var metaKey = (isProductDetail || isProductEditor) ? 'catalog/products' : (isBranchEditor ? 'branches' : (isBranchDetail ? 'branches' : (isOrderDetail ? 'orders' : (isCustomerDetail ? 'customers/:id' : (isTeamRoute ? ('team/' + teamSubtab) : (isReportsRoute ? 'reports' : (isFinanceRoute ? ('finance/' + financeSubtab) : (isMarketingRoute ? ('marketing/' + marketingSubtab) : (isSettingsRoute ? ('settings/' + settingsSubtab) : route)))))))));
     if (isMarketingEditor) metaKey = 'marketing/' + marketingSubtab;
     var meta = metaDict[metaKey] || metaDict[route] || metaDict['overview'];
     var tabId = meta.tab;
@@ -624,13 +624,17 @@
     var subEl = $('dash-page-subtitle');
     if (titleEl) titleEl.textContent = isProductEditor
       ? (productEditorId ? 'Edit Produk Master' : 'Tambah Produk Master')
-      : (isBranchEditor ? (branchEditorId ? 'Edit Cabang' : 'Tambah Cabang') : (isProductDetail ? 'Product Detail' : (isBranchDetail ? 'Branch Detail' : (isOrderDetail ? 'Order Detail' : (isCustomerDetail ? 'Customer Detail' : (isReportsRoute ? 'Reports' : meta.title)))));
+      : (isBranchEditor ? (branchEditorId ? 'Edit Cabang' : 'Tambah Cabang') : (isProductDetail ? 'Product Detail' : (isBranchDetail ? 'Branch Detail' : (isOrderDetail ? 'Order Detail' : (isCustomerDetail ? 'Customer Detail' : (isReportsRoute ? 'Reports' : meta.title))))));
     if (subEl) subEl.textContent = isProductEditor
       ? 'Susun identitas, harga, foto, dan komposisi Master Menu'
-      : (isBranchEditor ? 'Kelola identitas, lokasi, kontak, dan aturan operasional cabang' : (isProductDetail ? 'Detail produk master dan status adopsi di cabang' : (isBranchDetail ? 'Detail informasi, operasional, menu, dan tim cabang' : (isOrderDetail ? 'Detail transaksi, rincian biaya, dan status pesanan' : (isCustomerDetail ? 'Profil pelanggan, riwayat pesanan, dan loyalitas' : (isReportsRoute ? 'Laporan penjualan, analitik bisnis, dan kinerja cabang' : meta.sub)))));
+      : (isBranchEditor ? 'Kelola identitas, lokasi, kontak, dan aturan operasional cabang' : (isProductDetail ? 'Detail produk master dan status adopsi di cabang' : (isBranchDetail ? 'Detail informasi, operasional, menu, dan tim cabang' : (isOrderDetail ? 'Detail transaksi, rincian biaya, dan status pesanan' : (isCustomerDetail ? 'Profil pelanggan, riwayat pesanan, dan loyalitas' : (isReportsRoute ? 'Laporan penjualan, analitik bisnis, dan kinerja cabang' : meta.sub))))));
 
     // 6. Sync Owner bottom nav active module (no-op on desktop, hidden by CSS)
-    syncOwnerBottomNavActive(route);
+    if (typeof syncOwnerBottomNavActive === 'function') {
+      syncOwnerBottomNavActive(route);
+    } else if (typeof window !== 'undefined' && typeof window.syncOwnerBottomNavActive === 'function') {
+      window.syncOwnerBottomNavActive(route);
+    }
 
     // 7. In Platform Context: UI shells only, do not invoke merchant business loaders
     if (isPlatform) {
@@ -6643,7 +6647,7 @@ async function loadMenusView() {
     }
   }
 
-  function handleLogout() {
+  async function handleLogout() {
     if (!await confirmFeatureAction('logout-dashboard', 'Keluar Dashboard', 'Apakah Anda ingin keluar dari Dashboard?', 'Keluar')) return;
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
@@ -10801,7 +10805,11 @@ async function loadMenusView() {
     initOrdersFilterListeners();
     initMobileSidebar();
     initBranchContextSelector();
-    initOwnerBottomNav();
+    if (typeof initOwnerBottomNav === 'function') {
+      initOwnerBottomNav();
+    } else if (typeof window !== 'undefined' && typeof window.initOwnerBottomNav === 'function') {
+      window.initOwnerBottomNav();
+    }
     initOverviewControls();
 
     var refreshAppBtn = $('btn-settings-refresh-app-data');
