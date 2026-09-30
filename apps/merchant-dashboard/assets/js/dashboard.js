@@ -2912,7 +2912,7 @@
     notice.style.display = 'block';
   }
 
-  async function loadMasterMenuComposition(productId, legacyName) {
+  async function loadMasterMenuComposition(productId, legacyName, componentsAlreadyLoaded) {
     _masterMenuSelected = { flavor_id: '', complement_ids: [], level_id: '' };
     clearLegacyMenuMigrationNotice();
     renderMasterMenuSelectors();
@@ -2940,9 +2940,11 @@
       _masterMenuSelected.level_id = composition.level ? String(composition.level.id) : '';
     }
 
-    // Load all Master choices before applying a legacy suggestion so the dropdowns
-    // can be hydrated in one pass.
-    await loadMasterMenuComponents();
+    // The dedicated Product Editor preloads all Master references once. Older
+    // callers may omit the flag and still get a self-contained hydration pass.
+    if (!componentsAlreadyLoaded) {
+      await loadMasterMenuComponents();
+    }
 
     var hasStructuredComposition = Boolean(
       composition &&
@@ -3377,7 +3379,7 @@
       populateProductEditorForm(productData.product);
 
       setProductEditorLoading(true, 'Memuat komposisi dan opsi penjualan...');
-      await loadMasterMenuComposition(productData.product.id, productData.product.name);
+      await loadMasterMenuComposition(productData.product.id, productData.product.name, true);
       if (requestSeq !== _productEditorLoadSeq) return;
 
       await loadProductOptionsEditor(productData.product.id);
