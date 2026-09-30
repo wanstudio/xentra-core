@@ -834,68 +834,6 @@
   }
 
   /* =========================================================================
-     OWNER DASHBOARD — Mobile Bottom Navigation
-     5 fixed modules: Beranda, Bisnis, Pesanan, Keuangan, Lainnya.
-     Bottom nav is always the same regardless of Focus (branch selector) changes.
-     ========================================================================= */
-
-  var _ownerNavModuleMap = {
-    'overview': 'beranda',
-    'stock': 'bisnis',
-    'business': 'bisnis',
-    'catalog': 'bisnis', 'catalog/products': 'bisnis', 'catalog/categories': 'bisnis',
-    'catalog/menus': 'bisnis', 'branches': 'bisnis', 'customers': 'bisnis',
-    'marketing': 'bisnis', 'marketing/promotions': 'bisnis',
-    'marketing/banners': 'bisnis', 'marketing/discounts': 'bisnis',
-    'orders': 'pesanan',
-    'finance': 'keuangan', 'finance/overview': 'keuangan', 'finance/transactions': 'keuangan',
-    'finance/payouts': 'keuangan', 'finance/payment-methods': 'keuangan',
-    'more': 'lainnya', 'lainnya': 'lainnya',
-    'team': 'lainnya', 'settings': 'lainnya', 'reports': 'lainnya',
-    'settings/business/profile': 'lainnya', 'settings/security': 'lainnya'
-  };
-
-  function syncOwnerBottomNavActive(route) {
-    var module = _ownerNavModuleMap[route];
-    if (!module) {
-      if (route.indexOf('catalog/') === 0 || route.indexOf('branches/') === 0 ||
-          route.indexOf('marketing/') === 0 || route.indexOf('customers/') === 0) {
-        module = 'bisnis';
-      } else if (route.indexOf('finance/') === 0) {
-        module = 'keuangan';
-      } else if (route.indexOf('orders/') === 0) {
-        module = 'pesanan';
-      } else if (route.indexOf('team/') === 0 || route.indexOf('settings/') === 0 ||
-                 route.indexOf('reports/') === 0) {
-        module = 'lainnya';
-      } else {
-        module = 'beranda';
-      }
-    }
-    document.querySelectorAll('.x-owner-nav-item[data-tab-module]').forEach(function (btn) {
-      var active = btn.dataset.tabModule === module;
-      btn.classList.toggle('active', active);
-      if (active) {
-        btn.setAttribute('aria-current', 'page');
-      } else {
-        btn.removeAttribute('aria-current');
-      }
-    });
-  }
-  window.syncOwnerBottomNavActive = syncOwnerBottomNavActive;
-
-  function initOwnerBottomNav() {
-    var nav = $('x-owner-bottom-nav');
-    if (!nav) return;
-    nav.querySelectorAll('.x-owner-nav-item[data-route]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        navigateTo(btn.dataset.route);
-      });
-    });
-  }
-  window.initOwnerBottomNav = initOwnerBottomNav;
-
-  /* =========================================================================
      MOBILE SIDEBAR — Hamburger / Overlay / Close
      ========================================================================= */
 
