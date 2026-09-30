@@ -65,6 +65,7 @@ jobs:
           echo "=== [2/5] Install dependencies ==="
           source ~/.nvm/nvm.sh
           nvm use 24
+          export PORT=3001
           node -v
           npm -v
           npm install --omit=dev 2>&1
@@ -77,13 +78,15 @@ jobs:
           fi
 
           echo "=== [4/5] Restart app with PM2 ==="
+          # Canonical VPS topology: Nginx → Node :3001.
+          # Export PORT above so an existing restart and a fresh PM2 start use the same origin.
           pm2 restart xentra-core --update-env || pm2 start server/app.js --name xentra-core
           pm2 save
 
           echo "=== [5/5] Verify app is running ==="
           sleep 3
           pm2 status
-          curl -sf http://127.0.0.1:3000/health || {
+          curl -sf http://127.0.0.1:3001/health || {
             echo "ERROR: Health check failed!"
             pm2 logs xentra-core --lines 20
             exit 1
