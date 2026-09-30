@@ -592,6 +592,8 @@ Produk Master
 
 
 ## UX UPDATE — Category Management Tabs
-**29 September 2026**
+**30 September 2026**
 
-The Owner Kategori route is a management surface with exactly two tabs: Kategori and Rasa. Lists use compact card rows with overflow actions Edit / Hapus. This surface is separate from the Product assembly workspace but shares the same Core master authorities.
+The Owner Kategori route is the master-reference management surface with four tabs: Kategori, Rasa, Kelengkapan, and Level. Lists use compact card rows with overflow actions Edit / Hapus. This surface is separate from the Product assembly workspace but shares the same Core master authorities.
+
+Kelengkapan is a reusable 0..N vocabulary rendered as multi-select checkboxes in Product Master composition. Level is a reusable 0..1 vocabulary rendered as a single dropdown in Product Master composition. When a brand has no Level rows, the Owner surface idempotently provisions the standard values 1 — Tidak Pedas, 2 — Pedas Sedang, and 3 — Pedas Banget.
