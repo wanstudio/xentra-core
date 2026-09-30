@@ -1507,8 +1507,8 @@
         <div class="x-card-panel x-master-reference-page">
           <div class="x-panel-header-flex">
             <div>
-              <h3 class="x-master-products-title"><button type="button" class="x-title-back-btn" id="btn-master-category-back" aria-label="Kembali" onclick="goBackFromCategory()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg></button> Kategori</h3>
-              <p class="x-master-products-sub">Kelola Master Kategori, Rasa, dan Kelengkapan</p>
+              <h3 class="x-master-products-title x-owner-mobile-page-title"><button type="button" class="x-title-back-btn x-owner-mobile-page-back" id="btn-master-category-back" aria-label="Kembali" onclick="goBackFromCategory()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button> Kategori</h3>
+              <p class="x-master-products-sub x-owner-mobile-page-sub">Kelola Master Kategori, Rasa, dan Kelengkapan</p>
             </div>
           </div>
 
@@ -1568,13 +1568,13 @@
           <div class="x-card x-master-products-head">
             <div class="x-panel-header-flex">
               <div>
-                <h3 class="x-master-products-title">
-                  <button type="button" class="x-title-back-btn" id="btn-master-products-back" aria-label="Kembali" onclick="goBackFromMasterProducts()">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                <h3 class="x-master-products-title x-owner-mobile-page-title">
+                  <button type="button" class="x-title-back-btn x-owner-mobile-page-back" id="btn-master-products-back" aria-label="Kembali" onclick="goBackFromMasterProducts()">
+                    <svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
                   </button>
                   Produk Master
                 </h3>
-                <p class="x-master-products-sub">Cabang mengadopsi produk dari katalog ini</p>
+                <p class="x-master-products-sub x-owner-mobile-page-sub">Cabang mengadopsi produk dari katalog ini</p>
               </div>
               <div class="x-header-buttons">
                 <button type="button" class="x-btn-primary" id="btn-add-product-main">+ Tambah Produk Baru</button>
@@ -1867,13 +1867,16 @@
         <!-- Header banner showing branch context state -->
         <div class="x-card-panel" style="margin-bottom:16px;">
           <div class="x-panel-header-flex">
-            <div>
-              <div style="display:flex;align-items:center;gap:8px;">
-                <h3 id="menus-context-title">📋 Branch Menus (Katalog Jual Cabang)</h3>
+            <div class="x-owner-mobile-page-header">
+              <h3 id="menus-context-title" class="x-owner-mobile-page-title">
+                <button type="button" class="x-title-back-btn x-owner-mobile-page-back" id="btn-menus-page-back" aria-label="Kembali ke Catalog" onclick="goBackFromCatalogChild()">
+                  <svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+                </button>
+                <span>Menu Cabang</span>
                 <span id="menus-context-badge" class="x-badge x-badge-info">All Branches</span>
-              </div>
-              <p id="menus-context-subtitle" class="text-muted" style="font-size:13px;margin-top:2px;">
-                Pilih cabang pada Branch Context selector untuk mengelola menu jual spesifik per cabang.
+              </h3>
+              <p id="menus-context-subtitle" class="text-muted x-owner-mobile-page-sub">
+                Atur assortment dan kategori jual per cabang.
               </p>
             </div>
             <div id="menus-header-actions" class="x-header-buttons" style="display:none;">
