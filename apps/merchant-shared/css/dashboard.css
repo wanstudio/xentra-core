@@ -8330,7 +8330,7 @@ input[type="file"].x-input,
 
 
 /* ==========================================================================
-   MASTER PRODUCT EDITOR PAGE — RESPONSIVE / LOADING
+   MASTER PRODUCT EDITOR PAGE — RESPONSIVE
    The editor is a normal page inside the Catalog Products tab, never an overlay.
    ========================================================================== */
 .x-product-editor-breadcrumb-row {
@@ -8341,8 +8341,6 @@ input[type="file"].x-input,
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-  50% { opacity: 1; transform: scale(1); }
 }
 
 @media (max-width: 768px) {
@@ -8404,10 +8402,5 @@ input[type="file"].x-input,
 
   #product-editor-view .x-product-editor-breadcrumb-row > #prod-editor-breadcrumb {
     max-width: 100%;
-  }
-
-  #product-editor-view .x-product-editor-loading {
-    font-size: 11px;
-    padding: 8px;
   }
 }
