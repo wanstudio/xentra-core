@@ -549,11 +549,13 @@ test('Owner Dashboard Mobile Navigation', async t => {
       'CLIENT_ROUTE_META must have business and more route entries');
   });
 
-  await t.test('OWNER-MOB-23: _ownerNavModuleMap covers all 5 modules', () => {
+  await t.test('OWNER-MOB-23: bottom-nav MODULE_MAP covers all 5 modules', () => {
     const modules = ['beranda', 'bisnis', 'pesanan', 'keuangan', 'lainnya'];
+    assert.ok(navJs.includes('var MODULE_MAP = {'),
+      'Bottom-nav module resolver must keep one canonical MODULE_MAP');
     for (const mod of modules) {
       assert.ok(navJs.includes(`'${mod}'`),
-        `_ownerNavModuleMap must include module key '${mod}'`);
+        `MODULE_MAP must include module key '${mod}'`);
     }
   });
 
