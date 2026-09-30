@@ -121,7 +121,7 @@ class MasterMenuResolver {
     return ids.map(id => resolved.get(String(id)) || null).filter(Boolean);
   }
 
-  static resolveBranchMenu({ brandId, branchId, productIds = null, includeInactiveCategories = false }) {
+  static resolveBranchMenu({ brandId, branchId, productIds = null, includeInactiveCategories = false, exposeBranchPresentationOverrides = false }) {
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
     if (!branchId) throw new Error('BRANCH_CONTEXT_REQUIRED');
 
@@ -144,7 +144,9 @@ class MasterMenuResolver {
     const productRows = repository.findMasterProducts({ brandId, productIds: adopted, activeOnly: true });
     const states = repository.findBranchProductStates({ brandId, branchId, productIds: adopted });
     const membershipRows = repository.findBranchProductCategoryMemberships({ branchId, productIds: adopted });
+    const displayNameRows = repository.findBranchProductDisplayNameOverrides({ brandId, branchId, productIds: adopted });
     const stateMap = new Map(states.map(row => [String(row.product_id), row]));
+    const displayNameMap = new Map(displayNameRows.map(row => [String(row.product_id), row.name_override]));
 
     // A deactivated Branch Category stops being offered, and so do the products grouped only
     // under inactive categories. A product with no Branch Category at all is not deactivated —
@@ -154,7 +156,7 @@ class MasterMenuResolver {
     const categorisedIds = new Set(membershipRows.map(row => String(row.product_id)));
     const activeCategorisedIds = new Set(membershipRows.filter(isActiveMembership).map(row => String(row.product_id)));
     const categoryMap = indexRows(membershipRows.filter(isActiveMembership));
-    const resolved = this._composeProducts({ brandId, products: productRows, branchStates: stateMap, categoryMap });
+    const resolved = this._composeProducts({ brandId, products: productRows, branchStates: stateMap, categoryMap, displayNameMap, exposeBranchPresentationOverrides });
 
     const productList = adopted.map(id => resolved.get(String(id)) || null).filter(Boolean).filter(item => stateMap.has(String(item.product_id))).filter(item => {
       if (includeInactiveCategories) return true;
@@ -173,7 +175,7 @@ class MasterMenuResolver {
     return rows.map(row => row.product_id);
   }
 
-  static _composeProducts({ brandId, products, branchStates = new Map(), categoryMap = new Map() }) {
+  static _composeProducts({ brandId, products, branchStates = new Map(), categoryMap = new Map(), displayNameMap = new Map(), exposeBranchPresentationOverrides = false }) {
     const productIds = products.map(p => p.id);
     if (!productIds.length) return new Map();
     const flavors = indexRows(repository.findProductFlavors({ brandId, productIds }));
@@ -189,7 +191,9 @@ class MasterMenuResolver {
         complements: complements.get(id) || [],
         level: (levels.get(id) || [])[0] || null,
         branchState: branchStates.get(id) || null,
-        categories: categoryMap.get(id) || []
+        categories: categoryMap.get(id) || [],
+        displayNameOverride: displayNameMap.get(id) || null,
+        exposeBranchPresentationOverrides
       });
       if (view) map.set(id, view);
     }
