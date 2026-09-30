@@ -870,9 +870,33 @@ function initSchema(targetDb) {
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
       options_config TEXT DEFAULT NULL,
+      menu_schema_version INTEGER NOT NULL DEFAULT 1,
+      menu_migration_status TEXT NOT NULL DEFAULT 'legacy',
       FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
       FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
     );
+
+    CREATE TABLE IF NOT EXISTS product_menu_migrations (
+      product_id TEXT PRIMARY KEY,
+      brand_id TEXT NOT NULL,
+      source_schema TEXT NOT NULL DEFAULT 'legacy',
+      target_schema TEXT NOT NULL DEFAULT 'master-menu-composition-v1',
+      status TEXT NOT NULL DEFAULT 'legacy',
+      attempt_count INTEGER NOT NULL DEFAULT 0,
+      source_fingerprint TEXT,
+      last_error TEXT,
+      notes TEXT,
+      migrated_at TEXT,
+      verified_at TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+      FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_product_menu_migrations_brand_status
+      ON product_menu_migrations(brand_id, status);
+    CREATE INDEX IF NOT EXISTS idx_product_menu_migrations_brand_product
+      ON product_menu_migrations(brand_id, product_id);
 
     CREATE TABLE IF NOT EXISTS menu_flavors (
       id TEXT PRIMARY KEY,
@@ -1908,6 +1932,10 @@ function initSchema(targetDb) {
   try { targetDb.exec('ALTER TABLE products ADD COLUMN min_price REAL;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE products ADD COLUMN max_price REAL;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE products ADD COLUMN options_config TEXT;'); } catch (e) {}
+  // Menu migration lifecycle: legacy and canonical data coexist temporarily;
+  // these fields store state only, not duplicate business content.
+  try { targetDb.exec("ALTER TABLE products ADD COLUMN menu_schema_version INTEGER NOT NULL DEFAULT 1;"); } catch (e) {}
+  try { targetDb.exec("ALTER TABLE products ADD COLUMN menu_migration_status TEXT NOT NULL DEFAULT 'legacy';"); } catch (e) {}
   try { targetDb.exec('ALTER TABLE brands ADD COLUMN tagline TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE brands ADD COLUMN banners TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN order_channel TEXT DEFAULT "customer_app";'); } catch (e) {}
