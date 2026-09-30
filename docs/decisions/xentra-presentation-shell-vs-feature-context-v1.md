@@ -92,6 +92,17 @@ Examples:
 
 The current shell choice must never be treated as part of the feature's domain identity.
 
+## Branch surface classification (locked)
+
+The Branch feature follows the same presentation-shell contract:
+
+- **Branch Add/Edit → Page**: the form combines identity, address, WhatsApp contact, GPS coordinates, delivery pricing/radius, promotion thresholds, and operational state. It is a focused work surface, not a lightweight interaction.
+- Canonical routes: `branches/new` and `branches/:id/edit`.
+- **Branch Detail → Page**: `branches/:id` remains the canonical detail surface with Overview, Operations, Menu, Team, and Reports subtabs.
+- **Branch Catalog → Branch Detail → Menu Page**: the previous standalone Branch Catalog modal is retired as a duplicate surface. `branches/:id/menu` is the canonical route for branch menu management.
+- **Branch deletion/archive confirmation → generic Dialog**: destructive confirmation must use `XentraPresentation.confirm()`, while the delete/archive API behavior remains unchanged.
+- Branch business/API logic stays in the dashboard/feature controller; presentation routing does not create a second domain authority.
+
 ## Xentra layering
 
 ```text
