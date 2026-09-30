@@ -450,7 +450,9 @@
       !isProductEditor;
     var productDetailId = isProductDetail ? route.split('catalog/products/')[1] : null;
 
-    var isBranchDetail = !isPlatform && route.indexOf('branches/') === 0;
+    var isBranchEditor = !isPlatform && (route === 'branches/new' || /^branches\/[^/]+\/edit$/.test(route));
+    var branchEditorId = isBranchEditor && route !== 'branches/new' ? route.split('branches/')[1].split('/edit')[0] : null;
+    var isBranchDetail = !isPlatform && route.indexOf('branches/') === 0 && !isBranchEditor;
     var branchDetailParts = isBranchDetail ? route.split('/') : [];
     var branchDetailId = isBranchDetail ? branchDetailParts[1] : null;
     var branchDetailSubtab = isBranchDetail ? (branchDetailParts[2] || 'overview') : 'overview';
@@ -476,7 +478,7 @@
     var isSettingsRoute = !isPlatform && (route === 'settings' || route.indexOf('settings/') === 0);
     var settingsSubtab = isSettingsRoute ? (route.indexOf('settings/') === 0 ? route.split('settings/')[1] : 'business/profile') : 'business/profile';
 
-    var metaKey = (isProductDetail || isProductEditor) ? 'catalog/products' : (isBranchDetail ? 'branches' : (isOrderDetail ? 'orders' : (isCustomerDetail ? 'customers/:id' : (isTeamRoute ? ('team/' + teamSubtab) : (isReportsRoute ? 'reports' : (isFinanceRoute ? ('finance/' + financeSubtab) : (isMarketingRoute ? ('marketing/' + marketingSubtab) : (isSettingsRoute ? ('settings/' + settingsSubtab) : route))))))));
+    var metaKey = (isProductDetail || isProductEditor) ? 'catalog/products' : (isBranchEditor ? 'branches' : (isBranchDetail ? 'branches' : (isOrderDetail ? 'orders' : (isCustomerDetail ? 'customers/:id' : (isTeamRoute ? ('team/' + teamSubtab) : (isReportsRoute ? 'reports' : (isFinanceRoute ? ('finance/' + financeSubtab) : (isMarketingRoute ? ('marketing/' + marketingSubtab) : (isSettingsRoute ? ('settings/' + settingsSubtab) : route))))))));
     var meta = metaDict[metaKey] || metaDict[route] || metaDict['overview'];
     var tabId = meta.tab;
     var isCatalogChild = !isPlatform && route.indexOf('catalog/') === 0;
@@ -538,10 +540,10 @@
     var subEl = $('dash-page-subtitle');
     if (titleEl) titleEl.textContent = isProductEditor
       ? (productEditorId ? 'Edit Produk Master' : 'Tambah Produk Master')
-      : (isProductDetail ? 'Product Detail' : (isBranchDetail ? 'Branch Detail' : (isOrderDetail ? 'Order Detail' : (isCustomerDetail ? 'Customer Detail' : (isReportsRoute ? 'Reports' : meta.title)))));
+      : (isBranchEditor ? (branchEditorId ? 'Edit Cabang' : 'Tambah Cabang') : (isProductDetail ? 'Product Detail' : (isBranchDetail ? 'Branch Detail' : (isOrderDetail ? 'Order Detail' : (isCustomerDetail ? 'Customer Detail' : (isReportsRoute ? 'Reports' : meta.title)))));
     if (subEl) subEl.textContent = isProductEditor
       ? 'Susun identitas, harga, foto, dan komposisi Master Menu'
-      : (isProductDetail ? 'Detail produk master dan status adopsi di cabang' : (isBranchDetail ? 'Detail informasi, operasional, menu, dan tim cabang' : (isOrderDetail ? 'Detail transaksi, rincian biaya, dan status pesanan' : (isCustomerDetail ? 'Profil pelanggan, riwayat pesanan, dan loyalitas' : (isReportsRoute ? 'Laporan penjualan, analitik bisnis, dan kinerja cabang' : meta.sub)))));
+      : (isBranchEditor ? 'Kelola identitas, lokasi, kontak, dan aturan operasional cabang' : (isProductDetail ? 'Detail produk master dan status adopsi di cabang' : (isBranchDetail ? 'Detail informasi, operasional, menu, dan tim cabang' : (isOrderDetail ? 'Detail transaksi, rincian biaya, dan status pesanan' : (isCustomerDetail ? 'Profil pelanggan, riwayat pesanan, dan loyalitas' : (isReportsRoute ? 'Laporan penjualan, analitik bisnis, dan kinerja cabang' : meta.sub)))));
 
     // 6. Sync Owner bottom nav active module (no-op on desktop, hidden by CSS)
     syncOwnerBottomNavActive(route);
@@ -578,7 +580,9 @@
       }
     }
     if (tabId === 'branches') {
-      if (isBranchDetail && branchDetailId) {
+      if (isBranchEditor) {
+        showBranchEditorView(branchEditorId);
+      } else if (isBranchDetail && branchDetailId) {
         loadBranchDetail(branchDetailId, branchDetailSubtab);
       } else {
         showBranchListView();
@@ -4354,15 +4358,46 @@ async function loadMenusView() {
   function showBranchListView() {
     var listView = $('branch-list-view');
     var detailView = $('branch-detail-view');
+    var editorView = $('branch-editor-view');
     if (listView) listView.style.display = 'block';
     if (detailView) detailView.style.display = 'none';
+    if (editorView) editorView.style.display = 'none';
   }
 
   function showBranchDetailView() {
     var listView = $('branch-list-view');
     var detailView = $('branch-detail-view');
+    var editorView = $('branch-editor-view');
     if (listView) listView.style.display = 'none';
     if (detailView) detailView.style.display = 'block';
+    if (editorView) editorView.style.display = 'none';
+  }
+
+  function showBranchEditorView(branchId) {
+    var listView = $('branch-list-view');
+    var detailView = $('branch-detail-view');
+    var editorView = $('branch-editor-view');
+    if (listView) listView.style.display = 'none';
+    if (detailView) detailView.style.display = 'none';
+    if (!editorView) return;
+    editorView.style.display = 'block';
+
+    var b = branchId ? (state.branches.find(function (x) { return String(x.id) === String(branchId); }) || null) : null;
+    $('branch-id').value = b ? b.id : '';
+    $('branch-name').value = b ? (b.name || '') : '';
+    $('branch-address').value = b ? (b.address_text || '') : '';
+    $('branch-phone').value = b ? (b.whatsapp_number || b.phone || '') : '';
+    $('branch-latitude').value = b ? Number(b.latitude || 0) : '';
+    $('branch-longitude').value = b ? Number(b.longitude || 0) : '';
+    $('branch-free-km').value = b ? (b.free_delivery_km != null ? b.free_delivery_km : 0) : 0;
+    $('branch-price-km').value = b ? (b.price_per_km != null ? b.price_per_km : 3000) : 3000;
+    $('branch-radius').value = b ? (b.max_radius_km != null ? b.max_radius_km : 10) : 10;
+    $('branch-promo-minorder').value = b ? (b.promo_min_order != null ? b.promo_min_order : 50000) : 50000;
+    $('branch-promo-discount').value = b ? (b.promo_delivery_discount != null ? b.promo_delivery_discount : 0) : 0;
+    $('branch-open-override').checked = b ? !(b.is_open_override === 0 || b.is_open_override === false) : true;
+    $('branch-editor-title').textContent = b ? ('Edit Cabang: ' + (b.name || '')) : 'Tambah Cabang';
+    $('branch-editor-breadcrumb').textContent = b ? 'Edit Cabang' : 'Tambah Cabang';
+    setTimeout(function () { $('branch-name').focus(); }, 40);
   }
 
   window.switchBranchDetailSubtab = function (subtab) {
@@ -4622,32 +4657,11 @@ async function loadMenusView() {
   };
 
   window.openBranchModal = function (branchId) {
-    var b = branchId ? (state.branches.find(function (x) { return x.id === branchId; }) || null) : null;
-    $('branch-id').value = b ? b.id : '';
-    $('branch-name').value = b ? (b.name || '') : '';
-    $('branch-address').value = b ? (b.address_text || '') : '';
-    $('branch-phone').value = b ? (b.whatsapp_number || b.phone || '') : '';
-    $('branch-latitude').value = b ? Number(b.latitude || 0) : '';
-    $('branch-longitude').value = b ? Number(b.longitude || 0) : '';
-    $('branch-free-km').value = b ? (b.free_delivery_km != null ? b.free_delivery_km : 0) : 0;
-    $('branch-price-km').value = b ? (b.price_per_km != null ? b.price_per_km : 3000) : 3000;
-    $('branch-radius').value = b ? (b.max_radius_km != null ? b.max_radius_km : 10) : 10;
-    $('branch-promo-minorder').value = b ? (b.promo_min_order != null ? b.promo_min_order : 50000) : 50000;
-    $('branch-promo-discount').value = b ? (b.promo_delivery_discount != null ? b.promo_delivery_discount : 0) : 0;
-    $('branch-open-override').checked = b ? !(b.is_open_override === 0 || b.is_open_override === false) : true;
-    $('modal-branch-title').textContent = b ? ('Edit Cabang: ' + (b.name || '')) : 'Tambah Cabang';
-    var modal = $('modal-branch');
-    if (!modal) return;
-    modal.style.display = 'flex';
-    setTimeout(function () { $('branch-name').focus(); }, 80);
+    navigateTo(branchId ? ('branches/' + encodeURIComponent(branchId) + '/edit') : 'branches/new');
   };
 
   window.closeBranchModal = function () {
-    var modal = $('modal-branch');
-    if (!modal) return;
-    modal.style.display = 'none';
-    $('form-branch').reset();
-    $('branch-id').value = '';
+    navigateTo('branches');
   };
 
   window.deleteBranch = async function (branchId) {
@@ -4656,7 +4670,10 @@ async function loadMenusView() {
     var confirmMsg = isActive
       ? 'Yakin ingin menghapus cabang "' + (b.name || branchId) + '"?\n\nCabang aktif hanya dapat dihapus jika tidak ada pesanan aktif yang sedang berjalan.'
       : 'Yakin ingin memproses cabang "' + (b.name || branchId) + '"?\n\n• Jika ada riwayat transaksi → cabang akan diarsipkan (data aman).\n• Jika tidak ada riwayat → cabang akan dihapus permanen.';
-    if (!confirm(confirmMsg)) return;
+    var confirmed = window.XentraPresentation && typeof window.XentraPresentation.confirm === 'function'
+      ? await window.XentraPresentation.confirm({ id: 'delete-branch', title: 'Proses Cabang', message: confirmMsg, okLabel: 'Lanjutkan', cancelLabel: 'Batal' })
+      : window.confirm(confirmMsg);
+    if (!confirmed) return;
     try {
       var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId), {
         method: 'DELETE',
@@ -4717,7 +4734,7 @@ async function loadMenusView() {
           return;
         }
         showToast(id ? '✅ Perubahan cabang disimpan.' : '✅ Cabang baru berhasil ditambahkan.');
-        closeBranchModal();
+        navigateTo('branches');
         loadBranches();
       } catch (err) {
         if (err.status === 401) return;
