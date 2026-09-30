@@ -91,7 +91,7 @@ class ProductMenuMigrationRepository {
       'product_id, brand_id, source_schema, target_schema, status, ' +
       'attempt_count, canonical_fingerprint, last_error, notes, ' +
       'migrated_at, verified_at, created_at, updated_at' +
-      ') VALUES (?, ?, \'legacy\', ?, \'migrated\', 1, ?, NULL, ?, datetime(\'now\'), NULL, datetime(\'now\'), datetime(\'now\')) ' +
+      ') VALUES (?, ?, ?, ?, \'migrated\', 1, ?, NULL, ?, datetime(\'now\'), NULL, datetime(\'now\'), datetime(\'now\')) ' +
       'ON CONFLICT(product_id) DO UPDATE SET ' +
       'brand_id = excluded.brand_id, source_schema = excluded.source_schema, ' +
       'target_schema = excluded.target_schema, status = \'migrated\', ' +
@@ -113,6 +113,13 @@ class ProductMenuMigrationRepository {
 
   recordReconciliation({ brandId, productId, status, canonicalFingerprint = null, lastError = null, notes = null }) {
     const normalizedStatus = assertStatus(status);
+    const current = this.db.queryOne(
+      'SELECT menu_schema_version FROM products WHERE id = ? AND brand_id = ?',
+      [productId, brandId]
+    );
+    const sourceSchema = current && Number(current.menu_schema_version) === 2
+      ? TARGET_SCHEMA
+      : 'legacy';
     const migratedAt = normalizedStatus === 'migrated' ? 'datetime(\'now\')' : 'NULL';
     const verifiedAt = normalizedStatus === 'verified' ? 'datetime(\'now\')' : 'NULL';
     const version = normalizedStatus === 'migrated' || normalizedStatus === 'verified' ? 2 : 1;
