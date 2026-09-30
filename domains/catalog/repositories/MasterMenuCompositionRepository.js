@@ -1,6 +1,8 @@
 'use strict';
 
 const DataAccess = require('../../../core/data/DataAccess');
+const { ProductMenuMigrationRepository } = require('../migrations/ProductMenuMigrationRepository');
+
 
 const DEFINITIONS = Object.freeze({
   flavor: {
@@ -45,6 +47,9 @@ function normalizeSlug(value, fallbackName) {
 class MasterMenuCompositionRepository {
   constructor(dataAccess = DataAccess) {
     this.db = dataAccess;
+  }
+  migrationRepository() {
+    return new ProductMenuMigrationRepository(this.db);
   }
 
   findComponent({ type, brandId, componentId }) {
@@ -412,6 +417,16 @@ class MasterMenuCompositionRepository {
           [productId, normalizedLevelId]
         );
       }
+
+      // Canonical composition save is also the migration boundary. Record the
+      // lifecycle state in the same transaction so a Product can never claim
+      // to be migrated when its structured relations did not commit.
+      const savedComposition = this.findComposition({ brandId, productId });
+      this.migrationRepository().recordCanonicalSaved({
+        brandId,
+        productId,
+        composition: savedComposition
+      });
 
       this.db.exec('COMMIT');
     } catch (err) {
