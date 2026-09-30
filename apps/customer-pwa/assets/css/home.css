@@ -2079,11 +2079,7 @@
 }
 
 .x-detail-branch {
-  margin-bottom: 6px;
-  color: var(--x-text-muted, #999999);
-  font-size: 12.5px;
-  line-height: 16px;
-  font-weight: 600;
+  display: none;
 }
 
 .x-detail-subtitle {
