@@ -103,6 +103,18 @@ The Branch feature follows the same presentation-shell contract:
 - **Branch deletion/archive confirmation → generic Dialog**: destructive confirmation must use `XentraPresentation.confirm()`, while the delete/archive API behavior remains unchanged.
 - Branch business/API logic stays in the dashboard/feature controller; presentation routing does not create a second domain authority.
 
+## Team and Marketing surface classification (locked)
+
+- **Team member Add/Edit → Bottom Sheet**: compact identity, role, branch, and access fields are lightweight enough for a Sheet.
+- **Team invitation → Bottom Sheet**: email, role, and branch assignment are a focused lightweight action.
+- **Reset password token → Dialog**: the interaction is confirmation/result oriented rather than a workspace.
+- **Disable/Delete/Reset confirmations → generic Dialog**.
+- **Marketing Promotion Add/Edit → Page**: the promotion context contains multiple policy sections, rewards, branch scope, schedule, presentation content, media upload, and live preview.
+- **Marketing Banner Add/Edit → Page**: the banner context contains media, crop/edit state, targeting, scheduling, governance, and publication workflow.
+- **Marketing Banner Assignment → Bottom Sheet**: branch, placement, active state, and optional schedule are a focused configuration action.
+- **Marketing Banner Preview → Dialog**: read-only preview does not require a workspace.
+- Existing feature/API controllers remain authoritative; these changes only change composition and routing presentation.
+
 ## Xentra layering
 
 ```text
