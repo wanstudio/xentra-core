@@ -30,9 +30,9 @@ test('PRES-03: bottom sheet shell is reusable and responsive', () => {
 });
 
 test('PRES-04: Master Reference editor is feature content composed into Bottom Sheet', () => {
-  assert.ok(dashboardHtml.includes('id="modal-master-reference-quick-add"'));
+  assert.ok(dashboardHtml.includes('id="master-reference-editor"'));
   assert.ok(dashboardHtml.includes('id="master-reference-quick-add-anchor"'));
-  assert.ok(!dashboardHtml.includes('id="modal-master-reference-quick-add" class="x-modal-backdrop"'));
+  assert.ok(!dashboardHtml.includes('id="master-reference-editor" class="x-modal-backdrop"'));
   assert.ok(dashboardJs.includes("id: 'master-reference-quick-add'"));
   assert.ok(dashboardJs.includes("type: 'bottom-sheet'"));
   assert.ok(dashboardJs.includes("content: content"));
