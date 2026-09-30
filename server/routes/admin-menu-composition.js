@@ -15,6 +15,20 @@ function registerAdminMenuCompositionRoutes(router, deps = {}) {
   const service = deps.service || MasterMenuCompositionService;
   const roles = ['owner', 'brand_manager'];
 
+  router.post('/admin/menu/components/level/ensure-defaults', requireAuth(roles), (req, res) => {
+    try {
+      const levels = service.ensureDefaultLevels({
+        brandId: req.brand_id
+      });
+      res.json({ success: true, type: 'level', components: levels });
+    } catch (err) {
+      res.status(errorStatus(err && err.message)).json({
+        success: false,
+        error: err && err.message ? err.message : 'MASTER_MENU_LEVEL_DEFAULTS_FAILED'
+      });
+    }
+  });
+
   router.get('/admin/menu/components/:type', requireAuth(roles), (req, res) => {
     try {
       const type = service.validateType(req.params.type);
