@@ -2823,6 +2823,48 @@
     }
   }
 
+  function renderMasterLevelSelector(containerId, rows, selectedId) {
+    var box = $(containerId);
+    if (!box) return;
+
+    var selected = selectedId == null ? '' : String(selectedId);
+    var activeRows = (rows || []).filter(function(row) {
+      return row && (row.is_active !== false && Number(row.is_active) !== 0 || String(row.id) === selected);
+    });
+
+    if (!activeRows.length) {
+      box.innerHTML = '<span class="x-master-spice-level-label">Level Pedas</span><span class="x-master-spice-level-empty">Belum ada level</span>';
+      return;
+    }
+
+    var selectedIndex = activeRows.findIndex(function(row) {
+      return String(row.id) === selected;
+    });
+
+    var html = '<span class="x-master-spice-level-label">Level Pedas</span><span class="x-master-spice-level-segments" role="presentation">';
+    activeRows.forEach(function(row, index) {
+      var isFilled = selectedIndex >= 0 && index <= selectedIndex;
+      html += '<button type="button" class="x-master-spice-level-segment' +
+        (isFilled ? ' is-filled' : '') +
+        '" data-master-level-id="' + esc(row.id) + '"' +
+        ' aria-label="' + esc(row.name) + '"' +
+        ' aria-pressed="' + (String(row.id) === selected ? 'true' : 'false') + '"' +
+        ' title="' + esc(row.name) + '">' +
+        '<span aria-hidden="true"></span>' +
+      '</button>';
+    });
+    html += '</span>';
+
+    box.innerHTML = html;
+
+    box.querySelectorAll('[data-master-level-id]').forEach(function(button) {
+      button.addEventListener('click', function() {
+        var id = String(button.getAttribute('data-master-level-id') || '');
+        if (typeof box._xentraLevelSelect === 'function') box._xentraLevelSelect(id);
+      });
+    });
+  }
+
   function renderMasterChoiceGrid(containerId, rows, selectedId, options) {
     var box = $(containerId);
     if (!box) return;
@@ -2965,36 +3007,21 @@
 
     var levelSelect = $('prod-level');
     if (levelSelect) {
-      var levelHtml = '<option value="">Tidak ada Level</option>';
-      _masterMenuComponents.level.forEach(function(row) {
-        var selected = String(_masterMenuSelected.level_id || '') === String(row.id);
-        if (!row.is_active && !selected) return;
-        var suffix = row.is_active ? '' : ' (Nonaktif)';
-        levelHtml += '<option value="' + esc(row.id) + '"' +
-          (selected ? ' selected' : '') +
-          (row.is_active ? '' : ' data-inactive="1"') + '>' +
-          esc(row.name + suffix) + '</option>';
-      });
-      levelSelect.innerHTML = levelHtml;
       levelSelect.value = _masterMenuSelected.level_id || '';
     }
 
-    renderMasterChoiceGrid('prod-level-chips', _masterMenuComponents.level,
-      String(_masterMenuSelected.level_id || ''), {
-        variant: 'x-master-level-chip',
-        allowEmpty: true,
-        emptyLabel: 'Tidak ada Level',
-        addLabel: 'Tambah',
-        addAction: function() {
-          openMasterReferenceQuickAdd('level');
-        },
-        onSelect: function(id) {
-          if (levelSelect) levelSelect.value = id;
-          _masterMenuSelected.level_id = id;
-          renderMasterMenuSelectors();
-          renderMasterMenuCustomerPreview();
-        }
-      });
+    var levelBox = $('prod-level-chips');
+    if (levelBox) {
+      levelBox._xentraLevelSelect = function(id) {
+        if (levelSelect) levelSelect.value = id;
+        _masterMenuSelected.level_id = id;
+        renderMasterMenuSelectors();
+        renderMasterMenuCustomerPreview();
+      };
+    }
+
+    renderMasterLevelSelector('prod-level-chips', _masterMenuComponents.level,
+      String(_masterMenuSelected.level_id || ''));
 
     var complementBox = $('prod-complements-editor');
     var empty = $('prod-complements-empty');
@@ -4203,12 +4230,6 @@ async function loadMenusView() {
       _masterMenuSelected.flavor_id = flavorSelect.value || '';
       renderMasterMenuCustomerPreview();
     });
-    var levelSelect = $('prod-level');
-    if (levelSelect) levelSelect.addEventListener('change', function() {
-      _masterMenuSelected.level_id = levelSelect.value || '';
-      renderMasterMenuCustomerPreview();
-    });
-
     var priceInput = $('prod-price');
     if (priceInput) priceInput.addEventListener('input', function() {
       renderMasterMenuCustomerPreview();
