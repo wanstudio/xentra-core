@@ -8149,20 +8149,44 @@ async function loadMenusView() {
   });
 
   // Canonical Back behavior for Owner secondary/child pages.
-  // Resolve the current app-managed parent and replace the current entry.
-  // This avoids raw browser-history traversal, which may contain unrelated
-  // entries in a PWA/mobile session.
+  // Route structure is authoritative for known child surfaces; history.state
+  // remains the fallback for generic secondary pages. This prevents a malformed
+  // or reset browser state from making Product Editor jump back to Business.
+  function ownerChildParentRoute(route) {
+    var current = canonicalizeOwnerRoute(route || '');
+    if (
+      current === 'catalog/products/new' ||
+      /^catalog\\/products\\/[^/]+\\/edit$/.test(current) ||
+      (current.indexOf('catalog/products/') === 0 && current !== 'catalog/products')
+    ) {
+      return 'catalog/products';
+    }
+    if (
+      current === 'branches/new' ||
+      /^branches\\/[^/]+\\/edit$/.test(current) ||
+      (current.indexOf('branches/') === 0 && current !== 'branches')
+    ) {
+      return 'branches';
+    }
+    if (current.indexOf('orders/') === 0 && current !== 'orders') return 'orders';
+    if (current.indexOf('customers/') === 0 && current !== 'customers') return 'customers';
+    return null;
+  }
+
   window.goBackFromChildPage = function () {
     var state = window.history && window.history.state;
     var ownerState = state && state[OWNER_NAV_STATE_KEY];
     var currentRoute = ownerState && ownerState.route
       ? canonicalizeOwnerRoute(ownerState.route)
       : canonicalizeOwnerRoute(getCurrentRoute() || '');
-    var parentRoute = ownerState && ownerState.parentRoute
+
+    var explicitParent = ownerChildParentRoute(currentRoute);
+    var stateParent = ownerState && ownerState.parentRoute
       ? canonicalizeOwnerRoute(ownerState.parentRoute)
       : null;
+    var parentRoute = explicitParent || (stateParent && stateParent !== currentRoute ? stateParent : null);
 
-    if (parentRoute && parentRoute !== currentRoute) {
+    if (parentRoute) {
       navigateTo(parentRoute, { history: 'root' });
       return;
     }
