@@ -3490,6 +3490,22 @@
       });
     }
 
+    var btnAddComplementPage = $('btn-add-master-complement-page');
+    if (btnAddComplementPage && !btnAddComplementPage.dataset.bound) {
+      btnAddComplementPage.dataset.bound = 'true';
+      btnAddComplementPage.addEventListener('click', function() {
+        openMasterReferenceQuickAdd('complement');
+      });
+    }
+
+    var btnAddLevelPage = $('btn-add-master-level-page');
+    if (btnAddLevelPage && !btnAddLevelPage.dataset.bound) {
+      btnAddLevelPage.dataset.bound = 'true';
+      btnAddLevelPage.addEventListener('click', function() {
+        openMasterReferenceQuickAdd('level');
+      });
+    }
+
     var btnOptionsAddGroup = $('btn-prod-options-add-group');
     if (btnOptionsAddGroup) btnOptionsAddGroup.addEventListener('click', newProductOptionGroup);
 
