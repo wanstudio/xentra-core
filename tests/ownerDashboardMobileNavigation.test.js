@@ -208,6 +208,30 @@ test('Owner Dashboard Mobile Navigation', async t => {
   // --------------------------------------------------------------------------
   // CSS
   // --------------------------------------------------------------------------
+  await t.test('OWNER-MOB-14C: Product Editor Back is deterministic even without browser history state', () => {
+    assert.ok(js.includes('function ownerChildParentRoute(route)'),
+      'Owner child parent resolver must exist');
+
+    const start = js.indexOf('function ownerChildParentRoute(route)');
+    const end = js.indexOf('\n  window.goBackFromChildPage = function ()', start);
+    const resolver = js.slice(start, end);
+
+    assert.ok(resolver.includes("current === 'catalog/products/new'"),
+      'Add Product must have an explicit parent route');
+    assert.ok(resolver.includes("return 'catalog/products';"),
+      'Product child routes must return to Product Master');
+
+    const backStart = js.indexOf('window.goBackFromChildPage = function ()');
+    const backEnd = js.indexOf('\n  // Compatibility aliases', backStart);
+    const back = js.slice(backStart, backEnd);
+
+    assert.ok(back.includes('var explicitParent = ownerChildParentRoute(currentRoute)'));
+    assert.ok(back.includes('var parentRoute = explicitParent ||'));
+    assert.ok(back.includes("navigateTo(parentRoute, { history: 'root' });"));
+    assert.ok(!back.includes("window.history.back()"),
+      'Child Back must not rely on raw browser history traversal');
+  });
+
   await t.test('OWNER-MOB-14D: canonical router owns explicit parent-child navigation history', () => {
     assert.ok(js.includes("OWNER_NAV_STATE_KEY = '__xentraOwnerNavigation'"));
     assert.ok(js.includes('function ensureOwnerNavigationHistory(route)'));
