@@ -115,6 +115,22 @@ class ProductMenuMigrationService {
   static verifyProduct({ brandId, productId }) {
     const inspected = this.inspectProduct({ brandId, productId });
     const errors = validateCanonicalComposition(inspected.product, inspected.composition);
+    const hasStructuredRelations = !!(
+      inspected.composition &&
+      (inspected.composition.flavor ||
+       inspected.composition.level ||
+       (inspected.composition.complements && inspected.composition.complements.length))
+    );
+
+    // Verification is only allowed after the Product has entered the canonical
+    // schema through a real composition save. A legacy Product with only its
+    // existing Category must remain needs_review because its structured
+    // Flavor/Complement/Level meaning cannot be recovered deterministically.
+    if (!errors.length &&
+        inspected.product.menu_schema_version !== 2 &&
+        !hasStructuredRelations) {
+      errors.push('MIGRATION_NOT_RECONCILED');
+    }
 
     if (errors.length) {
       const migration = migrationRepository.recordReconciliation({
