@@ -8156,14 +8156,14 @@ async function loadMenusView() {
     var current = canonicalizeOwnerRoute(route || '');
     if (
       current === 'catalog/products/new' ||
-      /^catalog\\/products\\/[^/]+\\/edit$/.test(current) ||
+      /^catalog\/products\/[^/]+\/edit$/.test(current) ||
       (current.indexOf('catalog/products/') === 0 && current !== 'catalog/products')
     ) {
       return 'catalog/products';
     }
     if (
       current === 'branches/new' ||
-      /^branches\\/[^/]+\\/edit$/.test(current) ||
+      /^branches\/[^/]+\/edit$/.test(current) ||
       (current.indexOf('branches/') === 0 && current !== 'branches')
     ) {
       return 'branches';
