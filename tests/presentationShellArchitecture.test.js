@@ -115,6 +115,8 @@ test('PRES-13: Owner Dashboard legacy interactive surfaces use canonical present
   assert.ok(branchCatalogJs.includes("openBranchCatalogSheet('modal-adopt-product', 'branch-adopt-product')"));
   assert.ok(branchCatalogJs.includes("openBranchCatalogSheet('modal-branch-override', 'branch-product-override')"));
   assert.ok(branchCatalogJs.includes("requestBranchTextInput({ title: 'Tambah Kategori Cabang'"));
+  assert.ok(dashboardJs.includes("requestTextInputSheet({ title: 'Tambah Kategori Cabang'"));
+  assert.ok(dashboardJs.includes("requestTextInputSheet({ title: 'Tolak Pesanan'"));
 });
 
 test('PRES-14: Owner Dashboard destructive confirmations do not use native confirm()', () => {
