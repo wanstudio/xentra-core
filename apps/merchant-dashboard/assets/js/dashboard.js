@@ -3055,11 +3055,6 @@
         });
       }
 
-      complementBox.querySelectorAll('[data-master-choice-add]').forEach(function(button) {
-        button.addEventListener('click', function() {
-          openMasterReferenceQuickAdd('complement');
-        });
-      });
     }
 
     renderMasterMenuCustomerPreview();
