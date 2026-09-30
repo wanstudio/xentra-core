@@ -4193,7 +4193,9 @@ async function loadMenusView() {
     });
     var categorySelect = $('prod-category');
     if (categorySelect) categorySelect.addEventListener('change', function() {
+      _masterMenuSelected.category_id = categorySelect.value || '';
       renderMasterMenuCustomerPreview();
+      renderMasterMenuSelectors();
     });
 
     var flavorSelect = $('prod-flavor');
