@@ -2957,23 +2957,6 @@
       _masterMenuSelected.category_id = categorySelect.value || '';
     }
 
-    renderMasterChoiceGrid('prod-category-chips', state.categories || [],
-      String((categorySelect && categorySelect.value) || _masterMenuSelected.category_id || ''), {
-        variant: 'x-master-category-chip',
-        addLabel: 'Tambah',
-        addAction: function() {
-          var addButton = $('btn-add-master-category-from-product');
-          if (addButton) addButton.click();
-        },
-        onSelect: function(id) {
-          if (!categorySelect) return;
-          categorySelect.value = id;
-          _masterMenuSelected.category_id = id;
-          renderMasterMenuSelectors();
-          renderMasterMenuCustomerPreview();
-        }
-      });
-
     var flavorSelect = $('prod-flavor');
     if (flavorSelect) {
       var flavorHtml = '<option value="">Tidak ada Rasa</option>';
@@ -2989,24 +2972,6 @@
       flavorSelect.innerHTML = flavorHtml;
       flavorSelect.value = _masterMenuSelected.flavor_id || '';
     }
-
-    renderMasterChoiceGrid('prod-flavor-chips', _masterMenuComponents.flavor,
-      String(_masterMenuSelected.flavor_id || ''), {
-        variant: 'x-master-flavor-chip',
-        allowEmpty: true,
-        emptyLabel: 'Tidak ada Rasa',
-        addLabel: 'Tambah',
-        addAction: function() {
-          var addButton = $('btn-add-master-flavor-from-product');
-          if (addButton) addButton.click();
-        },
-        onSelect: function(id) {
-          if (flavorSelect) flavorSelect.value = id;
-          _masterMenuSelected.flavor_id = id;
-          renderMasterMenuSelectors();
-          renderMasterMenuCustomerPreview();
-        }
-      });
 
     var levelSelect = $('prod-level');
     if (levelSelect) {
