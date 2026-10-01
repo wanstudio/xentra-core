@@ -81,9 +81,13 @@ sub_categories
 
 Same-brand and parent-child integrity must be enforced.
 
-### Sub Category ↔ Rasa
+### Sub Category ↔ Rasa — PRE-LOCK DESIGN POINT
 
-Rasa is NOT a child taxonomy node. It is a reusable vocabulary with a compatibility association to Sub Categories.
+Rasa is NOT a child taxonomy node. It is a reusable vocabulary.
+
+Two models remain under evaluation before lock:
+
+**Model A — Compatibility association**
 
 ```
 Sub Category N ─── N Rasa
@@ -129,6 +133,20 @@ Sub Category: Ayam Bakar
 ```
 
 The same Rasa record may be reused by many Sub Categories.
+
+This model enables the Rasa selector to show only values explicitly allowed for the selected Sub Category. It also introduces a new management problem: an Owner must be able to connect an existing Rasa to another Sub Category without creating a duplicate. The Master Reference UX therefore needs an explicit association-management path if Model A is adopted.
+
+**Model B — Product-level Rasa only**
+
+```text
+Category 1 ─── N Sub Category
+Product ─── 0..1 Rasa
+Rasa remains brand-scoped and reusable.
+```
+
+Under Model B, the Rasa selector is filtered only by Brand, and the Sub Category does not own a compatibility list. This is simpler but does not prevent a semantically unsuitable Rasa from being selected.
+
+**Pre-lock rule:** do not implement either model as canonical until the usability and business-domain check decides whether compatibility restriction is actually valuable enough to justify the additional relationship-management UX.
 
 ## 4. Product identity under evaluation
 
@@ -410,6 +428,8 @@ The existing Branch Customer Display Name Override would need an explicit decisi
 4. **Shared Rasa expectations** — users may expect all Rasa values to appear everywhere unless compatibility is explained.
 5. **Duplicate titles** — multiple Products can intentionally resolve to the same title/subtitle.
 6. **Context changes** — changing Category/Sub Category must make downstream resets obvious.
+7. **Title propagation** — renaming a Sub Category would rename the Customer title for every Product using that Sub Category. The system must make the blast radius visible before save.
+8. **Rasa reuse** — if compatibility mode is used, an existing Rasa must be attachable to another Sub Category without creating duplicate master records.
 
 These are validation targets, not reasons to reject the model.
 
