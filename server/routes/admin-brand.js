@@ -16,11 +16,62 @@ module.exports = function registerAdminBrandRoutes(router, deps) {
     requireAuth,
     serializePublicBrand,
     coreBrandRepo,
-    CoreBrandRepo
+    CoreBrandRepo,
+    mediaService
   } = deps;
 
-  const BRAND_LOGO_DIR = path.join(__dirname, '../../apps/customer-pwa/assets/uploads/logos');
-  const BANNER_IMAGE_DIR = path.join(__dirname, '../../apps/customer-pwa/assets/uploads/banners');
+
+  async function processCanonicalImage({ brandId, tenantId, userId, imageBase64, mimeType, originalFilename, assetType, cropSpec }) {
+    const staged = await mediaService.stageUpload({
+      brandId,
+      tenantId,
+      userId,
+      imageBase64,
+      mimeType,
+      declaredFilename: originalFilename || null,
+      assetType,
+      enforceAspectRatio: false
+    });
+    const processed = await mediaService.processMedia({
+      mediaId: staged.media_id,
+      brandId,
+      cropSpec: cropSpec || null
+    });
+    return processed;
+  }
+
+  function pickPreviewUrl(asset, minWidth) {
+    const variants = Array.isArray(asset && asset.variants) ? [...asset.variants].sort((a, b) => a.width - b.width) : [];
+    if (!variants.length) return asset ? asset.url : null;
+    const candidate = variants.find(v => v.width >= (minWidth || 320)) || variants[variants.length - 1];
+    return candidate.url || asset.url;
+  }
+
+  function latestAttachedMediaId(brandId, entityType, entityId) {
+    const row = db.prepare(
+      "SELECT id FROM media_assets WHERE brand_id = ? AND attached_to_type = ? AND attached_to_id = ? AND status = 'ready' ORDER BY attached_at DESC LIMIT 1"
+    ).get(brandId, entityType, String(entityId));
+    return row ? row.id : null;
+  }
+
+  async function attachOrReplaceImage({ asset, oldMediaId, brandId, entityType, entityId }) {
+    if (oldMediaId) {
+      await mediaService.replaceEntityMedia({
+        newMediaId: asset.media_id,
+        oldMediaId,
+        brandId,
+        entityType,
+        entityId: String(entityId)
+      });
+    } else {
+      await mediaService.attachToEntity({
+        mediaId: asset.media_id,
+        brandId,
+        entityType,
+        entityId: String(entityId)
+      });
+    }
+  }
 
 // 11. Admin Brand Profile & Theme
 router.get('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) => {
@@ -38,7 +89,7 @@ router.get('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
 
 router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
-    const { name, primary_color, logo_url, custom_domain, tagline, banners, merchant_pwa_icon_url, pos_pwa_icon_url, merchant_pwa_name, pos_pwa_name } = req.body;
+    const { name, primary_color, custom_domain, tagline, banners, merchant_pwa_name, pos_pwa_name } = req.body;
     const bannersJson = banners ? (typeof banners === 'string' ? banners : JSON.stringify(banners)) : null;
 
     let normalizedPrimaryColor = undefined;
@@ -74,14 +125,9 @@ router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
     `).run(
       name !== undefined ? name : null,
       normalizedPrimaryColor !== undefined ? normalizedPrimaryColor : null,
-      logo_url !== undefined ? logo_url : null,
       custom_domain !== undefined ? custom_domain : null,
       tagline !== undefined ? tagline : null,
       bannersJson,
-      merchant_pwa_icon_url !== undefined ? 1 : 0,
-      merchant_pwa_icon_url !== undefined ? (typeof merchant_pwa_icon_url === 'string' ? merchant_pwa_icon_url.trim() : null) : null,
-      pos_pwa_icon_url !== undefined ? 1 : 0,
-      pos_pwa_icon_url !== undefined ? (typeof pos_pwa_icon_url === 'string' ? pos_pwa_icon_url.trim() : null) : null,
       merchant_pwa_name !== undefined ? 1 : 0,
       merchant_pwa_name !== undefined ? (typeof merchant_pwa_name === 'string' ? merchant_pwa_name.trim() || null : null) : null,
       pos_pwa_name !== undefined ? 1 : 0,
@@ -126,227 +172,234 @@ router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
   }
 });
 
-// Brand Logo Upload & Delete Endpoints
-
-router.post('/admin/brand/logo', requireAuth(['owner', 'brand_manager']), (req, res) => {
+// Canonical brand/installed-PWA media upload boundary.
+router.post('/admin/brand/logo', requireAuth(['owner', 'brand_manager']), async (req, res) => {
   try {
-    const { image_base64, mime_type } = req.body || {};
+    const { image_base64, mime_type, original_filename, crop_spec } = req.body || {};
     if (!image_base64) {
-      return res.status(400).json({ success: false, error: 'Gambar logo wajib diunggah.' });
+      return res.status(400).json({ success: false, error: 'Data gambar logo wajib diunggah.', code: 'MISSING_IMAGE_DATA' });
     }
 
-    const validation = ImageValidator.validateImageUpload({
+    const brand = db.prepare('SELECT logo_media_id FROM brands WHERE id = ?').get(req.brand_id);
+    const asset = await processCanonicalImage({
+      brandId: req.brand_id,
+      tenantId: req.brand ? req.brand.organization_id : null,
+      userId: req.user ? req.user.id : null,
       imageBase64: image_base64,
       mimeType: mime_type,
-      assetType: 'logo'
+      originalFilename: original_filename,
+      assetType: 'logo',
+      cropSpec: crop_spec || null
     });
 
-    if (!validation.valid) {
-      return res.status(400).json({ success: false, error: validation.error, code: validation.code });
-    }
+    await attachOrReplaceImage({
+      asset,
+      oldMediaId: brand && brand.logo_media_id,
+      brandId: req.brand_id,
+      entityType: 'brand_logo',
+      entityId: req.brand_id
+    });
 
-    fs.mkdirSync(BRAND_LOGO_DIR, { recursive: true });
-    const fileName = `logo-${crypto.randomBytes(8).toString('hex')}-${Date.now()}.${validation.info.ext}`;
-    fs.writeFileSync(path.join(BRAND_LOGO_DIR, fileName), validation.buffer);
+    const logoUrl = pickPreviewUrl(asset, 320);
+    coreBrandRepo.updateBrandLogoMedia(req.brand_id, { mediaId: asset.media_id, logoUrl });
+    if (req.brand) req.brand.logo_url = logoUrl;
 
-    const logoUrl = `/assets/uploads/logos/${fileName}`;
-    coreBrandRepo.updateBrandLogo(req.brand_id, logoUrl);
-
-    if (req.brand) {
-      req.brand.logo_url = logoUrl;
-    }
-
-    res.json({
+    res.status(201).json({
       success: true,
-      message: 'Logo brand berhasil diunggah.',
+      message: 'Logo brand berhasil diproses, dioptimalkan, dan dikaitkan.',
+      asset,
+      preview_url: logoUrl,
       logo_url: logoUrl
     });
   } catch (err) {
-    console.error('[API Error POST /admin/brand/logo]:', err);
-    res.status(500).json({ success: false, error: err.message });
+    const statusCode = err.code === 'UNAUTHORIZED_TENANT' ? 403 : 400;
+    console.error('[API Error POST /admin/brand/logo]:', err.message);
+    res.status(statusCode).json({ success: false, error: err.message, code: err.code || 'LOGO_UPLOAD_ERROR' });
   }
 });
 
-router.delete('/admin/brand/logo', requireAuth(['owner', 'brand_manager']), (req, res) => {
+router.delete('/admin/brand/logo', requireAuth(['owner', 'brand_manager']), async (req, res) => {
   try {
-    coreBrandRepo.removeBrandLogo(req.brand_id);
-    if (req.brand) {
-      req.brand.logo_url = null;
+    const brand = db.prepare('SELECT logo_media_id FROM brands WHERE id = ?').get(req.brand_id);
+    if (brand && brand.logo_media_id) {
+      await mediaService.unlinkMedia({ mediaId: brand.logo_media_id, brandId: req.brand_id });
     }
-    res.json({
-      success: true,
-      message: 'Logo brand berhasil dihapus.',
-      logo_url: null
-    });
+    coreBrandRepo.removeBrandLogoMedia(req.brand_id);
+    if (req.brand) req.brand.logo_url = null;
+    res.json({ success: true, message: 'Logo brand berhasil dihapus.', logo_url: null });
   } catch (err) {
-    console.error('[API Error DELETE /admin/brand/logo]:', err);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: err.message || 'Server error', code: 'LOGO_DELETE_ERROR' });
   }
 });
 
-// Installed PWA Identity Override — launcher icon routes
-// These ONLY affect the PWA launcher icon after install.
-// They do NOT change branding, RBAC, routing, or Customer PWA.
-
-router.post('/admin/brand/merchant-icon', requireAuth(['owner', 'brand_manager']), (req, res) => {
+router.post('/admin/brand/merchant-icon', requireAuth(['owner', 'brand_manager']), async (req, res) => {
   try {
-    const { url, image_base64, mime_type } = req.body || {};
-    let iconUrl = url;
-
-    if (image_base64) {
-      const validation = ImageValidator.validateImageUpload({
-        imageBase64: image_base64,
-        mimeType: mime_type,
-        assetType: 'logo'
-      });
-      if (!validation.valid) {
-        return res.status(400).json({ success: false, error: validation.error, code: validation.code });
-      }
-      fs.mkdirSync(BRAND_LOGO_DIR, { recursive: true });
-      const fileName = `merchant-icon-${crypto.randomBytes(8).toString('hex')}-${Date.now()}.${validation.info.ext}`;
-      fs.writeFileSync(path.join(BRAND_LOGO_DIR, fileName), validation.buffer);
-      iconUrl = `/assets/uploads/logos/${fileName}`;
-    }
-
-    if (!iconUrl) return res.status(400).json({ success: false, error: 'url atau gambar icon wajib diunggah.' });
-
-    coreBrandRepo.updateMerchantPwaIcon(req.brand_id, iconUrl);
-    if (req.brand) {
-      req.brand.merchant_pwa_icon_url = iconUrl;
-    }
-    return res.json({ success: true, message: 'Icon Merchant PWA berhasil diperbarui.', merchant_pwa_icon_url: iconUrl });
-  } catch (err) {
-    console.error('[API Error POST /admin/brand/merchant-icon]:', err);
-    return res.status(500).json({ success: false, error: err.message || 'Server error' });
-  }
-});
-
-router.delete('/admin/brand/merchant-icon', requireAuth(['owner', 'brand_manager']), (req, res) => {
-  try {
-    coreBrandRepo.removeMerchantPwaIcon(req.brand_id);
-    if (req.brand) {
-      req.brand.merchant_pwa_icon_url = null;
-    }
-    return res.json({ success: true, message: 'Icon Merchant PWA berhasil dihapus.', merchant_pwa_icon_url: null });
-  } catch (err) {
-    console.error('[API Error DELETE /admin/brand/merchant-icon]:', err);
-    return res.status(500).json({ success: false, error: err.message || 'Server error' });
-  }
-});
-
-router.post('/admin/brand/pos-icon', requireAuth(['owner', 'brand_manager']), (req, res) => {
-  try {
-    const { url, image_base64, mime_type } = req.body || {};
-    let iconUrl = url;
-
-    if (image_base64) {
-      const validation = ImageValidator.validateImageUpload({
-        imageBase64: image_base64,
-        mimeType: mime_type,
-        assetType: 'logo'
-      });
-      if (!validation.valid) {
-        return res.status(400).json({ success: false, error: validation.error, code: validation.code });
-      }
-      fs.mkdirSync(BRAND_LOGO_DIR, { recursive: true });
-      const fileName = `pos-icon-${crypto.randomBytes(8).toString('hex')}-${Date.now()}.${validation.info.ext}`;
-      fs.writeFileSync(path.join(BRAND_LOGO_DIR, fileName), validation.buffer);
-      iconUrl = `/assets/uploads/logos/${fileName}`;
-    }
-
-    if (!iconUrl) return res.status(400).json({ success: false, error: 'url atau gambar icon wajib diunggah.' });
-
-    coreBrandRepo.updatePosPwaIcon(req.brand_id, iconUrl);
-    if (req.brand) {
-      req.brand.pos_pwa_icon_url = iconUrl;
-    }
-    return res.json({ success: true, message: 'Icon POS PWA berhasil diperbarui.', pos_pwa_icon_url: iconUrl });
-  } catch (err) {
-    console.error('[API Error POST /admin/brand/pos-icon]:', err);
-    return res.status(500).json({ success: false, error: err.message || 'Server error' });
-  }
-});
-
-router.delete('/admin/brand/pos-icon', requireAuth(['owner', 'brand_manager']), (req, res) => {
-  try {
-    coreBrandRepo.removePosPwaIcon(req.brand_id);
-    if (req.brand) {
-      req.brand.pos_pwa_icon_url = null;
-    }
-    return res.json({ success: true, message: 'Icon POS PWA berhasil dihapus.', pos_pwa_icon_url: null });
-  } catch (err) {
-    console.error('[API Error DELETE /admin/brand/pos-icon]:', err);
-    return res.status(500).json({ success: false, error: err.message || 'Server error' });
-  }
-});
-
-// 11.1 Add/Upload/Delete Banners
-router.post('/admin/banners/upload', requireAuth(['owner', 'brand_manager']), (req, res) => {
-  try {
-    const { image_base64, mime_type } = req.body || {};
+    const { image_base64, mime_type, original_filename, crop_spec } = req.body || {};
     if (!image_base64) {
-      return res.status(400).json({ success: false, error: 'Gambar banner wajib diunggah.' });
+      return res.status(400).json({ success: false, error: 'Data icon Merchant PWA wajib diunggah.', code: 'MISSING_IMAGE_DATA' });
     }
 
-    const validation = ImageValidator.validateImageUpload({
+    const oldMediaId = latestAttachedMediaId(req.brand_id, 'brand_merchant_pwa_icon', req.brand_id);
+    const asset = await processCanonicalImage({
+      brandId: req.brand_id,
+      tenantId: req.brand ? req.brand.organization_id : null,
+      userId: req.user ? req.user.id : null,
       imageBase64: image_base64,
       mimeType: mime_type,
-      assetType: 'banner'
+      originalFilename: original_filename,
+      assetType: 'logo',
+      cropSpec: crop_spec || null
     });
 
-    if (!validation.valid) {
-      return res.status(400).json({ success: false, error: validation.error, code: validation.code, dimensions: validation.dimensions });
-    }
+    await attachOrReplaceImage({
+      asset,
+      oldMediaId,
+      brandId: req.brand_id,
+      entityType: 'brand_merchant_pwa_icon',
+      entityId: req.brand_id
+    });
 
-    fs.mkdirSync(BANNER_IMAGE_DIR, { recursive: true });
-    const fileName = `banner-${crypto.randomBytes(8).toString('hex')}-${Date.now()}.${validation.info.ext}`;
-    fs.writeFileSync(path.join(BANNER_IMAGE_DIR, fileName), validation.buffer);
-
-    const bannerUrl = `/assets/uploads/banners/${fileName}`;
-    res.json({
+    const iconUrl = pickPreviewUrl(asset, 320);
+    coreBrandRepo.updateMerchantPwaIcon(req.brand_id, iconUrl);
+    if (req.brand) req.brand.merchant_pwa_icon_url = iconUrl;
+    res.status(201).json({
       success: true,
-      message: 'Foto banner berhasil diunggah.',
-      image_url: bannerUrl,
-      info: validation.info
+      message: 'Icon Merchant PWA berhasil diproses dan diperbarui.',
+      media_id: asset.media_id,
+      preview_url: iconUrl,
+      merchant_pwa_icon_url: iconUrl
     });
   } catch (err) {
-    console.error('[API Error POST /admin/banners/upload]:', err);
-    res.status(500).json({ success: false, error: err.message });
+    const statusCode = err.code === 'UNAUTHORIZED_TENANT' ? 403 : 400;
+    res.status(statusCode).json({ success: false, error: err.message || 'Gagal menyimpan icon Merchant PWA.', code: err.code || 'MERCHANT_PWA_ICON_UPLOAD_ERROR' });
   }
 });
 
-router.post('/admin/banners', requireAuth(['owner', 'brand_manager']), (req, res) => {
+router.delete('/admin/brand/merchant-icon', requireAuth(['owner', 'brand_manager']), async (req, res) => {
   try {
-    let { image_url, image_base64, mime_type, title = '', link = '#' } = req.body || {};
+    const oldMediaId = latestAttachedMediaId(req.brand_id, 'brand_merchant_pwa_icon', req.brand_id);
+    if (oldMediaId) await mediaService.unlinkMedia({ mediaId: oldMediaId, brandId: req.brand_id });
+    coreBrandRepo.removeMerchantPwaIcon(req.brand_id);
+    if (req.brand) req.brand.merchant_pwa_icon_url = null;
+    res.json({ success: true, message: 'Icon Merchant PWA berhasil dihapus.', merchant_pwa_icon_url: null });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message || 'Server error', code: 'MERCHANT_PWA_ICON_DELETE_ERROR' });
+  }
+});
 
+router.post('/admin/brand/pos-icon', requireAuth(['owner', 'brand_manager']), async (req, res) => {
+  try {
+    const { image_base64, mime_type, original_filename, crop_spec } = req.body || {};
+    if (!image_base64) {
+      return res.status(400).json({ success: false, error: 'Data icon POS PWA wajib diunggah.', code: 'MISSING_IMAGE_DATA' });
+    }
+
+    const oldMediaId = latestAttachedMediaId(req.brand_id, 'brand_pos_pwa_icon', req.brand_id);
+    const asset = await processCanonicalImage({
+      brandId: req.brand_id,
+      tenantId: req.brand ? req.brand.organization_id : null,
+      userId: req.user ? req.user.id : null,
+      imageBase64: image_base64,
+      mimeType: mime_type,
+      originalFilename: original_filename,
+      assetType: 'logo',
+      cropSpec: crop_spec || null
+    });
+
+    await attachOrReplaceImage({
+      asset,
+      oldMediaId,
+      brandId: req.brand_id,
+      entityType: 'brand_pos_pwa_icon',
+      entityId: req.brand_id
+    });
+
+    const iconUrl = pickPreviewUrl(asset, 320);
+    coreBrandRepo.updatePosPwaIcon(req.brand_id, iconUrl);
+    if (req.brand) req.brand.pos_pwa_icon_url = iconUrl;
+    res.status(201).json({
+      success: true,
+      message: 'Icon POS PWA berhasil diproses dan diperbarui.',
+      media_id: asset.media_id,
+      preview_url: iconUrl,
+      pos_pwa_icon_url: iconUrl
+    });
+  } catch (err) {
+    const statusCode = err.code === 'UNAUTHORIZED_TENANT' ? 403 : 400;
+    res.status(statusCode).json({ success: false, error: err.message || 'Gagal menyimpan icon POS PWA.', code: err.code || 'POS_PWA_ICON_UPLOAD_ERROR' });
+  }
+});
+
+router.delete('/admin/brand/pos-icon', requireAuth(['owner', 'brand_manager']), async (req, res) => {
+  try {
+    const oldMediaId = latestAttachedMediaId(req.brand_id, 'brand_pos_pwa_icon', req.brand_id);
+    if (oldMediaId) await mediaService.unlinkMedia({ mediaId: oldMediaId, brandId: req.brand_id });
+    coreBrandRepo.removePosPwaIcon(req.brand_id);
+    if (req.brand) req.brand.pos_pwa_icon_url = null;
+    res.json({ success: true, message: 'Icon POS PWA berhasil dihapus.', pos_pwa_icon_url: null });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message || 'Server error', code: 'POS_PWA_ICON_DELETE_ERROR' });
+  }
+});
+
+// Legacy banner adapters still use the canonical Media System. Direct filesystem writes are forbidden.
+router.post('/admin/banners/upload', requireAuth(['owner', 'brand_manager']), async (req, res) => {
+  try {
+    const { image_base64, mime_type, original_filename, crop_spec } = req.body || {};
+    if (!image_base64) {
+      return res.status(400).json({ success: false, error: 'Data gambar banner wajib diunggah.', code: 'MISSING_IMAGE_DATA' });
+    }
+    const asset = await processCanonicalImage({
+      brandId: req.brand_id,
+      tenantId: req.brand ? req.brand.organization_id : null,
+      userId: req.user ? req.user.id : null,
+      imageBase64: image_base64,
+      mimeType: mime_type,
+      originalFilename: original_filename,
+      assetType: 'banner',
+      cropSpec: crop_spec || null
+    });
+    const previewUrl = pickPreviewUrl(asset, 640);
+    res.status(201).json({ success: true, message: 'Banner berhasil diproses melalui Media System.', media_id: asset.media_id, image_url: previewUrl, preview_url: previewUrl, asset });
+  } catch (err) {
+    const statusCode = err.code === 'UNAUTHORIZED_TENANT' ? 403 : 400;
+    res.status(statusCode).json({ success: false, error: err.message, code: err.code || 'BANNER_UPLOAD_ERROR' });
+  }
+});
+
+router.post('/admin/banners', requireAuth(['owner', 'brand_manager']), async (req, res) => {
+  try {
+    let { image_url, image_base64, mime_type, original_filename, title = '', link = '#', crop_spec } = req.body || {};
     let banners = [];
     try {
       banners = req.brand.banners ? (typeof req.brand.banners === 'string' ? JSON.parse(req.brand.banners) : req.brand.banners) : [];
-    } catch(e) {}
+    } catch (_) {}
     if (!Array.isArray(banners)) banners = [];
     if (banners.length >= 5) {
       return res.status(400).json({ success: false, error: 'Maksimal 5 slide banner promo.' });
     }
 
     if (image_base64) {
-      const validation = ImageValidator.validateImageUpload({
+      const asset = await processCanonicalImage({
+        brandId: req.brand_id,
+        tenantId: req.brand ? req.brand.organization_id : null,
+        userId: req.user ? req.user.id : null,
         imageBase64: image_base64,
         mimeType: mime_type,
-        assetType: 'banner'
+        originalFilename: original_filename,
+        assetType: 'banner',
+        cropSpec: crop_spec || null
       });
-
-      if (!validation.valid) {
-        return res.status(400).json({ success: false, error: validation.error, code: validation.code, dimensions: validation.dimensions });
+      image_url = pickPreviewUrl(asset, 640);
+    } else if (image_url) {
+      // Compatibility only: accept an internal Media System delivery URL, never arbitrary external URLs.
+      const existing = db.prepare('SELECT id, storage_key FROM media_assets WHERE brand_id = ? AND status = \'ready\' AND (storage_key = ? OR ? LIKE \'%\' || id || \'%\') LIMIT 1')
+        .get(req.brand_id, image_url, image_url);
+      if (!existing) {
+        return res.status(400).json({ success: false, error: 'URL gambar tidak berasal dari Media System Xentra.', code: 'EXTERNAL_MEDIA_URL_REJECTED' });
       }
-
-      fs.mkdirSync(BANNER_IMAGE_DIR, { recursive: true });
-      const fileName = `banner-${crypto.randomBytes(8).toString('hex')}-${Date.now()}.${validation.info.ext}`;
-      fs.writeFileSync(path.join(BANNER_IMAGE_DIR, fileName), validation.buffer);
-      image_url = `/assets/uploads/banners/${fileName}`;
-    }
-
-    if (!image_url) {
-      return res.status(400).json({ success: false, error: 'URL gambar banner atau file banner wajib diunggah.' });
+    } else {
+      return res.status(400).json({ success: false, error: 'Data gambar banner wajib diunggah.', code: 'MISSING_IMAGE_DATA' });
     }
 
     const newBanner = {
@@ -359,26 +412,10 @@ router.post('/admin/banners', requireAuth(['owner', 'brand_manager']), (req, res
     const bannersJson = JSON.stringify(banners);
     db.prepare('UPDATE brands SET banners = ?, updated_at = datetime(\'now\') WHERE id = ?').run(bannersJson, req.brand_id);
     if (req.brand) req.brand.banners = bannersJson;
-    res.json({ success: true, message: 'Banner berhasil ditambahkan.', banners });
+    res.status(201).json({ success: true, message: 'Banner berhasil diproses dan ditambahkan.', banners });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-router.delete('/admin/banners/:id', requireAuth(['owner', 'brand_manager']), (req, res) => {
-  try {
-    let banners = [];
-    try {
-      banners = req.brand.banners ? (typeof req.brand.banners === 'string' ? JSON.parse(req.brand.banners) : req.brand.banners) : [];
-    } catch(e) {}
-    if (!Array.isArray(banners)) banners = [];
-    banners = banners.filter(b => b.id !== req.params.id);
-    const bannersJson = JSON.stringify(banners);
-    db.prepare('UPDATE brands SET banners = ?, updated_at = datetime(\'now\') WHERE id = ?').run(bannersJson, req.brand_id);
-    if (req.brand) req.brand.banners = bannersJson;
-    res.json({ success: true, message: 'Banner berhasil dihapus.', banners });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    const statusCode = err.code === 'UNAUTHORIZED_TENANT' ? 403 : 400;
+    res.status(statusCode).json({ success: false, error: err.message, code: err.code || 'BANNER_UPLOAD_ERROR' });
   }
 });
 
