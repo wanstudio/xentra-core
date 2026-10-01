@@ -10,9 +10,9 @@
  *    - Validates required name and max 40 chars
  * 2. POST /admin/branches/:id/categories/:catId/image
  *    - Uploads base64 image (JPG/PNG/WEBP)
- *    - Persists file to disk under static uploads and writes URL to database
+ *    - Persists canonical Media System derivative URL and media_id to database
  *    - Leaves category name untouched when only updating image
- *    - Validates supported image mime type and max 3MB file size
+ *    - Validates supported image mime type and max 15MB file size
  * 3. End-to-end Edit Name + Image flow
  *    - Both new name and new image_url are persisted
  * 4. Error cases & status codes
@@ -142,10 +142,12 @@ test('CATEGORY EDIT 2 — Update image only preserves existing name', async () =
     body: JSON.stringify({ image_base64: testPng, mime_type: 'image/png' })
   });
 
-  assert.strictEqual(res.status, 200);
+  assert.strictEqual(res.status, 201);
   const data = await res.json();
   assert.strictEqual(data.success, true);
-  assert.ok(data.category.image_url.startsWith('/assets/uploads/categories/'));
+  assert.ok(data.category.image_url.startsWith('/assets/uploads/derivatives/'));
+  assert.ok(data.category.image_url.endsWith('.webp'));
+  assert.ok(data.category.media_id);
 
   // Verify in DB that name is preserved and image_url is saved
   const updated = db.prepare('SELECT name, slug, image_url, updated_at FROM branch_categories WHERE id = ?').get(catId);
@@ -178,7 +180,7 @@ test('CATEGORY EDIT 3 — Update both name and image succeeds', async () => {
     headers: { Authorization: 'Bearer ' + token },
     body: JSON.stringify({ image_base64: testPng, mime_type: 'image/png' })
   });
-  assert.strictEqual(resImage.status, 200);
+  assert.strictEqual(resImage.status, 201);
   const imgData = await resImage.json();
 
   // Final check
