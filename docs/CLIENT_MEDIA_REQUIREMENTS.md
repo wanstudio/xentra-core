@@ -112,6 +112,7 @@ Customer / Merchant / POS delivery
 - User cancellation of crop selection discards the new selection. There is no uncropped-upload bypass hidden behind `Batal`.
 - UI upload instructions must mirror the authoritative asset limits and state that crop/resize/compression are automatic where applicable.
 - Legacy compatibility routes may remain temporarily, but their binary handling must still delegate to the canonical Media Engine. A route that bypasses the engine is not an allowed compatibility path.
+- Branch Product photo override is quarantined: new branch photo writes/mutations are rejected, catalog resolution always uses the Master Product photo, and legacy `image_override` data is not treated as the active customer photo.
 
 ### Current canonical slot mapping
 
@@ -191,6 +192,8 @@ WebP is the default optimized delivery format. AVIF may be added later where ope
 Exact compression quality is selected by benchmark rather than an arbitrary fixed value.
 
 Delivery derivatives must strip EXIF/GPS metadata. If originals are retained internally, they are not customer-facing delivery assets.
+
+The canonical WebP quality setting is locked at **q82** for the current engine contract. Any benchmark-driven change must be an explicit policy revision.
 
 ## Canonical Media Model
 
