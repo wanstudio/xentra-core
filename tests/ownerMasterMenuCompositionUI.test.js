@@ -123,6 +123,7 @@ test('Owner Master Product UI exposes structured composition selectors', () => {
   assert.ok(HTML.includes('id="btn-add-master-flavor-from-product"'));
   assert.ok(HTML.includes('Master Product Composition'), 'Composition section must be present');
   assert.ok(HTML.includes('Preview Customer PWA'), 'Customer PWA preview must be present');
+  assert.ok(HTML.includes('Nama Produk → judul · Kategori → grouping · Rasa → subjudul · Kelengkapan → detail · Level → indikator'));
 });
 
 test('Legacy Master Product edit hydrates structured composition from the old title', () => {
