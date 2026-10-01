@@ -186,7 +186,7 @@ class MediaService {
   /**
    * Attach a READY asset to an entity.
    */
-  async attachToEntity({ mediaId, brandId, entityType, entityId }) {
+  async attachToEntity({ mediaId, brandId, entityType, entityId, manageTransaction = true }) {
     const asset = this.getMedia({ mediaId, brandId });
 
     if (!MediaLifecycle.canAttach(asset.status)) {
@@ -195,7 +195,16 @@ class MediaService {
       throw err;
     }
 
-    this.mediaRepo.attachMedia(mediaId, brandId, entityType, entityId);
+    if (manageTransaction) this.mediaRepo.beginTransaction();
+    try {
+      this.mediaRepo.attachMedia(mediaId, brandId, entityType, entityId);
+      if (manageTransaction) this.mediaRepo.commitTransaction();
+    } catch (err) {
+      if (manageTransaction) {
+        try { this.mediaRepo.rollbackTransaction(); } catch (_) {}
+      }
+      throw err;
+    }
     const updated = this.mediaRepo.findById(mediaId, brandId);
     return this._formatAssetResponse(updated);
   }
