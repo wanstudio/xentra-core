@@ -81,24 +81,31 @@ class MediaService {
     // 2. Persist binary to storage
     await this.storage.write(storageKey, buffer);
 
-    // 3. Persist metadata record in 'temporary' status
-    this.mediaRepo.createMedia({
-      id: mediaId,
-      tenant_id: tenantId,
-      brand_id: brandId,
-      uploaded_by: userId,
-      storage_key: storageKey,
-      mime_type: info.mime,
-      original_filename: declaredFilename,
-      width: info.width,
-      height: info.height,
-      size_bytes: info.sizeBytes,
-      asset_type: assetType,
-      status: MediaLifecycle.STATES.TEMPORARY
-    });
+    try {
+      // 3. Persist metadata record in 'temporary' status
+      this.mediaRepo.createMedia({
+        id: mediaId,
+        tenant_id: tenantId,
+        brand_id: brandId,
+        uploaded_by: userId,
+        storage_key: storageKey,
+        mime_type: info.mime,
+        original_filename: declaredFilename,
+        width: info.width,
+        height: info.height,
+        size_bytes: info.sizeBytes,
+        asset_type: assetType,
+        status: MediaLifecycle.STATES.TEMPORARY
+      });
 
-    const asset = this.mediaRepo.findById(mediaId, brandId);
-    return this._formatAssetResponse(asset);
+      const asset = this.mediaRepo.findById(mediaId, brandId);
+      return this._formatAssetResponse(asset);
+    } catch (err) {
+      // Intake is a single boundary: a failed DB write must not leave an orphaned
+      // staging binary behind.
+      await this.storage.delete(storageKey);
+      throw err;
+    }
   }
 
   /**
