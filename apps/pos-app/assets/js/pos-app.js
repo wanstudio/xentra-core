@@ -1479,7 +1479,7 @@
 
         var initials=(pName||'').split(' ').slice(0,2).map(function(w){return w.charAt(0);}).join('').toUpperCase()||'P';
         var mediaHtml='';
-        var imgUrl=p.image_url||p.image_override;
+        var imgUrl=p.image_url;
         if(imgUrl){
           mediaHtml='<div class="pos-product-media"><img src="'+esc(imgUrl)+'" alt="'+esc(pName)+'" loading="lazy" class="pos-product-img" onerror="this.style.display=\'none\';if(this.nextElementSibling)this.nextElementSibling.style.display=\'flex\';"><span class="pos-product-avatar" style="display:none;background:'+color.bg+';color:'+color.text+';border-color:'+color.border+'">'+esc(initials)+'</span></div>';
         }else{
