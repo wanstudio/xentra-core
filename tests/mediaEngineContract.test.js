@@ -187,7 +187,7 @@ test('MEDIA ENGINE — canonical boundary contract', async (t) => {
     }
   });
 
-  await t.test('16. Quarantined branch photo fields are not consumer delivery sources', () => {
+  await t.test('15. Quarantined branch photo fields are not consumer delivery sources', () => {
     const posCode = fs.readFileSync(path.join(ROOT, 'apps/pos-app/assets/js/pos-app.js'), 'utf8');
     const orderCode = fs.readFileSync(path.join(ROOT, 'server/routes/customer-orders.js'), 'utf8');
     assert.doesNotMatch(posCode, /p\.image_url\s*\|\|\s*p\.image_override/);
@@ -195,20 +195,28 @@ test('MEDIA ENGINE — canonical boundary contract', async (t) => {
     assert.doesNotMatch(orderCode, /bp\.image_override\s*\|\|\s*bp\.product_image_url/);
   });
 
-  await t.test('17. PWA and Promotion uploads use semantic Media Engine asset types', () => {
+  await t.test('16. Media slots use semantic asset types and generic mutation is manager-only', () => {
     const brandCode = fs.readFileSync(path.join(ROOT, 'server/routes/admin-brand.js'), 'utf8');
     const dashboardCode = fs.readFileSync(path.join(ROOT, 'apps/merchant-dashboard/assets/js/dashboard.js'), 'utf8');
+    const serviceCode = fs.readFileSync(path.join(ROOT, 'core/media/MediaService.js'), 'utf8');
+    const mediaRoutes = fs.readFileSync(path.join(ROOT, 'server/routes/media-upload.js'), 'utf8');
     assert.match(brandCode, /assetType: 'pwa_icon'/);
     assert.match(dashboardCode, /asset_type: 'promotion'/);
+    assert.match(serviceCode, /brand_merchant_pwa_icon: ['pwa_icon']/);
+    assert.match(serviceCode, /brand_pos_pwa_icon: ['pwa_icon']/);
+    assert.match(serviceCode, /banner_content_revision: ['banner']/);
+    assert.match(serviceCode, /MEDIA_ASSET_TYPE_MISMATCH/);
+    assert.match(mediaRoutes, /\/admin\/media\/:id\/attach', requireAuth\(\['owner', 'brand_manager'\]\)/);
+    assert.match(mediaRoutes, /\/admin\/media\/replace', requireAuth\(\['owner', 'brand_manager'\]\)/);
   });
 
-  await t.test('15. HTTP JSON body limit leaves headroom for 20MB base64 media', () => {
+  await t.test('17. HTTP JSON body limit leaves headroom for 20MB base64 media', () => {
     const appCode = fs.readFileSync(path.join(ROOT, 'server/app.js'), 'utf8');
     assert.match(appCode, /express\.json\(\{ limit: ['"]30mb['"] \}\)/);
     assert.match(appCode, /express\.urlencoded\(\{ extended: true, limit: ['"]30mb['"] \}\)/);
   });
 
-  await t.test('11. Orphaned media cannot retain a stale entity attachment', () => {
+  await t.test('18. Orphaned media cannot retain a stale entity attachment', () => {
     const repoCode = fs.readFileSync(path.join(ROOT, 'core/data/repositories/MediaRepository.js'), 'utf8');
     assert.match(repoCode, /status = 'orphan'/);
     assert.match(repoCode, /attached_to_type = NULL/);
