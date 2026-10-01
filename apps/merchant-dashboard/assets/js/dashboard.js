@@ -2902,13 +2902,13 @@
     var emptyImageEl = $('master-preview-image-empty');
     if (!titleEl || !subtitleEl || !detailEl || !indicatorEl || !priceEl) return;
 
-    var categorySelect = $('prod-category');
-    var categoryId = categorySelect ? String(categorySelect.value || '') : '';
-    var category = state.categories.find(function(row) { return String(row.id) === categoryId; });
+    var nameInput = $('prod-name');
+    var productName = nameInput ? String(nameInput.value || '').trim() : '';
     var flavorSelect = $('prod-flavor');
     var levelSelect = $('prod-level');
 
-    titleEl.textContent = category ? category.name : 'Pilih Kategori';
+    // Product Name is the Customer card title. Category remains grouping metadata.
+    titleEl.textContent = productName || 'Masukkan Nama Produk';
     subtitleEl.textContent = '';
     detailEl.textContent = '';
     indicatorEl.textContent = '';
