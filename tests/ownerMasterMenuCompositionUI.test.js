@@ -100,6 +100,22 @@ test('Master Product primary CTA directly opens the product editor', () => {
   assert.ok(JS.includes("btnAddProdMain.addEventListener('click', window.openAddProduct)"));
 });
 
+test('Owner Product Editor treats Product Name as the Customer title source', () => {
+  const start = HTML.indexOf('<section id="tab-catalog-products"');
+  const end = HTML.indexOf('<!-- TAB: CATALOG / MENUS', start);
+  const section = HTML.slice(start, end);
+
+  assert.ok(section.includes('id="prod-name-group"'));
+  assert.ok(section.includes('<label for="prod-name">Nama Produk'));
+  assert.ok(section.includes('<input type="text" id="prod-name" class="x-input" required'));
+  assert.ok(!section.includes('id="prod-name-group" hidden'));
+  assert.ok(!section.includes('Nama Internal Master'));
+  assert.ok(JS.includes("name: $('prod-name').value.trim()"));
+  assert.ok(JS.includes("var nameInput = $('prod-name');"));
+  assert.ok(JS.includes("nameInput.addEventListener('input'"));
+  assert.ok(JS.includes('const customerTitle = hasDisplayNameOverride ? displayNameOverride.trim() : product.name') || JS.includes('const customerTitle = hasDisplayNameOverride ? displayNameOverride.trim() : product.name'));
+});
+
 test('Owner Master Product UI exposes structured composition selectors', () => {
   for (const id of ['prod-category', 'prod-flavor', 'prod-complements-editor', 'prod-level']) {
     assert.ok(HTML.includes('id="' + id + '"'), 'Missing composition control: ' + id);
