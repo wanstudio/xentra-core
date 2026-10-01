@@ -50,22 +50,45 @@ module.exports = function registerAdminBrandRoutes(router, deps) {
     return row ? row.id : null;
   }
 
-  async function attachOrReplaceImage({ asset, oldMediaId, brandId, entityType, entityId }) {
+  async function attachOrReplaceImage({ asset, oldMediaId, brandId, entityType, entityId, manageTransaction = true }) {
     if (oldMediaId) {
       await mediaService.replaceEntityMedia({
         newMediaId: asset.media_id,
         oldMediaId,
         brandId,
         entityType,
-        entityId: String(entityId)
+        entityId: String(entityId),
+        manageTransaction
       });
     } else {
       await mediaService.attachToEntity({
         mediaId: asset.media_id,
         brandId,
         entityType,
-        entityId: String(entityId)
+        entityId: String(entityId),
+        manageTransaction
       });
+    }
+  }
+
+  async function bindBrandMediaAtomically({ asset, oldMediaId, brandId, entityType, entityId, persistReference }) {
+    // MediaService and BrandRepository share the same SQLite connection.
+    // Keep the media attachment and the owning Brand reference in one transaction.
+    db.exec('BEGIN IMMEDIATE;');
+    try {
+      await attachOrReplaceImage({
+        asset,
+        oldMediaId,
+        brandId,
+        entityType,
+        entityId,
+        manageTransaction: false
+      });
+      persistReference();
+      db.exec('COMMIT;');
+    } catch (err) {
+      try { db.exec('ROLLBACK;'); } catch (_) {}
+      throw err;
     }
   }
 
@@ -182,16 +205,15 @@ router.post('/admin/brand/logo', requireAuth(['owner', 'brand_manager']), async 
       cropSpec: crop_spec || null
     });
 
-    await attachOrReplaceImage({
+    const logoUrl = pickPreviewUrl(asset, 320);
+    await bindBrandMediaAtomically({
       asset,
       oldMediaId: brand && brand.logo_media_id,
       brandId: req.brand_id,
       entityType: 'brand_logo',
-      entityId: req.brand_id
+      entityId: req.brand_id,
+      persistReference: function () { coreBrandRepo.updateBrandLogoMedia(req.brand_id, { mediaId: asset.media_id, logoUrl }); }
     });
-
-    const logoUrl = pickPreviewUrl(asset, 320);
-    coreBrandRepo.updateBrandLogoMedia(req.brand_id, { mediaId: asset.media_id, logoUrl });
     if (req.brand) req.brand.logo_url = logoUrl;
 
     res.status(201).json({
@@ -241,16 +263,15 @@ router.post('/admin/brand/merchant-icon', requireAuth(['owner', 'brand_manager']
       cropSpec: crop_spec || null
     });
 
-    await attachOrReplaceImage({
+    const iconUrl = pickPreviewUrl(asset, 320);
+    await bindBrandMediaAtomically({
       asset,
       oldMediaId,
       brandId: req.brand_id,
       entityType: 'brand_merchant_pwa_icon',
-      entityId: req.brand_id
+      entityId: req.brand_id,
+      persistReference: function () { coreBrandRepo.updateMerchantPwaIcon(req.brand_id, { iconUrl, mediaId: asset.media_id }); }
     });
-
-    const iconUrl = pickPreviewUrl(asset, 320);
-    coreBrandRepo.updateMerchantPwaIcon(req.brand_id, { iconUrl, mediaId: asset.media_id });
     if (req.brand) req.brand.merchant_pwa_icon_url = iconUrl;
     res.status(201).json({
       success: true,
@@ -296,16 +317,15 @@ router.post('/admin/brand/pos-icon', requireAuth(['owner', 'brand_manager']), as
       cropSpec: crop_spec || null
     });
 
-    await attachOrReplaceImage({
+    const iconUrl = pickPreviewUrl(asset, 320);
+    await bindBrandMediaAtomically({
       asset,
       oldMediaId,
       brandId: req.brand_id,
       entityType: 'brand_pos_pwa_icon',
-      entityId: req.brand_id
-    });
-
-    const iconUrl = pickPreviewUrl(asset, 320);
-    coreBrandRepo.updatePosPwaIcon(req.brand_id, { iconUrl, mediaId: asset.media_id });
+      entityId: req.brand_id,
+      persistReference: function () { coreBrandRepo.updatePosPwaIcon(req.brand_id, { iconUrl, mediaId: asset.media_id }); }
+    }.
     if (req.brand) req.brand.pos_pwa_icon_url = iconUrl;
     res.status(201).json({
       success: true,
