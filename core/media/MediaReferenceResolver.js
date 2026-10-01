@@ -6,6 +6,7 @@
  * Checks all known media slots and tables in Xentra Core:
  * - Brand logo (`brands.logo_url` or `attached_to_id`)
  * - Brand promotional banners (`brands.banners` JSON array)
+ * - Merchant/Owner and POS PWA icon references (`*_pwa_icon_media_id` / delivery URLs)
  * - Master catalog products (`products.image_url` or `image` or `attached_to_id`)
  * - Master catalog categories (`categories.image_url` or `image` or `attached_to_id`)
  * - Branch product overrides (`branch_products.product_image_url` or `image_override`)
