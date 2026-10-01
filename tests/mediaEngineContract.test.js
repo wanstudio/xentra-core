@@ -145,16 +145,51 @@ test('MEDIA ENGINE — canonical boundary contract', async (t) => {
     assert.match(brandCode, /storage\.resolveUrl\(key\) === image_url/);
   });
 
-  await t.test('11. Branch catalog cannot resolve legacy image_override as active photo', () => {
+  await t.test('10. Branch catalog cannot resolve legacy image_override as active photo', () => {
     const catalogCode = fs.readFileSync(path.join(ROOT, 'core/data/repositories/CatalogRepository.js'), 'utf8');
     const adminCatalogCode = fs.readFileSync(path.join(ROOT, 'server/routes/admin-branch-catalog.js'), 'utf8');
-    assert.doesNotMatch(catalogCode, /COALESCE\\(bp\\.image_override, p\\.image_url\\)/);
+    assert.doesNotMatch(catalogCode, /COALESCE\(bp\.image_override, p\.image_url\)/);
     assert.doesNotMatch(adminCatalogCode, /COALESCE\\(bp\\.image_override, p\\.image_url\\)/);
-    assert.match(catalogCode, /p\\.image_url as image_url/);
+    assert.match(catalogCode, /p\.image_url as image_url/);
     assert.match(adminCatalogCode, /p\\.image_url as image_url/);
   });
 
-  await t.test('10. Orphaned media cannot retain a stale entity attachment', () => {
+  await t.test('12. Post-publish cleanup cannot downgrade a published asset', () => {
+    const serviceCode = fs.readFileSync(path.join(ROOT, 'core/media/MediaService.js'), 'utf8');
+    assert.match(serviceCode, /let published = false;/);
+    assert.match(serviceCode, /published = true;/);
+    assert.match(serviceCode, /Cleanup is best-effort and must NEVER roll back/);
+    assert.match(serviceCode, /if \(published\)/);
+  });
+
+  await t.test('13. Higher-level banner transactions do not nest MediaService transactions', () => {
+    const mediaCode = fs.readFileSync(path.join(ROOT, 'core/media/MediaService.js'), 'utf8');
+    const bannerCode = fs.readFileSync(path.join(ROOT, 'domains/banner/services/BannerContentService.js'), 'utf8');
+    assert.match(mediaCode, /manageTransaction = true/);
+    assert.match(bannerCode, /manageTransaction: false/);
+    assert.equal((bannerCode.match(/manageTransaction: false/g) || []).length, 3);
+  });
+
+  await t.test('14. Forward branch-product UI has no executable photo-upload state/path', () => {
+    const files = [
+      'apps/merchant-dashboard/assets/js/branch-catalog-ui.js',
+      'apps/merchant-app/assets/js/branch-catalog-ui.js'
+    ];
+    for (const rel of files) {
+      const code = fs.readFileSync(path.join(ROOT, rel), 'utf8');
+      assert.doesNotMatch(code, /uploadBranchProductImage/);
+      assert.doesNotMatch(code, /_bpSelectedFile/);
+      assert.doesNotMatch(code, /XentraCropEditor\.open/);
+    }
+  });
+
+  await t.test('15. HTTP JSON body limit leaves headroom for 20MB base64 media', () => {
+    const appCode = fs.readFileSync(path.join(ROOT, 'server/app.js'), 'utf8');
+    assert.match(appCode, /express\.json\(\{ limit: ['"]30mb['"] \}\)/);
+    assert.match(appCode, /express\.urlencoded\(\{ extended: true, limit: ['"]30mb['"] \}\)/);
+  });
+
+  await t.test('11. Orphaned media cannot retain a stale entity attachment', () => {
     const repoCode = fs.readFileSync(path.join(ROOT, 'core/data/repositories/MediaRepository.js'), 'utf8');
     assert.match(repoCode, /status = 'orphan'/);
     assert.match(repoCode, /attached_to_type = NULL/);
