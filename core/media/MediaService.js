@@ -78,8 +78,14 @@ class MediaService {
     const mediaId = `med_${crypto.randomBytes(8).toString('hex')}_${Date.now()}`;
     const storageKey = `staging/${brandId}/${mediaId}.${info.ext}`;
 
-    // 2. Persist binary to storage
-    await this.storage.write(storageKey, buffer);
+    // 2. Persist binary to storage. Cleanup is attempted even when the provider
+    // reports a write failure, because a provider may have created a partial file.
+    try {
+      await this.storage.write(storageKey, buffer);
+    } catch (err) {
+      try { await this.storage.delete(storageKey); } catch (_) {}
+      throw err;
+    }
 
     try {
       // 3. Persist metadata record in 'temporary' status
@@ -564,13 +570,15 @@ class MediaService {
       this.mediaRepo.updateStatus(mediaId, brandId, MediaLifecycle.STATES.PROCESSING);
     }
 
-    const oldVariants = this.mediaRepo.getVariantsByMediaId(mediaId);
-    const processingRunId = `run_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
     const newVariantKeys = [];
     let newPermanentOriginalKey = null;
     let transactionActive = false;
+    let oldVariants = [];
+    let processingRunId = null;
 
     try {
+      oldVariants = this.mediaRepo.getVariantsByMediaId(mediaId);
+      processingRunId = `run_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
       // 1. Read source binary from storage
       const sourceBuffer = await this.storage.read(asset.storage_key);
 
