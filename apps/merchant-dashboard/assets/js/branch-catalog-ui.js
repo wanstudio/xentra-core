@@ -19,6 +19,18 @@
   var formatMoney = S.formatMoney;
   var showToast = S.showToast;
 
+  // Nominal uang memakai shared currency input (merchant-shared/js/currency-input.js)
+  // supaya format/parse-nya satu sumber, bukan formatter lokal.
+  function setCurrency(el, value) {
+    if (!el) return;
+    if (window.XentraCurrencyInput) window.XentraCurrencyInput.setValue(el, value);
+    else el.value = (value === null || value === undefined) ? '' : value;
+  }
+  function currencyOf(el) {
+    if (!el) return 0;
+    return window.XentraCurrencyInput ? window.XentraCurrencyInput.getValue(el) : Number(el.value || 0);
+  }
+
   var hooks = { getBranches: null };
   var currentManagingBranchId = null;
   var currentBranchCatalogData = null;
@@ -325,13 +337,13 @@
     var priceHint = $('override-price-hint');
     if (isRange) {
       priceInput.readOnly = false;
-      priceInput.value = p.price != null ? p.price : (p.master_price != null ? p.master_price : '');
+      setCurrency(priceInput, p.price != null ? p.price : (p.master_price != null ? p.master_price : ''));
       priceInput.min = p.min_price != null ? p.min_price : p.master_price;
       priceInput.max = p.max_price != null ? p.max_price : p.master_price;
       priceHint.innerHTML = '💡 <strong>Range Harga Fleksibel:</strong> Cabang diizinkan menentukan harga antara <strong>' + formatMoney(p.min_price) + '</strong> s/d <strong>' + formatMoney(p.max_price) + '</strong>.';
     } else {
       priceInput.readOnly = true;
-      priceInput.value = p.price != null ? p.price : (p.master_price != null ? p.master_price : '');
+      setCurrency(priceInput, p.price != null ? p.price : (p.master_price != null ? p.master_price : ''));
       priceHint.innerHTML = '🔒 <strong>Harga Terkunci:</strong> Ditetapkan paten oleh Pemilik Resto (Owner) sebesar <strong>' + formatMoney(p.master_price) + '</strong>.';
     }
 
@@ -396,7 +408,7 @@
     // the server re-validates against the locked PricingPolicyModel.
     var pricingMode = String($('override-price-input').readOnly ? 'lock' : 'range').toLowerCase();
     if (pricingMode === 'range') {
-      payload.price = Number($('override-price-input').value);
+      payload.price = currencyOf($('override-price-input'));
     }
 
     // category — collect M:N checkboxes if present, otherwise fallback to select

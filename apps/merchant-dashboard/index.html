@@ -1820,11 +1820,11 @@
         <div class="x-form-row">
           <div class="x-form-group">
             <label for="prod-price">Harga Jual (Rp)</label>
-            <input type="number" id="prod-price" class="x-input" placeholder="28000" required>
+            <input type="text" inputmode="numeric" data-input-type="currency" id="prod-price" class="x-input" placeholder="28.000" required>
           </div>
           <div class="x-form-group">
             <label for="prod-regular-price">Harga Coret / Diskon (Rp)</label>
-            <input type="number" id="prod-regular-price" class="x-input" placeholder="32000">
+            <input type="text" inputmode="numeric" data-input-type="currency" id="prod-regular-price" class="x-input" placeholder="32.000">
           </div>
         </div>
         <div class="x-form-row">
@@ -1838,9 +1838,9 @@
           <div class="x-form-group" id="prod-range-fields" style="display:none;">
             <label>Harga Range (Rp)</label>
             <div class="x-form-row">
-              <input type="number" id="prod-min-price" class="x-input" placeholder="Min" style="flex:1;">
+              <input type="text" inputmode="numeric" data-input-type="currency" id="prod-min-price" class="x-input" placeholder="Min" style="flex:1;">
               <span style="padding:0 6px;color:#94a3b8;">—</span>
-              <input type="number" id="prod-max-price" class="x-input" placeholder="Max" style="flex:1;">
+              <input type="text" inputmode="numeric" data-input-type="currency" id="prod-max-price" class="x-input" placeholder="Max" style="flex:1;">
             </div>
           </div>
         </div>
@@ -3297,7 +3297,7 @@
                     </div>
                     <div>
                       <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:6px;">Tarif per KM (Rp)</label>
-                      <input id="set-ful-price-km" type="number" step="500" class="x-input" style="width:100%;">
+                      <input id="set-ful-price-km" type="text" inputmode="numeric" data-input-type="currency" class="x-input" style="width:100%;" placeholder="2.500">
                     </div>
                   </div>
 
@@ -4109,7 +4109,7 @@
         <!-- PRICE -->
         <div>
           <label style="font-size:12px;font-weight:700;color:#475569;display:block;margin-bottom:4px;">Harga Jual Cabang</label>
-          <input id="override-price-input" type="number" class="x-input" style="width:100%;" />
+          <input id="override-price-input" type="text" inputmode="numeric" data-input-type="currency" class="x-input" style="width:100%;" />
           <div id="override-price-hint" style="font-size:11px;color:#64748b;margin-top:6px;"></div>
         </div>
 
@@ -4774,7 +4774,7 @@
             </div>
             <div class="x-form-group">
               <label for="branch-price-km">Tarif Ongkir per KM (Rp)</label>
-              <input type="number" id="branch-price-km" class="x-input" min="0" placeholder="3000">
+              <input type="text" inputmode="numeric" data-input-type="currency" id="branch-price-km" class="x-input" placeholder="3.000">
             </div>
           </div>
           <div class="x-form-row">
@@ -4784,12 +4784,12 @@
             </div>
             <div class="x-form-group">
               <label for="branch-promo-minorder">Promo Min. Order (Rp)</label>
-              <input type="number" id="branch-promo-minorder" class="x-input" min="0" placeholder="50000">
+              <input type="text" inputmode="numeric" data-input-type="currency" id="branch-promo-minorder" class="x-input" placeholder="50.000">
             </div>
           </div>
           <div class="x-form-group">
             <label for="branch-promo-discount">Promo Diskon Ongkir (Rp)</label>
-            <input type="number" id="branch-promo-discount" class="x-input" min="0" placeholder="10000">
+            <input type="text" inputmode="numeric" data-input-type="currency" id="branch-promo-discount" class="x-input" placeholder="10.000">
           </div>
           <div class="x-form-group">
             <label class="x-checkbox-label">
@@ -4897,10 +4897,11 @@
   <script src="/merchant-shared/js/action-menu.js?v=1.0.1"></script>
   <script src="/merchant-shared/js/crop-editor.js?v=1.0.1"></script>
   <script src="/merchant-shared/js/catalog-client.js?v=1.0.1"></script>
-  <script src="/merchant-dashboard/assets/js/branch-catalog-ui.js?v=1.0.1"></script>
+  <script src="/merchant-shared/js/currency-input.js?v=1.0.0"></script>
+  <script src="/merchant-dashboard/assets/js/branch-catalog-ui.js?v=1.0.2"></script>
   <script src="/merchant-dashboard/assets/js/owner-bottom-nav.js?v=1.0.0"></script>
   <script src="/merchant-shared/js/presentation-shells.js?v=1.0.2"></script>
   <script src="/merchant-dashboard/assets/js/owner-navigation.js?v=1.0.0"></script>
-  <script src="/dashboard/assets/js/dashboard.js?v=3.0.54"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=3.0.55"></script>
 </body>
 </html>  

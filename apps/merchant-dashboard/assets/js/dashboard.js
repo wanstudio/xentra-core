@@ -107,6 +107,30 @@
   }
   var escapeHtml = esc;
 
+  // Field nominal memakai shared currency input (merchant-shared/js/currency-input.js).
+  // Semua baca/tulis lewat sini supaya tidak ada double-format/double-parse dan nilai
+  // yang dikirim ke server selalu angka murni.
+  var CurrencyInput = window.XentraCurrencyInput;
+  function currencyOf(el) {
+    if (!el) return 0;
+    return CurrencyInput ? CurrencyInput.getValue(el) : Number(el.value || 0);
+  }
+  function currencyValue(id) {
+    return currencyOf($(id));
+  }
+  // Field opsional: kosong berarti "pakai default", bukan 0.
+  function currencyValueOrDefault(id, fallback) {
+    var el = $(id);
+    if (!el || String(el.value).trim() === '') return fallback;
+    return currencyOf(el);
+  }
+  function setCurrencyValue(id, value) {
+    var el = $(id);
+    if (!el) return;
+    if (CurrencyInput) CurrencyInput.setValue(el, value);
+    else el.value = (value === null || value === undefined) ? '' : value;
+  }
+
   function requestTextInputSheet(options) {
     options = options || {};
     return new Promise(function(resolve) {
@@ -2924,7 +2948,7 @@
       indicatorEl.innerHTML = indicatorHtml;
     }
 
-    var price = Number(($('prod-price') && $('prod-price').value) || 0);
+    var price = currencyValue('prod-price');
     priceEl.textContent = formatMoney(price);
 
     var previewInput = $('prod-image-preview');
@@ -3510,7 +3534,7 @@
       var optionsHtml=(g.options||[]).map(function(o,oi){
         return '<div style="display:grid;grid-template-columns:minmax(0,1fr) 110px auto;gap:6px;align-items:center;margin-top:6px;">' +
           '<input class="x-input" data-opt-name="' + gi + ':' + oi + '" value="' + esc(o.name) + '" placeholder="Nama pilihan">' +
-          '<input type="number" class="x-input" data-opt-price="' + gi + ':' + oi + '" value="' + Number(o.price_adjustment || 0) + '" placeholder="Adjustment">' +
+          '<input type="text" inputmode="numeric" data-input-type="currency" class="x-input" data-opt-price="' + gi + ':' + oi + '" value="' + Number(o.price_adjustment || 0) + '" placeholder="Adjustment">' +
           '<button type="button" class="x-btn-secondary" data-opt-remove="' + gi + ':' + oi + '" style="color:#ef4444;">✕</button>' +
         '</div>';
       }).join('');
@@ -3530,7 +3554,8 @@
     box.querySelectorAll('[data-opt-group-min]').forEach(function(el){ el.oninput=function(){ _productOptionsDraft[Number(el.dataset.optGroupMin)].min=Math.max(0,Number(el.value||0)); }; });
     box.querySelectorAll('[data-opt-group-max]').forEach(function(el){ el.oninput=function(){ var v=el.value.trim(); _productOptionsDraft[Number(el.dataset.optGroupMax)].max=v===''?null:Math.max(0,Number(v)); }; });
     box.querySelectorAll('[data-opt-name]').forEach(function(el){ el.oninput=function(){ var parts=el.dataset.optName.split(':'); _productOptionsDraft[Number(parts[0])].options[Number(parts[1])].name=el.value; }; });
-    box.querySelectorAll('[data-opt-price]').forEach(function(el){ el.oninput=function(){ var parts=el.dataset.optPrice.split(':'); _productOptionsDraft[Number(parts[0])].options[Number(parts[1])].price_adjustment=Number(el.value||0); }; });
+    // price_adjustment = nominal uang, jadi dibaca lewat shared currency input.
+    box.querySelectorAll('[data-opt-price]').forEach(function(el){ el.oninput=function(){ var parts=el.dataset.optPrice.split(':'); _productOptionsDraft[Number(parts[0])].options[Number(parts[1])].price_adjustment=currencyOf(el); }; });
     box.querySelectorAll('[data-opt-remove-group]').forEach(function(el){ el.onclick=function(){ _productOptionsDraft.splice(Number(el.dataset.optRemoveGroup),1); renderProductOptionsEditor(); }; });
     box.querySelectorAll('[data-opt-remove]').forEach(function(el){ el.onclick=function(){ var parts=el.dataset.optRemove.split(':'); _productOptionsDraft[Number(parts[0])].options.splice(Number(parts[1]),1); renderProductOptionsEditor(); }; });
     box.querySelectorAll('[data-opt-add]').forEach(function(el){ el.onclick=function(){ var gi=Number(el.dataset.optAdd); _productOptionsDraft[gi].options.push({id:'option_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),name:'',price_adjustment:0}); renderProductOptionsEditor(); }; });
@@ -3638,11 +3663,11 @@
     if ($('product-editor-mobile-subtitle')) $('product-editor-mobile-subtitle').textContent = 'Susun identitas, harga, foto, dan komposisi Master Menu.';
     $('prod-id').value = '';
     $('prod-name').value = '';
-    $('prod-price').value = '';
-    $('prod-regular-price').value = '';
+    setCurrencyValue('prod-price', '');
+    setCurrencyValue('prod-regular-price', '');
     $('prod-pricing-mode').value = 'lock';
-    $('prod-min-price').value = '';
-    $('prod-max-price').value = '';
+    setCurrencyValue('prod-min-price', '');
+    setCurrencyValue('prod-max-price', '');
     toggleRangeFields();
     $('prod-desc').value = '';
     _productImageFile = null;
@@ -3670,11 +3695,11 @@
     $('prod-name').value = prod.name || '';
     populateProductCategorySelect();
     $('prod-category').value = prod.category_id || '';
-    $('prod-price').value = prod.price != null ? prod.price : '';
-    $('prod-regular-price').value = prod.regular_price || prod.price || '';
+    setCurrencyValue('prod-price', prod.price != null ? prod.price : '');
+    setCurrencyValue('prod-regular-price', prod.regular_price || prod.price || '');
     $('prod-pricing-mode').value = prod.pricing_mode || 'lock';
-    $('prod-min-price').value = prod.min_price || '';
-    $('prod-max-price').value = prod.max_price || '';
+    setCurrencyValue('prod-min-price', prod.min_price || '');
+    setCurrencyValue('prod-max-price', prod.max_price || '');
     toggleRangeFields();
     $('prod-desc').value = prod.description || '';
     _productImageFile = null;
@@ -4516,11 +4541,11 @@ async function loadMenusView() {
           // Product name is explicit user input and is the Customer card title.
           name: $('prod-name').value.trim(),
           category_id: $('prod-category').value,
-          price: Number($('prod-price').value),
-          regular_price: Number($('prod-regular-price').value || $('prod-price').value),
+          price: currencyValue('prod-price'),
+          regular_price: currencyValue('prod-regular-price') || currencyValue('prod-price'),
           pricing_mode: pricingMode,
-          min_price: pricingMode === 'range' ? Number($('prod-min-price').value || $('prod-price').value) : null,
-          max_price: pricingMode === 'range' ? Number($('prod-max-price').value || $('prod-price').value) : null,
+          min_price: pricingMode === 'range' ? (currencyValue('prod-min-price') || currencyValue('prod-price')) : null,
+          max_price: pricingMode === 'range' ? (currencyValue('prod-max-price') || currencyValue('prod-price')) : null,
           description: $('prod-desc').value
         };
 
@@ -4806,10 +4831,10 @@ async function loadMenusView() {
     $('branch-latitude').value = b ? Number(b.latitude || 0) : '';
     $('branch-longitude').value = b ? Number(b.longitude || 0) : '';
     $('branch-free-km').value = b ? (b.free_delivery_km != null ? b.free_delivery_km : 0) : 0;
-    $('branch-price-km').value = b ? (b.price_per_km != null ? b.price_per_km : 3000) : 3000;
+    setCurrencyValue('branch-price-km', b ? (b.price_per_km != null ? b.price_per_km : 3000) : 3000);
     $('branch-radius').value = b ? (b.max_radius_km != null ? b.max_radius_km : 10) : 10;
-    $('branch-promo-minorder').value = b ? (b.promo_min_order != null ? b.promo_min_order : 50000) : 50000;
-    $('branch-promo-discount').value = b ? (b.promo_delivery_discount != null ? b.promo_delivery_discount : 0) : 0;
+    setCurrencyValue('branch-promo-minorder', b ? (b.promo_min_order != null ? b.promo_min_order : 50000) : 50000);
+    setCurrencyValue('branch-promo-discount', b ? (b.promo_delivery_discount != null ? b.promo_delivery_discount : 0) : 0);
     $('branch-open-override').checked = b ? !(b.is_open_override === 0 || b.is_open_override === false) : true;
     $('branch-editor-title').textContent = b ? ('Edit Cabang: ' + (b.name || '')) : 'Tambah Cabang';
     $('branch-editor-breadcrumb').textContent = b ? 'Edit Cabang' : 'Tambah Cabang';
@@ -5127,10 +5152,10 @@ async function loadMenusView() {
         latitude: $('branch-latitude').value !== '' ? Number($('branch-latitude').value) : 0,
         longitude: $('branch-longitude').value !== '' ? Number($('branch-longitude').value) : 0,
         free_delivery_km: $('branch-free-km').value !== '' ? Number($('branch-free-km').value) : 0,
-        price_per_km: $('branch-price-km').value !== '' ? Number($('branch-price-km').value) : 3000,
+        price_per_km: currencyValueOrDefault('branch-price-km', 3000),
         max_radius_km: $('branch-radius').value !== '' ? Number($('branch-radius').value) : 10,
-        promo_min_order: $('branch-promo-minorder').value !== '' ? Number($('branch-promo-minorder').value) : 50000,
-        promo_delivery_discount: $('branch-promo-discount').value !== '' ? Number($('branch-promo-discount').value) : 0,
+        promo_min_order: currencyValueOrDefault('branch-promo-minorder', 50000),
+        promo_delivery_discount: currencyValueOrDefault('branch-promo-discount', 0),
         is_open_override: $('branch-open-override').checked ? 1 : 0
       };
 
@@ -11962,7 +11987,7 @@ async function loadMenusView() {
         if ($('set-ful-pickup-active')) $('set-ful-pickup-active').checked = Boolean(f.is_pickup_active);
         if ($('set-ful-max-radius')) $('set-ful-max-radius').value = f.max_radius_km || 10;
         if ($('set-ful-free-km')) $('set-ful-free-km').value = f.free_delivery_km || 3;
-        if ($('set-ful-price-km')) $('set-ful-price-km').value = f.price_per_km || 2500;
+        setCurrencyValue('set-ful-price-km', f.price_per_km || 2500);
       } catch (err) {
         console.warn('[Load Fulfillment Warn]:', err);
       }
@@ -11984,7 +12009,7 @@ async function loadMenusView() {
             if ($('set-ful-pickup-active')) $('set-ful-pickup-active').checked = Boolean(f.is_pickup_active);
             if ($('set-ful-max-radius')) $('set-ful-max-radius').value = f.max_radius_km || 10;
             if ($('set-ful-free-km')) $('set-ful-free-km').value = f.free_delivery_km || 3;
-            if ($('set-ful-price-km')) $('set-ful-price-km').value = f.price_per_km || 2500;
+            setCurrencyValue('set-ful-price-km', f.price_per_km || 2500);
           }
         });
     }
@@ -12006,7 +12031,7 @@ async function loadMenusView() {
           is_pickup_active: $('set-ful-pickup-active').checked,
           max_radius_km: parseFloat($('set-ful-max-radius').value) || 10.0,
           free_delivery_km: parseFloat($('set-ful-free-km').value) || 3.0,
-          price_per_km: parseFloat($('set-ful-price-km').value) || 2500.0
+          price_per_km: currencyValue('set-ful-price-km') || 2500
         };
 
         var res = await adminFetch(API_BASE + '/admin/settings/commerce/fulfillment', {
