@@ -10800,7 +10800,7 @@ async function loadMenusView() {
     if ($('mkt-promo-media-id')) $('mkt-promo-media-id').value = '';
     if ($('mkt-promo-icon-url')) $('mkt-promo-icon-url').value = '/assets/pwa/icon-192.png';
     if ($('mkt-promo-icon-status')) {
-      $('mkt-promo-icon-status').textContent = 'Format: PNG, JPG, WebP. Maks 10MB (Rasio 1:1).';
+      $('mkt-promo-icon-status').textContent = 'JPG, PNG, WebP · Maks. 10 MB · Rasio 1:1';
       $('mkt-promo-icon-status').style.color = '#64748b';
     }
 
