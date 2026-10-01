@@ -273,9 +273,9 @@ Karena itu:
 > The "save point = snapshot columns" implementation has been replaced by
 > **Master Product Default + Branch Optional Override**.
 > - Adoption no longer copies `product_name`/`product_description`/`product_image_url`.
-> - Override columns (`name_override`, `description_override`, `image_override`) default to NULL.
-> - NULL override = Branch inherits live Master value (propagation).
-> - Non-NULL override = Branch value wins via `COALESCE` at query time.
+> - The canonical Branch override exception is `name_override`, which defaults to NULL; NULL means inherit the live Master Customer display name.
+> - `description_override` and `image_override` are legacy compatibility fields only and remain quarantined from active resolution.
+> - Do not introduce Branch Product photo/content override as a second active authority.
 > - Legacy snapshot columns are retained for backward compatibility but are not the resolution path.
 > - The business invariant "adoption ≠ live dependency" is preserved: branches explicitly set overrides;
 
