@@ -109,7 +109,9 @@ test('1. Create branch category, then attach an image via the upload endpoint', 
   });
   const imgData = await imgRes.json();
   assert.strictEqual(imgData.success, true);
-  assert.ok(imgData.category.image_url.startsWith('/assets/uploads/categories/'));
+  assert.ok(imgData.category.image_url.startsWith('/assets/uploads/derivatives/'));
+  assert.ok(imgData.category.image_url.endsWith('.webp'));
+  assert.ok(imgData.category.media_id);
 
   const cats = await getCategories(auth, BARAT);
   const persisted = cats.find((c) => c.id === catId);
