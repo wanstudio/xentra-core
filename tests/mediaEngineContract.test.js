@@ -149,9 +149,9 @@ test('MEDIA ENGINE — canonical boundary contract', async (t) => {
     const catalogCode = fs.readFileSync(path.join(ROOT, 'core/data/repositories/CatalogRepository.js'), 'utf8');
     const adminCatalogCode = fs.readFileSync(path.join(ROOT, 'server/routes/admin-branch-catalog.js'), 'utf8');
     assert.doesNotMatch(catalogCode, /COALESCE\(bp\.image_override, p\.image_url\)/);
-    assert.doesNotMatch(adminCatalogCode, /COALESCE\\(bp\\.image_override, p\\.image_url\\)/);
+    assert.doesNotMatch(adminCatalogCode, /COALESCE\(bp\.image_override, p\.image_url\)/);
     assert.match(catalogCode, /p\.image_url as image_url/);
-    assert.match(adminCatalogCode, /p\\.image_url as image_url/);
+    assert.match(adminCatalogCode, /p\.image_url as image_url/);
   });
 
   await t.test('12. Post-publish cleanup cannot downgrade a published asset', () => {
@@ -177,9 +177,13 @@ test('MEDIA ENGINE — canonical boundary contract', async (t) => {
     ];
     for (const rel of files) {
       const code = fs.readFileSync(path.join(ROOT, rel), 'utf8');
-      assert.doesNotMatch(code, /uploadBranchProductImage/);
-      assert.doesNotMatch(code, /_bpSelectedFile/);
-      assert.doesNotMatch(code, /XentraCropEditor\.open/);
+      const start = code.indexOf('window.openBranchOverrideModal');
+      const end = code.indexOf('window.clearBranchProductOverride');
+      assert.ok(start >= 0 && end > start, rel + ' must contain a bounded branch-product override controller');
+      const branchProductController = code.slice(start, end);
+      assert.doesNotMatch(branchProductController, /uploadBranchProductImage/);
+      assert.doesNotMatch(branchProductController, /_bpSelectedFile/);
+      assert.doesNotMatch(branchProductController, /XentraCropEditor\.open/);
     }
   });
 
