@@ -768,3 +768,38 @@ If the user cancels or closes the warning:
 The reset occurs at the **draft/UI state** first. Persistence happens only when the Owner saves the Product.
 
 The same rule applies when the Category is changed from one valid parent to another; the system must not attempt to preserve Sub Category/Rasa by matching names.
+
+
+## 🔒 LOCKED SUB-DECISION — Sub Category Rename Warning & Propagation
+
+**Decision date:** 2026-10-01
+
+An Owner may rename a Master Sub Category.
+
+Because Sub Category is the Customer-facing title source, the rename propagates to the current title of every Product using that Sub Category.
+
+Before saving the rename, the UI must warn with the actual usage count.
+
+Conceptual behavior:
+
+\`\`\`
+Ubah Sub Kategori
+
+Ayam Bakar → Ayam Bakar Premium
+
+Sub Kategori ini digunakan oleh 20 menu.
+Perubahan nama akan mengubah judul menu tersebut di Customer PWA.
+
+[ Batal ] [ Simpan Perubahan ]
+                         ×
+\`\`\`
+
+Rules:
+
+- Rename is allowed.
+- The warning is mandatory when the Sub Category is used by one or more Products.
+- Cancel / \`×\` leaves the existing Sub Category name unchanged.
+- Save updates the Master Sub Category name; Products continue referencing the same Sub Category ID.
+- Customer-facing titles resolve from the updated Sub Category name.
+- Historical orders remain unchanged because they use the historical order/menu snapshot.
+- Before commit, Core must validate that the resulting Product identities remain unique under the new Sub Category identity context. If the rename would create duplicate Product identities, the rename must be blocked with a conflict message rather than silently creating/merging Products.
