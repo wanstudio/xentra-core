@@ -456,3 +456,25 @@ This is a presentation/UI contract only. No changes are authorized to Core autho
 
 The Home must reuse existing mature Xentra primitives and must not extend quarantined legacy UI/domain assumptions.
 \n\n## 🔒 LOCKED — Presentation Shell vs Feature Context v1 — 2026-09-30\n\nXentra separates **how** a feature is presented from **what** the feature does.\n\nReusable presentation shells: Page, Bottom Sheet, Dialog/Modal, Overlay, Side Sheet/Panel, and applicable Picker shells. Feature contexts remain independent: Category Editor, Flavor Editor, Product Editor, Branch Editor, Promo Editor, Customer Editor, etc.\n\nThe same feature context may be composed into different shells by UX context without duplicating business logic. Shells own presentation behavior; contexts own task state, validation, and domain actions. Reuse existing mature Xentra primitives and do not create feature-specific shell duplicates or a second generic UI framework.\n\nGit source of truth: `docs/decisions/xentra-presentation-shell-vs-feature-context-v1.md`.\n
+
+# 🔒 LOCKED — Product Name vs Category Display Boundary v1 — 2026-10-01
+
+The prior `Kategori → Customer title` interpretation is superseded.
+
+Canonical Product presentation is now:
+
+```
+products.name       → Customer card title
+Master Category     → grouping / classification
+Master Flavor       → Customer card subtitle
+Master Complement[] → Customer card detail
+Master Level        → Customer card indicator
+```
+
+**Owner Product Editor:** Nama Produk is a visible, required, editable field. Product Name must never be generated from Kategori + Rasa.
+
+**Resolver invariant:** the Customer title is `products.name` unless the explicitly supported Branch Customer Display Name Override is active. Category nodes in the Master catalog tree retain `categories.name` and are never renamed to a Product title.
+
+No schema migration is required because `products.name` already exists. This is a correction to the canonical read/presentation contract and its UI implementation.
+
+**Source of truth:** `docs/decisions/xentra-product-name-category-display-boundary-v1.md`.
