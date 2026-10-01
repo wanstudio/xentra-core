@@ -848,15 +848,9 @@
             showToast('✓ Potongan gambar kategori disesuaikan.');
           },
           onCancel: function () {
-            var reader = new FileReader();
-            reader.onload = function (e) {
-              var previewImg = $('bce-image-preview');
-              var previewMono = $('bce-image-preview-mono');
-              previewImg.src = e.target.result;
-              previewImg.style.display = 'block';
-              if (previewMono) previewMono.style.display = 'none';
-            };
-            reader.readAsDataURL(file);
+            _bceSelectedFile = null;
+            _bceCropSpec = null;
+            if (fileInput) fileInput.value = '';
           }
         });
       });
