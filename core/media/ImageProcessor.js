@@ -32,7 +32,7 @@ const DERIVATIVE_PRESETS = {
   ]
 };
 
-// Benchmarked WebP delivery configuration: quality 82 delivers 50-60% size reduction with sharp fidelity
+// Locked WebP delivery configuration. Keep quality 82 unless the canonical media policy is intentionally revised.
 const DEFAULT_WEBP_OPTIONS = {
   quality: 82,
   effort: 4,
