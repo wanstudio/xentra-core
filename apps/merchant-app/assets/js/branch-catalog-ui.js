@@ -36,59 +36,10 @@
 
 
   /* =========================================================================
-     MODUL 3.2: BRANCH PRODUCT OVERRIDE — name / description / image_url
-     Master Product Default + Branch Optional Override
+     MODUL 3.2: BRANCH PRODUCT OVERRIDE — text / price / category only
+     PHOTO OVERRIDE IS LOCKED: Master Product Owner controls the image.
      ========================================================================= */
   var _overrideProductId = null;
-  var _bpSelectedFile = null; // staged photo File to upload on save
-  var _bpCropSpec = null;
-
-  (function initBranchProductPhoto() {
-    var fileInput = $('override-img-file');
-    if (!fileInput) return;
-    fileInput.addEventListener('change', function () {
-      var file = fileInput.files && fileInput.files[0];
-      if (!file) { _bpSelectedFile = null; _bpCropSpec = null; return; }
-
-      var allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-      if (allowed.indexOf(file.type) === -1) {
-        showToast('❌ Format gambar tidak didukung. Gunakan JPG, PNG, atau WEBP.');
-        fileInput.value = '';
-        return;
-      }
-      if (file.size > 20 * 1024 * 1024) {
-        showToast('❌ Ukuran gambar melebihi batas maksimal 20MB.');
-        fileInput.value = '';
-        return;
-      }
-
-      _bpSelectedFile = file;
-
-      XentraCropEditor.open({
-        source: file,
-        assetType: 'product',
-        aspectRatio: 1.0,
-        title: 'Potong & Posisikan Foto Cabang (1:1)',
-        onConfirm: function (cropSpec, previewDataUrl) {
-          _bpCropSpec = cropSpec;
-          var previewImg = $('override-img-preview');
-          var previewMono = $('override-img-preview-mono');
-          if (previewImg) {
-            previewImg.src = previewDataUrl || URL.createObjectURL(file);
-            previewImg.style.display = 'block';
-          }
-          if (previewMono) previewMono.style.display = 'none';
-          $('override-img-status').textContent = '🟡 OVERRIDE baru (potongan disesuaikan)';
-          showToast('✓ Potongan foto menu cabang disesuaikan.');
-        },
-        onCancel: function () {
-          _bpSelectedFile = null;
-          _bpCropSpec = null;
-          if (fileInput) fileInput.value = '';
-        }
-      });
-    });
-  })();
 
   window.openBranchOverrideModal = function (productDataRaw) {
     var p;
