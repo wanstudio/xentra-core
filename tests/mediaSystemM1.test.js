@@ -410,6 +410,11 @@ test('MEDIA SYSTEM M1 — SECURE UPLOAD & VALIDATION SUITE', async (t) => {
     // Retry
     const retried = await mediaService.retryFailed({ mediaId: asset.media_id, brandId: BRAND_A });
     assert.equal(retried.status, MediaLifecycle.STATES.PROCESSING);
+
+    // The retry endpoint queues the asset in PROCESSING; the processing command
+    // must then accept that state instead of attempting PROCESSING -> PROCESSING.
+    const processed = await mediaService.processMedia({ mediaId: asset.media_id, brandId: BRAND_A });
+    assert.equal(processed.status, MediaLifecycle.STATES.READY);
   });
 
   await t.test('15. Atomic replacement: old asset becomes ORPHAN and new asset becomes attached', async () => {
@@ -455,6 +460,9 @@ test('MEDIA SYSTEM M1 — SECURE UPLOAD & VALIDATION SUITE', async (t) => {
     const oldAssetCheck = mediaService.getMedia({ mediaId: oldAsset.media_id, brandId: BRAND_A });
     assert.equal(oldAssetCheck.status, MediaLifecycle.STATES.ORPHAN);
     assert.ok(oldAssetCheck.orphaned_at);
+    assert.equal(oldAssetCheck.attached_to_type, null);
+    assert.equal(oldAssetCheck.attached_to_id, null);
+    assert.equal(oldAssetCheck.attached_at, null);
   });
 
   await t.test('16. Failed replacement leaves old asset intact and active', async () => {
