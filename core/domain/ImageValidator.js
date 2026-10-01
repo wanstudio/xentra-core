@@ -222,7 +222,7 @@ function inspectImageBuffer(buf) {
 }
 
 /**
- * Validates an upload payload for a specific asset type (logo, product, category, banner, general).
+ * Validates an upload payload for a specific asset type (logo, product, category, banner, avatar, pwa_icon, promotion, general).
  * Returns { valid: true, buffer, info } or { valid: false, error, code }.
  */
 function validateImageUpload({ imageBase64, mimeType, declaredFilename, assetType = 'general', enforceAspectRatio = false }) {
