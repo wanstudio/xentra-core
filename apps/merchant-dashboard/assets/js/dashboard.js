@@ -10587,22 +10587,53 @@ async function loadMenusView() {
 
   async function onPromotionIconFileSelected(file) {
     if (!file) return;
+
+    var fileInput = $('mkt-promo-icon-file');
     var statusEl = $('mkt-promo-icon-status');
     var mediaIdInput = $('mkt-promo-media-id');
     var iconUrlInput = $('mkt-promo-icon-url');
 
-    if (file.size > 10 * 1024 * 1024) {
-      showToast('Ukuran file maksimal 10 MB.');
+    var allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (allowed.indexOf(file.type) === -1) {
+      showToast('❌ Format icon tidak didukung. Gunakan JPG, PNG, atau WebP.');
+      if (fileInput) fileInput.value = '';
       return;
     }
 
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('Ukuran file maksimal 10 MB.');
+      if (fileInput) fileInput.value = '';
+      return;
+    }
+
+    if (!XentraCropEditor || typeof XentraCropEditor.open !== 'function') {
+      return uploadPromotionIconCanonical(file, null, fileInput, statusEl, mediaIdInput, iconUrlInput);
+    }
+
+    XentraCropEditor.open({
+      source: file,
+      assetType: 'logo',
+      aspectRatio: 1.0,
+      title: 'Potong & Posisikan Icon Promo (1:1)',
+      onConfirm: async function (cropSpec, previewDataUrl) {
+        try {
+          await uploadPromotionIconCanonical(file, cropSpec, fileInput, statusEl, mediaIdInput, iconUrlInput, previewDataUrl);
+        } catch (_) {}
+      },
+      onCancel: function () {
+        // Batal = discard the newly selected icon; persisted promotion media remains unchanged.
+        if (fileInput) fileInput.value = '';
+      }
+    });
+  }
+
+  async function uploadPromotionIconCanonical(file, cropSpec, fileInput, statusEl, mediaIdInput, iconUrlInput, previewDataUrl) {
     try {
       if (statusEl) {
-        statusEl.textContent = 'Mengunggah & memproses aset media...';
+        statusEl.textContent = 'Memproses icon melalui Media System...';
         statusEl.style.color = '#3b82f6';
       }
 
-      // Convert to base64
       var base64 = await new Promise(function (resolve, reject) {
         var reader = new FileReader();
         reader.onload = function () { resolve(reader.result); };
@@ -10610,15 +10641,14 @@ async function loadMenusView() {
         reader.readAsDataURL(file);
       });
 
-      // 1. Stage upload via /admin/media/upload
       var uploadRes = await adminFetch(API_BASE + '/admin/media/upload', {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
           image_base64: base64,
           mime_type: file.type,
-          original_filename: file.name,
-          asset_type: 'general',
+          original_filename: file.name || null,
+          asset_type: 'logo',
           enforce_aspect_ratio: false
         })
       });
@@ -10629,12 +10659,12 @@ async function loadMenusView() {
       }
 
       var mediaId = uploadJson.asset.media_id || uploadJson.asset.id;
+      if (!mediaId) throw new Error('Media ID tidak dikembalikan server.');
 
-      // 2. Process to ready state via /admin/media/:id/process
       var procRes = await adminFetch(API_BASE + '/admin/media/' + encodeURIComponent(mediaId) + '/process', {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ crop_spec: null })
+        body: JSON.stringify({ crop_spec: cropSpec || null })
       });
 
       var procJson = await procRes.json();
@@ -10643,16 +10673,18 @@ async function loadMenusView() {
       }
 
       var processedAsset = procJson.asset;
-      if (mediaIdInput) mediaIdInput.value = processedAsset.media_id || processedAsset.id;
-      if (iconUrlInput) iconUrlInput.value = processedAsset.url;
+      var preview = (processedAsset.variants || []).slice().sort(function (a, b) { return a.width - b.width; }).find(function (v) { return v.width >= 320; }) || (processedAsset.variants || [])[0];
+      var iconUrl = preview && preview.url ? preview.url : processedAsset.url;
+
+      if (mediaIdInput) mediaIdInput.value = processedAsset.media_id || processedAsset.id || mediaId;
+      if (iconUrlInput) iconUrlInput.value = iconUrl;
 
       if (statusEl) {
-        statusEl.textContent = '✓ Icon media berhasil diunggah dan siap digunakan.';
+        statusEl.textContent = '✓ Icon diproses otomatis: crop 1:1 + optimasi.';
         statusEl.style.color = '#16a34a';
       }
-
       updatePromotionPresentationPreview();
-      showToast('Icon promosi berhasil diunggah.');
+      showToast('Icon promosi berhasil diproses melalui Media System.');
     } catch (err) {
       console.error('[Promotion Icon Upload Error]:', err);
       if (statusEl) {
@@ -10660,8 +10692,12 @@ async function loadMenusView() {
         statusEl.style.color = '#ef4444';
       }
       showToast(err.message || 'Gagal memproses file icon.');
+      throw err;
+    } finally {
+      if (fileInput) fileInput.value = '';
     }
   }
+
   window.onPromotionIconFileSelected = onPromotionIconFileSelected;
 
   function formatDateTimeLocal(isoStr) {
