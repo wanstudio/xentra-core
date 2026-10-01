@@ -465,7 +465,7 @@ test('OVR-21 category move: valid own-branch category applies, cross-branch reje
   db.prepare('UPDATE branch_products SET branch_category_id = ? WHERE branch_id = ? AND product_id = ?').run(cats[0].id, BRANCH, PRODUCT);
 });
 
-test('OVR-22 branch product photo upload sets image_override and resolves in customer catalog', async function() {
+test('OVR-22 branch product photo upload is quarantined by the Master Product media boundary', async function() {
   clearOverrides();
   var tok = await getAuthToken();
 
@@ -474,33 +474,13 @@ test('OVR-22 branch product photo upload sets image_override and resolves in cus
     headers: { authorization: 'Bearer ' + tok },
     body: JSON.stringify({ image_base64: TINY_PNG_BASE64, mime_type: 'image/png' })
   });
-  assert.strictEqual(res.status, 200, 'image upload accepted: ' + JSON.stringify(res.body));
-  assert.ok(
-    /^\/assets\/uploads\/branch-products\//.test(res.body.product.image_override),
-    'override URL under /assets/uploads/branch-products/: ' + res.body.product.image_override
-  );
+
+  assert.strictEqual(res.status, 410, 'branch product photo override must be disabled: ' + JSON.stringify(res.body));
+  assert.strictEqual(res.body.success, false);
+  assert.strictEqual(res.body.code, 'BRANCH_PRODUCT_IMAGE_OVERRIDE_DISABLED');
 
   var row = db.prepare('SELECT image_override FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH, PRODUCT);
-  assert.strictEqual(row.image_override, res.body.product.image_override, 'image_override persisted');
-
-  var p = getProduct(BRANCH);
-  assert.strictEqual(p.image_url, res.body.product.image_override, 'customer catalog resolves branch photo');
-
-  // unsupported mime is rejected before any write
-  var bad = await mockFetch('/api/v1/admin/branches/' + BRANCH + '/products/' + PRODUCT + '/image', {
-    method: 'POST',
-    headers: { authorization: 'Bearer ' + tok },
-    body: JSON.stringify({ image_base64: NON_IMAGE_BASE64, mime_type: 'image/svg+xml' })
-  });
-  assert.strictEqual(bad.status, 400, 'unsupported mime rejected');
-
-  // missing image is rejected
-  var missing = await mockFetch('/api/v1/admin/branches/' + BRANCH + '/products/' + PRODUCT + '/image', {
-    method: 'POST',
-    headers: { authorization: 'Bearer ' + tok },
-    body: JSON.stringify({ mime_type: 'image/png' })
-  });
-  assert.strictEqual(missing.status, 400, 'missing image rejected');
+  assert.strictEqual(row.image_override, null, 'disabled endpoint must not persist image_override');
 
   clearOverrides();
-});
+});;
