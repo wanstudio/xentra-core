@@ -14,12 +14,12 @@
  *  OVR-05  GET source/status (master_name, master_description, master_image_url exposed)
  *  OVR-06  name override set
  *  OVR-07  description override set
- *  OVR-08  image override set
+ *  OVR-08  image_url mutation is quarantined (branch photo is Master-owned)
  *  OVR-09  name override clear (null -> inherit master)
  *  OVR-10  description override clear
- *  OVR-11  image override clear
- *  OVR-12  master propagation without override (all 3 fields)
- *  OVR-13  master propagation WITH override (override wins, master change ignored)
+ *  OVR-11  legacy image_override cannot shadow Master photo
+ *  OVR-12  master propagation without text override
+ *  OVR-13  master propagation WITH supported text override
  *  OVR-14  authorization cross-branch (branch manager of branch B cannot override branch A)
  *  OVR-15  PATCH empty body returns 400
  *  OVR-16  migration legacy identical -> NULL
