@@ -1079,7 +1079,7 @@
   // ── Installed PWA Identity Override — shared upload helper ─────────────────
   // Uploads a launcher icon file directly to the given PWA icon endpoint.
   // This avoids mutating or overwriting the main brand logo.
-  async function doUploadPwaLauncherIcon(file, endpoint, previewEl, hiddenEl, removeBtn, pickBtn) {
+  async function doUploadPwaLauncherIcon(file, endpoint, previewEl, hiddenEl, removeBtn, pickBtn, cropSpec) {
     if (pickBtn) { pickBtn.disabled = true; pickBtn.textContent = 'Mengunggah...'; }
     // Optimistic preview
     try {
@@ -1104,7 +1104,7 @@
       var iconRes = await adminFetch(API_BASE + endpoint, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ image_base64: base64, mime_type: file.type })
+        body: JSON.stringify({ image_base64: base64, mime_type: file.type, original_filename: file.name || null, crop_spec: cropSpec || null })
       });
       var iconData = await iconRes.json();
       if (iconRes.ok && iconData.success) {
@@ -1466,15 +1466,8 @@
               fileInputLogo.value = '';
             }
           },
-          onCancel: async function () {
-            // If user cancels crop modal, allow direct upload of the original image
-            try {
-              var reader = new FileReader();
-              reader.onload = function (ev) {
-                doUploadBrandLogo(file, null, ev.target.result, btnPickLogo);
-              };
-              reader.readAsDataURL(file);
-            } catch (_) {}
+          onCancel: function () {
+            // Batal = discard this new file. The persisted logo remains unchanged.
             fileInputLogo.value = '';
           }
         });
@@ -1659,7 +1652,7 @@
               if ($('set-profile-merchant-icon-preview') && previewDataUrl) { $('set-profile-merchant-icon-preview').src = previewDataUrl; }
               await doUploadPwaLauncherIcon(file, '/admin/brand/merchant-icon',
                 $('brand-tab-merchant-icon-preview'), $('brand-tab-merchant-icon'),
-                btnRemoveBrandTabMerchant, btnPickBrandTabMerchant);
+                btnRemoveBrandTabMerchant, btnPickBrandTabMerchant, cropSpec);
               loadBrandSettings();
             } finally {
               fileInputBrandTabMerchant.value = '';
@@ -1746,7 +1739,7 @@
               if ($('set-profile-pos-icon-preview') && previewDataUrl) { $('set-profile-pos-icon-preview').src = previewDataUrl; }
               await doUploadPwaLauncherIcon(file, '/admin/brand/pos-icon',
                 $('brand-tab-pos-icon-preview'), $('brand-tab-pos-icon'),
-                btnRemoveBrandTabPos, btnPickBrandTabPos);
+                btnRemoveBrandTabPos, btnPickBrandTabPos, cropSpec);
               loadBrandSettings();
             } finally {
               fileInputBrandTabPos.value = '';
@@ -1837,17 +1830,9 @@
             showToast('✓ Potongan banner disesuaikan.');
           },
           onCancel: function () {
-            var reader = new FileReader();
-            reader.onload = function (ev) {
-              if (bannerPreviewImg) {
-                bannerPreviewImg.src = ev.target.result;
-                bannerPreviewImg.style.display = 'block';
-              }
-              if (bannerEmptyBox) bannerEmptyBox.style.display = 'none';
-              if (btnBannerClear) btnBannerClear.style.display = 'inline-block';
-              if (btnBannerPick) btnBannerPick.textContent = '📁 Ganti File';
-            };
-            reader.readAsDataURL(file);
+            _bannerUploadFile = null;
+            _bannerCropSpec = null;
+            if (fileInputBanner) fileInputBanner.value = '';
           }
         });
       });
@@ -4500,12 +4485,9 @@ async function loadMenusView() {
             showToast('✓ Potongan foto menu disesuaikan.');
           },
           onCancel: function () {
-            // Keep original uncropped preview if user cancels editor
-            var reader = new FileReader();
-            reader.onload = function (e) {
-              setProductImagePreview(e.target.result, true);
-            };
-            reader.readAsDataURL(file);
+            _productImageFile = null;
+            _productCropSpec = null;
+            if (prodFileInput) prodFileInput.value = '';
           }
         });
       });
@@ -9296,10 +9278,16 @@ async function loadMenusView() {
         showToast('✓ Framing Banner disimpan untuk pemrosesan server.');
       },
       onCancel: function () {
+        _marketingBannerEditor.mediaFile = null;
+        _marketingBannerEditor.mediaReady = false;
         _marketingBannerEditor.cropSpec = null;
-        readMarketingBannerFileAsDataUrl(file).then(function (src) {
-          setMarketingBannerEditorPreview(src);
-        }).catch(function () {});
+        var fileInput = $('mkt-banner-file');
+        if (fileInput) fileInput.value = '';
+        setMarketingBannerEditorPreview(
+          _marketingBannerEditor.detail && _marketingBannerEditor.detail.media
+            ? _marketingBannerEditor.detail.media.preview_url
+            : null
+        );
       }
     });
   }
@@ -11402,14 +11390,8 @@ async function loadMenusView() {
                 fileInput.value = '';
               }
             },
-            onCancel: async function () {
-              try {
-                var reader = new FileReader();
-                reader.onload = function (ev) {
-                  doUploadBrandLogo(file, null, ev.target.result, btnPick);
-                };
-                reader.readAsDataURL(file);
-              } catch (_) {}
+            onCancel: function () {
+              // Batal = discard this new file. The persisted logo remains unchanged.
               fileInput.value = '';
             }
           });
