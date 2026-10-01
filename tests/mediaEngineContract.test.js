@@ -145,6 +145,15 @@ test('MEDIA ENGINE — canonical boundary contract', async (t) => {
     assert.match(brandCode, /storage\.resolveUrl\(key\) === image_url/);
   });
 
+  await t.test('11. Branch catalog cannot resolve legacy image_override as active photo', () => {
+    const catalogCode = fs.readFileSync(path.join(ROOT, 'core/data/repositories/CatalogRepository.js'), 'utf8');
+    const adminCatalogCode = fs.readFileSync(path.join(ROOT, 'server/routes/admin-branch-catalog.js'), 'utf8');
+    assert.doesNotMatch(catalogCode, /COALESCE\\(bp\\.image_override, p\\.image_url\\)/);
+    assert.doesNotMatch(adminCatalogCode, /COALESCE\\(bp\\.image_override, p\\.image_url\\)/);
+    assert.match(catalogCode, /p\\.image_url as image_url/);
+    assert.match(adminCatalogCode, /p\\.image_url as image_url/);
+  });
+
   await t.test('10. Orphaned media cannot retain a stale entity attachment', () => {
     const repoCode = fs.readFileSync(path.join(ROOT, 'core/data/repositories/MediaRepository.js'), 'utf8');
     assert.match(repoCode, /status = 'orphan'/);
