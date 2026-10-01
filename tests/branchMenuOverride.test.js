@@ -216,14 +216,15 @@ test('OVR-07 description override: PATCH description sets description_override',
   assert.strictEqual(p.description_override, 'Branch description');
 });
 
-test('OVR-08 image override: PATCH image_url sets image_override', async function() {
+test('OVR-08 image override: PATCH image_url is quarantined', async function() {
   clearOverrides();
   var res = await patchOverride(BRANCH, PRODUCT, { image_url: '/branch-img.png' });
-  assert.strictEqual(res.status, 200);
+  assert.strictEqual(res.status, 410);
+  assert.strictEqual(res.body.error, 'BRANCH_PRODUCT_IMAGE_OVERRIDE_DISABLED');
+
   var p = getProduct(BRANCH);
-  assert.strictEqual(p.image_url, '/branch-img.png', 'catalog returns branch image');
-  assert.strictEqual(p.name, 'Master Name', 'name unchanged -> master');
-  assert.strictEqual(p.image_override, '/branch-img.png');
+  assert.strictEqual(p.image_url, '/master-img.png', 'catalog always resolves photo from Master Product');
+  assert.strictEqual(p.image_override, null, 'legacy image_override is not created by the forward endpoint');
 });
 
 test('OVR-09 name override clear: PATCH name=null -> inherits master', async function() {
