@@ -124,4 +124,32 @@ test('MEDIA ENGINE — canonical boundary contract', async (t) => {
     assert.match(code, /function doUploadPwaLauncherIcon\(file, endpoint, previewEl, hiddenEl, removeBtn, pickBtn, cropSpec\)/);
     assert.match(code, /crop_spec: cropSpec \|\| null/);
   });
+
+  await t.test('8. Locked branch-product photo boundary is enforced server-side', () => {
+    const entityRoutes = fs.readFileSync(path.join(ROOT, 'server/routes/media-entities.js'), 'utf8');
+    const legacyRoutes = fs.readFileSync(path.join(ROOT, 'server/routes/media-upload.js'), 'utf8');
+
+    assert.match(entityRoutes, /BRANCH_PRODUCT_IMAGE_OVERRIDE_DISABLED/);
+    assert.match(entityRoutes, /res\.status\(410\)/);
+    assert.match(legacyRoutes, /LEGACY_BRANCH_PRODUCT_IMAGE_OVERRIDE_DISABLED/);
+    assert.match(legacyRoutes, /res\.status\(410\)/);
+  });
+
+  await t.test('9. Banner compatibility accepts only exact Media System delivery URLs', () => {
+    const brandCode = fs.readFileSync(path.join(ROOT, 'server/routes/admin-brand.js'), 'utf8');
+    assert.doesNotMatch(
+      brandCode,
+      /LIKE '\%' \|\| id \|\| '\%'/,
+      'banner compatibility must not trust arbitrary URLs containing a known media id'
+    );
+    assert.match(brandCode, /storage\.resolveUrl\(key\) === image_url/);
+  });
+
+  await t.test('10. Orphaned media cannot retain a stale entity attachment', () => {
+    const repoCode = fs.readFileSync(path.join(ROOT, 'core/data/repositories/MediaRepository.js'), 'utf8');
+    assert.match(repoCode, /status = 'orphan'/);
+    assert.match(repoCode, /attached_to_type = NULL/);
+    assert.match(repoCode, /attached_to_id = NULL/);
+    assert.match(repoCode, /attached_at = NULL/);
+  });
 });
