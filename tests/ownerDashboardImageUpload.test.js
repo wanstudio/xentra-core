@@ -506,7 +506,7 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
       mime_type: 'image/jpeg'
     });
 
-    assert.strictEqual(res.status, 200, `Non-square product upload must succeed. Got: ${JSON.stringify(res.body)}`);
+    assert.strictEqual(res.status, 201, `Non-square product upload must succeed. Got: ${JSON.stringify(res.body)}`);
     assert.strictEqual(res.body.success, true);
   });
 
