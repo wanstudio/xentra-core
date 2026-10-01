@@ -10607,12 +10607,14 @@ async function loadMenusView() {
     }
 
     if (!XentraCropEditor || typeof XentraCropEditor.open !== 'function') {
-      return uploadPromotionIconCanonical(file, null, fileInput, statusEl, mediaIdInput, iconUrlInput);
+      showToast('❌ Editor crop tidak tersedia. Upload dibatalkan; gambar tidak diproses tanpa Crop Editor.');
+      if (fileInput) fileInput.value = '';
+      return;
     }
 
     XentraCropEditor.open({
       source: file,
-      assetType: 'logo',
+      assetType: 'promotion',
       aspectRatio: 1.0,
       title: 'Potong & Posisikan Icon Promo (1:1)',
       onConfirm: async function (cropSpec, previewDataUrl) {
