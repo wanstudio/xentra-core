@@ -131,6 +131,24 @@
     else el.value = (value === null || value === undefined) ? '' : value;
   }
 
+  // Search input memakai kontrak live search bersama
+  // (merchant-shared/js/live-search.js): trigger lewat event input, normalisasi
+  // query satu sumber, debounce untuk yang memanggil API.
+  var LiveSearch = window.XentraLiveSearch;
+
+  /** Pasang live search pada input; silent kalau input/shared tidak ada. */
+  function bindLiveSearch(id, onQuery, options) {
+    var el = $(id);
+    if (!el || !LiveSearch) return;
+    LiveSearch.bind(el, onQuery, options);
+  }
+
+  /** Pencocokan filter client-side: case-insensitive + spasi dinormalisasi. */
+  function searchMatchesAny(values, query) {
+    if (!LiveSearch) return true;
+    return LiveSearch.matchesAny(values, LiveSearch.normalize(query));
+  }
+
   function requestTextInputSheet(options) {
     options = options || {};
     return new Promise(function(resolve) {
@@ -2159,10 +2177,7 @@
     return state.products.filter(function (p) {
       var matchesSearch = true;
       if (_catalogState.searchQuery) {
-        var q = _catalogState.searchQuery.toLowerCase();
-        var nameMatch = (p.name || '').toLowerCase().indexOf(q) !== -1;
-        var descMatch = (p.description || '').toLowerCase().indexOf(q) !== -1;
-        matchesSearch = nameMatch || descMatch;
+        matchesSearch = searchMatchesAny([p.name, p.description], _catalogState.searchQuery);
       }
 
       var matchesCat = true;
@@ -4402,13 +4417,11 @@ async function loadMenusView() {
     if (btnAddProdMain) btnAddProdMain.addEventListener('click', window.openAddProduct);
 
     // Search and filter controls for Master Products
-    var searchInput = $('prod-search-input');
-    if (searchInput) {
-      searchInput.addEventListener('input', function () {
-        _catalogState.searchQuery = searchInput.value.trim();
-        renderMasterProductsTable();
-      });
-    }
+    // Filter client-side: dataset produk sudah ada di memori, jadi tanpa debounce.
+    bindLiveSearch('prod-search-input', function (state) {
+      _catalogState.searchQuery = state.query;
+      renderMasterProductsTable();
+    }, { debounce: 0 });
 
     var catFilterSelect = $('prod-filter-category');
     if (catFilterSelect) {
@@ -4668,15 +4681,11 @@ async function loadMenusView() {
     var container = $('branches-list-container');
     if (!container) return;
 
-    var q = (_branchSearchQuery || '').toLowerCase();
+    var q = _branchSearchQuery || '';
     var statusFilter = _branchStatusFilter || 'all';
 
     var filtered = state.branches.filter(function (b) {
-      if (q) {
-        var nameMatch = (b.name || '').toLowerCase().indexOf(q) !== -1;
-        var addrMatch = (b.address_text || '').toLowerCase().indexOf(q) !== -1;
-        if (!nameMatch && !addrMatch) return false;
-      }
+      if (q && !searchMatchesAny([b.name, b.address_text], q)) return false;
       if (statusFilter === 'active') {
         if (b.is_active !== 1 && b.is_active !== true) return false;
       } else if (statusFilter === 'inactive') {
@@ -4756,13 +4765,11 @@ async function loadMenusView() {
   var _branchStatusFilter = 'all';
 
   function initBranchSearchAndFilter() {
-    var searchInput = $('branch-search-input');
-    if (searchInput) {
-      searchInput.addEventListener('input', function () {
-        _branchSearchQuery = searchInput.value.trim();
-        renderBranchesGrid();
-      });
-    }
+    // Filter client-side: data cabang sudah di memori, jadi tanpa debounce.
+    bindLiveSearch('branch-search-input', function (state) {
+      _branchSearchQuery = state.query;
+      renderBranchesGrid();
+    }, { debounce: 0 });
 
     var filterSelect = $('branch-filter-status');
     if (filterSelect) {
@@ -5482,13 +5489,13 @@ async function loadMenusView() {
   }
 
   function initOrdersFilterListeners() {
-    var searchInput = $('orders-search-input');
-    if (searchInput) {
-      searchInput.addEventListener('input', function () {
-        _ordersSearchQuery = searchInput.value.trim();
-        loadOrders();
-      });
-    }
+    // Live search + debounce: loadOrders() memanggil API, jadi tiap ketikan
+    // tidak boleh memicu request sendiri-sendiri. Yang dikirim ke server nilai
+    // asli (di-trim), bukan query yang sudah di-lowercase.
+    bindLiveSearch('orders-search-input', function (state) {
+      _ordersSearchQuery = state.raw.trim();
+      loadOrders();
+    }, { debounce: 300 });
 
     var filterStatus = $('orders-filter-status');
     if (filterStatus) {
@@ -7852,6 +7859,9 @@ async function loadMenusView() {
      ========================================================================= */
 
   var _customersList = [];
+  // Live search mengirim request berurutan; respons lama tidak boleh menimpa
+  // hasil yang lebih baru. Pola yang sama dipakai _ordersFetchSeq.
+  var _customersFetchSeq = 0;
   var _activeCustomerSegment = 'all';
 
   async function loadCustomers() {
@@ -7859,6 +7869,8 @@ async function loadMenusView() {
     if (tbody) {
       tbody.innerHTML = '<tr><td colspan="9" class="text-center py-6 text-muted">Memuat data pelanggan...</td></tr>';
     }
+
+    var currentSeq = ++_customersFetchSeq;
 
     try {
       var queryParams = [];
@@ -7880,6 +7892,9 @@ async function loadMenusView() {
       var res = await adminFetch(url, { headers: getAuthHeaders() });
       var data = await res.json();
 
+      // Respons usang (user sudah mengetik query yang lebih baru) dibuang.
+      if (currentSeq !== _customersFetchSeq) return;
+
       if (data.success) {
         _customersList = data.customers || [];
         renderCustomersTable(_customersList);
@@ -7889,6 +7904,7 @@ async function loadMenusView() {
         }
       }
     } catch (err) {
+      if (currentSeq !== _customersFetchSeq) return;
       console.error('[Load Customers Error]:', err);
       if (tbody) {
         tbody.innerHTML = '<tr><td colspan="9" class="text-center py-6 text-danger">Kesalahan jaringan saat memuat data pelanggan.</td></tr>';
@@ -7951,10 +7967,13 @@ async function loadMenusView() {
   }
   window.filterCustomersBySegment = filterCustomersBySegment;
 
-  function searchCustomers() {
+  // Search pelanggan = live search (search-as-you-type), tanpa tombol submit.
+  // Endpoint /admin/customers itu server-side, jadi pakai debounce supaya
+  // mengetik cepat tidak memicu request storm. Query kosong -> loadCustomers()
+  // mengirim tanpa parameter search, yang berarti default list penuh.
+  bindLiveSearch('customers-search-input', function () {
     loadCustomers();
-  }
-  window.searchCustomers = searchCustomers;
+  }, { debounce: 300 });
 
   function showCustomersListView() {
     var listView = $('customers-list-view');

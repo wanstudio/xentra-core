@@ -2023,13 +2023,12 @@
               <button type="button" class="x-subnav-tab" data-segment="segments" onclick="filterCustomersBySegment('segments')">Segments</button>
             </div>
 
-            <!-- Search and Filter Bar -->
-            <div style="display:flex;gap:12px;margin:16px 0;flex-wrap:wrap;align-items:center;">
-              <div style="flex:1;min-width:240px;position:relative;">
-                <input type="text" id="customers-search-input" class="x-input" placeholder="Cari nama pelanggan atau nomor WhatsApp..." style="padding-left:36px;">
+            <!-- Search Bar — live search, tanpa tombol submit -->
+            <div style="margin:16px 0;">
+              <div style="position:relative;">
+                <input type="text" id="customers-search-input" class="x-input" placeholder="Cari nama pelanggan atau nomor WhatsApp..." style="padding-left:36px;" aria-label="Cari pelanggan">
                 <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
               </div>
-              <button type="button" class="x-btn-primary" id="btn-customers-search" onclick="searchCustomers()">Cari</button>
             </div>
 
             <!-- Segments Guide View (if 'segments' tab active) -->
@@ -4898,10 +4897,11 @@
   <script src="/merchant-shared/js/crop-editor.js?v=1.0.1"></script>
   <script src="/merchant-shared/js/catalog-client.js?v=1.0.1"></script>
   <script src="/merchant-shared/js/currency-input.js?v=1.0.0"></script>
+  <script src="/merchant-shared/js/live-search.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/branch-catalog-ui.js?v=1.0.2"></script>
   <script src="/merchant-dashboard/assets/js/owner-bottom-nav.js?v=1.0.0"></script>
   <script src="/merchant-shared/js/presentation-shells.js?v=1.0.2"></script>
   <script src="/merchant-dashboard/assets/js/owner-navigation.js?v=1.0.0"></script>
-  <script src="/dashboard/assets/js/dashboard.js?v=3.0.55"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=3.0.56"></script>
 </body>
 </html>  
