@@ -56,7 +56,7 @@ router.put('/admin/categories/:id', requireAuth(['owner', 'brand_manager']), (re
           is_active = COALESCE(?, is_active)
       WHERE id = ? AND brand_id = ?
     `).run(
-      name !== undefined ? name.trim() : null,
+      name !== undefined ? name : null,
       sort_order !== undefined ? sort_order : null,
       normIsActive !== null ? normIsActive : null,
       req.params.id,
@@ -202,7 +202,7 @@ router.post('/admin/products', requireAuth(['owner', 'brand_manager']), (req, re
     }
 
     const id = 'prod_' + Date.now();
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const slug = normalizedName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
     db.prepare(`
       INSERT INTO products (id, brand_id, category_id, name, slug, description, price, regular_price, pricing_mode, min_price, max_price, is_active, sort_order)
@@ -290,7 +290,7 @@ router.put('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req,
           updated_at = datetime('now')
       WHERE id = ? AND brand_id = ?
     `).run(
-      name !== undefined ? name : null,
+      name !== undefined ? name.trim() : null,
       category_id !== undefined ? category_id : null,
       price !== undefined ? price : null,
       regular_price !== undefined ? regular_price : null,
