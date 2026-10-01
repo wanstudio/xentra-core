@@ -92,6 +92,18 @@ module.exports = function registerAdminBrandRoutes(router, deps) {
     }
   }
 
+  async function unlinkBrandMediaAtomically({ mediaId, brandId, clearReference }) {
+    db.exec('BEGIN IMMEDIATE;');
+    try {
+      await mediaService.unlinkMedia({ mediaId, brandId });
+      clearReference();
+      db.exec('COMMIT;');
+    } catch (err) {
+      try { db.exec('ROLLBACK;'); } catch (_) {}
+      throw err;
+    }
+  }
+
 // 11. Admin Brand Profile & Theme
 router.get('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
@@ -234,9 +246,14 @@ router.delete('/admin/brand/logo', requireAuth(['owner', 'brand_manager']), asyn
   try {
     const brand = db.prepare('SELECT logo_media_id FROM brands WHERE id = ?').get(req.brand_id);
     if (brand && brand.logo_media_id) {
-      await mediaService.unlinkMedia({ mediaId: brand.logo_media_id, brandId: req.brand_id });
+      await unlinkBrandMediaAtomically({
+        mediaId: brand.logo_media_id,
+        brandId: req.brand_id,
+        clearReference: function () { coreBrandRepo.removeBrandLogoMedia(req.brand_id); }
+      });
+    } else {
+      coreBrandRepo.removeBrandLogoMedia(req.brand_id);
     }
-    coreBrandRepo.removeBrandLogoMedia(req.brand_id);
     if (req.brand) req.brand.logo_url = null;
     res.json({ success: true, message: 'Logo brand berhasil dihapus.', logo_url: null });
   } catch (err) {
@@ -289,8 +306,15 @@ router.post('/admin/brand/merchant-icon', requireAuth(['owner', 'brand_manager']
 router.delete('/admin/brand/merchant-icon', requireAuth(['owner', 'brand_manager']), async (req, res) => {
   try {
     const oldMediaId = latestAttachedMediaId(req.brand_id, 'brand_merchant_pwa_icon', req.brand_id);
-    if (oldMediaId) await mediaService.unlinkMedia({ mediaId: oldMediaId, brandId: req.brand_id });
-    coreBrandRepo.removeMerchantPwaIcon(req.brand_id);
+    if (oldMediaId) {
+      await unlinkBrandMediaAtomically({
+        mediaId: oldMediaId,
+        brandId: req.brand_id,
+        clearReference: function () { coreBrandRepo.removeMerchantPwaIcon(req.brand_id); }
+      });
+    } else {
+      coreBrandRepo.removeMerchantPwaIcon(req.brand_id);
+    }
     if (req.brand) req.brand.merchant_pwa_icon_url = null;
     res.json({ success: true, message: 'Icon Merchant PWA berhasil dihapus.', merchant_pwa_icon_url: null });
   } catch (err) {
@@ -343,8 +367,15 @@ router.post('/admin/brand/pos-icon', requireAuth(['owner', 'brand_manager']), as
 router.delete('/admin/brand/pos-icon', requireAuth(['owner', 'brand_manager']), async (req, res) => {
   try {
     const oldMediaId = latestAttachedMediaId(req.brand_id, 'brand_pos_pwa_icon', req.brand_id);
-    if (oldMediaId) await mediaService.unlinkMedia({ mediaId: oldMediaId, brandId: req.brand_id });
-    coreBrandRepo.removePosPwaIcon(req.brand_id);
+    if (oldMediaId) {
+      await unlinkBrandMediaAtomically({
+        mediaId: oldMediaId,
+        brandId: req.brand_id,
+        clearReference: function () { coreBrandRepo.removePosPwaIcon(req.brand_id); }
+      });
+    } else {
+      coreBrandRepo.removePosPwaIcon(req.brand_id);
+    }
     if (req.brand) req.brand.pos_pwa_icon_url = null;
     res.json({ success: true, message: 'Icon POS PWA berhasil dihapus.', pos_pwa_icon_url: null });
   } catch (err) {
