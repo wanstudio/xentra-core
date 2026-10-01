@@ -1,3 +1,53 @@
+## 🔒 LOCKED — Canonical Single Media Engine Boundary v1 — 2026-10-01
+
+**Status:** LOCKED / AUTHORITATIVE
+
+All client-supplied image media must pass one canonical Xentra Media Engine before becoming an active application asset.
+
+Canonical flow:
+
+```text
+Client file
+→ UI preflight
+→ MediaService.stageUpload()
+→ ImageValidator
+→ CropSpec / crop intent
+→ ImageProcessor
+   → EXIF orientation normalization
+   → canonical crop
+   → resize without upscaling
+   → optimize/compress
+   → WebP delivery derivatives
+→ READY
+→ attach / replace
+→ delivery
+```
+
+Locked rules:
+- No HTTP route or repository may directly write uploaded image binaries.
+- Generic Brand/Profile settings are not media mutation APIs and cannot be used to inject image/media URLs.
+- Source images may be any aspect ratio; canonical crop is enforced by the server.
+- Product, Category, Logo, Avatar, Merchant/Owner PWA icon, POS PWA icon, and Promotion icon use 1:1 framing.
+- Banner uses approximately 1.94:1 framing.
+- EXIF orientation is normalized before crop interpretation.
+- CropSpec ratio is validated server-side.
+- Image geometry must never be stretched to force a target ratio.
+- WebP optimized derivatives are the normal delivery assets; originals are internal source assets.
+- Merchants upload normal originals; Xentra handles crop, resize, compression, and optimized delivery automatically.
+- **Batal** discards the newly selected media; **Gunakan Potongan** accepts crop intent.
+- UI upload copy must mirror the authoritative limits: Logo/PWA icon/Avatar/Promotion icon 10 MB, Product/Banner 20 MB, Category 15 MB.
+- Legacy compatibility paths may remain only as adapters into the canonical Media Engine. Raw-write media paths are forbidden.
+- Branch Product Photo Override remains quarantined/disabled under the current Menu architecture.
+
+Git source of truth:
+`docs/decisions/xentra-canonical-media-engine-boundary-v1.md`
+
+Detailed media contract:
+`docs/CLIENT_MEDIA_REQUIREMENTS.md`
+
+Regression boundary:
+`tests/mediaEngineContract.test.js`
+
 <!-- SNAPSHOT FROM NOTION — source page: 01-architecture-decision-log; fetched 2026-09-05 -->
 
 ## 🔒 LOCKED — Master Menu Migration Lifecycle: Expand → Migrate → Verify → Contract (2026-09-30)
