@@ -36,6 +36,9 @@
     if (entry.shell && entry.shell.parentNode) {
       entry.shell.parentNode.removeChild(entry.shell);
     }
+    if (entry.content) {
+      entry.content.classList.remove('x-presentation-close-relocated');
+    }
     restoreEntry(entry);
     stack = stack.filter(function (item) { return item !== entry; });
 
@@ -52,6 +55,39 @@
   function closeTop() {
     if (!stack.length) return false;
     return close(stack[stack.length - 1].id);
+  }
+
+  /*
+   * Bottom sheet: affordance tutup tinggal di casing, di atas surface.
+   *
+   * Tombol tutup milik konten (.x-modal-close — kontrak bersama modal) tetap ada
+   * di markup fitur dan tetap memegang handler-nya. Shell hanya menyembunyikan
+   * yang di konten, menaruh tombol kembar di casing dengan animasi yang sama,
+   * lalu meneruskan klik ke tombol aslinya. Pemanggilan dan animasi dari feature
+   * context tidak berubah.
+   */
+  function attachFloatingClose(shell, surface, content, id) {
+    var original = content.querySelector('.x-modal-close');
+    if (!original) return null;
+
+    content.classList.add('x-presentation-close-relocated');
+
+    var bar = document.createElement('div');
+    bar.className = 'x-presentation-sheet-bar';
+
+    var proxy = document.createElement('button');
+    proxy.type = 'button';
+    proxy.className = 'x-presentation-sheet-close';
+    proxy.setAttribute('aria-label', original.getAttribute('aria-label') || 'Tutup');
+    proxy.innerHTML = original.innerHTML || '&#10005;';
+    proxy.addEventListener('click', function () {
+      original.click();
+      if (getEntry(id)) close(id);
+    });
+
+    bar.appendChild(proxy);
+    shell.insertBefore(bar, surface);
+    return proxy;
   }
 
   function open(options) {
@@ -99,6 +135,14 @@
     surface.appendChild(content);
     shell.appendChild(backdrop);
     shell.appendChild(surface);
+
+    // Bottom sheet: tombol tutup dipindah ke casing supaya tampil DI ATAS sheet,
+    // bukan di dalam surface — kalau di dalam, ia ikut terpotong overflow konten.
+    // Elemen aslinya tetap ada dan tetap berfungsi; klik diteruskan ke sana.
+    if (type === 'bottom-sheet' && options.dismissible !== false) {
+      attachFloatingClose(shell, surface, content, id);
+    }
+
     presentationRoot.appendChild(shell);
     presentationRoot.setAttribute('data-open', 'true');
 

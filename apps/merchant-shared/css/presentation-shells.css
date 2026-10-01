@@ -50,8 +50,13 @@
   display: block !important;
 }
 
+/* Bottom sheet disusun sebagai kolom: baris tombol tutup di atas, sheet menempel
+   di bawah. Gutter sheet didefinisikan di sini supaya surface dan bar-nya sama. */
 .x-presentation-bottom-sheet {
-  align-items: flex-end;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  --x-sheet-gutter: 16px;
 }
 
 .x-presentation-bottom-sheet .x-presentation-surface {
@@ -72,6 +77,93 @@
   background: #cbd5e1;
 }
 
+/* --- Bottom sheet body contract --------------------------------------------
+   Isi bottom sheet boleh berupa markup modal legacy (header + isi + footer).
+   Di modal legacy casing-nya .x-modal-card, dan dari sana gutter blok isi
+   datang (`.x-modal-card .x-form`). Di shell casing-nya .x-presentation-surface,
+   jadi kontrak layout yang sama disediakan di sini — feature context tetap
+   hanya mengurus isi, bukan gutter.
+
+   Konten yang SUDAH berupa .x-modal-card dikecualikan supaya gutter-nya tidak
+   dobel. Gutter dipasang pada blok isi (bukan pada <form>), karena footer ikut
+   berada di dalam <form> dan harus tetap selebar sheet dengan gutter sendiri.
+   -------------------------------------------------------------------------- */
+
+/* Blok isi: label, input, dan helper text tidak menempel ke sisi sheet. */
+.x-presentation-surface > :not(.x-modal-card) > .x-form > :not(.x-modal-footer),
+.x-presentation-surface > :not(.x-modal-card) > .x-modal-scroll-body > * {
+  padding-left: var(--x-sheet-gutter, 20px);
+  padding-right: var(--x-sheet-gutter, 20px);
+}
+
+/* Header & footer memakai gutter yang sama dengan blok isi. Header legacy sudah
+   16px di mobile, tetapi footer legacy masih 20px — disamakan di sini. */
+.x-presentation-surface > :not(.x-modal-card) > .x-modal-header,
+.x-presentation-surface > :not(.x-modal-card) > .x-modal-footer,
+.x-presentation-surface > :not(.x-modal-card) > .x-form > .x-modal-footer {
+  padding-left: var(--x-sheet-gutter, 20px);
+  padding-right: var(--x-sheet-gutter, 20px);
+}
+
+/* Blok judul header dibiarkan menyusut supaya judul panjang tidak meluber. */
+.x-presentation-surface > :not(.x-modal-card) > .x-modal-header > div {
+  min-width: 0;
+}
+
+/* Tombol tutup bottom sheet tinggal di casing (bukan di dalam surface), di atas
+   sheet, dan memakai animasi naik/turun yang sama dengan sheet-nya. */
+.x-presentation-sheet-bar {
+  position: relative;
+  z-index: 1;
+  width: min(640px, 100vw);
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 var(--x-sheet-gutter, 20px) 10px;
+}
+
+.x-presentation-sheet-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .96);
+  color: #334155;
+  font-family: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, .2);
+  animation: x-presentation-sheet-in .18s ease-out;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.x-presentation-sheet-close:hover { background: #f1f5f9; }
+.x-presentation-sheet-close:active { transform: scale(.96); }
+.x-presentation-sheet-close:focus-visible { outline: 2px solid #111827; outline-offset: 2px; }
+
+/* Tombol tutup asli di header disembunyikan: sudah dipindah ke casing. */
+.x-presentation-close-relocated .x-modal-close {
+  display: none;
+}
+
+/* Sisakan ruang untuk baris tombol tutup supaya tidak terpotong di layar pendek. */
+.x-presentation-bottom-sheet:has(> .x-presentation-sheet-bar) .x-presentation-surface {
+  max-height: min(calc(86dvh - 56px), 704px);
+}
+
+@media (max-width: 768px) {
+  /* Ritme native di layar kecil: jarak header → isi → footer dirapatkan. */
+  .x-presentation-surface > :not(.x-modal-card) > .x-form {
+    margin-top: 16px;
+    gap: 16px;
+  }
+}
+
 .x-presentation-dialog .x-presentation-surface {
   width: min(420px, calc(100vw - 32px));
 }
@@ -82,10 +174,23 @@
 }
 
 @media (min-width: 769px) {
+  /* Tablet/desktop: gutter 20px, sama dengan padding header/footer legacy. */
+  .x-presentation-bottom-sheet {
+    --x-sheet-gutter: 20px;
+  }
+
   .x-presentation-bottom-sheet .x-presentation-surface {
     width: min(560px, calc(100vw - 48px));
     max-height: min(760px, calc(100vh - 48px));
     border-radius: 18px;
+  }
+
+  .x-presentation-sheet-bar {
+    width: min(560px, calc(100vw - 48px));
+  }
+
+  .x-presentation-bottom-sheet:has(> .x-presentation-sheet-bar) .x-presentation-surface {
+    max-height: min(704px, calc(100vh - 104px));
   }
 }
 
