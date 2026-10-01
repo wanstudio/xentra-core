@@ -687,3 +687,28 @@ Behavior:
 - The system must not silently overwrite the existing target Product.
 
 The exact copy can be refined during UI implementation, but the CTA behavior and recovery semantics are fixed for this proposal.
+
+
+## 🔒 LOCKED SUB-DECISION — Identity Change Does Not Auto-Deactivate the Original Product
+
+**Decision date:** 2026-10-01
+
+When an Owner changes a Product Identity component and the new target identity does not yet exist, the system creates the new Product identity with copied non-identity data, but **the original Product remains active and unchanged**.
+
+The identity-change workflow does not imply deletion, deactivation, replacement, or merge.
+
+Example:
+
+\`\`\`
+P001 = Ayam / Ayam Bakar / Original
+P002 = Ayam / Ayam Bakar / Lombok Ijo
+\`\`\`
+
+After the edit-as-new-identity operation, both Products may remain active.
+
+Product lifecycle remains controlled by the existing explicit Product actions:
+
+- Delete, subject to current integrity/lifecycle rules.
+- Active / inactive toggle.
+
+This preserves the existing Owner mental model that changing one identity dimension does not silently remove an existing menu. The Owner explicitly decides whether the original Product should remain available.
