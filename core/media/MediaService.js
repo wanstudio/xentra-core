@@ -209,15 +209,24 @@ class MediaService {
       throw err;
     }
 
-    // Attach new media
-    this.mediaRepo.attachMedia(newMediaId, brandId, entityType, entityId);
+    // Media-table replacement is transactional. The business entity row is
+    // intentionally updated by the owning route/repository after this succeeds.
+    this.mediaRepo.beginTransaction();
+    try {
+      this.mediaRepo.attachMedia(newMediaId, brandId, entityType, entityId);
 
-    // If oldMediaId is supplied and exists within same tenant, mark it as orphan
-    if (oldMediaId) {
-      const oldAsset = this.mediaRepo.findById(oldMediaId, brandId);
-      if (oldAsset && oldAsset.id !== newMediaId) {
-        this.mediaRepo.markAsOrphan(oldMediaId, brandId);
+      // If oldMediaId is supplied and exists within same tenant, mark it as orphan.
+      if (oldMediaId) {
+        const oldAsset = this.mediaRepo.findById(oldMediaId, brandId);
+        if (oldAsset && oldAsset.id !== newMediaId) {
+          this.mediaRepo.markAsOrphan(oldMediaId, brandId);
+        }
       }
+
+      this.mediaRepo.commitTransaction();
+    } catch (err) {
+      try { this.mediaRepo.rollbackTransaction(); } catch (_) {}
+      throw err;
     }
 
     const updated = this.mediaRepo.findById(newMediaId, brandId);
