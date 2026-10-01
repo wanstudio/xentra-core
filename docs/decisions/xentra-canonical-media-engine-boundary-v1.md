@@ -120,6 +120,7 @@ Current policy:
 - legacy Brand Logo route delegates to MediaService;
 - legacy Banner upload route delegates to MediaService;
 - Branch Product Photo Override remains quarantined and returns an explicit 410 because the forward architecture does not authorize branch-owned product photo overrides.
+- Branch catalog resolution always uses the Master Product photo; legacy `branch_products.image_override` is not an active customer-facing photo source.
 
 ## 7. Generic settings boundary
 
@@ -141,11 +142,11 @@ Replacement follows:
 process new → READY → attach new → orphan old
 ```
 
-Media replacement is transactional at the media metadata boundary: attaching the new asset and orphaning the old asset commit together, and orphan state clears stale attachment metadata so garbage collection can reason from authoritative references.
+Media replacement is transactional at the media metadata boundary: attaching the new asset and orphaning the old asset commit together, and orphan state clears stale attachment metadata so garbage collection can reason from authoritative references. When a higher-level service already owns the SQLite transaction, MediaService must participate without opening a nested transaction.
 
 Processing uses an isolated derivative run. Existing published variants remain intact until the new variant set is fully written and the metadata transaction commits. A failed run removes only its own temporary artifacts and leaves the previous published variants available for recovery.
 
-Failed processing must not destroy the currently active asset.
+Failed processing must not destroy the currently active asset. Post-publish storage cleanup is best-effort; a cleanup failure must not downgrade a successfully published asset to FAILED.
 
 ## 9. Governance
 
