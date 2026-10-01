@@ -141,7 +141,8 @@ class MediaService {
   }
 
   /**
-   * Transition asset from TEMPORARY to UPLOADED / PROCESSING / READY.
+   * Transition non-published lifecycle states for compatibility/admin tooling.
+   * Published READY/ORPHAN states are controlled by the canonical publish/unlink/reconcile flows.
    */
   async transitionStatus({ mediaId, brandId, targetStatus, errorMessage = null }) {
     const asset = this.getMedia({ mediaId, brandId });
@@ -149,6 +150,12 @@ class MediaService {
     if (targetStatus === MediaLifecycle.STATES.READY) {
       const err = new Error('Status READY hanya boleh diterbitkan setelah MediaProcessor menyelesaikan pipeline. Gunakan processMedia().');
       err.code = 'MEDIA_PROCESSING_REQUIRED';
+      throw err;
+    }
+
+    if (asset.status === MediaLifecycle.STATES.READY || asset.status === MediaLifecycle.STATES.ORPHAN) {
+      const err = new Error('Lifecycle asset yang sudah dipublish/orphan hanya boleh diubah melalui Media Engine publish, unlink, atau reconcile flow.');
+      err.code = 'MEDIA_LIFECYCLE_MANAGED';
       throw err;
     }
 
