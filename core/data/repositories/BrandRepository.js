@@ -202,9 +202,12 @@ class BrandRepository {
   // These affect only the PWA launcher icon after install. They do not change
   // branding, RBAC, routing, or Customer PWA behavior.
 
-  updateMerchantPwaIcon(brandId, iconUrl) {
+  updateMerchantPwaIcon(brandId, { iconUrl, mediaId }) {
     clearDomainCache();
-    this.db.execute('UPDATE brands SET merchant_pwa_icon_url = ?, merchant_pwa_icon_media_id = NULL WHERE id = ?', [iconUrl, brandId]);
+    this.db.execute(
+      'UPDATE brands SET merchant_pwa_icon_url = ?, merchant_pwa_icon_media_id = ?, updated_at = datetime(\'now\') WHERE id = ?',
+      [iconUrl || null, mediaId || null, brandId]
+    );
   }
 
   removeMerchantPwaIcon(brandId) {
@@ -212,9 +215,12 @@ class BrandRepository {
     this.db.execute('UPDATE brands SET merchant_pwa_icon_url = NULL, merchant_pwa_icon_media_id = NULL WHERE id = ?', [brandId]);
   }
 
-  updatePosPwaIcon(brandId, iconUrl) {
+  updatePosPwaIcon(brandId, { iconUrl, mediaId }) {
     clearDomainCache();
-    this.db.execute('UPDATE brands SET pos_pwa_icon_url = ?, pos_pwa_icon_media_id = NULL WHERE id = ?', [iconUrl, brandId]);
+    this.db.execute(
+      'UPDATE brands SET pos_pwa_icon_url = ?, pos_pwa_icon_media_id = ?, updated_at = datetime(\'now\') WHERE id = ?',
+      [iconUrl || null, mediaId || null, brandId]
+    );
   }
 
   removePosPwaIcon(brandId) {
