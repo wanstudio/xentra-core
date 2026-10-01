@@ -210,7 +210,11 @@ class ImageProcessor {
     for (const variant of targetVariants) {
       const variantBuffer = await sharp(croppedBuffer, { failOnError: false })
         .resize(variant.width, variant.height, {
-          fit: 'fill',
+          // Preserve image geometry. CropSpec is canonical, while 'cover'
+          // prevents tiny tolerated ratio differences (especially banners)
+          // from being stretched into the target dimensions.
+          fit: 'cover',
+          position: 'centre',
           withoutEnlargement: true
         })
         .webp(this.webpOptions)
