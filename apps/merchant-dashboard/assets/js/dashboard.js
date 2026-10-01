@@ -2947,7 +2947,7 @@
     if (imageEl && emptyImageEl) {
       if (src) {
         imageEl.src = src;
-        imageEl.alt = category ? category.name : 'Foto Menu';
+        imageEl.alt = productName || 'Foto Menu';
         imageEl.style.display = 'block';
         emptyImageEl.style.display = 'none';
       } else {
