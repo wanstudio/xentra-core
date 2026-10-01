@@ -187,6 +187,21 @@ test('MEDIA ENGINE — canonical boundary contract', async (t) => {
     }
   });
 
+  await t.test('16. Quarantined branch photo fields are not consumer delivery sources', () => {
+    const posCode = fs.readFileSync(path.join(ROOT, 'apps/pos-app/assets/js/pos-app.js'), 'utf8');
+    const orderCode = fs.readFileSync(path.join(ROOT, 'server/routes/customer-orders.js'), 'utf8');
+    assert.doesNotMatch(posCode, /p\.image_url\s*\|\|\s*p\.image_override/);
+    assert.doesNotMatch(orderCode, /SELECT product_image_url, image_override FROM branch_products/);
+    assert.doesNotMatch(orderCode, /bp\.image_override\s*\|\|\s*bp\.product_image_url/);
+  });
+
+  await t.test('17. PWA and Promotion uploads use semantic Media Engine asset types', () => {
+    const brandCode = fs.readFileSync(path.join(ROOT, 'server/routes/admin-brand.js'), 'utf8');
+    const dashboardCode = fs.readFileSync(path.join(ROOT, 'apps/merchant-dashboard/assets/js/dashboard.js'), 'utf8');
+    assert.match(brandCode, /assetType: 'pwa_icon'/);
+    assert.match(dashboardCode, /asset_type: 'promotion'/);
+  });
+
   await t.test('15. HTTP JSON body limit leaves headroom for 20MB base64 media', () => {
     const appCode = fs.readFileSync(path.join(ROOT, 'server/app.js'), 'utf8');
     assert.match(appCode, /express\.json\(\{ limit: ['"]30mb['"] \}\)/);
