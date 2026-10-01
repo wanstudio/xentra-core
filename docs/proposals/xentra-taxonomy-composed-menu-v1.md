@@ -165,7 +165,7 @@ product_levels       → Product indicator
 Category             → Product grouping/classification
 ```
 
-A Product may therefore share the same resolved title as another Product when other structured composition differs.
+Under the normal Product model, the identity combination is Category + Sub Category + Rasa. Therefore two normal Products must not differ only by Complement while keeping the same identity tuple.
 
 Example:
 
@@ -173,17 +173,17 @@ Example:
 Product A
   Sub Category = Ayam Bakar
   Rasa         = Original
-  Complement   = Nasi
 
 Product B
   Sub Category = Ayam Bakar
-  Rasa         = Original
-  Complement   = Kentang
+  Rasa         = Lombok Ijo
 ```
 
-Both may legitimately resolve to the same title/subtitle while remaining different Product entities.
+They are different Product identities.
 
-The product ID, not the displayed title, remains the stable identity for orders, inventory, adoption, promotions, and references.
+Complements are non-identity purchase configuration attached to the Product. A Product may still contain the same or different Complement configuration only where the surrounding Product identity is different.
+
+The product ID remains the stable technical identity for orders, inventory, adoption, promotions, and references.
 
 ## 5. Category should not be duplicated on Product without a reason
 
@@ -274,7 +274,7 @@ Rasa
 [ <empty> ▼ ] [+]
 ```
 
-The Rasa selector MUST display only Rasa values associated with that Sub Category.
+The Rasa selector SHOULD display Rasa values that have already been used by Products under the selected Sub Category. This relationship is usage-derived; no separate manual "Rasa ↔ Sub Category" management surface is required in the new concept.
 
 Rasa quick-add inherits the selected Sub Category context.
 
@@ -294,13 +294,14 @@ Rasa
 
 Save semantics:
 
-1. Create or reuse a brand-scoped Rasa master record.
-2. Create the Sub Category ↔ Rasa association.
-3. Return the Rasa ID.
-4. Refresh the Rasa selector.
-5. Auto-select the new Rasa for the current Product draft.
+1. Check the current Brand Master Rasa vocabulary for the normalized name.
+2. If the Rasa does not exist, create one Master Rasa record.
+3. If the Rasa already exists, offer contextual reuse for the current Sub Category/Product flow rather than creating a duplicate Master Rasa.
+4. Save the Product using the existing/reused Rasa ID.
+5. The Product then establishes that Rasa's usage under the selected Sub Category.
+6. Refresh the Rasa selector and auto-select the selected Rasa for the current Product draft.
 
-Duplicate creation must be prevented through normalized uniqueness within the Brand.
+The system must not require the Owner to maintain a separate compatibility matrix just to reuse an existing Rasa.
 
 ## 8. Downstream reset rules
 
@@ -408,7 +409,7 @@ Order identity continues to use `product_id`, not the display title.
 
 Branch adoption remains separate from Master taxonomy/composition.
 
-**Pre-lock direction:** Branch may adopt approved Master Products and classify them into Branch Categories, but Branch must not rename the Master Product or alter its customer-facing Master identity.
+**Locked direction for this new concept:** Branch may adopt approved Master Products and classify them into one or more Branch Categories, but Branch must not rename the Master Product or alter its customer-facing Master identity.
 
 Merchant may adopt approved Master Products and classify them into Branch Categories.
 
@@ -420,7 +421,7 @@ Merchant does not edit:
 - Sub Category ↔ Rasa compatibility;
 - Master Product composition.
 
-**The existing Branch Customer Display Name Override is proposed for cancellation under this new concept.** Branch naming must not be an independent Product identity/presentation authority. If a Branch needs a different grouping or merchandising label, it should use Branch Categories or another explicitly scoped Branch presentation mechanism that does not rename the Product identity.
+**The existing Branch Customer Display Name Override is cancelled for the new concept.** Branch naming must not be an independent Product identity/presentation authority. If a Branch needs a different grouping or merchandising label, it should use Branch Categories or another explicitly scoped Branch presentation mechanism that does not rename the Product identity.
 
 ## 14. Major UX risks to validate before lock
 
@@ -694,30 +695,6 @@ The principle is:
 > **Conflict → inspect, not edit.**
 
 
-## 🔒 LOCKED SUB-DECISION — Identity Change Does Not Auto-Deactivate the Original Product
-
-**Decision date:** 2026-10-01
-
-When an Owner changes a Product Identity component and the new target identity does not yet exist, the system creates the new Product identity with copied non-identity data, but **the original Product remains active and unchanged**.
-
-The identity-change workflow does not imply deletion, deactivation, replacement, or merge.
-
-Example:
-
-\`\`\`
-P001 = Ayam / Ayam Bakar / Original
-P002 = Ayam / Ayam Bakar / Lombok Ijo
-\`\`\`
-
-After the edit-as-new-identity operation, both Products may remain active.
-
-Product lifecycle remains controlled by the existing explicit Product actions:
-
-- Delete, subject to current integrity/lifecycle rules.
-- Active / inactive toggle.
-
-This preserves the existing Owner mental model that changing one identity dimension does not silently remove an existing menu. The Owner explicitly decides whether the original Product should remain available.
-
 
 ## 🔒 LOCKED SUB-DECISION — Category Change Warning & Downstream Reset
 
@@ -821,3 +798,135 @@ UI rules:
 - This is a UX/lifecycle decision only at this stage; no production implementation is implied by this document.
 
 Product records are not themselves considered descendants for purposes of automatic deletion. Product lifecycle remains governed by the Product domain.
+## 🔒 LOCKED SUB-DECISION — Normal Product Identity
+
+**Decision date:** 2026-10-01
+
+For a normal sellable Product, the canonical business identity is:
+
+```
+Category + Sub Category + Rasa
+```
+
+Rasa uses **Original** as the default Master Rasa for normal Product creation, so the normal Product identity is not left incomplete because of a missing/NULL Rasa.
+
+The technical Product ID remains stable and is not itself the human-readable identity. Identity uniqueness is enforced within a Brand.
+
+## 🔒 LOCKED SUB-DECISION — Rasa Is Reusable Master Data
+
+**Decision date:** 2026-10-01
+
+Rasa is a reusable Brand-scoped Master Reference. It is **not** a child taxonomy node of Sub Category.
+
+The Product references the Rasa record by ID.
+
+Rasa usage under a Sub Category is learned from actual Product composition; Owners do not maintain a separate compatibility-management UI.
+
+When a Rasa name already exists, the Product flow reuses the existing Master Rasa record instead of creating another identical Master record.
+
+## 🔒 LOCKED SUB-DECISION — Add-on vs Standalone Product
+
+**Decision date:** 2026-10-01
+
+An independently sellable menu item remains a Product.
+
+Example:
+
+```
+Ayam Bakar Original
++
+Sambal Matah
+```
+
+If Sambal Matah is sold independently, it is a separate Product ID in the cart/order. It is not merely an Add-on because it was purchased alongside another Product.
+
+Add-on/optional configuration remains reserved for values that are attached to a Product at purchase time under the approved Product Options contract and are not themselves independent sellable Products.
+
+## 🔒 LOCKED SUB-DECISION — Rasa Reuse Conflict Messaging
+
+**Decision date:** 2026-10-01
+
+When an Owner enters a Rasa name that already exists in the Brand Master vocabulary and is being reused in a different menu context, the contextual confirmation keeps normal CTA hierarchy:
+
+```
+Rasa "Cheesecake" sudah digunakan di menu lain.
+Lihat detail
+
+[ Batal ]   [ Tambahkan ]
+```
+
+`Lihat detail` is an inline text link, not a third CTA button.
+
+The detail interaction may show where the Rasa is already used. The primary decision remains **Tambahkan** or **Batal**.
+
+## 🔒 LOCKED SUB-DECISION — Sub Category Archive-First Lifecycle
+
+**Decision date:** 2026-10-01
+
+A Sub Category that still has Product dependencies is not permanently deletable.
+
+For populated taxonomy:
+
+- archive is the normal lifecycle action;
+- permanent Delete is available only when the Sub Category is empty under current dependency rules;
+- Archive must not silently migrate Products to another Sub Category;
+- any future Product migration is an explicit Owner action, not an automatic side effect of archive.
+
+## 🔎 PRE-LOCK AUDIT — Decisions vs Existing Notion/Git
+
+**Audit date:** 2026-10-01
+
+This section records what is already locked in current Xentra documentation, what can be carried forward, what conflicts with the new concept, and what is still open.
+
+### Existing locks that are compatible and should be carried forward
+
+- Master Product is Owner/Brand-owned; Branch only adopts approved Master Products.
+- Branch Product ↔ Branch Category is branch-local many-to-many; one adopted Product may appear in multiple Branch Categories.
+- Branch Manager may create/rename/reorder/delete its own Branch Categories subject to dependency/integrity rules.
+- Branch does not create Branch-owned Products or Bundles.
+- Inventory is the authority for sellable Product stock and movement history.
+- Product media uses the canonical Media Engine; Product and Category remain separate semantic media types; Branch Product Photo Override is not an active delivery authority.
+- Package/Bundle is an Owner/Master Catalog capability; Branch adopts it and does not create branch-owned bundles.
+- Promotion remains a separate domain from Bundle/Package.
+- Shared UI shells/primitives and contextual Bottom Sheet/Modal patterns remain part of the Xentra UI architecture.
+
+### Existing locks that directly conflict with this new concept and MUST be reconciled before final lock
+
+1. **Product Name vs Category Display Boundary v1** currently defines `products.name` as the required Customer title and keeps Rasa optional. The new concept replaces that semantic model with Sub Category as the Customer title and Category + Sub Category + Rasa as normal Product identity.
+2. **Branch Customer Display Name Override** currently permits `branch_products.name_override`. The new concept cancels that authority.
+3. Current Owner Product Editor contracts expose `Nama Produk` as a required free-text field. The new concept removes that field as the canonical identity input and replaces it with contextual Category/Sub Category/Rasa selection.
+4. Current resolver tests and Customer DTO tests explicitly assert `products.name → Customer title`. They must be superseded/reworked only after the new concept is finally locked.
+5. Current migration and compatibility contracts still treat `products.name` as the semantic legacy source for Master Product identity. A migration strategy is still required.
+
+### New decisions discussed here that are NOT yet fully locked
+
+- Exact physical schema for `sub_categories` and Product → Sub Category.
+- Exact physical uniqueness key and normalization rules for Category + Sub Category + Rasa.
+- Exact implementation of usage-derived Rasa availability without a separate manual compatibility matrix.
+- Product ID / identity-history model for long-term reporting after in-place identity edits.
+- Reporting semantics when one Product ID has different current identities over time.
+- Exact Package/Bundle taxonomy and identity model under the new Category + Sub Category + Rasa concept.
+- Exact distinction and UI contract for Add-on versus Product Options where both are used by existing Xentra POS contracts.
+- Package inventory explosion/consumption and order/reporting treatment.
+- Category archive cascade and restoration semantics.
+- Complete migration mapping from existing `products.name` values to Sub Categories and Rasa values.
+- Compatibility treatment for existing Branch `name_override` data before the old field is retired.
+
+### Decisions already made in this conversation and now recorded in this proposal
+
+- Normal Product identity = Category + Sub Category + Rasa; Original is the default Rasa.
+- Rasa is reusable Master data, not a child taxonomy node.
+- Rasa reuse is contextual; no manual Rasa↔Sub Category management UI is required.
+- Independently sellable additions such as Sambal Matah are Products, not Add-ons.
+- An identity edit is an in-place Product edit when the target identity is unused.
+- Category change warns and, after confirmation, resets downstream Sub Category and Rasa in the draft.
+- Sub Category rename is allowed but warns about affected Customer titles.
+- Populated taxonomy uses archive-first lifecycle; no automatic Product migration.
+- Duplicate Product identity opens a conflict modal, then a read-only detail Bottom Sheet; it never opens the target in Edit mode.
+- Branch Product rename override is cancelled for the new concept.
+
+### Current source-of-truth rule
+
+Until a final new locked decision explicitly supersedes current production contracts, existing authoritative Notion/Git decisions remain the production reference.
+
+The new proposal is a pre-lock target. It is not permission to implement conflicting semantics.
