@@ -245,13 +245,15 @@ test('OVR-10 description override clear: PATCH description=null -> inherits mast
   assert.strictEqual(p.description_override, null, 'description_override cleared');
 });
 
-test('OVR-11 image override clear: PATCH image_url=null -> inherits master', async function() {
-  db.prepare('UPDATE branch_products SET image_override = ? WHERE branch_id = ? AND product_id = ?').run('/branch.png', BRANCH, PRODUCT);
-  var res = await patchOverride(BRANCH, PRODUCT, { image_url: null });
-  assert.strictEqual(res.status, 200);
+test('OVR-11 legacy image override cannot shadow the Master Product photo', function() {
+  clearOverrides();
+  db.prepare('UPDATE branch_products SET image_override = ? WHERE branch_id = ? AND product_id = ?').run('/legacy-branch.png', BRANCH, PRODUCT);
+
   var p = getProduct(BRANCH);
-  assert.strictEqual(p.image_url, '/master-img.png', 'image_url falls back to master');
-  assert.strictEqual(p.image_override, null, 'image_override cleared');
+  assert.strictEqual(p.image_url, '/master-img.png', 'legacy branch photo no longer wins over Master');
+  assert.strictEqual(p.master_image_url, '/master-img.png');
+
+  clearOverrides();
 });
 
 test('OVR-12 master propagation without override: all 3 fields follow master update', function() {
