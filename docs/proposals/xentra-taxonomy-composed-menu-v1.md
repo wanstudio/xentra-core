@@ -589,3 +589,35 @@ Product 1 + Product 2 + Product 3 + eligible Promotion
 ```
 
 This boundary is required to avoid treating arbitrary product combinations as a new Product or Paket.
+
+
+## 🔒 LOCKED SUB-DECISION — Paket ≠ Promotion
+
+**Decision date:** 2026-10-01
+
+This sub-decision is locked for the new Xentra concept, while the overall document remains **PROPOSAL / NOT LOCKED**.
+
+1. **Paket is an explicitly created sellable Product/bundle.** It has its own Product identity, Owner-defined name, explicitly defined fixed component Product list, and explicitly defined Paket price.
+2. **A cart containing multiple normal Products is not automatically a Paket.**
+3. **Promotion/discount never converts a cart combination into a Paket.** The cart continues to contain the original Product IDs and the Promotion domain only changes the effective transaction price according to its rules.
+4. **Paket and Promotion therefore remain separate domain concepts, reporting concepts, and persistence concepts.**
+5. **Inventory effect of a Paket** is derived from its referenced component Product IDs; the Paket does not create duplicate component inventory records.
+6. **Do not infer Paket creation from price arithmetic, matching cart composition, or promotion eligibility.** A Paket exists only when an Owner explicitly creates it as such.
+
+Canonical examples:
+
+```
+Explicitly created:
+Paket A
+  ├── Product 1
+  ├── Product 2
+  └── Product 3
+  Harga Paket = explicit Owner-defined price
+
+Normal cart:
+Product 1 + Product 2 + Product 3
+  + Promotion
+  → discounted cart
+  → remains Product 1 + Product 2 + Product 3
+  → NOT a Paket
+```
