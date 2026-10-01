@@ -15,16 +15,18 @@
  * - source_height: natural source image height in pixels (> 0)
  * - aspect_ratio: target aspect ratio (number, e.g. 1.0 for square, ~1.944 for banner)
  * - zoom: display zoom level applied by user (>= 1.0)
- * - asset_type: 'product' | 'category' | 'logo' | 'avatar' | 'banner' | 'general'
+ * - asset_type: 'product' | 'category' | 'logo' | 'avatar' | 'pwa_icon' | 'promotion' | 'banner' | 'general'
  */
 
-const VALID_ASSET_TYPES = ['logo', 'product', 'category', 'banner', 'avatar', 'general'];
+const VALID_ASSET_TYPES = ['logo', 'product', 'category', 'banner', 'avatar', 'pwa_icon', 'promotion', 'general'];
 
 const CANONICAL_ASPECT_RATIOS = {
   logo: 1.0,
   product: 1.0,
   category: 1.0,
   avatar: 1.0,
+  pwa_icon: 1.0,
+  promotion: 1.0,
   banner: 350 / 180, // ~1.944
   general: null
 };
@@ -34,6 +36,8 @@ const CANONICAL_ASPECT_TOLERANCES = {
   product: 0.02,
   category: 0.02,
   avatar: 0.02,
+  pwa_icon: 0.02,
+  promotion: 0.02,
   banner: 0.05
 };
 
