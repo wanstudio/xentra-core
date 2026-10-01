@@ -1,8 +1,7 @@
 /**
  * XENTRA CORE — MEDIA UPLOAD ROUTES
  *
- * Legacy/canonical image upload adapters for master products and branch
- * catalog entities. Validation and persistence behaviour are unchanged.
+ * Compatibility upload adapters. Binary handling always delegates to the canonical Media System.
  */
 
 module.exports = function registerMediaUploadRoutes(router, deps) {
@@ -11,12 +10,6 @@ module.exports = function registerMediaUploadRoutes(router, deps) {
     requireAuth,
     mediaService
   } = deps;
-
-  // Upload / replace a branch category's image.
-// Persisted to disk under /assets/uploads/categories and verified strictly via ImageValidator.
-const CATEGORY_IMAGE_DIR = path.join(__dirname, '../../apps/customer-pwa/assets/uploads/categories');
-const PRODUCT_IMAGE_DIR = path.join(__dirname, '../../apps/customer-pwa/assets/uploads/products');
-const BRANCH_PRODUCT_IMAGE_DIR = path.join(__dirname, '../../apps/customer-pwa/assets/uploads/branch-products');
 
 router.post('/admin/branches/:id/categories/:catId/image', requireAuth(['owner', 'brand_manager', 'branch_manager']), async (req, res) => {
   try {
