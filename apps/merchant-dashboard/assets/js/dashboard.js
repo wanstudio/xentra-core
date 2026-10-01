@@ -10648,7 +10648,7 @@ async function loadMenusView() {
           image_base64: base64,
           mime_type: file.type,
           original_filename: file.name || null,
-          asset_type: 'logo',
+          asset_type: 'promotion',
           enforce_aspect_ratio: false
         })
       });
