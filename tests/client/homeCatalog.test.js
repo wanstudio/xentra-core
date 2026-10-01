@@ -133,6 +133,18 @@ test('Each branch shows its own stock_estimate for the same product', async () =
 });
 
 
+test('Customer catalog uses Product name as title and Category as grouping', async () => {
+  const res = await mockFetch('/api/v1/catalog/menu?branch_id=' + BARAT);
+  const data = await res.json();
+  assert.strictEqual(data.success, true);
+  const product = (data.all_products || []).find((p) => String(p.id) === '272');
+  assert.ok(product, 'expected product exists');
+  assert.ok(product.menu_title, 'Customer title must be present');
+  assert.strictEqual(product.menu_title, product.name, 'Customer title must come from Product name');
+  assert.ok(product.category_id != null, 'Product retains Category grouping');
+  assert.ok(product.menu_subtitle == null || typeof product.menu_subtitle === 'string');
+});
+
 test('Branch-scoped catalog exposes structured Master Menu presentation fields', async () => {
   const res = await mockFetch(`/api/v1/catalog/menu?branch_id=${BARAT}`);
   const data = await res.json();
