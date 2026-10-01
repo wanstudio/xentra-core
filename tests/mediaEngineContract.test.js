@@ -217,6 +217,7 @@ test('MEDIA ENGINE — canonical boundary contract', async (t) => {
     assert.doesNotMatch(lifecycleCode, /uploaded: \['processing', 'failed', 'ready'\]/);
     assert.match(serviceCode, /targetStatus === MediaLifecycle\.STATES\.READY/);
     assert.match(serviceCode, /MEDIA_PROCESSING_REQUIRED/);
+    assert.match(serviceCode, /MEDIA_LIFECYCLE_MANAGED/);
     assert.match(serviceCode, /return this\.processMedia\(\{ mediaId, brandId, cropSpec \}\)/);
     assert.match(mediaRoutes, /const \{ crop_spec \} = req\.body \|\| \{\};/);
     assert.match(mediaRoutes, /mediaService\.markReady\(\{[\s\S]*cropSpec: crop_spec \|\| null/);
