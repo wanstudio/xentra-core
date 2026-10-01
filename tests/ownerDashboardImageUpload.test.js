@@ -236,6 +236,13 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
   });
 
   await t.test('6b. Banner: arbitrary external URL containing a known media id is rejected', async () => {
+    const row = db.prepare('SELECT banners FROM brands WHERE id = ?').get(BRAND_ID);
+    let currentBanners = [];
+    try { currentBanners = JSON.parse(row && row.banners ? row.banners : '[]'); } catch (_) {}
+    const added = Array.isArray(currentBanners)
+      ? currentBanners.find(b => b.title === 'Diskon Spesial Liburan')
+      : null;
+    assert.ok(added && added.image_url, 'canonical banner URL must be persisted before spoof test');
     const mediaIdMatch = String(added.image_url).match(/\/(med_[^/]+)\//);
     assert.ok(mediaIdMatch, 'canonical banner URL should contain its media id');
     const attackerUrl = 'https://evil.example/image.png?ref=' + encodeURIComponent(mediaIdMatch[1]);
