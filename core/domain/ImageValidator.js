@@ -75,6 +75,28 @@ const IMAGE_RULES = {
     label: 'Avatar / Profile Image',
     specsText: 'JPG, PNG, atau WebP · Maks. 10 MB · Rasio 1:1'
   },
+  pwa_icon: {
+    maxBytes: 10 * 1024 * 1024, // 10MB (M0 locked policy)
+    maxWidth: 4096,
+    maxHeight: 4096,
+    maxMegaPixels: 20,
+    allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+    targetRatio: 1.0,
+    ratioTolerance: 0.15,
+    label: 'Icon PWA',
+    specsText: 'JPG, PNG, atau WebP · Maks. 10 MB · Rasio 1:1'
+  },
+  promotion: {
+    maxBytes: 10 * 1024 * 1024, // 10MB (M0 locked policy)
+    maxWidth: 4096,
+    maxHeight: 4096,
+    maxMegaPixels: 20,
+    allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+    targetRatio: 1.0,
+    ratioTolerance: 0.15,
+    label: 'Icon Promosi',
+    specsText: 'JPG, PNG, atau WebP · Maks. 10 MB · Rasio 1:1'
+  },
   general: {
     maxBytes: 20 * 1024 * 1024, // 20MB general boundary
     maxWidth: 4096,
