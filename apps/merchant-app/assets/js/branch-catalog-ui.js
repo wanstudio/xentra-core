@@ -82,17 +82,9 @@
           showToast('✓ Potongan foto menu cabang disesuaikan.');
         },
         onCancel: function () {
-          var reader = new FileReader();
-          reader.onload = function (e) {
-            var previewImg = $('override-img-preview');
-            var previewMono = $('override-img-preview-mono');
-            if (!previewImg) return;
-            previewImg.src = e.target.result;
-            previewImg.style.display = 'block';
-            if (previewMono) previewMono.style.display = 'none';
-            $('override-img-status').textContent = '🟡 OVERRIDE baru (belum disimpan)';
-          };
-          reader.readAsDataURL(file);
+          _bpSelectedFile = null;
+          _bpCropSpec = null;
+          if (fileInput) fileInput.value = '';
         }
       });
     });
