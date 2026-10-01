@@ -335,7 +335,7 @@ router.get('/admin/branches/:id/catalog', requireAuth(['owner', 'brand_manager',
         bp.product_id,
         COALESCE(bp.name_override, p.name) as name,
         COALESCE(bp.description_override, p.description) as description,
-        COALESCE(bp.image_override, p.image_url) as image_url,
+        p.image_url as image_url,
         bp.name_override,
         bp.description_override,
         bp.image_override,
@@ -763,6 +763,17 @@ router.patch('/admin/branches/:id/products/:productId/override', requireAuth(['o
     // Only fields explicitly present in the request body are updated.
     // Pass null to clear an override; omit the key entirely to leave it untouched.
     const updates = {};
+
+    // Branch product photos are Master-owned. A legacy client may no longer
+    // create or mutate image_override through this general override endpoint.
+    if (Object.prototype.hasOwnProperty.call(req.body, 'image_url')) {
+      return res.status(410).json({
+        success: false,
+        error: 'BRANCH_PRODUCT_IMAGE_OVERRIDE_DISABLED',
+        message: 'Foto Menu Cabang tidak dapat diubah. Foto ditentukan oleh Master Product Owner.'
+      });
+    }
+
     if (Object.prototype.hasOwnProperty.call(req.body, 'name')) {
       updates.name_override = req.body.name != null ? String(req.body.name).trim() || null : null;
     }
