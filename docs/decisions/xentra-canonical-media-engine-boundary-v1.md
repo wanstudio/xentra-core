@@ -141,6 +141,10 @@ Replacement follows:
 process new → READY → attach new → orphan old
 ```
 
+Media replacement is transactional at the media metadata boundary: attaching the new asset and orphaning the old asset commit together, and orphan state clears stale attachment metadata so garbage collection can reason from authoritative references.
+
+Processing uses an isolated derivative run. Existing published variants remain intact until the new variant set is fully written and the metadata transaction commits. A failed run removes only its own temporary artifacts and leaves the previous published variants available for recovery.
+
 Failed processing must not destroy the currently active asset.
 
 ## 9. Governance
