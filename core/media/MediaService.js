@@ -541,9 +541,18 @@ class MediaService {
   async processMedia({ mediaId, brandId, cropSpec = null }) {
     const asset = this.getMedia({ mediaId, brandId });
 
-    // Transition to PROCESSING
-    MediaLifecycle.assertTransition(asset.status, MediaLifecycle.STATES.PROCESSING);
-    this.mediaRepo.updateStatus(mediaId, brandId, MediaLifecycle.STATES.PROCESSING);
+    // A queued retry may already be in PROCESSING. A direct process call from
+    // TEMPORARY/UPLOADED/FAILED must enter PROCESSING exactly once.
+    if (asset.status !== MediaLifecycle.STATES.PROCESSING) {
+      MediaLifecycle.assertTransition(asset.status, MediaLifecycle.STATES.PROCESSING);
+      this.mediaRepo.updateStatus(mediaId, brandId, MediaLifecycle.STATES.PROCESSING);
+    }
+
+    const oldVariants = this.mediaRepo.getVariantsByMediaId(mediaId);
+    const processingRunId = `run_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
+    const newVariantKeys = [];
+    let newPermanentOriginalKey = null;
+    let transactionActive = false;
 
     try {
       // 1. Read source binary from storage
@@ -559,32 +568,20 @@ class MediaService {
         cropSpec: effectiveCrop
       });
 
-      // 4. Clean up any previous variants if this was a retry
-      this.mediaRepo.deleteVariantsByMediaId(mediaId);
-
-      // 5. Store derivatives and record in media_variants
-      const savedVariants = [];
+      // 4. Write the complete new derivative set under an isolated processing-run prefix.
+      // Existing READY variants remain untouched until the DB transaction commits.
+      const newVariantRecords = [];
       for (const derivative of result.derivatives) {
         const variantId = `var_${crypto.randomBytes(8).toString('hex')}_${Date.now()}`;
-        const derivativeStorageKey = `derivatives/${brandId}/${mediaId}/${derivative.name}.webp`;
+        const derivativeStorageKey = `derivatives/${brandId}/${mediaId}/${processingRunId}/${derivative.name}.webp`;
 
         await this.storage.write(derivativeStorageKey, derivative.buffer);
+        newVariantKeys.push(derivativeStorageKey);
 
-        this.mediaRepo.createVariant({
+        newVariantRecords.push({
           id: variantId,
           media_id: mediaId,
           variant_name: derivative.name,
-          width: derivative.width,
-          height: derivative.height,
-          format: derivative.format,
-          mime_type: derivative.mimeType,
-          size_bytes: derivative.sizeBytes,
-          storage_key: derivativeStorageKey
-        });
-
-        savedVariants.push({
-          id: variantId,
-          name: derivative.name,
           width: derivative.width,
           height: derivative.height,
           format: derivative.format,
@@ -595,33 +592,72 @@ class MediaService {
         });
       }
 
-      // 6. Relocate original from staging to permanent brand originals location if applicable
+      // 5. Copy the original to permanent storage before the DB commit. Do not delete
+      // staging until the DB now points at the permanent key, so a failed commit
+      // cannot leave the database referencing a missing source.
       let finalKey = asset.storage_key;
       if (asset.storage_key.startsWith('staging/')) {
         const ext = asset.mime_type === 'image/jpeg' ? 'jpg' : (asset.mime_type === 'image/webp' ? 'webp' : 'png');
-        const permKey = `originals/${brandId}/${mediaId}.${ext}`;
-        await this.storage.write(permKey, sourceBuffer);
-        await this.storage.delete(asset.storage_key);
-        finalKey = permKey;
+        newPermanentOriginalKey = `originals/${brandId}/${mediaId}.${ext}`;
+        await this.storage.write(newPermanentOriginalKey, sourceBuffer);
+        finalKey = newPermanentOriginalKey;
+      }
 
+      // 6. Atomically publish the new DB metadata. External storage writes are treated
+      // as a saga: newly written binaries are deleted on rollback; old binaries are
+      // deleted only after the DB commit succeeds.
+      this.mediaRepo.beginTransaction();
+      transactionActive = true;
+
+      this.mediaRepo.deleteVariantsByMediaId(mediaId);
+      for (const record of newVariantRecords) {
+        this.mediaRepo.createVariant(record);
+      }
+
+      this.mediaRepo.updateCropSpec(mediaId, brandId, result.cropSpec.toJSON());
+
+      if (finalKey !== asset.storage_key) {
         this.mediaRepo.db.execute(
           'UPDATE media_assets SET storage_key = ? WHERE id = ? AND brand_id = ?',
           [finalKey, mediaId, brandId]
         );
       }
 
-      // 7. Update crop spec record on asset
-      this.mediaRepo.updateCropSpec(mediaId, brandId, result.cropSpec.toJSON());
-
-      // 8. Transition asset to READY
       MediaLifecycle.assertTransition(MediaLifecycle.STATES.PROCESSING, MediaLifecycle.STATES.READY);
       this.mediaRepo.updateStatus(mediaId, brandId, MediaLifecycle.STATES.READY);
+
+      this.mediaRepo.commitTransaction();
+      transactionActive = false;
+
+      // 7. Cleanup superseded binaries after the successful DB publication.
+      for (const oldVariant of oldVariants) {
+        if (oldVariant.storage_key && !newVariantKeys.includes(oldVariant.storage_key)) {
+          await this.storage.delete(oldVariant.storage_key);
+        }
+      }
+      if (asset.storage_key.startsWith('staging/') && asset.storage_key !== finalKey) {
+        await this.storage.delete(asset.storage_key);
+      }
 
       const updated = this.mediaRepo.findById(mediaId, brandId);
       return this._formatAssetResponse(updated);
 
     } catch (err) {
-      // Safe lifecycle failure transition
+      if (transactionActive) {
+        try {
+          this.mediaRepo.rollbackTransaction();
+        } catch (_) {}
+      }
+
+      // Remove binaries produced by this failed processing attempt only.
+      for (const storageKey of newVariantKeys) {
+        try { await this.storage.delete(storageKey); } catch (_) {}
+      }
+      if (newPermanentOriginalKey) {
+        try { await this.storage.delete(newPermanentOriginalKey); } catch (_) {}
+      }
+
+      // Safe lifecycle failure transition; old READY/variant data remains intact.
       this.mediaRepo.updateStatus(mediaId, brandId, MediaLifecycle.STATES.FAILED, {
         error_message: err.message || 'Image processing failed'
       });
