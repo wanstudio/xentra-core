@@ -3,8 +3,10 @@
 const sharp = require('sharp');
 
 /**
- * Helper to generate minimal valid 100% compliant image buffers
- * for testing without external native libraries (Sharp, Canvas, etc.)
+ * Helper to generate deterministic image buffers for tests.
+ *
+ * JPEG fixtures use the same Sharp encoder as the runtime so decoder/processing
+ * tests exercise real image binaries rather than marker-only pseudo-JPEGs.
  */
 
 // 1. Generate an uncompressed 8-bit RGBA PNG buffer
@@ -70,8 +72,14 @@ function crc32(buf) {
 // 2. Generate a real, decoder-valid JPEG buffer with the requested dimensions.
 // This helper is async because Sharp is the authoritative encoder used by the runtime.
 async function createJpegBuffer(width, height) {
-  const raw = Buffer.alloc(width * height * 3, 0x80);
-  return sharp(raw, { raw: { width, height, channels: 3 } })
+  return sharp({
+    create: {
+      width,
+      height,
+      channels: 3,
+      background: { r: 128, g: 128, b: 128 }
+    }
+  })
     .jpeg({ quality: 80, chromaSubsampling: '4:2:0' })
     .toBuffer();
 }
