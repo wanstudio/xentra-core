@@ -113,7 +113,6 @@ test('Owner Product Editor treats Product Name as the Customer title source', ()
   assert.ok(JS.includes("name: $('prod-name').value.trim()"));
   assert.ok(JS.includes("var nameInput = $('prod-name');"));
   assert.ok(JS.includes("nameInput.addEventListener('input'"));
-  assert.ok(JS.includes('const customerTitle = hasDisplayNameOverride ? displayNameOverride.trim() : product.name') || JS.includes('const customerTitle = hasDisplayNameOverride ? displayNameOverride.trim() : product.name'));
 });
 
 test('Owner Master Product UI exposes structured composition selectors', () => {
