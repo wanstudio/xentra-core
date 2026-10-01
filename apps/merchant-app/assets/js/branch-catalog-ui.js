@@ -196,8 +196,8 @@
 
   window.clearBranchProductOverride = async function () {
     if (!currentManagingBranchId || !_overrideProductId) return;
-    if (!confirm('Kembalikan semua nilai ke Master? Nama, deskripsi, foto, harga, dan kategori dikembalikan ke pengaturan asal produk Master.')) return;
-    var res = await CatalogClient.updateBranchProductOverride(currentManagingBranchId, _overrideProductId, { name: null, description: null, image_url: null, price: null, branch_category_id: null, category_ids: [] });
+    if (!confirm('Kembalikan nilai teks, harga, dan kategori ke Master? Foto Menu tetap mengikuti Master Product Owner.')) return;
+    var res = await CatalogClient.updateBranchProductOverride(currentManagingBranchId, _overrideProductId, { name: null, description: null, price: null, branch_category_id: null, category_ids: [] });
     var data = await res.json();
     if (data.success) {
       showToast('✅ Semua nilai dikembalikan ke Master.');
