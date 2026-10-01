@@ -256,7 +256,7 @@ router.post('/admin/brand/merchant-icon', requireAuth(['owner', 'brand_manager']
     });
 
     const iconUrl = pickPreviewUrl(asset, 320);
-    coreBrandRepo.updateMerchantPwaIcon(req.brand_id, iconUrl);
+    coreBrandRepo.updateMerchantPwaIcon(req.brand_id, { iconUrl, mediaId: asset.media_id });
     if (req.brand) req.brand.merchant_pwa_icon_url = iconUrl;
     res.status(201).json({
       success: true,
@@ -311,7 +311,7 @@ router.post('/admin/brand/pos-icon', requireAuth(['owner', 'brand_manager']), as
     });
 
     const iconUrl = pickPreviewUrl(asset, 320);
-    coreBrandRepo.updatePosPwaIcon(req.brand_id, iconUrl);
+    coreBrandRepo.updatePosPwaIcon(req.brand_id, { iconUrl, mediaId: asset.media_id });
     if (req.brand) req.brand.pos_pwa_icon_url = iconUrl;
     res.status(201).json({
       success: true,
