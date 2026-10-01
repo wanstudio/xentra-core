@@ -202,9 +202,9 @@ test('MEDIA ENGINE — canonical boundary contract', async (t) => {
     const mediaRoutes = fs.readFileSync(path.join(ROOT, 'server/routes/media-upload.js'), 'utf8');
     assert.match(brandCode, /assetType: 'pwa_icon'/);
     assert.match(dashboardCode, /asset_type: 'promotion'/);
-    assert.match(serviceCode, /brand_merchant_pwa_icon: ['pwa_icon']/);
-    assert.match(serviceCode, /brand_pos_pwa_icon: ['pwa_icon']/);
-    assert.match(serviceCode, /banner_content_revision: ['banner']/);
+    assert.match(serviceCode, /brand_merchant_pwa_icon: \['pwa_icon'\]/);
+    assert.match(serviceCode, /brand_pos_pwa_icon: \['pwa_icon'\]/);
+    assert.match(serviceCode, /banner_content_revision: \['banner'\]/);
     assert.match(serviceCode, /MEDIA_ASSET_TYPE_MISMATCH/);
     assert.match(mediaRoutes, /\/admin\/media\/:id\/attach', requireAuth\(\['owner', 'brand_manager'\]\)/);
     assert.match(mediaRoutes, /\/admin\/media\/replace', requireAuth\(\['owner', 'brand_manager'\]\)/);
@@ -223,13 +223,13 @@ test('MEDIA ENGINE — canonical boundary contract', async (t) => {
     assert.match(mediaRoutes, /mediaService\.markReady\(\{[\s\S]*cropSpec: crop_spec \|\| null/);
   });
 
-  await t.test('17. HTTP JSON body limit leaves headroom for 20MB base64 media', () => {
+  await t.test('18. HTTP JSON body limit leaves headroom for 20MB base64 media', () => {
     const appCode = fs.readFileSync(path.join(ROOT, 'server/app.js'), 'utf8');
     assert.match(appCode, /express\.json\(\{ limit: ['"]30mb['"] \}\)/);
     assert.match(appCode, /express\.urlencoded\(\{ extended: true, limit: ['"]30mb['"] \}\)/);
   });
 
-  await t.test('18. Orphaned media cannot retain a stale entity attachment', () => {
+  await t.test('19. Orphaned media cannot retain a stale entity attachment', () => {
     const repoCode = fs.readFileSync(path.join(ROOT, 'core/data/repositories/MediaRepository.js'), 'utf8');
     assert.match(repoCode, /status = 'orphan'/);
     assert.match(repoCode, /attached_to_type = NULL/);
