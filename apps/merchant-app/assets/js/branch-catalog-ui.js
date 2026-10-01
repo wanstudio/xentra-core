@@ -65,7 +65,7 @@
     // Photo row — live override URL preview'd from the catalog payload
     var imgInput = $('override-img-file');
     if (imgInput) imgInput.value = '';
-    var hasImg = p.image_url || p.image_override || p.master_image_url;
+    var hasImg = p.image_url || p.master_image_url;
     var previewImg = $('override-img-preview');
     var previewMono = $('override-img-preview-mono');
     if (hasImg) {
@@ -77,7 +77,7 @@
       previewMono.style.display = 'block';
       previewMono.textContent = (p.name || p.master_name || '?').trim().slice(0, 1).toUpperCase();
     }
-    $('override-img-status').textContent = p.image_override ? '🟡 OVERRIDE aktif' : '🟢 DEFAULT (ikut Master)';
+    $('override-img-status').textContent = p.image_override ? '🟠 OVERRIDE legacy tersimpan (tidak digunakan)' : '🟢 DEFAULT (ikut Master)';
 
     // Price row — pricing policy drives editability (same UX as adopt modal)
     var isRange = String(p.pricing_mode).toLowerCase() === 'range';
