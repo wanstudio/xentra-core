@@ -237,7 +237,7 @@ router.post('/admin/brand/merchant-icon', requireAuth(['owner', 'brand_manager']
       imageBase64: image_base64,
       mimeType: mime_type,
       originalFilename: original_filename,
-      assetType: 'logo',
+      assetType: 'pwa_icon',
       cropSpec: crop_spec || null
     });
 
@@ -292,7 +292,7 @@ router.post('/admin/brand/pos-icon', requireAuth(['owner', 'brand_manager']), as
       imageBase64: image_base64,
       mimeType: mime_type,
       originalFilename: original_filename,
-      assetType: 'logo',
+      assetType: 'pwa_icon',
       cropSpec: crop_spec || null
     });
 
