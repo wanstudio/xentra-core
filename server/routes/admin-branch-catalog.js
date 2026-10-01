@@ -889,7 +889,7 @@ router.patch('/admin/branches/:id/products/:productId/override', requireAuth(['o
       SELECT
         COALESCE(bp.name_override, p.name) as name,
         COALESCE(bp.description_override, p.description) as description,
-        COALESCE(bp.image_override, p.image_url) as image_url,
+        p.image_url as image_url,
         bp.name_override, bp.description_override, bp.image_override,
         p.name as master_name, p.description as master_description, p.image_url as master_image_url,
         bp.price, p.price as master_price, p.pricing_mode, p.min_price, p.max_price,
