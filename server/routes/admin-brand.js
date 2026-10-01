@@ -95,7 +95,7 @@ router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
       let cleanHex = primary_color.trim();
       if (!cleanHex.startsWith('#')) cleanHex = '#' + cleanHex;
       if (/^#[0-9a-fA-F]{3}$/.test(cleanHex)) {
-        cleanHex = '#' + cleanHex[1] + cleanHex[1] + cleanHex[2] + cleanHex[3] + cleanHex[3];
+        cleanHex = '#' + cleanHex[1] + cleanHex[1] + cleanHex[2] + cleanHex[2] + cleanHex[3] + cleanHex[3];
       }
       if (!/^#[0-9a-fA-F]{6}$/.test(cleanHex)) {
         return res.status(400).json({ success: false, error: 'Format warna tema (hex) tidak valid. Gunakan format #RRGGBB.' });
