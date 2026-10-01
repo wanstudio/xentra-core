@@ -39,14 +39,16 @@ test('MEDIA ENGINE — canonical boundary contract', async (t) => {
     }
   });
 
-  await t.test('2. CropSpec accepts canonical square and banner ratios', () => {
-    assert.doesNotThrow(() => new CropSpec({
-      x: 0, y: 0, width: 400, height: 400,
-      source_width: 800, source_height: 800,
-      aspect_ratio: 1,
-      zoom: 1,
-      asset_type: 'product'
-    }));
+  await t.test('2. CropSpec accepts canonical square, PWA, promotion, and banner ratios', () => {
+    for (const assetType of ['product', 'pwa_icon', 'promotion']) {
+      assert.doesNotThrow(() => new CropSpec({
+        x: 0, y: 0, width: 400, height: 400,
+        source_width: 800, source_height: 800,
+        aspect_ratio: 1,
+        zoom: 1,
+        asset_type: assetType
+      }));
+    }
 
     assert.doesNotThrow(() => new CropSpec({
       x: 0, y: 0, width: 350, height: 180,
