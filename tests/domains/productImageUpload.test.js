@@ -7,8 +7,8 @@
  * Root cause it guards against: the old dashboard sent `image` (a pasted URL)
  * inside POST/PUT /admin/products, but the backend never persisted that field,
  * so menu photos could not be changed from the dashboard at all. The fix moves
- * photos to the established upload contract (base64 + mime_type, file persisted
- * to disk, only the URL stored) via POST /admin/products/:productId/image,
+ * photos to the canonical Media System contract (base64 + mime_type → validate/crop/resize/WebP)
+ * via POST /admin/products/:productId/image,
  * which writes BOTH products.image_url (customer PWA / public APIs) and
  * products.image (dashboard tables & Edit Menu modal).
  *
@@ -126,10 +126,11 @@ test('PRODUCT IMAGE 1 — create menu, then upload an image; both columns persis
     headers: auth,
     body: JSON.stringify({ image_base64: TINY_PNG_BASE64, mime_type: 'image/png' })
   });
-  assert.strictEqual(imgRes.status, 200);
+  assert.strictEqual(imgRes.status, 201);
   const imgData = await imgRes.json();
   assert.strictEqual(imgData.success, true);
-  assert.ok(imgData.product.image_url.startsWith('/assets/uploads/products/'), 'upload URL must live under /assets/uploads/products/');
+  assert.ok(imgData.product.image_url.startsWith('/assets/uploads/derivatives/'), 'upload URL must live under canonical Media System derivatives');
+   assert.ok(imgData.product.image_url.endsWith('.webp'));
   assert.strictEqual(imgData.product.image, imgData.product.image_url);
 
   const saved = row(productId);
@@ -153,7 +154,7 @@ test('PRODUCT IMAGE 2 — uploading again replaces the image in both columns', a
     headers: auth,
     body: JSON.stringify({ image_base64: TINY_PNG_BASE64, mime_type: 'image/png' })
   });
-  assert.strictEqual(firstRes.status, 200);
+  assert.strictEqual(firstRes.status, 201);
   const first = (await firstRes.json()).product;
 
   const secondRes = await mockFetch(`/api/v1/admin/products/${productId}/image`, {
@@ -161,7 +162,7 @@ test('PRODUCT IMAGE 2 — uploading again replaces the image in both columns', a
     headers: auth,
     body: JSON.stringify({ image_base64: TINY_PNG_BASE64, mime_type: 'image/webp' })
   });
-  assert.strictEqual(secondRes.status, 200);
+  assert.strictEqual(secondRes.status, 201);
   const second = (await secondRes.json()).product;
   assert.notStrictEqual(second.image_url, first.image_url, 'replacement must produce a different persisted URL');
 
@@ -233,7 +234,7 @@ test('PRODUCT IMAGE 4 — validation and error handling', async () => {
   assert.strictEqual(dataNoData.success, false);
   assert.strictEqual(dataNoData.error, 'Gambar menu wajib diunggah.');
 
-  // D. File larger than 3MB
+  // D. File larger than 20MB
   const oversized = Buffer.alloc(MAX_BYTES + 1).toString('base64');
   const resOversized = await mockFetch(`/api/v1/admin/products/${productId}/image`, {
     method: 'POST',
