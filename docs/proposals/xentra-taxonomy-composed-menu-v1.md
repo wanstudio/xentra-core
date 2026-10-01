@@ -621,3 +621,46 @@ Product 1 + Product 2 + Product 3
   → remains Product 1 + Product 2 + Product 3
   → NOT a Paket
 ```
+
+
+## 🔒 LOCKED SUB-DECISION — Identity Change UX Preserves the Editing Mental Model
+
+**Decision date:** 2026-10-01
+
+When a Product Identity component changes (Category, Sub Category, or Rasa), the Owner should experience the action as **editing the existing menu**, not as starting a blank Product.
+
+Because the identity changes, Core may need to create a new underlying Product identity. However, the UI must automatically carry forward the existing non-identity Product data into the new identity as editable state.
+
+Conceptually:
+
+```
+P001
+Ayam / Ayam Bakar / Original
+  ├── image
+  ├── description
+  ├── price
+  ├── complements
+  ├── level
+  └── POS configuration
+
+Owner changes Rasa:
+Original → Lombok Ijo
+
+UX result:
+P002
+Ayam / Ayam Bakar / Lombok Ijo
+  ├── copied image
+  ├── copied description
+  ├── copied price
+  ├── copied complements
+  ├── copied level
+  └── copied POS configuration
+```
+
+The system must first check whether the target identity already exists.
+
+- If the target identity already exists, do **not** create a duplicate Product. The UI must explain that the target Product already exists and offer a clear recovery path.
+- If the target identity does not exist, create the new Product identity with copied non-identity configuration.
+- The original Product remains historically stable according to Product lifecycle rules; it is not silently mutated into a different identity.
+
+This is a UX/domain contract: **"edit identity" is presented as an edit workflow, while Core preserves immutable Product identity underneath.**
