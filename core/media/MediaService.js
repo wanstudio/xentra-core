@@ -146,6 +146,12 @@ class MediaService {
   async transitionStatus({ mediaId, brandId, targetStatus, errorMessage = null }) {
     const asset = this.getMedia({ mediaId, brandId });
 
+    if (targetStatus === MediaLifecycle.STATES.READY) {
+      const err = new Error('Status READY hanya boleh diterbitkan setelah MediaProcessor menyelesaikan pipeline. Gunakan processMedia().');
+      err.code = 'MEDIA_PROCESSING_REQUIRED';
+      throw err;
+    }
+
     MediaLifecycle.assertTransition(asset.status, targetStatus);
 
     this.mediaRepo.updateStatus(mediaId, brandId, targetStatus, { error_message: errorMessage });
@@ -154,59 +160,12 @@ class MediaService {
   }
 
   /**
-   * Mark asset as READY (pipeline completion).
-   * Moves storage from staging to permanent brand directory if needed.
+   * Compatibility alias for the historical READY endpoint.
+   * It MUST execute the canonical processing pipeline; it must never publish
+   * an unprocessed staging/original binary as READY.
    */
-  async markReady({ mediaId, brandId }) {
-    const asset = this.getMedia({ mediaId, brandId });
-
-    // In M1, asset can transition from temporary -> ready (or uploaded/processing -> ready)
-    if (asset.status === MediaLifecycle.STATES.TEMPORARY) {
-      MediaLifecycle.assertTransition(asset.status, MediaLifecycle.STATES.UPLOADED);
-      this.mediaRepo.updateStatus(mediaId, brandId, MediaLifecycle.STATES.UPLOADED);
-    }
-
-    MediaLifecycle.assertTransition(asset.status === MediaLifecycle.STATES.TEMPORARY ? MediaLifecycle.STATES.UPLOADED : asset.status, MediaLifecycle.STATES.READY);
-
-    // Move file to permanent location if in staging
-    let finalKey = asset.storage_key;
-    if (asset.storage_key.startsWith('staging/')) {
-      const ext = asset.mime_type === 'image/jpeg' ? 'jpg' : (asset.mime_type === 'image/webp' ? 'webp' : 'png');
-      const permKey = `${asset.asset_type || 'assets'}/${brandId}/${mediaId}.${ext}`;
-      const data = await this.storage.read(asset.storage_key);
-      await this.storage.write(permKey, data);
-      await this.storage.delete(asset.storage_key);
-      finalKey = permKey;
-
-      // Update storage key in database
-      this.mediaRepo.db.execute(
-        'UPDATE media_assets SET storage_key = ? WHERE id = ? AND brand_id = ?',
-        [finalKey, mediaId, brandId]
-      );
-    }
-
-    this.mediaRepo.updateStatus(mediaId, brandId, MediaLifecycle.STATES.READY);
-    const updated = this.mediaRepo.findById(mediaId, brandId);
-    return this._formatAssetResponse(updated);
-  }
-
-  /**
-   * Retry processing for a FAILED asset.
-   */
-  async retryFailed({ mediaId, brandId }) {
-    const asset = this.getMedia({ mediaId, brandId });
-
-    if (asset.status !== MediaLifecycle.STATES.FAILED) {
-      const err = new Error(`Hanya aset berstatus 'failed' yang dapat di-retry. Status saat ini: '${asset.status}'.`);
-      err.code = 'INVALID_LIFECYCLE_TRANSITION';
-      throw err;
-    }
-
-    MediaLifecycle.assertTransition(asset.status, MediaLifecycle.STATES.PROCESSING);
-    this.mediaRepo.updateStatus(mediaId, brandId, MediaLifecycle.STATES.PROCESSING);
-
-    const updated = this.mediaRepo.findById(mediaId, brandId);
-    return this._formatAssetResponse(updated);
+  async markReady({ mediaId, brandId, cropSpec = null }) {
+    return this.processMedia({ mediaId, brandId, cropSpec });
   }
 
   /**
