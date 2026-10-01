@@ -523,3 +523,38 @@ The concept is technically feasible and can become the single forward Xentra mod
 However, **this document deliberately does not lock it yet**. The critical next step is to validate the human workflow and complete the dependency audit before replacing the current `products.name → Customer title` contract.
 
 Until then, no client-specific MyBangjo fork is required and no Xentra-vs-MyBangjo divergence is being introduced.
+
+
+## 5A. Product Normal vs Product Paket — Pre-lock Direction
+
+### Product Normal
+
+A normal Product identity is:
+
+```
+Category + Sub Category + Rasa
+```
+
+Add-ons are optional purchase-time additions and are not part of the Product identity.
+
+### Product Paket
+
+A Paket is itself a sellable Product/bundle identity. Its fixed contents are a composition of references to existing Products:
+
+```
+Paket Product
+  ├── component_product_id → Product A
+  ├── component_product_id → Product B
+  ├── component_product_id → Product C
+  └── ...
+```
+
+The Paket does not copy component names or stock values into independent inventory records.
+
+A Paket is a **bundle price over existing Product IDs**. When the Paket is sold, Core must resolve its component Product IDs and apply the corresponding stock/inventory effects to those underlying Products according to the inventory contract.
+
+The component Product IDs remain the source of truth for item identity, stock, reporting references, and historical traceability. The Paket has its own sellable Product identity so that the bundle can have its own customer presentation, price, availability, and promotion eligibility without duplicating the underlying Products.
+
+A separate Paket composition relation is preferred over encoding the bundle as free text or as reusable Complement records.
+
+**Pre-lock note:** the exact order-snapshot and revenue/reporting treatment of a Paket versus its component Products still requires explicit validation before lock.
