@@ -5456,6 +5456,15 @@ input[type="file"].x-input,
     border-color: #334155;
     box-shadow: 0 0 0 2px rgba(51, 65, 85, 0.15);
   }
+  /* State disabled: tetap terbaca, tapi tidak bisa dibuka. */
+  .x-occ-dropdown-trigger:disabled,
+  .x-occ-dropdown.is-disabled .x-occ-dropdown-trigger {
+    background: #f1f5f9;
+    border-color: #e2e8f0;
+    color: #94a3b8;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
   .x-occ-dropdown-trigger #occ-period-current-label {
     flex: 1 1 auto;
     white-space: nowrap;
@@ -5471,26 +5480,47 @@ input[type="file"].x-input,
   .x-occ-dropdown-trigger[aria-expanded="true"] .x-occ-chevron-icon {
     transform: rotate(180deg);
   }
-  .x-occ-dropdown-menu {
+  /* Permukaan menu: satu kontrak untuk SEMUA dropdown owner mobile — dipakai
+     dropdown filter kategori (Produk Master), pemilih periode, filter keuangan,
+     filter pesanan, dan pemilih cabang. */
+  .x-occ-dropdown-menu,
+  .x-branch-dropdown-menu {
     position: absolute;
     top: calc(100% + 6px);
-    left: 0;
-    right: 0;
     background: #ffffff;
     border: 1px solid #e2e8f0;
     border-radius: 14px;
     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
     padding: 6px;
-    z-index: 100;
+    /* Di atas bottom nav (200); tetap di bawah bottom sheet (1050) dan modal (9999). */
+    z-index: 220;
     display: none;
     flex-direction: column;
     gap: 2px;
+    /* Tidak boleh keluar viewport: dibatasi tinggi layar dan bisa di-scroll. */
+    max-height: min(320px, 50dvh);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    box-sizing: border-box;
   }
-  .x-occ-dropdown.open .x-occ-dropdown-menu {
+  .x-occ-dropdown-menu {
+    left: 0;
+    right: 0;
+  }
+  /* Pemilih cabang: menu mengikuti lebar nama cabang, bukan lebar trigger topbar. */
+  .x-branch-dropdown-menu {
+    left: 0;
+    right: auto;
+    min-width: 200px;
+    max-width: 280px;
+  }
+  .x-occ-dropdown.open .x-occ-dropdown-menu,
+  .x-branch-dropdown.open .x-branch-dropdown-menu {
     display: flex;
-    animation: occDropdownFadeIn 0.15s ease-out;
+    animation: xOwnerDropdownIn 0.15s ease-out;
   }
-  @keyframes occDropdownFadeIn {
+  @keyframes xOwnerDropdownIn {
     from {
       opacity: 0;
       transform: translateY(-6px);
@@ -5500,7 +5530,9 @@ input[type="file"].x-input,
       transform: translateY(0);
     }
   }
-  .x-occ-dropdown-item {
+  /* Item: padding touch-friendly; aktif = abu-abu sangat muda + checkmark kanan. */
+  .x-occ-dropdown-item,
+  .x-branch-dropdown-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -5518,23 +5550,91 @@ input[type="file"].x-input,
     -webkit-tap-highlight-color: transparent;
     box-sizing: border-box;
   }
-  .x-occ-dropdown-item:hover {
+  .x-branch-dropdown-item {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .x-occ-dropdown-item:hover,
+  .x-branch-dropdown-item:hover {
     background: #f1f5f9;
     color: #0f172a;
   }
-  .x-occ-dropdown-item.active {
+  .x-occ-dropdown-item.active,
+  .x-branch-dropdown-item.active {
     background: #f8fafc;
     color: #0f172a;
     font-weight: 700;
   }
-  .x-occ-dropdown-item .x-occ-check-icon {
+  .x-occ-dropdown-item .x-occ-check-icon,
+  .x-branch-dropdown-item .x-branch-check-icon {
     opacity: 0;
     color: #0f172a;
     flex-shrink: 0;
     transition: opacity 0.12s ease;
   }
-  .x-occ-dropdown-item.active .x-occ-check-icon {
+  .x-occ-dropdown-item.active .x-occ-check-icon,
+  .x-branch-dropdown-item.active .x-branch-check-icon {
     opacity: 1;
+  }
+
+  /* Select native memakai kontrak visual yang sama supaya tidak terlihat seperti
+     select desktop yang diperkecil. Picker-nya tetap native — paling nyaman di HP. */
+  body:not(.x-merchant-app) select {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 42px;
+    min-height: 42px;
+    padding: 0 36px 0 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    background-color: #f8fafc;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    color: #0f172a;
+    font-size: 14px;
+    font-weight: 700;
+    font-family: inherit;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body:not(.x-merchant-app) select:focus-visible {
+    outline: none;
+    border-color: #334155;
+    background-color: #ffffff;
+    box-shadow: 0 0 0 2px rgba(51, 65, 85, 0.15);
+  }
+  body:not(.x-merchant-app) select:disabled {
+    background-color: #f1f5f9;
+    border-color: #e2e8f0;
+    color: #94a3b8;
+    cursor: not-allowed;
+  }
+
+  /* Select native yang sudah dikonversi ke dropdown kustom tetap ada di DOM
+     sebagai sumber nilai; disembunyikan secara visual (bukan display:none supaya
+     nilainya tetap ikut terkirim bersama form). */
+  .x-owner-select-source {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    margin: -1px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    overflow: hidden !important;
+    clip-path: inset(50%) !important;
+    white-space: nowrap !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+  /* Host dropdown hasil konversi mengambil lebar penuh seperti select aslinya. */
+  .x-owner-select-dropdown {
+    display: block;
+    width: 100%;
   }
   .x-occ-period-selector-wrap {
     position: relative;
