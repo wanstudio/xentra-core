@@ -4359,6 +4359,11 @@ async function loadMenusView() {
       _masterMenuSelected.flavor_id = flavorSelect.value || '';
       renderMasterMenuCustomerPreview();
     });
+    var nameInput = $('prod-name');
+    if (nameInput) nameInput.addEventListener('input', function() {
+      renderMasterMenuCustomerPreview();
+    });
+
     var priceInput = $('prod-price');
     if (priceInput) priceInput.addEventListener('input', function() {
       renderMasterMenuCustomerPreview();
@@ -4521,27 +4526,8 @@ async function loadMenusView() {
       });
     }
 
-    // Nama internal master diturunkan dari Kategori + Rasa, misalnya
-    // "Bebek Goreng" + "Sambal Ijo" => "Bebek Goreng Sambal Ijo".
-    //
-    // Nilai ini yang dipakai order, dapur, struk, dan laporan — jadi harus ada. Tidak
-    // ditampilkan ke pelanggan: pelanggan melihat judul + subjudul yang disusun dari
-    // komposisi Master. Fieldnya sendiri tersembunyi, jadi tidak mungkin diketik.
-    function selectedOptionText(select) {
-      if (!select || select.selectedIndex < 0) return '';
-      var option = select.options[select.selectedIndex];
-      // Lewati opsi placeholder (mis. "Pilih Kategori") yang nilainya kosong.
-      if (!option || !String(option.value || '').trim()) return '';
-      return String(option.textContent || '').trim();
-    }
-
-    function deriveMasterProductName() {
-      return [
-        selectedOptionText($('prod-category')),
-        selectedOptionText($('prod-flavor'))
-      ].filter(Boolean).join(' ');
-    }
-
+    // Product name is a first-class Master Product identity and the
+    // authoritative Customer card title. Kategori is only the grouping/reference.
     // Form Master Product Submit
     var formProduct = $('form-product');
     if (formProduct) {
@@ -4550,9 +4536,8 @@ async function loadMenusView() {
         var id = $('prod-id').value;
         var pricingMode = $('prod-pricing-mode').value;
         var payload = {
-          // Diturunkan dari pilihan Kategori + Rasa. $('prod-name') tetap dipakai
-          // sebagai cadangan kalau keduanya belum terpilih.
-          name: deriveMasterProductName() || $('prod-name').value,
+          // Product name is explicit user input and is the Customer card title.
+          name: $('prod-name').value.trim(),
           category_id: $('prod-category').value,
           price: Number($('prod-price').value),
           regular_price: Number($('prod-regular-price').value || $('prod-price').value),
