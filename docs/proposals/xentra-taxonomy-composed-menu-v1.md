@@ -717,3 +717,54 @@ Product lifecycle remains controlled by the existing explicit Product actions:
 - Active / inactive toggle.
 
 This preserves the existing Owner mental model that changing one identity dimension does not silently remove an existing menu. The Owner explicitly decides whether the original Product should remain available.
+
+
+## 🔒 LOCKED SUB-DECISION — Category Change Warning & Downstream Reset
+
+**Decision date:** 2026-10-01
+
+When an Owner changes the Category of an existing Product during Product Edit, the UI must warn before applying the downstream reset.
+
+The warning exists to prevent accidental "data disappearance" surprises when a user is only experimenting with the selector.
+
+Conceptual behavior:
+
+\`\`\`
+Current:
+Category      Ayam
+Sub Category  Ayam Bakar
+Rasa          Original
+
+User selects:
+Category → Minuman
+\`\`\`
+
+Show confirmation:
+
+\`\`\`
+Kategori diubah
+
+Mengubah Kategori akan mengosongkan Sub Kategori dan Rasa yang sekarang dipilih.
+
+[ Batal ] [ Lanjutkan ]
+                         ×
+\`\`\`
+
+If the user continues:
+
+\`\`\`
+Category      Minuman
+Sub Category  <empty>
+Rasa          <empty>
+\`\`\`
+
+If the user cancels or closes the warning:
+
+- keep the previous Category;
+- keep the previous Sub Category;
+- keep the previous Rasa;
+- do not mutate the Product draft.
+
+The reset occurs at the **draft/UI state** first. Persistence happens only when the Owner saves the Product.
+
+The same rule applies when the Category is changed from one valid parent to another; the system must not attempt to preserve Sub Category/Rasa by matching names.
