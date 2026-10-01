@@ -1,5 +1,7 @@
 'use strict';
 
+const sharp = require('sharp');
+
 /**
  * Helper to generate minimal valid 100% compliant image buffers
  * for testing without external native libraries (Sharp, Canvas, etc.)
@@ -65,24 +67,13 @@ function crc32(buf) {
   return (crc ^ (-1)) >>> 0;
 }
 
-// 2. Generate a minimal valid JPEG buffer with SOF0 header
-function createJpegBuffer(width, height) {
-  const soi = Buffer.from([0xFF, 0xD8]);
-  // SOF0 marker: FF C0, length 17, precision 8, height, width, 3 components
-  const sof0 = Buffer.alloc(19);
-  sof0[0] = 0xFF;
-  sof0[1] = 0xC0;
-  sof0.writeUInt16BE(17, 2); // length
-  sof0[4] = 8; // 8-bit precision
-  sof0.writeUInt16BE(height, 5);
-  sof0.writeUInt16BE(width, 7);
-  sof0[9] = 3; // 3 components (Y, Cb, Cr)
-  sof0[10] = 1; sof0[11] = 0x11; sof0[12] = 0;
-  sof0[13] = 2; sof0[14] = 0x11; sof0[15] = 0;
-  sof0[16] = 3; sof0[17] = 0x11; sof0[18] = 0;
-
-  const eoi = Buffer.from([0xFF, 0xD9]);
-  return Buffer.concat([soi, sof0, eoi]);
+// 2. Generate a real, decoder-valid JPEG buffer with the requested dimensions.
+// This helper is async because Sharp is the authoritative encoder used by the runtime.
+async function createJpegBuffer(width, height) {
+  const raw = Buffer.alloc(width * height * 3, 0x80);
+  return sharp(raw, { raw: { width, height, channels: 3 } })
+    .jpeg({ quality: 80, chromaSubsampling: '4:2:0' })
+    .toBuffer();
 }
 
 // 3. Generate a minimal valid WebP buffer with VP8 chunk
