@@ -74,7 +74,7 @@ class CatalogRepository {
         p.pricing_mode,
         p.min_price,
         p.max_price,
-        COALESCE(bp.image_override, p.image_url) as image_url,
+        p.image_url as image_url,
         p.options_config,
         p.sort_order,
         bp.price as branch_raw_price,
@@ -140,7 +140,7 @@ class CatalogRepository {
         bp.product_id as id,
         COALESCE(bp.name_override, p.name) as name,
         COALESCE(bp.description_override, p.description) as description,
-        COALESCE(bp.image_override, p.image_url) as image_url,
+        p.image_url as image_url,
         bp.price,
         bp.stock,
         bp.is_available
