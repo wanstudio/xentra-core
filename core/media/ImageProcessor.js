@@ -168,8 +168,14 @@ class ImageProcessor {
       throw new Error('Valid source image buffer is required for processing.');
     }
 
-    // 1. Inspect source
-    const sourceMeta = await this.inspect(sourceBuffer);
+    // 1. Normalize EXIF orientation before crop coordinates are interpreted.
+    // Mobile-camera previews commonly reflect EXIF orientation; canonical server
+    // pixels must be physically oriented the same way before cropping.
+    const orientedSourceBuffer = await sharp(sourceBuffer, { failOnError: false })
+      .rotate()
+      .toBuffer();
+
+    const sourceMeta = await this.inspect(orientedSourceBuffer);
 
     // 2. Resolve & clamp CropSpec
     const resolvedCrop = this.resolveCropSpec({
@@ -181,7 +187,7 @@ class ImageProcessor {
 
     // 3. Prepare base cropped sharp instance
     // Note: Do not call withMetadata(), ensuring EXIF/GPS/IPTC/XMP/ICC metadata is stripped from output
-    const croppedPipeline = sharp(sourceBuffer, { failOnError: false })
+    const croppedPipeline = sharp(orientedSourceBuffer, { failOnError: false })
       .extract({
         left: resolvedCrop.x,
         top: resolvedCrop.y,
