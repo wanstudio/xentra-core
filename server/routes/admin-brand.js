@@ -85,8 +85,7 @@ router.get('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
 
 router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
-    const { name, primary_color, custom_domain, tagline, banners, merchant_pwa_name, pos_pwa_name } = req.body;
-    const bannersJson = banners ? (typeof banners === 'string' ? banners : JSON.stringify(banners)) : null;
+    const { name, primary_color, custom_domain, tagline, merchant_pwa_name, pos_pwa_name } = req.body;
 
     let normalizedPrimaryColor = undefined;
     if (primary_color !== undefined && primary_color !== null) {
@@ -96,7 +95,7 @@ router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
       let cleanHex = primary_color.trim();
       if (!cleanHex.startsWith('#')) cleanHex = '#' + cleanHex;
       if (/^#[0-9a-fA-F]{3}$/.test(cleanHex)) {
-        cleanHex = '#' + cleanHex[1] + cleanHex[1] + cleanHex[2] + cleanHex[2] + cleanHex[3] + cleanHex[3];
+        cleanHex = '#' + cleanHex[1] + cleanHex[1] + cleanHex[2] + cleanHex[3] + cleanHex[3];
       }
       if (!/^#[0-9a-fA-F]{6}$/.test(cleanHex)) {
         return res.status(400).json({ success: false, error: 'Format warna tema (hex) tidak valid. Gunakan format #RRGGBB.' });
@@ -104,16 +103,14 @@ router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
       normalizedPrimaryColor = cleanHex.toUpperCase();
     }
 
+    // Generic brand settings never mutate media references. Logo, installed PWA
+    // icons, and banners must be changed through canonical media endpoints.
     db.prepare(`
-      UPDATE brands 
+      UPDATE brands
       SET name = COALESCE(?, name),
           primary_color = COALESCE(?, primary_color),
-          logo_url = COALESCE(?, logo_url),
           custom_domain = COALESCE(?, custom_domain),
           tagline = COALESCE(?, tagline),
-          banners = COALESCE(?, banners),
-          merchant_pwa_icon_url = CASE WHEN ? = 1 THEN ? ELSE merchant_pwa_icon_url END,
-          pos_pwa_icon_url = CASE WHEN ? = 1 THEN ? ELSE pos_pwa_icon_url END,
           merchant_pwa_name = CASE WHEN ? = 1 THEN ? ELSE merchant_pwa_name END,
           pos_pwa_name = CASE WHEN ? = 1 THEN ? ELSE pos_pwa_name END,
           updated_at = datetime('now')
@@ -123,28 +120,25 @@ router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
       normalizedPrimaryColor !== undefined ? normalizedPrimaryColor : null,
       custom_domain !== undefined ? custom_domain : null,
       tagline !== undefined ? tagline : null,
-      bannersJson,
       merchant_pwa_name !== undefined ? 1 : 0,
       merchant_pwa_name !== undefined ? (typeof merchant_pwa_name === 'string' ? merchant_pwa_name.trim() || null : null) : null,
       pos_pwa_name !== undefined ? 1 : 0,
       pos_pwa_name !== undefined ? (typeof pos_pwa_name === 'string' ? pos_pwa_name.trim() || null : null) : null,
       req.brand_id
     );
-    // P1.2: brand row written → drop the cached hostname→brand mapping so the
-    // new profile/domain is authoritative immediately.
+
     CoreBrandRepo.clearCustomDomainCache();
 
-    const freshBrand = db.prepare('SELECT * FROM brands WHERE id = ?').get(req.brand_id);
-    if (req.brand && freshBrand) {
-      Object.assign(req.brand, freshBrand);
-    }
-
+    const targetBrand = db.prepare('SELECT * FROM brands WHERE id = ?').get(req.brand_id) || req.brand;
     let parsedBanners = [];
     try {
-      parsedBanners = bannersJson ? JSON.parse(bannersJson) : (typeof req.brand.banners === 'string' ? JSON.parse(req.brand.banners) : req.brand.banners);
-    } catch (_) {}
+      parsedBanners = targetBrand && targetBrand.banners
+        ? (typeof targetBrand.banners === 'string' ? JSON.parse(targetBrand.banners) : targetBrand.banners)
+        : [];
+    } catch (_) {
+      parsedBanners = [];
+    }
 
-    const targetBrand = freshBrand || req.brand;
     res.json({
       success: true,
       message: 'Pengaturan brand dan tema berhasil diperbarui.',
