@@ -509,90 +509,22 @@ router.post('/admin/media/entity/branches/:branchId/categories/:catId/image',
   }
 );
 
-// ---- Branch Product Image Override (M5 canonical) ----
+// ---- Branch Product Image Override (LOCKED: disabled) ----
 
 /**
- * POST /admin/media/entity/branches/:branchId/products/:productId/image
- * Upload, process, and attach canonical media as branch product image override.
+ * POST /admin/media/entity/:branchId/products/:productId/image
+ *
+ * Branch Product photos are not an independent media source. The canonical
+ * Master Product Owner owns the photo; a branch may not upload/override it.
+ * Keep this compatibility endpoint quarantined so stale clients fail closed.
  */
 router.post('/admin/media/entity/branches/:branchId/products/:productId/image',
   requireAuth(['owner', 'brand_manager', 'branch_manager']),
-  async (req, res) => {
-    try {
-      if (req.user.role === 'branch_manager') {
-        const assignedBranchId = req.user.branchId || req.user.branch_id;
-        if (assignedBranchId && assignedBranchId !== req.params.branchId) {
-          return res.status(403).json({ success: false, error: 'FORBIDDEN_BRANCH_SCOPE', code: 'FORBIDDEN_BRANCH_SCOPE' });
-        }
-      }
-
-      const branch = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(req.params.branchId, req.brand_id);
-      if (!branch) return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan.', code: 'BRANCH_NOT_FOUND' });
-
-      const bp = db.prepare('SELECT branch_id, image_media_id FROM branch_products WHERE branch_id = ? AND product_id = ?')
-        .get(req.params.branchId, req.params.productId);
-      if (!bp) return res.status(404).json({ success: false, error: 'Produk tidak ditemukan di katalog cabang ini.', code: 'BRANCH_PRODUCT_NOT_FOUND' });
-
-      const { image_base64, mime_type, original_filename, crop_spec } = req.body || {};
-      if (!image_base64) {
-        return res.status(400).json({ success: false, error: 'Data gambar produk cabang wajib diunggah.', code: 'MISSING_IMAGE_DATA' });
-      }
-
-      const oldMediaId = bp.image_media_id || null;
-
-      const asset = await runEntityMediaPipeline({
-        brandId: req.brand_id,
-        tenantId: req.brand ? req.brand.organization_id : null,
-        userId: req.user ? req.user.id : null,
-        imageBase64: image_base64,
-        mimeType: mime_type,
-        originalFilename: original_filename,
-        assetType: 'product',
-        cropSpec: crop_spec || null
-      });
-
-      await mediaService.attachToEntity({
-        mediaId: asset.media_id,
-        brandId: req.brand_id,
-        entityType: 'branch_product',
-        entityId: `${req.params.branchId}:${req.params.productId}`
-      });
-
-      if (oldMediaId && oldMediaId !== asset.media_id) {
-        await mediaService.unlinkMedia({ mediaId: oldMediaId, brandId: req.brand_id }).catch(() => {});
-      }
-
-      const previewUrl = resolvePreviewUrl(asset, 320);
-
-      try {
-        db.prepare("UPDATE branch_products SET image_media_id = ?, image_override = ?, updated_at = datetime('now') WHERE branch_id = ? AND product_id = ?")
-          .run(asset.media_id, previewUrl || asset.url, req.params.branchId, req.params.productId);
-      } catch (e) {
-        if (String(e).includes('no such column: image_media_id')) {
-          db.prepare("UPDATE branch_products SET image_override = ?, updated_at = datetime('now') WHERE branch_id = ? AND product_id = ?")
-            .run(previewUrl || asset.url, req.params.branchId, req.params.productId);
-        } else throw e;
-      }
-
-      res.status(201).json({
-        success: true,
-        message: 'Gambar produk cabang berhasil diproses dan dikaitkan.',
-        asset,
-        preview_url: previewUrl,
-        product: {
-          branch_id: req.params.branchId,
-          product_id: req.params.productId,
-          media_id: asset.media_id,
-          image_url: previewUrl || asset.url,
-          image_override: previewUrl || asset.url
-        }
-      });
-    } catch (err) {
-      const statusCode = err.code === 'UNAUTHORIZED_TENANT' ? 403 : 400;
-      console.error('[M5 POST /admin/media/entity/branches/:branchId/products/:productId/image]:', err.message);
-      res.status(statusCode).json({ success: false, error: err.message, code: err.code || 'BRANCH_PRODUCT_IMAGE_ERROR' });
-    }
-  }
+  (req, res) => res.status(410).json({
+    success: false,
+    error: 'Foto Menu Cabang dinonaktifkan. Foto ditentukan oleh Master Product Owner.',
+    code: 'BRANCH_PRODUCT_IMAGE_OVERRIDE_DISABLED'
+  })
 );
 
 /**
