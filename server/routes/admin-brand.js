@@ -1,18 +1,14 @@
 /**
  * XENTRA CORE — ADMIN BRAND ROUTES
  *
- * Brand profile/theme plus legacy logo and banner endpoints.
- * Canonical entity media lifecycle remains in media-upload.js/media-entities.js.
+ * Brand profile/theme plus compatibility upload adapters.
+ * Every client image upload is processed through the canonical Media System.
  */
 'use strict';
 
 module.exports = function registerAdminBrandRoutes(router, deps) {
   const {
     db,
-    path,
-    fs,
-    crypto,
-    ImageValidator,
     requireAuth,
     serializePublicBrand,
     coreBrandRepo,
