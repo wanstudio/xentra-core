@@ -191,16 +191,18 @@ router.post('/admin/media/upload', requireAuth(['owner', 'brand_manager', 'branc
   }
 });
 
-// Mark asset as READY (completing upload pipeline)
+// Compatibility endpoint: publish READY only through the canonical image-processing pipeline.
 router.post('/admin/media/:id/ready', requireAuth(['owner', 'brand_manager', 'branch_manager']), async (req, res) => {
   try {
+    const { crop_spec } = req.body || {};
     const asset = await mediaService.markReady({
       mediaId: req.params.id,
-      brandId: req.brand_id
+      brandId: req.brand_id,
+      cropSpec: crop_spec || null
     });
     res.json({
       success: true,
-      message: 'Media siap digunakan.',
+      message: 'Media telah diproses dan siap digunakan.',
       asset
     });
   } catch (err) {
