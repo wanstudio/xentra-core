@@ -664,3 +664,26 @@ The system must first check whether the target identity already exists.
 - The original Product remains historically stable according to Product lifecycle rules; it is not silently mutated into a different identity.
 
 This is a UX/domain contract: **"edit identity" is presented as an edit workflow, while Core preserves immutable Product identity underneath.**
+
+
+## 🔒 LOCKED SUB-DECISION — Duplicate Identity Recovery UI
+
+**Decision date:** 2026-10-01
+
+When an Owner changes a Product Identity component and the target identity already exists, Core must not create a duplicate Product.
+
+The Product Editor presents a modal overlay explaining the conflict and provides:
+
+[ Buka Produk yang Sudah Ada ]   [ Batal ]
+
+The overlay also has the standard \`×\` close control.
+
+Behavior:
+
+- **Buka Produk yang Sudah Ada** → close the conflict modal and navigate/open the existing target Product in the Product Editor.
+- **Batal** → close the conflict modal and keep the current Product Editor state unchanged.
+- **×** → same dismissal semantics as Batal.
+- The system must not silently merge two Products.
+- The system must not silently overwrite the existing target Product.
+
+The exact copy can be refined during UI implementation, but the CTA behavior and recovery semantics are fixed for this proposal.
