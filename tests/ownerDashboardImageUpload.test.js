@@ -235,6 +235,25 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
     assert.ok(added.image_url.endsWith('.webp'));
   });
 
+  await t.test('6b. Banner: arbitrary external URL containing a known media id is rejected', async () => {
+    const mediaIdMatch = String(added.image_url).match(/\/(med_[^/]+)\//);
+    assert.ok(mediaIdMatch, 'canonical banner URL should contain its media id');
+    const attackerUrl = 'https://evil.example/image.png?ref=' + encodeURIComponent(mediaIdMatch[1]);
+
+    const res = await makeRequest(server, {
+      path: '/api/v1/admin/banners',
+      method: 'POST',
+      headers: { Authorization: `Bearer ${ownerToken}` }
+    }, {
+      image_url: attackerUrl,
+      title: 'Should Be Rejected'
+    });
+
+    assert.strictEqual(res.status, 400);
+    assert.strictEqual(res.body.success, false);
+    assert.strictEqual(res.body.code, 'EXTERNAL_MEDIA_URL_REJECTED');
+  });
+
   // CORRECTED: Per locked media contract, non-square SOURCE images must be ACCEPTED at intake for banners.
   // A square (1:1) source for a banner is also a valid source — the crop editor handles the 1.94:1 output.
   // enforceAspectRatio defaults to false — do NOT reject valid sources for wrong source ratio.
