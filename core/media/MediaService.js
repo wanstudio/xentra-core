@@ -215,7 +215,7 @@ class MediaService {
    * 2. Attach new asset to entity
    * 3. Mark old asset as ORPHAN (with 30-day grace period timestamp)
    */
-  async replaceEntityMedia({ newMediaId, oldMediaId, brandId, entityType, entityId }) {
+  async replaceEntityMedia({ newMediaId, oldMediaId, brandId, entityType, entityId, manageTransaction = true }) {
     const newAsset = this.getMedia({ mediaId: newMediaId, brandId });
 
     if (!MediaLifecycle.canAttach(newAsset.status)) {
@@ -224,9 +224,9 @@ class MediaService {
       throw err;
     }
 
-    // Media-table replacement is transactional. The business entity row is
-    // intentionally updated by the owning route/repository after this succeeds.
-    this.mediaRepo.beginTransaction();
+    // Media-table replacement is transactional when this service owns the transaction.
+    // Callers that already hold a DB transaction must pass manageTransaction=false.
+    if (manageTransaction) this.mediaRepo.beginTransaction();
     try {
       this.mediaRepo.attachMedia(newMediaId, brandId, entityType, entityId);
 
@@ -238,9 +238,11 @@ class MediaService {
         }
       }
 
-      this.mediaRepo.commitTransaction();
+      if (manageTransaction) this.mediaRepo.commitTransaction();
     } catch (err) {
-      try { this.mediaRepo.rollbackTransaction(); } catch (_) {}
+      if (manageTransaction) {
+        try { this.mediaRepo.rollbackTransaction(); } catch (_) {}
+      }
       throw err;
     }
 
