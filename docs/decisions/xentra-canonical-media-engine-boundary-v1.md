@@ -122,6 +122,16 @@ Current policy:
 - Branch Product Photo Override remains quarantined and returns an explicit 410 because the forward architecture does not authorize branch-owned product photo overrides.
 - Branch catalog resolution always uses the Master Product photo; legacy `branch_products.image_override` is not an active customer-facing photo source.
 
+## 7.5 Media slot and lifecycle boundary
+
+Media Engine entity attachment is type-safe and lifecycle-safe:
+
+- A media asset may only attach to an approved entity type whose slot matches the asset semantic `asset_type`.
+- Canonical slot mappings include `logo`, `product`, `category`, `banner`, `avatar`, `pwa_icon`, and `promotion`.
+- Generic media attach/replace HTTP mutations are manager-only compatibility boundaries; branch roles use slot-specific adapters instead.
+- `READY` is a published state, not an upload shortcut. Direct lifecycle mutation to `READY` is forbidden; `MediaService.processMedia()` is the normal publication path after ImageProcessor completion.
+- The historical `/admin/media/:id/ready` endpoint is retained only as a compatibility alias and delegates to the canonical processing pipeline.
+
 ## 7. Generic settings boundary
 
 Generic Brand/Profile settings are not media mutation APIs.
