@@ -63,6 +63,75 @@ These policy limits are the authoritative product limits. M1 implementation must
 
 The architecture must remain compatible with future resumable/chunked uploads for unreliable mobile networks and large files. Resumable upload is not required for M1.
 
+## 🔒 Canonical Single Media Engine Boundary v1
+
+**Status:** LOCKED / AUTHORITATIVE  
+**Decision date:** 2026-10-01  
+**Source of truth:** `docs/decisions/xentra-canonical-media-engine-boundary-v1.md`
+
+All client-supplied image media must pass one canonical server-side Media Engine before the binary can become an active entity asset.
+
+Canonical boundary:
+
+```text
+Client file selection
+      ↓
+UI preflight (format/size UX only)
+      ↓
+MediaService.stageUpload()
+      ↓
+ImageValidator
+      ↓
+CropSpec (user intent)
+      ↓
+ImageProcessor
+  ├─ normalize EXIF orientation
+  ├─ crop to canonical asset ratio
+  ├─ resize without upscaling
+  ├─ optimize/compress
+  └─ encode delivery derivatives as WebP
+      ↓
+media_variants / READY
+      ↓
+Attach / replace entity reference
+      ↓
+Customer / Merchant / POS delivery
+```
+
+### Engine invariants
+
+- Routes and repositories must never write uploaded image binaries directly.
+- Generic business/profile settings endpoints must not accept or mutate image/media URLs as a substitute for media operations.
+- Canonical uploads are binary uploads; arbitrary external image URLs are not accepted as new media.
+- Every canonical image slot uses `media_id` plus optimized delivery variants; legacy URL columns may be synchronized for compatibility only.
+- Crop UI produces intent (`CropSpec`), not authoritative pixels.
+- Server processing re-orients mobile-camera images before interpreting crop coordinates.
+- Product, Category, Logo, Avatar = 1:1 canonical crop; Banner = approximately 1.94:1.
+- The server rejects CropSpec values whose crop ratio is incompatible with the asset type.
+- Delivery derivatives use WebP and the locked compression configuration; originals are never used as the normal customer-facing delivery asset.
+- User cancellation of crop selection discards the new selection. There is no uncropped-upload bypass hidden behind `Batal`.
+- UI upload instructions must mirror the authoritative asset limits and state that crop/resize/compression are automatic where applicable.
+- Legacy compatibility routes may remain temporarily, but their binary handling must still delegate to the canonical Media Engine. A route that bypasses the engine is not an allowed compatibility path.
+
+### Current canonical slot mapping
+
+| Slot | Max input | Canonical output |
+|---|---:|---|
+| Brand Logo | 10 MB | 1:1 WebP derivatives |
+| Master Product | 20 MB | 1:1 WebP derivatives |
+| Category | 15 MB | 1:1 WebP derivatives |
+| Banner | 20 MB | ~1.94:1 WebP derivatives |
+| Avatar | 10 MB | 1:1 WebP derivatives |
+| Merchant/Owner PWA icon | 10 MB | 1:1 WebP derivatives |
+| POS PWA icon | 10 MB | 1:1 WebP derivatives |
+| Promotion icon | 10 MB | 1:1 WebP derivatives |
+
+Merchant-facing instruction is intentionally: **upload the normal original photo; Xentra handles crop, resize, compression, and optimized delivery automatically.**
+
+### Governance
+
+Future upload slots, media endpoints, crop editors, image settings, or profile/logo APIs must reuse this engine rather than introduce another upload pipeline. A new media path is not canonical until it is wired through `MediaService` + `ImageValidator` + `ImageProcessor` and covered by regression tests.
+
 ## Crop & Processing Contract
 
 - Users may upload non-square/non-canonical source images.
