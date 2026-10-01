@@ -124,6 +124,9 @@ Current policy:
 
 ## 7.5 Media slot and lifecycle boundary
 
+Brand-owned media binding is transactionally paired with the owning Brand reference: attach/replace or unlink cannot commit half of the relationship. Post-processing publication remains a separate canonical transaction boundary.
+
+
 Media Engine entity attachment is type-safe and lifecycle-safe:
 
 - A media asset may only attach to an approved entity type whose slot matches the asset semantic `asset_type`.
