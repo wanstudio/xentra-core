@@ -212,7 +212,16 @@ test('MEDIA ENGINE — canonical boundary contract', async (t) => {
     assert.match(mediaRoutes, /\/admin\/media\/replace', requireAuth\(\['owner', 'brand_manager'\]\)/);
   });
 
-  await t.test('17. READY cannot bypass image processing', () => {
+  await t.test('17. Brand media binding/unlink is transactionally paired with Brand references', () => {
+    const brandCode = fs.readFileSync(path.join(ROOT, 'server/routes/admin-brand.js'), 'utf8');
+    assert.match(brandCode, /bindBrandMediaAtomically/);
+    assert.match(brandCode, /unlinkBrandMediaAtomically/);
+    assert.match(brandCode, /manageTransaction: false/);
+    assert.match(brandCode, /persistReference: function \(\) \{ coreBrandRepo\.updateBrandLogoMedia/);
+    assert.match(brandCode, /clearReference: function \(\) \{ coreBrandRepo\.removeBrandLogoMedia/);
+  });
+
+  await t.test('18. READY cannot bypass image processing', () => {
     const lifecycleCode = fs.readFileSync(path.join(ROOT, 'core/media/MediaLifecycle.js'), 'utf8');
     const serviceCode = fs.readFileSync(path.join(ROOT, 'core/media/MediaService.js'), 'utf8');
     const mediaRoutes = fs.readFileSync(path.join(ROOT, 'server/routes/media-upload.js'), 'utf8');
@@ -225,13 +234,13 @@ test('MEDIA ENGINE — canonical boundary contract', async (t) => {
     assert.match(mediaRoutes, /mediaService\.markReady\(\{[\s\S]*cropSpec: crop_spec \|\| null/);
   });
 
-  await t.test('18. HTTP JSON body limit leaves headroom for 20MB base64 media', () => {
+  await t.test('19. HTTP JSON body limit leaves headroom for 20MB base64 media', () => {
     const appCode = fs.readFileSync(path.join(ROOT, 'server/app.js'), 'utf8');
     assert.match(appCode, /express\.json\(\{ limit: ['"]30mb['"] \}\)/);
     assert.match(appCode, /express\.urlencoded\(\{ extended: true, limit: ['"]30mb['"] \}\)/);
   });
 
-  await t.test('19. Orphaned media cannot retain a stale entity attachment', () => {
+  await t.test('20. Orphaned media cannot retain a stale entity attachment', () => {
     const repoCode = fs.readFileSync(path.join(ROOT, 'core/data/repositories/MediaRepository.js'), 'utf8');
     assert.match(repoCode, /status = 'orphan'/);
     assert.match(repoCode, /attached_to_type = NULL/);
