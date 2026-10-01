@@ -575,6 +575,7 @@ class MediaService {
     let transactionActive = false;
     let oldVariants = [];
     let processingRunId = null;
+    let published = false;
 
     try {
       oldVariants = this.mediaRepo.getVariantsByMediaId(mediaId);
@@ -652,21 +653,42 @@ class MediaService {
 
       this.mediaRepo.commitTransaction();
       transactionActive = false;
+      published = true;
 
       // 7. Cleanup superseded binaries after the successful DB publication.
+      // Cleanup is best-effort and must NEVER roll back or fail the newly published asset.
       for (const oldVariant of oldVariants) {
         if (oldVariant.storage_key && !newVariantKeys.includes(oldVariant.storage_key)) {
-          await this.storage.delete(oldVariant.storage_key);
+          try {
+            await this.storage.delete(oldVariant.storage_key);
+          } catch (cleanupErr) {
+            console.warn('[MediaService] Failed to delete superseded media variant:', cleanupErr.message);
+          }
         }
       }
       if (asset.storage_key.startsWith('staging/') && asset.storage_key !== finalKey) {
-        await this.storage.delete(asset.storage_key);
+        try {
+          await this.storage.delete(asset.storage_key);
+        } catch (cleanupErr) {
+          console.warn('[MediaService] Failed to delete staging source after publish:', cleanupErr.message);
+        }
       }
 
       const updated = this.mediaRepo.findById(mediaId, brandId);
       return this._formatAssetResponse(updated);
 
     } catch (err) {
+      if (published) {
+        // Publication already committed. Never destroy the published asset or mark it
+        // FAILED because a post-commit read/cleanup operation encountered an error.
+        try {
+          const publishedAsset = this.mediaRepo.findById(mediaId, brandId);
+          return this._formatAssetResponse(publishedAsset);
+        } catch (_) {
+          throw err;
+        }
+      }
+
       if (transactionActive) {
         try {
           this.mediaRepo.rollbackTransaction();
