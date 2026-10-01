@@ -21,6 +21,32 @@ const { ImageProcessor } = require('./ImageProcessor');
 const { CropSpec } = require('../domain/CropSpec');
 const MediaReferenceResolver = require('./MediaReferenceResolver');
 
+const ENTITY_MEDIA_ASSET_TYPES = Object.freeze({
+  brand_logo: ['logo'],
+  brand_merchant_pwa_icon: ['pwa_icon'],
+  brand_pos_pwa_icon: ['pwa_icon'],
+  product: ['product'],
+  category: ['category'],
+  branch_category: ['category'],
+  brand_banner: ['banner'],
+  banner_content_revision: ['banner']
+});
+
+function assertEntityMediaContract(asset, entityType) {
+  const allowedTypes = ENTITY_MEDIA_ASSET_TYPES[entityType];
+  if (!allowedTypes) {
+    const err = new Error(`Tipe entitas media '${entityType}' tidak diizinkan oleh Media Engine.`);
+    err.code = 'INVALID_MEDIA_ENTITY_TYPE';
+    throw err;
+  }
+
+  if (!allowedTypes.includes(asset.asset_type)) {
+    const err = new Error(`Media asset_type '${asset.asset_type}' tidak kompatibel dengan entity_type '${entityType}'.`);
+    err.code = 'MEDIA_ASSET_TYPE_MISMATCH';
+    throw err;
+  }
+}
+
 class MediaService {
   constructor({
     mediaRepository = new MediaRepository(),
@@ -195,6 +221,8 @@ class MediaService {
       throw err;
     }
 
+    assertEntityMediaContract(asset, entityType);
+
     if (manageTransaction) this.mediaRepo.beginTransaction();
     try {
       this.mediaRepo.attachMedia(mediaId, brandId, entityType, entityId);
@@ -223,6 +251,8 @@ class MediaService {
       err.code = 'ASSET_NOT_READY';
       throw err;
     }
+
+    assertEntityMediaContract(newAsset, entityType);
 
     // Media-table replacement is transactional when this service owns the transaction.
     // Callers that already hold a DB transaction must pass manageTransaction=false.
