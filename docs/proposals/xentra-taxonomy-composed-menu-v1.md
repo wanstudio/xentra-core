@@ -551,10 +551,41 @@ Paket Product
 
 The Paket does not copy component names or stock values into independent inventory records.
 
-A Paket is a **bundle price over existing Product IDs**. When the Paket is sold, Core must resolve its component Product IDs and apply the corresponding stock/inventory effects to those underlying Products according to the inventory contract.
+A Paket is a **named, explicitly priced sellable Product** whose fixed contents reference existing Product IDs. Its price is a property of the Paket Product; it is not automatically recalculated from current component prices.
+
+When the Paket is sold, Core must resolve its component Product IDs and apply the corresponding stock/inventory effects to those underlying Products according to the inventory contract.
 
 The component Product IDs remain the source of truth for item identity, stock, reporting references, and historical traceability. The Paket has its own sellable Product identity so that the bundle can have its own customer presentation, price, availability, and promotion eligibility without duplicating the underlying Products.
 
 A separate Paket composition relation is preferred over encoding the bundle as free text or as reusable Complement records.
 
 **Pre-lock note:** the exact order-snapshot and revenue/reporting treatment of a Paket versus its component Products still requires explicit validation before lock.
+
+
+## 5B. Paket vs Promotion — Pre-lock Boundary
+
+A Paket and a Promotion are different concepts.
+
+**Paket**
+- is a named, sellable Product created by Owner;
+- has a fixed, explicitly defined component Product list;
+- has its own explicit Paket price;
+- has its own Product identity and can be adopted by Branches;
+- consumes stock from its referenced component Products when sold.
+
+**Promotion / discount**
+- does not create or convert the cart into a Paket;
+- may apply a lower effective price when the cart contains qualifying normal Products;
+- keeps the original Product IDs in the order/cart;
+- remains governed by the Promotion domain and its own eligibility/discount rules.
+
+Example:
+
+```
+Product 1 + Product 2 + Product 3 + eligible Promotion
+→ discounted cart
+→ still three separate Product IDs
+→ NOT automatically a Paket
+```
+
+This boundary is required to avoid treating arbitrary product combinations as a new Product or Paket.
