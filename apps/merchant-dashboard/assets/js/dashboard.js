@@ -10632,12 +10632,14 @@ async function loadMenusView() {
     }
 
     if (!XentraCropEditor || typeof XentraCropEditor.open !== 'function') {
-      return uploadPromotionIconCanonical(file, null, fileInput, statusEl, mediaIdInput, iconUrlInput);
+      showToast('❌ Editor crop tidak tersedia. Upload dibatalkan; gambar tidak diproses tanpa Crop Editor.');
+      if (fileInput) fileInput.value = '';
+      return;
     }
 
     XentraCropEditor.open({
       source: file,
-      assetType: 'logo',
+      assetType: 'promotion',
       aspectRatio: 1.0,
       title: 'Potong & Posisikan Icon Promo (1:1)',
       onConfirm: async function (cropSpec, previewDataUrl) {
@@ -10673,7 +10675,7 @@ async function loadMenusView() {
           image_base64: base64,
           mime_type: file.type,
           original_filename: file.name || null,
-          asset_type: 'logo',
+          asset_type: 'promotion',
           enforce_aspect_ratio: false
         })
       });
@@ -10825,7 +10827,7 @@ async function loadMenusView() {
     if ($('mkt-promo-media-id')) $('mkt-promo-media-id').value = '';
     if ($('mkt-promo-icon-url')) $('mkt-promo-icon-url').value = '/assets/pwa/icon-192.png';
     if ($('mkt-promo-icon-status')) {
-      $('mkt-promo-icon-status').textContent = 'Format: PNG, JPG, WebP. Maks 10MB (Rasio 1:1).';
+      $('mkt-promo-icon-status').textContent = 'JPG, PNG, WebP · Maks. 10 MB · Rasio 1:1';
       $('mkt-promo-icon-status').style.color = '#64748b';
     }
 

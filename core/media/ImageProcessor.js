@@ -10,7 +10,7 @@
  * - Metadata stripping (EXIF/GPS/ICC/IPTC/XMP) for customer-facing delivery privacy
  * - Resource safety and memory-efficient streaming/buffer transforms
  * - Canonical output dimensions:
- *     Square assets (product, category, logo, avatar): 320, 640, 1024, 1600, 2048
+ *     Square assets (product, category, logo, avatar, pwa_icon, promotion): 320, 640, 1024, 1600, 2048
  *     Banner assets (~1.94:1): 640x330, 1200x619, 1920x990
  */
 const sharp = require('sharp');
@@ -147,7 +147,7 @@ class ImageProcessor {
    *
    * @param {Object} options
    * @param {Buffer} options.sourceBuffer - Raw source image binary
-   * @param {string} options.assetType - 'product' | 'category' | 'logo' | 'avatar' | 'banner' | 'general'
+   * @param {string} options.assetType - 'product' | 'category' | 'logo' | 'avatar' | 'pwa_icon' | 'promotion' | 'banner' | 'general'
    * @param {Object|CropSpec} [options.cropSpec] - M2 crop intent
    * @returns {Promise<{
    *   cropSpec: CropSpec,

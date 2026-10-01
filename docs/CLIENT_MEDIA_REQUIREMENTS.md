@@ -129,6 +129,23 @@ Customer / Merchant / POS delivery
 
 Merchant-facing instruction is intentionally: **upload the normal original photo; Xentra handles crop, resize, compression, and optimized delivery automatically.**
 
+### Strict entity and lifecycle boundary
+
+Brand-owned media bindings are committed atomically with their `brands.*_media_id` references so a DB failure cannot leave a newly attached asset without its owning reference or vice versa.
+
+
+The canonical Media Engine also locks the consumer/attachment contract, not only binary processing:
+
+- `brand_logo` → `logo`
+- `brand_merchant_pwa_icon` → `pwa_icon`
+- `brand_pos_pwa_icon` → `pwa_icon`
+- `product` → `product`
+- `category` / `branch_category` → `category`
+- `brand_banner` / `banner_content_revision` → `banner`
+- A media asset cannot be attached through a generic endpoint when its `asset_type` does not match the target slot.
+- Direct transition to `READY` is not a publish mechanism. Media becomes `READY` only through the processing pipeline; the historical READY endpoint delegates to that pipeline.
+- Branch-facing consumers must not use quarantined `branch_products.image_override` or legacy snapshot photo fields as active delivery sources.
+
 ### Governance
 
 Future upload slots, media endpoints, crop editors, image settings, or profile/logo APIs must reuse this engine rather than introduce another upload pipeline. A new media path is not canonical until it is wired through `MediaService` + `ImageValidator` + `ImageProcessor` and covered by regression tests.

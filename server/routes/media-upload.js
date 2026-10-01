@@ -191,16 +191,18 @@ router.post('/admin/media/upload', requireAuth(['owner', 'brand_manager', 'branc
   }
 });
 
-// Mark asset as READY (completing upload pipeline)
+// Compatibility endpoint: publish READY only through the canonical image-processing pipeline.
 router.post('/admin/media/:id/ready', requireAuth(['owner', 'brand_manager', 'branch_manager']), async (req, res) => {
   try {
+    const { crop_spec } = req.body || {};
     const asset = await mediaService.markReady({
       mediaId: req.params.id,
-      brandId: req.brand_id
+      brandId: req.brand_id,
+      cropSpec: crop_spec || null
     });
     res.json({
       success: true,
-      message: 'Media siap digunakan.',
+      message: 'Media telah diproses dan siap digunakan.',
       asset
     });
   } catch (err) {
@@ -317,7 +319,7 @@ router.post('/admin/media/:id/retry', requireAuth(['owner', 'brand_manager', 'br
 });
 
 // Attach a READY asset to an entity
-router.post('/admin/media/:id/attach', requireAuth(['owner', 'brand_manager', 'branch_manager']), async (req, res) => {
+router.post('/admin/media/:id/attach', requireAuth(['owner', 'brand_manager']), async (req, res) => {
   try {
     const { entity_type, entity_id } = req.body || {};
     if (!entity_type || !entity_id) {
@@ -347,7 +349,7 @@ router.post('/admin/media/:id/attach', requireAuth(['owner', 'brand_manager', 'b
 });
 
 // Atomic replacement of media
-router.post('/admin/media/replace', requireAuth(['owner', 'brand_manager', 'branch_manager']), async (req, res) => {
+router.post('/admin/media/replace', requireAuth(['owner', 'brand_manager']), async (req, res) => {
   try {
     const { new_media_id, old_media_id, entity_type, entity_id } = req.body || {};
     if (!new_media_id || !entity_type || !entity_id) {

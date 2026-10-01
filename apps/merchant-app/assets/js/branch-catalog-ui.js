@@ -746,7 +746,7 @@
           return;
         }
         if (file.size > 15 * 1024 * 1024) {
-          showToast('❌ Ukuran gambar melebihi batas maksimal 15MB.');
+          showToast('❌ Ukuran gambar melebihi batas maksimal 15 MB.');
           fileInput.value = '';
           return;
         }

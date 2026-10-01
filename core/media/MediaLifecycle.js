@@ -29,7 +29,7 @@ class MediaLifecycle {
 
   static VALID_TRANSITIONS = {
     temporary: ['uploaded', 'processing', 'failed'],
-    uploaded: ['processing', 'failed', 'ready'], // direct-to-ready allowed when processing is no-op/M1
+    uploaded: ['processing', 'failed'], // READY is published only by MediaService.processMedia()
     processing: ['ready', 'failed'],
     ready: ['orphan', 'failed'],
     failed: ['processing', 'temporary', 'orphan'], // retryable to processing or temporary

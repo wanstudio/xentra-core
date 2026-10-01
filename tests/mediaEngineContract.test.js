@@ -39,14 +39,16 @@ test('MEDIA ENGINE — canonical boundary contract', async (t) => {
     }
   });
 
-  await t.test('2. CropSpec accepts canonical square and banner ratios', () => {
-    assert.doesNotThrow(() => new CropSpec({
-      x: 0, y: 0, width: 400, height: 400,
-      source_width: 800, source_height: 800,
-      aspect_ratio: 1,
-      zoom: 1,
-      asset_type: 'product'
-    }));
+  await t.test('2. CropSpec accepts canonical square, PWA, promotion, and banner ratios', () => {
+    for (const assetType of ['product', 'pwa_icon', 'promotion']) {
+      assert.doesNotThrow(() => new CropSpec({
+        x: 0, y: 0, width: 400, height: 400,
+        source_width: 800, source_height: 800,
+        aspect_ratio: 1,
+        zoom: 1,
+        asset_type: assetType
+      }));
+    }
 
     assert.doesNotThrow(() => new CropSpec({
       x: 0, y: 0, width: 350, height: 180,
@@ -149,9 +151,9 @@ test('MEDIA ENGINE — canonical boundary contract', async (t) => {
     const catalogCode = fs.readFileSync(path.join(ROOT, 'core/data/repositories/CatalogRepository.js'), 'utf8');
     const adminCatalogCode = fs.readFileSync(path.join(ROOT, 'server/routes/admin-branch-catalog.js'), 'utf8');
     assert.doesNotMatch(catalogCode, /COALESCE\(bp\.image_override, p\.image_url\)/);
-    assert.doesNotMatch(adminCatalogCode, /COALESCE\\(bp\\.image_override, p\\.image_url\\)/);
+    assert.doesNotMatch(adminCatalogCode, /COALESCE\(bp\.image_override, p\.image_url\)/);
     assert.match(catalogCode, /p\.image_url as image_url/);
-    assert.match(adminCatalogCode, /p\\.image_url as image_url/);
+    assert.match(adminCatalogCode, /p\.image_url as image_url/);
   });
 
   await t.test('12. Post-publish cleanup cannot downgrade a published asset', () => {
@@ -177,19 +179,68 @@ test('MEDIA ENGINE — canonical boundary contract', async (t) => {
     ];
     for (const rel of files) {
       const code = fs.readFileSync(path.join(ROOT, rel), 'utf8');
-      assert.doesNotMatch(code, /uploadBranchProductImage/);
-      assert.doesNotMatch(code, /_bpSelectedFile/);
-      assert.doesNotMatch(code, /XentraCropEditor\.open/);
+      const start = code.indexOf('window.openBranchOverrideModal');
+      const end = code.indexOf('window.clearBranchProductOverride');
+      assert.ok(start >= 0 && end > start, rel + ' must contain a bounded branch-product override controller');
+      const branchProductController = code.slice(start, end);
+      assert.doesNotMatch(branchProductController, /uploadBranchProductImage/);
+      assert.doesNotMatch(branchProductController, /_bpSelectedFile/);
+      assert.doesNotMatch(branchProductController, /XentraCropEditor\.open/);
     }
   });
 
-  await t.test('15. HTTP JSON body limit leaves headroom for 20MB base64 media', () => {
+  await t.test('15. Quarantined branch photo fields are not consumer delivery sources', () => {
+    const posCode = fs.readFileSync(path.join(ROOT, 'apps/pos-app/assets/js/pos-app.js'), 'utf8');
+    const orderCode = fs.readFileSync(path.join(ROOT, 'server/routes/customer-orders.js'), 'utf8');
+    assert.doesNotMatch(posCode, /p\.image_url\s*\|\|\s*p\.image_override/);
+    assert.doesNotMatch(orderCode, /SELECT product_image_url, image_override FROM branch_products/);
+    assert.doesNotMatch(orderCode, /bp\.image_override\s*\|\|\s*bp\.product_image_url/);
+  });
+
+  await t.test('16. Media slots use semantic asset types and generic mutation is manager-only', () => {
+    const brandCode = fs.readFileSync(path.join(ROOT, 'server/routes/admin-brand.js'), 'utf8');
+    const dashboardCode = fs.readFileSync(path.join(ROOT, 'apps/merchant-dashboard/assets/js/dashboard.js'), 'utf8');
+    const serviceCode = fs.readFileSync(path.join(ROOT, 'core/media/MediaService.js'), 'utf8');
+    const mediaRoutes = fs.readFileSync(path.join(ROOT, 'server/routes/media-upload.js'), 'utf8');
+    assert.match(brandCode, /assetType: 'pwa_icon'/);
+    assert.match(dashboardCode, /asset_type: 'promotion'/);
+    assert.match(serviceCode, /brand_merchant_pwa_icon: \['pwa_icon'\]/);
+    assert.match(serviceCode, /brand_pos_pwa_icon: \['pwa_icon'\]/);
+    assert.match(serviceCode, /banner_content_revision: \['banner'\]/);
+    assert.match(serviceCode, /MEDIA_ASSET_TYPE_MISMATCH/);
+    assert.match(mediaRoutes, /\/admin\/media\/:id\/attach', requireAuth\(\['owner', 'brand_manager'\]\)/);
+    assert.match(mediaRoutes, /\/admin\/media\/replace', requireAuth\(\['owner', 'brand_manager'\]\)/);
+  });
+
+  await t.test('17. Brand media binding/unlink is transactionally paired with Brand references', () => {
+    const brandCode = fs.readFileSync(path.join(ROOT, 'server/routes/admin-brand.js'), 'utf8');
+    assert.match(brandCode, /bindBrandMediaAtomically/);
+    assert.match(brandCode, /unlinkBrandMediaAtomically/);
+    assert.match(brandCode, /manageTransaction: false/);
+    assert.match(brandCode, /persistReference: function \(\) \{ coreBrandRepo\.updateBrandLogoMedia/);
+    assert.match(brandCode, /clearReference: function \(\) \{ coreBrandRepo\.removeBrandLogoMedia/);
+  });
+
+  await t.test('18. READY cannot bypass image processing', () => {
+    const lifecycleCode = fs.readFileSync(path.join(ROOT, 'core/media/MediaLifecycle.js'), 'utf8');
+    const serviceCode = fs.readFileSync(path.join(ROOT, 'core/media/MediaService.js'), 'utf8');
+    const mediaRoutes = fs.readFileSync(path.join(ROOT, 'server/routes/media-upload.js'), 'utf8');
+    assert.doesNotMatch(lifecycleCode, /uploaded: \['processing', 'failed', 'ready'\]/);
+    assert.match(serviceCode, /targetStatus === MediaLifecycle\.STATES\.READY/);
+    assert.match(serviceCode, /MEDIA_PROCESSING_REQUIRED/);
+    assert.match(serviceCode, /MEDIA_LIFECYCLE_MANAGED/);
+    assert.match(serviceCode, /return this\.processMedia\(\{ mediaId, brandId, cropSpec \}\)/);
+    assert.match(mediaRoutes, /const \{ crop_spec \} = req\.body \|\| \{\};/);
+    assert.match(mediaRoutes, /mediaService\.markReady\(\{[\s\S]*cropSpec: crop_spec \|\| null/);
+  });
+
+  await t.test('19. HTTP JSON body limit leaves headroom for 20MB base64 media', () => {
     const appCode = fs.readFileSync(path.join(ROOT, 'server/app.js'), 'utf8');
     assert.match(appCode, /express\.json\(\{ limit: ['"]30mb['"] \}\)/);
     assert.match(appCode, /express\.urlencoded\(\{ extended: true, limit: ['"]30mb['"] \}\)/);
   });
 
-  await t.test('11. Orphaned media cannot retain a stale entity attachment', () => {
+  await t.test('20. Orphaned media cannot retain a stale entity attachment', () => {
     const repoCode = fs.readFileSync(path.join(ROOT, 'core/data/repositories/MediaRepository.js'), 'utf8');
     assert.match(repoCode, /status = 'orphan'/);
     assert.match(repoCode, /attached_to_type = NULL/);

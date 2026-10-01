@@ -764,8 +764,8 @@ router.patch('/admin/branches/:id/products/:productId/override', requireAuth(['o
     // Pass null to clear an override; omit the key entirely to leave it untouched.
     const updates = {};
 
-    // Branch product photos are Master-owned. A legacy client may no longer
-    // create or mutate image_override through this general override endpoint.
+    // Branch product photos are Master-owned. This endpoint only manages
+    // branch-owned operational overrides such as name, description, price, and category.
     if (Object.prototype.hasOwnProperty.call(req.body, 'image_url')) {
       return res.status(410).json({
         success: false,
@@ -780,10 +780,6 @@ router.patch('/admin/branches/:id/products/:productId/override', requireAuth(['o
     if (Object.prototype.hasOwnProperty.call(req.body, 'description')) {
       updates.description_override = req.body.description != null ? String(req.body.description).trim() || null : null;
     }
-    if (Object.prototype.hasOwnProperty.call(req.body, 'image_url')) {
-      updates.image_override = req.body.image_url != null ? String(req.body.image_url).trim() || null : null;
-    }
-
     // price — enforced by the same locked PricingPolicyModel used at adopt time:
     //   lock  → branch CANNOT change price (custom price rejected, master wins)
     //   range → branch price must sit inside [min_price, max_price]
@@ -1364,7 +1360,7 @@ router.get('/admin/branches/:id/categories/:catId/products', requireAuth(['owner
         bp.product_id,
         COALESCE(bp.name_override, p.name) as name,
         COALESCE(bp.description_override, p.description) as description,
-        COALESCE(bp.image_override, p.image_url) as image_url,
+        p.image_url as image_url,
         bp.price,
         p.price as master_price,
         p.pricing_mode,

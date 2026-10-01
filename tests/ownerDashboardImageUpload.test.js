@@ -342,7 +342,7 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
   // REGRESSION TESTS — File Size Policy (M0-locked authoritative limits)
   // ============================================================
 
-  await t.test('R1. Product: Non-square source (1200x900) accepted by validateImageUpload', () => {
+  await t.test('R1. Product: Non-square source (1200x900) accepted by validateImageUpload', async () => {
     const buf = await createJpegBuffer(1200, 900);
     const base64 = buf.toString('base64');
     const result = validateImageUpload({
@@ -356,7 +356,7 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
     assert.strictEqual(result.info.height, 900);
   });
 
-  await t.test('R2. Category: Non-square source (1600x900) accepted by validateImageUpload', () => {
+  await t.test('R2. Category: Non-square source (1600x900) accepted by validateImageUpload', async () => {
     const buf = await createJpegBuffer(1600, 900);
     const base64 = buf.toString('base64');
     const result = validateImageUpload({
@@ -368,7 +368,7 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
     assert.strictEqual(result.valid, true, `1600x900 category source must be accepted: ${result.error}`);
   });
 
-  await t.test('R3. Logo: Non-square source (800x600) accepted by validateImageUpload', () => {
+  await t.test('R3. Logo: Non-square source (800x600) accepted by validateImageUpload', async () => {
     const buf = await createJpegBuffer(800, 600);
     const base64 = buf.toString('base64');
     const result = validateImageUpload({
@@ -380,7 +380,7 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
     assert.strictEqual(result.valid, true, `800x600 logo source must be accepted: ${result.error}`);
   });
 
-  await t.test('R4. Banner: Non-square source (1200x1200 square) accepted by validateImageUpload', () => {
+  await t.test('R4. Banner: Non-square source (1200x1200 square) accepted by validateImageUpload', async () => {
     const buf = await createJpegBuffer(1200, 1200);
     const base64 = buf.toString('base64');
     const result = validateImageUpload({
@@ -392,7 +392,7 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
     assert.strictEqual(result.valid, true, `1200x1200 banner source must be accepted: ${result.error}`);
   });
 
-  await t.test('R5. Product: File exceeding 20 MB rejected with FILE_TOO_LARGE', () => {
+  await t.test('R5. Product: File exceeding 20 MB rejected with FILE_TOO_LARGE', async () => {
     // Build a buffer slightly above 20MB by padding a minimal JPEG
     const base = await createJpegBuffer(100, 100);
     const filler = Buffer.alloc(20 * 1024 * 1024 + 1024);
@@ -408,7 +408,7 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
     assert.strictEqual(result.code, 'FILE_TOO_LARGE');
   });
 
-  await t.test('R6. Category: File exceeding 15 MB rejected with FILE_TOO_LARGE', () => {
+  await t.test('R6. Category: File exceeding 15 MB rejected with FILE_TOO_LARGE', async () => {
     const base = await createJpegBuffer(100, 100);
     const filler = Buffer.alloc(15 * 1024 * 1024 + 1024);
     const bigBuf = Buffer.concat([base, filler]);
@@ -423,7 +423,7 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
     assert.strictEqual(result.code, 'FILE_TOO_LARGE');
   });
 
-  await t.test('R7. Banner: File exceeding 20 MB rejected with FILE_TOO_LARGE', () => {
+  await t.test('R7. Banner: File exceeding 20 MB rejected with FILE_TOO_LARGE', async () => {
     const base = await createJpegBuffer(100, 100);
     const filler = Buffer.alloc(20 * 1024 * 1024 + 1024);
     const bigBuf = Buffer.concat([base, filler]);
@@ -438,7 +438,7 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
     assert.strictEqual(result.code, 'FILE_TOO_LARGE');
   });
 
-  await t.test('R8. Logo: File exceeding 10 MB rejected with FILE_TOO_LARGE', () => {
+  await t.test('R8. Logo: File exceeding 10 MB rejected with FILE_TOO_LARGE', async () => {
     const base = await createJpegBuffer(100, 100);
     const filler = Buffer.alloc(10 * 1024 * 1024 + 1024);
     const bigBuf = Buffer.concat([base, filler]);
@@ -453,7 +453,7 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
     assert.strictEqual(result.code, 'FILE_TOO_LARGE');
   });
 
-  await t.test('R9. 20 MP safety ceiling: oversized pixel count rejected with PIXEL_COUNT_TOO_LARGE', () => {
+  await t.test('R9. 20 MP safety ceiling: oversized pixel count rejected with PIXEL_COUNT_TOO_LARGE', async () => {
     // createJpegBuffer uses only header bytes — we can set any width/height to test dimension logic
     // 4500x4500 = 20.25MP > 20MP ceiling
     const buf = await createJpegBuffer(4500, 4500);
@@ -468,7 +468,7 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
     assert.strictEqual(result.code, 'PIXEL_COUNT_TOO_LARGE', `Expected PIXEL_COUNT_TOO_LARGE, got ${result.code}: ${result.error}`);
   });
 
-  await t.test('R10. 20 MP boundary: 4000x4000 (16MP) within 20MP ceiling accepted', () => {
+  await t.test('R10. 20 MP boundary: 4000x4000 (16MP) within 20MP ceiling accepted', async () => {
     // 4000x4000 = 16MP — within maxWidth/maxHeight (4096) and under 20MP ceiling
     const buf = await createJpegBuffer(4000, 4000);
     const base64 = buf.toString('base64');
@@ -481,7 +481,7 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
     assert.strictEqual(result.valid, true, `High-res image within 20MP ceiling should be accepted: ${result.error}`);
   });
 
-  await t.test('R11. HEIC/HEIF file rejected with UNSUPPORTED_FORMAT', () => {
+  await t.test('R11. HEIC/HEIF file rejected with UNSUPPORTED_FORMAT', async () => {
     // Minimal ISOBMFF ftyp box with heic brand
     const buf = Buffer.alloc(20);
     buf.writeUInt32BE(20, 0);                // box size
@@ -502,7 +502,7 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
       'Error must mention HEIC/HEIF');
   });
 
-  await t.test('R12. Spoofed file (PHP script with .jpg extension) rejected', () => {
+  await t.test('R12. Spoofed file (PHP script with .jpg extension) rejected', async () => {
     const phpContent = '<?php system($_GET["cmd"]); ?>';
     const base64 = Buffer.from(phpContent).toString('base64');
     const result = validateImageUpload({
