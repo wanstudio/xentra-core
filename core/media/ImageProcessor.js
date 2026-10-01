@@ -32,7 +32,7 @@ const DERIVATIVE_PRESETS = {
   ]
 };
 
-// Benchmarked WebP delivery configuration: quality 82 delivers 50-60% size reduction with sharp fidelity
+// Locked WebP delivery configuration. Keep quality 82 unless the canonical media policy is intentionally revised.
 const DEFAULT_WEBP_OPTIONS = {
   quality: 82,
   effort: 4,
@@ -168,8 +168,14 @@ class ImageProcessor {
       throw new Error('Valid source image buffer is required for processing.');
     }
 
-    // 1. Inspect source
-    const sourceMeta = await this.inspect(sourceBuffer);
+    // 1. Normalize EXIF orientation before crop coordinates are interpreted.
+    // Mobile-camera previews commonly reflect EXIF orientation; canonical server
+    // pixels must be physically oriented the same way before cropping.
+    const orientedSourceBuffer = await sharp(sourceBuffer, { failOnError: false })
+      .rotate()
+      .toBuffer();
+
+    const sourceMeta = await this.inspect(orientedSourceBuffer);
 
     // 2. Resolve & clamp CropSpec
     const resolvedCrop = this.resolveCropSpec({
@@ -181,7 +187,7 @@ class ImageProcessor {
 
     // 3. Prepare base cropped sharp instance
     // Note: Do not call withMetadata(), ensuring EXIF/GPS/IPTC/XMP/ICC metadata is stripped from output
-    const croppedPipeline = sharp(sourceBuffer, { failOnError: false })
+    const croppedPipeline = sharp(orientedSourceBuffer, { failOnError: false })
       .extract({
         left: resolvedCrop.x,
         top: resolvedCrop.y,
@@ -204,7 +210,11 @@ class ImageProcessor {
     for (const variant of targetVariants) {
       const variantBuffer = await sharp(croppedBuffer, { failOnError: false })
         .resize(variant.width, variant.height, {
-          fit: 'fill',
+          // Preserve image geometry. CropSpec is canonical, while 'cover'
+          // prevents tiny tolerated ratio differences (especially banners)
+          // from being stretched into the target dimensions.
+          fit: 'cover',
+          position: 'centre',
           withoutEnlargement: true
         })
         .webp(this.webpOptions)

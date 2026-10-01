@@ -78,27 +78,40 @@ class MediaService {
     const mediaId = `med_${crypto.randomBytes(8).toString('hex')}_${Date.now()}`;
     const storageKey = `staging/${brandId}/${mediaId}.${info.ext}`;
 
-    // 2. Persist binary to storage
-    await this.storage.write(storageKey, buffer);
+    // 2. Persist binary to storage. Cleanup is attempted even when the provider
+    // reports a write failure, because a provider may have created a partial file.
+    try {
+      await this.storage.write(storageKey, buffer);
+    } catch (err) {
+      try { await this.storage.delete(storageKey); } catch (_) {}
+      throw err;
+    }
 
-    // 3. Persist metadata record in 'temporary' status
-    this.mediaRepo.createMedia({
-      id: mediaId,
-      tenant_id: tenantId,
-      brand_id: brandId,
-      uploaded_by: userId,
-      storage_key: storageKey,
-      mime_type: info.mime,
-      original_filename: declaredFilename,
-      width: info.width,
-      height: info.height,
-      size_bytes: info.sizeBytes,
-      asset_type: assetType,
-      status: MediaLifecycle.STATES.TEMPORARY
-    });
+    try {
+      // 3. Persist metadata record in 'temporary' status
+      this.mediaRepo.createMedia({
+        id: mediaId,
+        tenant_id: tenantId,
+        brand_id: brandId,
+        uploaded_by: userId,
+        storage_key: storageKey,
+        mime_type: info.mime,
+        original_filename: declaredFilename,
+        width: info.width,
+        height: info.height,
+        size_bytes: info.sizeBytes,
+        asset_type: assetType,
+        status: MediaLifecycle.STATES.TEMPORARY
+      });
 
-    const asset = this.mediaRepo.findById(mediaId, brandId);
-    return this._formatAssetResponse(asset);
+      const asset = this.mediaRepo.findById(mediaId, brandId);
+      return this._formatAssetResponse(asset);
+    } catch (err) {
+      // Intake is a single boundary: a failed DB write must not leave an orphaned
+      // staging binary behind.
+      await this.storage.delete(storageKey);
+      throw err;
+    }
   }
 
   /**
@@ -173,7 +186,7 @@ class MediaService {
   /**
    * Attach a READY asset to an entity.
    */
-  async attachToEntity({ mediaId, brandId, entityType, entityId }) {
+  async attachToEntity({ mediaId, brandId, entityType, entityId, manageTransaction = true }) {
     const asset = this.getMedia({ mediaId, brandId });
 
     if (!MediaLifecycle.canAttach(asset.status)) {
@@ -182,7 +195,16 @@ class MediaService {
       throw err;
     }
 
-    this.mediaRepo.attachMedia(mediaId, brandId, entityType, entityId);
+    if (manageTransaction) this.mediaRepo.beginTransaction();
+    try {
+      this.mediaRepo.attachMedia(mediaId, brandId, entityType, entityId);
+      if (manageTransaction) this.mediaRepo.commitTransaction();
+    } catch (err) {
+      if (manageTransaction) {
+        try { this.mediaRepo.rollbackTransaction(); } catch (_) {}
+      }
+      throw err;
+    }
     const updated = this.mediaRepo.findById(mediaId, brandId);
     return this._formatAssetResponse(updated);
   }
@@ -193,7 +215,7 @@ class MediaService {
    * 2. Attach new asset to entity
    * 3. Mark old asset as ORPHAN (with 30-day grace period timestamp)
    */
-  async replaceEntityMedia({ newMediaId, oldMediaId, brandId, entityType, entityId }) {
+  async replaceEntityMedia({ newMediaId, oldMediaId, brandId, entityType, entityId, manageTransaction = true }) {
     const newAsset = this.getMedia({ mediaId: newMediaId, brandId });
 
     if (!MediaLifecycle.canAttach(newAsset.status)) {
@@ -202,15 +224,26 @@ class MediaService {
       throw err;
     }
 
-    // Attach new media
-    this.mediaRepo.attachMedia(newMediaId, brandId, entityType, entityId);
+    // Media-table replacement is transactional when this service owns the transaction.
+    // Callers that already hold a DB transaction must pass manageTransaction=false.
+    if (manageTransaction) this.mediaRepo.beginTransaction();
+    try {
+      this.mediaRepo.attachMedia(newMediaId, brandId, entityType, entityId);
 
-    // If oldMediaId is supplied and exists within same tenant, mark it as orphan
-    if (oldMediaId) {
-      const oldAsset = this.mediaRepo.findById(oldMediaId, brandId);
-      if (oldAsset && oldAsset.id !== newMediaId) {
-        this.mediaRepo.markAsOrphan(oldMediaId, brandId);
+      // If oldMediaId is supplied and exists within same tenant, mark it as orphan.
+      if (oldMediaId) {
+        const oldAsset = this.mediaRepo.findById(oldMediaId, brandId);
+        if (oldAsset && oldAsset.id !== newMediaId) {
+          this.mediaRepo.markAsOrphan(oldMediaId, brandId);
+        }
       }
+
+      if (manageTransaction) this.mediaRepo.commitTransaction();
+    } catch (err) {
+      if (manageTransaction) {
+        try { this.mediaRepo.rollbackTransaction(); } catch (_) {}
+      }
+      throw err;
     }
 
     const updated = this.mediaRepo.findById(newMediaId, brandId);
@@ -541,11 +574,23 @@ class MediaService {
   async processMedia({ mediaId, brandId, cropSpec = null }) {
     const asset = this.getMedia({ mediaId, brandId });
 
-    // Transition to PROCESSING
-    MediaLifecycle.assertTransition(asset.status, MediaLifecycle.STATES.PROCESSING);
-    this.mediaRepo.updateStatus(mediaId, brandId, MediaLifecycle.STATES.PROCESSING);
+    // A queued retry may already be in PROCESSING. A direct process call from
+    // TEMPORARY/UPLOADED/FAILED must enter PROCESSING exactly once.
+    if (asset.status !== MediaLifecycle.STATES.PROCESSING) {
+      MediaLifecycle.assertTransition(asset.status, MediaLifecycle.STATES.PROCESSING);
+      this.mediaRepo.updateStatus(mediaId, brandId, MediaLifecycle.STATES.PROCESSING);
+    }
+
+    const newVariantKeys = [];
+    let newPermanentOriginalKey = null;
+    let transactionActive = false;
+    let oldVariants = [];
+    let processingRunId = null;
+    let published = false;
 
     try {
+      oldVariants = this.mediaRepo.getVariantsByMediaId(mediaId);
+      processingRunId = `run_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
       // 1. Read source binary from storage
       const sourceBuffer = await this.storage.read(asset.storage_key);
 
@@ -559,32 +604,20 @@ class MediaService {
         cropSpec: effectiveCrop
       });
 
-      // 4. Clean up any previous variants if this was a retry
-      this.mediaRepo.deleteVariantsByMediaId(mediaId);
-
-      // 5. Store derivatives and record in media_variants
-      const savedVariants = [];
+      // 4. Write the complete new derivative set under an isolated processing-run prefix.
+      // Existing READY variants remain untouched until the DB transaction commits.
+      const newVariantRecords = [];
       for (const derivative of result.derivatives) {
         const variantId = `var_${crypto.randomBytes(8).toString('hex')}_${Date.now()}`;
-        const derivativeStorageKey = `derivatives/${brandId}/${mediaId}/${derivative.name}.webp`;
+        const derivativeStorageKey = `derivatives/${brandId}/${mediaId}/${processingRunId}/${derivative.name}.webp`;
 
         await this.storage.write(derivativeStorageKey, derivative.buffer);
+        newVariantKeys.push(derivativeStorageKey);
 
-        this.mediaRepo.createVariant({
+        newVariantRecords.push({
           id: variantId,
           media_id: mediaId,
           variant_name: derivative.name,
-          width: derivative.width,
-          height: derivative.height,
-          format: derivative.format,
-          mime_type: derivative.mimeType,
-          size_bytes: derivative.sizeBytes,
-          storage_key: derivativeStorageKey
-        });
-
-        savedVariants.push({
-          id: variantId,
-          name: derivative.name,
           width: derivative.width,
           height: derivative.height,
           format: derivative.format,
@@ -595,33 +628,93 @@ class MediaService {
         });
       }
 
-      // 6. Relocate original from staging to permanent brand originals location if applicable
+      // 5. Copy the original to permanent storage before the DB commit. Do not delete
+      // staging until the DB now points at the permanent key, so a failed commit
+      // cannot leave the database referencing a missing source.
       let finalKey = asset.storage_key;
       if (asset.storage_key.startsWith('staging/')) {
         const ext = asset.mime_type === 'image/jpeg' ? 'jpg' : (asset.mime_type === 'image/webp' ? 'webp' : 'png');
-        const permKey = `originals/${brandId}/${mediaId}.${ext}`;
-        await this.storage.write(permKey, sourceBuffer);
-        await this.storage.delete(asset.storage_key);
-        finalKey = permKey;
+        newPermanentOriginalKey = `originals/${brandId}/${mediaId}.${ext}`;
+        await this.storage.write(newPermanentOriginalKey, sourceBuffer);
+        finalKey = newPermanentOriginalKey;
+      }
 
+      // 6. Atomically publish the new DB metadata. External storage writes are treated
+      // as a saga: newly written binaries are deleted on rollback; old binaries are
+      // deleted only after the DB commit succeeds.
+      this.mediaRepo.beginTransaction();
+      transactionActive = true;
+
+      this.mediaRepo.deleteVariantsByMediaId(mediaId);
+      for (const record of newVariantRecords) {
+        this.mediaRepo.createVariant(record);
+      }
+
+      this.mediaRepo.updateCropSpec(mediaId, brandId, result.cropSpec.toJSON());
+
+      if (finalKey !== asset.storage_key) {
         this.mediaRepo.db.execute(
           'UPDATE media_assets SET storage_key = ? WHERE id = ? AND brand_id = ?',
           [finalKey, mediaId, brandId]
         );
       }
 
-      // 7. Update crop spec record on asset
-      this.mediaRepo.updateCropSpec(mediaId, brandId, result.cropSpec.toJSON());
-
-      // 8. Transition asset to READY
       MediaLifecycle.assertTransition(MediaLifecycle.STATES.PROCESSING, MediaLifecycle.STATES.READY);
       this.mediaRepo.updateStatus(mediaId, brandId, MediaLifecycle.STATES.READY);
+
+      this.mediaRepo.commitTransaction();
+      transactionActive = false;
+      published = true;
+
+      // 7. Cleanup superseded binaries after the successful DB publication.
+      // Cleanup is best-effort and must NEVER roll back or fail the newly published asset.
+      for (const oldVariant of oldVariants) {
+        if (oldVariant.storage_key && !newVariantKeys.includes(oldVariant.storage_key)) {
+          try {
+            await this.storage.delete(oldVariant.storage_key);
+          } catch (cleanupErr) {
+            console.warn('[MediaService] Failed to delete superseded media variant:', cleanupErr.message);
+          }
+        }
+      }
+      if (asset.storage_key.startsWith('staging/') && asset.storage_key !== finalKey) {
+        try {
+          await this.storage.delete(asset.storage_key);
+        } catch (cleanupErr) {
+          console.warn('[MediaService] Failed to delete staging source after publish:', cleanupErr.message);
+        }
+      }
 
       const updated = this.mediaRepo.findById(mediaId, brandId);
       return this._formatAssetResponse(updated);
 
     } catch (err) {
-      // Safe lifecycle failure transition
+      if (published) {
+        // Publication already committed. Never destroy the published asset or mark it
+        // FAILED because a post-commit read/cleanup operation encountered an error.
+        try {
+          const publishedAsset = this.mediaRepo.findById(mediaId, brandId);
+          return this._formatAssetResponse(publishedAsset);
+        } catch (_) {
+          throw err;
+        }
+      }
+
+      if (transactionActive) {
+        try {
+          this.mediaRepo.rollbackTransaction();
+        } catch (_) {}
+      }
+
+      // Remove binaries produced by this failed processing attempt only.
+      for (const storageKey of newVariantKeys) {
+        try { await this.storage.delete(storageKey); } catch (_) {}
+      }
+      if (newPermanentOriginalKey) {
+        try { await this.storage.delete(newPermanentOriginalKey); } catch (_) {}
+      }
+
+      // Safe lifecycle failure transition; old READY/variant data remains intact.
       this.mediaRepo.updateStatus(mediaId, brandId, MediaLifecycle.STATES.FAILED, {
         error_message: err.message || 'Image processing failed'
       });

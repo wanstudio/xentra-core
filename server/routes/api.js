@@ -964,7 +964,8 @@ registerAdminBrandRoutes(router, {
   requireAuth,
   serializePublicBrand,
   coreBrandRepo,
-  CoreBrandRepo
+  CoreBrandRepo,
+  mediaService
 });
 
 // Master catalog CRUD is isolated in server/routes/admin-catalog.js.

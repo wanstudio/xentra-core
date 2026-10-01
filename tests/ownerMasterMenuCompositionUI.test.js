@@ -100,6 +100,21 @@ test('Master Product primary CTA directly opens the product editor', () => {
   assert.ok(JS.includes("btnAddProdMain.addEventListener('click', window.openAddProduct)"));
 });
 
+test('Owner Product Editor treats Product Name as the Customer title source', () => {
+  const start = HTML.indexOf('<section id="tab-catalog-products"');
+  const end = HTML.indexOf('<!-- TAB: CATALOG / MENUS', start);
+  const section = HTML.slice(start, end);
+
+  assert.ok(section.includes('id="prod-name-group"'));
+  assert.ok(section.includes('<label for="prod-name">Nama Produk'));
+  assert.ok(section.includes('<input type="text" id="prod-name" class="x-input" required'));
+  assert.ok(!section.includes('id="prod-name-group" hidden'));
+  assert.ok(!section.includes('Nama Internal Master'));
+  assert.ok(JS.includes("name: $('prod-name').value.trim()"));
+  assert.ok(JS.includes("var nameInput = $('prod-name');"));
+  assert.ok(JS.includes("nameInput.addEventListener('input'"));
+});
+
 test('Owner Master Product UI exposes structured composition selectors', () => {
   for (const id of ['prod-category', 'prod-flavor', 'prod-complements-editor', 'prod-level']) {
     assert.ok(HTML.includes('id="' + id + '"'), 'Missing composition control: ' + id);
@@ -108,6 +123,7 @@ test('Owner Master Product UI exposes structured composition selectors', () => {
   assert.ok(HTML.includes('id="btn-add-master-flavor-from-product"'));
   assert.ok(HTML.includes('Master Product Composition'), 'Composition section must be present');
   assert.ok(HTML.includes('Preview Customer PWA'), 'Customer PWA preview must be present');
+  assert.ok(HTML.includes('Nama Produk → judul · Kategori → grouping · Rasa → subjudul · Kelengkapan → detail · Level → indikator'));
 });
 
 test('Legacy Master Product edit hydrates structured composition from the old title', () => {

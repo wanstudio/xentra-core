@@ -90,14 +90,14 @@ Per the forward contract:
 
 | Field | Cardinality | Source | Customer presentation |
 |---|---:|---|---|
-| Kategori | exactly 1 | Owner Master Category | title |
-| Rasa | 0..1 | Owner Master Flavor | subtitle |
+| Product Name | exactly 1 | Master Product | title |
+| Kategori | exactly 1 | Owner Master Category | grouping / classification |\n| Rasa | 0..1 | Owner Master Flavor | subtitle |
 | Kelengkapan | 0..N | Owner Master Complement | ordered detail |
 | Level | 0..1 | Owner Master Level | indicator |
 
 All four are structured relations. Merchant does not type them.
 
-`products.name` remains the durable internal Master Product identity; it is not the new Customer card title source when a Master Category exists.
+`products.name` is the explicit Master Product Name and the default Customer card title. It must not be derived from Category + Flavor. Master Category remains grouping/classification.
 
 ## 4. Target data model
 
@@ -646,3 +646,24 @@ Customer presentation for Level is a four-dot horizontal intensity indicator: fi
 Visible controls are touch-friendly selectable chips. Selected state uses the product accent lime treatment; unselected state remains white with a light border. Kelengkapan keeps the existing complement_ids[] array contract. Level remains a single level_id. The underlying native selects remain hidden as compatibility/state controls only; they are not the primary presentation.
 
 The visible surface also exposes a + Tambah chip that opens the existing Master Reference quick-add flow, so creation does not require returning to another page. This supersedes the previous visible checkbox/select presentation without changing the canonical composition API or database model.
+
+
+## 🔒 IMPLEMENTATION CORRECTION — Product Name vs Category Display Boundary v1
+**Decision date: 1 October 2026**
+
+A domain/UX correction supersedes the earlier `Kategori → title` interpretation.
+
+The Owner Product Editor now treats **Nama Produk** as a first-class required input. The canonical resolver maps `products.name → Customer title`, while `categories.name` remains Category grouping/classification.
+
+Implementation requirements:
+- expose and validate `prod-name` in the Owner Product Editor;
+- submit `prod-name` directly to the Product API;
+- live preview title follows `prod-name`;
+- Master resolver title follows `products.name` unless the Branch Display Name Override is active;
+- Master resolver category tree uses the actual Master Category name;
+- preserve Branch Categories as a separate branch grouping mechanism;
+- do not introduce a new database column because `products.name` already exists.
+
+This correction is a read/presentation/domain-contract repair, not a new Product identity model.
+
+**Source of truth:** `docs/decisions/xentra-product-name-category-display-boundary-v1.md`.

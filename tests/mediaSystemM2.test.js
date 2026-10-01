@@ -231,7 +231,7 @@ test('MEDIA SYSTEM M2 — CROP / IMAGE EDITOR UI & DOMAIN SUITE', async (t) => {
   // 9. MediaService stores and retrieves crop_spec intent
   // --------------------------------------------------------------------------
   await t.test('9. MediaService stores and retrieves crop_spec intent', async () => {
-    const jpegBuf = createJpegBuffer(600, 400);
+    const jpegBuf = await createJpegBuffer(600, 400);
     const staged = await mediaService.stageUpload({
       brandId: BRAND_ID,
       imageBase64: jpegBuf.toString('base64'),

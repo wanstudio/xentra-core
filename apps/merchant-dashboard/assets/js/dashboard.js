@@ -1079,7 +1079,7 @@
   // ── Installed PWA Identity Override — shared upload helper ─────────────────
   // Uploads a launcher icon file directly to the given PWA icon endpoint.
   // This avoids mutating or overwriting the main brand logo.
-  async function doUploadPwaLauncherIcon(file, endpoint, previewEl, hiddenEl, removeBtn, pickBtn) {
+  async function doUploadPwaLauncherIcon(file, endpoint, previewEl, hiddenEl, removeBtn, pickBtn, cropSpec) {
     if (pickBtn) { pickBtn.disabled = true; pickBtn.textContent = 'Mengunggah...'; }
     // Optimistic preview
     try {
@@ -1104,7 +1104,7 @@
       var iconRes = await adminFetch(API_BASE + endpoint, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ image_base64: base64, mime_type: file.type })
+        body: JSON.stringify({ image_base64: base64, mime_type: file.type, original_filename: file.name || null, crop_spec: cropSpec || null })
       });
       var iconData = await iconRes.json();
       if (iconRes.ok && iconData.success) {
@@ -1466,15 +1466,8 @@
               fileInputLogo.value = '';
             }
           },
-          onCancel: async function () {
-            // If user cancels crop modal, allow direct upload of the original image
-            try {
-              var reader = new FileReader();
-              reader.onload = function (ev) {
-                doUploadBrandLogo(file, null, ev.target.result, btnPickLogo);
-              };
-              reader.readAsDataURL(file);
-            } catch (_) {}
+          onCancel: function () {
+            // Batal = discard this new file. The persisted logo remains unchanged.
             fileInputLogo.value = '';
           }
         });
@@ -1659,7 +1652,7 @@
               if ($('set-profile-merchant-icon-preview') && previewDataUrl) { $('set-profile-merchant-icon-preview').src = previewDataUrl; }
               await doUploadPwaLauncherIcon(file, '/admin/brand/merchant-icon',
                 $('brand-tab-merchant-icon-preview'), $('brand-tab-merchant-icon'),
-                btnRemoveBrandTabMerchant, btnPickBrandTabMerchant);
+                btnRemoveBrandTabMerchant, btnPickBrandTabMerchant, cropSpec);
               loadBrandSettings();
             } finally {
               fileInputBrandTabMerchant.value = '';
@@ -1746,7 +1739,7 @@
               if ($('set-profile-pos-icon-preview') && previewDataUrl) { $('set-profile-pos-icon-preview').src = previewDataUrl; }
               await doUploadPwaLauncherIcon(file, '/admin/brand/pos-icon',
                 $('brand-tab-pos-icon-preview'), $('brand-tab-pos-icon'),
-                btnRemoveBrandTabPos, btnPickBrandTabPos);
+                btnRemoveBrandTabPos, btnPickBrandTabPos, cropSpec);
               loadBrandSettings();
             } finally {
               fileInputBrandTabPos.value = '';
@@ -1837,17 +1830,9 @@
             showToast('✓ Potongan banner disesuaikan.');
           },
           onCancel: function () {
-            var reader = new FileReader();
-            reader.onload = function (ev) {
-              if (bannerPreviewImg) {
-                bannerPreviewImg.src = ev.target.result;
-                bannerPreviewImg.style.display = 'block';
-              }
-              if (bannerEmptyBox) bannerEmptyBox.style.display = 'none';
-              if (btnBannerClear) btnBannerClear.style.display = 'inline-block';
-              if (btnBannerPick) btnBannerPick.textContent = '📁 Ganti File';
-            };
-            reader.readAsDataURL(file);
+            _bannerUploadFile = null;
+            _bannerCropSpec = null;
+            if (fileInputBanner) fileInputBanner.value = '';
           }
         });
       });
@@ -2902,13 +2887,13 @@
     var emptyImageEl = $('master-preview-image-empty');
     if (!titleEl || !subtitleEl || !detailEl || !indicatorEl || !priceEl) return;
 
-    var categorySelect = $('prod-category');
-    var categoryId = categorySelect ? String(categorySelect.value || '') : '';
-    var category = state.categories.find(function(row) { return String(row.id) === categoryId; });
+    var nameInput = $('prod-name');
+    var productName = nameInput ? String(nameInput.value || '').trim() : '';
     var flavorSelect = $('prod-flavor');
     var levelSelect = $('prod-level');
 
-    titleEl.textContent = category ? category.name : 'Pilih Kategori';
+    // Product Name is the Customer card title. Category remains grouping metadata.
+    titleEl.textContent = productName || 'Masukkan Nama Produk';
     subtitleEl.textContent = '';
     detailEl.textContent = '';
     indicatorEl.textContent = '';
@@ -2947,7 +2932,7 @@
     if (imageEl && emptyImageEl) {
       if (src) {
         imageEl.src = src;
-        imageEl.alt = category ? category.name : 'Foto Menu';
+        imageEl.alt = productName || 'Foto Menu';
         imageEl.style.display = 'block';
         emptyImageEl.style.display = 'none';
       } else {
@@ -4346,6 +4331,7 @@ async function loadMenusView() {
     var flavorSelect = $('prod-flavor');
     if (flavorSelect) flavorSelect.addEventListener('change', function() {
       _masterMenuSelected.flavor_id = flavorSelect.value || '';
+      renderMasterMenuCustomerPreview();
     });
     var categorySelect = $('prod-category');
     if (categorySelect) categorySelect.addEventListener('change', function() {
@@ -4353,12 +4339,11 @@ async function loadMenusView() {
       renderMasterMenuCustomerPreview();
       renderMasterMenuSelectors();
     });
-
-    var flavorSelect = $('prod-flavor');
-    if (flavorSelect) flavorSelect.addEventListener('change', function() {
-      _masterMenuSelected.flavor_id = flavorSelect.value || '';
+    var nameInput = $('prod-name');
+    if (nameInput) nameInput.addEventListener('input', function() {
       renderMasterMenuCustomerPreview();
     });
+
     var priceInput = $('prod-price');
     if (priceInput) priceInput.addEventListener('input', function() {
       renderMasterMenuCustomerPreview();
@@ -4500,12 +4485,9 @@ async function loadMenusView() {
             showToast('✓ Potongan foto menu disesuaikan.');
           },
           onCancel: function () {
-            // Keep original uncropped preview if user cancels editor
-            var reader = new FileReader();
-            reader.onload = function (e) {
-              setProductImagePreview(e.target.result, true);
-            };
-            reader.readAsDataURL(file);
+            _productImageFile = null;
+            _productCropSpec = null;
+            if (prodFileInput) prodFileInput.value = '';
           }
         });
       });
@@ -4521,27 +4503,8 @@ async function loadMenusView() {
       });
     }
 
-    // Nama internal master diturunkan dari Kategori + Rasa, misalnya
-    // "Bebek Goreng" + "Sambal Ijo" => "Bebek Goreng Sambal Ijo".
-    //
-    // Nilai ini yang dipakai order, dapur, struk, dan laporan — jadi harus ada. Tidak
-    // ditampilkan ke pelanggan: pelanggan melihat judul + subjudul yang disusun dari
-    // komposisi Master. Fieldnya sendiri tersembunyi, jadi tidak mungkin diketik.
-    function selectedOptionText(select) {
-      if (!select || select.selectedIndex < 0) return '';
-      var option = select.options[select.selectedIndex];
-      // Lewati opsi placeholder (mis. "Pilih Kategori") yang nilainya kosong.
-      if (!option || !String(option.value || '').trim()) return '';
-      return String(option.textContent || '').trim();
-    }
-
-    function deriveMasterProductName() {
-      return [
-        selectedOptionText($('prod-category')),
-        selectedOptionText($('prod-flavor'))
-      ].filter(Boolean).join(' ');
-    }
-
+    // Product name is a first-class Master Product identity and the
+    // authoritative Customer card title. Kategori is only the grouping/reference.
     // Form Master Product Submit
     var formProduct = $('form-product');
     if (formProduct) {
@@ -4550,9 +4513,8 @@ async function loadMenusView() {
         var id = $('prod-id').value;
         var pricingMode = $('prod-pricing-mode').value;
         var payload = {
-          // Diturunkan dari pilihan Kategori + Rasa. $('prod-name') tetap dipakai
-          // sebagai cadangan kalau keduanya belum terpilih.
-          name: deriveMasterProductName() || $('prod-name').value,
+          // Product name is explicit user input and is the Customer card title.
+          name: $('prod-name').value.trim(),
           category_id: $('prod-category').value,
           price: Number($('prod-price').value),
           regular_price: Number($('prod-regular-price').value || $('prod-price').value),
@@ -9316,10 +9278,16 @@ async function loadMenusView() {
         showToast('✓ Framing Banner disimpan untuk pemrosesan server.');
       },
       onCancel: function () {
+        _marketingBannerEditor.mediaFile = null;
+        _marketingBannerEditor.mediaReady = false;
         _marketingBannerEditor.cropSpec = null;
-        readMarketingBannerFileAsDataUrl(file).then(function (src) {
-          setMarketingBannerEditorPreview(src);
-        }).catch(function () {});
+        var fileInput = $('mkt-banner-file');
+        if (fileInput) fileInput.value = '';
+        setMarketingBannerEditorPreview(
+          _marketingBannerEditor.detail && _marketingBannerEditor.detail.media
+            ? _marketingBannerEditor.detail.media.preview_url
+            : null
+        );
       }
     });
   }
@@ -10619,22 +10587,53 @@ async function loadMenusView() {
 
   async function onPromotionIconFileSelected(file) {
     if (!file) return;
+
+    var fileInput = $('mkt-promo-icon-file');
     var statusEl = $('mkt-promo-icon-status');
     var mediaIdInput = $('mkt-promo-media-id');
     var iconUrlInput = $('mkt-promo-icon-url');
 
-    if (file.size > 10 * 1024 * 1024) {
-      showToast('Ukuran file maksimal 10 MB.');
+    var allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (allowed.indexOf(file.type) === -1) {
+      showToast('❌ Format icon tidak didukung. Gunakan JPG, PNG, atau WebP.');
+      if (fileInput) fileInput.value = '';
       return;
     }
 
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('Ukuran file maksimal 10 MB.');
+      if (fileInput) fileInput.value = '';
+      return;
+    }
+
+    if (!XentraCropEditor || typeof XentraCropEditor.open !== 'function') {
+      return uploadPromotionIconCanonical(file, null, fileInput, statusEl, mediaIdInput, iconUrlInput);
+    }
+
+    XentraCropEditor.open({
+      source: file,
+      assetType: 'logo',
+      aspectRatio: 1.0,
+      title: 'Potong & Posisikan Icon Promo (1:1)',
+      onConfirm: async function (cropSpec, previewDataUrl) {
+        try {
+          await uploadPromotionIconCanonical(file, cropSpec, fileInput, statusEl, mediaIdInput, iconUrlInput, previewDataUrl);
+        } catch (_) {}
+      },
+      onCancel: function () {
+        // Batal = discard the newly selected icon; persisted promotion media remains unchanged.
+        if (fileInput) fileInput.value = '';
+      }
+    });
+  }
+
+  async function uploadPromotionIconCanonical(file, cropSpec, fileInput, statusEl, mediaIdInput, iconUrlInput, previewDataUrl) {
     try {
       if (statusEl) {
-        statusEl.textContent = 'Mengunggah & memproses aset media...';
+        statusEl.textContent = 'Memproses icon melalui Media System...';
         statusEl.style.color = '#3b82f6';
       }
 
-      // Convert to base64
       var base64 = await new Promise(function (resolve, reject) {
         var reader = new FileReader();
         reader.onload = function () { resolve(reader.result); };
@@ -10642,15 +10641,14 @@ async function loadMenusView() {
         reader.readAsDataURL(file);
       });
 
-      // 1. Stage upload via /admin/media/upload
       var uploadRes = await adminFetch(API_BASE + '/admin/media/upload', {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
           image_base64: base64,
           mime_type: file.type,
-          original_filename: file.name,
-          asset_type: 'general',
+          original_filename: file.name || null,
+          asset_type: 'logo',
           enforce_aspect_ratio: false
         })
       });
@@ -10661,12 +10659,12 @@ async function loadMenusView() {
       }
 
       var mediaId = uploadJson.asset.media_id || uploadJson.asset.id;
+      if (!mediaId) throw new Error('Media ID tidak dikembalikan server.');
 
-      // 2. Process to ready state via /admin/media/:id/process
       var procRes = await adminFetch(API_BASE + '/admin/media/' + encodeURIComponent(mediaId) + '/process', {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ crop_spec: null })
+        body: JSON.stringify({ crop_spec: cropSpec || null })
       });
 
       var procJson = await procRes.json();
@@ -10675,16 +10673,18 @@ async function loadMenusView() {
       }
 
       var processedAsset = procJson.asset;
-      if (mediaIdInput) mediaIdInput.value = processedAsset.media_id || processedAsset.id;
-      if (iconUrlInput) iconUrlInput.value = processedAsset.url;
+      var preview = (processedAsset.variants || []).slice().sort(function (a, b) { return a.width - b.width; }).find(function (v) { return v.width >= 320; }) || (processedAsset.variants || [])[0];
+      var iconUrl = preview && preview.url ? preview.url : processedAsset.url;
+
+      if (mediaIdInput) mediaIdInput.value = processedAsset.media_id || processedAsset.id || mediaId;
+      if (iconUrlInput) iconUrlInput.value = iconUrl;
 
       if (statusEl) {
-        statusEl.textContent = '✓ Icon media berhasil diunggah dan siap digunakan.';
+        statusEl.textContent = '✓ Icon diproses otomatis: crop 1:1 + optimasi.';
         statusEl.style.color = '#16a34a';
       }
-
       updatePromotionPresentationPreview();
-      showToast('Icon promosi berhasil diunggah.');
+      showToast('Icon promosi berhasil diproses melalui Media System.');
     } catch (err) {
       console.error('[Promotion Icon Upload Error]:', err);
       if (statusEl) {
@@ -10692,8 +10692,12 @@ async function loadMenusView() {
         statusEl.style.color = '#ef4444';
       }
       showToast(err.message || 'Gagal memproses file icon.');
+      throw err;
+    } finally {
+      if (fileInput) fileInput.value = '';
     }
   }
+
   window.onPromotionIconFileSelected = onPromotionIconFileSelected;
 
   function formatDateTimeLocal(isoStr) {
@@ -11446,14 +11450,8 @@ async function loadMenusView() {
                 fileInput.value = '';
               }
             },
-            onCancel: async function () {
-              try {
-                var reader = new FileReader();
-                reader.onload = function (ev) {
-                  doUploadBrandLogo(file, null, ev.target.result, btnPick);
-                };
-                reader.readAsDataURL(file);
-              } catch (_) {}
+            onCancel: function () {
+              // Batal = discard this new file. The persisted logo remains unchanged.
               fileInput.value = '';
             }
           });

@@ -1213,7 +1213,7 @@
             </div>
             <div class="x-file-upload-info">
               <input type="file" id="bce-image-file" class="x-input" accept="image/png,image/jpeg,image/webp">
-              <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">JPG, PNG, atau WEBP. Maks 3MB. Tampil persegi (1:1) di Home.</small>
+              <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">JPG, PNG, atau WEBP. Maks 15MB. Hasil tampil persegi (1:1); Xentra akan crop, resize, dan kompresi otomatis.</small>
             </div>
           </div>
         </div>
@@ -1287,8 +1287,8 @@
               <span id="override-img-preview-mono" style="font-weight:700;color:#94a3b8;font-size:20px;">?</span>
             </div>
             <div class="x-file-upload-info">
-              <input type="file" id="override-img-file" class="x-input" accept="image/png,image/jpeg,image/webp">
-              <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">JPG, PNG, atau WEBP. Maks 3MB. Hanya foto menu cabang ini — tidak mengubah foto menu Master.</small>
+              <input type="file" id="override-img-file" class="x-input" accept="image/png,image/jpeg,image/webp" disabled>
+              <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Foto Menu Cabang legacy dinonaktifkan. Foto ditentukan oleh Master Product Owner.</small>
             </div>
           </div>
           <div style="font-size:11px;color:#64748b;margin-top:6px;">Status: <span id="override-img-status" style="font-weight:700;"></span></div>
@@ -1400,7 +1400,7 @@
 
       <div class="x-modal-footer">
         <button type="button" class="x-btn-secondary" id="btn-crop-cancel">Batal</button>
-        <button type="button" class="x-btn-primary" id="btn-crop-confirm">✓ Konfirmasi Potongan</button>
+        <button type="button" class="x-btn-primary" id="btn-crop-confirm">✓ Gunakan Potongan</button>
       </div>
     </div>
   </div>

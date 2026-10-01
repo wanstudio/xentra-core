@@ -40,7 +40,7 @@ test('Master resolver maps structured composition to Customer view fields', () =
   assert.equal(rows.length, 1);
   const p = rows[0];
   assert.equal(p.product_id, PRODUCT);
-  assert.equal(p.title, 'Ayam Tulang Lunak');
+  assert.equal(p.title, 'Master Internal Name');
   assert.equal(p.subtitle, 'Lombok Ijo');
   assert.deepEqual(p.detail, ['Nasi', 'Lalapan']);
   assert.equal(p.indicator, 'Level 3');
@@ -48,6 +48,7 @@ test('Master resolver maps structured composition to Customer view fields', () =
   assert.equal(p.image, 'ayam.png');
   assert.equal(p.price, 28000);
   assert.equal(p.master.name, 'Master Internal Name');
+  assert.equal(p.master.category_name, 'Ayam Tulang Lunak');
 });
 
 test('Branch resolver contains adopted Product and Branch Category but no legacy override fields', () => {
@@ -61,6 +62,14 @@ test('Branch resolver contains adopted Product and Branch Category but no legacy
   assert.equal(Object.prototype.hasOwnProperty.call(p, 'image_override'), false);
 });
 
+test('Master resolver keeps Category as grouping while Product name remains Customer title', () => {
+  const menu = MasterMenuResolver.resolveMasterMenu({ brandId: BRAND });
+  assert.equal(menu.categories.length, 1);
+  assert.equal(menu.categories[0].name, 'Ayam Tulang Lunak');
+  assert.equal(menu.categories[0].products.length, 1);
+  assert.equal(menu.categories[0].products[0].title, 'Master Internal Name');
+});
+
 test('Branch display-name override is optional and only changes Customer title', () => {
   db.prepare('UPDATE branch_products SET name_override = NULL WHERE branch_id = ? AND product_id = ?').run(BRANCH, PRODUCT);
 
@@ -69,7 +78,7 @@ test('Branch display-name override is optional and only changes Customer title',
     branchId: BRANCH,
     exposeBranchPresentationOverrides: true
   }).products[0];
-  assert.equal(fallback.title, 'Ayam Tulang Lunak');
+  assert.equal(fallback.title, 'Master Internal Name');
   assert.equal(fallback.subtitle, 'Lombok Ijo');
   assert.equal(fallback.display_name_override, null);
 

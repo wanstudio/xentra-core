@@ -20,6 +20,18 @@ class MediaRepository {
     return this;
   }
 
+  beginTransaction() {
+    return this.db.exec('BEGIN IMMEDIATE;');
+  }
+
+  commitTransaction() {
+    return this.db.exec('COMMIT;');
+  }
+
+  rollbackTransaction() {
+    return this.db.exec('ROLLBACK;');
+  }
+
   /**
    * Insert a new media record in temporary/uploading state.
    */
@@ -169,6 +181,9 @@ class MediaRepository {
       UPDATE media_assets
       SET status = 'orphan',
           orphaned_at = ?,
+          attached_to_type = NULL,
+          attached_to_id = NULL,
+          attached_at = NULL,
           updated_at = ?
       WHERE id = ? AND brand_id = ?
     `, [now, now, id, brandId]);

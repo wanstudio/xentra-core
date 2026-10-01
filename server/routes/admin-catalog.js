@@ -22,7 +22,7 @@ router.post('/admin/categories', requireAuth(['owner', 'brand_manager']), (req, 
     if (!name) return res.status(400).json({ success: false, error: 'Nama kategori wajib diisi.' });
 
     const id = 'cat_' + Date.now();
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const slug = normalizedName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
     
     db.prepare(`
       INSERT INTO categories (id, brand_id, name, slug, sort_order)
@@ -182,7 +182,13 @@ router.get('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req,
 router.post('/admin/products', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const { name, category_id, price, regular_price, description, image, pricing_mode, min_price, max_price } = req.body;
-    if (!name || !price) return res.status(400).json({ success: false, error: 'Nama dan harga menu wajib diisi.' });
+    const normalizedName = typeof name === 'string' ? name.trim() : '';
+    if (!normalizedName || price === undefined || price === null || price === '') {
+      return res.status(400).json({ success: false, error: 'Nama Produk dan harga menu wajib diisi.' });
+    }
+    if (!category_id) {
+      return res.status(400).json({ success: false, error: 'Kategori produk wajib dipilih.' });
+    }
 
     // P1 TENANT CATEGORY INTEGRITY GUARD (FINDING 02)
     if (category_id) {
@@ -196,7 +202,7 @@ router.post('/admin/products', requireAuth(['owner', 'brand_manager']), (req, re
     }
 
     const id = 'prod_' + Date.now();
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const slug = normalizedName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
     db.prepare(`
       INSERT INTO products (id, brand_id, category_id, name, slug, description, price, regular_price, pricing_mode, min_price, max_price, is_active, sort_order)
@@ -205,7 +211,7 @@ router.post('/admin/products', requireAuth(['owner', 'brand_manager']), (req, re
       id,
       req.brand_id,
       category_id !== undefined ? category_id : null,
-      name,
+      normalizedName,
       slug,
       description !== undefined ? description : '',
       Number(price),
@@ -220,11 +226,11 @@ router.post('/admin/products', requireAuth(['owner', 'brand_manager']), (req, re
       success: true,
       product: {
         id,
-        name,
+        name: normalizedName,
         category_id,
         price: Number(price),
         regular_price: regular_price ? Number(regular_price) : Number(price),
-        description,
+        description: description !== undefined ? description : '',
         image: image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400',
         is_active: 1
       }
@@ -237,6 +243,9 @@ router.post('/admin/products', requireAuth(['owner', 'brand_manager']), (req, re
 router.put('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const { name, category_id, price, regular_price, description, image, is_active, pricing_mode, min_price, max_price } = req.body;
+    if (name !== undefined && (typeof name !== 'string' || !name.trim())) {
+      return res.status(400).json({ success: false, error: 'Nama Produk tidak boleh kosong.' });
+    }
 
     // P1 TENANT CATEGORY INTEGRITY GUARD (FINDING 02)
     if (category_id !== undefined && category_id !== null) {
@@ -281,7 +290,7 @@ router.put('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req,
           updated_at = datetime('now')
       WHERE id = ? AND brand_id = ?
     `).run(
-      name !== undefined ? name : null,
+      name !== undefined ? name.trim() : null,
       category_id !== undefined ? category_id : null,
       price !== undefined ? price : null,
       regular_price !== undefined ? regular_price : null,

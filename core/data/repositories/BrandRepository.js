@@ -110,10 +110,11 @@ class BrandRepository {
     return this.db.queryOne('SELECT * FROM brands WHERE id = ? LIMIT 1', [brandId]);
   }
 
-  updateBrandProfile(brandId, { name, logo_url, tagline, primary_color, banners, merchant_pwa_icon_url, pos_pwa_icon_url, merchant_pwa_name, pos_pwa_name }) {
+  updateBrandProfile(brandId, { name, tagline, primary_color, merchant_pwa_name, pos_pwa_name }) {
     if (name !== undefined && (typeof name !== 'string' || !name.trim())) {
       throw new Error('Nama brand harus berupa teks yang valid.');
     }
+
     let normalizedPrimaryColor = undefined;
     if (primary_color !== undefined && primary_color !== null) {
       if (typeof primary_color !== 'string') {
@@ -129,53 +130,23 @@ class BrandRepository {
       }
       normalizedPrimaryColor = cleanHex.toUpperCase();
     }
-    let serializedBanners = null;
-    if (banners !== undefined && banners !== null) {
-      if (typeof banners === 'string') {
-        try {
-          const parsed = JSON.parse(banners);
-          if (!Array.isArray(parsed)) throw new Error();
-          serializedBanners = JSON.stringify(parsed);
-        } catch (_) {
-          throw new Error('Format banners JSON tidak valid, harus berupa JSON array.');
-        }
-      } else if (Array.isArray(banners)) {
-        serializedBanners = JSON.stringify(banners);
-      } else {
-        throw new Error('Format banners tidak valid, harus berupa array atau JSON string.');
-      }
-    }
 
+    // Media references are intentionally excluded. Logo, PWA icons, and banners
+    // must be created/replaced through the canonical Media System endpoints.
     clearDomainCache();
-    return this.db.execute(`
-      UPDATE brands
-      SET name = COALESCE(?, name),
-          logo_url = COALESCE(?, logo_url),
-          tagline = COALESCE(?, tagline),
-          primary_color = COALESCE(?, primary_color),
-          banners = COALESCE(?, banners),
-          merchant_pwa_icon_url = CASE WHEN ? IS NOT NULL THEN ? ELSE merchant_pwa_icon_url END,
-          pos_pwa_icon_url = CASE WHEN ? IS NOT NULL THEN ? ELSE pos_pwa_icon_url END,
-          merchant_pwa_name = CASE WHEN ? = 1 THEN ? ELSE merchant_pwa_name END,
-          pos_pwa_name = CASE WHEN ? = 1 THEN ? ELSE pos_pwa_name END,
-          updated_at = datetime('now')
-      WHERE id = ?
-    `, [
-      name !== undefined ? name.trim() : null,
-      logo_url !== undefined ? (typeof logo_url === 'string' ? logo_url.trim() : null) : null,
-      tagline !== undefined ? (typeof tagline === 'string' ? tagline.trim() : '') : null,
-      normalizedPrimaryColor !== undefined ? normalizedPrimaryColor : null,
-      banners !== undefined ? serializedBanners : null,
-      merchant_pwa_icon_url !== undefined ? merchant_pwa_icon_url : null,
-      merchant_pwa_icon_url !== undefined ? merchant_pwa_icon_url : null,
-      pos_pwa_icon_url !== undefined ? pos_pwa_icon_url : null,
-      pos_pwa_icon_url !== undefined ? pos_pwa_icon_url : null,
-      merchant_pwa_name !== undefined ? 1 : 0,
-      merchant_pwa_name !== undefined ? (typeof merchant_pwa_name === 'string' ? merchant_pwa_name.trim() || null : null) : null,
-      pos_pwa_name !== undefined ? 1 : 0,
-      pos_pwa_name !== undefined ? (typeof pos_pwa_name === 'string' ? pos_pwa_name.trim() || null : null) : null,
-      brandId
-    ]);
+    return this.db.execute(
+      "UPDATE brands SET name = COALESCE(?, name), tagline = COALESCE(?, tagline), primary_color = COALESCE(?, primary_color), merchant_pwa_name = CASE WHEN ? = 1 THEN ? ELSE merchant_pwa_name END, pos_pwa_name = CASE WHEN ? = 1 THEN ? ELSE pos_pwa_name END, updated_at = datetime('now') WHERE id = ?",
+      [
+        name !== undefined ? name.trim() : null,
+        tagline !== undefined ? (typeof tagline === 'string' ? tagline.trim() : '') : null,
+        normalizedPrimaryColor !== undefined ? normalizedPrimaryColor : null,
+        merchant_pwa_name !== undefined ? 1 : 0,
+        merchant_pwa_name !== undefined ? (typeof merchant_pwa_name === 'string' ? merchant_pwa_name.trim() || null : null) : null,
+        pos_pwa_name !== undefined ? 1 : 0,
+        pos_pwa_name !== undefined ? (typeof pos_pwa_name === 'string' ? pos_pwa_name.trim() || null : null) : null,
+        brandId
+      ]
+    );
   }
 
   updateBrandLogo(brandId, logoUrl) {
@@ -231,9 +202,12 @@ class BrandRepository {
   // These affect only the PWA launcher icon after install. They do not change
   // branding, RBAC, routing, or Customer PWA behavior.
 
-  updateMerchantPwaIcon(brandId, iconUrl) {
+  updateMerchantPwaIcon(brandId, { iconUrl, mediaId }) {
     clearDomainCache();
-    this.db.execute('UPDATE brands SET merchant_pwa_icon_url = ?, merchant_pwa_icon_media_id = NULL WHERE id = ?', [iconUrl, brandId]);
+    this.db.execute(
+      'UPDATE brands SET merchant_pwa_icon_url = ?, merchant_pwa_icon_media_id = ?, updated_at = datetime(\'now\') WHERE id = ?',
+      [iconUrl || null, mediaId || null, brandId]
+    );
   }
 
   removeMerchantPwaIcon(brandId) {
@@ -241,9 +215,12 @@ class BrandRepository {
     this.db.execute('UPDATE brands SET merchant_pwa_icon_url = NULL, merchant_pwa_icon_media_id = NULL WHERE id = ?', [brandId]);
   }
 
-  updatePosPwaIcon(brandId, iconUrl) {
+  updatePosPwaIcon(brandId, { iconUrl, mediaId }) {
     clearDomainCache();
-    this.db.execute('UPDATE brands SET pos_pwa_icon_url = ?, pos_pwa_icon_media_id = NULL WHERE id = ?', [iconUrl, brandId]);
+    this.db.execute(
+      'UPDATE brands SET pos_pwa_icon_url = ?, pos_pwa_icon_media_id = ?, updated_at = datetime(\'now\') WHERE id = ?',
+      [iconUrl || null, mediaId || null, brandId]
+    );
   }
 
   removePosPwaIcon(brandId) {

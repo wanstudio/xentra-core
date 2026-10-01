@@ -60,7 +60,8 @@ function resolveProductView({
   const activeComplements = complements || [];
   const branchAvailable = branchState ? branchState.is_available !== 0 : true;
   const hasDisplayNameOverride = typeof displayNameOverride === 'string' && displayNameOverride.trim() !== '';
-  const customerTitle = hasDisplayNameOverride ? displayNameOverride.trim() : product.category_name;
+  // products.name is the canonical Customer card title. Master Category is grouping only.
+  const customerTitle = hasDisplayNameOverride ? displayNameOverride.trim() : product.name;
   const customerSubtitle = hasDisplayNameOverride ? null : (activeFlavor ? activeFlavor.name : null);
 
   return {
@@ -95,7 +96,9 @@ function resolveProductView({
       name: product.name,
       slug: product.slug,
       description: product.description || '',
-      category_id: product.category_id
+      category_id: product.category_id,
+      category_name: product.category_name,
+      category_slug: product.category_slug
     }
   };
 }
@@ -114,8 +117,8 @@ class MasterMenuResolver {
       seen.add(id);
       categories.push({
         id: id,
-        name: product.title,
-        slug: String(product.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
+        name: product.master.category_name,
+        slug: product.master.category_slug || String(product.master.category_name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
         products: []
       });
     }

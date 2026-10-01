@@ -36,73 +36,15 @@
 
 
   /* =========================================================================
-     MODUL 3.2: BRANCH PRODUCT OVERRIDE — name / description / image_url
-     Master Product Default + Branch Optional Override
+     MODUL 3.2: BRANCH PRODUCT OVERRIDE — text / price / category only
+     PHOTO OVERRIDE IS LOCKED: Master Product Owner controls the image.
      ========================================================================= */
   var _overrideProductId = null;
-  var _bpSelectedFile = null; // staged photo File to upload on save
-  var _bpCropSpec = null;
-
-  (function initBranchProductPhoto() {
-    var fileInput = $('override-img-file');
-    if (!fileInput) return;
-    fileInput.addEventListener('change', function () {
-      var file = fileInput.files && fileInput.files[0];
-      if (!file) { _bpSelectedFile = null; _bpCropSpec = null; return; }
-
-      var allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-      if (allowed.indexOf(file.type) === -1) {
-        showToast('❌ Format gambar tidak didukung. Gunakan JPG, PNG, atau WEBP.');
-        fileInput.value = '';
-        return;
-      }
-      if (file.size > 20 * 1024 * 1024) {
-        showToast('❌ Ukuran gambar melebihi batas maksimal 20MB.');
-        fileInput.value = '';
-        return;
-      }
-
-      _bpSelectedFile = file;
-
-      XentraCropEditor.open({
-        source: file,
-        assetType: 'product',
-        aspectRatio: 1.0,
-        title: 'Potong & Posisikan Foto Cabang (1:1)',
-        onConfirm: function (cropSpec, previewDataUrl) {
-          _bpCropSpec = cropSpec;
-          var previewImg = $('override-img-preview');
-          var previewMono = $('override-img-preview-mono');
-          if (previewImg) {
-            previewImg.src = previewDataUrl || URL.createObjectURL(file);
-            previewImg.style.display = 'block';
-          }
-          if (previewMono) previewMono.style.display = 'none';
-          $('override-img-status').textContent = '🟡 OVERRIDE baru (potongan disesuaikan)';
-          showToast('✓ Potongan foto menu cabang disesuaikan.');
-        },
-        onCancel: function () {
-          var reader = new FileReader();
-          reader.onload = function (e) {
-            var previewImg = $('override-img-preview');
-            var previewMono = $('override-img-preview-mono');
-            if (!previewImg) return;
-            previewImg.src = e.target.result;
-            previewImg.style.display = 'block';
-            if (previewMono) previewMono.style.display = 'none';
-            $('override-img-status').textContent = '🟡 OVERRIDE baru (belum disimpan)';
-          };
-          reader.readAsDataURL(file);
-        }
-      });
-    });
-  })();
 
   window.openBranchOverrideModal = function (productDataRaw) {
     var p;
     try { p = JSON.parse(productDataRaw.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'")); } catch (e) { showToast('❌ Gagal membuka override.'); return; }
     _overrideProductId = p.product_id;
-    _bpSelectedFile = null;
 
     var modal = $('modal-branch-override');
     if (!modal) { showToast('❌ Modal override tidak ditemukan di HTML.'); return; }
@@ -123,7 +65,7 @@
     // Photo row — live override URL preview'd from the catalog payload
     var imgInput = $('override-img-file');
     if (imgInput) imgInput.value = '';
-    var hasImg = p.image_url || p.image_override || p.master_image_url;
+    var hasImg = p.image_url || p.master_image_url;
     var previewImg = $('override-img-preview');
     var previewMono = $('override-img-preview-mono');
     if (hasImg) {
@@ -135,7 +77,7 @@
       previewMono.style.display = 'block';
       previewMono.textContent = (p.name || p.master_name || '?').trim().slice(0, 1).toUpperCase();
     }
-    $('override-img-status').textContent = p.image_override ? '🟡 OVERRIDE aktif' : '🟢 DEFAULT (ikut Master)';
+    $('override-img-status').textContent = p.image_override ? '🟠 OVERRIDE legacy tersimpan (tidak digunakan)' : '🟢 DEFAULT (ikut Master)';
 
     // Price row — pricing policy drives editability (same UX as adopt modal)
     var isRange = String(p.pricing_mode).toLowerCase() === 'range';
@@ -190,7 +132,6 @@
     var modal = $('modal-branch-override');
     if (modal) modal.style.display = 'none';
     _overrideProductId = null;
-    _bpSelectedFile = null;
   };
 
   window.saveBranchProductOverride = async function () {
@@ -228,33 +169,6 @@
     }
 
     try {
-      // 1. Staged photo (if any) — upload first, server returns the override URL.
-      if (_bpSelectedFile) {
-        var base64 = await new Promise(function (resolve, reject) {
-          var reader = new FileReader();
-          reader.onload = function () { resolve(reader.result); };
-          reader.onerror = function () { reject(new Error('Gagal membaca file gambar.')); };
-          reader.readAsDataURL(_bpSelectedFile);
-        });
-
-        var branchImgPayload = { image_base64: base64, mime_type: _bpSelectedFile.type };
-        if (_bpCropSpec) {
-          branchImgPayload.crop_spec = _bpCropSpec;
-        }
-
-        var imgRes = await CatalogClient.uploadBranchProductImage(currentManagingBranchId, _overrideProductId, branchImgPayload);
-        var imgData = {};
-        try {
-          imgData = await imgRes.json();
-        } catch (_) {
-          imgData = { success: false, error: 'Respon server tidak valid saat mengunggah gambar.' };
-        }
-        if (!imgRes.ok || !imgData.success) {
-          showToast('❌ ' + (imgData.error || imgData.message || 'Gagal mengunggah gambar.'));
-          return;
-        }
-      }
-
       // 2. Text + price + category overrides
       var res = await CatalogClient.updateBranchProductOverride(currentManagingBranchId, _overrideProductId, payload);
       var data = await res.json();
@@ -280,8 +194,8 @@
 
   window.clearBranchProductOverride = async function () {
     if (!currentManagingBranchId || !_overrideProductId) return;
-    if (!confirm('Kembalikan semua nilai ke Master? Nama, deskripsi, foto, harga, dan kategori dikembalikan ke pengaturan asal produk Master.')) return;
-    var res = await CatalogClient.updateBranchProductOverride(currentManagingBranchId, _overrideProductId, { name: null, description: null, image_url: null, price: null, branch_category_id: null, category_ids: [] });
+    if (!confirm('Kembalikan nilai teks, harga, dan kategori ke Master? Foto Menu tetap mengikuti Master Product Owner.')) return;
+    var res = await CatalogClient.updateBranchProductOverride(currentManagingBranchId, _overrideProductId, { name: null, description: null, price: null, branch_category_id: null, category_ids: [] });
     var data = await res.json();
     if (data.success) {
       showToast('✅ Semua nilai dikembalikan ke Master.');
@@ -856,15 +770,9 @@
             showToast('✓ Potongan gambar kategori disesuaikan.');
           },
           onCancel: function () {
-            var reader = new FileReader();
-            reader.onload = function (e) {
-              var previewImg = $('bce-image-preview');
-              var previewMono = $('bce-image-preview-mono');
-              previewImg.src = e.target.result;
-              previewImg.style.display = 'block';
-              if (previewMono) previewMono.style.display = 'none';
-            };
-            reader.readAsDataURL(file);
+            _bceSelectedFile = null;
+            _bceCropSpec = null;
+            if (fileInput) fileInput.value = '';
           }
         });
       });

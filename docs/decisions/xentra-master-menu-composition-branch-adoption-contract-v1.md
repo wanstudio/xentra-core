@@ -88,9 +88,9 @@ Merchant **cannot**:
 
 One Master Product remains identified by `products.id`.
 
-`products.name` remains the durable internal/administrative product identity used by Core, search, reporting, references, and compatibility surfaces.
+`products.name` is the explicit Master Product Name used by Core, search, reporting, references, and the default Customer presentation.
 
-It is **not** the authoritative Customer card title for the new composition model when a Master Category is present.
+It **is** the authoritative Customer card title for the new composition model. Master Category remains grouping/classification only.
 
 The composition values are structured references. The combination of values is not a Product primary key.
 
@@ -109,7 +109,8 @@ products.category_id → categories.id
 Card presentation:
 
 ```
-categories.name → Customer card title
+products.name → Customer card title
+categories.name → Category grouping / classification
 ```
 
 A Master Product has **exactly one Master Category**.
@@ -241,9 +242,10 @@ Kelengkapan
 Level
 ```
 
-Owner then creates/edits a Master Product using selectors:
+Owner then creates/edits a Master Product using an explicit Product Name plus structured selectors:
 
 ```
+Nama Produk     [ required text ]
 Kategori        [ single select ]
 Rasa            [ single select / optional ]
 Kelengkapan     [ multi select ]
@@ -626,3 +628,25 @@ Master component **inactivation affects selection, not existing Product presenta
 - Physical deletion remains blocked while references exist.
 
 This avoids silently changing the customer-facing composition of an already configured menu merely because a vocabulary record was retired.
+
+
+## 🔒 SUPERSEDING DECISION — Product Name vs Category Display Boundary v1
+**Decision date: 1 October 2026**
+
+The earlier mapping `Kategori → Customer card title` is superseded. The forward contract is:
+
+```
+products.name       → Customer card title
+Master Category     → grouping / classification
+Master Flavor       → Customer card subtitle
+Master Complement[] → Customer card detail
+Master Level        → Customer card indicator
+```
+
+The Owner Product Editor must expose **Nama Produk** as a required editable field. Product Name must never be derived from Kategori + Rasa.
+
+For Master Menu resolution, Category nodes use the actual Master Category record (`categories.name`), while Product nodes use their own `products.name`. Multiple Products in one Category must remain individually distinguishable.
+
+Existing Branch Customer Display Name Override remains the narrow Branch-scoped exception: a non-empty `branch_products.name_override` replaces the Customer title for that Branch; clearing it restores the live Master Product Name. The existing subtitle-suppression behavior for an active override remains unchanged.
+
+**Source of truth:** `docs/decisions/xentra-product-name-category-display-boundary-v1.md`.

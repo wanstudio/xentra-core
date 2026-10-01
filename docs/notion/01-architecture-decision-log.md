@@ -1,3 +1,53 @@
+## 🔒 LOCKED — Canonical Single Media Engine Boundary v1 — 2026-10-01
+
+**Status:** LOCKED / AUTHORITATIVE
+
+All client-supplied image media must pass one canonical Xentra Media Engine before becoming an active application asset.
+
+Canonical flow:
+
+```text
+Client file
+→ UI preflight
+→ MediaService.stageUpload()
+→ ImageValidator
+→ CropSpec / crop intent
+→ ImageProcessor
+   → EXIF orientation normalization
+   → canonical crop
+   → resize without upscaling
+   → optimize/compress
+   → WebP delivery derivatives
+→ READY
+→ attach / replace
+→ delivery
+```
+
+Locked rules:
+- No HTTP route or repository may directly write uploaded image binaries.
+- Generic Brand/Profile settings are not media mutation APIs and cannot be used to inject image/media URLs.
+- Source images may be any aspect ratio; canonical crop is enforced by the server.
+- Product, Category, Logo, Avatar, Merchant/Owner PWA icon, POS PWA icon, and Promotion icon use 1:1 framing.
+- Banner uses approximately 1.94:1 framing.
+- EXIF orientation is normalized before crop interpretation.
+- CropSpec ratio is validated server-side.
+- Image geometry must never be stretched to force a target ratio.
+- WebP optimized derivatives are the normal delivery assets; originals are internal source assets.
+- Merchants upload normal originals; Xentra handles crop, resize, compression, and optimized delivery automatically.
+- **Batal** discards the newly selected media; **Gunakan Potongan** accepts crop intent.
+- UI upload copy must mirror the authoritative limits: Logo/PWA icon/Avatar/Promotion icon 10 MB, Product/Banner 20 MB, Category 15 MB.
+- Legacy compatibility paths may remain only as adapters into the canonical Media Engine. Raw-write media paths are forbidden.
+- Branch Product Photo Override remains quarantined/disabled under the current Menu architecture.
+
+Git source of truth:
+`docs/decisions/xentra-canonical-media-engine-boundary-v1.md`
+
+Detailed media contract:
+`docs/CLIENT_MEDIA_REQUIREMENTS.md`
+
+Regression boundary:
+`tests/mediaEngineContract.test.js`
+
 <!-- SNAPSHOT FROM NOTION — source page: 01-architecture-decision-log; fetched 2026-09-05 -->
 
 ## 🔒 LOCKED — Master Menu Migration Lifecycle: Expand → Migrate → Verify → Contract (2026-09-30)
@@ -456,3 +506,25 @@ This is a presentation/UI contract only. No changes are authorized to Core autho
 
 The Home must reuse existing mature Xentra primitives and must not extend quarantined legacy UI/domain assumptions.
 \n\n## 🔒 LOCKED — Presentation Shell vs Feature Context v1 — 2026-09-30\n\nXentra separates **how** a feature is presented from **what** the feature does.\n\nReusable presentation shells: Page, Bottom Sheet, Dialog/Modal, Overlay, Side Sheet/Panel, and applicable Picker shells. Feature contexts remain independent: Category Editor, Flavor Editor, Product Editor, Branch Editor, Promo Editor, Customer Editor, etc.\n\nThe same feature context may be composed into different shells by UX context without duplicating business logic. Shells own presentation behavior; contexts own task state, validation, and domain actions. Reuse existing mature Xentra primitives and do not create feature-specific shell duplicates or a second generic UI framework.\n\nGit source of truth: `docs/decisions/xentra-presentation-shell-vs-feature-context-v1.md`.\n
+
+# 🔒 LOCKED — Product Name vs Category Display Boundary v1 — 2026-10-01
+
+The prior `Kategori → Customer title` interpretation is superseded.
+
+Canonical Product presentation is now:
+
+```
+products.name       → Customer card title
+Master Category     → grouping / classification
+Master Flavor       → Customer card subtitle
+Master Complement[] → Customer card detail
+Master Level        → Customer card indicator
+```
+
+**Owner Product Editor:** Nama Produk is a visible, required, editable field. Product Name must never be generated from Kategori + Rasa.
+
+**Resolver invariant:** the Customer title is `products.name` unless the explicitly supported Branch Customer Display Name Override is active. Category nodes in the Master catalog tree retain `categories.name` and are never renamed to a Product title.
+
+No schema migration is required because `products.name` already exists. This is a correction to the canonical read/presentation contract and its UI implementation.
+
+**Source of truth:** `docs/decisions/xentra-product-name-category-display-boundary-v1.md`.

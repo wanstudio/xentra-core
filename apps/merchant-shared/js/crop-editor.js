@@ -257,6 +257,12 @@
         _titleEl.textContent = _activeConfig.title ||
           (assetType === 'banner' ? 'Sesuaikan Banner Promo (~1.94:1)' : 'Sesuaikan Potongan Foto (1:1)');
       }
+      var subtitleEl = $('crop-editor-subtitle');
+      if (subtitleEl) {
+        subtitleEl.textContent = assetType === 'banner'
+          ? 'Geser dan sesuaikan zoom. Area di dalam bingkai akan menjadi banner ±1.94:1.'
+          : 'Geser dan sesuaikan zoom. Area di dalam bingkai akan menjadi foto persegi 1:1.';
+      }
       if (_ratioInfo) {
         _ratioInfo.textContent = 'Rasio Target: ' +
           (assetType === 'banner' ? '±1.94:1 (Banner)' : '1:1 (Persegi)');

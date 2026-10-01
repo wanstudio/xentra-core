@@ -77,15 +77,13 @@ router.get('/admin/settings/business/profile', requireAuth(['owner', 'brand_mana
 // 2.2 Brand Profile (PUT - Owner/Brand Manager only)
 router.put('/admin/settings/business/profile', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
-    const { name, tagline, logo_url, primary_color, banners, merchant_pwa_icon_url, pos_pwa_icon_url, merchant_pwa_name, pos_pwa_name } = req.body;
+    const { name, tagline, primary_color, merchant_pwa_name, pos_pwa_name } = req.body;
+    // Media URLs are read-only here. Logo/icon/banner changes must go through
+    // the canonical Media System upload/delete endpoints.
     coreBrandRepo.updateBrandProfile(req.brand_id, {
       name,
       tagline,
-      logo_url,
       primary_color,
-      banners,
-      merchant_pwa_icon_url,
-      pos_pwa_icon_url,
       merchant_pwa_name,
       pos_pwa_name
     });

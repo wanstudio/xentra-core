@@ -257,7 +257,8 @@ class BannerContentService {
         mediaId: content.mediaId,
         brandId,
         entityType: 'banner_content_revision',
-        entityId: revisionId
+        entityId: revisionId,
+        manageTransaction: false
       });
 
       this.repository.commitTransaction();
@@ -337,7 +338,8 @@ class BannerContentService {
           mediaId: content.mediaId,
           brandId,
           entityType: 'banner_content_revision',
-          entityId: revisionId
+          entityId: revisionId,
+          manageTransaction: false
         });
       } else {
         if (draft.media_id !== content.mediaId) {
@@ -346,7 +348,8 @@ class BannerContentService {
             oldMediaId: draft.media_id,
             brandId,
             entityType: 'banner_content_revision',
-            entityId: draft.id
+            entityId: draft.id,
+            manageTransaction: false
           });
         }
 

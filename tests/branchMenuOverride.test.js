@@ -14,12 +14,12 @@
  *  OVR-05  GET source/status (master_name, master_description, master_image_url exposed)
  *  OVR-06  name override set
  *  OVR-07  description override set
- *  OVR-08  image override set
+ *  OVR-08  image_url mutation is quarantined (branch photo is Master-owned)
  *  OVR-09  name override clear (null -> inherit master)
  *  OVR-10  description override clear
- *  OVR-11  image override clear
- *  OVR-12  master propagation without override (all 3 fields)
- *  OVR-13  master propagation WITH override (override wins, master change ignored)
+ *  OVR-11  legacy image_override cannot shadow Master photo
+ *  OVR-12  master propagation without text override
+ *  OVR-13  master propagation WITH supported text override
  *  OVR-14  authorization cross-branch (branch manager of branch B cannot override branch A)
  *  OVR-15  PATCH empty body returns 400
  *  OVR-16  migration legacy identical -> NULL
@@ -216,14 +216,15 @@ test('OVR-07 description override: PATCH description sets description_override',
   assert.strictEqual(p.description_override, 'Branch description');
 });
 
-test('OVR-08 image override: PATCH image_url sets image_override', async function() {
+test('OVR-08 image override: PATCH image_url is quarantined', async function() {
   clearOverrides();
   var res = await patchOverride(BRANCH, PRODUCT, { image_url: '/branch-img.png' });
-  assert.strictEqual(res.status, 200);
+  assert.strictEqual(res.status, 410);
+  assert.strictEqual(res.body.error, 'BRANCH_PRODUCT_IMAGE_OVERRIDE_DISABLED');
+
   var p = getProduct(BRANCH);
-  assert.strictEqual(p.image_url, '/branch-img.png', 'catalog returns branch image');
-  assert.strictEqual(p.name, 'Master Name', 'name unchanged -> master');
-  assert.strictEqual(p.image_override, '/branch-img.png');
+  assert.strictEqual(p.image_url, '/master-img.png', 'catalog always resolves photo from Master Product');
+  assert.strictEqual(p.image_override, null, 'legacy image_override is not created by the forward endpoint');
 });
 
 test('OVR-09 name override clear: PATCH name=null -> inherits master', async function() {
@@ -244,13 +245,15 @@ test('OVR-10 description override clear: PATCH description=null -> inherits mast
   assert.strictEqual(p.description_override, null, 'description_override cleared');
 });
 
-test('OVR-11 image override clear: PATCH image_url=null -> inherits master', async function() {
-  db.prepare('UPDATE branch_products SET image_override = ? WHERE branch_id = ? AND product_id = ?').run('/branch.png', BRANCH, PRODUCT);
-  var res = await patchOverride(BRANCH, PRODUCT, { image_url: null });
-  assert.strictEqual(res.status, 200);
+test('OVR-11 legacy image override cannot shadow the Master Product photo', function() {
+  clearOverrides();
+  db.prepare('UPDATE branch_products SET image_override = ? WHERE branch_id = ? AND product_id = ?').run('/legacy-branch.png', BRANCH, PRODUCT);
+
   var p = getProduct(BRANCH);
-  assert.strictEqual(p.image_url, '/master-img.png', 'image_url falls back to master');
-  assert.strictEqual(p.image_override, null, 'image_override cleared');
+  assert.strictEqual(p.image_url, '/master-img.png', 'legacy branch photo no longer wins over Master');
+  assert.strictEqual(p.master_image_url, '/master-img.png');
+
+  clearOverrides();
 });
 
 test('OVR-12 master propagation without override: all 3 fields follow master update', function() {
@@ -465,7 +468,7 @@ test('OVR-21 category move: valid own-branch category applies, cross-branch reje
   db.prepare('UPDATE branch_products SET branch_category_id = ? WHERE branch_id = ? AND product_id = ?').run(cats[0].id, BRANCH, PRODUCT);
 });
 
-test('OVR-22 branch product photo upload sets image_override and resolves in customer catalog', async function() {
+test('OVR-22 branch product photo upload is quarantined by the Master Product media boundary', async function() {
   clearOverrides();
   var tok = await getAuthToken();
 
@@ -474,33 +477,13 @@ test('OVR-22 branch product photo upload sets image_override and resolves in cus
     headers: { authorization: 'Bearer ' + tok },
     body: JSON.stringify({ image_base64: TINY_PNG_BASE64, mime_type: 'image/png' })
   });
-  assert.strictEqual(res.status, 200, 'image upload accepted: ' + JSON.stringify(res.body));
-  assert.ok(
-    /^\/assets\/uploads\/branch-products\//.test(res.body.product.image_override),
-    'override URL under /assets/uploads/branch-products/: ' + res.body.product.image_override
-  );
+
+  assert.strictEqual(res.status, 410, 'branch product photo override must be disabled: ' + JSON.stringify(res.body));
+  assert.strictEqual(res.body.success, false);
+  assert.strictEqual(res.body.code, 'BRANCH_PRODUCT_IMAGE_OVERRIDE_DISABLED');
 
   var row = db.prepare('SELECT image_override FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH, PRODUCT);
-  assert.strictEqual(row.image_override, res.body.product.image_override, 'image_override persisted');
-
-  var p = getProduct(BRANCH);
-  assert.strictEqual(p.image_url, res.body.product.image_override, 'customer catalog resolves branch photo');
-
-  // unsupported mime is rejected before any write
-  var bad = await mockFetch('/api/v1/admin/branches/' + BRANCH + '/products/' + PRODUCT + '/image', {
-    method: 'POST',
-    headers: { authorization: 'Bearer ' + tok },
-    body: JSON.stringify({ image_base64: NON_IMAGE_BASE64, mime_type: 'image/svg+xml' })
-  });
-  assert.strictEqual(bad.status, 400, 'unsupported mime rejected');
-
-  // missing image is rejected
-  var missing = await mockFetch('/api/v1/admin/branches/' + BRANCH + '/products/' + PRODUCT + '/image', {
-    method: 'POST',
-    headers: { authorization: 'Bearer ' + tok },
-    body: JSON.stringify({ mime_type: 'image/png' })
-  });
-  assert.strictEqual(missing.status, 400, 'missing image rejected');
+  assert.strictEqual(row.image_override, null, 'disabled endpoint must not persist image_override');
 
   clearOverrides();
-});
+});;
