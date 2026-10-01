@@ -131,6 +131,9 @@ Merchant-facing instruction is intentionally: **upload the normal original photo
 
 ### Strict entity and lifecycle boundary
 
+Brand-owned media bindings are committed atomically with their `brands.*_media_id` references so a DB failure cannot leave a newly attached asset without its owning reference or vice versa.
+
+
 The canonical Media Engine also locks the consumer/attachment contract, not only binary processing:
 
 - `brand_logo` → `logo`
