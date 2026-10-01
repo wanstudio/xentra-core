@@ -408,6 +408,8 @@ Order identity continues to use `product_id`, not the display title.
 
 Branch adoption remains separate from Master taxonomy/composition.
 
+**Pre-lock direction:** Branch may adopt approved Master Products and classify them into Branch Categories, but Branch must not rename the Master Product or alter its customer-facing Master identity.
+
 Merchant may adopt approved Master Products and classify them into Branch Categories.
 
 Merchant does not edit:
@@ -418,7 +420,7 @@ Merchant does not edit:
 - Sub Category ↔ Rasa compatibility;
 - Master Product composition.
 
-The existing Branch Customer Display Name Override would need an explicit decision review because the primary title is no longer `products.name`.
+**The existing Branch Customer Display Name Override is proposed for cancellation under this new concept.** Branch naming must not be an independent Product identity/presentation authority. If a Branch needs a different grouping or merchandising label, it should use Branch Categories or another explicitly scoped Branch presentation mechanism that does not rename the Product identity.
 
 ## 14. Major UX risks to validate before lock
 
