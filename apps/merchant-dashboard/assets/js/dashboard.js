@@ -4346,18 +4346,13 @@ async function loadMenusView() {
     var flavorSelect = $('prod-flavor');
     if (flavorSelect) flavorSelect.addEventListener('change', function() {
       _masterMenuSelected.flavor_id = flavorSelect.value || '';
+      renderMasterMenuCustomerPreview();
     });
     var categorySelect = $('prod-category');
     if (categorySelect) categorySelect.addEventListener('change', function() {
       _masterMenuSelected.category_id = categorySelect.value || '';
       renderMasterMenuCustomerPreview();
       renderMasterMenuSelectors();
-    });
-
-    var flavorSelect = $('prod-flavor');
-    if (flavorSelect) flavorSelect.addEventListener('change', function() {
-      _masterMenuSelected.flavor_id = flavorSelect.value || '';
-      renderMasterMenuCustomerPreview();
     });
     var nameInput = $('prod-name');
     if (nameInput) nameInput.addEventListener('input', function() {
