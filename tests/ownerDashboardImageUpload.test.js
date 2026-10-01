@@ -131,7 +131,7 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
   // Aspect ratio enforcement belongs to the crop/processing stage (M3), NOT intake validation.
   // enforceAspectRatio defaults to false — source can be any ratio; crop makes it 1:1.
   await t.test('2. Brand Logo: Non-square source (350x180) ACCEPTED at intake — crop fixes ratio', async () => {
-    const rectJpeg = createJpegBuffer(350, 180);
+    const rectJpeg = await createJpegBuffer(350, 180);
     const base64 = rectJpeg.toString('base64');
 
     const prevBrandRow = db.prepare('SELECT logo_url FROM brands WHERE id = ?').get(BRAND_ID);
@@ -211,7 +211,7 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
       db.prepare('UPDATE brands SET banners = ? WHERE id = ?').run(JSON.stringify(parsed.slice(0, 2)), BRAND_ID);
     }
 
-    const bannerJpeg = createJpegBuffer(350, 180);
+    const bannerJpeg = await createJpegBuffer(350, 180);
     const base64 = bannerJpeg.toString('base64');
 
 
@@ -246,7 +246,7 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
       db.prepare('UPDATE brands SET banners = ? WHERE id = ?').run(JSON.stringify(parsed.slice(0, 2)), BRAND_ID);
     }
 
-    const squareJpeg = createJpegBuffer(200, 200);
+    const squareJpeg = await createJpegBuffer(200, 200);
     const base64 = squareJpeg.toString('base64');
 
     const res = await makeRequest(server, {
@@ -269,7 +269,7 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
     let testProd = db.prepare('SELECT id, image_url FROM products WHERE brand_id = ? LIMIT 1').get(BRAND_ID);
     assert.ok(testProd, 'A product must exist for testing');
 
-    const squareJpeg = createJpegBuffer(300, 300);
+    const squareJpeg = await createJpegBuffer(300, 300);
     const base64 = squareJpeg.toString('base64');
 
     const res = await makeRequest(server, {
@@ -317,7 +317,7 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
   // ============================================================
 
   await t.test('R1. Product: Non-square source (1200x900) accepted by validateImageUpload', () => {
-    const buf = createJpegBuffer(1200, 900);
+    const buf = await createJpegBuffer(1200, 900);
     const base64 = buf.toString('base64');
     const result = validateImageUpload({
       imageBase64: base64,
@@ -331,7 +331,7 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
   });
 
   await t.test('R2. Category: Non-square source (1600x900) accepted by validateImageUpload', () => {
-    const buf = createJpegBuffer(1600, 900);
+    const buf = await createJpegBuffer(1600, 900);
     const base64 = buf.toString('base64');
     const result = validateImageUpload({
       imageBase64: base64,
@@ -343,7 +343,7 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
   });
 
   await t.test('R3. Logo: Non-square source (800x600) accepted by validateImageUpload', () => {
-    const buf = createJpegBuffer(800, 600);
+    const buf = await createJpegBuffer(800, 600);
     const base64 = buf.toString('base64');
     const result = validateImageUpload({
       imageBase64: base64,
@@ -355,7 +355,7 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
   });
 
   await t.test('R4. Banner: Non-square source (1200x1200 square) accepted by validateImageUpload', () => {
-    const buf = createJpegBuffer(1200, 1200);
+    const buf = await createJpegBuffer(1200, 1200);
     const base64 = buf.toString('base64');
     const result = validateImageUpload({
       imageBase64: base64,
@@ -368,7 +368,7 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
 
   await t.test('R5. Product: File exceeding 20 MB rejected with FILE_TOO_LARGE', () => {
     // Build a buffer slightly above 20MB by padding a minimal JPEG
-    const base = createJpegBuffer(100, 100);
+    const base = await createJpegBuffer(100, 100);
     const filler = Buffer.alloc(20 * 1024 * 1024 + 1024);
     const bigBuf = Buffer.concat([base, filler]);
     const base64 = bigBuf.toString('base64');
@@ -383,7 +383,7 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
   });
 
   await t.test('R6. Category: File exceeding 15 MB rejected with FILE_TOO_LARGE', () => {
-    const base = createJpegBuffer(100, 100);
+    const base = await createJpegBuffer(100, 100);
     const filler = Buffer.alloc(15 * 1024 * 1024 + 1024);
     const bigBuf = Buffer.concat([base, filler]);
     const base64 = bigBuf.toString('base64');
@@ -398,7 +398,7 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
   });
 
   await t.test('R7. Banner: File exceeding 20 MB rejected with FILE_TOO_LARGE', () => {
-    const base = createJpegBuffer(100, 100);
+    const base = await createJpegBuffer(100, 100);
     const filler = Buffer.alloc(20 * 1024 * 1024 + 1024);
     const bigBuf = Buffer.concat([base, filler]);
     const base64 = bigBuf.toString('base64');
@@ -413,7 +413,7 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
   });
 
   await t.test('R8. Logo: File exceeding 10 MB rejected with FILE_TOO_LARGE', () => {
-    const base = createJpegBuffer(100, 100);
+    const base = await createJpegBuffer(100, 100);
     const filler = Buffer.alloc(10 * 1024 * 1024 + 1024);
     const bigBuf = Buffer.concat([base, filler]);
     const base64 = bigBuf.toString('base64');
@@ -430,7 +430,7 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
   await t.test('R9. 20 MP safety ceiling: oversized pixel count rejected with PIXEL_COUNT_TOO_LARGE', () => {
     // createJpegBuffer uses only header bytes — we can set any width/height to test dimension logic
     // 4500x4500 = 20.25MP > 20MP ceiling
-    const buf = createJpegBuffer(4500, 4500);
+    const buf = await createJpegBuffer(4500, 4500);
     const base64 = buf.toString('base64');
     const result = validateImageUpload({
       imageBase64: base64,
@@ -444,7 +444,7 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
 
   await t.test('R10. 20 MP boundary: 4000x4000 (16MP) within 20MP ceiling accepted', () => {
     // 4000x4000 = 16MP — within maxWidth/maxHeight (4096) and under 20MP ceiling
-    const buf = createJpegBuffer(4000, 4000);
+    const buf = await createJpegBuffer(4000, 4000);
     const base64 = buf.toString('base64');
     const result = validateImageUpload({
       imageBase64: base64,
@@ -494,7 +494,7 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
     let testProd = db.prepare('SELECT id FROM products WHERE brand_id = ? LIMIT 1').get(BRAND_ID);
     assert.ok(testProd, 'A product must exist for testing');
 
-    const nonSquareJpeg = createJpegBuffer(1200, 900);
+    const nonSquareJpeg = await createJpegBuffer(1200, 900);
     const base64 = nonSquareJpeg.toString('base64');
 
     const res = await makeRequest(server, {
