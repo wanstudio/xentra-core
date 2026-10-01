@@ -623,70 +623,75 @@ Product 1 + Product 2 + Product 3
 ```
 
 
-## 🔒 LOCKED SUB-DECISION — Identity Change UX Preserves the Editing Mental Model
+## 🔒 LOCKED SUB-DECISION — Identity Change Is In-place When Unique
 
 **Decision date:** 2026-10-01
 
-When a Product Identity component changes (Category, Sub Category, or Rasa), the Owner should experience the action as **editing the existing menu**, not as starting a blank Product.
+For an existing Product, changing an Identity component (Category, Sub Category, or Rasa) is still presented as a normal **Edit Product** action.
 
-Because the identity changes, Core may need to create a new underlying Product identity. However, the UI must automatically carry forward the existing non-identity Product data into the new identity as editable state.
+If the target identity is not already used by another Product, Core updates the same Product record in place.
 
 Conceptually:
 
-```
+\`\`\`
 P001
 Ayam / Ayam Bakar / Original
-  ├── image
-  ├── description
-  ├── price
-  ├── complements
-  ├── level
-  └── POS configuration
 
-Owner changes Rasa:
+Owner edits Rasa:
 Original → Lombok Ijo
 
-UX result:
-P002
+if target identity is unused:
+
+P001
 Ayam / Ayam Bakar / Lombok Ijo
-  ├── copied image
-  ├── copied description
-  ├── copied price
-  ├── copied complements
-  ├── copied level
-  └── copied POS configuration
-```
+\`\`\`
 
-The system must first check whether the target identity already exists.
+Non-identity data stays attached to the same Product ID:
 
-- If the target identity already exists, do **not** create a duplicate Product. The UI must explain that the target Product already exists and offer a clear recovery path.
-- If the target identity does not exist, create the new Product identity with copied non-identity configuration.
-- The original Product remains historically stable according to Product lifecycle rules; it is not silently mutated into a different identity.
+- image;
+- description;
+- price;
+- complements;
+- level;
+- POS configuration;
+- other approved Product fields.
 
-This is a UX/domain contract: **"edit identity" is presented as an edit workflow, while Core preserves immutable Product identity underneath.**
+Historical orders remain unchanged because the order stores the authoritative historical menu snapshot used at purchase time.
 
+If the target identity is already used by another Product, the edit must not mutate either Product and must enter the locked duplicate-identity recovery flow below.
+
+This means the UX mental model and the Product ID remain aligned: **an edit is an edit** when the requested identity is available.
 
 ## 🔒 LOCKED SUB-DECISION — Duplicate Identity Recovery UI
 
 **Decision date:** 2026-10-01
 
-When an Owner changes a Product Identity component and the target identity already exists, Core must not create a duplicate Product.
+When an Owner edits a Product Identity component and the target identity already exists, Core must not mutate the current Product into that identity.
 
-The Product Editor presents a modal overlay explaining the conflict and provides:
+The Product Editor presents a modal overlay:
 
-[ Buka Produk yang Sudah Ada ]   [ Batal ]
+\`\`\`
+Produk sudah ada
 
-The overlay also has the standard \`×\` close control.
+Produk dengan kombinasi tersebut sudah tersedia.
+
+[Buka Produk yang Sudah Ada]   [Batal]
+                              ×
+\`\`\`
 
 Behavior:
 
-- **Buka Produk yang Sudah Ada** → close the conflict modal and navigate/open the existing target Product in the Product Editor.
-- **Batal** → close the conflict modal and keep the current Product Editor state unchanged.
+- **Buka Produk yang Sudah Ada** → close the modal and open the target Product in a **read-only detail Bottom Sheet**.
+- **Batal** → close the modal and keep the current Product Editor state unchanged.
 - **×** → same dismissal semantics as Batal.
-- The system must not silently merge two Products.
+- The detail Bottom Sheet has **no Edit CTA**.
+- The user must deliberately leave the conflict flow and choose the existing Product from the normal Product management surface when they intentionally want to edit it.
+- The system must not silently merge Products.
 - The system must not silently overwrite the existing target Product.
 
-The exact copy can be refined during UI implementation, but the CTA behavior and recovery semantics are fixed for this proposal.
+The principle is:
+
+> **Conflict → inspect, not edit.**
 
 
 ## 🔒 LOCKED SUB-DECISION — Identity Change Does Not Auto-Deactivate the Original Product
