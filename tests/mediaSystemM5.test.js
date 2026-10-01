@@ -665,7 +665,7 @@ test('MEDIA SYSTEM M5 — OWNER DASHBOARD MEDIA INTEGRATION SUITE', async (t) =>
   // We use the live HTTP server to test round-trip behavior.
 
   await t.test('18-21. Dashboard endpoint regression: legacy upload routes still work (M1 regression guard)', async () => {
-    // Test the legacy /admin/brand/logo endpoint still returns 200 for valid uploads
+    // Compatibility /admin/brand/logo endpoint remains available and now routes through the canonical Media System.
     const squarePng = createPngBuffer(200, 200);
     const b64 = squarePng.toString('base64');
 
