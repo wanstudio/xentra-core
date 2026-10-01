@@ -45,7 +45,6 @@
     var p;
     try { p = JSON.parse(productDataRaw.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'")); } catch (e) { showToast('❌ Gagal membuka override.'); return; }
     _overrideProductId = p.product_id;
-    _bpSelectedFile = null;
 
     var modal = $('modal-branch-override');
     if (!modal) { showToast('❌ Modal override tidak ditemukan di HTML.'); return; }
@@ -133,7 +132,6 @@
     var modal = $('modal-branch-override');
     if (modal) modal.style.display = 'none';
     _overrideProductId = null;
-    _bpSelectedFile = null;
   };
 
   window.saveBranchProductOverride = async function () {
