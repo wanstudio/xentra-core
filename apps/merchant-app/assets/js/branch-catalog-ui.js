@@ -171,33 +171,6 @@
     }
 
     try {
-      // 1. Staged photo (if any) — upload first, server returns the override URL.
-      if (_bpSelectedFile) {
-        var base64 = await new Promise(function (resolve, reject) {
-          var reader = new FileReader();
-          reader.onload = function () { resolve(reader.result); };
-          reader.onerror = function () { reject(new Error('Gagal membaca file gambar.')); };
-          reader.readAsDataURL(_bpSelectedFile);
-        });
-
-        var branchImgPayload = { image_base64: base64, mime_type: _bpSelectedFile.type };
-        if (_bpCropSpec) {
-          branchImgPayload.crop_spec = _bpCropSpec;
-        }
-
-        var imgRes = await CatalogClient.uploadBranchProductImage(currentManagingBranchId, _overrideProductId, branchImgPayload);
-        var imgData = {};
-        try {
-          imgData = await imgRes.json();
-        } catch (_) {
-          imgData = { success: false, error: 'Respon server tidak valid saat mengunggah gambar.' };
-        }
-        if (!imgRes.ok || !imgData.success) {
-          showToast('❌ ' + (imgData.error || imgData.message || 'Gagal mengunggah gambar.'));
-          return;
-        }
-      }
-
       // 2. Text + price + category overrides
       var res = await CatalogClient.updateBranchProductOverride(currentManagingBranchId, _overrideProductId, payload);
       var data = await res.json();
