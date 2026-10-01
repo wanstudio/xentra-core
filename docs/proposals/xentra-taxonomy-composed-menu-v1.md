@@ -803,3 +803,21 @@ Rules:
 - Customer-facing titles resolve from the updated Sub Category name.
 - Historical orders remain unchanged because they use the historical order/menu snapshot.
 - Before commit, Core must validate that the resulting Product identities remain unique under the new Sub Category identity context. If the rename would create duplicate Product identities, the rename must be blocked with a conflict message rather than silently creating/merging Products.
+
+
+## 🔒 LOCKED SUB-DECISION — Archive-First Taxonomy Lifecycle
+
+**Decision date:** 2026-10-01
+
+For the new Xentra taxonomy UX, Master Category and its direct taxonomy descendants use an **archive-first lifecycle**.
+
+UI rules:
+
+- A Category that is not empty is **not deletable**.
+- The primary destructive lifecycle action for a populated Category is **Archive**, not Delete.
+- Archiving a Category also archives its descendant Sub Categories as part of the same taxonomy lifecycle action.
+- A Category may be permanently deleted only when it is empty according to the current dependency rules.
+- No automatic Product migration is triggered by Archive.
+- This is a UX/lifecycle decision only at this stage; no production implementation is implied by this document.
+
+Product records are not themselves considered descendants for purposes of automatic deletion. Product lifecycle remains governed by the Product domain.
