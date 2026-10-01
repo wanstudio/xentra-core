@@ -1760,12 +1760,10 @@
           </div>
         </div>
 
-        <!-- Disembunyikan, bukan dihapus. `required` sengaja dilepas: field required yang
-             display:none membuat browser menolak submit (not focusable). Isi nilainya
-             masih dipakai payload simpan (name: $('prod-name').value). -->
-        <div class="x-form-group" id="prod-name-group" hidden>
-          <label for="prod-name">Nama Internal Master</label>
-          <input type="text" id="prod-name" class="x-input" placeholder="Contoh: Bebek Goreng Crispy">
+        <div class="x-form-group" id="prod-name-group">
+          <label for="prod-name">Nama Produk <span class="x-required-mark" aria-hidden="true">*</span></label>
+          <input type="text" id="prod-name" class="x-input" required maxlength="160" autocomplete="off" placeholder="Contoh: Bebek Goreng Crispy">
+          <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Nama ini menjadi judul utama yang tampil di Customer PWA. Kategori hanya untuk pengelompokan produk.</small>
         </div>
         <div id="master-legacy-migration-notice" class="x-form-group" style="display:none;padding:10px 12px;border:1px solid #fde68a;border-radius:10px;background:#fffbeb;">
           <div style="font-size:12px;font-weight:700;color:#92400e;">Lengkapi format Master Menu</div>
