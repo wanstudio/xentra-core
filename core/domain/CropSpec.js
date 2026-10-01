@@ -29,6 +29,14 @@ const CANONICAL_ASPECT_RATIOS = {
   general: null
 };
 
+const CANONICAL_ASPECT_TOLERANCES = {
+  logo: 0.02,
+  product: 0.02,
+  category: 0.02,
+  avatar: 0.02,
+  banner: 0.05
+};
+
 class CropSpec {
   constructor({
     x = 0,
@@ -84,6 +92,25 @@ class CropSpec {
 
     if (this.zoom < 1.0) {
       throw new Error('zoom must be >= 1.0.');
+    }
+
+    // Canonical crop contract: enforce aspect ratio server-side so a caller
+    // cannot submit a valid coordinate box that later gets stretched into
+    // a square/banner derivative.
+    const targetRatio = CANONICAL_ASPECT_RATIOS[this.asset_type];
+    if (targetRatio !== null && targetRatio !== undefined) {
+      const actualRatio = this.width / this.height;
+      const tolerance = CANONICAL_ASPECT_TOLERANCES[this.asset_type] || 0.02;
+      if (Math.abs(actualRatio - targetRatio) > tolerance) {
+        throw new Error(
+          "Crop ratio is invalid for asset_type '" + this.asset_type + "': expected ~" + targetRatio.toFixed(2) + ":1, got " + actualRatio.toFixed(2) + ":1."
+        );
+      }
+      if (this.aspect_ratio !== null && Math.abs(this.aspect_ratio - actualRatio) > tolerance) {
+        throw new Error(
+          "aspect_ratio does not match crop dimensions: expected " + actualRatio.toFixed(2) + ", got " + this.aspect_ratio.toFixed(2) + "."
+        );
+      }
     }
 
     if (!VALID_ASSET_TYPES.includes(this.asset_type)) {
@@ -166,5 +193,6 @@ class CropSpec {
 module.exports = {
   CropSpec,
   VALID_ASSET_TYPES,
-  CANONICAL_ASPECT_RATIOS
+  CANONICAL_ASPECT_RATIOS,
+  CANONICAL_ASPECT_TOLERANCES
 };
