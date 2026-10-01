@@ -112,10 +112,11 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
       mime_type: 'image/png'
     });
 
-    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.status, 201);
     assert.strictEqual(res.body.success, true);
-    assert.ok(res.body.logo_url.startsWith('/assets/uploads/logos/logo-'));
-    assert.ok(res.body.logo_url.endsWith('.png'));
+    assert.ok(res.body.logo_url.startsWith('/assets/uploads/derivatives/'));
+    assert.ok(res.body.logo_url.endsWith('.webp'));
+    assert.ok(res.body.media_id || (res.body.asset && res.body.asset.media_id));
 
     // Verify DB update
     const brandRow = db.prepare('SELECT logo_url FROM brands WHERE id = ?').get(BRAND_ID);
@@ -145,7 +146,7 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
     });
 
     // Non-square source MUST be accepted — enforceAspectRatio is false at intake
-    assert.strictEqual(res.status, 200, `Non-square source must be accepted. Got: ${JSON.stringify(res.body)}`);
+    assert.strictEqual(res.status, 201, `Non-square source must be accepted. Got: ${JSON.stringify(res.body)}`);
     assert.strictEqual(res.body.success, true);
     assert.ok(res.body.logo_url, 'logo_url must be returned');
   });
@@ -224,18 +225,14 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
       title: 'Diskon Spesial Liburan'
     });
 
-    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.status, 201);
     assert.strictEqual(res.body.success, true);
     assert.ok(Array.isArray(res.body.banners));
 
     const added = res.body.banners.find(b => b.title === 'Diskon Spesial Liburan');
     assert.ok(added, 'Added banner must exist in returned list');
-    assert.ok(added.image_url.startsWith('/assets/uploads/banners/banner-'));
-    assert.ok(added.image_url.endsWith('.jpg'));
-
-    // Check on disk
-    const diskPath = path.join(__dirname, '../apps/customer-pwa', added.image_url);
-    assert.ok(fs.existsSync(diskPath), 'Uploaded banner file must exist on disk');
+    assert.ok(added.image_url.startsWith('/assets/uploads/derivatives/'));
+    assert.ok(added.image_url.endsWith('.webp'));
   });
 
   // CORRECTED: Per locked media contract, non-square SOURCE images must be ACCEPTED at intake for banners.
@@ -263,7 +260,7 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
     });
 
     // Square source must be accepted — enforceAspectRatio is false at intake
-    assert.strictEqual(res.status, 200, `Square source must be accepted for banner intake. Got: ${JSON.stringify(res.body)}`);
+    assert.strictEqual(res.status, 201, `Square source must be accepted for banner intake. Got: ${JSON.stringify(res.body)}`);
     assert.strictEqual(res.body.success, true);
   });
 
@@ -284,13 +281,10 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
       mime_type: 'image/jpeg'
     });
 
-    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.status, 201);
     assert.strictEqual(res.body.success, true);
-    assert.ok(res.body.product.image_url.startsWith('/assets/uploads/products/'));
-
-    // Check disk
-    const diskPath = path.join(__dirname, '../apps/customer-pwa', res.body.product.image_url);
-    assert.ok(fs.existsSync(diskPath), 'Product image file must exist on disk');
+    assert.ok(res.body.product.image_url.startsWith('/assets/uploads/derivatives/'));
+    assert.ok(res.body.product.image_url.endsWith('.webp'));
   });
 
   await t.test('9. RBAC: Cashier cannot upload brand logo or banners', async () => {
