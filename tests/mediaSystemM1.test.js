@@ -24,7 +24,7 @@ test('MEDIA SYSTEM M1 — SECURE UPLOAD & VALIDATION SUITE', async (t) => {
   } catch (_) {}
 
   await t.test('1. Valid JPEG binary upload stages to TEMPORARY status', async () => {
-    const jpegBuf = createJpegBuffer(400, 400);
+    const jpegBuf = await createJpegBuffer(400, 400);
     const result = await mediaService.stageUpload({
       brandId: BRAND_A,
       imageBase64: jpegBuf.toString('base64'),
@@ -94,7 +94,7 @@ test('MEDIA SYSTEM M1 — SECURE UPLOAD & VALIDATION SUITE', async (t) => {
   });
 
   await t.test('5. Wrong client MIME: declared image/png but actual binary is valid JPEG', async () => {
-    const realJpeg = createJpegBuffer(250, 250);
+    const realJpeg = await createJpegBuffer(250, 250);
     // Client incorrectly claims it is image/png
     const result = await mediaService.stageUpload({
       brandId: BRAND_A,
@@ -153,7 +153,7 @@ test('MEDIA SYSTEM M1 — SECURE UPLOAD & VALIDATION SUITE', async (t) => {
   });
 
   await t.test('7. Oversized dimensions: width > 4096 is rejected with DIMENSIONS_TOO_LARGE', async () => {
-    const wideBuf = createJpegBuffer(5000, 1000);
+    const wideBuf = await createJpegBuffer(5000, 1000);
     await assert.rejects(
       async () => {
         await mediaService.stageUpload({
@@ -173,7 +173,7 @@ test('MEDIA SYSTEM M1 — SECURE UPLOAD & VALIDATION SUITE', async (t) => {
 
   await t.test('8. Excessive pixel count: pixels exceeding 20 MP safety limit is rejected, within 20 MP accepted', async () => {
     // Within 20 MP: 4000 x 4000 = 16.0 MP (previously rejected under 16 MP, now accepted under 20 MP ceiling)
-    const validHighRes = createJpegBuffer(4000, 4000);
+    const validHighRes = await createJpegBuffer(4000, 4000);
     const staged = await mediaService.stageUpload({
       brandId: BRAND_A,
       imageBase64: validHighRes.toString('base64'),
@@ -197,7 +197,7 @@ test('MEDIA SYSTEM M1 — SECURE UPLOAD & VALIDATION SUITE', async (t) => {
 
   await t.test('8b. M1 Intake accepts raw camera photos of non-canonical aspect ratios', async () => {
     // A 16:9 landscape photo uploaded as product (raw camera photo before M2/M3 crop)
-    const rawPhoto16x9 = createJpegBuffer(1600, 900);
+    const rawPhoto16x9 = await createJpegBuffer(1600, 900);
     const stagedProduct = await mediaService.stageUpload({
       brandId: BRAND_A,
       imageBase64: rawPhoto16x9.toString('base64'),
@@ -210,7 +210,7 @@ test('MEDIA SYSTEM M1 — SECURE UPLOAD & VALIDATION SUITE', async (t) => {
     assert.equal(stagedProduct.height, 900);
 
     // A 1:1 square photo uploaded as banner (raw photo before banner crop)
-    const squarePhoto = createJpegBuffer(1000, 1000);
+    const squarePhoto = await createJpegBuffer(1000, 1000);
     const stagedBanner = await mediaService.stageUpload({
       brandId: BRAND_A,
       imageBase64: squarePhoto.toString('base64'),
@@ -223,7 +223,7 @@ test('MEDIA SYSTEM M1 — SECURE UPLOAD & VALIDATION SUITE', async (t) => {
     assert.equal(stagedBanner.height, 1000);
 
     // Avatar assetType works seamlessly
-    const avatarPhoto = createJpegBuffer(400, 400);
+    const avatarPhoto = await createJpegBuffer(400, 400);
     const stagedAvatar = await mediaService.stageUpload({
       brandId: BRAND_A,
       imageBase64: avatarPhoto.toString('base64'),
