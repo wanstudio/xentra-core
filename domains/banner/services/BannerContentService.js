@@ -257,7 +257,8 @@ class BannerContentService {
         mediaId: content.mediaId,
         brandId,
         entityType: 'banner_content_revision',
-        entityId: revisionId
+        entityId: revisionId,
+        manageTransaction: false
       });
 
       this.repository.commitTransaction();
