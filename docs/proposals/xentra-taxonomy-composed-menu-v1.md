@@ -379,7 +379,7 @@ The engine must reject:
 - a Product using a Rasa from another Brand;
 - a Product selecting a Rasa that is not associated with its Sub Category;
 - duplicate normalized Category names within the same Brand;
-- duplicate normalized Sub Category names within the same Brand;
+- duplicate normalized Sub Category names within the same Brand, including across different parent Categories;
 - duplicate normalized Rasa names within the same Brand;
 - duplicate Sub Category ↔ Rasa association rows.
 
@@ -514,16 +514,13 @@ Preferred sequence:
 
 These must be answered explicitly before the document can become LOCKED:
 
-- Is Sub Category always the customer title, or can a Product opt out?
-- Can two Products intentionally share the same Sub Category + Rasa combination?
 - Does Complement compatibility need its own Sub Category association model?
 - Does Level need compatibility constraints?
 - What happens to existing Products whose current `products.name` does not correspond to any Sub Category?
-- Is the existing Branch Customer Display Name Override still required?
-- Should Branch override be renamed or retired under the new title model?
 - What is the canonical search label: resolved title, title + subtitle, or additional hidden keywords?
 - How are legacy Products migrated without losing customer-visible identity?
 - How are reports, receipts, payment gateways, promotions, KDS/POS, and historical orders kept stable?
+- What is the exact physical uniqueness constraint/normalization implementation for Category names, Sub Category names, and Normal Product identity?
 
 ## 19. Current conclusion
 
