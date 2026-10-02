@@ -10,16 +10,16 @@
 
 Evaluate a single Xentra-wide product/catalog concept in which:
 
-- **Category** is a parent taxonomy node.
-- **Sub Category** is a child taxonomy node of Category.
-- **Sub Category name is the primary customer-facing menu title.**
-- **Original is the universal baseline Rasa for Normal Products.** A new Sub Category can always use `Original` without requiring prior usage of that Rasa. **Original is not displayed in Customer UI; non-Original Rasa values remain visible as the Product subtitle.**
-- **Rasa** is a reusable master vocabulary that may be associated with multiple Sub Categories.
-- A Product remains a stable catalog entity for pricing, inventory, adoption, orders, reporting, and references.
+- **Product** is the atomic catalog/stock unit (e.g. Ayam, Nasi, Sambal Ijo, Lalapan, Es Teh, Kopi Americano).
+- **Menu Satuan** is a sellable menu entry backed by exactly one Product.
+- **Menu Paket** is a sellable menu entry composed of two or more existing Products.
+- **Category** and **Sub Category** are customer-facing menu taxonomy; Sub Category remains the primary title source for a Menu.
+- **Rasa** is reusable menu vocabulary and is part of Menu presentation/identity, not Product stock identity.
+- **SKU** marks a Product as stock-managed under the Xentra inventory rule.
+- A Product remains a stable atomic entity for inventory, adoption, and references; a Menu remains the customer-facing commercial selling entity.
 - No separate Xentra-vs-client product architecture is introduced.
 
 The goal is to validate the concept end-to-end before changing the canonical Xentra contract.
-
 ## 2. Human mental model
 
 The Owner should experience the Product Editor as composing one sellable menu item and, where needed, attaching included components. **Kelengkapan is not Package mode.** It describes the contents/included components of a Product. Package is a separate Product subtype with its own fixed bundle semantics.
@@ -177,43 +177,65 @@ Under Model B, the Rasa selector is filtered only by Brand, and the Sub Category
 
 **Pre-lock rule:** do not implement either model as canonical until the usability and business-domain check decides whether compatibility restriction is actually valuable enough to justify the additional relationship-management UX.
 
-## 4. Product identity under evaluation
+## 4. Product and Menu identity
 
-The Product remains an entity with a stable `products.id`.
+The earlier model that treated **Category + Sub Category + Rasa** as the identity of a Normal Product is superseded.
 
-The new conceptual difference is that Product Name is no longer the primary authored customer title.
+### Product identity
 
-Target conceptual mapping:
-
-```
-products.id          → Product identity
-sub_categories.id    → Product title source
-menu_flavors.id      → Product subtitle source (optional)
-product_complements  → Product detail
-product_levels       → Product indicator
-Category             → Product grouping/classification
-```
-
-Under the normal Product model, the identity combination is Category + Sub Category + Rasa. Therefore two normal Products must not differ only by Complement while keeping the same identity tuple.
-
-Example:
+Product is the atomic catalog/stock entity:
 
 ```
-Product A
-  Sub Category = Ayam Bakar
-  Rasa         = Original
-
-Product B
-  Sub Category = Ayam Bakar
-  Rasa         = Lombok Ijo
+Product
+├─ Ayam
+├─ Nasi
+├─ Sambal Ijo
+├─ Lalapan
+├─ Es Teh
+├─ Kopi Americano
+└─ ...
 ```
 
-They are different Product identities.
+The Product identity is its stable Product ID plus its own Product attributes, including SKU when stock-managed. Product does not inherit customer-facing menu taxonomy merely because a Menu later references it.
 
-Complements are non-identity purchase configuration attached to the Product. A Product may still contain the same or different Complement configuration only where the surrounding Product identity is different.
+### Menu identity
 
-The product ID remains the stable technical identity for orders, inventory, adoption, promotions, and references.
+Menu is the customer-facing commercial selling entity.
 
+```
+Menu
+├─ type = SINGLE | PACKAGE
+├─ Category
+├─ Sub Category
+├─ Rasa
+├─ customer presentation
+├─ price
+└─ Product references
+```
+
+For **Menu Satuan**, the Menu references exactly one Product.
+
+For **Menu Paket**, the Menu references two or more existing Products.
+
+Thus:
+
+```
+PRODUCT
+= atomic item
+
+MENU
+= commercial/customer-facing selling configuration
+
+MENU SATUAN
+= Menu → 1 Product
+
+MENU PAKET
+= Menu → N Products
+```
+
+The Sub Category remains the customer-facing title source for the Menu. Rasa remains the customer-facing subtitle source according to the existing Original/non-Original presentation rule. Level/Pedas is a Menu presentation attribute in the current food context.
+
+Historical orders must snapshot the resolved Menu presentation and the Product references needed for inventory reversal/audit so later Menu edits do not rewrite historical transactions.
 ## 5. Category should not be duplicated on Product without a reason
 
 Under a strict taxonomy model, Sub Category already determines its parent Category.
@@ -687,37 +709,33 @@ Current target semantics:
 5. Inventory effect is determined by the SKU/stock authority rules in the dedicated pre-lock inventory contract.
 6. No implementation on `main` is implied by this supersession.
 
-## 🔒 LOCKED SUB-DECISION — Customer Search Uses Resolved Product Presentation
+## 🔒 LOCKED SUB-DECISION — Customer Search Uses Resolved Menu Presentation
 
 **Decision date:** 2026-10-02
 
-Customer search must operate on the resolved customer-facing Product presentation, not only the primary title.
+Customer search operates on the resolved customer-facing **Menu presentation**, not on the atomic Product record alone.
 
 Rules:
 
-1. **Title** is searchable.
-2. **Subtitle / Rasa** is searchable.
-3. Search should resolve against the same Customer Menu View Model used for customer presentation rather than making the Customer PWA reconstruct search fields from raw database tables.
-4. A query matching Rasa must be able to find the corresponding Product. Example:
-   `"lombok"` finds **Ayam Bakar / Lombok Ijo**.
+1. **Menu title** is searchable.
+2. **Menu subtitle / Rasa** is searchable.
+3. Search resolves against the same Customer Menu View Model used for presentation.
+4. A query matching Rasa must find the corresponding Menu. Example: "lombok" finds **Ayam Bakar / Lombok Ijo**.
 5. Level/Pedas is not a searchable field for the current concept.
-6. Search is discovery, not a second Product identity model. It must not alter the canonical Product identity `Category + Sub Category + Rasa`.
-7. Customer search UI uses live search behavior: results update while the customer types; no separate **Cari** submit button is required for this concept.
+6. Search does not create or alter Product or Menu identity.
+7. Customer search uses live behavior: results update while typing; no separate **Cari** submit button is required.
 
 Conceptually:
 
 ```
-Product
+Menu
   title    = Ayam Bakar
   subtitle = Lombok Ijo
-
-resolved search text
-  = Ayam Bakar Lombok Ijo
+  product  = AYAM-001
 
 "lombok"
   → Ayam Bakar / Lombok Ijo
 ```
-
 ## 🔒 LOCKED SUB-DECISION — Paket Is Sold as One Whole Unit
 
 **Decision date:** 2026-10-02
@@ -1217,19 +1235,18 @@ Rules:
    - Ikan → Goreng
 6. This is a **name uniqueness rule**, separate from Normal Product identity uniqueness.
 
-## 🔒 LOCKED SUB-DECISION — Normal Product Identity
+## 🔄 SUPERSEDED SUB-DECISION — Normal Product Identity
 
-**Decision date:** 2026-10-01
+The earlier decision that defined a normal Product identity as **Category + Sub Category + Rasa** is superseded by the 2026-10-02 Product/Menu separation.
 
-For a normal sellable Product, the canonical business identity is:
+Current canonical target:
 
-```
-Category + Sub Category + Rasa
-```
+- **Product** = atomic catalog/stock entity.
+- **Menu Satuan** = customer-facing selling entity referencing exactly one Product.
+- **Menu Paket** = customer-facing selling entity referencing two or more Products.
+- Category, Sub Category, Rasa, Level/Pedas, customer-facing title, and menu price belong to the **Menu** layer rather than defining the atomic Product stock identity.
 
-Rasa uses **Original** as the default Master Rasa for normal Product creation, so the normal Product identity is not left incomplete because of a missing/NULL Rasa.
-
-The technical Product ID remains stable and is not itself the human-readable identity. Identity uniqueness is enforced within a Brand.
+The historical decision remains preserved as an implementation record and must not be used as the target contract for new work.
 
 ## 🔒 LOCKED SUB-DECISION — Rasa Is Reusable Master Data
 
@@ -1520,7 +1537,7 @@ Technical reconciliation is still required in schema, resolver, API, migration, 
 
 ### Decisions already made in this conversation and now recorded in this proposal
 
-- Normal Product identity = Category + Sub Category + Rasa; Original is the default Rasa.
+- Product/Menu separation: Product is atomic; Menu Satuan references 1 Product; Menu Paket references 2+ Products; Category + Sub Category + Rasa belong to Menu presentation/identity.
 - Level is a generic domain concept; food UI may label it Pedas; presentation/configuration is reusable in Shared.
 - Kelengkapan checkbox activates Paket mode; unchecked is Normal Product, checked reveals Package composition and uses component Product IDs.
 - Product Options remains a separate domain; its pricing/add-on and operational rules are intentionally deferred.
