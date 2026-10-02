@@ -22,7 +22,9 @@ The goal is to validate the concept end-to-end before changing the canonical Xen
 
 ## 2. Human mental model
 
-The Owner should experience the Product Editor as composing a menu item:
+The Owner should experience the Product Editor as composing one sellable menu item and, where needed, attaching included components. **Kelengkapan is not Package mode.** It describes the contents/included components of a Product. Package is a separate Product subtype with its own fixed bundle semantics.
+
+Normal Product editor:
 
 ```
 Category
@@ -34,21 +36,43 @@ Sub Category
 Rasa
 [ Lombok Ijo ▼ ]
 
-Level
-[ Pedas ▼ ]
-
+☐ Aktifkan Level Pedas
 ☐ Aktifkan Kelengkapan
 ```
 
-Normal Product customer presentation:
+When **☐ Aktifkan Kelengkapan** is checked, the editor reveals the included component list while the item remains a **Normal Product**:
 
 ```
-Ayam Tulang Lunak
-Lombok Ijo
-Pedas 3
+Kelengkapan
+
+[ + Tambah Product ]
+
+Nasi        ×
+Lalapan     ×
+Sambal      ×
 ```
 
-When **☐ Aktifkan Kelengkapan** is checked, the editor enters Paket composition mode and reveals the Package composition fields, including the component Product list and Paket price.
+This does not turn the Product into a Package.
+
+A separate Package flow creates an explicit fixed composite:
+
+```
+Paket
+[ ... ]
+
+Isi Paket
+
+[ + Tambah Product ]
+
+Ayam Bakar   ×
+Nasi         ×
+Es Teh       ×
+
+Harga Paket
+[ ... ]
+```
+
+The exact Product Editor entry/navigation pattern for Package remains a UX implementation choice, but its semantic distinction from Normal Product + Kelengkapan is mandatory.
 
 UI labels must describe the semantic role honestly. The Product Editor must not pretend that a free-text Product Name exists if the primary customer title is actually resolved from Sub Category.
 
@@ -535,17 +559,19 @@ Until then, no client-specific MyBangjo fork is required and no Xentra-vs-MyBang
 
 ### Product Normal
 
-A normal Product identity is:
+A Normal Product is one sellable Product identity:
 
 ```
 Category + Sub Category + Rasa
 ```
 
-Normal Product does not include Paket composition. The editor exposes **☐ Aktifkan Kelengkapan** as the explicit switch into Paket mode. Independently sellable additions remain Products; any other purchase-time options must use the explicit Product Options contract.
+A Normal Product may optionally have **Kelengkapan**. Kelengkapan is an included/composition relationship and does **not** change the Product subtype.
+
+Inventory behavior is determined by the Product's SKU/stock authority, not by the mere existence of components. See the dedicated pre-lock inventory contract below.
 
 ### Product Paket
 
-A Paket is itself a sellable Product/bundle identity. Its fixed contents are a composition of references to existing Products:
+A Paket is a separate sellable Product subtype. Its fixed contents are references to existing Products:
 
 ```
 Paket Product
@@ -555,18 +581,7 @@ Paket Product
   └── ...
 ```
 
-The Paket does not copy component names or stock values into independent inventory records.
-
-A Paket is a **named, explicitly priced sellable Product** whose fixed contents reference existing Product IDs. Its price is a property of the Paket Product; it is not automatically recalculated from current component prices.
-
-When the Paket is sold, Core must resolve its component Product IDs and apply the corresponding stock/inventory effects to those underlying Products according to the inventory contract.
-
-The component Product IDs remain the source of truth for item identity, stock, reporting references, and historical traceability. The Paket has its own sellable Product identity so that the bundle can have its own customer presentation, price, availability, and promotion eligibility without duplicating the underlying Products.
-
-A separate Paket composition relation is preferred over encoding the bundle as free text or as reusable Complement records.
-
-**Pre-lock note:** the exact order-snapshot and revenue/reporting treatment of a Paket versus its component Products still requires explicit validation before lock.
-
+A Paket is an explicit commercial bundle. It is not inferred from a Normal Product merely because that Product has several components.
 
 ## 5B. Paket vs Promotion — Pre-lock Boundary
 
@@ -612,51 +627,18 @@ Rules:
 5. The current Xentra Product Options capability may remain as an existing domain contract/capability; this taxonomy decision does not redesign it.
 6. The new taxonomy/product concept must not invent Product Options behavior merely to fill the current Product Editor.
 
-## 🔒 LOCKED SUB-DECISION — Kelengkapan Checkbox Activates Paket Mode
+## 🔄 SUPERSEDED SUB-DECISION — Kelengkapan Is Not Paket Mode
 
-**Decision date:** 2026-10-02
+The earlier proposal text that treated **Kelengkapan** as a switch into Paket mode is superseded by the current concept.
 
-The Product Editor uses a simple checkbox/toggle to activate **Kelengkapan** for the current Product draft.
+Current target semantics:
 
-```
-☐ Aktifkan Kelengkapan
-```
-
-Behavior:
-
-- **Unchecked** → the Product is a **Normal Product** and the editor does not show Package composition fields.
-- **Checked** → the editor enters **Paket mode** and reveals the Paket composition UI.
-- Paket mode shows the component Product list and the explicit Paket price; the Paket also has its own Owner-defined display name as required by the locked Paket subtype contract.
-- Each included item is referenced by its own **Product ID**. The component remains a real Product for inventory, reporting traceability, and references.
-- Checking the box does not create duplicate Product records for the components.
-- Unrelated fields of the normal Product editor are not reinterpreted as "Kelengkapan".
-- The checkbox is a UI control for choosing the Product subtype/composition mode; the underlying domain remains **Normal Product** versus **Paket Product**.
-
-Conceptually:
-
-```
-☐ Aktifkan Kelengkapan
-        │
-        ├── unchecked → NORMAL
-        │              Category + Sub Category + Rasa
-        │              + optional Level
-        │
-        └── checked   → PACKAGE
-                       Paket name
-                       Component Product IDs
-                       Paket price
-```
-
-Inventory remains component-driven:
-
-```
-Paket P100 sold × 1
-  → component P001 stock -1
-  → component P002 stock -1
-  → component P003 stock -1
-```
-
-This is the canonical UX for activating Paket composition. Detailed lifecycle rules for changing an already-published Product between Normal and Paket remain a separate domain edge case and are not implied by the checkbox alone.
+1. `Kelengkapan` belongs to a **Normal Product**.
+2. It describes included/composed component Products.
+3. It does **not** change the Product subtype to PACKAGE.
+4. A `Paket` is created explicitly as the separate PACKAGE Product subtype.
+5. Inventory effect is determined by the SKU/stock authority rules in the dedicated pre-lock inventory contract.
+6. No implementation on `main` is implied by this supersession.
 
 ## 🔒 LOCKED SUB-DECISION — Customer Search Uses Resolved Product Presentation
 
@@ -787,32 +769,18 @@ The human meaning of "Paket" (a combined offering, often perceived as a value/di
 
 Rules:
 
-1. A Paket exists only when the Owner explicitly creates a Product as **PACKAGE** / activates **Kelengkapan**. The system must not infer Paket status merely from multiple Products being sold together, the name containing "Paket", or a lower price/promotion.
+1. A Paket exists only when the Owner explicitly creates a Product as `PACKAGE`. The system must not infer Paket status merely from multiple Products being sold together, the name containing "Paket", or a lower price/promotion.
 2. A Paket is one sellable Product entity with its own Product ID, customer-facing name, and explicit Paket price.
-3. The Paket contains a **fixed composition of existing Product IDs**. The components remain separate Product entities and retain their own identities/data.
-4. For the current contract, each listed component contributes **one unit per one complete Paket**. Customer Qty controls the number of complete Paket units sold.
-5. A Paket may optionally also participate in a Promotion; Promotion does not create or change Paket identity.
-6. The current Package model does not support customer selection/reconfiguration of components at purchase time. Customer-side component selection/configuration is a future domain and is not implied by Paket.
-7. A Paket does not inherit component Rasa or Level automatically. Component attributes remain attributes of their respective Products.
+3. The Paket contains a fixed composition of existing Product IDs. The components remain separate Product entities and retain their own identities/data.
+4. **Current Xentra inventory contract: a Paket does not have its own SKU or stock balance.** Its stock effect is derived from the stock authority of its referenced component Products.
+5. A component Product with a SKU is a stock-managed unit and is consumed according to the Package composition.
+6. A component Product without a SKU is non-stock and creates no inventory movement by itself.
+7. If a referenced Normal Product without a SKU has its own composition, the inventory resolver may continue through that composition until it reaches stock-managed Products, subject to cycle prevention and validity rules.
+8. A Package cannot contain another Package under the current contract.
+9. A Paket may optionally participate in a Promotion; Promotion does not create or change Paket identity.
+10. The current Package model does not support customer-side reconfiguration of components at purchase time.
 
-Reference alignment: fixed-bundle systems commonly model a bundle as a sellable parent product linked to component products; the parent/bundle price can be distinct from component inventory, and fixed bundles are distinct from configurable composite/bundle experiences. Shopify documents fixed bundles as a product associated with component products, with parent price and component-driven inventory; WooCommerce distinguishes fixed Product Bundles from Composite Products and supports a base/fixed bundle price. These references support the separation between "fixed composite sellable product" and "customer-configured combination", but do not determine Xentra's business rules.
-
-Conceptually:
-
-```
-Human:
-"Geprek + Nasi" → paket
-"Paket Special Bagong" → paket
-
-Xentra system:
-Owner explicitly selects Paket mode
-        ↓
-PACKAGE Product
-        ↓
-fixed component Product IDs
-        ↓
-one Paket = one complete unit
-```
+Reference alignment: Shopify, WooCommerce, Square, Odoo, and Toast demonstrate fixed bundles/kits and recipe/composition-based stock depletion as established patterns. The Xentra contract intentionally chooses one simplified rule: **Package itself is virtual/non-stock in the current scope; stock authority lives in the referenced Product composition.**
 
 ## 🔒 LOCKED SUB-DECISION — Paket Revenue Belongs to the Paket
 
@@ -962,37 +930,22 @@ context label = other     (future menu)
 same underlying Level domain
 ```
 
-## 🔒 LOCKED SUB-DECISION — Paket Product Subtype & Component Inventory
+## 🔄 SUPERSEDED SUB-DECISION — Paket Product Subtype & Component Inventory
 
-**Decision date:** 2026-10-02
+The earlier wording that simply made every Paket consume component Product stock is retained only where it agrees with the more precise stock-authority model below and is otherwise superseded.
 
-A **Paket is a Product subtype with its own identity model**. It remains a sellable Product, but it is not required to satisfy the normal Product identity tuple of Category + Sub Category + Rasa.
+A Paket remains a Product subtype with its own Product ID and fixed component Product references. The current Xentra target is that a Package is a **virtual composite sellable Product** and therefore does not have its own stock balance in the current contract.
 
-Locked rules:
-
-1. Paket has its own stable **Product ID**, Owner-defined name, explicitly defined component Product IDs, and explicitly defined Paket price.
-2. The normal Product identity rule `Category + Sub Category + Rasa` applies to **Normal Products**, not to Paket.
-3. Category/Sub Category may still be used to classify a Paket where the catalog UX requires it, but those taxonomy fields are not the Paket identity key.
-4. A Paket is an explicitly created catalog entity. It is never inferred from cart combinations or Promotion rules.
-5. **Paket has no independent stock balance.** When a Paket is sold, inventory consumption is derived from its referenced component Product IDs and quantities.
-6. The inventory engine must therefore be able to trace a Paket sale down to its component Product stock movements.
-7. **Paket cannot contain another Paket.** Package composition may reference Normal Products only under this contract.
-8. Payment may treat the Paket as one sellable order item at the Paket price; payment processing does not need to reconstruct the component composition.
-9. Revenue/reporting allocation beyond the sellable Paket line versus component inventory consumption remains a separate implementation detail to be finalized.
-
-Conceptual model:
+The exact inventory effect of the Paket is now governed by:
 
 ```
-PRODUCT
-├── NORMAL
-│   └── Identity = Category + Sub Category + Rasa
-│
-└── PACKAGE
-    ├── Identity = Package Product ID
-    ├── Display Name = Owner-defined Paket name
-    ├── Price = Owner-defined Paket price
-    └── Components = Normal Product ID + Qty
+PACKAGE
+  → no parent stock in current contract
+  → resolve component Product stock authority
+  → consume the resulting component SKU stock
 ```
+
+The dedicated pre-lock inventory contract below is the authoritative target for this proposal.
 
 ## 🔒 LOCKED SUB-DECISION — Paket ≠ Promotion
 
@@ -1290,6 +1243,341 @@ For populated taxonomy:
 - permanent Delete is available only when the Sub Category is empty under current dependency rules;
 - Archive must not silently migrate Products to another Sub Category;
 - any future Product migration is an explicit Owner action, not an automatic side effect of archive.
+
+## 🧭 PRE-LOCK — Product / Composition / Package / Inventory Contract
+
+**Decision status:** PROPOSED / PRE-LOCK — 2026-10-02
+
+This section reconciles the new Product/Package concept with the existing authoritative Xentra Inventory model (`branch_products.stock` + immutable `inventory_movements`) and with patterns documented by Toast, Odoo, Shopify, WooCommerce, and Square.
+
+### 1. Core principle
+
+For the Xentra concept, the simplest durable rule is:
+
+> **A Product with a SKU is a stock-managed whole. A Product without a SKU is not a stock-managed whole.**
+
+SKU assignment may be manual or generated by the system. The source of the SKU does not change its business meaning.
+
+```
+Product
+  ├── SKU exists
+  │    → Product itself is stock-managed
+  │    → branch stock can be maintained for that Product
+  │
+  └── SKU is NULL
+       → Product itself is non-stock
+       → stock, if any, must come from its composition
+```
+
+This is a **Xentra business rule**, not a claim that all SaaS products universally use SKU existence as the stock-tracking switch. Existing SaaS references expose separate inventory controls; Xentra intentionally simplifies that relationship for this product model.
+
+### 2. Product without composition
+
+```
+Nasi
+SKU = NASI-001
+
+→ stock authority = Nasi
+→ Branch stock = whole ready-to-sell units
+```
+
+Sale of 1:
+
+```
+NASI-001 -1
+```
+
+### 3. Normal Product with Kelengkapan
+
+Kelengkapan does not create Package semantics.
+
+#### A. Parent Product has SKU
+
+```
+Ayam Bakar Komplit
+SKU = AYKOM-001
+
+Kelengkapan:
+- Ayam
+- Nasi
+- Lalapan
+```
+
+The parent is a stock-managed whole:
+
+```
+Sale ×1
+→ AYKOM-001 -1
+```
+
+Component references describe the Product's included content. Their presence must **not** cause an automatic second stock deduction, otherwise the same sale would consume both the finished Product and its components.
+
+This is the **whole-stock mode**.
+
+#### B. Parent Product has no SKU
+
+```
+Ayam Bakar Komplit
+SKU = NULL
+
+Kelengkapan:
+- Ayam        [SKU AYAM-001]
+- Nasi        [SKU NASI-001]
+- Lalapan     [no SKU]
+```
+
+The parent is non-stock. Inventory consumption is resolved through its composition:
+
+```
+Sale ×1
+→ AYAM-001 -1
+→ NASI-001 -1
+→ Lalapan = no inventory movement
+```
+
+The rule is not that Xentra prioritizes one component over another; **only components that are explicitly stock-managed (SKU exists) can affect inventory**. If Ayam must be counted as stock, Ayam must itself be represented as a stock-managed Product with a SKU.
+
+This is the **composition/recipe stock mode**.
+
+### 4. Package
+
+Current Xentra Package is a **virtual fixed composite**:
+
+```
+Paket Super Hemat
+SKU = NULL
+
+Components:
+- Ayam       [SKU AYAM-001]
+- Nasi       [SKU NASI-001]
+- Es Teh     [SKU ESTE-001]
+```
+
+The Package has no stock balance of its own.
+
+A sale of one Package resolves to:
+
+```
+AYAM-001 -1
+NASI-001 -1
+ESTE-001 -1
+```
+
+The Package itself is still one commercial order line and one customer quantity unit.
+
+### 5. "SKU di dalam SKU"
+
+A composition can reference Product records that themselves have SKUs. Therefore a stock-managed Product can structurally be a component of another Product/Package.
+
+However, **stock authority is singular per sold layer**:
+
+```
+Parent has SKU
+→ parent is the stock authority
+→ do not also deplete child stock for that same parent sale
+
+Parent has no SKU
+→ resolve component composition
+→ deplete stock-managed descendants
+```
+
+This prevents double deduction.
+
+The current Package does not need a parent SKU. A future "finished/assembled Package stock" workflow could introduce a stockable parent SKU, but that would be a separate Production/Assembly capability rather than an implicit feature of Package creation.
+
+### 6. Recursive resolution and cycle prevention
+
+The inventory engine should resolve a sellable Product into a **Stock Consumption Plan** before writing any inventory movement.
+
+```
+Sale Product
+  ↓
+Is Product SKU-managed?
+  ├── YES → consume parent SKU only
+  └── NO  → inspect composition
+             ├── child SKU → consume child SKU
+             ├── child non-SKU + composition → recurse
+             └── child non-SKU + no composition → no stock effect
+```
+
+The resolver must reject composition cycles:
+
+```
+A → B → A
+```
+
+and must produce a deterministic flattened plan:
+
+```
+{ product_id, sku, branch_id, quantity, source_path }
+```
+
+Before mutation, aggregate duplicate SKU/Product references so one sale cannot create contradictory movements for the same stock identity.
+
+### 7. Physical database target
+
+The proposal should evolve the current physical model toward:
+
+```sql
+products
+  id
+  brand_id
+  ...
+  sku NULL
+```
+
+with a **Brand-unique normalized SKU** when non-NULL.
+
+Normal Product composition:
+
+```sql
+product_components
+  parent_product_id
+  component_product_id
+  quantity
+  sort_order
+```
+
+Package composition:
+
+```sql
+package_components
+  package_product_id
+  component_product_id
+  quantity
+  sort_order
+```
+
+Existing `branch_products.stock` remains the Branch-level stock balance for SKU-managed Products. Non-SKU Products should not receive a stock balance.
+
+The inventory ledger continues to record the actual Product/SKU stock identity that moved:
+
+```text
+inventory_movements.product_id = stock-managed Product
+inventory_movements.quantity = signed movement
+inventory_movements.reference_id = source order / transfer / etc.
+```
+
+The Package itself does not get an inventory ledger entry in the current virtual-package model.
+
+### 8. Creation and adoption lifecycle
+
+Creating a Product does **not** fabricate Branch stock.
+
+```
+Create Master Product
+      ↓
+SKU?
+├── no  → Product exists, non-stock
+└── yes → Product is stockable
+            ↓
+       Branch adopts product
+            ↓
+       Inventory stock can be initialized/received/adjusted
+```
+
+This preserves the existing Xentra boundary that **Branch assignment is not itself an inventory mutation** and stock is owned by the Inventory domain.
+
+For a non-SKU Product, `branch_products.stock` remains NULL/non-stock semantics rather than an arbitrary quantity.
+
+### 9. Sale transaction contract
+
+At the inventory-consumption boundary:
+
+```
+Order reaches accepted/confirmed stock boundary
+      ↓
+Build Stock Consumption Plan
+      ↓
+Validate all required stock balances atomically
+      ↓
+Apply all stock deductions in one transaction
+      ↓
+Append inventory_movements for every actual stock movement
+      ↓
+Commit
+```
+
+No partial success is allowed.
+
+If any required stock-managed Product lacks sufficient Branch stock, the transaction must fail as an inventory conflict rather than decrementing only some components.
+
+For Xentra's current ready-to-sell model, this remains aligned with the existing acceptance → sellable stock decrease boundary.
+
+### 10. Availability contract
+
+For a Product with parent SKU:
+
+```
+availability = parent Branch stock / operational availability
+```
+
+For a non-SKU Product with composition:
+
+```
+availability = all required stock-managed descendants are sufficiently stocked
+```
+
+For a Package:
+
+```
+availability = all required component stock authorities are sufficiently stocked
+```
+
+A non-SKU component that has no stock authority never makes a Product unavailable due to inventory quantity, because Xentra does not track it as stock.
+
+### 11. Critical invariants
+
+The inventory engine must enforce:
+
+1. **SKU is nullable.**
+2. **Non-NULL SKU = stock-managed Product.**
+3. **NULL SKU = non-stock Product.**
+4. A Product cannot simultaneously use parent-stock and child-stock depletion for the same sale.
+5. Package has no stock balance in the current contract.
+6. Package composition cannot contain another Package.
+7. Composition cycles are rejected.
+8. A stock movement must reference a stock-managed Product/SKU.
+9. Product creation/adoption does not itself invent stock quantity.
+10. Sale-time stock mutations are atomic and idempotent.
+11. Historical orders keep their own snapshots and are not rewritten by later Product/composition edits.
+
+### 12. Explicit examples
+
+```
+A. Nasi
+   SKU NASI-001
+   → whole stock item
+
+B. Ayam Bakar Komplit
+   SKU AYKOM-001
+   Components: Ayam, Nasi, Lalapan
+   → stock whole = AYKOM-001
+
+C. Ayam Bakar Komplit
+   no SKU
+   Components: Ayam[SKU], Nasi[SKU], Lalapan[no SKU]
+   → stock = AYAM-001 + NASI-001
+
+D. Paket Super Hemat
+   no SKU
+   Components: Ayam[SKU], Nasi[SKU], Es Teh[SKU]
+   → stock = AYAM-001 + NASI-001 + ESTE-001
+```
+
+### 13. Reference cross-check
+
+- Toast Inventory documents recipe-driven stock depletion and notes that stock can be held at ingredient or prep-item level.
+- Odoo Kit documentation allows a sellable kit to be represented as a product with component Products and a configurable inventory treatment.
+- Shopify/WooCommerce/Square document fixed bundles/kit-style relationships in which a sellable bundle can coexist with component-level inventory tracking.
+
+These references support the architectural distinction between a sellable composite, whole-stock Product, and component-driven stock depletion; they do not force Xentra to copy any vendor's exact UI or data model.
+
+### 14. Status
+
+This is a **pre-lock target model**. It supersedes contradictory inventory statements elsewhere in this proposal, but it does not yet supersede the authoritative production inventory contract on `main`.
+
+Final lock should happen only after the complete Product/Package/Inventory dependency audit is reconciled across Catalog, Branch adoption, POS, Order, Reporting, Purchasing, and any future Production/Recipe domain.
 
 ## 🔎 PRE-LOCK AUDIT — Decisions vs Existing Notion/Git
 
