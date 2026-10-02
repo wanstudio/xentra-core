@@ -119,13 +119,16 @@ function ensureComposedMenuSchema(db = DataAccess) {
     FOR EACH ROW
     WHEN
       (NEW.sub_category_id IS NOT NULL AND
-       (SELECT brand_id FROM sub_categories WHERE id = NEW.sub_category_id) <> NEW.brand_id)
+       ((SELECT brand_id FROM sub_categories WHERE id = NEW.sub_category_id) IS NULL OR
+        (SELECT brand_id FROM sub_categories WHERE id = NEW.sub_category_id) <> NEW.brand_id))
       OR
       (NEW.rasa_id IS NOT NULL AND
-       (SELECT brand_id FROM menu_flavors WHERE id = NEW.rasa_id) <> NEW.brand_id)
+       ((SELECT brand_id FROM menu_flavors WHERE id = NEW.rasa_id) IS NULL OR
+        (SELECT brand_id FROM menu_flavors WHERE id = NEW.rasa_id) <> NEW.brand_id))
       OR
       (NEW.level_id IS NOT NULL AND
-       (SELECT brand_id FROM menu_levels WHERE id = NEW.level_id) <> NEW.brand_id)
+       ((SELECT brand_id FROM menu_levels WHERE id = NEW.level_id) IS NULL OR
+        (SELECT brand_id FROM menu_levels WHERE id = NEW.level_id) <> NEW.brand_id))
     BEGIN
       SELECT RAISE(ABORT, 'MENU_CROSS_BRAND');
     END;
@@ -135,13 +138,16 @@ function ensureComposedMenuSchema(db = DataAccess) {
     FOR EACH ROW
     WHEN
       (NEW.sub_category_id IS NOT NULL AND
-       (SELECT brand_id FROM sub_categories WHERE id = NEW.sub_category_id) <> NEW.brand_id)
+       ((SELECT brand_id FROM sub_categories WHERE id = NEW.sub_category_id) IS NULL OR
+        (SELECT brand_id FROM sub_categories WHERE id = NEW.sub_category_id) <> NEW.brand_id))
       OR
       (NEW.rasa_id IS NOT NULL AND
-       (SELECT brand_id FROM menu_flavors WHERE id = NEW.rasa_id) <> NEW.brand_id)
+       ((SELECT brand_id FROM menu_flavors WHERE id = NEW.rasa_id) IS NULL OR
+        (SELECT brand_id FROM menu_flavors WHERE id = NEW.rasa_id) <> NEW.brand_id))
       OR
       (NEW.level_id IS NOT NULL AND
-       (SELECT brand_id FROM menu_levels WHERE id = NEW.level_id) <> NEW.brand_id)
+       ((SELECT brand_id FROM menu_levels WHERE id = NEW.level_id) IS NULL OR
+        (SELECT brand_id FROM menu_levels WHERE id = NEW.level_id) <> NEW.brand_id))
     BEGIN
       SELECT RAISE(ABORT, 'MENU_CROSS_BRAND');
     END;
@@ -163,8 +169,10 @@ function ensureComposedMenuSchema(db = DataAccess) {
     CREATE TRIGGER IF NOT EXISTS trg_menu_items_brand_consistency_insert
     BEFORE INSERT ON menu_items
     FOR EACH ROW
-    WHEN (SELECT brand_id FROM products WHERE id = NEW.product_id) <>
-         (SELECT brand_id FROM menus WHERE id = NEW.menu_id)
+    WHEN (SELECT brand_id FROM products WHERE id = NEW.product_id) IS NULL
+         OR (SELECT brand_id FROM menus WHERE id = NEW.menu_id) IS NULL
+         OR (SELECT brand_id FROM products WHERE id = NEW.product_id) <>
+            (SELECT brand_id FROM menus WHERE id = NEW.menu_id)
     BEGIN
       SELECT RAISE(ABORT, 'MENU_ITEM_CROSS_BRAND');
     END;
@@ -172,8 +180,10 @@ function ensureComposedMenuSchema(db = DataAccess) {
     CREATE TRIGGER IF NOT EXISTS trg_menu_items_brand_consistency_update
     BEFORE UPDATE OF menu_id, product_id ON menu_items
     FOR EACH ROW
-    WHEN (SELECT brand_id FROM products WHERE id = NEW.product_id) <>
-         (SELECT brand_id FROM menus WHERE id = NEW.menu_id)
+    WHEN (SELECT brand_id FROM products WHERE id = NEW.product_id) IS NULL
+         OR (SELECT brand_id FROM menus WHERE id = NEW.menu_id) IS NULL
+         OR (SELECT brand_id FROM products WHERE id = NEW.product_id) <>
+            (SELECT brand_id FROM menus WHERE id = NEW.menu_id)
     BEGIN
       SELECT RAISE(ABORT, 'MENU_ITEM_CROSS_BRAND');
     END;
@@ -196,8 +206,10 @@ function ensureComposedMenuSchema(db = DataAccess) {
     CREATE TRIGGER IF NOT EXISTS trg_branch_menus_brand_consistency_insert
     BEFORE INSERT ON branch_menus
     FOR EACH ROW
-    WHEN (SELECT brand_id FROM branches WHERE id = NEW.branch_id) <>
-         (SELECT brand_id FROM menus WHERE id = NEW.menu_id)
+    WHEN (SELECT brand_id FROM branches WHERE id = NEW.branch_id) IS NULL
+         OR (SELECT brand_id FROM menus WHERE id = NEW.menu_id) IS NULL
+         OR (SELECT brand_id FROM branches WHERE id = NEW.branch_id) <>
+            (SELECT brand_id FROM menus WHERE id = NEW.menu_id)
     BEGIN
       SELECT RAISE(ABORT, 'BRANCH_MENU_CROSS_BRAND');
     END;
@@ -205,8 +217,10 @@ function ensureComposedMenuSchema(db = DataAccess) {
     CREATE TRIGGER IF NOT EXISTS trg_branch_menus_brand_consistency_update
     BEFORE UPDATE OF branch_id, menu_id ON branch_menus
     FOR EACH ROW
-    WHEN (SELECT brand_id FROM branches WHERE id = NEW.branch_id) <>
-         (SELECT brand_id FROM menus WHERE id = NEW.menu_id)
+    WHEN (SELECT brand_id FROM branches WHERE id = NEW.branch_id) IS NULL
+         OR (SELECT brand_id FROM menus WHERE id = NEW.menu_id) IS NULL
+         OR (SELECT brand_id FROM branches WHERE id = NEW.branch_id) <>
+            (SELECT brand_id FROM menus WHERE id = NEW.menu_id)
     BEGIN
       SELECT RAISE(ABORT, 'BRANCH_MENU_CROSS_BRAND');
     END;
@@ -229,10 +243,13 @@ function ensureComposedMenuSchema(db = DataAccess) {
     BEFORE INSERT ON branch_menu_categories
     FOR EACH ROW
     WHEN
-      (SELECT brand_id FROM branches WHERE id = NEW.branch_id) <>
-      (SELECT brand_id FROM menus WHERE id = NEW.menu_id)
-      OR
-      (SELECT branch_id FROM branch_categories WHERE id = NEW.branch_category_id) <> NEW.branch_id
+      (SELECT brand_id FROM branches WHERE id = NEW.branch_id) IS NULL
+      OR (SELECT brand_id FROM menus WHERE id = NEW.menu_id) IS NULL
+      OR (SELECT brand_id FROM branch_categories WHERE id = NEW.branch_category_id) IS NULL
+      OR (SELECT branch_id FROM branch_categories WHERE id = NEW.branch_category_id) IS NULL
+      OR (SELECT branch_id FROM branch_categories WHERE id = NEW.branch_category_id) <> NEW.branch_id
+      OR (SELECT brand_id FROM branches WHERE id = NEW.branch_id) <>
+         (SELECT brand_id FROM menus WHERE id = NEW.menu_id)
     BEGIN
       SELECT RAISE(ABORT, 'BRANCH_MENU_CATEGORY_SCOPE_MISMATCH');
     END;
@@ -241,10 +258,13 @@ function ensureComposedMenuSchema(db = DataAccess) {
     BEFORE UPDATE OF branch_id, menu_id, branch_category_id ON branch_menu_categories
     FOR EACH ROW
     WHEN
-      (SELECT brand_id FROM branches WHERE id = NEW.branch_id) <>
-      (SELECT brand_id FROM menus WHERE id = NEW.menu_id)
-      OR
-      (SELECT branch_id FROM branch_categories WHERE id = NEW.branch_category_id) <> NEW.branch_id
+      (SELECT brand_id FROM branches WHERE id = NEW.branch_id) IS NULL
+      OR (SELECT brand_id FROM menus WHERE id = NEW.menu_id) IS NULL
+      OR (SELECT brand_id FROM branch_categories WHERE id = NEW.branch_category_id) IS NULL
+      OR (SELECT branch_id FROM branch_categories WHERE id = NEW.branch_category_id) IS NULL
+      OR (SELECT branch_id FROM branch_categories WHERE id = NEW.branch_category_id) <> NEW.branch_id
+      OR (SELECT brand_id FROM branches WHERE id = NEW.branch_id) <>
+         (SELECT brand_id FROM menus WHERE id = NEW.menu_id)
     BEGIN
       SELECT RAISE(ABORT, 'BRANCH_MENU_CATEGORY_SCOPE_MISMATCH');
     END;
@@ -261,14 +281,32 @@ function ensureComposedMenuSchema(db = DataAccess) {
       FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT
     );
 
+    CREATE TABLE IF NOT EXISTS product_sku_history (
+      id TEXT PRIMARY KEY,
+      brand_id TEXT NOT NULL,
+      product_id TEXT NOT NULL,
+      previous_sku TEXT,
+      new_sku TEXT,
+      actor_id TEXT,
+      actor_role TEXT,
+      changed_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_product_sku_history_product
+      ON product_sku_history(brand_id, product_id, changed_at);
+
     CREATE INDEX IF NOT EXISTS idx_branch_product_inventory_product
       ON branch_product_inventory(product_id, branch_id);
 
     CREATE TRIGGER IF NOT EXISTS trg_branch_product_inventory_brand_consistency_insert
     BEFORE INSERT ON branch_product_inventory
     FOR EACH ROW
-    WHEN (SELECT brand_id FROM branches WHERE id = NEW.branch_id) <>
-         (SELECT brand_id FROM products WHERE id = NEW.product_id)
+    WHEN (SELECT brand_id FROM branches WHERE id = NEW.branch_id) IS NULL
+         OR (SELECT brand_id FROM products WHERE id = NEW.product_id) IS NULL
+         OR (SELECT brand_id FROM branches WHERE id = NEW.branch_id) <>
+            (SELECT brand_id FROM products WHERE id = NEW.product_id)
     BEGIN
       SELECT RAISE(ABORT, 'BRANCH_PRODUCT_INVENTORY_CROSS_BRAND');
     END;
@@ -276,8 +314,10 @@ function ensureComposedMenuSchema(db = DataAccess) {
     CREATE TRIGGER IF NOT EXISTS trg_branch_product_inventory_brand_consistency_update
     BEFORE UPDATE OF branch_id, product_id ON branch_product_inventory
     FOR EACH ROW
-    WHEN (SELECT brand_id FROM branches WHERE id = NEW.branch_id) <>
-         (SELECT brand_id FROM products WHERE id = NEW.product_id)
+    WHEN (SELECT brand_id FROM branches WHERE id = NEW.branch_id) IS NULL
+         OR (SELECT brand_id FROM products WHERE id = NEW.product_id) IS NULL
+         OR (SELECT brand_id FROM branches WHERE id = NEW.branch_id) <>
+            (SELECT brand_id FROM products WHERE id = NEW.product_id)
     BEGIN
       SELECT RAISE(ABORT, 'BRANCH_PRODUCT_INVENTORY_CROSS_BRAND');
     END;
