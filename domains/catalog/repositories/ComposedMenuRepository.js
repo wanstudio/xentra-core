@@ -132,6 +132,23 @@ class ComposedMenuRepository {
     );
   }
 
+  listProducts({ brandId, activeOnly = true, query = null }) {
+    const clauses = ['p.brand_id = ?'];
+    const params = [brandId];
+    if (activeOnly) clauses.push('p.is_active = 1');
+    if (query != null && String(query).trim() !== '') {
+      clauses.push('(lower(p.name) LIKE ? OR lower(COALESCE(p.sku, \'\')) LIKE ?)');
+      const needle = '%' + String(query).trim().toLowerCase() + '%';
+      params.push(needle, needle);
+    }
+    return this.db.queryMany(
+      "SELECT p.id, p.brand_id, p.name, p.sku, p.description, p.image_url, p.image, p.is_active " +
+      "FROM products p WHERE " + clauses.join(' AND ') +
+      " ORDER BY p.name ASC, p.id ASC",
+      params
+    );
+  }
+
   findMenu({ brandId, menuId }) {
     return this.db.queryOne(
       "SELECT m.id, m.brand_id, m.menu_type, m.sub_category_id, m.rasa_id, m.level_id, " +
@@ -164,6 +181,23 @@ class ComposedMenuRepository {
       "(id, brand_id, menu_type, sub_category_id, rasa_id, level_id, package_name, selling_price, status) " +
       "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [id, brandId, menuType, subCategoryId, rasaId, levelId, packageName, sellingPrice, status]
+    );
+  }
+
+  updateMenu({ brandId, menuId, fields }) {
+    const allowed = ['sub_category_id', 'rasa_id', 'level_id', 'package_name', 'selling_price', 'status'];
+    const sets = [];
+    const params = [];
+    for (const key of allowed) {
+      if (!Object.prototype.hasOwnProperty.call(fields || {}, key)) continue;
+      sets.push(key + ' = ?');
+      params.push(fields[key]);
+    }
+    if (!sets.length) return { changes: 0 };
+    params.push(menuId, brandId);
+    return this.db.execute(
+      "UPDATE menus SET " + sets.join(', ') + ", updated_at = datetime('now') WHERE id = ? AND brand_id = ?",
+      params
     );
   }
 
@@ -220,6 +254,19 @@ class ComposedMenuRepository {
       "WHERE " + clauses.join(' AND ') +
       " ORDER BY COALESCE(sc.sort_order, 999999) ASC, sc.name ASC, m.package_name ASC, m.id ASC",
       params
+    );
+  }
+
+  listMenuInventory({ brandId, branchId, menuIds }) {
+    const normalized = ids(menuIds);
+    if (!normalized.length) return [];
+    return this.db.queryMany(
+      "SELECT bpi.branch_id, bpi.product_id, bpi.stock_qty, bpi.low_stock_threshold, p.sku " +
+      "FROM branch_product_inventory bpi " +
+      "JOIN products p ON p.id = bpi.product_id AND p.brand_id = ? " +
+      "JOIN branches b ON b.id = bpi.branch_id AND b.brand_id = ? " +
+      "WHERE bpi.branch_id = ? AND bpi.product_id IN (" + placeholders(normalized.length) + ")",
+      [brandId, brandId, branchId, ...normalized]
     );
   }
 
