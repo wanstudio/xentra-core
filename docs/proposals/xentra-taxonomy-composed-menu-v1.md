@@ -862,24 +862,26 @@ all components must pass Core validity checks
 
 ## 🔒 LOCKED SUB-DECISION — Paket Is an Explicit Fixed Composite Sellable Product
 
-**Decision date:** 2026-10-02
+**Decision date:** 2026-10-03
 
-The human meaning of "Paket" (a combined offering, often perceived as a value/discounted deal) is different from the system meaning. Xentra uses the system definition for persistence and business rules.
+The human meaning of "Paket" (a combined offering, often perceived as a value/deal) is different from the system meaning. Xentra uses the system definition for persistence and business rules.
 
 Rules:
 
-1. A Paket exists only when the Owner explicitly creates a Product as `PACKAGE`. The system must not infer Paket status merely from multiple Products being sold together, the name containing "Paket", or a lower price/promotion.
-2. A Paket is one sellable Product entity with its own Product ID, customer-facing name, and explicit Paket price.
-3. The Paket contains a fixed composition of existing Product IDs. The components remain separate Product entities and retain their own identities/data.
-4. **Current Xentra inventory contract: a Paket does not have its own SKU or stock balance.** Its stock effect is derived from the stock authority of its referenced component Products.
-5. A component Product with a SKU is a stock-managed unit and is consumed according to the Package composition.
-6. A component Product without a SKU is non-stock and creates no inventory movement by itself.
-7. If a referenced Normal Product without a SKU has its own composition, the inventory resolver may continue through that composition until it reaches stock-managed Products, subject to cycle prevention and validity rules.
-8. A Package cannot contain another Package under the current contract.
-9. A Paket may optionally participate in a Promotion; Promotion does not create or change Paket identity.
-10. The current Package model does not support customer-side reconfiguration of components at purchase time.
+1. A Paket exists only when the Owner explicitly creates a **Menu Paket**. It is not inferred from a cart combination, menu name, or Promotion.
+2. A Menu Paket is one customer-facing commercial selling entity with its own name, presentation, selling price, and fixed Product composition.
+3. The Paket composition references existing atomic Products; it never duplicates Product records.
+4. Each component line has a fixed **positive integer quantity**.
+5. The same Product may appear once with quantity greater than one. Duplicate Product records are never created to represent quantity.
+6. A Paket must represent more than one Product unit in total. A single Product ×1 is a Menu Satuan, not a Paket.
+7. The Menu Paket itself has **no SKU and no stock balance** in the current Xentra model.
+8. A component Product with a SKU contributes inventory consumption equal to `component_qty × package_sale_qty`.
+9. A component Product without a SKU is non-stock and creates no inventory movement.
+10. Package availability is constrained by all required stock-managed components.
+11. Package components are atomic Products only; a Package/Menu cannot contain another Menu or Package.
+12. Customer-side component quantity changes or reconfiguration are not supported. The fixed quantities are part of the Menu Paket definition.
 
-Reference alignment: Shopify, WooCommerce, Square, Odoo, and Toast demonstrate fixed bundles/kits and recipe/composition-based stock depletion as established patterns. The Xentra contract intentionally chooses one simplified rule: **Package itself is virtual/non-stock in the current scope; stock authority lives in the referenced Product composition.**
+Reference cross-check: Odoo BoMs explicitly store component quantities and sell kits as a single sales line; WooCommerce Product Bundles supports per-component quantities and multiple instances of the same product; Square bundles expose a Quantity field per component. citeturn277241search0turn277241search13turn277241search10
 
 ## 🔒 LOCKED SUB-DECISION — Paket Revenue Belongs to the Paket
 
