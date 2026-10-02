@@ -689,6 +689,29 @@ resolved search text
   → Ayam Bakar / Lombok Ijo
 ```
 
+## 🔒 LOCKED SUB-DECISION — One Component Row per Product ID with Quantity
+
+**Decision date:** 2026-10-02
+
+Within a Paket composition, the same Component Product ID appears only once. Repetition is represented by the component row's quantity, not by duplicate component rows.
+
+Rules:
+
+1. A Paket composition may contain each eligible Component Product ID at most **one time**.
+2. Each component row has its own **Qty** field.
+3. Example:
+
+```
+Paket Ayam Komplit
+├── Ayam Bakar   Qty 2
+├── Nasi         Qty 1
+└── Es Teh       Qty 1
+```
+
+4. The inventory effect of one sold Paket is derived from each component Product ID multiplied by its configured component quantity.
+5. The UI must prevent duplicate insertion of the same Product ID into the Paket composition; selecting an already-present Product should focus/use the existing row rather than create another row.
+6. This rule does not mean the Paket itself can be sold only as one unit. Customer/cart quantity of the Paket remains a separate quantity from component Qty.
+
 ## 🔒 LOCKED SUB-DECISION — Paket Component Invalidity Blocks Sale
 
 **Decision date:** 2026-10-02
