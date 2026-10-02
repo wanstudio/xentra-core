@@ -592,6 +592,38 @@ Product 1 + Product 2 + Product 3 + eligible Promotion
 This boundary is required to avoid treating arbitrary product combinations as a new Product or Paket.
 
 
+## 🔒 LOCKED SUB-DECISION — Paket Product Subtype & Component Inventory
+
+**Decision date:** 2026-10-02
+
+A **Paket is a Product subtype with its own identity model**. It remains a sellable Product, but it is not required to satisfy the normal Product identity tuple of Category + Sub Category + Rasa.
+
+Locked rules:
+
+1. Paket has its own stable **Product ID**, Owner-defined name, explicitly defined component Product IDs, and explicitly defined Paket price.
+2. The normal Product identity rule `Category + Sub Category + Rasa` applies to **Normal Products**, not to Paket.
+3. Category/Sub Category may still be used to classify a Paket where the catalog UX requires it, but those taxonomy fields are not the Paket identity key.
+4. A Paket is an explicitly created catalog entity. It is never inferred from cart combinations or Promotion rules.
+5. **Paket has no independent stock balance.** When a Paket is sold, inventory consumption is derived from its referenced component Product IDs and quantities.
+6. The inventory engine must therefore be able to trace a Paket sale down to its component Product stock movements.
+7. **Paket cannot contain another Paket.** Package composition may reference Normal Products only under this contract.
+8. Payment may treat the Paket as one sellable order item at the Paket price; payment processing does not need to reconstruct the component composition.
+9. Revenue/reporting allocation beyond the sellable Paket line versus component inventory consumption remains a separate implementation detail to be finalized.
+
+Conceptual model:
+
+```
+PRODUCT
+├── NORMAL
+│   └── Identity = Category + Sub Category + Rasa
+│
+└── PACKAGE
+    ├── Identity = Package Product ID
+    ├── Display Name = Owner-defined Paket name
+    ├── Price = Owner-defined Paket price
+    └── Components = Normal Product ID + Qty
+```
+
 ## 🔒 LOCKED SUB-DECISION — Paket ≠ Promotion
 
 **Decision date:** 2026-10-01
@@ -909,9 +941,8 @@ Technical reconciliation is still required in schema, resolver, API, migration, 
 - Exact implementation of usage-derived Rasa availability without a separate manual compatibility matrix.
 - Product ID / identity-history model for long-term reporting after in-place identity edits.
 - Reporting semantics when one Product ID has different current identities over time.
-- Exact Package/Bundle taxonomy and identity model under the new Category + Sub Category + Rasa concept.
 - Exact distinction and UI contract for Add-on versus Product Options where both are used by existing Xentra POS contracts.
-- Package inventory explosion/consumption and order/reporting treatment.
+- Exact Package revenue/reporting allocation and order-snapshot treatment.
 - Category archive cascade and restoration semantics.
 - Complete migration mapping from existing `products.name` values to Sub Categories and Rasa values.
 - Compatibility treatment for existing Branch `name_override` data before the old field is retired.
