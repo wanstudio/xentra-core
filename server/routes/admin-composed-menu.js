@@ -11,6 +11,7 @@ function statusForError(message) {
     case 'SUB_CATEGORY_ALREADY_EXISTS':
     case 'RASA_ALREADY_EXISTS':
     case 'PRODUCT_SKU_ALREADY_EXISTS':
+    case 'PRODUCT_SKU_REMOVAL_BLOCKED_STOCK':
       return 409;
     case 'MENU_NOT_FOUND':
     case 'MASTER_PRODUCT_NOT_FOUND':
@@ -205,7 +206,9 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
       const product = service.setProductSku({
         brandId: req.brand_id,
         productId: req.params.id,
-        sku: req.body && req.body.sku
+        sku: req.body && req.body.sku,
+        actorId: req.user && (req.user.id || req.user.userId) || null,
+        actorRole: req.user && req.user.role || null
       });
       res.json({ success: true, product });
     } catch (err) {
