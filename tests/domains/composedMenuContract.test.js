@@ -17,7 +17,8 @@ const PRODUCT_B = 'cmv1_test_product_b';
 const BRANCH = 'cmv1_test_branch';
 const BRANCH_CATEGORY = 'cmv1_test_branch_category';
 
-test.before(() => {
+test.before(async () => {
+  await db.ready;
   db.prepare("INSERT OR IGNORE INTO organizations (id, name, slug) VALUES (?, 'Composed Menu Test Org', 'cmv1-test-org')").run(ORG);
   db.prepare("INSERT OR IGNORE INTO brands (id, organization_id, name, slug) VALUES (?, ?, 'Composed Menu Test Brand', 'cmv1-test-brand')").run(BRAND, ORG);
   db.prepare("INSERT OR IGNORE INTO brands (id, organization_id, name, slug) VALUES (?, ?, 'Composed Menu Other Brand', 'cmv1-test-brand-other')").run(OTHER_BRAND, ORG);
@@ -153,6 +154,52 @@ test('Branch Menu adoption is separate from Product Inventory and package availa
 
   assert.equal(stockout[0].is_available, false);
   assert.equal(stockout[0].blocking_reason, 'OUT_OF_STOCK');
+});
+
+test('SKU removal is blocked while active branch stock remains positive and history is written', () => {
+  ComposedMenuService.setProductSku({
+    brandId: BRAND,
+    productId: PRODUCT_A,
+    sku: 'sku-remove-cmv1'
+  });
+  assert.throws(
+    () => ComposedMenuService.setProductSku({
+      brandId: BRAND,
+      productId: PRODUCT_A,
+      sku: null
+    }),
+    /PRODUCT_SKU_REMOVAL_BLOCKED_STOCK/
+  );
+
+  db.prepare(
+    'UPDATE branch_product_inventory SET stock_qty = 0 WHERE branch_id = ? AND product_id = ?'
+  ).run(BRANCH, PRODUCT_A);
+  db.prepare(
+    'UPDATE branch_products SET stock = 0 WHERE branch_id = ? AND product_id = ?'
+  ).run(BRANCH, PRODUCT_A);
+
+  const removed = ComposedMenuService.setProductSku({
+    brandId: BRAND,
+    productId: PRODUCT_A,
+    sku: null,
+    actorId: 'cmv1-owner',
+    actorRole: 'owner'
+  });
+  assert.equal(removed.sku, null);
+
+  const history = db.prepare(
+    'SELECT previous_sku, new_sku, actor_id, actor_role FROM product_sku_history WHERE brand_id = ? AND product_id = ? ORDER BY changed_at DESC LIMIT 1'
+  ).get(BRAND, PRODUCT_A);
+  assert.equal(history.previous_sku, 'sku-remove-cmv1');
+  assert.equal(history.new_sku, null);
+  assert.equal(history.actor_id, 'cmv1-owner');
+  assert.equal(history.actor_role, 'owner');
+
+  ComposedMenuService.setProductSku({
+    brandId: BRAND,
+    productId: PRODUCT_A,
+    sku: 'sku-cmv1-final'
+  });
 });
 
 test('Cross-brand Product SKU and taxonomy references are rejected', () => {
