@@ -1,6 +1,7 @@
 'use strict';
 
 const {
+  ComposedProductService,
   ComposedMenuService,
   ComposedMenuResolver
 } = require('../../domains/catalog');
@@ -40,9 +41,83 @@ function sendError(res, err, fallback) {
 
 function registerAdminComposedMenuRoutes(router, deps = {}) {
   const requireAuth = deps.requireAuth;
+  const productService = deps.productService || ComposedProductService;
   const service = deps.service || ComposedMenuService;
   const resolver = deps.resolver || ComposedMenuResolver;
   const ownerRoles = ['owner', 'brand_manager'];
+
+  router.get('/admin/composed/products', requireAuth(ownerRoles), (req, res) => {
+    try {
+      const activeOnly = !(req.query && (req.query.active_only === '0' || req.query.active_only === 'false'));
+      const query = req.query && req.query.q != null ? req.query.q : null;
+      res.json({
+        success: true,
+        products: productService.listProducts({
+          brandId: req.brand_id,
+          activeOnly,
+          query
+        })
+      });
+    } catch (err) {
+      sendError(res, err, 'COMPOSED_PRODUCT_LIST_FAILED');
+    }
+  });
+
+  router.post('/admin/composed/products', requireAuth(ownerRoles), (req, res) => {
+    try {
+      const body = req.body || {};
+      const product = productService.createProduct({
+        brandId: req.brand_id,
+        name: body.name,
+        sku: body.sku,
+        description: body.description,
+        imageUrl: body.image_url,
+        image: body.image,
+        isActive: body.is_active,
+        actorId: req.user && (req.user.id || req.user.userId) || null,
+        actorRole: req.user && req.user.role || null
+      });
+      res.status(201).json({ success: true, product });
+    } catch (err) {
+      sendError(res, err, 'COMPOSED_PRODUCT_CREATE_FAILED');
+    }
+  });
+
+  router.put('/admin/composed/products/:id', requireAuth(ownerRoles), (req, res) => {
+    try {
+      const body = req.body || {};
+      const product = productService.updateProduct({
+        brandId: req.brand_id,
+        productId: req.params.id,
+        name: body.name,
+        sku: body.sku,
+        description: body.description,
+        imageUrl: body.image_url,
+        image: body.image,
+        isActive: body.is_active,
+        actorId: req.user && (req.user.id || req.user.userId) || null,
+        actorRole: req.user && req.user.role || null
+      });
+      res.json({ success: true, product });
+    } catch (err) {
+      sendError(res, err, 'COMPOSED_PRODUCT_UPDATE_FAILED');
+    }
+  });
+
+  router.patch('/admin/composed/products/:id/status', requireAuth(ownerRoles), (req, res) => {
+    try {
+      const product = productService.updateProduct({
+        brandId: req.brand_id,
+        productId: req.params.id,
+        isActive: req.body && req.body.is_active,
+        actorId: req.user && (req.user.id || req.user.userId) || null,
+        actorRole: req.user && req.user.role || null
+      });
+      res.json({ success: true, product });
+    } catch (err) {
+      sendError(res, err, 'COMPOSED_PRODUCT_STATUS_UPDATE_FAILED');
+    }
+  });
 
   router.get('/admin/menus', requireAuth(ownerRoles), (req, res) => {
     try {
@@ -89,6 +164,25 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
     }
   });
 
+  router.put('/admin/menus/:id/single', requireAuth(ownerRoles), (req, res) => {
+    try {
+      const body = req.body || {};
+      const menu = service.updateSingleMenu({
+        brandId: req.brand_id,
+        menuId: req.params.id,
+        productId: body.product_id,
+        subCategoryId: body.sub_category_id,
+        rasaId: body.rasa_id,
+        levelId: body.level_id,
+        sellingPrice: body.selling_price,
+        status: body.status
+      });
+      res.json({ success: true, menu });
+    } catch (err) {
+      sendError(res, err, 'COMPOSED_SINGLE_MENU_UPDATE_FAILED');
+    }
+  });
+
   router.post('/admin/menus/package', requireAuth(ownerRoles), (req, res) => {
     try {
       const body = req.body || {};
@@ -105,6 +199,26 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
       res.status(201).json({ success: true, menu });
     } catch (err) {
       sendError(res, err, 'COMPOSED_PACKAGE_MENU_CREATE_FAILED');
+    }
+  });
+
+  router.put('/admin/menus/:id/package', requireAuth(ownerRoles), (req, res) => {
+    try {
+      const body = req.body || {};
+      const menu = service.updatePackageMenu({
+        brandId: req.brand_id,
+        menuId: req.params.id,
+        packageName: body.package_name,
+        sellingPrice: body.selling_price,
+        subCategoryId: body.sub_category_id,
+        rasaId: body.rasa_id,
+        levelId: body.level_id,
+        components: body.components,
+        status: body.status
+      });
+      res.json({ success: true, menu });
+    } catch (err) {
+      sendError(res, err, 'COMPOSED_PACKAGE_MENU_UPDATE_FAILED');
     }
   });
 
@@ -213,6 +327,21 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
       res.json({ success: true, product });
     } catch (err) {
       sendError(res, err, 'PRODUCT_SKU_UPDATE_FAILED');
+    }
+  });
+
+  router.get('/catalog/branch-menu', (req, res) => {
+    try {
+      const branchId = req.query && req.query.branch_id;
+      const includeUnavailable = req.query && (req.query.include_unavailable === '1' || req.query.include_unavailable === 'true');
+      const menus = resolver.resolveBranchMenu({
+        brandId: req.brand_id,
+        branchId,
+        includeUnavailable
+      });
+      res.json({ success: true, menus });
+    } catch (err) {
+      sendError(res, err, 'COMPOSED_BRANCH_MENU_READ_FAILED');
     }
   });
 
