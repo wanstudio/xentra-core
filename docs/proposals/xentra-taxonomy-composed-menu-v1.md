@@ -660,6 +660,32 @@ Paket P100 sold × 1
 
 This is the canonical UX for activating Paket composition. Detailed lifecycle rules for changing an already-published Product between Normal and Paket remain a separate domain edge case and are not implied by the checkbox alone.
 
+## 🔒 LOCKED SUB-DECISION — Level Is Optional and NULL When Unset
+
+**Decision date:** 2026-10-02
+
+Level is optional for a Normal Product.
+
+Rules:
+
+1. A Normal Product may have no Level value.
+2. When Level is not set, the stored value is **NULL**.
+3. When Level is NULL, the Customer UI must show **neither the Level label nor the Level indicator**.
+4. The absence of a Level is not interpreted as the lowest Level value.
+5. When a Level is set, the contextual UI may present its label (for food, **Pedas**) and indicator/value according to the active context.
+
+Conceptually:
+
+```
+Level = NULL
+→ no "Pedas" label
+→ no Pedas indicator
+
+Level = 3
+→ "Pedas"
+→ indicator for Level 3
+```
+
 ## 🔒 LOCKED SUB-DECISION — Level Is Generic, UI Label Is Contextual
 
 **Decision date:** 2026-10-02
