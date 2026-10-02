@@ -536,7 +536,7 @@ A normal Product identity is:
 Category + Sub Category + Rasa
 ```
 
-Add-ons are optional purchase-time additions and are not part of the Product identity.
+Normal Product does not use Kelengkapan as a generic composition field. Independently sellable additions are Products; any remaining purchase-time options must use the explicit Product Options contract.
 
 ### Product Paket
 
@@ -591,6 +591,30 @@ Product 1 + Product 2 + Product 3 + eligible Promotion
 
 This boundary is required to avoid treating arbitrary product combinations as a new Product or Paket.
 
+
+## 🔒 LOCKED SUB-DECISION — Normal Product Excludes Kelengkapan
+
+**Decision date:** 2026-10-02
+
+For the new Xentra concept, **Kelengkapan is not a field of Normal Product composition**.
+
+The earlier Kelengkapan concept came from treating a Product as though it were a Paket assembled from several included items. That assumption is superseded.
+
+Locked Normal Product model:
+
+```
+Category + Sub Category + Rasa
++ optional Level
++ Product-level fields
+```
+
+Rules:
+
+1. Normal Product does not require a Kelengkapan field.
+2. Items such as Nasi, Lalapan, Sambal, or Es Teh that are independently sellable remain separate Product entities.
+3. When those Products are intentionally sold together as a named bundle, that is a Paket and follows the locked Paket contract.
+4. Existing legacy Kelengkapan data/fields must be treated as migration/retirement work, not as the target Normal Product domain model.
+5. Any future optional purchase-time configuration must be defined explicitly through the Product Options contract, not by reviving Kelengkapan as a generic catch-all field.
 
 ## 🔒 LOCKED SUB-DECISION — Level Is Generic, UI Label Is Contextual
 
@@ -968,6 +992,7 @@ Technical reconciliation is still required in schema, resolver, API, migration, 
 - Reporting semantics when one Product ID has different current identities over time.
 - Exact distinction and UI contract for Add-on versus Product Options where both are used by existing Xentra POS contracts.
 - Exact Package revenue/reporting allocation and order-snapshot treatment.
+- Exact boundary and activation rules for optional Product Options in Normal Product flows.
 - Category archive cascade and restoration semantics.
 - Complete migration mapping from existing `products.name` values to Sub Categories and Rasa values.
 - Compatibility treatment for existing Branch `name_override` data before the old field is retired.
