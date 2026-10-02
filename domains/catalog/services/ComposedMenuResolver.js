@@ -64,7 +64,7 @@ function resolveMenuBase(menu) {
   };
 }
 
-function calculateInventory(menuItems, inventoryRows) {
+function calculateInventory(menuItems, inventoryRows, menuType = null) {
   const inventoryMap = new Map(
     (inventoryRows || []).map(row => [String(row.product_id), row])
   );
@@ -80,13 +80,17 @@ function calculateInventory(menuItems, inventoryRows) {
   }
 
   const totalUnits = normalizedItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
-  if (normalizedItems.length > 0) {
-    const firstMenu = normalizedItems[0].menu_type;
-    // Menu type is not always projected on item rows; these structural checks are
-    // reinforced by the service/schema. Invalid persisted composition is fail-closed.
-    if (normalizedItems.some(item => Number(item.quantity) <= 0)) {
-      blocking = blocking || 'MENU_COMPOSITION_INVALID';
-    }
+  if (normalizedItems.some(item => Number(item.quantity) <= 0)) {
+    blocking = blocking || 'MENU_COMPOSITION_INVALID';
+  }
+  if (menuType === 'SINGLE' && (
+    normalizedItems.length !== 1 ||
+    Number(normalizedItems[0] && normalizedItems[0].quantity) !== 1
+  )) {
+    blocking = blocking || 'MENU_COMPOSITION_INVALID';
+  }
+  if (menuType === 'PACKAGE' && totalUnits < 2) {
+    blocking = blocking || 'MENU_COMPOSITION_INVALID';
   }
 
   const items = normalizedItems.map(item => {
@@ -195,7 +199,7 @@ class ComposedMenuResolver {
         ? base.price
         : Number(branchState.price_override);
 
-      const inventoryState = calculateInventory(itemMap.get(String(menu.id)) || [], inventory);
+      const inventoryState = calculateInventory(itemMap.get(String(menu.id)) || [], inventory, menu.menu_type);
 
       const menuStatusValid = String(menu.status).toUpperCase() === 'ACTIVE';
       let blockingReason = null;
