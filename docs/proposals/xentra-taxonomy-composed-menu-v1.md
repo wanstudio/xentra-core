@@ -841,7 +841,7 @@ The minimum target relationship is:
 products
   id
   brand_id
-  internal_name
+  name              -- internal Product name
   sku NULL
   description
   media ...
