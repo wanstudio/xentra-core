@@ -580,7 +580,7 @@ These must be answered explicitly before the document can become LOCKED:
 
 ## 19. Current conclusion
 
-The concept is technically feasible and can become the single forward Xentra model.
+The concept is technically feasible and can become the single forward Xentra model. The current canonical direction is: **Product = atomic stock/catalog unit; Menu Satuan = one Product for sale; Menu Paket = multiple Products for sale as one commercial offering; Inventory quantity is owned by Inventory, not Menu.**
 
 However, **this document deliberately does not lock it yet**. The critical next step is to validate the human workflow and complete the dependency audit before replacing the current `products.name → Customer title` contract.
 
@@ -1544,6 +1544,55 @@ Reference alignment: Odoo Kit/BoM explicitly records component quantities and sc
 
 **Status:** LOCKED SUB-DECISION for proposal only. `main` remains unchanged.
 
+## 🔒 LOCKED SUB-DECISION — Inventory Quantity Belongs to Inventory Domain — 2026-10-03
+
+The **quantity of stock on hand is an Inventory-domain value**, not a Menu-domain value.
+
+Rules:
+
+1. Product creation establishes the Product identity and, when SKU is present, that the Product is stock-managed.
+2. Creating or assigning a SKU does **not** create a stock quantity.
+3. Menu Satuan and Menu Paket define **selling composition/quantity**, not Branch stock on hand.
+4. Branch stock quantities are entered, received, counted, adjusted, transferred, or otherwise mutated through the **Inventory domain**.
+5. The physical stock remains Branch-scoped. The existing Xentra production contract uses `branch_products.stock` as the physical stock boundary owned by Inventory; the future schema may normalize this further without changing the domain ownership.
+6. Menu Paket component quantity is a commercial composition quantity (for example `Nasi ×2` inside a Package). It must never be confused with `Nasi stock = 2`.
+
+Conceptually:
+
+```text
+MENU DOMAIN
+  Paket Keluarga
+  └─ Nasi ×2          ← composition quantity
+
+INVENTORY DOMAIN
+  Branch A
+  └─ Nasi SKU NASI-001
+     Stock on hand = 87  ← inventory quantity
+```
+
+### SKU lifecycle
+
+SKU is a Product attribute and may be generated or manually assigned.
+
+Current target behavior:
+
+- Assign SKU → Product becomes stock-managed; no stock quantity is fabricated.
+- Edit SKU → allowed while retaining the same Product ID and Branch stock identity; the change must be auditable.
+- Historical inventory movements and transaction snapshots must remain identifiable after an SKU change. A future physical implementation should preserve prior SKU values through an SKU history/audit record or equivalent immutable snapshot.
+- Remove SKU → changes the Product from stock-managed to non-stock. To avoid orphaning physical stock, Core must block SKU removal while any active Branch holds positive stock for that Product. After stock reaches zero and no blocking inventory operation remains, SKU removal may proceed as an audited Product change.
+- A removed/old SKU must not be silently reassigned to another Product while historical references would become ambiguous; exact SKU reuse policy is a technical reconciliation detail.
+
+The purpose is to keep the semantic contract simple:
+
+```text
+SKU      → Product stockability / stock identity
+Stock Qty → Inventory domain
+Menu Qty  → Menu composition or customer order quantity
+```
+
+Reference cross-check: Shopify allows SKU edits on existing products/variants and maintains inventory adjustment history separately; Square likewise treats stock quantities as inventory operations on stock-tracked item variations. These references support separating identifier management from stock quantity management; Xentra intentionally makes that separation stricter by assigning stock-quantity ownership to Inventory. citeturn487219search4turn487219search1turn487219search2
+
+**Status:** LOCKED SUB-DECISION for the proposal only. `main` remains unchanged.
 ## 🔎 PRE-LOCK AUDIT — Decisions vs Existing Notion/Git
 
 **Audit date:** 2026-10-01
