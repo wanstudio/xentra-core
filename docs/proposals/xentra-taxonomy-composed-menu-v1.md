@@ -13,7 +13,7 @@ Evaluate a single Xentra-wide product/catalog concept in which:
 - **Category** is a parent taxonomy node.
 - **Sub Category** is a child taxonomy node of Category.
 - **Sub Category name is the primary customer-facing menu title.**
-- **Original is the universal baseline Rasa for Normal Products.** A new Sub Category can always use `Original` without requiring prior usage of that Rasa.
+- **Original is the universal baseline Rasa for Normal Products.** A new Sub Category can always use `Original` without requiring prior usage of that Rasa. **Original is not displayed in Customer UI; non-Original Rasa values remain visible as the Product subtitle.**
 - **Rasa** is a reusable master vocabulary that may be associated with multiple Sub Categories.
 - A Product remains a stable catalog entity for pricing, inventory, adoption, orders, reporting, and references.
 - No separate Xentra-vs-client product architecture is introduced.
