@@ -4,6 +4,10 @@ const ComposedMenuRepository = require('../repositories/ComposedMenuRepository')
 
 const repository = new ComposedMenuRepository();
 
+function ensureSchema() {
+  repository.ensureSchema();
+}
+
 function groupRows(rows, key) {
   const map = new Map();
   for (const row of rows || []) {
@@ -117,7 +121,8 @@ function calculateInventory(menuItems, inventoryRows) {
 }
 
 class ComposedMenuResolver {
-  static resolveMenu({ brandId, menuId }) {
+  static resolveMenu({
+    ensureSchema(); brandId, menuId }) {
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
     const menu = repository.findMenu({ brandId, menuId });
     if (!menu) throw new Error('MENU_NOT_FOUND');
@@ -138,7 +143,8 @@ class ComposedMenuResolver {
     };
   }
 
-  static resolveBranchMenu({ brandId, branchId, menuIds = null, includeUnavailable = false }) {
+  static resolveBranchMenu({
+    ensureSchema(); brandId, branchId, menuIds = null, includeUnavailable = false }) {
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
     if (!branchId) throw new Error('BRANCH_CONTEXT_REQUIRED');
 
@@ -204,7 +210,8 @@ class ComposedMenuResolver {
     }).filter(Boolean);
   }
 
-  static searchBranchMenu({ brandId, branchId, query }) {
+  static searchBranchMenu({
+    ensureSchema(); brandId, branchId, query }) {
     const needle = String(query == null ? '' : query).trim().toLocaleLowerCase();
     if (!needle) return this.resolveBranchMenu({ brandId, branchId });
 
