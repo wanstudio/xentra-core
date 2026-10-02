@@ -1593,6 +1593,38 @@ Menu Qty  → Menu composition or customer order quantity
 Reference cross-check: Shopify allows SKU edits on existing products/variants and maintains inventory adjustment history separately; Square likewise treats stock quantities as inventory operations on stock-tracked item variations. These references support separating identifier management from stock quantity management; Xentra intentionally makes that separation stricter by assigning stock-quantity ownership to Inventory. citeturn487219search4turn487219search1turn487219search2
 
 **Status:** LOCKED SUB-DECISION for the proposal only. `main` remains unchanged.
+## 🔒 LOCKED SUB-DECISION — Menu Price Ownership
+
+**Decision date:** 2026-10-03
+
+The canonical **selling price belongs to the Menu layer**, not the atomic Product layer.
+
+Rules:
+
+1. Product is the atomic catalog/stock unit and does not carry the canonical customer selling price.
+2. Menu Satuan has its own selling price.
+3. Menu Paket has its own explicit package selling price.
+4. The same Product may be referenced by multiple Menus with different selling prices without duplicating the Product or SKU.
+5. Package price is never inferred by summing current Product selling prices; the Owner explicitly defines the Menu Paket price.
+6. Any future Branch-specific price override must attach to the Branch's adopted Menu/selling configuration, not mutate the Product's stock identity.
+7. Historical orders snapshot the effective selling price and Menu presentation at transaction time.
+
+Example:
+
+```text
+Product Nasi [SKU NASI-001]
+│
+├─ Menu Satuan: Nasi Putih       Rp8.000
+├─ Menu Satuan: Nasi Dingin      Rp7.000
+└─ Menu Paket: Ayam + Nasi       Rp35.000
+```
+
+All three can consume the same `NASI-001` stock when Nasi is a stock-managed Product.
+
+Reference alignment: Toast supports menu-specific pricing for the same menu item and Square models price on the sellable item variation while inventory is tracked separately. These patterns support keeping customer selling price with the sellable menu/variation layer rather than using stock identity as the price authority. citeturn201158search1turn201158search2
+
+**Status:** LOCKED SUB-DECISION for the proposal only. `main` remains unchanged.
+
 ## 🔎 PRE-LOCK AUDIT — Decisions vs Existing Notion/Git
 
 **Audit date:** 2026-10-01
