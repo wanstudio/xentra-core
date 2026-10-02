@@ -41,12 +41,14 @@ Target attributes:
 ```text
 Product ID          immutable technical identity
 Brand ID            tenant/brand scope
-Internal Name       human-readable atomic label
-SKU                 optional; presence means stock-managed
+name                human-readable atomic/internal label
+sku                 optional; presence means stock-managed
 Description         product/item description
 Media               product/item media
 Lifecycle Status    draft / active / archived as supported by Product domain
 ```
+
+The physical column may remain named `name`; its **forward semantic meaning is internal Product name**, not Customer Menu title. The target model adds a real Product SKU field because the current production schema does not yet carry `products.sku`.
 
 Product does **not** own the customer-facing Menu taxonomy.
 
@@ -766,6 +768,13 @@ Existing products.description/media
 Existing SKU, when available
 → preserve as Product SKU / stock-managed state
 
+Legacy Product stock without an existing SKU
+→ automatically assign a deterministic generated SKU before or as part of inventory migration
+→ preserve the Product as stock-managed
+
+Legacy Product with no stock evidence and no business reason to track inventory
+→ may remain SKU NULL / non-stock
+
 Existing price
 → becomes the initial Menu Satuan price
 ```
@@ -783,6 +792,8 @@ Legacy Product name
 ```
 
 The migration must never guess ambiguous semantics.
+
+Because the current production schema does not contain `products.sku`, the migration must first classify legacy Products by actual inventory evidence. A Product with positive Branch stock or historical stock movements cannot simply become SKU NULL under the new rule; it must receive a deterministic generated SKU or an explicit Owner decision before the new Inventory contract is activated.
 
 Examples of data that require review instead of silent conversion:
 
@@ -840,7 +851,6 @@ menus
   id
   brand_id
   menu_type
-  category_id
   sub_category_id
   rasa_id NULL
   level_id NULL
@@ -849,6 +859,8 @@ menus
   status
   created_at
   updated_at
+
+Note: Menu does not need a second stored `category_id` when `sub_category_id` already determines its parent Category. Category is resolved through `sub_categories.category_id`. This avoids two base columns becoming inconsistent.
 
 menu_items
   menu_id
@@ -876,14 +888,17 @@ Target integrity:
 Menu Satuan
 → exactly one menu_items row
 → quantity = 1
+→ rasa_id resolves to a valid Brand Rasa
 
 Menu Paket
 → total component units >= 2
 → each Product appears once
 → quantity is positive integer
+→ package_name is required
 
 Menu
-→ Sub Category belongs to same Brand and its Category
+→ Sub Category belongs to same Brand
+→ Sub Category determines Category
 → Product references belong to same Brand
 → Menu Satuan duplicate identity rejected on (Sub Category, Rasa)
 ```
@@ -924,6 +939,7 @@ The following no longer need another business-question loop:
 These are engineering decisions that can be solved during implementation/reconciliation and do not require another conceptual discovery loop:
 
 - exact SQLite/Postgres-style normalized-key implementation for Brand-scoped uniqueness;
+- exact Product SKU generation format/prefix remains an engineering convention, provided generated SKUs are deterministic/unique within Brand and auditable;
 - exact physical migration mechanics for existing SQLite tables;
 - exact inventory SKU-history table versus snapshot representation;
 - exact media binding for Menu Paket;
@@ -962,6 +978,6 @@ BRANCH MENU ADOPTION
 PRODUCT SKU / INVENTORY
 ```
 
-The major remaining work is implementation reconciliation against the existing production codebase, not another round of basic concept discovery.
+The major remaining work is implementation reconciliation against the existing production codebase, especially migration of the current Product schema that has no SKU column and currently stores selling price/category directly on Product. This is implementation reconciliation, not another round of basic concept discovery.
 
 **Production/main must remain unchanged until the final Xentra contract is explicitly promoted.**
