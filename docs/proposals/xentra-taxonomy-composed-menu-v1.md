@@ -378,7 +378,8 @@ The engine must reject:
 - a Product using a Sub Category from another Brand;
 - a Product using a Rasa from another Brand;
 - a Product selecting a Rasa that is not associated with its Sub Category;
-- duplicate normalized Sub Category names under the same Category;
+- duplicate normalized Category names within the same Brand;
+- duplicate normalized Sub Category names within the same Brand;
 - duplicate normalized Rasa names within the same Brand;
 - duplicate Sub Category ↔ Rasa association rows.
 
@@ -949,21 +950,22 @@ UI rules:
 - This is a UX/lifecycle decision only at this stage; no production implementation is implied by this document.
 
 Product records are not themselves considered descendants for purposes of automatic deletion. Product lifecycle remains governed by the Product domain.
-## 🔒 LOCKED SUB-DECISION — Sub Category Name Uniqueness Scope
+## 🔒 LOCKED SUB-DECISION — Category and Sub Category Names Are Brand-Unique
 
 **Decision date:** 2026-10-02
 
-Sub Category names may be reused across different parent Categories within the same Brand.
+Within one Brand, both **Category name** and **Sub Category name** must be unique.
 
 Rules:
 
-1. The uniqueness scope for a Sub Category name is **within its parent Category**.
-2. The same normalized name may therefore exist under different Categories, for example:
+1. Two Categories in the same Brand may not share the same normalized name.
+2. Two Sub Categories in the same Brand may not share the same normalized name, even when their parent Categories are different.
+3. Parent Category still determines which Sub Categories are shown in the Product Editor, but parent context does not permit duplicate Sub Category titles.
+4. The system must warn on duplicate entry before save and Core must enforce the same uniqueness constraint server-side.
+5. The purpose is to keep the customer-facing Sub Category title unambiguous and prevent visually duplicated menu items such as:
    - Ayam → Goreng
    - Ikan → Goreng
-3. Product Editor selectors are parent-scoped: selecting a Category determines which Sub Categories are available.
-4. The system must reject duplicate normalized Sub Category names only when they collide under the **same parent Category**.
-5. A Sub Category remains unambiguous through its stable ID and its parent Category relation.
+6. This is a **name uniqueness rule**, separate from Normal Product identity uniqueness.
 
 ## 🔒 LOCKED SUB-DECISION — Normal Product Identity
 
