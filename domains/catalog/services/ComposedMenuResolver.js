@@ -122,7 +122,9 @@ function calculateInventory(menuItems, inventoryRows) {
 
 class ComposedMenuResolver {
   static resolveMenu({
-    ensureSchema(); brandId, menuId }) {
+    brandId, menuId
+  }) {
+    ensureSchema();
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
     const menu = repository.findMenu({ brandId, menuId });
     if (!menu) throw new Error('MENU_NOT_FOUND');
@@ -144,7 +146,9 @@ class ComposedMenuResolver {
   }
 
   static resolveBranchMenu({
-    ensureSchema(); brandId, branchId, menuIds = null, includeUnavailable = false }) {
+    brandId, branchId, menuIds = null, includeUnavailable = false
+  }) {
+    ensureSchema();
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
     if (!branchId) throw new Error('BRANCH_CONTEXT_REQUIRED');
 
@@ -211,7 +215,9 @@ class ComposedMenuResolver {
   }
 
   static searchBranchMenu({
-    ensureSchema(); brandId, branchId, query }) {
+    brandId, branchId, query
+  }) {
+    ensureSchema();
     const needle = String(query == null ? '' : query).trim().toLocaleLowerCase();
     if (!needle) return this.resolveBranchMenu({ brandId, branchId });
 
