@@ -236,133 +236,134 @@ MENU PAKET
 The Sub Category remains the customer-facing title source for the Menu. Rasa remains the customer-facing subtitle source according to the existing Original/non-Original presentation rule. Level/Pedas is a Menu presentation attribute in the current food context.
 
 Historical orders must snapshot the resolved Menu presentation and the Product references needed for inventory reversal/audit so later Menu edits do not rewrite historical transactions.
-## 5. Category should not be duplicated on Product without a reason
+## 5. Menu Taxonomy: Category → Sub Category → Rasa
 
-Under a strict taxonomy model, Sub Category already determines its parent Category.
+Category, Sub Category, and Rasa belong to the **Menu** layer, not the atomic Product layer.
 
-Therefore the preferred canonical relationship is:
+Canonical relationship:
 
+```text
+Menu
+  ├─ Category
+  ├─ Sub Category
+  └─ Rasa
 ```
-products.sub_category_id
+
+Sub Category determines its parent Category:
+
+```text
+Menu.sub_category_id
         ↓
 sub_categories.category_id
         ↓
 categories.id
 ```
 
-Keeping both `products.category_id` and `products.sub_category_id` as independently writable canonical fields would create a consistency risk.
+Product does not carry independent Category/Sub Category/Rasa identity in the new model.
 
-If the existing `products.category_id` column must remain temporarily for compatibility, it should become derived/validated compatibility state during migration rather than a second source of truth.
+Category and Sub Category names remain Brand-unique. Sub Category remains the primary customer-facing title source for the Menu. Rasa remains reusable Brand Master data; `Original` is the universal baseline and is hidden in customer subtitle presentation.
 
-## 6. Owner Product Editor behavior
+A Menu may reference Product(s) independently of the Product's stock identity. The same Product may be reused by many Menus.
+## 6. Owner Product and Menu Editor behavior
 
-Initial state:
+Product and Menu are created as separate semantic entities.
 
+### Product Editor
+
+Product Editor creates the atomic Product/stock unit:
+
+```text
+Foto
+Nama internal / label Product (non-customer Menu title)
+SKU
+Deskripsi
+Status
 ```
+
+SKU behavior:
+
+```text
+SKU kosong → Product non-stock
+SKU ada    → Product stock-managed
+```
+
+The Product Editor does not select Category, Sub Category, Rasa, Level/Pedas, or customer selling price as Product identity. Those belong to Menu.
+
+### Menu Editor
+
+Menu Editor creates the customer-facing selling entity:
+
+```text
+Jenis Menu
+○ Satuan
+○ Paket
+
 Category
-[ <empty> ▼ ] [+]
+[ Pilih Category ▼ ] [+]
 
 Sub Category
-[ <empty> ▼ ] [+]
+[ Pilih Sub Category ▼ ] [+]
 
 Rasa
-[ <empty> ▼ ] [+]
+[ Original ▼ ] [+]
 
-Level
-[ <empty> ▼ ]
+Level Pedas
+[ optional ]
 
-☐ Aktifkan Kelengkapan
+Product(s)
+[ pilih Product ]
 
-...
+Harga Jual
+[ ... ]
+
+Status
+[ ... ]
 ```
 
-After Category selection:
+For **Menu Satuan**, exactly one Product is selected.
 
-```
-Category
-[ Ayam ▼ ] [+]
+For **Menu Paket**, two or more Products are selected.
 
-Sub Category
-[ <empty> ▼ ] [+]
-```
+Sub Category selector is parent-scoped to the chosen Category.
 
-The Sub Category selector MUST query only children of the selected Category.
+Quick-add Sub Category inherits the selected Category as fixed/read-only context.
 
-The Sub Category `+` button inherits the selected Category context.
+Menu Editor should resolve the Customer preview from the same fields used by Customer Menu View Model.
 
-Quick-add flow:
-
-```
-Tambah Sub Kategori
-
-Kategori
-[ Ayam ]                  ← read-only / fixed context
-
-Sub Kategori
-[ __________________ ]
-
-[Simpan]
-```
-
-Save payload must carry the parent explicitly:
-
-```json
-{
-  "category_id": "CATEGORY_AYAM",
-  "name": "Ayam Tulang Lunak"
-}
-```
-
-After successful creation, the selector refreshes and the new Sub Category becomes selected.
-
+Product may exist without any Menu Satuan because it can be used as a component of Menu Paket.
 ## 7. Rasa selector behavior
+
+Rasa is selected in **Menu Editor**, after Category/Sub Category context is known.
 
 After Sub Category is selected:
 
-```
+```text
 Sub Category
-[ Ayam Tulang Lunak ▼ ]
+[ Ayam Bakar ▼ ]
 
 Rasa
-[ <empty> ▼ ] [+]
+[ Original ▼ ] [+]
 ```
 
-The Rasa selector SHOULD display Rasa values that have already been used by Products under the selected Sub Category. This relationship is usage-derived; no separate manual "Rasa ↔ Sub Category" management surface is required in the new concept.
+Rasa is reusable Brand Master data. The selector may show Rasa values already used by Menus under the selected Sub Category, while `Original` is always available as the baseline.
 
 Rasa quick-add inherits the selected Sub Category context.
 
-Quick-add flow:
-
-```
-Tambah Rasa
-
-Sub Kategori
-[ Ayam Tulang Lunak ]      ← read-only / fixed context
-
-Rasa
-[ __________________ ]
-
-[Simpan]
-```
-
 Save semantics:
 
-1. Check the current Brand Master Rasa vocabulary for the normalized name.
-2. If the Rasa does not exist, create one Master Rasa record.
-3. If the Rasa already exists, offer contextual reuse for the current Sub Category/Product flow rather than creating a duplicate Master Rasa.
-4. Save the Product using the existing/reused Rasa ID.
-5. The Product then establishes that Rasa's usage under the selected Sub Category.
-6. Refresh the Rasa selector and auto-select the selected Rasa for the current Product draft.
+1. Normalize the entered Brand Rasa name.
+2. Reuse an existing Master Rasa when the normalized name already exists.
+3. Otherwise create the Brand Master Rasa.
+4. Save the Menu with the resulting Rasa ID.
 
-The system must not require the Owner to maintain a separate compatibility matrix just to reuse an existing Rasa.
-
+No separate manual Rasa ↔ Sub Category compatibility matrix is required in the current concept.
 ## 8. Downstream reset rules
 
-Parent changes invalidate downstream selections.
+Parent changes invalidate downstream **Menu** selections.
 
 ### Category changes
 
-```
+```text
 Category changes
       ↓
 Sub Category reset
@@ -372,93 +373,74 @@ Rasa reset
 
 ### Sub Category changes
 
-```
-Sub Category changes
-      ↓
-Rasa reset IF current Rasa is not associated with the new Sub Category
-```
+Changing Sub Category must revalidate the current Rasa. If the current Rasa is not available/used for the new Menu context, the Menu Editor resets Rasa to the applicable baseline state (`Original`).
 
-The UI must never preserve an impossible combination such as:
+The UI must never preserve impossible taxonomy combinations.
 
-```
-Category = Minuman
-Sub Category = Ayam Geprek
-```
-
-or:
-
-```
-Sub Category = Ayam Bakar
-Rasa = Lombok Ijo
-```
-
-when that association has not been authorized.
-
-Backend validation MUST enforce the same rule even when the client is bypassed.
-
+Core must enforce the same validation server-side. Draft UI state is mutated first; persistence occurs only on Menu save.
 ## 9. Taxonomy governance
 
-Owner is the authority for Master taxonomy.
+Owner is the authority for Master taxonomy and Master Menu definitions.
 
 Owner may:
 
-- create Category;
-- edit Category;
-- deactivate Category;
-- create Sub Category under a selected Category;
-- edit Sub Category;
-- deactivate Sub Category;
+- create/edit/archive Category;
+- create/edit/archive Sub Category under a Category;
 - create/reuse Rasa;
-- associate Rasa with Sub Category;
-- remove a Sub Category ↔ Rasa association.
+- create/edit/archive Menu Satuan;
+- create/edit/archive Menu Paket;
+- assign Product(s) to a Menu;
+- set Menu presentation and selling price.
 
-Master reference management remains separate from Product composition.
+Branch adopts approved Menus for customer-facing sale and does not edit Master Product or Master Menu definitions.
 
-The Product Editor may offer contextual `+` quick-add actions but must not become a second unrestricted Master Reference management surface.
-
+Master taxonomy management remains separate from Product creation and from Branch merchandising.
 ## 10. Referential integrity requirements
 
 The engine must reject:
 
 - a Sub Category whose Category belongs to another Brand;
-- a Product using a Sub Category from another Brand;
-- a Product using a Rasa from another Brand;
-- a Product selecting a Rasa that is not associated with its Sub Category;
+- a Menu using Category/Sub Category/Rasa from another Brand;
+- a Menu whose Sub Category does not belong to its Category;
+- a Menu Satuan with zero or more than one Product reference;
+- a Menu Paket with fewer than two Product references;
+- a Menu referencing a Product from another Brand;
+- a Menu Paket referencing another Package/Menu rather than an atomic Product;
 - duplicate normalized Category names within the same Brand;
-- duplicate normalized Sub Category names within the same Brand, including across different parent Categories;
+- duplicate normalized Sub Category names within the same Brand;
 - duplicate normalized Rasa names within the same Brand;
-- duplicate Sub Category ↔ Rasa association rows.
+- duplicate Product SKU values within the same Brand when SKU is non-NULL;
+- composition references that create cycles within the same Menu definition;
+- stock movements against a Product that has no SKU.
 
 The UI is not the authority. Core validation is the authority.
-
 ## 11. Customer read model
 
-Customer PWA must consume one resolved Menu View Model.
+Customer PWA must consume one resolved **Menu View Model**.
 
 Target mapping:
 
-```
-title       ← sub_categories.name
-subtitle    ← menu_flavors.name (nullable)
-detail[]    ← Product-specific detail/option data
-indicator   ← Level value/presentation (current food UI label: "Pedas")
-image       ← Master Product media
-price       ← Master Product / Pricing Policy
-availability← Branch operational state
-categories[]← Branch Category memberships
-options     ← existing Product Options contract
+```text
+title        ← Menu.Sub Category.name
+subtitle     ← Menu.Rasa.name when Rasa != Original; otherwise hidden
+level        ← Menu Level/Pedas presentation when configured
+image        ← Menu/Product media according to the approved media source
+price        ← Menu selling price / Branch Menu price policy
+availability ← Branch operational state + Product SKU stock where relevant
+product_refs ← Menu Product reference(s)
+category     ← Menu.Category
 ```
 
-Customer code must not reconstruct this model by joining raw database concepts.
-
+Customer code must not reconstruct menu semantics by directly joining arbitrary raw Product, Category, or Rasa tables.
 ## 12. Order and historical behavior
 
-At order commitment, Core must snapshot the resolved customer presentation used by the order.
+At order commitment, Core must snapshot the resolved Menu presentation and the Product reference(s) needed for inventory and historical audit.
 
-Future taxonomy or Rasa edits must not rewrite historical order display.
+Future Menu edits must not rewrite historical order display.
 
-Order identity continues to use `product_id`, not the display title.
+Historical inventory reversal must use the Menu composition/stock-resolution snapshot that governed the original sale rather than today's Menu definition.
 
+Commercial order identity is Menu-based, while Product IDs/SKUs remain the inventory identities used by the stock engine.
 ## 13. Branch adoption
 
 The new Product/Menu separation changes the adoption boundary:
