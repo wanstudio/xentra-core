@@ -598,6 +598,21 @@ Product 1 + Product 2 + Product 3 + eligible Promotion
 This boundary is required to avoid treating arbitrary product combinations as a new Product or Paket.
 
 
+## 🔒 LOCKED SUB-DECISION — Product Options Is a Separate Domain
+
+**Decision date:** 2026-10-02
+
+**Product Options** remains a separate domain from Normal Product identity and from Paket/Kelengkapan.
+
+Rules:
+
+1. Product Options is not part of the Normal Product identity tuple.
+2. Product Options is not the mechanism for composing Paket components.
+3. Product Options may have its own option values, pricing, and add-on charges where that domain requires them.
+4. The detailed Product Options business rules, pricing behavior, inventory interaction, UI, and order representation are **intentionally out of scope for this lock**.
+5. The current Xentra Product Options capability may remain as an existing domain contract/capability; this taxonomy decision does not redesign it.
+6. The new taxonomy/product concept must not invent Product Options behavior merely to fill the current Product Editor.
+
 ## 🔒 LOCKED SUB-DECISION — Kelengkapan Checkbox Activates Paket Mode
 
 **Decision date:** 2026-10-02
@@ -1020,7 +1035,7 @@ Technical reconciliation is still required in schema, resolver, API, migration, 
 - Reporting semantics when one Product ID has different current identities over time.
 - Exact distinction and UI contract for Add-on versus Product Options where both are used by existing Xentra POS contracts.
 - Exact Package revenue/reporting allocation and order-snapshot treatment.
-- Exact boundary and activation rules for optional Product Options in Normal Product flows.
+- Detailed Product Options domain contract: option values, add-on pricing, inventory interaction, UI, and order representation.
 - Category archive cascade and restoration semantics.
 - Complete migration mapping from existing `products.name` values to Sub Categories and Rasa values.
 - Compatibility treatment for existing Branch `name_override` data before the old field is retired.
@@ -1030,6 +1045,7 @@ Technical reconciliation is still required in schema, resolver, API, migration, 
 - Normal Product identity = Category + Sub Category + Rasa; Original is the default Rasa.
 - Level is a generic domain concept; food UI may label it Pedas; presentation/configuration is reusable in Shared.
 - Kelengkapan checkbox activates Paket mode; unchecked is Normal Product, checked reveals Package composition and uses component Product IDs.
+- Product Options remains a separate domain; its pricing/add-on and operational rules are intentionally deferred.
 - Rasa is reusable Master data, not a child taxonomy node.
 - Rasa reuse is contextual; no manual Rasa↔Sub Category management UI is required.
 - Independently sellable additions such as Sambal Matah are Products, not Add-ons.
