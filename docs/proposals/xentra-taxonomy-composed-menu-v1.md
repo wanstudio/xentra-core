@@ -658,6 +658,37 @@ Paket P100 sold × 1
 
 This is the canonical UX for activating Paket composition. Detailed lifecycle rules for changing an already-published Product between Normal and Paket remain a separate domain edge case and are not implied by the checkbox alone.
 
+## 🔒 LOCKED SUB-DECISION — Customer Search Uses Resolved Product Presentation
+
+**Decision date:** 2026-10-02
+
+Customer search must operate on the resolved customer-facing Product presentation, not only the primary title.
+
+Rules:
+
+1. **Title** is searchable.
+2. **Subtitle / Rasa** is searchable.
+3. Search should resolve against the same Customer Menu View Model used for customer presentation rather than making the Customer PWA reconstruct search fields from raw database tables.
+4. A query matching Rasa must be able to find the corresponding Product. Example:
+   `"lombok"` finds **Ayam Bakar / Lombok Ijo**.
+5. Level/Pedas is not a searchable field for the current concept.
+6. Search is discovery, not a second Product identity model. It must not alter the canonical Product identity `Category + Sub Category + Rasa`.
+7. Customer search UI uses live search behavior: results update while the customer types; no separate **Cari** submit button is required for this concept.
+
+Conceptually:
+
+```
+Product
+  title    = Ayam Bakar
+  subtitle = Lombok Ijo
+
+resolved search text
+  = Ayam Bakar Lombok Ijo
+
+"lombok"
+  → Ayam Bakar / Lombok Ijo
+```
+
 ## 🔒 LOCKED SUB-DECISION — Current Level Pedas Product Editor UI
 
 **Decision date:** 2026-10-02
