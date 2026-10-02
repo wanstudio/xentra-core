@@ -710,7 +710,7 @@ Qty = 3
 
 4. The Customer UI must not expose component-level quantity controls for a Paket sale.
 5. Inventory consumption is derived from the Paket composition for each Paket unit, multiplied by the number of Paket units sold.
-6. This decision only locks the **customer/cart quantity semantics**. The detailed internal Package composition rule, including whether an Owner may configure a component quantity greater than one inside a single Paket, remains a separate open design question.
+6. **Each component listed in a Paket represents one unit per one complete Paket.** The current Paket model does not expose or configure a component Qty field. If the composition contains Ayam Bakar, Nasi, and Es Teh, one Paket contains exactly one of each. Customer Qty is the only quantity control in the current Paket sale model.
 
 ## 🔒 LOCKED SUB-DECISION — Paket Component Invalidity Blocks Sale
 
