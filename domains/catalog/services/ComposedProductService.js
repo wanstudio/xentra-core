@@ -50,7 +50,9 @@ class ComposedProductService {
     description = '',
     imageUrl = null,
     image = null,
-    isActive = true
+    isActive = true,
+    actorId = null,
+    actorRole = null
   }) {
     ensureSchema();
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
@@ -61,21 +63,27 @@ class ComposedProductService {
     const baseSlug = slugify(normalizedName) || id;
     const slug = baseSlug + '-' + id.slice(-8);
 
+    repository.db.exec('BEGIN IMMEDIATE');
     try {
       repository.db.execute(
         "INSERT INTO products " +
-        "(id, brand_id, category_id, name, slug, description, price, regular_price, image_url, image, is_active) " +
-        "VALUES (?, ?, NULL, ?, ?, ?, 0, NULL, ?, ?, ?)",
-        [id, brandId, normalizedName, slug, description == null ? '' : String(description), imageUrl, image, normalizeBoolean(isActive) ? 1 : 0]
+        "(id, brand_id, category_id, name, slug, description, price, regular_price, image_url, image, is_active, sku) " +
+        "VALUES (?, ?, NULL, ?, ?, ?, 0, NULL, ?, ?, ?, ?)",
+        [id, brandId, normalizedName, slug, description == null ? '' : String(description), imageUrl, image, normalizeBoolean(isActive) ? 1 : 0, normalizedSku]
       );
 
       if (normalizedSku) {
         repository.db.execute(
-          "UPDATE products SET sku = ?, updated_at = datetime('now') WHERE id = ? AND brand_id = ?",
-          [normalizedSku, id, brandId]
+          "INSERT INTO product_sku_history " +
+          "(id, brand_id, product_id, previous_sku, new_sku, actor_id, actor_role) " +
+          "VALUES (?, ?, ?, NULL, ?, ?, ?)",
+          [makeId('skuhist'), brandId, id, normalizedSku, actorId, actorRole]
         );
       }
+
+      repository.db.exec('COMMIT');
     } catch (err) {
+      try { repository.db.exec('ROLLBACK'); } catch (_) {}
       if (/idx_products_brand_sku_normalized/i.test(String(err && err.message))) {
         throw new Error('PRODUCT_SKU_ALREADY_EXISTS');
       }
@@ -93,7 +101,9 @@ class ComposedProductService {
     imageUrl,
     image,
     isActive,
-    sku
+    sku,
+    actorId = null,
+    actorRole = null
   }) {
     ensureSchema();
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
@@ -101,50 +111,94 @@ class ComposedProductService {
     const current = repository.findProduct({ brandId, productId });
     if (!current) throw new Error('MASTER_PRODUCT_NOT_FOUND');
 
-    if (name !== undefined) {
-      const normalizedName = normalizeName(name);
-      repository.db.execute(
-        "UPDATE products SET name = ?, updated_at = datetime('now') WHERE id = ? AND brand_id = ?",
-        [normalizedName, productId, brandId]
+    const previousSku = current.sku == null ? null : String(current.sku).trim() || null;
+    const nextSku = sku === undefined ? previousSku : normalizeSku(sku);
+    if (previousSku !== nextSku && previousSku && !nextSku) {
+      const positiveStock = repository.db.queryOne(
+        "SELECT 1 AS found FROM branches b " +
+        "LEFT JOIN branch_product_inventory bpi ON bpi.branch_id = b.id AND bpi.product_id = ? " +
+        "LEFT JOIN branch_products bp ON bp.branch_id = b.id AND bp.product_id = ? " +
+        "WHERE b.brand_id = ? AND b.is_active = 1 " +
+        "AND (COALESCE(bpi.stock_qty, 0) > 0 OR COALESCE(bp.stock, 0) > 0) LIMIT 1",
+        [productId, productId, brandId]
       );
+      if (positiveStock) throw new Error('PRODUCT_SKU_REMOVAL_BLOCKED_STOCK');
     }
-    if (description !== undefined) {
-      repository.db.execute(
-        "UPDATE products SET description = ?, updated_at = datetime('now') WHERE id = ? AND brand_id = ?",
-        [description == null ? '' : String(description), productId, brandId]
-      );
-    }
-    if (imageUrl !== undefined || image !== undefined) {
-      repository.db.execute(
-        "UPDATE products SET image_url = ?, image = ?, updated_at = datetime('now') WHERE id = ? AND brand_id = ?",
-        [imageUrl === undefined ? current.image_url : imageUrl, image === undefined ? current.image : image, productId, brandId]
-      );
-    }
-    if (isActive !== undefined) {
-      repository.db.execute(
-        "UPDATE products SET is_active = ?, updated_at = datetime('now') WHERE id = ? AND brand_id = ?",
-        [normalizeBoolean(isActive) ? 1 : 0, productId, brandId]
-      );
-    }
-    if (sku !== undefined) {
-      const ComposedMenuService = require('./ComposedMenuService');
-      ComposedMenuService.setProductSku({
-        brandId,
-        productId,
-        sku
-      });
+
+    const normalizedName = name === undefined ? null : normalizeName(name);
+    const nextDescription = description === undefined ? null : (description == null ? '' : String(description));
+    const nextImageUrl = imageUrl === undefined ? null : imageUrl;
+    const nextImage = image === undefined ? null : image;
+    const nextActive = isActive === undefined ? null : (normalizeBoolean(isActive) ? 1 : 0);
+
+    repository.db.exec('BEGIN IMMEDIATE');
+    try {
+      if (normalizedName !== null) {
+        repository.db.execute(
+          "UPDATE products SET name = ?, updated_at = datetime('now') WHERE id = ? AND brand_id = ?",
+          [normalizedName, productId, brandId]
+        );
+      }
+      if (description !== undefined) {
+        repository.db.execute(
+          "UPDATE products SET description = ?, updated_at = datetime('now') WHERE id = ? AND brand_id = ?",
+          [nextDescription, productId, brandId]
+        );
+      }
+      if (imageUrl !== undefined || image !== undefined) {
+        repository.db.execute(
+          "UPDATE products SET image_url = ?, image = ?, updated_at = datetime('now') WHERE id = ? AND brand_id = ?",
+          [imageUrl === undefined ? current.image_url : nextImageUrl, image === undefined ? current.image : nextImage, productId, brandId]
+        );
+      }
+      if (nextActive !== null) {
+        repository.db.execute(
+          "UPDATE products SET is_active = ?, updated_at = datetime('now') WHERE id = ? AND brand_id = ?",
+          [nextActive, productId, brandId]
+        );
+      }
+
+      if (previousSku !== nextSku) {
+        try {
+          repository.db.execute(
+            "UPDATE products SET sku = ?, updated_at = datetime('now') WHERE id = ? AND brand_id = ?",
+            [nextSku, productId, brandId]
+          );
+        } catch (err) {
+          if (/idx_products_brand_sku_normalized/i.test(String(err && err.message))) {
+            throw new Error('PRODUCT_SKU_ALREADY_EXISTS');
+          }
+          if (/PRODUCT_SKU_EMPTY/i.test(String(err && err.message))) {
+            throw new Error('PRODUCT_SKU_EMPTY');
+          }
+          throw err;
+        }
+
+        repository.db.execute(
+          "INSERT INTO product_sku_history " +
+          "(id, brand_id, product_id, previous_sku, new_sku, actor_id, actor_role) " +
+          "VALUES (?, ?, ?, ?, ?, ?, ?)",
+          [makeId('skuhist'), brandId, productId, previousSku, nextSku, actorId, actorRole]
+        );
+      }
+
+      repository.db.exec('COMMIT');
+    } catch (err) {
+      try { repository.db.exec('ROLLBACK'); } catch (_) {}
+      if (/idx_products_brand_sku_normalized/i.test(String(err && err.message))) {
+        throw new Error('PRODUCT_SKU_ALREADY_EXISTS');
+      }
+      throw err;
     }
 
     return repository.findProduct({ brandId, productId });
   }
 
   static archiveProduct({ brandId, productId, actorId = null, actorRole = null }) {
-    ensureSchema();
     return this.updateProduct({
       brandId,
       productId,
       isActive: false,
-      sku: undefined,
       actorId,
       actorRole
     });
