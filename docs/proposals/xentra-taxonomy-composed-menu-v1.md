@@ -689,28 +689,28 @@ resolved search text
   → Ayam Bakar / Lombok Ijo
 ```
 
-## 🔒 LOCKED SUB-DECISION — One Component Row per Product ID with Quantity
+## 🔒 LOCKED SUB-DECISION — Paket Is Sold as One Whole Unit
 
 **Decision date:** 2026-10-02
 
-Within a Paket composition, the same Component Product ID appears only once. Repetition is represented by the component row's quantity, not by duplicate component rows.
+For the current Xentra customer/cart model, a Paket is one whole sellable unit. Customer quantity changes the number of complete Paket units purchased.
 
 Rules:
 
-1. A Paket composition may contain each eligible Component Product ID at most **one time**.
-2. Each component row has its own **Qty** field.
+1. One Paket in the cart represents **one complete Paket**, with its fixed composition.
+2. Customer/cart control `Qty` changes the **quantity of complete Paket units**, not the quantity of individual component Products.
 3. Example:
 
 ```
-Paket Ayam Komplit
-├── Ayam Bakar   Qty 2
-├── Nasi         Qty 1
-└── Es Teh       Qty 1
+Paket Special Semar
+Qty = 3
+
+= 3 complete Paket units
 ```
 
-4. The inventory effect of one sold Paket is derived from each component Product ID multiplied by its configured component quantity.
-5. The UI must prevent duplicate insertion of the same Product ID into the Paket composition; selecting an already-present Product should focus/use the existing row rather than create another row.
-6. This rule does not mean the Paket itself can be sold only as one unit. Customer/cart quantity of the Paket remains a separate quantity from component Qty.
+4. The Customer UI must not expose component-level quantity controls for a Paket sale.
+5. Inventory consumption is derived from the Paket composition for each Paket unit, multiplied by the number of Paket units sold.
+6. This decision only locks the **customer/cart quantity semantics**. The detailed internal Package composition rule, including whether an Owner may configure a component quantity greater than one inside a single Paket, remains a separate open design question.
 
 ## 🔒 LOCKED SUB-DECISION — Paket Component Invalidity Blocks Sale
 
