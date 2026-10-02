@@ -635,7 +635,9 @@ class ComposedMenuService {
   }
 
   static listMenus({
-    ensureSchema(); brandId, menuType = null, status = null }) {
+    brandId, menuType = null, status = null
+  }) {
+    ensureSchema();
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
     return repository.listMenus({
       brandId,
