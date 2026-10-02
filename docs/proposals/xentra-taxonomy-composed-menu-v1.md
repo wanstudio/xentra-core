@@ -689,6 +689,39 @@ resolved search text
   → Ayam Bakar / Lombok Ijo
 ```
 
+## 🔒 LOCKED SUB-DECISION — Paket Components May Be Non-Published Products
+
+**Decision date:** 2026-10-02
+
+A valid Master Product does not need to be published as a standalone Customer PWA menu item before it can be used as a Paket component.
+
+Rules:
+
+1. A Product may be a valid Paket component even when it is not currently published/visible as a standalone Customer menu item.
+2. A Product in **Draft** status may be referenced by a **Draft Paket** while the Owner is assembling the catalog.
+3. A Paket may become publishable/sellable only after Core validates that all referenced components satisfy the minimum Product validity required for sale.
+4. Adding a Product to a Paket does not automatically publish that Product as a standalone Customer menu item.
+5. Component selection is Brand-scoped and may use valid Products that are Published, hidden/not standalone, or Draft according to the Paket lifecycle rules.
+6. Archived/deleted or otherwise invalid Products cannot be newly selected as Paket components.
+7. Customer visibility and Product existence are separate concerns.
+
+Conceptually:
+
+```
+Master Product
+    ↓
+can exist independently of standalone Customer visibility
+
+Paket Draft
+    ├── Published Product      ✅
+    ├── Hidden Product         ✅
+    └── Draft Product          ✅
+
+Publish/Sell Paket
+    ↓
+all components must pass Core validity checks
+```
+
 ## 🔒 LOCKED SUB-DECISION — Paket Revenue Belongs to the Paket
 
 **Decision date:** 2026-10-02
