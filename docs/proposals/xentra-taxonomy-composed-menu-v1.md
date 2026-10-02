@@ -658,6 +658,23 @@ Paket P100 sold × 1
 
 This is the canonical UX for activating Paket composition. Detailed lifecycle rules for changing an already-published Product between Normal and Paket remain a separate domain edge case and are not implied by the checkbox alone.
 
+## 🔒 LOCKED SUB-DECISION — Current Level Pedas Product Editor UI
+
+**Decision date:** 2026-10-02
+
+For the current Xentra food-menu concept, Level Pedas is activated directly from the Product Editor by checkbox rather than through a preset/range configuration sheet.
+
+Rules:
+
+1. Product Editor shows Category → Sub Category → Rasa → **☐ Aktifkan Level Pedas** → **☐ Aktifkan Kelengkapan**.
+2. When **Aktifkan Level Pedas** is checked, the Level Pedas control appears directly underneath.
+3. First activation defaults to **Level 1**.
+4. While active, Level Pedas cannot be empty.
+5. The current food UI uses four selectable positions for Level Pedas.
+6. Unchecking the checkbox sets Level to **NULL** and hides the Level Pedas control.
+7. The four positions are current food UI behavior only; they do not constrain the generic Level domain or future menu contexts.
+8. Variant/Variation remains a separate future domain discussion covering pricing, SKU, inventory, cart, order, payment, POS, and reporting.
+
 ## 🔒 LOCKED SUB-DECISION — Level Is Optional and NULL When Unset
 
 **Decision date:** 2026-10-02
