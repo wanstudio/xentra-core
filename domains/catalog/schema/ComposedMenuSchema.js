@@ -98,9 +98,14 @@ function ensureComposedMenuSchema(db = DataAccess) {
       FOREIGN KEY (rasa_id) REFERENCES menu_flavors(id) ON DELETE RESTRICT,
       FOREIGN KEY (level_id) REFERENCES menu_levels(id) ON DELETE RESTRICT,
       CHECK (
-        (menu_type = 'SINGLE' AND package_name IS NULL)
+        (menu_type = 'SINGLE'
+          AND sub_category_id IS NOT NULL
+          AND rasa_id IS NOT NULL
+          AND package_name IS NULL)
         OR
-        (menu_type = 'PACKAGE' AND package_name IS NOT NULL AND trim(package_name) <> '')
+        (menu_type = 'PACKAGE'
+          AND package_name IS NOT NULL
+          AND trim(package_name) <> '')
       )
     );
 
