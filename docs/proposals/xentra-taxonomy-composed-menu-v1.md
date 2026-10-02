@@ -689,6 +689,35 @@ resolved search text
   → Ayam Bakar / Lombok Ijo
 ```
 
+## 🔒 LOCKED SUB-DECISION — Paket Revenue Belongs to the Paket
+
+**Decision date:** 2026-10-02
+
+For the current Xentra Package model, a sold Paket is one sellable transaction line at the explicit Paket price. Revenue is not automatically allocated back to component Products.
+
+Rules:
+
+1. The Paket carries the transaction sales identity and explicit Paket price.
+2. Payment/order/revenue records use the Paket sale as the primary commercial line.
+3. Component Products remain the source of inventory consumption according to Paket composition and quantity.
+4. Component-level sales attribution may be used for analytics/reporting later, but it does not change the primary transaction revenue allocation.
+5. Formal revenue allocation/accounting treatment is outside the current Paket contract and may be introduced later as a separate accounting/reporting domain.
+
+Conceptually:
+
+```
+Paket Ayam Komplit
+Harga Paket = Rp45.000
+
+Transaction revenue
+→ Paket = Rp45.000
+
+Inventory effect
+→ Ayam Bakar -1
+→ Nasi       -1
+→ Es Teh     -1
+```
+
 ## 🔒 LOCKED SUB-DECISION — Historical Reporting Uses Identity at Time of Sale
 
 **Decision date:** 2026-10-02
@@ -725,6 +754,20 @@ Stable Product ID view
 ```
 
 This is a reporting/history contract. Exact physical reporting schema and identity-version storage remain implementation details to be finalized during the technical reconciliation phase.
+
+## 🔒 LOCKED SUB-DECISION — Level Pedas Is Informational, Not a Customer Request
+
+**Decision date:** 2026-10-02
+
+For the current Xentra food-menu concept, Level/Pedas is a Product presentation attribute that communicates the menu's configured level. It is not a customer customization/request field.
+
+Rules:
+
+1. The Owner sets the Product's Level Pedas value in Master Product data.
+2. Customer PWA displays that value as information when Level Pedas is enabled.
+3. Level Pedas does not create a customer selection step in the current order flow.
+4. A customer's ad-hoc offline request for a different spice level than the configured Product value is handled operationally by people and is not represented as a separate system request in the current Xentra model.
+5. The current Level Pedas value remains part of the Product's resolved presentation/history according to the existing snapshot rules.
 
 ## 🔒 LOCKED SUB-DECISION — Current Level Pedas Product Editor UI
 
