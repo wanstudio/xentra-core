@@ -461,22 +461,50 @@ Order identity continues to use `product_id`, not the display title.
 
 ## 13. Branch adoption
 
-Branch adoption remains separate from Master taxonomy/composition.
+The new Product/Menu separation changes the adoption boundary:
 
-**Locked direction for this new concept:** Branch may adopt approved Master Products and classify them into one or more Branch Categories, but Branch must not rename the Master Product or alter its customer-facing Master identity.
+**Branch adopts Menus for customer-facing sales; Branch inventory manages the underlying Products.**
 
-Merchant may adopt approved Master Products and classify them into Branch Categories.
+Conceptually:
 
-Merchant does not edit:
+```text
+Master Product
+   ↓
+Master Menu
+   ↓
+Branch adopts Menu
+   ↓
+Menu resolves to Product(s)
+   ↓
+Branch Inventory holds stock per Product SKU
+```
 
-- Master Category;
-- Master Sub Category;
-- Master Rasa;
-- Sub Category ↔ Rasa compatibility;
-- Master Product composition.
+### Menu Satuan
 
-**The existing Branch Customer Display Name Override is cancelled for the new concept.** Branch naming must not be an independent Product identity/presentation authority. If a Branch needs a different grouping or merchandising label, it should use Branch Categories or another explicitly scoped Branch presentation mechanism that does not rename the Product identity.
+Branch adoption of a Menu Satuan makes that Menu available for sale at the Branch, subject to Branch operational availability.
 
+```text
+Menu Satuan: Nasi
+→ Product Nasi [SKU NASI-001]
+→ Branch stock = NASI-001
+```
+
+### Menu Paket
+
+Branch adoption of a Menu Paket makes the Paket sellable at the Branch, subject to the availability of all required Product stock authorities.
+
+```text
+Menu Paket: Ayam + Sambal + Nasi
+→ Ayam [SKU]
+→ Sambal [SKU]
+→ Nasi [SKU]
+```
+
+The Branch does not create or edit Master Products or Master Menus. Branch Category remains a branch-local merchandising grouping for adopted Menus.
+
+A Product may exist in Branch Inventory even when it is not currently exposed as a standalone Menu Satuan, because the same Product can be required by one or more Menu Pakets.
+
+**Important:** the existing production contract currently treats `branch_products.product_id` as the adoption/inventory boundary. This proposal supersedes that target semantics for the future Product/Menu model; technical migration must reconcile the physical schema later rather than silently changing production behavior now.
 ## 14. Major UX risks to validate before lock
 
 1. **Terminology learning curve** — first-time Owner may ask where "Nama Produk" is.
@@ -652,6 +680,22 @@ MENU PAKET
 ```
 
 `Kelengkapan` is not a separate Product subtype or Package mode in this model. The earlier proposal wording that used Kelengkapan as a mechanism for turning a Normal Product into a Package is superseded.
+## 🔒 LOCKED SUB-DECISION — Product Reuse Across Menus — 2026-10-02
+
+The same Product may be referenced by multiple Menus without duplicating the Product or its inventory identity.
+
+```text
+Product Nasi [SKU NASI-001]
+├─ Menu Satuan: Nasi Putih
+├─ Menu Paket: Ayam + Nasi
+└─ Menu Paket: Ikan + Nasi
+```
+
+All three Menus reference the same Product and therefore the same Branch stock pool for `NASI-001`.
+
+Product duplication is not permitted merely because the Product is used in another Menu. Menu-specific customer presentation, price, and composition belong to Menu; stock identity remains on Product.
+
+**Status:** LOCKED SUB-DECISION for the proposal only. Production/main remains unchanged until final promotion.
 ## 5B. Paket vs Promotion — Pre-lock Boundary
 
 A Paket and a Promotion are different concepts.
@@ -1538,6 +1582,7 @@ Technical reconciliation is still required in schema, resolver, API, migration, 
 ### Decisions already made in this conversation and now recorded in this proposal
 
 - Product/Menu separation: Product is atomic; Menu Satuan references 1 Product; Menu Paket references 2+ Products; Category + Sub Category + Rasa belong to Menu presentation/identity.
+- The same Product may be reused by multiple Menus; Branch adopts Menus for sales while Inventory remains Product/SKU-based.
 - Level is a generic domain concept; food UI may label it Pedas; presentation/configuration is reusable in Shared.
 - Kelengkapan checkbox activates Paket mode; unchecked is Normal Product, checked reveals Package composition and uses component Product IDs.
 - Product Options remains a separate domain; its pricing/add-on and operational rules are intentionally deferred.
