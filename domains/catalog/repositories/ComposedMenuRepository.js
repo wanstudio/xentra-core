@@ -18,6 +18,9 @@ function placeholders(count) {
 class ComposedMenuRepository {
   constructor(db = DataAccess) {
     this.db = db;
+  }
+
+  ensureSchema() {
     ensureComposedMenuSchema(this.db);
   }
 
