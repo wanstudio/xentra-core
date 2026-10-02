@@ -33,8 +33,8 @@ Sub Category
 Rasa
 [ Lombok Ijo ▼ ] [+]
 
-Kelengkapan
-[ Sambal ▼ ] [+]
+Level
+[ Pedas ▼ ]
 ```
 
 Customer presentation:
@@ -386,8 +386,8 @@ Target mapping:
 ```
 title       ← sub_categories.name
 subtitle    ← menu_flavors.name (nullable)
-detail[]    ← ordered menu_complements.name[]
-indicator   ← menu_levels.name / structured level value
+detail[]    ← Product-specific detail/option data
+indicator   ← Level value/presentation (current food UI label: "Pedas")
 image       ← Master Product media
 price       ← Master Product / Pricing Policy
 availability← Branch operational state
@@ -591,6 +591,31 @@ Product 1 + Product 2 + Product 3 + eligible Promotion
 
 This boundary is required to avoid treating arbitrary product combinations as a new Product or Paket.
 
+
+## 🔒 LOCKED SUB-DECISION — Level Is Generic, UI Label Is Contextual
+
+**Decision date:** 2026-10-02
+
+**Level** remains the generic domain concept. The current food-menu UI may present the field as **Pedas**, but that is a contextual UI label, not a change to the underlying domain field.
+
+Rules:
+
+1. Core/data contracts continue to use **Level** as the semantic field/concept.
+2. In a food context, the UI label may be **Pedas**.
+3. Future menu contexts may reuse the same Level concept with a different UI label and value presentation without renaming or forking the underlying domain field.
+4. The Level UI pattern is a candidate for the **Shared** layer; context-specific naming/configuration is supplied by the consuming feature.
+5. The exact value vocabulary and compatibility rules for Level are not assumed globally and remain subject to the requirements of each menu context.
+
+Conceptually:
+
+```
+Shared Level Component
+        ↓
+context label = "Pedas"   (food)
+context label = other     (future menu)
+        ↓
+same underlying Level domain
+```
 
 ## 🔒 LOCKED SUB-DECISION — Paket Product Subtype & Component Inventory
 
@@ -950,6 +975,7 @@ Technical reconciliation is still required in schema, resolver, API, migration, 
 ### Decisions already made in this conversation and now recorded in this proposal
 
 - Normal Product identity = Category + Sub Category + Rasa; Original is the default Rasa.
+- Level is a generic domain concept; food UI may label it Pedas; presentation/configuration is reusable in Shared.
 - Rasa is reusable Master data, not a child taxonomy node.
 - Rasa reuse is contextual; no manual Rasa↔Sub Category management UI is required.
 - Independently sellable additions such as Sambal Matah are Products, not Add-ons.
