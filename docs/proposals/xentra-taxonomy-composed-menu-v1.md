@@ -1,11 +1,11 @@
 # Xentra — Taxonomy, Product & Composed Menu Contract v1
 
-**Status:** PROPOSAL — PRE-LOCK
+**Status:** LOCKED TARGET CONTRACT — IMPLEMENTATION ISOLATED ON PROPOSAL BRANCH
 **Audit / reconciliation date:** 2026-10-03
 **Branch:** `proposal/xentra-taxonomy-composed-menu-v1`
-**Production status:** `main` is unchanged by this proposal.
+**Production status:** `main` is unchanged. All construction work remains isolated on `proposal/xentra-taxonomy-composed-menu-v1`.
 
-> This document is the canonical proposal for the new Product → Menu → Inventory direction. Older proposal wording that conflicts with this document is superseded. Existing production contracts remain authoritative until a separate final promotion decision.
+> This document is the locked target contract for the new Product → Menu → Inventory direction. Older proposal wording that conflicts with this document is superseded. Existing production contracts remain authoritative until final promotion to `main`.
 
 ## 1. Executive contract
 
