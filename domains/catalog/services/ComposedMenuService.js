@@ -491,7 +491,6 @@ class ComposedMenuService {
   }
 
   static createPackageMenu({
-    ensureSchema();
     brandId,
     packageName,
     sellingPrice,
@@ -501,6 +500,7 @@ class ComposedMenuService {
     components,
     status = 'DRAFT'
   }) {
+    ensureSchema();
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
 
     const normalizedPackageName = normalizeName(packageName, 'MENU_PACKAGE_NAME_REQUIRED');
@@ -570,7 +570,9 @@ class ComposedMenuService {
   }
 
   static setMenuStatus({
-    ensureSchema(); brandId, menuId, status }) {
+    brandId, menuId, status
+  }) {
+    ensureSchema();
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
     const menu = repository.findMenu({ brandId, menuId });
     if (!menu) throw new Error('MENU_NOT_FOUND');
@@ -584,7 +586,6 @@ class ComposedMenuService {
   }
 
   static adoptMenuToBranch({
-    ensureSchema();
     brandId,
     branchId,
     menuId,
@@ -592,6 +593,7 @@ class ComposedMenuService {
     priceOverride = null,
     branchCategoryIds = []
   }) {
+    ensureSchema();
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
 
     const menu = repository.findMenu({ brandId, menuId });
