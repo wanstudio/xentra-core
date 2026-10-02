@@ -1421,7 +1421,7 @@ NASI-001      -1
 LALAPAN-001   -1
 ```
 
-Customer Qty controls complete Paket units. Component quantity is one unit per component in the current MVP unless a later decision expands it.
+Customer Qty controls complete Paket units. Each Menu Paket component has its own fixed positive integer quantity, and inventory consumption multiplies that component quantity by the ordered Paket Qty.
 
 ### 5. Product reuse
 
@@ -1527,6 +1527,23 @@ No partial component deduction is allowed.
 ### 12. Status
 
 This is now a **LOCKED SUB-DECISION in the proposal**, not a production implementation. It supersedes the earlier `Kelengkapan`-driven Product composition model for this new concept. Existing authoritative production inventory contracts on `main` remain unchanged until the final Xentra Product/Menu contract is explicitly promoted.
+## 🔒 LOCKED SUB-DECISION — Menu Paket Component Quantity — 2026-10-03
+
+Menu Paket component quantity is part of the Menu Paket definition.
+
+Rules:
+1. Each component line stores a fixed positive integer `quantity`.
+2. The same Product may be used with quantity greater than 1; duplicate Product records are not created.
+3. Customer/cart Qty changes the number of complete Package units and never edits component quantities.
+4. Inventory consumption for a component is `package_sale_qty × component_qty`.
+5. Package availability is calculated from component stock divided by required component quantity; the limiting component determines the maximum complete Package units available.
+6. A Package with only one Product unit is treated as Menu Satuan, not Menu Paket.
+7. Quantity changes to an existing Menu Paket affect future sales only. Historical orders keep the component quantities that applied at the transaction.
+
+Reference alignment: Odoo Kit/BoM explicitly records component quantities and scales them for the sold kit quantity; WooCommerce Product Bundles supports per-component quantities and multiple instances of the same product; Square exposes component Quantity in bundle editing. citeturn277241search0turn277241search13turn277241search10
+
+**Status:** LOCKED SUB-DECISION for proposal only. `main` remains unchanged.
+
 ## 🔎 PRE-LOCK AUDIT — Decisions vs Existing Notion/Git
 
 **Audit date:** 2026-10-01
