@@ -1416,37 +1416,60 @@ Before mutation, aggregate duplicate SKU/Product references so one sale cannot c
 
 ### 7. Physical database target
 
-The proposal should evolve the current physical model toward:
+The proposal should use **one Product composition engine** for both Normal Product Kelengkapan and Package composition. Creating separate `product_components` and `package_components` tables would duplicate structural logic and force the inventory resolver to understand two parallel composition systems.
+
+Target model:
 
 ```sql
 products
   id
   brand_id
+  product_type        -- NORMAL | PACKAGE
   ...
   sku NULL
 ```
 
 with a **Brand-unique normalized SKU** when non-NULL.
 
-Normal Product composition:
+Shared composition relation:
 
 ```sql
-product_components
+product_compositions
   parent_product_id
   component_product_id
   quantity
   sort_order
 ```
 
-Package composition:
+Semantics come from the **parent Product type**, not from a second table:
 
-```sql
-package_components
-  package_product_id
-  component_product_id
-  quantity
-  sort_order
 ```
+parent.product_type = NORMAL
+→ composition = Kelengkapan / included components
+
+parent.product_type = PACKAGE
+→ composition = fixed Paket components
+```
+
+This gives one structural path:
+
+```
+Product
+  ↓
+Product Composition
+  ↓
+Component Product
+```
+
+while preserving different domain meaning at the Product subtype level.
+
+Current UI/business constraints:
+
+- Normal Product may have zero or more composition rows when Kelengkapan is enabled.
+- Package composition contains existing Product IDs only.
+- Package cannot contain another Package under the current contract.
+- Current Package component quantity is one unit per Package; the physical relation may keep a `quantity` field, but current Package creation does not expose a component-quantity editor and Core should enforce `quantity = 1` for PACKAGE until a future decision expands this.
+- Composition cycles must be rejected.
 
 Existing `branch_products.stock` remains the Branch-level stock balance for SKU-managed Products. Non-SKU Products should not receive a stock balance.
 
@@ -1459,6 +1482,21 @@ inventory_movements.reference_id = source order / transfer / etc.
 ```
 
 The Package itself does not get an inventory ledger entry in the current virtual-package model.
+
+This shared composition structure means the inventory engine only needs **one resolver**:
+
+```
+Sale
+ ↓
+resolve Product
+ ↓
+if parent has SKU → consume parent only
+if parent has no SKU → walk product_compositions
+ ↓
+consume descendant SKU authorities
+```
+
+The resolver therefore remains generic across Normal Product Kelengkapan and Package without creating separate inventory engines.
 
 ### 8. Creation and adoption lifecycle
 
