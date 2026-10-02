@@ -1625,6 +1625,40 @@ Reference alignment: Toast supports menu-specific pricing for the same menu item
 
 **Status:** LOCKED SUB-DECISION for the proposal only. `main` remains unchanged.
 
+## 🔒 LOCKED SUB-DECISION — Product Internal Name
+
+**Decision date:** 2026-10-03
+
+Product remains a human-manageable atomic entity and therefore requires an internal Product name/label for Owner, Inventory, Menu selection, reporting, and operational interfaces.
+
+Rules:
+1. Product name is an **internal/catalog identity label**, not the customer-facing Menu title.
+2. Product name may be simple and atomic, for example `Ayam`, `Nasi`, `Sambal Ijo`, `Lalapan`, `Es Teh`, `Kopi Americano`.
+3. Product name is independent from Menu Category, Sub Category, Rasa, Level/Pedas, customer title, and selling price.
+4. The same Product name/SKU may be referenced by multiple Menus.
+5. Menu-specific customer presentation must never be reconstructed by exposing the Product internal name as the canonical Menu title when the Menu has its own presentation.
+6. Product internal name remains stable enough for administrative selection, while Product ID is the immutable technical identity.
+
+Conceptually:
+
+```text
+PRODUCT
+Nasi
+SKU NASI-001
+
+MENU SATUAN
+Nasi Putih
+→ Product Nasi
+
+MENU PAKET
+Ayam Bakar Sambal Ijo + Nasi
+→ Product Nasi
+```
+
+The earlier statement that the free-text Product Name is removed is therefore interpreted as: **removed as the customer-facing Menu title source, not removed as the internal atomic Product label.**
+
+**Status:** LOCKED SUB-DECISION for proposal only. `main` remains unchanged.
+
 ## 🔎 PRE-LOCK AUDIT — Decisions vs Existing Notion/Git
 
 **Audit date:** 2026-10-01
