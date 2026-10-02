@@ -45,6 +45,10 @@ function normalizeSku(value) {
   return sku ? sku : null;
 }
 
+function ensureSchema() {
+  repository.ensureSchema();
+}
+
 function normalizeLevelId(value) {
   if (value === undefined || value === null || value === '') return null;
   return String(value).trim() || null;
@@ -89,7 +93,8 @@ function normalizeProductComponents(value) {
 }
 
 class ComposedMenuService {
-  static setProductSku({ brandId, productId, sku, actorId = null, actorRole = null }) {
+  static setProductSku({
+    ensureSchema(); brandId, productId, sku, actorId = null, actorRole = null }) {
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
     const product = repository.findProductSku({ brandId, productId });
     if (!product) throw new Error('MASTER_PRODUCT_NOT_FOUND');
@@ -143,12 +148,14 @@ class ComposedMenuService {
     return repository.findProductSku({ brandId, productId });
   }
 
-  static listSubCategories({ brandId, categoryId = null, activeOnly = false }) {
+  static listSubCategories({
+    ensureSchema(); brandId, categoryId = null, activeOnly = false }) {
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
     return repository.listSubCategories({ brandId, categoryId, activeOnly });
   }
 
-  static createSubCategory({ brandId, categoryId, name, slug = null, sortOrder = 0 }) {
+  static createSubCategory({
+    ensureSchema(); brandId, categoryId, name, slug = null, sortOrder = 0 }) {
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
     if (!categoryId) throw new Error('CATEGORY_REQUIRED');
 
@@ -186,12 +193,14 @@ class ComposedMenuService {
     return repository.findSubCategory({ brandId, subCategoryId: id });
   }
 
-  static listRasas({ brandId, activeOnly = false }) {
+  static listRasas({
+    ensureSchema(); brandId, activeOnly = false }) {
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
     return repository.listRasas({ brandId, activeOnly });
   }
 
-  static ensureOriginalRasa({ brandId }) {
+  static ensureOriginalRasa({
+    ensureSchema(); brandId }) {
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
     const existing = repository.findRasaByName({ brandId, name: 'Original' });
     if (existing) return existing;
@@ -211,7 +220,8 @@ class ComposedMenuService {
     return repository.findRasaByName({ brandId, name: 'Original' });
   }
 
-  static createRasa({ brandId, name, slug = null, sortOrder = 0 }) {
+  static createRasa({
+    ensureSchema(); brandId, name, slug = null, sortOrder = 0 }) {
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
     const normalizedName = normalizeName(name, 'RASA_NAME_REQUIRED');
     const existing = repository.findRasaByName({ brandId, name: normalizedName });
@@ -240,6 +250,7 @@ class ComposedMenuService {
   }
 
   static createSingleMenu({
+    ensureSchema();
     brandId,
     productId,
     subCategoryId,
@@ -316,6 +327,7 @@ class ComposedMenuService {
   }
 
   static createPackageMenu({
+    ensureSchema();
     brandId,
     packageName,
     sellingPrice,
@@ -393,7 +405,8 @@ class ComposedMenuService {
     return repository.findMenu({ brandId, menuId: id });
   }
 
-  static setMenuStatus({ brandId, menuId, status }) {
+  static setMenuStatus({
+    ensureSchema(); brandId, menuId, status }) {
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
     const menu = repository.findMenu({ brandId, menuId });
     if (!menu) throw new Error('MENU_NOT_FOUND');
@@ -407,6 +420,7 @@ class ComposedMenuService {
   }
 
   static adoptMenuToBranch({
+    ensureSchema();
     brandId,
     branchId,
     menuId,
@@ -454,7 +468,8 @@ class ComposedMenuService {
     };
   }
 
-  static listMenus({ brandId, menuType = null, status = null }) {
+  static listMenus({
+    ensureSchema(); brandId, menuType = null, status = null }) {
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
     return repository.listMenus({
       brandId,
