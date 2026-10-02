@@ -73,8 +73,23 @@ function calculateInventory(menuItems, inventoryRows) {
   let stockManagedComponentCount = 0;
   let packageCapacity = Infinity;
   let blocking = null;
+  const normalizedItems = Array.isArray(menuItems) ? menuItems : [];
 
-  const items = (menuItems || []).map(item => {
+  if (normalizedItems.length === 0) {
+    blocking = 'MENU_COMPOSITION_INVALID';
+  }
+
+  const totalUnits = normalizedItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+  if (normalizedItems.length > 0) {
+    const firstMenu = normalizedItems[0].menu_type;
+    // Menu type is not always projected on item rows; these structural checks are
+    // reinforced by the service/schema. Invalid persisted composition is fail-closed.
+    if (normalizedItems.some(item => Number(item.quantity) <= 0)) {
+      blocking = blocking || 'MENU_COMPOSITION_INVALID';
+    }
+  }
+
+  const items = normalizedItems.map(item => {
     const sku = item.sku == null ? null : String(item.sku).trim() || null;
     const stockManaged = !!sku;
     const inv = inventoryMap.get(String(item.product_id));
@@ -168,7 +183,6 @@ class ComposedMenuResolver {
     const branchMap = new Map(branchMenus.map(row => [String(row.menu_id), row]));
     const productIds = items.map(item => item.product_id);
     const inventory = repository.getInventory({ branchId, productIds });
-    const inventoryMap = new Map(inventory.map(row => [String(row.product_id), row]));
     const memberships = repository.listBranchMenuCategoryMemberships({ brandId, branchId });
     const membershipMap = groupRows(memberships, 'menu_id');
 
