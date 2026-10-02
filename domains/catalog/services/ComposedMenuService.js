@@ -326,6 +326,158 @@ class ComposedMenuService {
     return repository.findMenu({ brandId, menuId: id });
   }
 
+  static updateSingleMenu({
+    brandId,
+    menuId,
+    productId,
+    subCategoryId,
+    rasaId = undefined,
+    levelId = undefined,
+    sellingPrice,
+    status = undefined
+  }) {
+    ensureSchema();
+    const current = repository.findMenu({ brandId, menuId });
+    if (!current) throw new Error('MENU_NOT_FOUND');
+    if (current.menu_type !== 'SINGLE') throw new Error('MENU_TYPE_MISMATCH');
+
+    const nextProductId = productId === undefined ? null : String(productId);
+    const nextSubCategoryId = subCategoryId === undefined ? current.sub_category_id : subCategoryId;
+    const nextRasaId = rasaId === undefined ? current.rasa_id : (rasaId || null);
+    const nextLevelId = levelId === undefined ? current.level_id : (levelId || null);
+    const nextPrice = sellingPrice === undefined ? Number(current.selling_price) : normalizePrice(sellingPrice);
+    const nextStatus = status === undefined ? current.status : normalizeStatus(status);
+
+    const product = repository.findProduct({ brandId, productId: nextProductId || (repository.listMenuItems({ brandId, menuIds: [menuId] })[0] || {}).product_id });
+    if (!product) throw new Error('MASTER_PRODUCT_NOT_FOUND');
+    const existingItem = repository.listMenuItems({ brandId, menuIds: [menuId] })[0];
+    if (product.is_active === 0 && (!existingItem || String(existingItem.product_id) !== String(product.id))) {
+      throw new Error('MASTER_PRODUCT_INACTIVE');
+    }
+
+    const sub = repository.findSubCategory({ brandId, subCategoryId: nextSubCategoryId });
+    if (!sub) throw new Error('SUB_CATEGORY_NOT_FOUND');
+    if (sub.is_active === 0 && String(sub.id) !== String(current.sub_category_id)) {
+      throw new Error('SUB_CATEGORY_INACTIVE');
+    }
+
+    let rasa = nextRasaId ? repository.findRasa({ brandId, rasaId: nextRasaId }) : null;
+    if (!rasa) rasa = this.ensureOriginalRasa({ brandId });
+    if (rasa.is_active === 0 && String(rasa.id) !== String(current.rasa_id)) throw new Error('RASA_INACTIVE');
+
+    if (nextLevelId) {
+      const level = repository.findLevel({ brandId, levelId: nextLevelId });
+      if (!level) throw new Error('LEVEL_NOT_FOUND');
+      if (level.is_active === 0 && String(level.id) !== String(current.level_id)) throw new Error('LEVEL_INACTIVE');
+    }
+
+    const duplicate = repository.findSingleMenuByIdentity({
+      brandId,
+      subCategoryId: sub.id,
+      rasaId: rasa.id
+    });
+    if (duplicate && String(duplicate.id) !== String(menuId)) throw new Error('MENU_SATUAN_ALREADY_EXISTS');
+
+    repository.begin();
+    try {
+      repository.updateMenu({
+        brandId,
+        menuId,
+        fields: {
+          sub_category_id: sub.id,
+          rasa_id: rasa.id,
+          level_id: nextLevelId,
+          package_name: null,
+          selling_price: nextPrice,
+          status: nextStatus
+        }
+      });
+      repository.replaceMenuItems({ menuId, items: [{ productId: product.id, quantity: 1 }] });
+      repository.commit();
+    } catch (err) {
+      try { repository.rollback(); } catch (_) {}
+      throw err;
+    }
+
+    return repository.findMenu({ brandId, menuId });
+  }
+
+  static updatePackageMenu({
+    brandId,
+    menuId,
+    packageName,
+    sellingPrice,
+    subCategoryId = undefined,
+    rasaId = undefined,
+    levelId = undefined,
+    components,
+    status = undefined
+  }) {
+    ensureSchema();
+    const current = repository.findMenu({ brandId, menuId });
+    if (!current) throw new Error('MENU_NOT_FOUND');
+    if (current.menu_type !== 'PACKAGE') throw new Error('MENU_TYPE_MISMATCH');
+
+    const currentItems = repository.listMenuItems({ brandId, menuIds: [menuId] });
+    const normalizedComponents = components === undefined
+      ? currentItems.map(item => ({ productId: item.product_id, quantity: Number(item.quantity) }))
+      : normalizeProductComponents(components);
+
+    const nextPackageName = packageName === undefined
+      ? current.package_name
+      : normalizeName(packageName, 'MENU_PACKAGE_NAME_REQUIRED');
+    const nextPrice = sellingPrice === undefined ? Number(current.selling_price) : normalizePrice(sellingPrice);
+    const nextSubCategoryId = subCategoryId === undefined ? current.sub_category_id : (subCategoryId || null);
+    const nextRasaId = rasaId === undefined ? current.rasa_id : (rasaId || null);
+    const nextLevelId = levelId === undefined ? current.level_id : (levelId || null);
+    const nextStatus = status === undefined ? current.status : normalizeStatus(status);
+
+    const sub = nextSubCategoryId ? repository.findSubCategory({ brandId, subCategoryId: nextSubCategoryId }) : null;
+    if (nextSubCategoryId && !sub) throw new Error('SUB_CATEGORY_NOT_FOUND');
+    if (sub && sub.is_active === 0 && String(sub.id) !== String(current.sub_category_id)) throw new Error('SUB_CATEGORY_INACTIVE');
+
+    const rasa = nextRasaId ? repository.findRasa({ brandId, rasaId: nextRasaId }) : null;
+    if (nextRasaId && !rasa) throw new Error('RASA_NOT_FOUND');
+    if (rasa && rasa.is_active === 0 && String(rasa.id) !== String(current.rasa_id)) throw new Error('RASA_INACTIVE');
+
+    if (nextLevelId) {
+      const level = repository.findLevel({ brandId, levelId: nextLevelId });
+      if (!level) throw new Error('LEVEL_NOT_FOUND');
+      if (level.is_active === 0 && String(level.id) !== String(current.level_id)) throw new Error('LEVEL_INACTIVE');
+    }
+
+    for (const component of normalizedComponents) {
+      const product = repository.findProduct({ brandId, productId: component.productId });
+      if (!product) throw new Error('MASTER_PRODUCT_NOT_FOUND');
+      if (product.is_active === 0 && !currentItems.some(item => String(item.product_id) === String(component.productId))) {
+        throw new Error('MASTER_PRODUCT_INACTIVE');
+      }
+    }
+
+    repository.begin();
+    try {
+      repository.updateMenu({
+        brandId,
+        menuId,
+        fields: {
+          sub_category_id: nextSubCategoryId,
+          rasa_id: nextRasaId,
+          level_id: nextLevelId,
+          package_name: nextPackageName,
+          selling_price: nextPrice,
+          status: nextStatus
+        }
+      });
+      repository.replaceMenuItems({ menuId, items: normalizedComponents });
+      repository.commit();
+    } catch (err) {
+      try { repository.rollback(); } catch (_) {}
+      throw err;
+    }
+
+    return repository.findMenu({ brandId, menuId });
+  }
+
   static createPackageMenu({
     ensureSchema();
     brandId,
