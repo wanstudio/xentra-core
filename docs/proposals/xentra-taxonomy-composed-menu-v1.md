@@ -401,19 +401,22 @@ The engine must reject:
 
 - a Sub Category whose Category belongs to another Brand;
 - a Menu using Category/Sub Category/Rasa from another Brand;
-- a Menu whose Sub Category does not belong to its Category;
+- a Menu whose Sub Category does not belong to its selected Category;
 - a Menu Satuan with zero or more than one Product reference;
 - a Menu Paket with fewer than two Product references;
 - a Menu referencing a Product from another Brand;
 - a Menu Paket referencing another Package/Menu rather than an atomic Product;
 - duplicate normalized Category names within the same Brand;
-- duplicate normalized Sub Category names within the same Brand;
+- duplicate normalized Sub Category names within the same Brand, including across different parent Categories;
 - duplicate normalized Rasa names within the same Brand;
-- duplicate Product SKU values within the same Brand when SKU is non-NULL;
-- composition references that create cycles within the same Menu definition;
+- duplicate normalized Product SKU values within the same Brand when SKU is non-NULL;
+- duplicate Menu identity (Sub Category + Rasa) within the same Brand;
+- creation of a Menu whose Sub Category + Rasa combination already exists in the same Brand;
+- composition references that violate Menu type rules or create cycles;
 - stock movements against a Product that has no SKU.
 
 The UI is not the authority. Core validation is the authority.
+
 ## 11. Customer read model
 
 Customer PWA must consume one resolved **Menu View Model**.
@@ -1271,18 +1274,57 @@ Rules:
    - Ikan → Goreng
 6. This is a **name uniqueness rule**, separate from Normal Product identity uniqueness.
 
-## 🔄 SUPERSEDED SUB-DECISION — Normal Product Identity
+## 🔄 SUPERSEDED SUB-DECISION — Normal Product Identity and Menu Uniqueness
 
-The earlier decision that defined a normal Product identity as **Category + Sub Category + Rasa** is superseded by the 2026-10-02 Product/Menu separation.
+The earlier decision that defined a normal Product identity as **Category + Sub Category + Rasa** is superseded by the Product/Menu separation.
 
 Current canonical target:
 
 - **Product** = atomic catalog/stock entity.
 - **Menu Satuan** = customer-facing selling entity referencing exactly one Product.
 - **Menu Paket** = customer-facing selling entity referencing two or more Products.
-- Category, Sub Category, Rasa, Level/Pedas, customer-facing title, and menu price belong to the **Menu** layer rather than defining the atomic Product stock identity.
+- **Menu identity/uniqueness** is evaluated at the customer-facing Menu layer.
 
-The historical decision remains preserved as an implementation record and must not be used as the target contract for new work.
+### Menu identity
+
+For the current food-menu model, the canonical Menu identity is:
+
+```text
+Sub Category + Rasa
+```
+
+Category is taxonomy context/parentage, not a second identity dimension for duplicate detection. The same identity combination must not be created again even if a user attempts to place it under another Category.
+
+Because Sub Category names are already Brand-unique, a different parent Category cannot be used to bypass Menu identity uniqueness.
+
+Rasa remains reusable across different Sub Categories. Therefore these are different Menus:
+
+```text
+Ayam Bakar + Original
+Ayam Goreng + Original
+Ayam Bakar + Lombok Ijo
+```
+
+but this is a duplicate:
+
+```text
+Ayam Bakar + Lombok Ijo
+Ayam Bakar + Lombok Ijo
+```
+
+When the Owner attempts to create a duplicate Menu identity, Core blocks creation and the UI shows a warning with one dismissal CTA:
+
+```text
+Menu sudah ada
+
+Menu dengan Sub Kategori dan Rasa tersebut sudah tersedia.
+
+[ Tutup ]
+```
+
+The system must not merge, overwrite, or open the existing Menu for editing from this conflict. The Owner can find the existing Menu through the normal Menu management surface.
+
+Status: the old Product identity conflict flow is historical and superseded for this new Product/Menu model.
 
 ## 🔒 LOCKED SUB-DECISION — Rasa Is Reusable Master Data
 
@@ -1692,7 +1734,7 @@ Technical reconciliation is still required in schema, resolver, API, migration, 
 ### New decisions discussed here that are NOT yet fully locked
 
 - Exact physical schema for `sub_categories` and Product → Sub Category.
-- Exact physical uniqueness key and normalization rules for Category + Sub Category + Rasa.
+- Exact physical uniqueness key and normalization rules for Menu identity: Sub Category + Rasa.
 - Exact implementation of usage-derived Rasa availability without a separate manual compatibility matrix.
 - Product ID / identity-history model for long-term reporting after in-place identity edits.
 - Reporting semantics when one Product ID has different current identities over time.
@@ -1705,7 +1747,8 @@ Technical reconciliation is still required in schema, resolver, API, migration, 
 
 ### Decisions already made in this conversation and now recorded in this proposal
 
-- Product/Menu separation: Product is atomic; Menu Satuan references 1 Product; Menu Paket references 2+ Products; Category + Sub Category + Rasa belong to Menu presentation/identity.
+- Product/Menu separation: Product is atomic; Menu Satuan references 1 Product; Menu Paket references 2+ Products; Category + Sub Category + Rasa belong to Menu, with Menu uniqueness defined by Sub Category + Rasa.
+- Duplicate Menu identity is based on Sub Category + Rasa within Brand, regardless of Category parent; duplicate creation shows a blocking warning with CTA [ Tutup ].
 - The same Product may be reused by multiple Menus; Branch adopts Menus for sales while Inventory remains Product/SKU-based.
 - Level is a generic domain concept; food UI may label it Pedas; presentation/configuration is reusable in Shared.
 - Kelengkapan checkbox activates Paket mode; unchecked is Normal Product, checked reveals Package composition and uses component Product IDs.
