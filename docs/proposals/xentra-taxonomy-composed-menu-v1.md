@@ -890,14 +890,18 @@ This section records what is already locked in current Xentra documentation, wha
 - Promotion remains a separate domain from Bundle/Package.
 - Shared UI shells/primitives and contextual Bottom Sheet/Modal patterns remain part of the Xentra UI architecture.
 
-### Existing locks that directly conflict with this new concept and MUST be reconciled before final lock
+### Existing locks that are being OVERWRITTEN by the new Xentra concept
 
-1. **Product Name vs Category Display Boundary v1** currently defines `products.name` as the required Customer title and keeps Rasa optional. The new concept replaces that semantic model with Sub Category as the Customer title and Category + Sub Category + Rasa as normal Product identity.
-2. **Branch Customer Display Name Override** currently permits `branch_products.name_override`. The new concept cancels that authority.
-3. Current Owner Product Editor contracts expose `Nama Produk` as a required free-text field. The new concept removes that field as the canonical identity input and replaces it with contextual Category/Sub Category/Rasa selection.
-4. Current resolver tests and Customer DTO tests explicitly assert `products.name → Customer title`. They must be superseded/reworked only after the new concept is finally locked.
-5. Current migration and compatibility contracts still treat `products.name` as the semantic legacy source for Master Product identity. A migration strategy is still required.
+The following legacy semantics are explicitly overwritten for the new Xentra direction:
 
+1. **products.name → Customer title** → **OVERWRITE**. Customer title now comes from **Sub Category**.
+2. **Nama Produk required free-text field** → **OVERWRITE**. Product identity is assembled through **Category → Sub Category → Rasa**.
+3. **Rasa optional** → **OVERWRITE**. **Original** is the default Rasa, so the normal Product identity is complete.
+4. **Branch Customer Display Name Override (branch_products.name_override)** → **OVERWRITE / CANCEL**. Branch must not rename or redefine the Master Product.
+
+The old decisions remain preserved as historical implementation records. They are no longer the target design for the new Xentra model.
+
+Technical reconciliation is still required in schema, resolver, API, migration, reporting/history, tests, and retirement/quarantine of legacy paths before implementation is promoted.
 ### New decisions discussed here that are NOT yet fully locked
 
 - Exact physical schema for `sub_categories` and Product → Sub Category.
