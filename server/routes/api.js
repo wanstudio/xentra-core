@@ -19,6 +19,7 @@ const registerWorkforceRoutes = require('./workforce');
 const registerPlatformRoutes = require('./platform');
 const registerAdminCatalogRoutes = require('./admin-catalog');
 const registerAdminMenuCompositionRoutes = require('./admin-menu-composition');
+const registerAdminComposedMenuRoutes = require('./admin-composed-menu');
 const registerAdminBrandRoutes = require('./admin-brand');
 const registerAdminBranchRoutes = require('./admin-branches');
 const registerAdminOrderRoutes = require('./admin-orders');
@@ -972,6 +973,8 @@ registerAdminBrandRoutes(router, {
 registerAdminCatalogRoutes(router, { db, requireAuth });
 // Master Menu Composition routes use Owner-authoritative structured component data.
 registerAdminMenuCompositionRoutes(router, { requireAuth });
+// New locked Product → Menu → Inventory construction boundary.
+registerAdminComposedMenuRoutes(router, { requireAuth });
 
 // Admin branch management routes are isolated in server/routes/admin-branches.js.
 registerAdminBranchRoutes(router, { db, crypto, requireAuth });
