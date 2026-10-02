@@ -1001,3 +1001,19 @@ PRODUCT SKU / INVENTORY
 The major remaining work is implementation reconciliation against the existing production codebase, especially migration of the current Product schema that has no SKU column and currently stores selling price/category directly on Product. This is implementation reconciliation, not another round of basic concept discovery.
 
 **Production/main must remain unchanged until the final Xentra contract is explicitly promoted.**
+
+
+## Implementation status — 2026-10-03
+
+The business/domain contract above is locked. Construction has started on `proposal/xentra-taxonomy-composed-menu-v1`; `main` remains untouched.
+
+Implemented as the first additive foundation:
+- Product SKU field with normalized Brand-scoped uniqueness and audited SKU history.
+- Sub Category master with Brand-scoped normalized name uniqueness and Category parent relation.
+- Menu Satuan and Menu Paket persistence with fixed `menu_items` composition and quantity rules.
+- Branch Menu adoption separated from Product inventory.
+- Branch Product Inventory as the new Product/SKU stock boundary, with missing inventory row resolved as zero stock.
+- Canonical composed-menu resolver for customer title/subtitle, Branch availability, Package capacity, and live title/Rasa search.
+- Admin API surface for Menu creation, Sub Category/Rasa management, SKU management, Branch adoption, and menu status.
+
+Legacy Product-composition and Branch Product paths are intentionally still present. They are not silently rewritten; migration and consumer quarantine are later gates.
