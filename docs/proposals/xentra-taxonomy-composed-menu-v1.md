@@ -915,43 +915,13 @@ Inventory effect
 → Es Teh     -1
 ```
 
-## 🔒 LOCKED SUB-DECISION — Historical Reporting Uses Identity at Time of Sale
+## 🔄 SUPERSEDED SUB-DECISION — Historical Reporting Uses Identity at Time of Sale
 
-**Decision date:** 2026-10-02
+The earlier Product-identity framing is superseded.
 
-When a stable Product ID remains the same while its current identity/presentation changes, historical sales reporting must preserve the Product identity/presentation that existed at the time of each transaction.
+Current target: historical records preserve the **Menu identity/presentation and Product SKU references used by the transaction**.
 
-Rules:
-
-1. Historical sales views group/display the Product using its **identity/presentation at time of sale**, not the Product's current title or current taxonomy.
-2. Order history therefore remains stable even when the Product is later edited in place.
-3. The stable **Product ID** remains available as a separate analytical dimension, so lifetime or cross-identity analysis can aggregate transactions belonging to the same Product ID.
-4. The reporting model must support both perspectives without rewriting historical transaction data:
-   - **Historical identity view** → what was sold at that time.
-   - **Stable Product ID view** → what the technical Product entity has sold across its lifetime.
-5. This does not require changing the Product ID when Category, Sub Category, or Rasa changes, provided the target identity is unique and the edit follows the locked in-place identity-change rule.
-6. Historical order/menu snapshots remain authoritative for historical customer-facing presentation; reports must not reconstruct historical names from the current Product record.
-
-Conceptually:
-
-```
-P001 current
-  → Ayam Bakar / Lombok Ijo
-
-Historical sales
-  Jan → Ayam Bakar / Original   100
-  Feb → Ayam Bakar / Lombok Ijo 80
-
-Historical identity view
-  → Original 100
-  → Lombok Ijo 80
-
-Stable Product ID view
-  → P001 total 180
-```
-
-This is a reporting/history contract. Exact physical reporting schema and identity-version storage remain implementation details to be finalized during the technical reconciliation phase.
-
+Product remains an atomic inventory identity; Menu remains the commercial/customer-facing identity. Historical orders must retain the Menu presentation and the Product/SKU stock consumption snapshot that applied at transaction time.
 ## 🔒 LOCKED SUB-DECISION — Level Pedas Is Informational, Not a Customer Request
 
 **Decision date:** 2026-10-02
@@ -966,23 +936,22 @@ Rules:
 4. A customer's ad-hoc offline request for a different spice level than the configured Product value is handled operationally by people and is not represented as a separate system request in the current Xentra model.
 5. The current Level Pedas value remains part of the Product's resolved presentation/history according to the existing snapshot rules.
 
-## 🔒 LOCKED SUB-DECISION — Current Level Pedas Product Editor UI
+## 🔄 SUPERSEDED SUB-DECISION — Current Level Pedas Product Editor UI
 
-**Decision date:** 2026-10-02
+The earlier wording placed Level/Pedas inside Product Editor. It is superseded.
 
-For the current Xentra food-menu concept, Level Pedas is activated directly from the Product Editor by checkbox rather than through a preset/range configuration sheet.
+Current target: **Level/Pedas is configured in Menu Editor**, because it is a customer-facing Menu attribute.
 
-Rules:
+Food context:
 
-1. Product Editor shows Category → Sub Category → Rasa → **☐ Aktifkan Level Pedas** → **☐ Aktifkan Kelengkapan**.
-2. When **Aktifkan Level Pedas** is checked, the Level Pedas control appears directly underneath.
-3. First activation defaults to **Level 1**.
-4. While active, Level Pedas cannot be empty.
-5. The current food UI uses four selectable positions for Level Pedas.
-6. Unchecking the checkbox sets Level to **NULL** and hides the Level Pedas control.
-7. The four positions are current food UI behavior only; they do not constrain the generic Level domain or future menu contexts.
-8. Variant/Variation remains a separate future domain discussion covering pricing, SKU, inventory, cart, order, payment, POS, and reporting.
+```text
+☐ Aktifkan Level Pedas
 
+when enabled → four selectable positions, default Level 1
+when disabled → Level = NULL; no Pedas label/indicator in Customer UI
+```
+
+Level remains a generic domain concept; "Pedas" is contextual food UI naming.
 ## 🔒 LOCKED SUB-DECISION — Level Is Optional and NULL When Unset
 
 **Decision date:** 2026-10-02
