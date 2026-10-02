@@ -880,6 +880,24 @@ branch_menu_categories
   branch_id
   menu_id
   branch_category_id
+
+branch_product_inventory
+  branch_id
+  product_id
+  stock_qty
+  low_stock_threshold
+  created_at
+  updated_at
+
+inventory_movements
+  branch_id
+  product_id
+  quantity
+  previous_stock
+  current_stock
+  movement_type
+  reference_id
+  created_at
 ```
 
 Target integrity:
@@ -904,6 +922,8 @@ Menu
 ```
 
 The exact physical columns for media, lifecycle timestamps and compatibility fields may be reconciled with the existing schema without changing these ownership rules.
+
+**Important:** Branch Menu adoption and Product inventory are separate authorities. A Product may have Branch stock without a standalone Menu Satuan adoption because it may be used only as a component of one or more Menu Pakets. A missing Branch inventory row for a SKU-managed Product represents zero available stock; it must not be interpreted as unknown stock.
 
 ## 22. What is already resolved by this audit
 
