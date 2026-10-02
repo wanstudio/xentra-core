@@ -1,7 +1,6 @@
 'use strict';
 
 const crypto = require('crypto');
-const DataAccess = require('../../../core/data/DataAccess');
 const ComposedMenuRepository = require('../repositories/ComposedMenuRepository');
 
 const repository = new ComposedMenuRepository();
@@ -90,21 +89,50 @@ function normalizeProductComponents(value) {
 }
 
 class ComposedMenuService {
-  static setProductSku({ brandId, productId, sku }) {
+  static setProductSku({ brandId, productId, sku, actorId = null, actorRole = null }) {
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
     const product = repository.findProductSku({ brandId, productId });
     if (!product) throw new Error('MASTER_PRODUCT_NOT_FOUND');
 
+    const previousSku = product.sku == null ? null : String(product.sku).trim() || null;
     const normalized = normalizeSku(sku);
+
+    // Removing stock identity is a governed operation. It is not allowed while any
+    // active branch still has positive stock in either the new inventory table or
+    // the legacy compatibility stock column.
+    if (previousSku && !normalized) {
+      const positiveStock = repository.db.queryOne(
+        "SELECT 1 AS found FROM branches b " +
+        "LEFT JOIN branch_product_inventory bpi ON bpi.branch_id = b.id AND bpi.product_id = ? " +
+        "LEFT JOIN branch_products bp ON bp.branch_id = b.id AND bp.product_id = ? " +
+        "WHERE b.brand_id = ? AND b.is_active = 1 " +
+        "AND (COALESCE(bpi.stock_qty, 0) > 0 OR COALESCE(bp.stock, 0) > 0) LIMIT 1",
+        [productId, productId, brandId]
+      );
+      if (positiveStock) throw new Error('PRODUCT_SKU_REMOVAL_BLOCKED_STOCK');
+    }
+
+    if (previousSku === normalized) return repository.findProductSku({ brandId, productId });
+
+    repository.begin();
     try {
       repository.updateProductSku({
         brandId,
         productId,
         sku: normalized
       });
+      repository.db.execute(
+        "INSERT INTO product_sku_history (id, brand_id, product_id, previous_sku, new_sku, actor_id, actor_role) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [makeId('skuhist'), brandId, productId, previousSku, normalized, actorId, actorRole]
+      );
+      repository.commit();
     } catch (err) {
+      try { repository.rollback(); } catch (_) {}
       if (/UNIQUE constraint failed/i.test(String(err && err.message))) {
-        throw new Error('PRODUCT_SKU_ALREADY_EXISTS');
+        if (/idx_products_brand_sku_normalized/i.test(String(err && err.message))) {
+          throw new Error('PRODUCT_SKU_ALREADY_EXISTS');
+        }
       }
       if (/PRODUCT_SKU_EMPTY/i.test(String(err && err.message))) {
         throw new Error('PRODUCT_SKU_EMPTY');
