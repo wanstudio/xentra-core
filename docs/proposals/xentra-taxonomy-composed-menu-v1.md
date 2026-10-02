@@ -779,6 +779,41 @@ Publish/Sell Paket
 all components must pass Core validity checks
 ```
 
+## 🔒 LOCKED SUB-DECISION — Paket Is an Explicit Fixed Composite Sellable Product
+
+**Decision date:** 2026-10-02
+
+The human meaning of "Paket" (a combined offering, often perceived as a value/discounted deal) is different from the system meaning. Xentra uses the system definition for persistence and business rules.
+
+Rules:
+
+1. A Paket exists only when the Owner explicitly creates a Product as **PACKAGE** / activates **Kelengkapan**. The system must not infer Paket status merely from multiple Products being sold together, the name containing "Paket", or a lower price/promotion.
+2. A Paket is one sellable Product entity with its own Product ID, customer-facing name, and explicit Paket price.
+3. The Paket contains a **fixed composition of existing Product IDs**. The components remain separate Product entities and retain their own identities/data.
+4. For the current contract, each listed component contributes **one unit per one complete Paket**. Customer Qty controls the number of complete Paket units sold.
+5. A Paket may optionally also participate in a Promotion; Promotion does not create or change Paket identity.
+6. The current Package model does not support customer selection/reconfiguration of components at purchase time. Customer-side component selection/configuration is a future domain and is not implied by Paket.
+7. A Paket does not inherit component Rasa or Level automatically. Component attributes remain attributes of their respective Products.
+
+Reference alignment: fixed-bundle systems commonly model a bundle as a sellable parent product linked to component products; the parent/bundle price can be distinct from component inventory, and fixed bundles are distinct from configurable composite/bundle experiences. Shopify documents fixed bundles as a product associated with component products, with parent price and component-driven inventory; WooCommerce distinguishes fixed Product Bundles from Composite Products and supports a base/fixed bundle price. These references support the separation between "fixed composite sellable product" and "customer-configured combination", but do not determine Xentra's business rules.
+
+Conceptually:
+
+```
+Human:
+"Geprek + Nasi" → paket
+"Paket Special Bagong" → paket
+
+Xentra system:
+Owner explicitly selects Paket mode
+        ↓
+PACKAGE Product
+        ↓
+fixed component Product IDs
+        ↓
+one Paket = one complete unit
+```
+
 ## 🔒 LOCKED SUB-DECISION — Paket Revenue Belongs to the Paket
 
 **Decision date:** 2026-10-02
