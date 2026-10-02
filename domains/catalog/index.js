@@ -10,6 +10,8 @@ const CatalogService = require('./services/CatalogService');
 const PricingPolicyModel = require('./models/PricingPolicyModel');
 const MasterMenuResolver = require('./services/MasterMenuResolver');
 const MasterMenuCompositionService = require('./services/MasterMenuCompositionService');
+const ComposedMenuService = require('./services/ComposedMenuService');
+const ComposedMenuResolver = require('./services/ComposedMenuResolver');
 
 const CATALOG_IDENTITY = {
   name: 'catalog',
@@ -48,5 +50,7 @@ module.exports = {
   CatalogService,
   PricingPolicyModel,
   MasterMenuResolver,
-  MasterMenuCompositionService
+  MasterMenuCompositionService,
+  ComposedMenuService,
+  ComposedMenuResolver
 };
