@@ -762,29 +762,37 @@ Menu
 "lombok"
   → Ayam Bakar / Lombok Ijo
 ```
-## 🔒 LOCKED SUB-DECISION — Paket Is Sold as One Whole Unit
+## 🔄 SUPERSEDED SUB-DECISION — Paket Is Sold as One Whole Unit
 
-**Decision date:** 2026-10-02
+The earlier rule that each Package component is exactly one unit per Package is superseded by the quantity-enabled Package model.
 
-For the current Xentra customer/cart model, a Paket is one whole sellable unit. Customer quantity changes the number of complete Paket units purchased.
+Current rules:
 
-Rules:
+1. A Paket remains one whole commercial order line.
+2. Customer/cart Qty controls the number of complete Paket units.
+3. Each Package component has a fixed **positive integer component quantity**.
+4. Inventory consumption is `package_sale_qty × component_qty` for each stock-managed component.
+5. Customer cannot change component quantities from the cart; they are defined by the Menu Paket.
+6. The same Product can be represented once with `quantity > 1`; duplicated Product records are not required.
+7. Zero or negative component quantities are rejected. Decimal/UoM quantities are outside the current MVP contract.
 
-1. One Paket in the cart represents **one complete Paket**, with its fixed composition.
-2. Customer/cart control `Qty` changes the **quantity of complete Paket units**, not the quantity of individual component Products.
-3. Example:
+Example:
 
+```text
+Paket Keluarga
+├─ Ayam     ×2
+├─ Nasi     ×2
+├─ Sambal   ×2
+└─ Es Teh   ×3
+
+Customer Qty = 2
+
+Inventory:
+AYAM     -4
+NASI     -4
+SAMBAL   -4
+ES TEH   -6
 ```
-Paket Special Semar
-Qty = 3
-
-= 3 complete Paket units
-```
-
-4. The Customer UI must not expose component-level quantity controls for a Paket sale.
-5. Inventory consumption is derived from the Paket composition for each Paket unit, multiplied by the number of Paket units sold.
-6. **Each component listed in a Paket represents one unit per one complete Paket.** The current Paket model does not expose or configure a component Qty field. If the composition contains Ayam Bakar, Nasi, and Es Teh, one Paket contains exactly one of each. Customer Qty is the only quantity control in the current Paket sale model.
-7. **Future extension:** component quantity greater than one is considered a valid future capability candidate, but it is not part of the current Paket contract and must be designed separately with its own inventory, reporting, pricing/cost, and UI implications.
 
 ## 🔒 LOCKED SUB-DECISION — Paket Component Invalidity Blocks Sale
 
