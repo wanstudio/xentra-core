@@ -5,7 +5,7 @@ const DataAccess = require('../../../core/data/DataAccess');
 let ensured = false;
 
 function hasColumn(db, table, column) {
-  return db.queryMany(\`PRAGMA table_info(\${table})\`).some(row => String(row.name) === column);
+  return db.queryMany(`PRAGMA table_info(${table})`).some(row => String(row.name) === column);
 }
 
 function normalizeName(value) {
@@ -22,7 +22,7 @@ function ensureComposedMenuSchema(db = DataAccess) {
     db.exec('ALTER TABLE products ADD COLUMN sku TEXT;');
   }
 
-  db.exec(\`
+  db.exec(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_products_brand_sku_normalized
       ON products(brand_id, lower(trim(sku)))
       WHERE sku IS NOT NULL AND trim(sku) <> '';
@@ -321,7 +321,7 @@ function ensureComposedMenuSchema(db = DataAccess) {
     BEGIN
       SELECT RAISE(ABORT, 'BRANCH_PRODUCT_INVENTORY_CROSS_BRAND');
     END;
-  \`);
+  `);
 
   ensured = true;
 }
