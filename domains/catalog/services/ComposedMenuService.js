@@ -94,7 +94,9 @@ function normalizeProductComponents(value) {
 
 class ComposedMenuService {
   static setProductSku({
-    ensureSchema(); brandId, productId, sku, actorId = null, actorRole = null }) {
+    brandId, productId, sku, actorId = null, actorRole = null
+  }) {
+    ensureSchema();
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
     const product = repository.findProductSku({ brandId, productId });
     if (!product) throw new Error('MASTER_PRODUCT_NOT_FOUND');
@@ -149,13 +151,17 @@ class ComposedMenuService {
   }
 
   static listSubCategories({
-    ensureSchema(); brandId, categoryId = null, activeOnly = false }) {
+    brandId, categoryId = null, activeOnly = false
+  }) {
+    ensureSchema();
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
     return repository.listSubCategories({ brandId, categoryId, activeOnly });
   }
 
   static createSubCategory({
-    ensureSchema(); brandId, categoryId, name, slug = null, sortOrder = 0 }) {
+    brandId, categoryId, name, slug = null, sortOrder = 0
+  }) {
+    ensureSchema();
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
     if (!categoryId) throw new Error('CATEGORY_REQUIRED');
 
@@ -194,13 +200,17 @@ class ComposedMenuService {
   }
 
   static listRasas({
-    ensureSchema(); brandId, activeOnly = false }) {
+    brandId, activeOnly = false
+  }) {
+    ensureSchema();
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
     return repository.listRasas({ brandId, activeOnly });
   }
 
   static ensureOriginalRasa({
-    ensureSchema(); brandId }) {
+    brandId
+  }) {
+    ensureSchema();
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
     const existing = repository.findRasaByName({ brandId, name: 'Original' });
     if (existing) return existing;
@@ -221,7 +231,9 @@ class ComposedMenuService {
   }
 
   static createRasa({
-    ensureSchema(); brandId, name, slug = null, sortOrder = 0 }) {
+    brandId, name, slug = null, sortOrder = 0
+  }) {
+    ensureSchema();
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
     const normalizedName = normalizeName(name, 'RASA_NAME_REQUIRED');
     const existing = repository.findRasaByName({ brandId, name: normalizedName });
@@ -250,7 +262,6 @@ class ComposedMenuService {
   }
 
   static createSingleMenu({
-    ensureSchema();
     brandId,
     productId,
     subCategoryId,
@@ -259,6 +270,7 @@ class ComposedMenuService {
     sellingPrice,
     status = 'DRAFT'
   }) {
+    ensureSchema();
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
 
     const product = repository.findProduct({ brandId, productId });
