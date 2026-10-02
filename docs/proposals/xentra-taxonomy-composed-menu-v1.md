@@ -31,19 +31,23 @@ Sub Category
 [ Ayam Tulang Lunak ▼ ] [+]
 
 Rasa
-[ Lombok Ijo ▼ ] [+]
+[ Lombok Ijo ▼ ]
 
 Level
 [ Pedas ▼ ]
+
+☐ Aktifkan Kelengkapan
 ```
 
-Customer presentation:
+Normal Product customer presentation:
 
 ```
 Ayam Tulang Lunak
 Lombok Ijo
-Sambal
+Pedas 3
 ```
+
+When **☐ Aktifkan Kelengkapan** is checked, the editor enters Paket composition mode and reveals the Package composition fields, including the component Product list and Paket price.
 
 UI labels must describe the semantic role honestly. The Product Editor must not pretend that a free-text Product Name exists if the primary customer title is actually resolved from Sub Category.
 
@@ -217,8 +221,10 @@ Sub Category
 Rasa
 [ <empty> ▼ ] [+]
 
-Kelengkapan
-[ <empty> ▼ ] [+]
+Level
+[ <empty> ▼ ]
+
+☐ Aktifkan Kelengkapan
 
 ...
 ```
@@ -536,7 +542,7 @@ A normal Product identity is:
 Category + Sub Category + Rasa
 ```
 
-Normal Product does not use Kelengkapan as a generic composition field. Independently sellable additions are Products; any remaining purchase-time options must use the explicit Product Options contract.
+Normal Product does not include Paket composition. The editor exposes **☐ Aktifkan Kelengkapan** as the explicit switch into Paket mode. Independently sellable additions remain Products; any other purchase-time options must use the explicit Product Options contract.
 
 ### Product Paket
 
@@ -592,29 +598,51 @@ Product 1 + Product 2 + Product 3 + eligible Promotion
 This boundary is required to avoid treating arbitrary product combinations as a new Product or Paket.
 
 
-## 🔒 LOCKED SUB-DECISION — Normal Product Excludes Kelengkapan
+## 🔒 LOCKED SUB-DECISION — Kelengkapan Checkbox Activates Paket Mode
 
 **Decision date:** 2026-10-02
 
-For the new Xentra concept, **Kelengkapan is not a field of Normal Product composition**.
-
-The earlier Kelengkapan concept came from treating a Product as though it were a Paket assembled from several included items. That assumption is superseded.
-
-Locked Normal Product model:
+The Product Editor uses a simple checkbox/toggle to activate **Kelengkapan** for the current Product draft.
 
 ```
-Category + Sub Category + Rasa
-+ optional Level
-+ Product-level fields
+☐ Aktifkan Kelengkapan
 ```
 
-Rules:
+Behavior:
 
-1. Normal Product does not require a Kelengkapan field.
-2. Items such as Nasi, Lalapan, Sambal, or Es Teh that are independently sellable remain separate Product entities.
-3. When those Products are intentionally sold together as a named bundle, that is a Paket and follows the locked Paket contract.
-4. Existing legacy Kelengkapan data/fields must be treated as migration/retirement work, not as the target Normal Product domain model.
-5. Any future optional purchase-time configuration must be defined explicitly through the Product Options contract, not by reviving Kelengkapan as a generic catch-all field.
+- **Unchecked** → the Product is a **Normal Product** and the editor does not show Package composition fields.
+- **Checked** → the editor enters **Paket mode** and reveals the Paket composition UI.
+- Paket mode shows the component Product list and the explicit Paket price; the Paket also has its own Owner-defined display name as required by the locked Paket subtype contract.
+- Each included item is referenced by its own **Product ID**. The component remains a real Product for inventory, reporting traceability, and references.
+- Checking the box does not create duplicate Product records for the components.
+- Unrelated fields of the normal Product editor are not reinterpreted as "Kelengkapan".
+- The checkbox is a UI control for choosing the Product subtype/composition mode; the underlying domain remains **Normal Product** versus **Paket Product**.
+
+Conceptually:
+
+```
+☐ Aktifkan Kelengkapan
+        │
+        ├── unchecked → NORMAL
+        │              Category + Sub Category + Rasa
+        │              + optional Level
+        │
+        └── checked   → PACKAGE
+                       Paket name
+                       Component Product IDs
+                       Paket price
+```
+
+Inventory remains component-driven:
+
+```
+Paket P100 sold × 1
+  → component P001 stock -1
+  → component P002 stock -1
+  → component P003 stock -1
+```
+
+This is the canonical UX for activating Paket composition. Detailed lifecycle rules for changing an already-published Product between Normal and Paket remain a separate domain edge case and are not implied by the checkbox alone.
 
 ## 🔒 LOCKED SUB-DECISION — Level Is Generic, UI Label Is Contextual
 
@@ -1001,6 +1029,7 @@ Technical reconciliation is still required in schema, resolver, API, migration, 
 
 - Normal Product identity = Category + Sub Category + Rasa; Original is the default Rasa.
 - Level is a generic domain concept; food UI may label it Pedas; presentation/configuration is reusable in Shared.
+- Kelengkapan checkbox activates Paket mode; unchecked is Normal Product, checked reveals Package composition and uses component Product IDs.
 - Rasa is reusable Master data, not a child taxonomy node.
 - Rasa reuse is contextual; no manual Rasa↔Sub Category management UI is required.
 - Independently sellable additions such as Sambal Matah are Products, not Add-ons.
