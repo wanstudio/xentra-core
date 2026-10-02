@@ -949,6 +949,22 @@ UI rules:
 - This is a UX/lifecycle decision only at this stage; no production implementation is implied by this document.
 
 Product records are not themselves considered descendants for purposes of automatic deletion. Product lifecycle remains governed by the Product domain.
+## 🔒 LOCKED SUB-DECISION — Sub Category Name Uniqueness Scope
+
+**Decision date:** 2026-10-02
+
+Sub Category names may be reused across different parent Categories within the same Brand.
+
+Rules:
+
+1. The uniqueness scope for a Sub Category name is **within its parent Category**.
+2. The same normalized name may therefore exist under different Categories, for example:
+   - Ayam → Goreng
+   - Ikan → Goreng
+3. Product Editor selectors are parent-scoped: selecting a Category determines which Sub Categories are available.
+4. The system must reject duplicate normalized Sub Category names only when they collide under the **same parent Category**.
+5. A Sub Category remains unambiguous through its stable ID and its parent Category relation.
+
 ## 🔒 LOCKED SUB-DECISION — Normal Product Identity
 
 **Decision date:** 2026-10-01
