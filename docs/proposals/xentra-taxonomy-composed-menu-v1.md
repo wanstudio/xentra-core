@@ -689,6 +689,39 @@ resolved search text
   → Ayam Bakar / Lombok Ijo
 ```
 
+## 🔒 LOCKED SUB-DECISION — Paket Component Invalidity Blocks Sale
+
+**Decision date:** 2026-10-02
+
+A Paket remains a persistent Product entity when one of its referenced component Products becomes unavailable or invalid. The Paket is not deleted and its Product identity/history are preserved, but it must not remain sellable while a required component is invalid.
+
+Rules:
+
+1. If a required component Product is archived, deleted, or otherwise invalid for sale, the Paket remains stored with its existing Product ID and historical records.
+2. The Paket becomes **not sellable / unavailable** because of the invalid component; it is not silently sold without that component.
+3. The Paket is not automatically converted to Draft merely because a component became invalid. Draft means the Paket itself is not finished; component invalidity is a sale-eligibility problem.
+4. Core must expose the blocking reason, e.g. `COMPONENT_UNAVAILABLE`, so Owner/Merchant surfaces can explain why the Paket cannot be sold.
+5. The Owner must be able to repair the Paket by replacing/removing the invalid component according to the Package composition rules, after which Core can re-evaluate sale eligibility.
+6. Historical orders remain unchanged and the Paket Product identity is not rewritten by this lifecycle event.
+7. A component being temporarily out of stock is a separate availability condition from the component Product itself becoming invalid/archived; both can make the Paket unavailable, but they must remain distinguishable.
+
+Conceptually:
+
+```
+Component Product archived/invalid
+        ↓
+Paket remains persisted
+        ↓
+saleable = false
+blocking_reason = COMPONENT_UNAVAILABLE
+        ↓
+Owner repairs Package composition
+        ↓
+Core re-validates
+        ↓
+Paket can become saleable again
+```
+
 ## 🔒 LOCKED SUB-DECISION — Paket Components May Be Non-Published Products
 
 **Decision date:** 2026-10-02
