@@ -13,6 +13,8 @@ function statusForError(message) {
     case 'RASA_ALREADY_EXISTS':
     case 'PRODUCT_SKU_ALREADY_EXISTS':
     case 'PRODUCT_SKU_REMOVAL_BLOCKED_STOCK':
+    case 'MENU_TYPE_MISMATCH':
+    case 'RASA_ORIGINAL_PROTECTED':
       return 409;
     case 'MENU_NOT_FOUND':
     case 'MASTER_PRODUCT_NOT_FOUND':
@@ -269,6 +271,35 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
     }
   });
 
+  router.put('/admin/sub-categories/:id', requireAuth(ownerRoles), (req, res) => {
+    try {
+      const body = req.body || {};
+      const result = service.updateSubCategory({
+        brandId: req.brand_id,
+        subCategoryId: req.params.id,
+        name: body.name,
+        categoryId: body.category_id,
+        slug: body.slug,
+        isActive: body.is_active
+      });
+      res.json({ success: true, ...result });
+    } catch (err) {
+      sendError(res, err, 'SUB_CATEGORY_UPDATE_FAILED');
+    }
+  });
+
+  router.delete('/admin/sub-categories/:id', requireAuth(ownerRoles), (req, res) => {
+    try {
+      const result = service.deleteSubCategory({
+        brandId: req.brand_id,
+        subCategoryId: req.params.id
+      });
+      res.json({ success: true, ...result });
+    } catch (err) {
+      sendError(res, err, 'SUB_CATEGORY_DELETE_FAILED');
+    }
+  });
+
   router.post('/admin/sub-categories', requireAuth(ownerRoles), (req, res) => {
     try {
       const body = req.body || {};
@@ -297,6 +328,35 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
       });
     } catch (err) {
       sendError(res, err, 'RASA_LIST_FAILED');
+    }
+  });
+
+  router.put('/admin/rasas/:id', requireAuth(ownerRoles), (req, res) => {
+    try {
+      const body = req.body || {};
+      const result = service.updateRasa({
+        brandId: req.brand_id,
+        rasaId: req.params.id,
+        name: body.name,
+        slug: body.slug,
+        sortOrder: body.sort_order,
+        isActive: body.is_active
+      });
+      res.json({ success: true, ...result });
+    } catch (err) {
+      sendError(res, err, 'RASA_UPDATE_FAILED');
+    }
+  });
+
+  router.delete('/admin/rasas/:id', requireAuth(ownerRoles), (req, res) => {
+    try {
+      const result = service.deleteRasa({
+        brandId: req.brand_id,
+        rasaId: req.params.id
+      });
+      res.json({ success: true, ...result });
+    } catch (err) {
+      sendError(res, err, 'RASA_DELETE_FAILED');
     }
   });
 
