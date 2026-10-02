@@ -1328,15 +1328,19 @@ Status: the old Product identity conflict flow is historical and superseded for 
 
 ## 🔒 LOCKED SUB-DECISION — Rasa Is Reusable Master Data
 
-**Decision date:** 2026-10-01
+**Decision date:** 2026-10-03
 
-Rasa is a reusable Brand-scoped Master Reference. It is **not** a child taxonomy node of Sub Category.
+Rasa is reusable Brand-scoped Master data used by **Menus**. It is not a child taxonomy node and it is not part of the atomic Product identity.
 
-The Product references the Rasa record by ID.
+Rules:
+1. Menu references a Rasa record by ID.
+2. `Original` is always available as the baseline/default Rasa for Menu Satuan and applicable Menu Paket presentation.
+3. `Original` is hidden in the customer subtitle; non-Original Rasa may be shown as subtitle.
+4. The same Rasa may be reused by many Menus with different Sub Categories.
+5. Duplicate Master Rasa records with the same normalized Brand name are not created.
+6. No manual Sub Category ↔ Rasa compatibility matrix is required in the current concept; Menu usage establishes contextual availability.
 
-Rasa usage under a Sub Category is learned from actual Product composition; Owners do not maintain a separate compatibility-management UI.
-
-When a Rasa name already exists, the Product flow reuses the existing Master Rasa record instead of creating another identical Master record.
+**Status:** LOCKED SUB-DECISION for proposal only. `main` remains unchanged.
 
 ## 🔒 LOCKED SUB-DECISION — Add-on vs Standalone Product
 
@@ -1724,8 +1728,8 @@ This section records what is already locked in current Xentra documentation, wha
 The following legacy semantics are explicitly overwritten for the new Xentra direction:
 
 1. **products.name → Customer title** → **OVERWRITE**. Customer title now comes from **Sub Category**.
-2. **Nama Produk required free-text field** → **OVERWRITE**. Product identity is assembled through **Category → Sub Category → Rasa**.
-3. **Rasa optional** → **OVERWRITE**. **Original** is the default Rasa, so the normal Product identity is complete.
+2. **Nama Produk required free-text field** → **OVERWRITE** as the customer-facing Menu title. Product retains an internal atomic name/label; Menu owns customer-facing taxonomy and presentation.
+3. **Rasa optional** → **OVERWRITE** at the old Product-identity layer. Rasa now belongs to Menu identity/presentation; `Original` is the default Menu Rasa baseline.
 4. **Branch Customer Display Name Override (branch_products.name_override)** → **OVERWRITE / CANCEL**. Branch must not rename or redefine the Master Product.
 
 The old decisions remain preserved as historical implementation records. They are no longer the target design for the new Xentra model.
@@ -1742,7 +1746,7 @@ Technical reconciliation is still required in schema, resolver, API, migration, 
 - Exact Package revenue/reporting allocation and order-snapshot treatment.
 - Detailed Product Options domain contract: option values, add-on pricing, inventory interaction, UI, and order representation.
 - Category archive cascade and restoration semantics.
-- Complete migration mapping from existing `products.name` values to Sub Categories and Rasa values.
+- Complete migration mapping from existing `products.name` values to internal Product names and Menu Sub Category/Rasa values.
 - Compatibility treatment for existing Branch `name_override` data before the old field is retired.
 
 ### Decisions already made in this conversation and now recorded in this proposal
@@ -1751,16 +1755,16 @@ Technical reconciliation is still required in schema, resolver, API, migration, 
 - Duplicate Menu identity is based on Sub Category + Rasa within Brand, regardless of Category parent; duplicate creation shows a blocking warning with CTA [ Tutup ].
 - The same Product may be reused by multiple Menus; Branch adopts Menus for sales while Inventory remains Product/SKU-based.
 - Level is a generic domain concept; food UI may label it Pedas; presentation/configuration is reusable in Shared.
-- Kelengkapan checkbox activates Paket mode; unchecked is Normal Product, checked reveals Package composition and uses component Product IDs.
+- The earlier `Kelengkapan → Paket mode` concept is superseded. Current model uses Menu Satuan vs Menu Paket; Product remains atomic.
 - Product Options remains a separate domain; its pricing/add-on and operational rules are intentionally deferred.
 - Rasa is reusable Master data, not a child taxonomy node.
-- Rasa reuse is contextual; no manual Rasa↔Sub Category management UI is required.
+- Rasa reuse is contextual at the Menu layer; no manual Rasa↔Sub Category compatibility matrix is required.
 - Independently sellable additions such as Sambal Matah are Products, not Add-ons.
-- An identity edit is an in-place Product edit when the target identity is unused.
-- Category change warns and, after confirmation, resets downstream Sub Category and Rasa in the draft.
-- Sub Category rename is allowed but warns about affected Customer titles.
+- Menu identity edits are handled at the Menu layer; the old Product identity-edit rule is superseded.
+- Changing Menu Category warns and, after confirmation, resets downstream Menu Sub Category and Rasa in the draft.
+- Sub Category rename remains allowed but its impact is on Menus using that Sub Category; affected customer titles are warned before save.
 - Populated taxonomy uses archive-first lifecycle; no automatic Product migration.
-- Duplicate Product identity opens a conflict modal, then a read-only detail Bottom Sheet; it never opens the target in Edit mode.
+- Duplicate Menu identity is blocked with the single-CTA `[ Tutup ]` warning; there is no direct Edit CTA from the warning.
 - Branch Product rename override is cancelled for the new concept.
 
 ### Current source-of-truth rule
