@@ -1018,6 +1018,10 @@ Implemented in the proposal branch:
 - canonical Menu customer/master and Branch resolver, including Package stock-capacity math and invalid-component blocking;
 - canonical checkout verification, Menu snapshots, and shared-Product stock aggregation;
 - canonical inventory repository routing for SKU-managed Products;
+- canonical Reporting stock summaries from `branch_product_inventory` and Menu-aware sales/item grouping with legacy order-history fallback;
+- canonical POS and Checkout catalog consumers with no silent Product-catalog fallback;
+- canonical Merchant Order item presentation from immutable Menu snapshots;
+- Promotion reward `target_product_id` explicitly retained as Product inventory reference until a separate Menu-targeted promotion contract is approved;
 - Branch Menu availability mutation with Branch Manager scope;
 - canonical Customer PWA catalog consumption without silent legacy catalog fallback;
 - canonical Menu endpoint compatibility envelope for older consumers;
