@@ -67,7 +67,7 @@ test('CLIENT OWNER DASHBOARD — Marketing / Promotion Workspace Visibility & Li
                 capability_type: 'install_incentive',
                 stacking_policy: 'exclusive',
                 is_active: 1,
-                rewards: [{ reward_type: 'freebie_product', target_product_name: 'Es Teh Manis' }],
+                rewards: [{ reward_type: 'freebie_product', target_menu_id: 'menu-es-teh', target_menu_title: 'Es Teh Manis' }],
                 scopes: [{ branch_id: 'branch-1', is_active: 1 }],
                 redemptions_count: 5
               }
@@ -76,15 +76,15 @@ test('CLIENT OWNER DASHBOARD — Marketing / Promotion Workspace Visibility & Li
           text: async () => '{}'
         };
       }
-      if (u.includes('/admin/catalog/products')) {
+      if (u.includes('/admin/menus')) {
         return {
           ok: true,
           status: 200,
           json: async () => ({
             success: true,
-            products: [
-              { id: 'prod-1', name: 'Ayam Goreng', price: 25000 },
-              { id: 'prod-2', name: 'Es Teh Manis', price: 5000 }
+            menus: [
+              { id: 'menu-ayam', menu_type: 'SINGLE', sub_category_name: 'Ayam Goreng', selling_price: 25000, status: 'ACTIVE' },
+              { id: 'menu-es-teh', menu_type: 'SINGLE', sub_category_name: 'Es Teh Manis', selling_price: 5000, status: 'ACTIVE' }
             ]
           }),
           text: async () => '{}'
@@ -183,7 +183,7 @@ test('CLIENT OWNER DASHBOARD — Marketing / Promotion Workspace Visibility & Li
     assert.ok(win.document.getElementById('mkt-promo-status'), 'Status select must exist');
     assert.ok(win.document.getElementById('mkt-promo-start-at'), 'Start date input must exist');
     assert.ok(win.document.getElementById('mkt-promo-end-at'), 'End date input must exist');
-    assert.ok(win.document.getElementById('mkt-promo-target-product'), 'Target product select must exist');
+    assert.ok(win.document.getElementById('mkt-promo-target-menu'), 'Target Menu select must exist');
     assert.ok(win.document.getElementById('mkt-promo-branches-list'), 'Branches list container must exist');
     assert.ok(win.document.getElementById('btn-mkt-submit-promo'), 'Submit button must exist');
   });
