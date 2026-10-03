@@ -297,7 +297,7 @@ class ComposedMenuRepository {
 
   findBranchMenu({ brandId, branchId, menuId }) {
     return this.db.queryOne(
-      "SELECT bm.branch_id, bm.menu_id, bm.is_available, bm.price_override, " +
+      "SELECT bm.branch_id, bm.menu_id, bm.is_available, bm.price_override, bm.display_name_override, " +
       "m.brand_id, m.menu_type, m.selling_price, m.status " +
       "FROM branch_menus bm " +
       "JOIN menus m ON m.id = bm.menu_id AND m.brand_id = ? " +
@@ -329,6 +329,24 @@ class ComposedMenuRepository {
       "INSERT INTO branch_menus (branch_id, menu_id, is_available, price_override) VALUES (?, ?, ?, ?)",
       [branchId, menuId, isAvailable ? 1 : 0, priceOverride]
     );
+  }
+
+  setBranchMenuDisplayName({ brandId, branchId, menuId, displayNameOverride }) {
+    const existing = this.findBranchMenu({ brandId, branchId, menuId });
+    if (!existing) throw new Error('BRANCH_MENU_NOT_FOUND');
+
+    return this.db.execute(
+      "UPDATE branch_menus SET display_name_override = ?, updated_at = datetime('now') WHERE branch_id = ? AND menu_id = ?",
+      [displayNameOverride, branchId, menuId]
+    );
+  }
+
+  removeBranchMenu({ brandId, branchId, menuId }) {
+    const existing = this.findBranchMenu({ brandId, branchId, menuId });
+    if (!existing) throw new Error('BRANCH_MENU_NOT_FOUND');
+
+    this.db.execute('DELETE FROM branch_menu_categories WHERE branch_id = ? AND menu_id = ?', [branchId, menuId]);
+    return this.db.execute('DELETE FROM branch_menus WHERE branch_id = ? AND menu_id = ?', [branchId, menuId]);
   }
 
   setBranchMenuAvailability({ brandId, branchId, menuId, isAvailable }) {
