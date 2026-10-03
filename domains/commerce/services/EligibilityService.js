@@ -210,6 +210,24 @@ class EligibilityService {
       return { eligible: false, reasons: [EligibilityService.REASONS.INVALID_CART], branch_id: branch_id || null, brand_id: brand_id || null, items: [] };
     }
 
+    const branchGate = EligibilityService._resolveBranch({ brand_id, branch_id, order_type });
+    if (!branchGate.ok) {
+      const reasons = [branchGate.reason];
+      return {
+        eligible: false,
+        reasons,
+        branch_id,
+        brand_id,
+        items: items.map((item) => ({
+          menu_id: item && item.menu_id ? String(item.menu_id) : null,
+          product_id: item && (item.product_id != null ? item.product_id : item.id),
+          quantity: item && item.quantity != null ? Number(item.quantity) : Number(item && item.qty != null ? item.qty : 1),
+          eligible: false,
+          reasons
+        }))
+      };
+    }
+
     const nonRewardItems = items.filter((item) => {
       if (!item) return false;
       const pid = String(item.product_id || item.id || '');
@@ -267,23 +285,6 @@ class EligibilityService {
           menu_id: item.menu_id,
           quantity: item.quantity != null ? Number(item.quantity) : Number(item.qty != null ? item.qty : 1),
           eligible: Boolean(canonicalVerification.is_valid),
-          reasons
-        }))
-      };
-    }
-
-    const branchGate = EligibilityService._resolveBranch({ brand_id, branch_id, order_type });
-    if (!branchGate.ok) {
-      const reasons = [branchGate.reason];
-      return {
-        eligible: false,
-        reasons,
-        branch_id,
-        brand_id,
-        items: items.map((item) => ({
-          product_id: item.product_id != null ? item.product_id : item.id,
-          quantity: item.quantity != null ? Number(item.quantity) : Number(item.qty != null ? item.qty : 1),
-          eligible: false,
           reasons
         }))
       };
