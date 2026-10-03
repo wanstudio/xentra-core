@@ -106,7 +106,7 @@ test('canonical Menu Paket consumes component quantities and allows SKU-less non
     brandId: BRAND,
     branchId: BRANCH,
     items: [
-      { menu_id: MENU_PACKAGE, quantity: 2, expected_price: 30000 }
+      { menu_id: MENU_PACKAGE, quantity: 1, expected_price: 30000 }
     ]
   });
 
