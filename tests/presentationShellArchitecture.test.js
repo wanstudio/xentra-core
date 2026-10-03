@@ -114,7 +114,7 @@ test('PRES-12: Marketing Banner assignment is Bottom Sheet and preview is Dialog
 test('PRES-14: Merchant Menu display-name editor uses canonical presentation transport', () => {
   assert.ok(merchantMenuJs.includes('XentraPresentation.open({'));
   assert.ok(merchantMenuJs.includes("type: 'bottom-sheet'"));
-  assert.ok(merchantMenuJs.includes('updateBranchProductDisplayName'));
+  assert.ok(merchantMenuJs.includes('updateBranchMenuDisplayName'));
   assert.ok(merchantMenuJs.includes("label: 'Ubah Nama Tampil'"));
 });
 
