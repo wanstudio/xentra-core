@@ -216,8 +216,9 @@ class ComposedMenuRepository {
     if (!normalized.length) return [];
     return this.db.queryMany(
       "SELECT mi.menu_id, mi.product_id, mi.quantity, mi.sort_order, " +
-      "p.name AS product_name, p.sku, p.description AS product_description, " +
-      "p.image_url AS product_image_url, p.image AS product_image, p.is_active AS product_is_active " +
+      "p.name AS product_name, p.slug AS product_slug, p.sku, p.description AS product_description, " +
+      "p.image_url AS product_image_url, p.image AS product_image, p.media_id AS product_media_id, " +
+      "p.is_active AS product_is_active " +
       "FROM menu_items mi " +
       "JOIN menus m ON m.id = mi.menu_id AND m.brand_id = ? " +
       "JOIN products p ON p.id = mi.product_id AND p.brand_id = m.brand_id " +
