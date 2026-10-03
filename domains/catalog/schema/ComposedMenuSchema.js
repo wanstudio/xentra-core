@@ -356,6 +356,37 @@ function ensureComposedMenuSchema(db = DataAccess) {
     END;
   `);
 
+  // Rasa is reusable Brand Master data. Enforce normalized-name uniqueness
+  // at the write boundary so quick-add/update can never create a duplicate master.
+  // Triggers are used instead of a new unique index because legacy rows may
+  // predate this contract and must not make additive schema initialization fail.
+  db.exec(`
+    CREATE TRIGGER IF NOT EXISTS trg_menu_flavors_brand_name_unique_insert
+    BEFORE INSERT ON menu_flavors
+    FOR EACH ROW
+    WHEN EXISTS (
+      SELECT 1 FROM menu_flavors mf
+      WHERE mf.brand_id = NEW.brand_id
+        AND lower(trim(mf.name)) = lower(trim(NEW.name))
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'RASA_ALREADY_EXISTS');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_menu_flavors_brand_name_unique_update
+    BEFORE UPDATE OF brand_id, name ON menu_flavors
+    FOR EACH ROW
+    WHEN EXISTS (
+      SELECT 1 FROM menu_flavors mf
+      WHERE mf.brand_id = NEW.brand_id
+        AND lower(trim(mf.name)) = lower(trim(NEW.name))
+        AND mf.id <> NEW.id
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'RASA_ALREADY_EXISTS');
+    END;
+  `);
+
   ensured = true;
 }
 
