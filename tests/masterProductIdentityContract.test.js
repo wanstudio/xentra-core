@@ -43,7 +43,7 @@ test('Product contract separates atomic Product ownership from commercial Menu o
 
   assert.ok(ownerJs.includes("sku: sku || null"));
   assert.ok(ownerJs.includes("is_active: $('prod-is-active').checked ? 1 : 0"));
-  assert.ok(ownerJs.includes("API_BASE + '/admin/products'"));
+  assert.ok(ownerJs.includes("API_BASE + '/admin/composed/products'"));
   assert.ok(!ownerJs.includes("saveMasterMenuComposition(savedId)"));
 });
 
@@ -55,7 +55,7 @@ test('Product Editor loader hydrates only atomic Product data', () => {
 
   assert.ok(loader.includes('showProductEditorSection();'));
   assert.ok(loader.includes('resetProductEditorForAdd();'));
-  assert.ok(loader.includes("API_BASE + '/admin/products/'"));
+  assert.ok(loader.includes("API_BASE + '/admin/composed/products/'"));
   assert.ok(!loader.includes('loadMasterMenuComponents()'));
   assert.ok(!loader.includes('loadMasterMenuComposition('));
   assert.ok(!loader.includes('loadProductOptionsEditor('));
@@ -63,8 +63,7 @@ test('Product Editor loader hydrates only atomic Product data', () => {
 
 test('Product list displays atomic identity fields instead of commercial pricing', () => {
   const sectionStart = ownerJs.indexOf('function renderMasterProductsTable()');
-  const sectionEnd = ownerJs.indexOf('// ─────────────────────────────────────────────────────────────────────────
-  // PRODUCT DETAIL VIEW', sectionStart);
+  const sectionEnd = ownerJs.indexOf('// PRODUCT DETAIL VIEW', sectionStart);
   const renderer = ownerJs.slice(sectionStart, sectionEnd);
 
   assert.ok(renderer.includes('String(p.sku || \'\')'));
