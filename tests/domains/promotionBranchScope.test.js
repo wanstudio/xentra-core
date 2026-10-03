@@ -285,8 +285,8 @@ describe('Promotion Phase 1 — Campaign <-> Branch Scope Domain Audit & Impleme
       branch_id: branchC,
       brand_id: brandId,
       items: [
-        { product_id: foodProdA, quantity: 1, expected_price: 25000 },
-        { product_id: 'reward_' + promoGlobalMulti, is_promo_reward: true, quantity: 1, expected_price: 0 }
+        { menu_id: foodMenu, quantity: 1, expected_price: 25000 },
+        { menu_id: rewardMenuA, is_promo_reward: true, promo_id: promoGlobalMulti, quantity: 1, expected_price: 0 }
       ],
       customer: { phone: '0812340002' },
       pwa_runtime: { display_mode: 'standalone' }
@@ -304,8 +304,8 @@ describe('Promotion Phase 1 — Campaign <-> Branch Scope Domain Audit & Impleme
       branch_id: branchA,
       brand_id: brandId,
       items: [
-        { product_id: foodProdA, quantity: 1, expected_price: 25000 },
-        { product_id: 'reward_' + promoGlobalMulti, is_promo_reward: true, quantity: 1, expected_price: 0 }
+        { menu_id: foodMenu, quantity: 1, expected_price: 25000 },
+        { menu_id: rewardMenuA, is_promo_reward: true, promo_id: promoGlobalMulti, quantity: 1, expected_price: 0 }
       ],
       customer: { phone: '0812340003' },
       pwa_runtime: { display_mode: 'standalone' }
@@ -521,9 +521,9 @@ describe('Promotion Phase 1 — Campaign <-> Branch Scope Domain Audit & Impleme
       branch_id: branchB, // Resolved authoritative branch
       brand_id: brandId,
       items: [
-        { product_id: foodProdA, quantity: 1, expected_price: 25000 },
+        { menu_id: foodMenu, quantity: 1, expected_price: 25000 },
         // Client maliciously claims promoExclusiveA which is only scoped to branchA
-        { product_id: 'reward_' + promoExclusiveA, is_promo_reward: true, promo_id: promoExclusiveA, quantity: 1, expected_price: 0 }
+        { menu_id: rewardMenuA, is_promo_reward: true, promo_id: promoExclusiveA, quantity: 1, expected_price: 0 }
       ],
       customer: { phone: '081299990099' },
       pwa_runtime: { display_mode: 'standalone' }
