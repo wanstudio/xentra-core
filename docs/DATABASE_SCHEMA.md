@@ -2,6 +2,46 @@
 
 **Database Standard:** ANSI SQL Compliant (Compatible with MySQL 8.0+, PostgreSQL 14+, SQLite 3)
 
+**FORWARD CANONICAL SCHEMA — PROPOSAL BRANCH / 2026-10-03**
+
+This proposal branch introduces and validates the Product → Menu → Inventory boundary.
+The legacy tables and columns described later in this file remain physical compatibility
+storage until consumer migration is complete. They must not be interpreted as the forward
+customer-facing source of truth.
+
+Forward authority:
+
+```text
+products
+  = atomic reusable Product + optional SKU
+
+menus
+  = customer-facing Menu Satuan / Menu Paket + selling price + taxonomy
+
+menu_items
+  = fixed Product composition
+
+branch_menus
+  = Branch adoption + daily Menu availability + optional Branch Menu price override
+
+branch_menu_categories
+  = Branch-local merchandising membership
+
+branch_product_inventory
+  = Branch Product stock quantity
+
+inventory_movements
+  = immutable stock mutation ledger
+```
+
+For canonical orders, `order_items.menu_id`, `order_items.menu_type`, and
+`order_items.component_snapshot` are the additive transaction references. The legacy
+`product_id/product_name` columns remain compatibility fields during migration.
+
+Canonical business rules are defined in
+`docs/proposals/xentra-taxonomy-composed-menu-v1.md`. That file is authoritative for
+the target semantics while this branch is under construction.
+
 ---
 
 ## 1. Tenancy & Hierarchy Tables
