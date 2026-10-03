@@ -3684,22 +3684,22 @@
       });
       var data = await res.json();
       if (data.success) {
-        showToast('Status ketersediaan menu diperbarui.');
+        showToast('Status Product diperbarui.');
         loadMasterProducts();
         if (_catalogState.activeDetailProductId) {
           loadProductDetailView(_catalogState.activeDetailProductId);
         }
       }
     } catch (e) {
-      showToast('Gagal mengubah status stok.');
+      showToast('Gagal mengubah status Product.');
     }
   };
 
   window.deleteProduct = async function (id) {
     if (window.XentraPresentation && !await window.XentraPresentation.confirm({
       id: 'delete-master-product',
-      title: 'Hapus Produk Master',
-      message: 'Apakah Anda yakin ingin menghapus produk master ini? Tindakan ini tidak dapat dibatalkan.',
+      title: 'Hapus Product Master',
+      message: 'Apakah Anda yakin ingin menghapus Product Master ini? Tindakan ini tidak dapat dibatalkan.',
       okLabel: 'Hapus',
       cancelLabel: 'Batal'
     })) return;
@@ -3710,7 +3710,7 @@
       });
       var data = await res.json();
       if (data.success) {
-        showToast('Produk master berhasil dihapus.');
+        showToast('Product Master berhasil dihapus.');
         if (_catalogState.activeDetailProductId === id) {
           navigateTo('catalog/products');
         } else {
@@ -3718,7 +3718,7 @@
         }
       }
     } catch (e) {
-      showToast('Gagal menghapus produk.');
+      showToast('Gagal menghapus Product.');
     }
   };
 
