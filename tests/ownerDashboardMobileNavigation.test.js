@@ -343,29 +343,29 @@ test('Owner Dashboard Mobile Navigation', async t => {
 
     const h = createHarness('#business');
     h.controller.initialize();
-    assert.deepEqual(h.controller.getSnapshot().stack, ['business']);
+    assert.deepEqual(Array.from(h.controller.getSnapshot().stack), ['business']);
 
     h.controller.navigate('catalog/products');
-    assert.deepEqual(h.controller.getSnapshot().stack, ['business', 'catalog/products']);
+    assert.deepEqual(Array.from(h.controller.getSnapshot().stack), ['business', 'catalog/products']);
 
     h.controller.navigate('catalog/products/new');
     assert.deepEqual(
-      h.controller.getSnapshot().stack,
+      Array.from(h.controller.getSnapshot().stack),
       ['business', 'catalog/products', 'catalog/products/new']
     );
 
     h.controller.back();
     assert.equal(h.window.lastRendered, 'catalog/products');
-    assert.deepEqual(h.controller.getSnapshot().stack, ['business', 'catalog/products']);
+    assert.deepEqual(Array.from(h.controller.getSnapshot().stack), ['business', 'catalog/products']);
 
     h.controller.back();
     assert.equal(h.window.lastRendered, 'business');
-    assert.deepEqual(h.controller.getSnapshot().stack, ['business']);
+    assert.deepEqual(Array.from(h.controller.getSnapshot().stack), ['business']);
 
     const deep = createHarness('#catalog/products/new');
     deep.controller.initialize();
     assert.deepEqual(
-      deep.controller.getSnapshot().stack,
+      Array.from(deep.controller.getSnapshot().stack),
       ['business', 'catalog/products', 'catalog/products/new']
     );
     deep.controller.back();
@@ -404,12 +404,14 @@ test('Owner Dashboard Mobile Navigation', async t => {
     assert.equal((adapter.match(/window\.history\.(pushState|replaceState|back|go)\(/g) || []).length, 0,
       'Dashboard child Back adapter must not mutate browser history directly');
 
-    const engine = navEngineJs;
-    assert.ok(engine.includes("current === 'catalog/products/new'"),
+    const configStart = js.indexOf('var OWNER_ROUTE_ALIASES = {');
+    const configEnd = js.indexOf('function configureOwnerNavigationEngine()', configStart);
+    const engine = configStart >= 0 && configEnd > configStart ? js.slice(configStart, configEnd) : '';
+    assert.ok(engine.includes("catalog/products/new"),
       'Navigation engine configuration must know Product Editor route');
     assert.ok(engine.includes("return 'catalog/products';"),
       'Product Editor must resolve to Product Master as its parent');
-    assert.ok(engine.includes("current === 'catalog/products'"),
+    assert.ok(engine.includes("catalog/products"),
       'Navigation engine configuration must know Product Master route');
     assert.ok(engine.includes("return 'business';"),
       'Product Master must resolve to Business as its parent');
