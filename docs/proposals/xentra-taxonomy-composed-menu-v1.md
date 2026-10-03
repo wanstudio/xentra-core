@@ -1150,7 +1150,7 @@ The client may carry `menu_id` for cart identity, but the server remains authori
 
 A Promotion may target a Menu Paket.
 
-The order line still represents one commercial Menu Paket. `product_id` is not the commercial identity for the package and may be `NULL`.
+The order line still represents one commercial Menu Paket. `product_id` is **not** the commercial identity for the package. Because the existing `order_items.product_id` column remains `NOT NULL` for compatibility, Xentra stores the first component Product as a compatibility pointer only. It must never be used as the package identity or as the package stock quantity authority.
 
 Inventory is deducted from the package component snapshot exactly like any other canonical Menu sale.
 
