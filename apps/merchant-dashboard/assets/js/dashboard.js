@@ -195,7 +195,7 @@
 
 
   window.toggleStockChecked = function (id, checked) {
-    window.toggleStock(id);
+    window.toggleStock(id, checked ? 1 : 0);
   };
 
 
