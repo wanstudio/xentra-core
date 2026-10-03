@@ -50,7 +50,7 @@ POS capabilities exposed in the execution surface:
 - menu selection inside Sale;
 - optional table context for dine-in transactions;
 - cart quantity changes;
-- hold / resume dine-in bill;
+- hold / resume POS Sale for Dine-In and Takeaway;
 - cash payment and cash tender/change;
 - transaction history;
 - transaction-detail actions, including COD cash handover/settlement where applicable;
@@ -205,6 +205,26 @@ The underlying POS composer still uses the canonical backend order type value. T
 
 `Dine-In` → `dine_in`  
 `Takeaway` → `pickup`
+
+### Hold Bill UX
+
+Hold Bill is a **transaction action/state**, not a payment method and not a navigation mode.
+
+For the currently active Draft Sale:
+- **Tahan** saves the current Sale as a Hold Bill and returns the cashier to a clean/new Sale context.
+- Hold is available for both **Dine-In** and **Takeaway** while the Sale is still a draft.
+- For Dine-In, the selected table remains part of the held Sale and the table hold must follow the existing Dining/Core authority.
+- A held Sale can later be **Buka/Resume** from the POS Hold Bill list.
+
+The **Rincian Pesanan** mobile modal is the review/checkout surface for the current Sale. It must provide the action that applies to the current Sale:
+**Tahan | Bayar**.
+
+It must **not** use "Ditahan (N)" in that modal as a substitute for the current Sale's Hold action. "Ditahan (N)" is an entry to the separate Hold Bill list and belongs in the transaction/history context or another explicit Hold-list entry point.
+
+Semantic separation:
+- **Tahan** = mutate/save the current draft Sale into Hold Bill state.
+- **Ditahan** = open/list already-held Sales.
+- **Bayar** = begin payment for the current Sale.
 
 ### Single Transaction Flow
 
