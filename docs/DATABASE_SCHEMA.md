@@ -46,20 +46,15 @@ the target semantics while this branch is under construction.
 
 ## 1. Tenancy & Hierarchy Tables
 
-> **Implementation note (B1/C1/C2 — Branch, Product Assignment & Inventory Boundary,
-> 2026-09-04):** the live SQLite schema in `server/database/db.js` implements the tenancy
-> hierarchy with the tables below (`organizations` → `brands` → `branches`, plus
-> `branch_delivery_settings` carrying the delivery/pickup capability flags that this spec's
-> `branch_settings` example describes). Product → Branch assignment is the `branch_products`
-> table below with DB-level brand-consistency and non-negative-stock triggers; physical
-> stock lives in `branch_products.stock` (owned by the Inventory domain, never fabricated by
-> assignment) and every mutation is recorded in the immutable `inventory_movements` ledger
-> (atomic guarded updates + optional `mutation_id` idempotency). Known deltas from this spec,
-> deliberately not materialized yet (no approved business contract): `dinein_enabled` and
-> `operating_hours` (schedule-driven open state). Branch open/close is represented by the
-> server-authoritative `branches.is_open_override` master switch consumed by `BranchMatcher`
-> and the public branch API. Authorized branch/product-operational mutations are recorded
-> append-only in `branch_operation_logs`.
+> **Implementation note (2026-10-03):** the live SQLite schema still contains legacy
+> `branch_products` assignment/compatibility storage because migration is staged. For the
+> forward Product → Menu → Inventory model, `branch_menus` owns Menu adoption and Branch Menu
+> availability/price override, while `branch_product_inventory` owns Product stock quantity.
+> `branch_products.stock`, `branch_products.is_available`, legacy snapshot/override fields,
+> and legacy branch-price fields are compatibility data only until consumer migration is
+> completed. Inventory mutations still append to the immutable `inventory_movements` ledger.
+> The physical schema may therefore contain both generations during the migration window, but
+> they must never be treated as two competing authorities.
 
 ### `organizations`
 Master SaaS account / holding organization.
@@ -158,18 +153,17 @@ CREATE TABLE branch_operation_logs (
 );
 ```
 
-### `branch_products` (C1 — Product → Branch Assignment)
-An explicit, brand-consistent assignment of a Product Master row to one Branch.
-Assignment ≠ inventory (the row carries no stock until the Inventory domain records it;
-API-created assignments keep `stock` NULL) and ≠ operational availability (`is_available`
-is a branch-scoped flag toggled by Owner/Brand or the assigned Branch Manager).
+### `branch_products` (LEGACY compatibility — Product → Branch Assignment)
+An explicit historical Product → Branch assignment row retained during migration. In the
+forward model it is not the Menu adoption authority and its stock/availability/price fields
+must not be used as canonical Menu or Inventory state.
 ```sql
 CREATE TABLE branch_products (
     branch_id VARCHAR(36) NOT NULL,
     product_id VARCHAR(36) NOT NULL,
-    price REAL,                       -- optional branch price override
-    stock INTEGER DEFAULT 100,        -- Inventory domain owns stock semantics
-    is_available BOOLEAN DEFAULT TRUE,
+    price REAL,                       -- LEGACY branch price compatibility only
+    stock INTEGER DEFAULT 100,        -- LEGACY stock compatibility only
+    is_available BOOLEAN DEFAULT TRUE, -- LEGACY availability compatibility only
     low_stock_threshold INTEGER DEFAULT 5,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -291,8 +285,7 @@ Product fields:
 - menu_migration_status → legacy, needs_review, migrated, verified, or failed.
 
 `products` stores the lightweight current lifecycle state. `product_menu_migrations`
-stores reconciliation evidence/fingerprint. Canonical Menu values remain normalized in
-`products.category_id`, `product_flavors`, `product_complements`, and `product_levels`.
+stores reconciliation evidence/fingerprint. Legacy component relations may exist on Product for migration/backward compatibility. **Canonical customer-facing Menu semantics are stored in `menus`, `menu_items`, and the Menu taxonomy references; do not use Product relations as a substitute for Menu identity.**
 
 Migration lifecycle: Expand → Migrate → Verify → Contract.
 Legacy fields are not removed until a separate verification/consumer audit gate is passed.
