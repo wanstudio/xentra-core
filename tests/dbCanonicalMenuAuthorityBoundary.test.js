@@ -30,12 +30,8 @@ test('Legacy branch-product startup migration cannot become canonical Menu autho
 
   assert.ok(block.includes('UPDATE branch_products'), 'legacy compatibility migration may update branch_products');
   assert.ok(block.includes('branch_product_categories'), 'legacy Product-category reconciliation may remain');
-  assert.ok(!block.includes('UPDATE menus'), 'legacy compatibility migration must not mutate canonical Menu rows');
-  assert.ok(!block.includes('INSERT INTO menus'), 'legacy compatibility migration must not create canonical Menu rows');
-  assert.ok(!block.includes('UPDATE branch_menus'), 'legacy compatibility migration must not mutate Branch Menu adoption');
-  assert.ok(!block.includes('INSERT INTO branch_menus'), 'legacy compatibility migration must not create Branch Menu adoption');
-  assert.ok(!block.includes('UPDATE branch_menu_categories'), 'legacy compatibility migration must not mutate canonical Menu category membership');
-  assert.ok(!block.includes('INSERT INTO branch_menu_categories'), 'legacy compatibility migration must not create canonical Menu category membership');
+  const canonicalMutation = /(?:UPDATE|INSERT(?:\s+OR\s+(?:IGNORE|REPLACE))?|DELETE\s+FROM)\s+(?:menus|branch_menus|branch_menu_categories)\b/i;
+  assert.ok(!canonicalMutation.test(block), 'legacy compatibility migration must not execute mutations against canonical Menu tables');
 });
 
 test('Canonical Menu resolver prices from menus.selling_price, not Product or branch Product price', () => {
@@ -66,4 +62,35 @@ test('Superseded Product-centric migration CLI fails closed', () => {
   assert.ok(!legacyMigrationCli.includes("require('../core/data/DataAccess')"));
   assert.ok(!legacyMigrationCli.includes('ProductMenuMigrationService.reconcile'));
   assert.ok(!legacyMigrationCli.includes('ProductMenuMigrationService.verify'));
+});
+
+
+test('Forward Customer/POS/Checkout paths stay on the canonical Menu boundary', () => {
+  const route = fs.readFileSync(path.join(ROOT, 'server/routes/catalog.js'), 'utf8');
+  const home = fs.readFileSync(path.join(ROOT, 'apps/customer-pwa/assets/js/pages/home.js'), 'utf8');
+  const pos = fs.readFileSync(path.join(ROOT, 'apps/pos-app/assets/js/pos-app.js'), 'utf8');
+  const checkout = fs.readFileSync(path.join(ROOT, 'apps/customer-pwa/assets/js/pages/checkout.js'), 'utf8');
+  const composedCheckout = fs.readFileSync(
+    path.join(ROOT, 'domains/commerce/services/ComposedMenuCheckoutService.js'),
+    'utf8'
+  );
+
+  assert.ok(route.includes("router.get('/catalog/composed-menu'"), 'canonical catalog route must exist');
+  assert.ok(route.includes('ComposedMenuResolver.resolveBranchMenu'), 'canonical catalog route must use ComposedMenuResolver');
+  assert.ok(route.includes("router.get(['/catalog/menu', '/home']"), 'legacy catalog route must remain isolated as compatibility');
+  assert.ok(route.includes('CatalogService.getMenu'), 'legacy CatalogService must remain behind the compatibility route');
+
+  for (const [name, source] of [['Customer Home', home], ['POS', pos], ['Checkout', checkout]]) {
+    assert.ok(source.includes('/catalog/composed-menu'), name + ' must consume the canonical composed-menu endpoint');
+    assert.ok(
+      !/(?:["'\`])\/catalog\/menu(?:[?'"\`]|$)/.test(source),
+      name + ' must not call the legacy /catalog/menu endpoint'
+    );
+  }
+
+  assert.ok(
+    composedCheckout.includes("require('../../catalog/services/ComposedMenuResolver')"),
+    'canonical checkout verification must resolve through ComposedMenuResolver'
+  );
+  assert.ok(composedCheckout.includes('menu.selling_price'), 'canonical checkout pricing must come from Menu selling_price');
 });
