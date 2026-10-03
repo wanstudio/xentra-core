@@ -82,3 +82,27 @@ Rules:
 - Existing Commerce, fulfillment, reporting, eligibility, and persistence contracts that use `pickup` remain canonical.
 - POS uses the label **Takeaway** when creating a new cashier sale and sends the existing canonical `pickup` value to Core.
 - Delivery remains an independent fulfillment/order context and is not a cashier-facing POS new-sale mode.
+
+
+## 🔒 LOCKED — POS Hold Bill Lifecycle / Exact UX Placement — 2026-10-03
+
+**Status:** LOCKED / CANONICAL
+
+POS Hold Bill is a **cashier-side Draft Sale state**, not an operational Commerce Order.
+
+Canonical flow:
+`Draft Sale → Tahan → Hold Bill → Buka/Resume → Kirim/Teruskan Pesanan → Operational transaction flow`
+
+Locked semantics:
+- **Tahan** is a direct, reversible action; the normal path does not require a confirmation modal.
+- **Tahan** persists the current draft as Hold Bill and does **not** materialize a canonical Commerce Order.
+- Hold must not place the sale in Merchant Order Center or start kitchen/fulfillment lifecycle.
+- **Pesanan Ditahan (N)** is the list of already-held Sales and belongs under **Transaksi**.
+- **Buka/Resume** restores a held draft into the Sale workspace.
+- **Kirim/Teruskan Pesanan** is the explicit continuation action that submits the held draft into the applicable operational transaction flow.
+- **Bayar** is a separate payment action; Hold does not imply payment settlement.
+- For Dine-In, table context remains part of the held draft and table hold/release remains under Dining/Core authority.
+- A **Ditahan (N)** shortcut must not replace the current Sale's **Tahan** action inside the Rincian Pesanan modal.
+
+Implementation reconciliation:
+Current legacy POS code still materializes a canonical Commerce Order from `POST /pos/held-orders`. This is non-compliant with this locked contract and must be reconciled before the Hold implementation is considered aligned.
