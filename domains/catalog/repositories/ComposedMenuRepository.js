@@ -306,6 +306,16 @@ class ComposedMenuRepository {
     );
   }
 
+  setBranchMenuAvailability({ brandId, branchId, menuId, isAvailable }) {
+    const existing = this.findBranchMenu({ brandId, branchId, menuId });
+    if (!existing) throw new Error('BRANCH_MENU_NOT_FOUND');
+
+    return this.db.execute(
+      "UPDATE branch_menus SET is_available = ?, updated_at = datetime('now') WHERE branch_id = ? AND menu_id = ?",
+      [isAvailable ? 1 : 0, branchId, menuId]
+    );
+  }
+
   listBranchMenuCategoryMemberships({ brandId, branchId, menuId = null }) {
     const clauses = ['bmc.branch_id = ?', 'm.brand_id = ?'];
     const params = [branchId, brandId];
