@@ -270,6 +270,61 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
     }
   });
 
+  router.patch('/admin/branches/:branchId/menu/:menuId/display-name', requireAuth(menuAdoptionRoles), (req, res) => {
+    try {
+      const branchId = String(req.params.branchId || '').trim();
+      const menuId = String(req.params.menuId || '').trim();
+      if (!branchId || !menuId) return res.status(400).json({ success: false, error: 'BRANCH_AND_MENU_REQUIRED' });
+
+      if (req.user && req.user.role === 'branch_manager') {
+        const assignedBranchId = req.user.branchId || req.user.branch_id;
+        if (assignedBranchId && String(assignedBranchId) !== branchId) {
+          return res.status(403).json({ success: false, error: 'FORBIDDEN_BRANCH_SCOPE' });
+        }
+      }
+
+      const result = service.setBranchMenuDisplayName({
+        brandId: req.brand_id,
+        branchId,
+        menuId,
+        name: req.body && req.body.name
+      });
+      res.json({
+        success: true,
+        branch_id: branchId,
+        menu_id: menuId,
+        display_name_override: result.display_name_override || null,
+        display_name: result.display_name_override || null
+      });
+    } catch (err) {
+      sendError(res, err, 'COMPOSED_BRANCH_MENU_DISPLAY_NAME_UPDATE_FAILED');
+    }
+  });
+
+  router.delete('/admin/branches/:branchId/menu/:menuId', requireAuth(menuAdoptionRoles), (req, res) => {
+    try {
+      const branchId = String(req.params.branchId || '').trim();
+      const menuId = String(req.params.menuId || '').trim();
+      if (!branchId || !menuId) return res.status(400).json({ success: false, error: 'BRANCH_AND_MENU_REQUIRED' });
+
+      if (req.user && req.user.role === 'branch_manager') {
+        const assignedBranchId = req.user.branchId || req.user.branch_id;
+        if (assignedBranchId && String(assignedBranchId) !== branchId) {
+          return res.status(403).json({ success: false, error: 'FORBIDDEN_BRANCH_SCOPE' });
+        }
+      }
+
+      const result = service.removeMenuFromBranch({
+        brandId: req.brand_id,
+        branchId,
+        menuId
+      });
+      res.json({ success: true, ...result });
+    } catch (err) {
+      sendError(res, err, 'COMPOSED_BRANCH_MENU_REMOVE_FAILED');
+    }
+  });
+
   router.patch('/admin/menus/:id/availability', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
     try {
       const branchId = req.body && req.body.branch_id;
