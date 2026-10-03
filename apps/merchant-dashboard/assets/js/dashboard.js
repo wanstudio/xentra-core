@@ -11443,6 +11443,7 @@ async function loadMenusView() {
     var titleEl = $('cm-preview-title');
     var subtitleEl = $('cm-preview-subtitle');
     var detailEl = $('cm-preview-detail');
+    var indicatorEl = $('cm-preview-indicator');
     var priceEl = $('cm-preview-price');
     var imageEl = $('cm-preview-image');
     var emptyEl = $('cm-preview-image-empty');
@@ -11452,9 +11453,18 @@ async function loadMenusView() {
     var sub = ownerMasterMenuSelectedSubCategory();
     var rasa = ownerMasterMenuSelectedRasa();
     var rasaLabel = rasa ? ownerMasterMenuRasaLabel(rasa.name) : '';
+    var selectedLevel = ownerMasterMenuSelectedLevel();
+    if (selectedLevel) {
+      levelName = String(selectedLevel.name || '');
+      levelPosition = Number(selectedLevel.sort_order);
+      if (!Number.isFinite(levelPosition) || levelPosition < 1) levelPosition = 1;
+      levelPosition = Math.min(4, Math.floor(levelPosition));
+    }
     var detail = '';
     var image = '';
     var title = '';
+    var levelName = '';
+    var levelPosition = 0;
 
     if (type === 'PACKAGE') {
       title = String(($('cm-package-name') && $('cm-package-name').value) || '').trim() || 'Nama Menu Paket';
