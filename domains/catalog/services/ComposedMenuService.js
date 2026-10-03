@@ -655,6 +655,132 @@ class ComposedMenuService {
     return repository.findBranchMenu({ brandId, branchId, menuId });
   }
 
+  static updateSubCategory({
+    brandId,
+    subCategoryId,
+    name = undefined,
+    categoryId = undefined,
+    slug = undefined,
+    isActive = undefined
+  }) {
+    ensureSchema();
+    if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
+
+    const current = repository.findSubCategory({ brandId, subCategoryId });
+    if (!current) throw new Error('SUB_CATEGORY_NOT_FOUND');
+
+    const nextName = name === undefined ? current.name : normalizeName(name, 'SUB_CATEGORY_NAME_REQUIRED');
+    const nextCategoryId = categoryId === undefined ? current.category_id : categoryId;
+    const nextSlug = slug === undefined ? current.slug : slugify(slug || nextName);
+    if (!nextSlug) throw new Error('SUB_CATEGORY_SLUG_REQUIRED');
+
+    const category = repository.findCategory({ brandId, categoryId: nextCategoryId });
+    if (!category) throw new Error('CATEGORY_NOT_FOUND');
+    if (category.is_active === 0) throw new Error('CATEGORY_INACTIVE');
+
+    const duplicate = repository.findSubCategoryByName({ brandId, name: nextName });
+    if (duplicate && String(duplicate.id) !== String(subCategoryId)) {
+      throw new Error('SUB_CATEGORY_ALREADY_EXISTS');
+    }
+
+    const slugConflict = repository.db.queryOne(
+      'SELECT id FROM sub_categories WHERE brand_id = ? AND lower(trim(slug)) = lower(trim(?)) AND id <> ? LIMIT 1',
+      [brandId, nextSlug, subCategoryId]
+    );
+    if (slugConflict) throw new Error('SUB_CATEGORY_ALREADY_EXISTS');
+
+    const nextIsActive = isActive === undefined ? Number(current.is_active) : (Boolean(isActive) ? 1 : 0);
+    repository.db.execute(
+      "UPDATE sub_categories SET category_id = ?, name = ?, slug = ?, is_active = ?, updated_at = datetime('now') WHERE id = ? AND brand_id = ?",
+      [nextCategoryId, nextName, nextSlug, nextIsActive, subCategoryId, brandId]
+    );
+
+    return repository.findSubCategory({ brandId, subCategoryId });
+  }
+
+  static deleteSubCategory({ brandId, subCategoryId }) {
+    ensureSchema();
+    if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
+
+    const current = repository.findSubCategory({ brandId, subCategoryId });
+    if (!current) throw new Error('SUB_CATEGORY_NOT_FOUND');
+
+    // Archive-first contract: Sub Category is never hard-deleted from this path.
+    // Existing Menu relations therefore remain historically stable.
+    repository.db.execute(
+      "UPDATE sub_categories SET is_active = 0, updated_at = datetime('now') WHERE id = ? AND brand_id = ?",
+      [subCategoryId, brandId]
+    );
+
+    return {
+      id: subCategoryId,
+      status: 'ARCHIVED',
+      archived: true,
+      sub_category: repository.findSubCategory({ brandId, subCategoryId })
+    };
+  }
+
+  static updateRasa({
+    brandId,
+    rasaId,
+    name = undefined,
+    slug = undefined,
+    sortOrder = undefined,
+    isActive = undefined
+  }) {
+    ensureSchema();
+    if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
+
+    const current = repository.findRasa({ brandId, rasaId });
+    if (!current) throw new Error('RASA_NOT_FOUND');
+
+    const currentIsOriginal = String(current.name || '').trim().toLowerCase() === 'original';
+    const nextName = name === undefined ? current.name : normalizeName(name, 'RASA_NAME_REQUIRED');
+    const nextIsOriginal = String(nextName || '').trim().toLowerCase() === 'original';
+    if (currentIsOriginal && !nextIsOriginal) throw new Error('RASA_ORIGINAL_PROTECTED');
+    if (nextIsOriginal && !currentIsOriginal) throw new Error('RASA_ORIGINAL_PROTECTED');
+
+    const duplicate = repository.findRasaByName({ brandId, name: nextName });
+    if (duplicate && String(duplicate.id) !== String(rasaId)) throw new Error('RASA_ALREADY_EXISTS');
+
+    const nextSlug = slug === undefined ? current.slug : slugify(slug || nextName);
+    if (!nextSlug) throw new Error('RASA_SLUG_REQUIRED');
+
+    const nextSortOrder = sortOrder === undefined ? Number(current.sort_order || 0) : (
+      Number.isFinite(Number(sortOrder)) ? Number(sortOrder) : 0
+    );
+    const nextIsActive = isActive === undefined ? Number(current.is_active) : (Boolean(isActive) ? 1 : 0);
+
+    repository.db.execute(
+      "UPDATE menu_flavors SET name = ?, slug = ?, sort_order = ?, is_active = ?, updated_at = datetime('now') WHERE id = ? AND brand_id = ?",
+      [nextName, nextSlug, nextSortOrder, nextIsActive, rasaId, brandId]
+    );
+
+    return repository.findRasa({ brandId, rasaId });
+  }
+
+  static deleteRasa({ brandId, rasaId }) {
+    ensureSchema();
+    if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
+
+    const current = repository.findRasa({ brandId, rasaId });
+    if (!current) throw new Error('RASA_NOT_FOUND');
+    if (String(current.name || '').trim().toLowerCase() === 'original') {
+      throw new Error('RASA_ORIGINAL_PROTECTED');
+    }
+
+    repository.db.execute(
+      "UPDATE menu_flavors SET is_active = 0, updated_at = datetime('now') WHERE id = ? AND brand_id = ?",
+      [rasaId, brandId]
+    );
+
+    return {
+      id: rasaId,
+      status: 'ARCHIVED',
+      archived: true,
+      rasa: repository.findRasa({ brandId, rasaId })
+    };
+  }
   static listMenus({
     brandId, menuType = null, status = null
   }) {
