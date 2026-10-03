@@ -116,6 +116,70 @@ test('Menu Paket requires at least two total component units and uses fixed quan
   assert.deepEqual(items, [{ product_id: PRODUCT_A, quantity: 2 }]);
 });
 
+test('Package update revalidates the effective composition and rejects an empty Package', () => {
+  const menu = ComposedMenuService.createPackageMenu({
+    brandId: BRAND,
+    packageName: 'Paket Revalidation CMV1',
+    sellingPrice: 39000,
+    components: [{ product_id: PRODUCT_B, quantity: 2 }],
+    status: 'ACTIVE'
+  });
+
+  db.prepare('DELETE FROM menu_items WHERE menu_id = ?').run(menu.id);
+
+  assert.throws(
+    () => ComposedMenuService.updatePackageMenu({
+      brandId: BRAND,
+      menuId: menu.id,
+      sellingPrice: 39000
+    }),
+    /MENU_PACKAGE_COMPONENTS_REQUIRED/
+  );
+});
+
+test('Master Menu resolver fails closed when an active Menu references an inactive Product', () => {
+  const menu = ComposedMenuService.createPackageMenu({
+    brandId: BRAND,
+    packageName: 'Paket Invalid Component CMV1',
+    sellingPrice: 42000,
+    components: [{ product_id: PRODUCT_B, quantity: 2 }],
+    status: 'ACTIVE'
+  });
+
+  db.prepare(
+    'UPDATE products SET is_active = 0, updated_at = datetime(\'now\') WHERE id = ? AND brand_id = ?'
+  ).run(PRODUCT_B, BRAND);
+
+  const resolved = ComposedMenuResolver.resolveMasterMenu({
+    brandId: BRAND,
+    menuIds: [menu.id]
+  });
+
+  assert.equal(resolved.length, 1);
+  assert.equal(resolved[0].is_available, false);
+  assert.equal(resolved[0].blocking_reason, 'COMPONENT_UNAVAILABLE');
+
+  db.prepare(
+    'UPDATE products SET is_active = 1, updated_at = datetime(\'now\') WHERE id = ? AND brand_id = ?'
+  ).run(PRODUCT_B, BRAND);
+});
+
+test('Rasa master uniqueness is normalized within one Brand', () => {
+  const rasa = ComposedMenuService.createRasa({
+    brandId: BRAND,
+    name: 'Lombok Ijo CMV1'
+  });
+  assert.equal(rasa.name, 'Lombok Ijo CMV1');
+
+  assert.throws(
+    () => ComposedMenuService.createRasa({
+      brandId: BRAND,
+      name: '  lombok ijo cmv1  '
+    }),
+    /RASA_ALREADY_EXISTS/
+  );
+});
+
 test('Branch Menu adoption is separate from Product Inventory and package availability is component-driven', () => {
   const menus = db.prepare("SELECT id FROM menus WHERE brand_id = ? AND menu_type = 'PACKAGE' LIMIT 1").get(BRAND);
   ComposedMenuService.adoptMenuToBranch({
