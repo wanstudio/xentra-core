@@ -126,6 +126,52 @@ test('apply migrates a simple legacy Product to one Menu Satuan with Original Ra
   assert.equal(Number(migration.attempt_count), 1);
 });
 
+test('migration respects Product reuse when another Menu already uses the same Product', () => {
+  const otherSub = 'cmm_reuse_other_subcategory';
+  const otherRasa = 'cmm_reuse_other_rasa';
+  const otherMenu = 'cmm_reuse_other_menu';
+
+  db.prepare(
+    "INSERT OR IGNORE INTO sub_categories (id, brand_id, category_id, name, slug, is_active) VALUES (?, ?, ?, 'Stock Existing Other Menu', 'stock-existing-other-menu', 1)"
+  ).run(otherSub, BRAND, CATEGORY);
+  db.prepare(
+    "INSERT OR IGNORE INTO menu_flavors (id, brand_id, name, slug, is_active) VALUES (?, ?, 'Lombok CMM Reuse', 'lombok-cmm-reuse', 1)"
+  ).run(otherRasa, BRAND);
+  db.prepare(
+    "INSERT OR IGNORE INTO menus (id, brand_id, menu_type, sub_category_id, rasa_id, selling_price, status) VALUES (?, ?, 'SINGLE', ?, ?, 44000, 'ACTIVE')"
+  ).run(otherMenu, BRAND, otherSub, otherRasa);
+  db.prepare(
+    "INSERT OR IGNORE INTO menu_items (menu_id, product_id, quantity, sort_order) VALUES (?, ?, 1, 0)"
+  ).run(otherMenu, PRODUCT_STOCK);
+
+  const plan = ComposedMenuMigrationService.reconcileProduct({
+    brandId: BRAND,
+    productId: PRODUCT_STOCK
+  });
+
+  assert.equal(plan.status, 'legacy');
+  assert.equal(plan.existing_menu_id, null);
+  assert.equal(plan.target_requires_owner_review, false);
+
+  const result = ComposedMenuMigrationService.reconcileProduct({
+    brandId: BRAND,
+    productId: PRODUCT_STOCK,
+    apply: true
+  });
+  assert.equal(result.status, 'migrated');
+
+  const reused = db.prepare(
+    'SELECT selling_price, status FROM menus WHERE id = ?'
+  ).get(otherMenu);
+  assert.equal(Number(reused.selling_price), 44000);
+  assert.equal(reused.status, 'ACTIVE');
+
+  const canonicalMenus = db.prepare(
+    "SELECT m.id, m.selling_price FROM menus m JOIN menu_items mi ON mi.menu_id = m.id WHERE m.brand_id = ? AND m.menu_type = 'SINGLE' AND mi.product_id = ? AND mi.quantity = 1"
+  ).all(BRAND, PRODUCT_STOCK);
+  assert.equal(canonicalMenus.length, 2);
+});
+
 test('apply migrates legacy branch adoption, branch categories and stock into canonical boundaries', () => {
   db.prepare(
     "INSERT OR REPLACE INTO branch_products (branch_id, product_id, branch_category_id, price, stock, is_available, low_stock_threshold) VALUES (?, ?, ?, ?, ?, ?, ?)"
