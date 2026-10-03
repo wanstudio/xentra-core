@@ -182,13 +182,23 @@ router.get('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req,
 
 router.post('/admin/products', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
-    const { name, category_id, price, regular_price, description, image, pricing_mode, min_price, max_price } = req.body;
+    const { name, category_id, price, regular_price, description, image, pricing_mode, min_price, max_price, sku } = req.body;
     const normalizedName = typeof name === 'string' ? name.trim() : '';
-    if (!normalizedName || price === undefined || price === null || price === '') {
-      return res.status(400).json({ success: false, error: 'Nama Produk dan harga menu wajib diisi.' });
+    if (!normalizedName) {
+      return res.status(400).json({ success: false, error: 'Nama Produk wajib diisi.' });
     }
-    if (!category_id) {
-      return res.status(400).json({ success: false, error: 'Kategori produk wajib dipilih.' });
+
+    // Product is the atomic inventory entity in the v1 proposal.
+    // category_id/price/pricing fields remain optional compatibility fields while
+    // legacy consumers migrate to canonical Menu ownership.
+    if (category_id) {
+      const validCategory = db.prepare('SELECT id FROM categories WHERE id = ? AND brand_id = ?').get(category_id, req.brand_id);
+      if (!validCategory) {
+        return res.status(400).json({
+          success: false,
+          error: 'Kategori produk tidak ditemukan atau bukan milik brand ini.'
+        });
+      }
     }
 
     // P1 TENANT CATEGORY INTEGRITY GUARD (FINDING 02)
@@ -215,8 +225,10 @@ router.post('/admin/products', requireAuth(['owner', 'brand_manager']), (req, re
       normalizedName,
       slug,
       description !== undefined ? description : '',
-      Number(price),
-      regular_price ? Number(regular_price) : Number(price),
+      price !== undefined && price !== null && price !== '' ? Number(price) : 0,
+      regular_price !== undefined && regular_price !== null && regular_price !== ''
+        ? Number(regular_price)
+        : (price !== undefined && price !== null && price !== '' ? Number(price) : 0),
       pricing_mode || 'lock',
       min_price !== undefined ? Number(min_price) : null,
       max_price !== undefined ? Number(max_price) : null,
@@ -243,7 +255,7 @@ router.post('/admin/products', requireAuth(['owner', 'brand_manager']), (req, re
 
 router.put('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
-    const { name, category_id, price, regular_price, description, image, is_active, pricing_mode, min_price, max_price } = req.body;
+    const { name, category_id, price, regular_price, description, image, is_active, pricing_mode, min_price, max_price, sku } = req.body;
     if (name !== undefined && (typeof name !== 'string' || !name.trim())) {
       return res.status(400).json({ success: false, error: 'Nama Produk tidak boleh kosong.' });
     }
@@ -288,6 +300,7 @@ router.put('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req,
           max_price = COALESCE(?, max_price),
           description = COALESCE(?, description),
           is_active = COALESCE(?, is_active),
+          sku = CASE WHEN ? IS NULL THEN sku ELSE ? END,
           updated_at = datetime('now')
       WHERE id = ? AND brand_id = ?
     `).run(
