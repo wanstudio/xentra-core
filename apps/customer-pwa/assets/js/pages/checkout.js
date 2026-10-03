@@ -4296,8 +4296,12 @@
       pwa_runtime: pwaRuntime,
       items: items.map(function (i) {
         return {
-          product_id: i.product_id || i.id,
+          product_id: i.menu_id ? (i.product_id || null) : (i.product_id || i.id),
           id: i.id,
+          menu_id: i.menu_id || null,
+          menu_type: i.menu_type || null,
+          component_snapshot: Array.isArray(i.component_snapshot) ? i.component_snapshot : null,
+          menu_snapshot: i.menu_snapshot || null,
           quantity: Number(i.quantity) || 1,
           expected_price: Number(i.price) || 0,
           name: i.name,
@@ -4416,7 +4420,11 @@
     var payloadItems = items.map(function (i) {
       return {
         id: i.id,
-        product_id: i.product_id || i.id,
+        product_id: i.menu_id ? (i.product_id || null) : (i.product_id || i.id),
+        menu_id: i.menu_id || null,
+        menu_type: i.menu_type || null,
+        component_snapshot: Array.isArray(i.component_snapshot) ? i.component_snapshot : null,
+        menu_snapshot: i.menu_snapshot || null,
         quantity: Number(i.quantity) || 1,
         expected_price: Number(i.price) || 0,
         name: i.name || '',
@@ -4557,7 +4565,11 @@
       items: items.map(function (i) {
         return {
           id: i.id,
-          product_id: i.product_id || i.id,
+          product_id: i.menu_id ? (i.product_id || null) : (i.product_id || i.id),
+          menu_id: i.menu_id || null,
+          menu_type: i.menu_type || null,
+          component_snapshot: Array.isArray(i.component_snapshot) ? i.component_snapshot : null,
+          menu_snapshot: i.menu_snapshot || null,
           quantity: Number(i.quantity) || 1,
           expected_price: Number(i.price) || 0,
           note: i.note || (typeof Store !== 'undefined' && Store.getNote ? Store.getNote(i.id, i.branch_id) : '') || '',
