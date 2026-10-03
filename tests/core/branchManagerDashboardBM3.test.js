@@ -651,6 +651,11 @@ describe('BM-3 — Branch Manager Dashboard: Menu + Stok + Promo', () => {
     }
     const originalRasa = rasa || db.prepare("SELECT id FROM menu_flavors WHERE brand_id = ? AND lower(trim(name)) = 'original' LIMIT 1").get(BRAND_ID);
 
+    const adoptableProductId = 'prod_bm3_adoptable';
+    db.prepare(
+      "INSERT OR REPLACE INTO products (id, brand_id, category_id, name, slug, price, is_active) VALUES (?, ?, 'cat_bm3_1', 'Menu BM3 Adoptable', 'menu-bm3-adoptable', 8000, 1)"
+    ).run(adoptableProductId, BRAND_ID);
+
     const subCategoryId = 'bm3_adopt_sub';
     db.prepare(
       "INSERT OR IGNORE INTO sub_categories (id, brand_id, category_id, name, slug, sort_order, is_active) VALUES (?, ?, 'cat_bm3_1', 'Menu BM3 Adoptable', 'menu-bm3-adoptable', 1, 1)"
