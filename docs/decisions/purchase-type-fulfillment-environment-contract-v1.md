@@ -461,3 +461,26 @@ Implementation record — current HEAD `ec480f60ff00fdee39031b7a2ecdb401c661e016
 Verification constraint: full `npm test` was not run in this environment because the available runtime could not resolve GitHub/DNS for a fresh repository checkout. Source-level verification was performed through the repository files and targeted contract tests were added.
 
 Any later change to environment phases, completion authority, handoff semantics, or shared-vs-independent boundaries requires a new explicit decision.
+
+
+## 🔒 LOCKED ADDENDUM — POS Human Label for Pickup / Takeaway v1
+**Decision date:** 2026-10-03
+
+The canonical Commerce / fulfillment environment remains **Pickup** and the backend/domain value remains:
+
+`order_type = pickup`
+
+For the **cashier-facing POS UI**, the human label is:
+
+**Takeaway**
+
+This is a presentation-language mapping, not a new purchase type and not a second backend value.
+
+Canonical mapping:
+
+`POS Dine-In` → `dine_in`  
+`POS Takeaway` → `pickup`
+
+**Delivery is not exposed as a cashier-facing POS new-sale mode.** Delivery remains an independent fulfillment environment and may appear in POS transaction detail for financial actions such as COD settlement.
+
+No new `takeaway` purchase type is introduced by this decision.
