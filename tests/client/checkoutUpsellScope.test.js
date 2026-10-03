@@ -11,7 +11,7 @@
  *
  * Required coverage:
  *  - A  single-branch checkout: upsell is fetched via the authoritative
- *       Branch-scoped contract GET /catalog/menu?branch_id=<fulfillment branch>
+ *       Branch-scoped contract GET /catalog/composed-menu?branch_id=<fulfillment branch>
  *  - B  multi-branch cart scoped to one branch (and the reverse branch): the
  *       rail never reads the unscoped global /catalog/menu and never falls back
  *       to globally defined products (even when a Branch has < 3 products)
@@ -96,54 +96,40 @@ function deliverable(branchId) {
   };
 }
 
-// Catalog fixtures mirror the REAL GET /catalog/menu response contract
-// (server/routes/api.js): top-level categories[]/all_products[]/products.items,
-// branch-scoped — each branch sees ONLY its own adopted products.
+// Catalog fixtures mirror the REAL canonical GET /catalog/composed-menu response:
+// top-level `menus[]` plus branch-scoped `categories[]`. Each branch returns ONLY
+// its own adopted Menus.
 const CATALOG = {
   branch_a: {
     success: true,
-    categories: [{ id: 'cat_a', name: 'Menu', products: [
-      { id: 'pA1', name: 'A1 Telur Asin Mantap', price: 10000, image_url: '' },
-      { id: 'pA2', name: 'A2 Rawon Stroke', price: 12000, image_url: '' },
-      { id: 'pA3', name: 'A3 Es Dawet', price: 8000, image_url: '' }
-    ] }],
-    all_products: [
-      { id: 'pA1', name: 'A1 Telur Asin Mantap', price: 10000, image_url: '' },
-      { id: 'pA2', name: 'A2 Rawon Stroke', price: 12000, image_url: '' },
-      { id: 'pA3', name: 'A3 Es Dawet', price: 8000, image_url: '' }
+    model: 'product-menu-inventory-v1',
+    menus: [
+      { id: 'pA1', menu_id: 'pA1', menu_type: 'SINGLE', title: 'A1 Telur Asin Mantap', price: 10000, components: [{ product_id: 'prodA1', sku: null, quantity: 1 }], category: { id: 'cat_a', name: 'Menu' } },
+      { id: 'pA2', menu_id: 'pA2', menu_type: 'SINGLE', title: 'A2 Rawon Stroke', price: 12000, components: [{ product_id: 'prodA2', sku: null, quantity: 1 }], category: { id: 'cat_a', name: 'Menu' } },
+      { id: 'pA3', menu_id: 'pA3', menu_type: 'SINGLE', title: 'A3 Es Dawet', price: 8000, components: [{ product_id: 'prodA3', sku: null, quantity: 1 }], category: { id: 'cat_a', name: 'Menu' } }
     ],
-    products: { items: [
-      { id: 'pA1', name: 'A1 Telur Asin Mantap', price: 10000, image_url: '' },
-      { id: 'pA2', name: 'A2 Rawon Stroke', price: 12000, image_url: '' },
-      { id: 'pA3', name: 'A3 Es Dawet', price: 8000, image_url: '' }
-    ] }
+    categories: [{ id: 'cat_a', name: 'Menu', menus: [] }]
   },
   branch_b: {
     success: true,
-    categories: [{ id: 'cat_b', name: 'Menu', products: [
-      { id: 'pB1', name: 'B1 Kopi Susu Malang', price: 15000, image_url: '' }
-    ] }],
-    all_products: [{ id: 'pB1', name: 'B1 Kopi Susu Malang', price: 15000, image_url: '' }],
-    products: { items: [{ id: 'pB1', name: 'B1 Kopi Susu Malang', price: 15000, image_url: '' }] }
+    model: 'product-menu-inventory-v1',
+    menus: [
+      { id: 'pB1', menu_id: 'pB1', menu_type: 'SINGLE', title: 'B1 Kopi Susu Malang', price: 15000, components: [{ product_id: 'prodB1', sku: null, quantity: 1 }], category: { id: 'cat_b', name: 'Menu' } }
+    ],
+    categories: [{ id: 'cat_b', name: 'Menu', menus: [] }]
   }
 };
 
-// What an unscoped GET /catalog/menu returns (cross-branch/global pool).
+// What an unscoped GET /catalog/composed-menu returns (cross-branch/global pool).
 // The checkout upsell must NEVER call this; if it ever does, the tests fail.
 const GLOBAL_CATALOG = {
   success: true,
-  categories: [{ id: 'cat_g', name: 'Global', products: [
-    { id: 'pG1', name: 'GLOBAL Semar Special', price: 35000, image_url: '' },
-    { id: 'pG2', name: 'GLOBAL Mie Gurih', price: 15000, image_url: '' }
-  ] }],
-  all_products: [
-    { id: 'pG1', name: 'GLOBAL Semar Special', price: 35000, image_url: '' },
-    { id: 'pG2', name: 'GLOBAL Mie Gurih', price: 15000, image_url: '' }
+  model: 'product-menu-inventory-v1',
+  menus: [
+    { id: 'pG1', menu_id: 'pG1', menu_type: 'SINGLE', title: 'GLOBAL Semar Special', price: 35000, components: [{ product_id: 'prodG1', sku: null, quantity: 1 }], category: { id: 'cat_g', name: 'Global' } },
+    { id: 'pG2', menu_id: 'pG2', menu_type: 'SINGLE', title: 'GLOBAL Mie Gurih', price: 15000, components: [{ product_id: 'prodG2', sku: null, quantity: 1 }], category: { id: 'cat_g', name: 'Global' } }
   ],
-  products: { items: [
-    { id: 'pG1', name: 'GLOBAL Semar Special', price: 35000, image_url: '' },
-    { id: 'pG2', name: 'GLOBAL Mie Gurih', price: 15000, image_url: '' }
-  ] }
+  categories: [{ id: 'cat_g', name: 'Global', menus: [] }]
 };
 
 const BRANCHES = [
@@ -227,9 +213,9 @@ function freshHarness(seedCart, opts) {
       if (url.indexOf('/promotions/active') === 0) {
         return Promise.resolve({ success: true, promotions: [], applied: [], rejected: [] });
       }
-      if (url === '/catalog/menu' || url.indexOf('/catalog/menu?') === 0) {
+      if (url === '/catalog/composed-menu' || url.indexOf('/catalog/menu?') === 0) {
         catalogCalls.push(url);
-        if (url === '/catalog/menu') return Promise.resolve(GLOBAL_CATALOG); // must never happen
+        if (url === '/catalog/composed-menu') return Promise.resolve(GLOBAL_CATALOG); // must never happen
         const q = url.indexOf('?branch_id=');
         if (q >= 0) {
           const bid = url.slice(q + '?branch_id='.length);
@@ -299,7 +285,7 @@ function freshHarness(seedCart, opts) {
     resolvePost: (i, res) => { resolvers[i](res); },
     flush: async () => { for (let i = 0; i < 15; i++) await Promise.resolve(); },
     catalogUpsellCalls: () => catalogCalls.filter((u) => u.indexOf('branch_id=') >= 0),
-    unscopedCatalogCalls: () => catalogCalls.filter((u) => u === '/catalog/menu'),
+    unscopedCatalogCalls: () => catalogCalls.filter((u) => u === '/catalog/composed-menu'),
     cleanup: () => timers.restore()
   };
 }
@@ -312,9 +298,9 @@ test('A: single-branch checkout upsell uses only the fulfillment-branch catalog 
     await g.flush();
 
     const scopeCalls = g.catalogUpsellCalls();
-    assert.strictEqual(g.unscopedCatalogCalls().length, 0, 'A: unscoped global GET /catalog/menu was NEVER called by the checkout');
+    assert.strictEqual(g.unscopedCatalogCalls().length, 0, 'A: unscoped global GET /catalog/composed-menu was NEVER called by the checkout');
     assert.ok(scopeCalls.length >= 1, 'A: branch-scoped upsell fetch was issued');
-    assert.ok(scopeCalls.every((u) => u === '/catalog/menu?branch_id=branch_a'), 'A: every upsell fetch is for the Checkout fulfillment branch ONLY');
+    assert.ok(scopeCalls.every((u) => u === '/catalog/composed-menu?branch_id=branch_a'), 'A: every upsell fetch is for the Checkout fulfillment branch ONLY');
     assert.ok(scopeCalls.length === 1, 'A: exactly one upsell fetch (no redundant re-fetch while branch is stable)');
 
     const html = g.trackEl.innerHTML;
@@ -339,7 +325,7 @@ test('B/C: multi-branch cart scoped to the OTHER branch (reverse): rail + add la
 
     const scopeCalls = g.catalogUpsellCalls();
     assert.ok(scopeCalls.length >= 1, 'C: reverse checkout still fetches branch-scoped upsell');
-    assert.ok(scopeCalls.every((u) => u === '/catalog/menu?branch_id=branch_b'), 'C: scope is the checkout branch (branch_b), NOT the cart-mixed brand scope');
+    assert.ok(scopeCalls.every((u) => u === '/catalog/composed-menu?branch_id=branch_b'), 'C: scope is the checkout branch (branch_b), NOT the cart-mixed brand scope');
     assert.strictEqual(g.unscopedCatalogCalls().length, 0, 'B: unscoped global catalog never called for a multi-branch cart');
 
     const html = g.trackEl.innerHTML;
@@ -372,14 +358,14 @@ test('D: a delivery quote resolving a DIFFERENT fulfillment branch re-scopes the
   try {
     await g.flush(); // branches prefill -> fulfillment branch branch_a -> upsell branch_a
     assert.strictEqual(g.unscopedCatalogCalls().length, 0, 'D: global catalog never called');
-    assert.ok(g.catalogUpsellCalls().some((u) => u === '/catalog/menu?branch_id=branch_a'), 'D: initial scope branch_a');
+    assert.ok(g.catalogUpsellCalls().some((u) => u === '/catalog/composed-menu?branch_id=branch_a'), 'D: initial scope branch_a');
 
     // The delivery domain resolves a different fulfillment branch (branch_b).
     g.resolvePost(g.posts.length - 1, deliverable('branch_b'));
     await g.flush();
 
     const scopeCalls = g.catalogUpsellCalls();
-    assert.ok(scopeCalls.some((u) => u === '/catalog/menu?branch_id=branch_b'), 'D: rail re-scoped to the newly authoritative branch (branch_b)');
+    assert.ok(scopeCalls.some((u) => u === '/catalog/composed-menu?branch_id=branch_b'), 'D: rail re-scoped to the newly authoritative branch (branch_b)');
     const html = g.trackEl.innerHTML;
     assert.ok(html.indexOf('B1 Kopi Susu Malang') >= 0, 'D: new fulfillment branch product shown');
     assert.ok(html.indexOf('A1') === -1 && html.indexOf('A2') === -1 && html.indexOf('A3') === -1, 'D: stale branch_a cards were dropped, never persisted');
