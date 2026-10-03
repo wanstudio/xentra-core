@@ -12,6 +12,7 @@
 const CatalogRepository = require('../../../core/data/repositories/CatalogRepository');
 const ProductOptionsModel = require('../../catalog/models/ProductOptionsModel');
 const MasterMenuResolver = require('../../catalog/services/MasterMenuResolver');
+const PromotionRewardResolver = require('../../promotion/services/PromotionRewardResolver');
 const { verifyComposedCheckout } = require('./ComposedMenuCheckoutService');
 
 const catalogRepository = new CatalogRepository();
@@ -106,7 +107,7 @@ class PrePaymentVerificationGate {
     const verifiedItems = [];
     const appliedPromos = [];
 
-    const canonicalItems = items.filter(item => item && item.menu_id);
+    const canonicalItems = items.filter(item => item && item.menu_id && !item.is_promo_reward && !item.promo_id && !item.promotion_id);
     const nonRewardLegacyItems = items.filter(item => {
       const isReward = Boolean(item && (
         item.is_promo_reward ||
@@ -151,29 +152,32 @@ class PrePaymentVerificationGate {
       PromotionEngineService = require('../../promotion/services/PromotionEngineService');
     } catch (_) {}
 
-    for (const item of items.filter(function (entry) { return !(entry && entry.menu_id); })) {
+    for (const item of items) {
       const productId = item.product_id || item.id;
       const rawQty = item.quantity != null ? item.quantity : item.qty;
       const requestedQty = Number(rawQty);
-      if (!productId) {
-        errors.push('Setiap baris pesanan wajib menyertakan product_id.');
-        continue;
-      }
-      if (!Number.isInteger(requestedQty) || requestedQty <= 0) {
-        errors.push(`Kuantitas untuk produk "${item.name || productId}" harus berupa bilangan bulat positif (> 0).`);
-        continue;
-      }
 
       const isRewardIntent = Boolean(
-        item.is_promo_reward || item.promo_id || String(productId).startsWith('reward_')
+        item.is_promo_reward ||
+        item.promo_id ||
+        item.promotion_id ||
+        (productId && String(productId).startsWith('reward_'))
       );
 
+      if (!Number.isInteger(requestedQty) || requestedQty <= 0) {
+        errors.push(`Kuantitas untuk item "${item.name || item.menu_id || productId || 'unknown'}" harus berupa bilangan bulat positif (> 0).`);
+        continue;
+      }
+
       if (isRewardIntent && PromotionEngineService) {
-        let promoId = item.promo_id || (String(productId).startsWith('reward_') ? String(productId).replace(/^reward_/, '') : null);
+        let promoId = item.promo_id || item.promotion_id ||
+          (productId && String(productId).startsWith('reward_') ? String(productId).replace(/^reward_/, '') : null);
+
         const nonRewardItems = items.filter(it => {
           const pid = String(it.product_id || it.id || '');
-          return !it.is_promo_reward && !it.promo_id && !pid.startsWith('reward_');
+          return !it.is_promo_reward && !it.promo_id && !it.promotion_id && !pid.startsWith('reward_');
         });
+
         const evalResult = PromotionEngineService.evaluate({
           brand_id,
           branch_id,
@@ -181,45 +185,68 @@ class PrePaymentVerificationGate {
           customer_phone: (customer && customer.phone) ? String(customer.phone).trim() : '',
           cart_items: nonRewardItems
         });
-        const eligiblePromo = (evalResult.applied || []).find(p => !promoId || p.promo_id === promoId || p.id === promoId) ||
-                              (evalResult.discovery || []).find(p => (!promoId || p.promo_id === promoId || p.id === promoId) && p.should_grant_reward);
+
+        const eligiblePromo = (evalResult.applied || []).find(p =>
+          !promoId || p.promo_id === promoId || p.id === promoId
+        ) || (evalResult.discovery || []).find(p =>
+          (!promoId || p.promo_id === promoId || p.id === promoId) && p.should_grant_reward
+        );
+
         if (!eligiblePromo) {
           errors.push('Klaim hadiah promo tidak valid atau syarat promo belum terpenuhi.');
           continue;
         }
+
         const authoritativePromoId = eligiblePromo.promo_id || eligiblePromo.id;
         const rewardSpec = eligiblePromo.reward || {};
-        const targetPid = rewardSpec.product_id;
-        if (!targetPid) {
-          errors.push(`Definisi produk hadiah promo "${eligiblePromo.name || authoritativePromoId}" tidak ditemukan.`);
+
+        let resolvedReward;
+        try {
+          resolvedReward = PromotionRewardResolver.resolveConfiguredReward({
+            brandId: brand_id,
+            branchId: branch_id,
+            reward: rewardSpec
+          });
+        } catch (err) {
+          const rewardMessage = {
+            BRANCH_MENU_NOT_ADOPTED: 'Menu hadiah belum diadopsi di cabang yang akan memenuhi pesananmu.',
+            BRANCH_MENU_UNAVAILABLE: 'Menu hadiah sedang dinonaktifkan di cabang yang akan memenuhi pesananmu.',
+            REWARD_BRANCH_CATEGORY_UNAVAILABLE: 'Kategori cabang untuk menu hadiah sedang tidak tersedia.',
+            REWARD_OUT_OF_STOCK: 'Maaf, menu hadiah sedang habis di cabang yang akan memenuhi pesananmu.',
+            REWARD_MENU_COMPONENT_UNAVAILABLE: 'Komponen menu hadiah sedang tidak tersedia.',
+            REWARD_MENU_INACTIVE: 'Menu hadiah saat ini tidak aktif.',
+            REWARD_PRODUCT_NOT_FOUND: 'Produk hadiah legacy tidak ditemukan.',
+            BRANCH_REWARD_PRODUCT_NOT_AVAILABLE: 'Produk hadiah legacy tidak tersedia di cabang ini.',
+            BRANCH_REWARD_PRODUCT_UNAVAILABLE: 'Produk hadiah legacy sedang dinonaktifkan di cabang ini.'
+          }[err.message] || 'Menu hadiah promo tidak dapat diselesaikan secara aman.';
+          errors.push(rewardMessage);
           continue;
         }
-        const bpCheck = catalogRepository.findRewardProduct(branch_id, targetPid);
-        const rewardDisplayName = bpCheck?.name || eligiblePromo.display?.reward_title || 'Hadiah Promo';
-        if (!bpCheck) {
-          errors.push(`Produk hadiah "${rewardDisplayName}" tidak tersedia di cabang yang akan memenuhi pesananmu. Pilih hadiah lain atau lanjut tanpa hadiah.`);
+
+        if (item.menu_id && resolvedReward.menu_id &&
+            String(item.menu_id) !== String(resolvedReward.menu_id)) {
+          errors.push('Menu hadiah promo pada keranjang tidak sesuai dengan definisi promo yang berlaku.');
           continue;
         }
-        if (bpCheck.is_available === 0) {
-          errors.push(`Produk hadiah "${rewardDisplayName}" sedang dinonaktifkan di cabang yang akan memenuhi pesananmu. Pilih hadiah lain atau lanjut tanpa hadiah.`);
-          continue;
-        }
-        const rewardStock = bpCheck.stock != null ? Number(bpCheck.stock) : null;
-        if (rewardStock !== null && rewardStock < 1) {
-          errors.push(`Maaf, "${rewardDisplayName}" sedang habis di cabang yang akan memenuhi pesananmu. Pilih hadiah lain atau lanjut tanpa hadiah.`);
-          continue;
-        }
-        const authoritativeRewardPrice = Number(rewardSpec.reward_price || rewardSpec.amount_in_cents || 0);
-        const authoritativeRewardName = bpCheck.name || eligiblePromo.display?.reward_title || 'Hadiah Promo Spesial';
-        const catalogRewardPrice = Number(bpCheck.regular_price || bpCheck.price || authoritativeRewardPrice);
-        // Architectural Invariant: One campaign identity applies at most once per order
+
+        const authoritativeRewardPrice = Number(
+          rewardSpec.reward_price !== undefined
+            ? rewardSpec.reward_price
+            : (rewardSpec.amount_in_cents || 0)
+        );
+        const authoritativeRewardName = resolvedReward.name || eligiblePromo.display?.reward_title || 'Hadiah Promo Spesial';
+        const catalogRewardPrice = Number(resolvedReward.regular_price || 0);
+
         if (appliedPromos.some(ap => ap.promo_id === authoritativePromoId)) {
-          // Promo already applied for this order; ignore/reject duplicate reward lines
           continue;
         }
 
         verifiedItems.push({
-          product_id: targetPid,
+          product_id: resolvedReward.product_id,
+          menu_id: resolvedReward.menu_id,
+          menu_type: resolvedReward.menu_type,
+          menu_snapshot: resolvedReward.menu_snapshot,
+          component_snapshot: resolvedReward.component_snapshot,
           promo_id: authoritativePromoId,
           is_promo_reward: true,
           name: authoritativeRewardName,
@@ -228,10 +255,19 @@ class PrePaymentVerificationGate {
           subtotal: authoritativeRewardPrice,
           notes: eligiblePromo.display?.reward_badge_text || 'Bonus Promo Terverifikasi'
         });
+
         appliedPromos.push({
           promo_id: authoritativePromoId,
           benefit_amount: authoritativeRewardPrice === 0 ? catalogRewardPrice : authoritativeRewardPrice
         });
+        continue;
+      }
+
+      // A non-reward canonical Menu was already verified by ComposedMenuCheckoutService.
+      if (item.menu_id) continue;
+
+      if (!productId) {
+        errors.push('Setiap baris pesanan wajib menyertakan product_id.');
         continue;
       }
 
