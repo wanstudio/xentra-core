@@ -27,6 +27,8 @@ describe('Promotion Branch Activation ↔ Reward Catalog Readiness', () => {
 
   const masterFood = 'prod_readiness_food';
   const masterReward = 'prod_readiness_reward';
+  const foodMenu = 'menu_readiness_food';
+  const rewardMenu = 'menu_readiness_reward';
   const promoTestId = 'prm_readiness_01';
 
   function cleanup() {
@@ -35,6 +37,12 @@ describe('Promotion Branch Activation ↔ Reward Catalog Readiness', () => {
       db.prepare("DELETE FROM promotion_rules WHERE promotion_id = ?").run(promoTestId);
       db.prepare("DELETE FROM promotion_branch_scope WHERE promotion_id = ?").run(promoTestId);
       db.prepare("DELETE FROM promotions WHERE id = ?").run(promoTestId);
+      db.prepare("DELETE FROM branch_menu_categories WHERE branch_id IN (?, ?)").run(branchA, branchB);
+      db.prepare("DELETE FROM branch_menus WHERE branch_id IN (?, ?)").run(branchA, branchB);
+      db.prepare("DELETE FROM branch_product_inventory WHERE branch_id IN (?, ?)").run(branchA, branchB);
+      db.prepare("DELETE FROM menu_items WHERE menu_id IN (?, ?)").run(foodMenu, rewardMenu);
+      db.prepare("DELETE FROM menus WHERE id IN (?, ?)").run(foodMenu, rewardMenu);
+      db.prepare("DELETE FROM sub_categories WHERE id IN ('sub_readiness_food', 'sub_readiness_reward')").run();
       db.prepare("DELETE FROM branch_products WHERE branch_id IN (?, ?)").run(branchA, branchB);
       db.prepare("DELETE FROM products WHERE id IN (?, ?)").run(masterFood, masterReward);
       db.prepare("DELETE FROM branches WHERE id IN (?, ?)").run(branchA, branchB);
@@ -63,6 +71,14 @@ describe('Promotion Branch Activation ↔ Reward Catalog Readiness', () => {
     db.prepare('INSERT INTO products (id, brand_id, name, slug, price, is_active) VALUES (?, ?, ?, ?, ?, 1)')
       .run(masterReward, brandId, 'Es Teh Melati Hadiah', 'es-teh-melati-hadiah', 5000);
 
+    const rasaRow = db.prepare("SELECT id FROM menu_flavors WHERE brand_id = ? AND lower(trim(name)) = 'original' AND is_active = 1 LIMIT 1").get(brandId)
+      || (db.prepare("INSERT INTO menu_flavors (id, brand_id, name, slug, is_active) VALUES ('readiness_original_rasa', ?, 'Original', 'readiness-original', 1)").run(brandId), db.prepare("SELECT id FROM menu_flavors WHERE id = 'readiness_original_rasa'").get());
+    db.prepare("INSERT OR REPLACE INTO sub_categories (id, brand_id, category_id, name, slug, is_active) VALUES ('sub_readiness_food', ?, (SELECT category_id FROM products WHERE id = ?), 'Nasi Uduk Spesial', 'sub-readiness-food', 1)").run(brandId, masterFood);
+    db.prepare("INSERT OR REPLACE INTO sub_categories (id, brand_id, category_id, name, slug, is_active) VALUES ('sub_readiness_reward', ?, (SELECT category_id FROM products WHERE id = ?), 'Es Teh Melati Hadiah', 'sub-readiness-reward', 1)").run(brandId, masterReward);
+    db.prepare("INSERT OR REPLACE INTO menus (id, brand_id, menu_type, sub_category_id, rasa_id, selling_price, status) VALUES (?, ?, 'SINGLE', 'sub_readiness_food', ?, 20000, 'ACTIVE')").run(foodMenu, brandId, rasaRow.id);
+    db.prepare("INSERT OR REPLACE INTO menus (id, brand_id, menu_type, sub_category_id, rasa_id, selling_price, status) VALUES (?, ?, 'SINGLE', 'sub_readiness_reward', ?, 5000, 'ACTIVE')").run(rewardMenu, brandId, rasaRow.id);
+    db.prepare("INSERT OR REPLACE INTO menu_items (menu_id, product_id, quantity, sort_order) VALUES (?, ?, 1, 0), (?, ?, 1, 0)").run(foodMenu, masterFood, rewardMenu, masterReward);
+    db.prepare("INSERT OR REPLACE INTO branch_categories (id, brand_id, branch_id, name, slug, sort_order, is_active) VALUES ('bc_readiness_A', ?, ?, 'Makanan', 'bc-readiness-A', 1, 1), ('bc_readiness_B', ?, ?, 'Makanan', 'bc-readiness-B', 1, 1)").run(brandId, branchA, brandId, branchB);
     // 4. Branch A has both food and reward available (is_available = 1)
     db.prepare('INSERT INTO branch_products (branch_id, product_id, price, stock, is_available) VALUES (?, ?, ?, ?, 1)')
       .run(branchA, masterFood, 20000, 50);
@@ -73,6 +89,10 @@ describe('Promotion Branch Activation ↔ Reward Catalog Readiness', () => {
     db.prepare('INSERT INTO branch_products (branch_id, product_id, price, stock, is_available) VALUES (?, ?, ?, ?, 1)')
       .run(branchB, masterFood, 20000, 50);
 
+    db.prepare("INSERT OR REPLACE INTO branch_menus (branch_id, menu_id, is_available) VALUES (?, ?, 1), (?, ?, 1)").run(branchA, rewardMenu, branchA, foodMenu);
+    db.prepare("INSERT OR REPLACE INTO branch_menus (branch_id, menu_id, is_available) VALUES (?, ?, 1)").run(branchB, foodMenu);
+    db.prepare("INSERT OR REPLACE INTO branch_menu_categories (branch_id, menu_id, branch_category_id) VALUES (?, ?, 'bc_readiness_A'), (?, ?, 'bc_readiness_A'), (?, ?, 'bc_readiness_B')").run(branchA, rewardMenu, branchA, foodMenu, branchB, foodMenu);
+    db.prepare("INSERT OR REPLACE INTO branch_product_inventory (branch_id, product_id, stock_qty, low_stock_threshold) VALUES (?, ?, 50, 5), (?, ?, 25, 5), (?, ?, 50, 5)").run(branchA, masterFood, branchA, masterReward, branchB, masterFood);
     // 5. Seed promotion with freebie reward
     db.prepare(`
       INSERT INTO promotions (id, brand_id, name, capability_type, stacking_policy, priority_weight, is_active)
@@ -85,7 +105,7 @@ describe('Promotion Branch Activation ↔ Reward Catalog Readiness', () => {
     `).run(promoTestId);
 
     db.prepare(`
-      INSERT INTO promotion_rewards (id, promotion_id, reward_type, target_product_id, amount_in_cents, presentation_payload)
+      INSERT INTO promotion_rewards (id, promotion_id, reward_type, target_menu_id, amount_in_cents, presentation_payload)
       VALUES ('rew_readiness_01', ?, 'freebie_product', ?, 0, '{"reward_title":"Hadiah Es Teh"}')
     `).run(promoTestId, masterReward);
 
@@ -112,10 +132,10 @@ describe('Promotion Branch Activation ↔ Reward Catalog Readiness', () => {
 
     const rewards = repo.findRewards(promoTestId);
     assert.strictEqual(rewards.length, 1);
-    const targetPid = rewards[0].target_product_id;
+    const targetMid = rewards[0].target_menu_id;
 
     // Catalog prerequisite check for Branch B
-    const bp = db.prepare('SELECT is_available, stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branchB, targetPid);
+    const bp = db.prepare('SELECT is_available FROM branch_menus WHERE branch_id = ? AND menu_id = ?').get(branchB, targetMid);
     assert.strictEqual(bp, undefined, 'Reward product must not exist in Branch B');
 
     // Expected rejection error
@@ -143,7 +163,7 @@ describe('Promotion Branch Activation ↔ Reward Catalog Readiness', () => {
   test('ACT-04: Activating at Branch A succeeds because reward exists and is_available = 1', () => {
     const rewards = repo.findRewards(promoTestId);
     const targetPid = rewards[0].target_product_id;
-    const bp = db.prepare('SELECT is_available, stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branchA, targetPid);
+    const bp = db.prepare('SELECT is_available, stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branchA, targetMid);
     assert.ok(bp);
     assert.strictEqual(bp.is_available, 1);
 
@@ -169,8 +189,8 @@ describe('Promotion Branch Activation ↔ Reward Catalog Readiness', () => {
       pwa_runtime: { display_mode: 'standalone' },
       customer: { phone: '081288880001' },
       items: [
-        { product_id: masterFood, quantity: 1, price: 20000 },
-        { is_promo_reward: true, promo_id: promoTestId, product_id: masterReward, quantity: 1, price: 0 }
+        { menu_id: foodMenu, quantity: 1, expected_price: 20000 },
+        { is_promo_reward: true, promo_id: promoTestId, menu_id: rewardMenu, quantity: 1, expected_price: 0 }
       ]
     };
 
@@ -183,7 +203,7 @@ describe('Promotion Branch Activation ↔ Reward Catalog Readiness', () => {
 
   test('ACT-07: PrePaymentVerificationGate rejects promo at Branch A if reward stock becomes 0', () => {
     // Temporarily set stock to 0 in branch_products
-    db.prepare('UPDATE branch_products SET stock = 0 WHERE branch_id = ? AND product_id = ?').run(branchA, masterReward);
+    db.prepare('UPDATE branch_product_inventory SET stock_qty = 0 WHERE branch_id = ? AND product_id = ?').run(branchA, masterReward);
 
     const orderPayload = {
       brand_id: brandId,
@@ -201,7 +221,7 @@ describe('Promotion Branch Activation ↔ Reward Catalog Readiness', () => {
     assert.ok(gateResult.errors.some(e => e.includes('sedang habis di cabang')));
 
     // Restore stock
-    db.prepare('UPDATE branch_products SET stock = 25 WHERE branch_id = ? AND product_id = ?').run(branchA, masterReward);
+    db.prepare('UPDATE branch_product_inventory SET stock_qty = 25 WHERE branch_id = ? AND product_id = ?').run(branchA, masterReward);
   });
 
   test('ACT-08: Real Bangjo brand prm_bangjo_pwa_install reward points to 401 and succeeds PrePaymentVerificationGate at Bangjo branch', () => {
