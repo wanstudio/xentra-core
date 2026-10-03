@@ -662,6 +662,46 @@ class ComposedMenuService {
     };
   }
 
+  static setBranchMenuDisplayName({
+    brandId, branchId, menuId, name
+  }) {
+    ensureSchema();
+    if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
+    if (!branchId) throw new Error('BRANCH_CONTEXT_REQUIRED');
+
+    const menu = repository.findMenu({ brandId, menuId });
+    if (!menu) throw new Error('MENU_NOT_FOUND');
+    const branch = repository.db.queryOne(
+      'SELECT id FROM branches WHERE id = ? AND brand_id = ?',
+      [branchId, brandId]
+    );
+    if (!branch) throw new Error('BRANCH_NOT_FOUND');
+
+    const displayName = name == null ? null : String(name).trim() || null;
+    if (displayName && displayName.length > 100) throw new Error('DISPLAY_NAME_TOO_LONG');
+
+    repository.setBranchMenuDisplayName({
+      brandId,
+      branchId,
+      menuId,
+      displayNameOverride: displayName
+    });
+
+    return repository.findBranchMenu({ brandId, branchId, menuId });
+  }
+
+  static removeMenuFromBranch({
+    brandId, branchId, menuId
+  }) {
+    ensureSchema();
+    if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
+    if (!branchId) throw new Error('BRANCH_CONTEXT_REQUIRED');
+    const menu = repository.findMenu({ brandId, menuId });
+    if (!menu) throw new Error('MENU_NOT_FOUND');
+    repository.removeBranchMenu({ brandId, branchId, menuId });
+    return { branch_id: branchId, menu_id: menuId, removed: true };
+  }
+
   static setBranchMenuAvailability({
     brandId, branchId, menuId, isAvailable
   }) {
