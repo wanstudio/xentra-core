@@ -591,7 +591,7 @@ describe('Promotion Security & RBAC Scope Authorization Suite', () => {
 
     assert.equal(updateRes.status, 400);
     assert.equal(updateRes.body.success, false);
-    assert.ok(updateRes.body.error.includes('Produk reward tidak valid'));
+    assert.ok(/Produk reward legacy tidak valid|Menu reward tidak valid/.test(updateRes.body.error));
   });
 
   // PROMO-AUTH-16: Reward target_product_id cannot belong to foreign brand (400)
