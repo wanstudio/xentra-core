@@ -27,6 +27,7 @@ test('Master Menu editor models Menu as the commercial entity', () => {
   assert.ok(HTML.includes('id="cm-rasa"'));
   assert.ok(HTML.includes('id="cm-level"'));
   assert.ok(HTML.includes('id="cm-price"'));
+  assert.ok(HTML.includes('id="cm-preview-indicator"'));
   assert.ok(HTML.includes('Harga komersial berada di Menu, bukan di Product Master.'));
   assert.ok(!HTML.includes('id="cm-name"'));
   assert.ok(!HTML.includes('id="cm-regular-price"'));
@@ -69,6 +70,7 @@ test('Owner preview follows canonical customer identity rules', () => {
   assert.ok(JS.includes("title = String(($('cm-package-name') && $('cm-package-name').value) || '').trim() || 'Nama Menu Paket'"));
   assert.ok(JS.includes('ownerMasterMenuRasaLabel'));
   assert.ok(JS.includes('priceEl.textContent = formatMoney'));
+  assert.ok(JS.includes('x-master-customer-preview-spice-label'));
 });
 
 test('Master Menu workspace has dedicated mobile-first presentation styles', () => {
