@@ -130,8 +130,10 @@ router.get(['/catalog/menu', '/home'], async (req, res) => {
         id: p.id || p.product_id,
         name: p.master && p.master.name ? p.master.name : p.name,
         description: p.master && p.master.description ? p.master.description : (p.description || ''),
-        category_id: p.category_id || (p.categories && p.categories[0] ? p.categories[0].id : null),
-        category_ids: Array.isArray(p.categories) ? p.categories.map(function (c) { return String(c.id); }) : [],
+        category_id: p.category_id || (p.master && p.master.category_id) || (p.categories && p.categories[0] ? p.categories[0].id : null),
+        category_ids: Array.isArray(p.categories) && p.categories.length
+          ? p.categories.map(function (c) { return String(c.id); })
+          : (p.master && p.master.category_id != null ? [String(p.master.category_id)] : []),
         price: p.price,
         regular_price: p.regular_price,
         is_active: p.is_active !== false,
