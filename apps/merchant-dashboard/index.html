@@ -1599,34 +1599,12 @@
             </div>
           </div>
 
-          <!-- Search & Filter Controls -->
+          <!-- Search -->
           <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap;align-items:center;">
-            <div style="flex:1;min-width:200px;position:relative;">
-              <input type="text" id="prod-search-input" class="x-input" placeholder="Cari nama produk..." style="padding-left:36px;">
+            <div style="flex:1;min-width:220px;position:relative;">
+              <input type="search" id="prod-search-input" class="x-input" placeholder="Cari nama Product / SKU..." autocomplete="off" style="padding-left:36px;">
               <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
             </div>
-            <div style="min-width:180px;">
-              <!-- Tampilannya memakai gaya dropdown pemilih periode di Beranda. Select
-                   aslinya tetap ada tapi disembunyikan: ia yang jadi sumber nilai untuk
-                   penyaringan, dan opsinya diisi JavaScript. -->
-              <div class="x-occ-dropdown" id="prod-filter-category-dropdown" style="width:100%;">
-                <button type="button" class="x-occ-dropdown-trigger" id="btn-prod-filter-category" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter kategori" onclick="toggleProductCategoryFilter()">
-                  <span id="prod-filter-category-label">Semua Kategori</span>
-                  <svg class="x-occ-chevron-icon" aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                </button>
-                <div class="x-occ-dropdown-menu" id="prod-filter-category-menu" role="listbox" aria-label="Pilih kategori"></div>
-                <div style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;overflow:hidden;">
-                  <select id="prod-filter-category" class="x-input">
-                    <option value="all">Semua Kategori</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Category filter chips -->
-          <div class="x-catalog-filters" id="catalog-products-category-chips" style="margin-top:12px;">
-            <!-- Category buttons rendered here -->
           </div>
 
           <!-- Products Table -->
@@ -1635,16 +1613,14 @@
               <thead>
                 <tr>
                   <th>Foto</th>
-                  <th>Nama Produk</th>
-                  <th>Kategori</th>
-                  <th>Harga Dasar</th>
-                  <th>Mode Harga</th>
-                  <th>Status Master</th>
+                  <th>Product</th>
+                  <th>SKU</th>
+                  <th>Status</th>
                   <th class="text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody id="master-products-table-body">
-                <tr><td colspan="7" class="text-center py-6">Memuat daftar produk...</td></tr>
+                <tr><td colspan="5" class="text-center py-6">Memuat daftar Product...</td></tr>
               </tbody>
             </table>
           </div>
@@ -1738,17 +1714,19 @@
     </div>
 
     <form id="form-product" class="x-form x-product-editor-form" style="max-width:920px;margin:0 auto;">
+      <input type="hidden" id="prod-id" value="">
+
       <div class="x-card x-product-editor-main-card">
         <div style="margin-bottom:18px;">
-        <h3 id="product-editor-title" style="margin:0;font-size:20px;">Tambah Produk Master</h3>
-        <p id="prod-editor-subtitle" class="text-muted" style="margin:5px 0 0;font-size:13px;">Susun identitas dan komposisi Master Menu.</p>
-      </div>
-        <input type="hidden" id="prod-id" value="">
+          <h3 id="product-editor-title" style="margin:0;font-size:20px;">Tambah Product Atomic</h3>
+          <p id="prod-editor-subtitle" class="text-muted" style="margin:5px 0 0;font-size:13px;">Product adalah unit catalog/stock. Taxonomy, harga jual, dan identitas customer dikelola oleh Menu.</p>
+        </div>
+
         <div class="x-form-group">
-          <label>Foto Menu</label>
+          <label>Foto Product</label>
           <div class="x-image-upload-control">
             <div class="x-image-upload-preview-box" id="prod-image-preview-box" style="width:84px;height:84px;">
-              <img id="prod-image-preview" alt="Foto Menu" style="display:none;width:100%;height:100%;object-fit:cover;">
+              <img id="prod-image-preview" alt="Foto Product" style="display:none;width:100%;height:100%;object-fit:cover;">
               <div id="prod-image-empty" class="x-image-upload-empty" style="font-size:24px;">🍲</div>
             </div>
             <div class="x-image-upload-info">
@@ -1763,137 +1741,43 @@
           </div>
         </div>
 
-        <div class="x-form-group" id="prod-name-group">
-          <label for="prod-name">Nama Produk <span class="x-required-mark" aria-hidden="true">*</span></label>
-          <input type="text" id="prod-name" class="x-input" required maxlength="160" autocomplete="off" placeholder="Contoh: Bebek Goreng Crispy">
-          <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Nama ini menjadi judul utama yang tampil di Customer PWA. Kategori hanya untuk pengelompokan produk.</small>
-        </div>
-        <div id="master-legacy-migration-notice" class="x-form-group" style="display:none;padding:10px 12px;border:1px solid #fde68a;border-radius:10px;background:#fffbeb;">
-          <div style="font-size:12px;font-weight:700;color:#92400e;">Lengkapi format Master Menu</div>
-          <div id="master-legacy-migration-detail" style="font-size:11px;line-height:1.45;color:#a16207;margin-top:3px;"></div>
-        </div>
-
-        <div class="x-form-group x-master-choice-group">
-          <div class="x-master-choice-label-row">
-            <label for="prod-category" style="margin:0;">Kategori <span class="x-required-mark" aria-hidden="true">*</span></label>
-          </div>
-          <div class="x-master-select-with-add">
-            <select id="prod-category" class="x-input" required></select>
-            <button type="button" class="x-master-select-add" id="btn-add-master-category-from-product" aria-label="Tambah Kategori">+</button>
-          </div>
-        </div>
-
-        <div class="x-form-group x-master-choice-group">
-          <div class="x-master-choice-label-row">
-            <label for="prod-flavor" style="margin:0;">Rasa</label>
-          </div>
-          <div class="x-master-select-with-add">
-            <select id="prod-flavor" class="x-input">
-              <option value="">Tidak ada Rasa</option>
-            </select>
-            <button type="button" class="x-master-select-add" id="btn-add-master-flavor-from-product" aria-label="Tambah Rasa">+</button>
-          </div>
-        </div>
-
-        <div class="x-form-group x-master-choice-group">
-          <div class="x-master-choice-label-row">
-            <label style="margin:0;">Kelengkapan <span class="text-muted">(Detail Customer)</span></label>
-          </div>
-          <div id="prod-complements-editor" class="x-master-choice-grid x-master-complement-grid" role="group" aria-label="Pilih Kelengkapan">
-            <button type="button" class="x-master-choice-chip x-master-choice-add" data-master-choice-add="1" aria-label="Tambah Kelengkapan">
-              <span aria-hidden="true">+</span><span>Tambah</span>
-            </button>
-          </div>
-          <div id="prod-complements-empty" class="text-muted x-master-choice-empty" hidden aria-hidden="true"></div>
-        </div>
-
-        <div class="x-form-group x-master-choice-group">
-          <div id="prod-level-chips" class="x-master-spice-level" role="radiogroup" aria-label="Pilih Level Pedas"></div>
-          <input type="hidden" id="prod-level" value="">
-        </div>
-
-        <div class="x-form-row">
-          <div class="x-form-group">
-            <label for="prod-price">Harga Jual (Rp)</label>
-            <input type="number" id="prod-price" class="x-input" placeholder="28000" required>
-          </div>
-          <div class="x-form-group">
-            <label for="prod-regular-price">Harga Coret / Diskon (Rp)</label>
-            <input type="number" id="prod-regular-price" class="x-input" placeholder="32000">
-          </div>
-        </div>
-        <div class="x-form-row">
-          <div class="x-form-group">
-            <label for="prod-pricing-mode">Mode Harga</label>
-            <select id="prod-pricing-mode" class="x-input">
-              <option value="lock">Tetap (Lock)</option>
-              <option value="range">Fleksibel (Range)</option>
-            </select>
-          </div>
-          <div class="x-form-group" id="prod-range-fields" style="display:none;">
-            <label>Harga Range (Rp)</label>
-            <div class="x-form-row">
-              <input type="number" id="prod-min-price" class="x-input" placeholder="Min" style="flex:1;">
-              <span style="padding:0 6px;color:#94a3b8;">—</span>
-              <input type="number" id="prod-max-price" class="x-input" placeholder="Max" style="flex:1;">
-            </div>
-          </div>
+        <div class="x-form-group">
+          <label for="prod-name">Nama Product <span class="x-required-mark" aria-hidden="true">*</span></label>
+          <input type="text" id="prod-name" class="x-input" required maxlength="160" autocomplete="off" placeholder="Contoh: Fillet Ayam Crispy">
+          <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Nama internal/atomic Product. Nama ini bukan judul customer Menu.</small>
         </div>
 
         <div class="x-form-group">
-          <div class="x-master-composition-preview-head">
-            <div>
-              <strong>Preview Customer PWA</strong>
-              <span>Hasil card mengikuti komposisi Master di atas.</span>
-            </div>
-            <span class="x-badge x-badge-info">Live Preview</span>
-          </div>
-          <div class="x-master-customer-preview" id="master-menu-customer-preview">
-            <div class="x-master-customer-preview-card">
-              <div class="x-master-customer-preview-info">
-                <div class="x-master-customer-preview-title" id="master-preview-title">Masukkan Nama Produk</div>
-                <div class="x-master-customer-preview-subtitle" id="master-preview-subtitle"></div>
-                <div class="x-master-customer-preview-detail" id="master-preview-detail"></div>
-                <div class="x-master-customer-preview-indicator" id="master-preview-indicator"></div>
-                <div class="x-master-customer-preview-price" id="master-preview-price">Rp0</div>
-              </div>
-              <div class="x-master-customer-preview-media">
-                <img id="master-preview-image" alt="" style="display:none;">
-                <span id="master-preview-image-empty" aria-hidden="true">🍲</span>
-              </div>
-            </div>
-            <div class="x-master-customer-preview-note">Nama Produk → judul · Kategori → grouping · Rasa → subjudul · Kelengkapan → detail · Level → indikator</div>
-          </div>
+          <label for="prod-sku">SKU</label>
+          <input type="text" id="prod-sku" class="x-input" maxlength="120" autocomplete="off" placeholder="Contoh: AYAM-FLT-001">
+          <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Opsional. SKU unik dalam Brand; Product dengan SKU menjadi stock-managed.</small>
         </div>
 
         <div class="x-form-group">
-          <div style="font-size:11px;color:#64748b;padding:8px 10px;border:1px dashed #cbd5e1;border-radius:8px;">
-            Komposisi Menu di atas adalah Master. Merchant/Branch Manager hanya dapat mengadopsi menu ini dan tidak dapat mengubah komposisinya.
-          </div>
+          <label for="prod-desc">Deskripsi Internal Product</label>
+          <textarea id="prod-desc" class="x-input" rows="3" placeholder="Catatan internal tentang Product / unit stok..."></textarea>
         </div>
 
-        <div class="x-form-group">
-          <label for="prod-desc">Deskripsi Internal Master</label>
-          <textarea id="prod-desc" class="x-input" rows="2" placeholder="Catatan internal produk Master..."></textarea>
-        </div>
-      </div>
-
-      <div class="x-card x-product-editor-pos-card">
-        <div class="x-product-editor-pos-card-header">
+        <div class="x-form-group" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fafc;">
           <div>
-            <h3>Opsi Penjualan POS</h3>
-            <p class="text-muted">Opsional · konfigurasi yang digunakan khusus saat penjualan melalui POS.</p>
+            <strong style="display:block;font-size:13px;">Product Aktif</strong>
+            <span class="text-muted" style="display:block;font-size:11px;margin-top:3px;">Product nonaktif tidak dapat menjadi komponen Menu yang tersedia.</span>
           </div>
+          <label class="x-toggle" style="flex:0 0 auto;">
+            <input type="checkbox" id="prod-is-active" checked aria-label="Status aktif Product">
+            <span class="x-toggle-slider"></span>
+          </label>
         </div>
 
-        <div id="prod-options-editor" class="x-product-pos-options-editor"></div>
-        <button type="button" id="btn-prod-options-add-group" class="x-btn-secondary x-product-pos-add-group">+ Tambah Group Opsi</button>
-        <p class="x-product-editor-pos-help">Ini tidak mengubah komposisi Customer PWA. Variant = pilih satu; Add-on = boleh beberapa.</p>
+        <div class="x-product-legacy-boundary-note">
+          <strong>Compatibility boundary</strong>
+          <span>Field harga/taxonomy lama pada database Product masih dipertahankan untuk consumer dan migrasi lama, tetapi tidak lagi diedit dari Product Editor canonical. Semua harga jual dan taxonomy customer baru ditulis pada Menu.</span>
+        </div>
       </div>
 
       <div class="x-product-editor-actions">
         <button type="button" class="x-btn-secondary" id="btn-cancel-product-editor">Batal</button>
-        <button type="submit" class="x-btn-primary" id="btn-save-product-editor">Simpan Produk</button>
+        <button type="submit" class="x-btn-primary" id="btn-save-product-editor">Simpan Product</button>
       </div>
     </form>
 
