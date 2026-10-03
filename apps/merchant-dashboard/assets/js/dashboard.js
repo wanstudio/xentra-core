@@ -718,7 +718,7 @@
     if (!isPlatform) {
       document.querySelectorAll('.x-nav-sub-item[data-route]').forEach(function (btn) {
         var targetRoute = btn.dataset.route;
-        var isActiveSub = targetRoute === route || (isProductDetail && targetRoute === 'catalog/products');
+        var isActiveSub = targetRoute === route || (isProductDetail && targetRoute === 'catalog/products') || (isMasterMenuEditor && targetRoute === 'catalog/master-menus');
         btn.classList.toggle('active', isActiveSub);
       });
 
