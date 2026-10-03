@@ -14,6 +14,7 @@ const SHARED_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/shared.j
 const CATALOG_CLIENT_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/catalog-client.js');
 const BRANCH_CATALOG_JS_PATH = path.join(__dirname, '../apps/merchant-app/assets/js/branch-catalog-ui.js');
 const OWNER_BRANCH_CATALOG_JS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/js/branch-catalog-ui.js');
+const OWNER_NAVIGATION_JS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/js/owner-navigation.js');
 
 test('CLIENT OWNER DASHBOARD — Marketing / Promotion Workspace Visibility & Lifecycle', async (t) => {
   const html = fs.readFileSync(HTML_PATH, 'utf8');
@@ -25,6 +26,7 @@ test('CLIENT OWNER DASHBOARD — Marketing / Promotion Workspace Visibility & Li
   function evalApp(win) {
     win.eval(sharedJs);
     win.eval(ownerCatalogJs);
+    win.eval(fs.readFileSync(OWNER_NAVIGATION_JS_PATH, 'utf8'));
     win.eval(js);
   }
 
