@@ -223,3 +223,29 @@ Forward runtime inventory now confirms:
 - API/repository support for `target_product_id` remains compatibility-only until legacy rows are explicitly migrated; it must not regain forward UI authority.
 
 Retirement rule: do not delete compatibility routes/fields solely because forward UI no longer calls them. Removal requires a separate data migration and compatibility-consumer inventory proving no deployed older client still depends on them.
+
+## 10. Legacy data readiness inventory — 2026-10-04
+
+A read-only inventory service now exists at:
+
+`domains/catalog/services/LegacyDataReadinessService.js`
+
+It is intentionally **report-only** and issues SELECT statements only. It does not reconcile, migrate, update, or delete any data.
+
+The inventory reports:
+
+- Product migration status and schema-version distribution;
+- Products that do or do not have canonical Menu composition references through `menu_items`;
+- legacy Promotion Rewards that still target Product, including whether the Product resolves to zero, one, or multiple canonical Menu candidates in the same brand;
+- legacy `branch_products` assignments, including whether exactly one canonical `branch_menus` adoption exists for the same branch;
+- legacy `branch_product_categories` row count;
+- cross-brand canonical Product → Menu integrity anomalies.
+
+Readiness statuses:
+
+- `CANONICAL_READY` — no remaining compatibility data/blocker was detected by this inventory;
+- `LEGACY_REQUIRES_MIGRATION` — legacy rows remain, but the inventory found no unresolved/ambiguous mapping;
+- `NEEDS_REVIEW` — at least one legacy Product reference has zero or multiple canonical candidates;
+- `BLOCKED` — canonical Product/Menu brand integrity is inconsistent.
+
+This report is a **prerequisite for retirement**, not a migration command. A status other than `CANONICAL_READY` must not be interpreted as permission to delete legacy fields, routes, or compatibility transports.
