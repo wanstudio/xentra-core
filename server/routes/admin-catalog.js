@@ -201,17 +201,6 @@ router.post('/admin/products', requireAuth(['owner', 'brand_manager']), (req, re
       }
     }
 
-    // P1 TENANT CATEGORY INTEGRITY GUARD (FINDING 02)
-    if (category_id) {
-      const validCategory = db.prepare('SELECT id FROM categories WHERE id = ? AND brand_id = ?').get(category_id, req.brand_id);
-      if (!validCategory) {
-        return res.status(400).json({
-          success: false,
-          error: 'Kategori produk tidak ditemukan atau bukan milik brand ini.'
-        });
-      }
-    }
-
     const compatibilityPrice = price !== undefined && price !== null && price !== '' ? Number(price) : 0;
     const compatibilityRegularPrice = regular_price !== undefined && regular_price !== null && regular_price !== ''
       ? Number(regular_price)
@@ -294,7 +283,7 @@ router.put('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req,
       'SELECT id FROM products WHERE id = ? AND brand_id = ?'
     ).get(req.params.id, req.brand_id);
     if (!existing) {
-      return res.status(404).json({ success: false, error: 'Menu produk tidak ditemukan.' });
+      return res.status(404).json({ success: false, error: 'Product tidak ditemukan.' });
     }
 
     db.prepare(`
@@ -332,7 +321,7 @@ router.put('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req,
       'SELECT * FROM products WHERE id = ? AND brand_id = ?'
     ).get(req.params.id, req.brand_id);
 
-    res.json({ success: true, message: 'Menu produk berhasil diperbarui.', product });
+    res.json({ success: true, message: 'Product berhasil diperbarui.', product });
   } catch (err) {
     if (err && (err.code === 'SQLITE_CONSTRAINT_UNIQUE' || String(err.message || '').toLowerCase().includes('unique constraint failed: products.brand_id, products.sku'))) {
       return res.status(400).json({ success: false, error: 'PRODUCT_SKU_ALREADY_EXISTS' });
@@ -344,7 +333,7 @@ router.put('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req,
 router.get('/admin/products/:id/options', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const product = db.prepare('SELECT id, name, options_config FROM products WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
-    if (!product) return res.status(404).json({ success: false, error: 'Menu produk tidak ditemukan.' });
+    if (!product) return res.status(404).json({ success: false, error: 'Product tidak ditemukan.' });
     const ProductOptionsModel = require('../../domains/catalog/models/ProductOptionsModel');
     res.json({ success: true, product_id: product.id, product_name: product.name, options_config: ProductOptionsModel.normalizeConfig(product.options_config) });
   } catch (err) {
@@ -355,7 +344,7 @@ router.get('/admin/products/:id/options', requireAuth(['owner', 'brand_manager']
 router.put('/admin/products/:id/options', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const product = db.prepare('SELECT id, name FROM products WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
-    if (!product) return res.status(404).json({ success: false, error: 'Menu produk tidak ditemukan.' });
+    if (!product) return res.status(404).json({ success: false, error: 'Product tidak ditemukan.' });
 
     const ProductOptionsModel = require('../../domains/catalog/models/ProductOptionsModel');
     const config = ProductOptionsModel.validateConfig(req.body && req.body.options_config);
@@ -392,7 +381,7 @@ router.patch('/admin/products/:id/toggle', requireAuth(['owner', 'brand_manager'
     `).run(req.params.id, req.brand_id);
 
     if (!stmt || stmt.changes === 0) {
-      return res.status(404).json({ success: false, error: 'Menu produk tidak ditemukan atau tidak berubah.' });
+      return res.status(404).json({ success: false, error: 'Product tidak ditemukan atau tidak berubah.' });
     }
 
     res.json({ success: true, message: 'Status ketersediaan menu berhasil diubah.' });
@@ -405,9 +394,9 @@ router.delete('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (r
   try {
     const stmt = db.prepare('DELETE FROM products WHERE id = ? AND brand_id = ?').run(req.params.id, req.brand_id);
     if (!stmt || stmt.changes === 0) {
-      return res.status(404).json({ success: false, error: 'Menu produk tidak ditemukan.' });
+      return res.status(404).json({ success: false, error: 'Product tidak ditemukan.' });
     }
-    res.json({ success: true, message: 'Menu berhasil dihapus.' });
+    res.json({ success: true, message: 'Product berhasil dihapus.' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
