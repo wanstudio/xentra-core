@@ -260,7 +260,7 @@ test('Branch Menu adoption is separate from Product Inventory and package availa
   assert.equal(resolved[0].inventory.available_quantity, 2);
 
   db.prepare(
-    'UPDATE branch_product_inventory SET stock_qty = 3, updated_at = datetime("now") WHERE branch_id = ? AND product_id = ?'
+    'UPDATE branch_product_inventory SET stock_qty = 3, updated_at = datetime('now') WHERE branch_id = ? AND product_id = ?'
   ).run(BRANCH, PRODUCT_A);
 
   const stockout = ComposedMenuResolver.resolveBranchMenu({
@@ -275,10 +275,16 @@ test('Branch Menu adoption is separate from Product Inventory and package availa
 });
 
 test('Branch Menu with only deactivated Branch Categories is hidden from Customer resolution', () => {
+  const hiddenRasaId = 'cmv1_hidden_category_rasa';
+  db.prepare(
+    "INSERT OR IGNORE INTO menu_flavors (id, brand_id, name, slug, is_active) VALUES (?, ?, 'Hidden Category Rasa CMV1', 'hidden-category-rasa-cmv1', 1)"
+  ).run(hiddenRasaId, BRAND);
+
   const menu = ComposedMenuService.createSingleMenu({
     brandId: BRAND,
     productId: PRODUCT_B,
     subCategoryId: db.prepare("SELECT id FROM sub_categories WHERE brand_id = ? AND name = 'Ayam Bakar CMV1'").get(BRAND).id,
+    rasaId: hiddenRasaId,
     sellingPrice: 21000,
     status: 'ACTIVE'
   });
@@ -388,7 +394,7 @@ test.after(() => {
   db.prepare('DELETE FROM menus WHERE brand_id = ?').run(BRAND);
   db.prepare('DELETE FROM sub_categories WHERE brand_id = ? AND id = ?').run(BRAND, SUBCATEGORY);
   db.prepare('DELETE FROM sub_categories WHERE brand_id = ? AND name = ?').run(BRAND, 'Ayam Bakar CMV1');
-  db.prepare('DELETE FROM menu_flavors WHERE brand_id = ? AND name = ?').run(BRAND, 'Original');
+  db.prepare('DELETE FROM menu_flavors WHERE brand_id = ? AND id IN (?, ?)').run(BRAND, 'cmv1_hidden_category_rasa', db.prepare("SELECT id FROM menu_flavors WHERE brand_id = ? AND lower(trim(name)) = 'original' LIMIT 1").get(BRAND)?.id || '');
   db.prepare('DELETE FROM products WHERE id IN (?, ?)').run(PRODUCT_A, PRODUCT_B);
   db.prepare('DELETE FROM branch_categories WHERE id = ?').run(BRANCH_CATEGORY);
   db.prepare('DELETE FROM branches WHERE id = ?').run(BRANCH);
