@@ -15,6 +15,11 @@ function normalizeName(value) {
 function ensureComposedMenuSchema(db = DataAccess) {
   if (ensured) return;
 
+  // Additive order snapshot fields. Existing order_items columns remain for legacy consumers.
+  try { db.exec('ALTER TABLE order_items ADD COLUMN menu_id TEXT;'); } catch (_) {}
+  try { db.exec('ALTER TABLE order_items ADD COLUMN menu_type TEXT;'); } catch (_) {}
+  try { db.exec('ALTER TABLE order_items ADD COLUMN component_snapshot TEXT;'); } catch (_) {}
+
   // Product becomes the atomic inventory identity. The legacy products.price/category
   // columns remain compatibility fields during migration; new Menu code does not use them
   // as customer-facing authorities.
