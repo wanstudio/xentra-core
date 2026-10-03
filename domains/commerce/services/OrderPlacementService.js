@@ -612,19 +612,6 @@ class OrderPlacementService {
         });
       }
 
-      const canonicalItems = items.filter(item => item && item.menu_id);
-      if (canonicalItems.length > 0) {
-        const composedResult = deductComposedStock({
-          order,
-          items: canonicalItems,
-          referenceId: order.order_number,
-          actorId: order.customer_phone || 'online_payment',
-          notes: 'Pemotongan stok otomatis komponen Menu setelah pembayaran [' + order.order_number + ']',
-          dbTransactionProvided: true
-        });
-        deductedItems.push(...composedResult.deducted_items);
-      }
-
       if (ownsTransaction) inventoryRepository.commitTransaction();
       return { success: true, deducted_items: deductedItems };
     } catch (err) {
@@ -680,6 +667,19 @@ class OrderPlacementService {
         });
 
         deductedItems.push({ product_id: item.product_id, product_name: item.product_name, quantity: item.quantity, previous_stock: prevStock, current_stock: currentStock });
+      }
+
+      const canonicalItems = items.filter(item => item && item.menu_id);
+      if (canonicalItems.length > 0) {
+        const composedResult = deductComposedStock({
+          order,
+          items: canonicalItems,
+          referenceId: order.order_number,
+          actorId: order.customer_phone || 'online_payment',
+          notes: 'Pemotongan stok otomatis komponen Menu setelah pembayaran [' + order.order_number + ']',
+          dbTransactionProvided: true
+        });
+        deductedItems.push(...composedResult.deducted_items);
       }
 
       if (ownsTransaction) inventoryRepository.commitTransaction();
