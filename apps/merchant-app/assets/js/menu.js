@@ -750,7 +750,7 @@
     var q = (_bmMenuState.addCatalogSearchQuery || '').toLowerCase();
     var filtered = all.filter(function (p) {
       if (!q) return true;
-      return (p.name || '').toLowerCase().indexOf(q) !== -1 || (p.description || '').toLowerCase().indexOf(q) !== -1;
+      return (p.name || p.title || '').toLowerCase().indexOf(q) !== -1 || (p.subtitle || '').toLowerCase().indexOf(q) !== -1;
     });
 
     filtered.forEach(function (p) {
@@ -807,7 +807,7 @@
     var count = (_bmMenuState.selectedCatalogProductIds && _bmMenuState.selectedCatalogProductIds.size) || 0;
     var countEl = $('bm-add-catalog-count');
     if (countEl) {
-      countEl.textContent = count + ' produk dipilih';
+      countEl.textContent = count + ' menu dipilih';
     }
     var submitBtn = $('btn-bm-submit-adopt-catalog');
     if (submitBtn) {
@@ -841,7 +841,7 @@
 
     if (!filtered.length) {
       container.innerHTML = '<div style="background:#f8fafc; border:1px dashed #cbd5e1; border-radius:8px; padding:28px; text-align:center; color:#64748b; font-size:13px;">' +
-        (q ? 'Tidak ada produk master yang sesuai dengan pencarian "' + esc(q) + '".' : 'Belum ada produk master yang tersedia untuk brand ini.') +
+        (q ? 'Tidak ada Master Menu yang sesuai dengan pencarian "' + esc(q) + '".' : 'Belum ada Master Menu yang tersedia untuk brand ini.') +
       '</div>';
       updateBMAddCatalogFooter();
       return;
@@ -850,19 +850,19 @@
     var selectedSet = _bmMenuState.selectedCatalogProductIds || new Set();
 
     container.innerHTML = filtered.map(function (p) {
-      var pid = String(p.id);
-      var img = p.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100';
+      var pid = String(p.menu_id || p.id);
+      var img = p.image_url || (p.components && p.components[0] && p.components[0].image_url) || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100';
       var isRange = p.pricing_mode === 'range';
-      var modeBadge = isRange
-        ? '<span class="x-badge x-badge-range" style="font-size:11px;">Range (' + formatMoney(p.min_price) + ' - ' + formatMoney(p.max_price) + ')</span>'
-        : '<span class="x-badge x-badge-lock" style="font-size:11px;">Harga Terkunci</span>';
+      var modeBadge = '<span class="x-badge x-badge-info" style="font-size:11px;">' +
+        (String(p.menu_type || '').toUpperCase() === 'PACKAGE' ? 'Menu Paket' : 'Menu Satuan') +
+        '</span>';
 
       if (p.is_adopted) {
         return '<div class="x-catalog-picker-card is-adopted" id="catalog-pick-card-' + esc(pid) + '">' +
           '<div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0;">' +
             '<img src="' + esc(img) + '" style="width:44px; height:44px; border-radius:6px; object-fit:cover; flex-shrink:0; border:1px solid #e2e8f0;" alt="">' +
             '<div style="min-width:0; flex:1;">' +
-              '<div style="font-weight:700; font-size:13.5px; color:#334155; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + esc(p.name) + '</div>' +
+              '<div style="font-weight:700; font-size:13.5px; color:#334155; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + esc(p.name || p.title || 'Menu') + '</div>' +
               '<div style="display:flex; gap:6px; align-items:center; margin-top:2px; flex-wrap:wrap;">' +
                 '<span style="font-size:12px; font-weight:700; color:#64748b;">' + formatMoney(p.price || p.master_price) + '</span>' +
                 modeBadge +
@@ -906,7 +906,7 @@
 
     var selectedSet = _bmMenuState.selectedCatalogProductIds;
     if (!selectedSet || selectedSet.size === 0) {
-      showToast('⚠️ Pilih minimal 1 produk master untuk diadopsi.');
+      showToast('⚠️ Pilih minimal 1 Master Menu untuk diadopsi.');
       return;
     }
 
