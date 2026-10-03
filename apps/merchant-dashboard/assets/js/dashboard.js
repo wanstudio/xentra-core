@@ -2239,54 +2239,30 @@
       var prod = data.product;
       var branchAdoptions = data.branch_adoptions || [];
 
-      // Update Header & Breadcrumb
+      // Product detail is intentionally atomic. Do not render legacy
+      // Product price/category as customer/commercial identity.
       if ($('prod-detail-breadcrumb')) $('prod-detail-breadcrumb').textContent = prod.name;
-    if ($('product-detail-mobile-title')) $('product-detail-mobile-title').textContent = 'Detail Produk · ' + (prod.name || 'Produk');
-      if ($('prod-detail-name')) $('prod-detail-name').textContent = prod.name;
+      if ($('product-detail-mobile-title')) $('product-detail-mobile-title').textContent = 'Detail Product · ' + (prod.name || 'Product');
+      if ($('prod-detail-name')) $('prod-detail-name').textContent = prod.name || 'Product';
       if ($('prod-detail-desc')) $('prod-detail-desc').textContent = prod.description || 'Tidak ada deskripsi.';
-      if ($('prod-detail-price')) $('prod-detail-price').textContent = formatMoney(prod.price);
+      if ($('prod-detail-sku')) $('prod-detail-sku').textContent = prod.sku || 'Belum ada SKU';
 
-      var img = prod.image || prod.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100';
-      if ($('prod-detail-img')) $('prod-detail-img').src = img;
-
-      // Category badge
-      var cat = state.categories.find(function (c) { return String(c.id) === String(prod.category_id); });
-      if ($('prod-detail-category-badge')) {
-        $('prod-detail-category-badge').textContent = cat ? cat.name : 'Umum';
-      }
-
-      // Pricing mode badge
-      var modeBadge = $('prod-detail-pricing-mode-badge');
-      if (modeBadge) {
-        var isRange = prod.pricing_mode === 'range';
-        modeBadge.className = 'x-badge ' + (isRange ? 'x-badge-range' : 'x-badge-lock');
-        modeBadge.textContent = isRange ? 'Mode: Range' : 'Mode: Fixed (Lock)';
-      }
-
-      var rangeBox = $('prod-detail-range-box');
-      if (rangeBox) {
-        if (prod.pricing_mode === 'range') {
-          rangeBox.style.display = 'block';
-          if ($('prod-detail-range')) {
-            $('prod-detail-range').textContent = formatMoney(prod.min_price || prod.price) + ' - ' + formatMoney(prod.max_price || prod.price);
-          }
+      var img = prod.image || prod.image_url || '';
+      if ($('prod-detail-img')) {
+        if (img) {
+          $('prod-detail-img').src = img;
+          $('prod-detail-img').style.display = 'block';
         } else {
-          rangeBox.style.display = 'none';
+          $('prod-detail-img').removeAttribute('src');
+          $('prod-detail-img').style.display = 'none';
         }
       }
 
-      // Status badge
       var statusBadge = $('prod-detail-status-badge');
       if (statusBadge) {
         var isActive = prod.is_active !== 0;
         statusBadge.className = 'x-badge ' + (isActive ? 'x-badge-success' : 'x-badge-warning');
-        statusBadge.textContent = isActive ? 'Master: Aktif' : 'Master: Nonaktif';
-      }
-
-      // Edit button handler
-      var editBtn = $('btn-edit-from-detail');
-      if (editBtn) {
-        editBtn.onclick = function () { openEditProduct(prod.id); };
+        statusBadge.textContent = isActive ? 'Aktif' : 'Nonaktif';
       }
 
       // Render branch adoptions table
