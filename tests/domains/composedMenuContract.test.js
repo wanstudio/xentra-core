@@ -233,6 +233,46 @@ test('Branch Menu adoption is separate from Product Inventory and package availa
   assert.equal(stockout[0].blocking_reason, 'OUT_OF_STOCK');
 });
 
+test('Branch Menu with only deactivated Branch Categories is hidden from Customer resolution', () => {
+  const menu = ComposedMenuService.createSingleMenu({
+    brandId: BRAND,
+    productId: PRODUCT_B,
+    subCategoryId: db.prepare("SELECT id FROM sub_categories WHERE brand_id = ? AND name = 'Ayam Bakar CMV1'").get(BRAND).id,
+    sellingPrice: 21000,
+    status: 'ACTIVE'
+  });
+
+  ComposedMenuService.adoptMenuToBranch({
+    brandId: BRAND,
+    branchId: BRANCH,
+    menuId: menu.id,
+    isAvailable: true,
+    branchCategoryIds: [BRANCH_CATEGORY]
+  });
+
+  db.prepare('UPDATE branch_categories SET is_active = 0 WHERE id = ?').run(BRANCH_CATEGORY);
+
+  const hidden = ComposedMenuResolver.resolveBranchMenu({
+    brandId: BRAND,
+    branchId: BRANCH,
+    menuIds: [menu.id],
+    includeUnavailable: false
+  });
+  assert.equal(hidden.length, 0);
+
+  const visibleWithReason = ComposedMenuResolver.resolveBranchMenu({
+    brandId: BRAND,
+    branchId: BRANCH,
+    menuIds: [menu.id],
+    includeUnavailable: true
+  });
+  assert.equal(visibleWithReason.length, 1);
+  assert.equal(visibleWithReason[0].is_available, false);
+  assert.equal(visibleWithReason[0].blocking_reason, 'BRANCH_CATEGORY_UNAVAILABLE');
+
+  db.prepare('UPDATE branch_categories SET is_active = 1 WHERE id = ?').run(BRANCH_CATEGORY);
+});
+
 test('SKU removal is blocked while active branch stock remains positive and history is written', () => {
   ComposedMenuService.setProductSku({
     brandId: BRAND,
