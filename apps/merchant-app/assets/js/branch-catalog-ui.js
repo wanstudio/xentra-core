@@ -231,9 +231,9 @@
   };
 
   // Adopt Product Modal Actions
-  window.openMerchantAdoptModal = function (productId) {
+  window.openMerchantAdoptModal = function (menuId) {
     if (!currentBranchCatalogData) return;
-    var p = currentBranchCatalogData.available_master_products.find(function (x) { return String(x.id) === String(productId); });
+    var p = currentBranchCatalogData.available_master_products.find(function (x) { return String(x.menu_id || x.id) === String(menuId); });
     if (!p) return;
 
     var resolvedBranchId = currentManagingBranchId ||
@@ -247,7 +247,7 @@
       return;
     }
 
-    $('adopt-product-id').value = p.id;
+    $('adopt-product-id').value = p.menu_id || p.id;
     $('adopt-product-name').value = p.name || p.id;
 
     if ($('adopt-menu-title')) $('adopt-menu-title').textContent = composition.title || '—';
@@ -289,7 +289,7 @@
       btn.disabled = true;
       btn.textContent = 'Menyimpan...';
 
-      var prodId = $('adopt-product-id').value;
+      var menuId = $('adopt-product-id').value;
       var catId = $('adopt-branch-category').value;
       if (!catId) {
         showToast('❌ Pilih minimal satu Kategori Cabang.');
@@ -299,9 +299,9 @@
       }
 
       try {
-        var res = await CatalogClient.adoptProduct(currentManagingBranchId, {
-          product_id: prodId,
-          category_ids: [catId]
+        var res = await CatalogClient.adoptMenu(currentManagingBranchId, {
+          menu_id: menuId,
+          branch_category_ids: [catId]
         });
         var data = await res.json();
         if (data.success) {
@@ -314,7 +314,7 @@
             loadInlineBranchCatalog();
           }
         } else {
-          showToast('❌ ' + (data.message || data.error || 'Gagal mengadopsi produk.'));
+          showToast('❌ ' + (data.message || data.error || 'Gagal mengadopsi menu.'));
         }
       } catch (err) {
         showToast('❌ Kesalahan jaringan.');
@@ -372,8 +372,8 @@
       currentBranchCatalogData = data;
 
       var categories = data.categories || [];
-      var adopted = data.adopted_products || [];
-      var available = data.available_master_products || [];
+      var adopted = data.adopted_menus || data.adopted_products || [];
+      var available = data.available_master_menus || data.available_master_products || [];
 
       // Update subtitle
       var subtitle = $('branch-catalog-subtitle');
@@ -947,7 +947,7 @@
     
     container.innerHTML = filtered.map(function (p) {
       var comp = p.menu_composition || {};
-      var img = comp.image || p.image_url || p.master_image_url || '';
+      var img = comp.image_url || (comp.components && comp.components[0] && comp.components[0].image_url) || p.image_url || p.master_image_url || '';
       var isAvailable = p.is_available === 1 || p.is_available === true;
       var categoryNames = (p.categories || []).map(function (c) { return c.name; }).filter(Boolean);
       var categoryHtml = categoryNames.length
@@ -968,7 +968,7 @@
       var price = comp.price != null ? Number(comp.price) : Number(p.master_price || p.price || 0);
             var availabilityToggle = '' +
         '<label class="x-toggle' + (isAvailable ? ' x-toggle-on' : '') + '" title="' + (isAvailable ? 'Menu tersedia' : 'Menu habis') + '">' +
-          '<input type="checkbox" ' + (isAvailable ? 'checked' : '') + ' onchange="toggleBranchProductAvailability(\'' + p.product_id + '\', this.checked ? 1 : 0)" aria-label="Ubah ketersediaan menu cabang">' +
+          '<input type="checkbox" ' + (isAvailable ? 'checked' : '') + ' onchange="toggleBranchMenuAvailability(\'' + p.product_id + '\', this.checked ? 1 : 0)" aria-label="Ubah ketersediaan menu cabang">' +
           '<span class="x-toggle-slider"></span>' +
         '</label>';
 
@@ -984,7 +984,7 @@
               '<div>' + availabilityToggle + '</div>',
               '<div class="x-item-actions">',
                 '<button type="button" class="x-action-menu-trigger" aria-label="Aksi menu cabang" onclick="XentraActionMenu.open(this, [' +
-                  '{ label: \'Hapus dari Cabang\', icon: \'🗑️\', destructive: true, onClick: function() { removeBranchProduct(\'' + p.product_id + '\'); } }' +
+                  '{ label: \'Hapus dari Cabang\', icon: \'🗑️\', destructive: true, onClick: function() { removeBranchMenu(\'' + p.product_id + '\'); } }' +
                 '])">',
                 '</button>',
               '</div>',
@@ -1042,12 +1042,12 @@
       });
     });
   }
-  // Override removeBranchProduct and toggleBranchProductAvailability to also refresh inline panel
-  var _origToggleBranchAvail = window.toggleBranchProductAvailability;
-  window.toggleBranchProductAvailability = async function (productId, nextAvail) {
+  // Override removeBranchMenu and toggleBranchMenuAvailability to also refresh inline panel
+  var _origToggleBranchAvail = window.toggleBranchMenuAvailability;
+  window.toggleBranchMenuAvailability = async function (menuId, nextAvail) {
     if (!currentManagingBranchId) return;
     try {
-      var res = await CatalogClient.setBranchProductAvailability(currentManagingBranchId, productId, nextAvail);
+      var res = await CatalogClient.setBranchMenuAvailability(currentManagingBranchId, menuId, nextAvail);
       var data = await res.json();
       if (data.success) {
         showToast('Ketersediaan menu cabang diperbarui.');
@@ -1061,17 +1061,17 @@
     }
   };
 
-  var _origRemoveBranchProduct = window.removeBranchProduct;
-  window.removeBranchProduct = async function (productId, productName) {
-    productName = productName || 'menu ini';
+  var _origRemoveBranchProduct = window.removeBranchMenu;
+  window.removeBranchMenu = async function (menuId, menuName) {
+    menuName = menuName || 'menu ini';
     if (!currentManagingBranchId) return;
-    if (!confirm('Hapus "' + productName + '" dari katalog cabang ini? Menu tidak akan lagi tampil di halaman pemesanan pelanggan.')) return;
+    if (!confirm('Hapus "' + menuName + '" dari katalog cabang ini? Menu tidak akan lagi tampil di halaman pemesanan pelanggan.')) return;
 
     try {
-      var res = await CatalogClient.removeBranchProduct(currentManagingBranchId, productId);
+      var res = await CatalogClient.removeBranchMenu(currentManagingBranchId, menuId);
       var data = await res.json();
       if (data.success) {
-        showToast('\u2705 Produk dihapus dari katalog cabang.');
+        showToast('\u2705 Menu dihapus dari katalog cabang.');
         if (isBranchManager()) loadInlineBranchCatalog();
         else loadInlineBranchCatalog();
       } else {
