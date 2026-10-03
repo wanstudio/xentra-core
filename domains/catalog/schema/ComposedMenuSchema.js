@@ -1,6 +1,6 @@
 'use strict';
 
-let ensured = false;
+const ensuredDbs = new WeakSet();
 
 function hasColumn(db, table, column) {
   return db.queryMany(`PRAGMA table_info(${table})`).some(row => String(row.name) === column);
@@ -11,8 +11,8 @@ function normalizeName(value) {
 }
 
 function ensureComposedMenuSchema(db) {
-  if (ensured) return;
   if (!db) db = require('../../../core/data/DataAccess');
+  if (ensuredDbs.has(db)) return;
 
   // Additive order snapshot fields. Existing order_items columns remain for legacy consumers.
   try { db.exec('ALTER TABLE order_items ADD COLUMN menu_id TEXT;'); } catch (_) {}
@@ -389,7 +389,7 @@ function ensureComposedMenuSchema(db) {
     END;
   `);
 
-  ensured = true;
+  ensuredDbs.add(db);
 }
 
 module.exports = {
