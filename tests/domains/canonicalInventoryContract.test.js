@@ -17,8 +17,10 @@ const BRANCH = 'canonical_inventory_test_branch';
 test.before(async () => {
   await db.ready;
   ensureComposedMenuSchema({
-    queryMany: db.prepare.bind(db),
-    exec: db.exec.bind(db)
+    queryMany(sql, params = []) { return db.prepare(sql).all(...params); },
+    queryOne(sql, params = []) { return db.prepare(sql).get(...params); },
+    execute(sql, params = []) { return db.prepare(sql).run(...params); },
+    exec(sql) { return db.exec(sql); }
   });
 });
 
