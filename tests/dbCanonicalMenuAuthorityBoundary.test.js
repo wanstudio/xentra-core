@@ -16,6 +16,10 @@ const historicalPlan = fs.readFileSync(
   path.join(ROOT, 'docs/decisions/xentra-master-menu-composition-implementation-plan-v1.md'),
   'utf8'
 );
+const legacyMigrationCli = fs.readFileSync(
+  path.join(ROOT, 'tools/migrate-master-menu.js'),
+  'utf8'
+);
 
 test('Legacy branch-product startup migration cannot become canonical Menu authority', () => {
   const start = dbSource.indexOf('// LEGACY BRANCH-PRODUCT COMPATIBILITY MIGRATION ONLY.');
@@ -54,4 +58,12 @@ test('DB comments explicitly classify branch_products.price as a legacy compatib
   assert.ok(dbSource.includes('Legacy pricing compatibility shadow only'));
   assert.ok(dbSource.includes('Canonical Menu selling price is menus.selling_price'));
   assert.ok(dbSource.includes('branch_products.price MUST NOT be treated as authority by new Menu code'));
+});
+
+test('Superseded Product-centric migration CLI fails closed', () => {
+  assert.ok(legacyMigrationCli.includes('LEGACY_MASTER_MENU_MIGRATION_DISABLED'));
+  assert.ok(legacyMigrationCli.includes('Product → Menu → Inventory'));
+  assert.ok(!legacyMigrationCli.includes("require('../core/data/DataAccess')"));
+  assert.ok(!legacyMigrationCli.includes('ProductMenuMigrationService.reconcile'));
+  assert.ok(!legacyMigrationCli.includes('ProductMenuMigrationService.verify'));
 });
