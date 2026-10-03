@@ -117,3 +117,44 @@ test('Checkout keeps MasterMenuResolver strictly behind the legacy Product fallb
     'checkout must reject mixing canonical Menu and legacy Product cart models'
   );
 });
+
+
+test('Forward Merchant surfaces do not read legacy branch-product catalog endpoints', () => {
+  const merchantBranchCatalog = fs.readFileSync(
+    path.join(ROOT, 'apps/merchant-app/assets/js/branch-catalog-ui.js'),
+    'utf8'
+  );
+  const merchantMenu = fs.readFileSync(
+    path.join(ROOT, 'apps/merchant-app/assets/js/menu.js'),
+    'utf8'
+  );
+  const merchantToday = fs.readFileSync(
+    path.join(ROOT, 'apps/merchant-app/assets/js/hari-ini.js'),
+    'utf8'
+  );
+  const ownerBranchCatalog = fs.readFileSync(
+    path.join(ROOT, 'apps/merchant-dashboard/assets/js/branch-catalog-ui.js'),
+    'utf8'
+  );
+
+  for (const [name, source] of [
+    ['Merchant Branch Catalog', merchantBranchCatalog],
+    ['Merchant Menu', merchantMenu],
+    ['Merchant Hari Ini', merchantToday],
+    ['Owner Branch Catalog', ownerBranchCatalog]
+  ]) {
+    assert.ok(
+      !source.includes('/admin/branches/'),
+      name + ' must not hard-code legacy branch-product admin transport'
+    );
+    assert.ok(
+      !source.includes('updateBranchProductOverride'),
+      name + ' must not call the legacy Product override transport'
+    );
+  }
+
+  assert.ok(
+    merchantToday.includes('/admin/branches/" + encodeURIComponent(branchId) + "/menu'),
+    'Merchant Hari Ini must read canonical Branch Menu state'
+  );
+});
