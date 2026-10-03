@@ -3688,12 +3688,142 @@
         </div>
       </section>
 
-      <!-- PLATFORM: DOMAINS -->
+      <!-- PLATFORM: DOMAINS (LOCKED ARCHITECTURE CONTRACT) -->
       <section id="tab-platform-domains" class="x-tab-content">
-        <div class="x-route-placeholder">
-          <div class="x-route-placeholder-icon">🔗</div>
-          <h3>Domains</h3>
-          <p>Routing custom domain, verifikasi SSL/TLS otomatis, dan pemetaan ingress tenant.</p>
+        <div class="x-card" style="margin-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+            <div>
+              <h2 style="margin: 0; font-size: 1.25rem; font-weight: 700; color: #0f172a;">Domain Registry</h2>
+              <p style="margin: 4px 0 0 0; font-size: 0.875rem; color: #64748b;">Kelola pemetaan domain tenant, jenis surface (customer, merchant, pos), verifikasi DNS, dan status provisioning edge.</p>
+            </div>
+            <button type="button" class="btn btn-primary" id="btn-open-add-domain" style="display: inline-flex; align-items: center; gap: 6px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <span>Tambah Domain</span>
+            </button>
+          </div>
+
+          <div style="display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap;">
+            <input type="text" id="platform-domains-search" class="form-control" placeholder="Cari domain (hostname)..." style="max-width: 280px; font-size: 0.875rem;">
+            <select id="platform-domains-filter-surface" class="form-select" style="max-width: 180px; font-size: 0.875rem;">
+              <option value="">Semua Surface</option>
+              <option value="customer">Customer PWA</option>
+              <option value="merchant">Merchant Dashboard</option>
+              <option value="pos">POS Kasir</option>
+            </select>
+            <select id="platform-domains-filter-status" class="form-select" style="max-width: 160px; font-size: 0.875rem;">
+              <option value="">Semua Status</option>
+              <option value="active">Active</option>
+              <option value="disabled">Disabled</option>
+            </select>
+            <button type="button" class="btn btn-secondary" id="btn-refresh-domains" style="padding: 6px 12px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+            </button>
+          </div>
+
+          <div class="table-responsive" style="overflow-x: auto;">
+            <table class="table" id="table-platform-domains" style="width: 100%; border-collapse: collapse;">
+              <thead>
+                <tr style="border-bottom: 2px solid #e2e8f0; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em;">
+                  <th style="padding: 10px 12px;">Hostname</th>
+                  <th style="padding: 10px 12px;">Surface Type</th>
+                  <th style="padding: 10px 12px;">Tenant / Brand</th>
+                  <th style="padding: 10px 12px;">Verification</th>
+                  <th style="padding: 10px 12px;">Edge / SSL</th>
+                  <th style="padding: 10px 12px;">Status</th>
+                  <th style="padding: 10px 12px; text-align: right;">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="platform-domains-tbody" style="font-size: 0.875rem;">
+                <tr>
+                  <td colspan="7" style="padding: 24px; text-align: center; color: #94a3b8;">Memuat daftar domain...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- MODAL: ADD DOMAIN -->
+        <div id="modal-add-domain" class="x-modal" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.6); z-index: 1000; align-items: center; justify-content: center; padding: 20px;">
+          <div class="x-card" style="width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; background: #fff; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px;">
+              <h3 style="margin: 0; font-size: 1.125rem; font-weight: 700; color: #0f172a;">Tambah Domain Tenant</h3>
+              <button type="button" id="btn-close-add-domain" style="background: none; border: none; font-size: 1.25rem; cursor: pointer; color: #64748b;">&times;</button>
+            </div>
+            <form id="form-add-domain">
+              <div style="margin-bottom: 14px;">
+                <label style="display: block; font-size: 0.8125rem; font-weight: 600; color: #334155; margin-bottom: 4px;">Hostname *</label>
+                <input type="text" id="add-domain-hostname" class="form-control" placeholder="contoh: pos.myclient.com atau app.myclient.com" required style="width: 100%; font-size: 0.875rem;">
+                <small style="color: #64748b; font-size: 0.75rem;">Masukkan domain lengkap tanpa protokol http/https.</small>
+              </div>
+
+              <div style="margin-bottom: 14px;">
+                <label style="display: block; font-size: 0.8125rem; font-weight: 600; color: #334155; margin-bottom: 4px;">Target Brand / Tenant *</label>
+                <input type="text" id="add-domain-brand-id" class="form-control" value="brand_bangjo" placeholder="brand_id" required style="width: 100%; font-size: 0.875rem;">
+                <small style="color: #64748b; font-size: 0.75rem;">ID Brand tenant target (misal: brand_bangjo).</small>
+              </div>
+
+              <div style="margin-bottom: 14px;">
+                <label style="display: block; font-size: 0.8125rem; font-weight: 600; color: #334155; margin-bottom: 4px;">Target Organization *</label>
+                <input type="text" id="add-domain-org-id" class="form-control" value="org_xentra_holding" placeholder="organization_id" required style="width: 100%; font-size: 0.875rem;">
+              </div>
+
+              <div style="margin-bottom: 14px;">
+                <label style="display: block; font-size: 0.8125rem; font-weight: 600; color: #334155; margin-bottom: 4px;">Surface Type *</label>
+                <select id="add-domain-surface" class="form-select" style="width: 100%; font-size: 0.875rem;">
+                  <option value="customer">Customer PWA (Storefront / Delivery / Dine-in)</option>
+                  <option value="merchant">Merchant Dashboard (Owner / Manager Operational)</option>
+                  <option value="pos">POS Kasir (Cashier Tablet / Terminal)</option>
+                </select>
+                <small style="color: #64748b; font-size: 0.75rem;">Surface menentukan aplikasi yang dilayani oleh domain ini secara authoritative data.</small>
+              </div>
+
+              <div style="margin-bottom: 20px;">
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 0.875rem; color: #334155; cursor: pointer;">
+                  <input type="checkbox" id="add-domain-is-primary">
+                  <span>Jadikan domain primer untuk surface ini</span>
+                </label>
+              </div>
+
+              <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn btn-secondary" id="btn-cancel-add-domain">Batal</button>
+                <button type="submit" class="btn btn-primary" id="btn-submit-add-domain">Daftarkan Domain</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- MODAL: DNS VERIFICATION INSTRUCTIONS -->
+        <div id="modal-verify-domain" class="x-modal" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.6); z-index: 1000; align-items: center; justify-content: center; padding: 20px;">
+          <div class="x-card" style="width: 100%; max-width: 550px; max-height: 90vh; overflow-y: auto; background: #fff; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px;">
+              <h3 style="margin: 0; font-size: 1.125rem; font-weight: 700; color: #0f172a;">Instruksi Verifikasi DNS</h3>
+              <button type="button" id="btn-close-verify-domain" style="background: none; border: none; font-size: 1.25rem; cursor: pointer; color: #64748b;">&times;</button>
+            </div>
+            <div>
+              <p style="font-size: 0.875rem; color: #475569; margin-bottom: 16px;">
+                Untuk memverifikasi kepemilikan domain <strong id="verify-domain-hostname-display">-</strong>, tambahkan TXT record berikut pada DNS provider Anda (misal: Cloudflare, Namecheap, cPanel):
+              </p>
+
+              <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 16px; font-family: monospace; font-size: 0.8125rem;">
+                <div style="margin-bottom: 8px;">
+                  <span style="color: #64748b;">Tipe Record:</span> <strong style="color: #0f172a;">TXT</strong>
+                </div>
+                <div style="margin-bottom: 8px;">
+                  <span style="color: #64748b;">Host / Name:</span> <strong id="verify-domain-record-name" style="color: #0f172a; word-break: break-all;">-</strong>
+                </div>
+                <div>
+                  <span style="color: #64748b;">Value / Content:</span> <strong id="verify-domain-record-value" style="color: #0f172a; word-break: break-all;">-</strong>
+                </div>
+              </div>
+
+              <div id="verify-result-alert" style="display: none; padding: 10px; border-radius: 6px; font-size: 0.8125rem; margin-bottom: 16px;"></div>
+
+              <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn btn-secondary" id="btn-close-verify-modal">Tutup</button>
+                <button type="button" class="btn btn-primary" id="btn-trigger-verify-dns">Periksa DNS Sekarang</button>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

@@ -53,7 +53,15 @@ class PermissionModel {
     // Platform Control Plane Permissions
     PLATFORM_MANAGE: 'platform:manage',
     PLATFORM_TENANT_MANAGE: 'platform:tenant:manage',
-    PLATFORM_AUDIT_VIEW: 'platform:audit:view'
+    PLATFORM_AUDIT_VIEW: 'platform:audit:view',
+
+    // Domain Management Permissions (LOCKED architecture contract)
+    DOMAIN_READ: 'domain:read',
+    DOMAIN_CREATE: 'domain:create',
+    DOMAIN_VERIFY: 'domain:verify',
+    DOMAIN_UPDATE: 'domain:update',
+    DOMAIN_DISABLE: 'domain:disable',
+    DOMAIN_DELETE: 'domain:delete'
   };
 
   /**
@@ -63,7 +71,24 @@ class PermissionModel {
     [RoleModel.ROLES.PLATFORM_OWNER]: [
       'platform:manage',
       'platform:tenant:manage',
-      'platform:audit:view'
+      'platform:audit:view',
+      'domain:read',
+      'domain:create',
+      'domain:verify',
+      'domain:update',
+      'domain:disable',
+      'domain:delete'
+    ],
+    [RoleModel.ROLES.PLATFORM_ADMIN]: [
+      'platform:manage',
+      'platform:tenant:manage',
+      'platform:audit:view',
+      'domain:read',
+      'domain:create',
+      'domain:verify',
+      'domain:update',
+      'domain:disable',
+      'domain:delete'
     ],
     [RoleModel.ROLES.OWNER]: [
       'org:manage',

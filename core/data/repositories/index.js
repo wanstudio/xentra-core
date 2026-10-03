@@ -23,6 +23,7 @@ const BannerContentRepository = require('./BannerContentRepository');
 const BannerAssignmentRepository = require('./BannerAssignmentRepository');
 const CustomerRepository = require('./CustomerRepository');
 const OrderAdditionRepository = require('./OrderAdditionRepository');
+const TenantDomainRepository = require('./TenantDomainRepository');
 
 module.exports = {
   CatalogRepository,
@@ -47,5 +48,6 @@ module.exports = {
   BannerContentRepository,
   BannerAssignmentRepository,
   CustomerRepository,
-  OrderAdditionRepository
+  OrderAdditionRepository,
+  TenantDomainRepository
 };

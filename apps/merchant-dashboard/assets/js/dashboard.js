@@ -785,8 +785,11 @@
       window.syncOwnerBottomNavActive(route);
     }
 
-    // 7. In Platform Context: UI shells only, do not invoke merchant business loaders
+    // 7. In Platform Context: UI shells and platform loaders
     if (isPlatform) {
+      if (tabId === 'platform-domains' && typeof loadPlatformDomains === 'function') {
+        loadPlatformDomains();
+      }
       return;
     }
 
@@ -12203,6 +12206,339 @@ async function loadMenusView() {
       }
     }
     window.loadSettingsSecurity = loadSettingsSecurity;
+
+    // =========================================================================
+    // PLATFORM: DOMAIN MANAGEMENT CONTROLLER (LOCKED CONTRACT)
+    // =========================================================================
+    var platformDomainsCache = [];
+    var currentVerifyDomainId = null;
+
+    async function loadPlatformDomains() {
+      var tbody = $('platform-domains-tbody');
+      if (!tbody) return;
+
+      tbody.innerHTML = '<tr><td colspan="7" style="padding: 24px; text-align: center; color: #94a3b8;">Memuat data domain dari registry...</td></tr>';
+
+      try {
+        var surfaceFilter = $('platform-domains-filter-surface') ? $('platform-domains-filter-surface').value : '';
+        var statusFilter = $('platform-domains-filter-status') ? $('platform-domains-filter-status').value : '';
+        var searchVal = $('platform-domains-search') ? $('platform-domains-search').value.trim().toLowerCase() : '';
+
+        var queryParts = [];
+        if (surfaceFilter) queryParts.push('surface_type=' + encodeURIComponent(surfaceFilter));
+        if (statusFilter) queryParts.push('status=' + encodeURIComponent(statusFilter));
+        var qs = queryParts.length ? '?' + queryParts.join('&') : '';
+
+        var res = await fetch(API_BASE + '/platform/domains' + qs, {
+          headers: getAuthHeaders()
+        });
+
+        if (!res.ok) {
+          throw new Error('Gagal memuat domain (HTTP ' + res.status + ')');
+        }
+
+        var json = await res.json();
+        var domains = json.domains || [];
+        platformDomainsCache = domains;
+
+        if (searchVal) {
+          domains = domains.filter(function (d) {
+            return (d.hostname || '').toLowerCase().indexOf(searchVal) !== -1;
+          });
+        }
+
+        renderPlatformDomainsTable(domains);
+      } catch (err) {
+        console.error('[PlatformDomains:load Error]:', err);
+        tbody.innerHTML = '<tr><td colspan="7" style="padding: 24px; text-align: center; color: #ef4444;">' + esc(err.message) + '</td></tr>';
+      }
+    }
+    window.loadPlatformDomains = loadPlatformDomains;
+
+    function renderPlatformDomainsTable(domains) {
+      var tbody = $('platform-domains-tbody');
+      if (!tbody) return;
+
+      if (!domains || domains.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="padding: 32px; text-align: center; color: #94a3b8;">Belum ada domain yang terdaftar dalam registry.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = domains.map(function (d) {
+        var isPrimaryBadge = d.is_primary ? ' <span class="x-badge" style="background:#e0f2fe;color:#0369a1;font-size:0.6875rem;font-weight:700;">PRIMARY</span>' : '';
+
+        // Surface badge
+        var surfaceBadgeColor = d.surface_type === 'pos' ? '#fef3c7;color:#b45309' : (d.surface_type === 'merchant' ? '#f3e8ff;color:#7e22ce' : '#ecfdf5;color:#047857');
+        var surfaceLabel = d.surface_type === 'pos' ? 'POS Kasir' : (d.surface_type === 'merchant' ? 'Merchant App' : 'Customer PWA');
+        var surfaceBadge = '<span class="x-badge" style="background:' + surfaceBadgeColor + ';font-weight:600;font-size:0.75rem;">' + esc(surfaceLabel) + '</span>';
+
+        // Verification badge
+        var isVerified = d.verification_status === 'verified';
+        var verifyBadge = isVerified
+          ? '<span class="x-badge" style="background:#ecfdf5;color:#047857;font-weight:700;">VERIFIED</span>'
+          : '<span class="x-badge" style="background:#fffbeb;color:#b45309;font-weight:700;">PENDING DNS</span>';
+
+        // Provisioning / TLS badge
+        var isTlsActive = d.tls_status === 'active';
+        var tlsBadge = isTlsActive
+          ? '<span class="x-badge" style="background:#ecfdf5;color:#047857;font-size:0.75rem;">🔒 Active (SSL)</span>'
+          : '<span class="x-badge" style="background:#f1f5f9;color:#64748b;font-size:0.75rem;">⚙️ ' + esc(d.provisioning_status || 'unprovisioned') + '</span>';
+
+        // Status badge
+        var isActive = d.status === 'active';
+        var statusBadge = isActive
+          ? '<span class="x-badge" style="background:#ecfdf5;color:#047857;font-weight:700;">ACTIVE</span>'
+          : '<span class="x-badge" style="background:#fef2f2;color:#b91c1c;font-weight:700;">DISABLED</span>';
+
+        // Action buttons
+        var verifyBtn = !isVerified
+          ? '<button type="button" class="btn btn-sm btn-outline-primary btn-check-dns" data-id="' + esc(d.id) + '" style="font-size:0.75rem;padding:3px 8px;margin-right:4px;">Verifikasi</button>'
+          : '';
+        var toggleStatusBtn = isActive
+          ? '<button type="button" class="btn btn-sm btn-outline-secondary btn-disable-domain" data-id="' + esc(d.id) + '" style="font-size:0.75rem;padding:3px 8px;margin-right:4px;">Disable</button>'
+          : '<button type="button" class="btn btn-sm btn-outline-success btn-activate-domain" data-id="' + esc(d.id) + '" style="font-size:0.75rem;padding:3px 8px;margin-right:4px;">Enable</button>';
+        var deleteBtn = '<button type="button" class="btn btn-sm btn-outline-danger btn-delete-domain" data-id="' + esc(d.id) + '" data-host="' + esc(d.hostname) + '" style="font-size:0.75rem;padding:3px 8px;">Hapus</button>';
+
+        return '<tr style="border-bottom: 1px solid #f1f5f9;">' +
+          '<td style="padding: 12px;"><strong style="font-family:monospace;color:#0f172a;">' + esc(d.hostname) + '</strong>' + isPrimaryBadge + '</td>' +
+          '<td style="padding: 12px;">' + surfaceBadge + '</td>' +
+          '<td style="padding: 12px;font-size:0.8125rem;color:#475569;"><code>' + esc(d.brand_id) + '</code></td>' +
+          '<td style="padding: 12px;">' + verifyBadge + '</td>' +
+          '<td style="padding: 12px;">' + tlsBadge + '</td>' +
+          '<td style="padding: 12px;">' + statusBadge + '</td>' +
+          '<td style="padding: 12px; text-align: right; white-space: nowrap;">' + verifyBtn + toggleStatusBtn + deleteBtn + '</td>' +
+        '</tr>';
+      }).join('');
+
+      wirePlatformDomainsEvents();
+    }
+
+    function wirePlatformDomainsEvents() {
+      // Check DNS button
+      document.querySelectorAll('.btn-check-dns').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var id = btn.getAttribute('data-id');
+          openVerifyDomainModal(id);
+        });
+      });
+
+      // Toggle status buttons
+      document.querySelectorAll('.btn-disable-domain').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+          var id = btn.getAttribute('data-id');
+          try {
+            var res = await fetch(API_BASE + '/platform/domains/' + id + '/disable', {
+              method: 'POST',
+              headers: getAuthHeaders()
+            });
+            if (res.ok) loadPlatformDomains();
+          } catch (_) {}
+        });
+      });
+
+      document.querySelectorAll('.btn-activate-domain').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+          var id = btn.getAttribute('data-id');
+          try {
+            var res = await fetch(API_BASE + '/platform/domains/' + id + '/activate', {
+              method: 'POST',
+              headers: getAuthHeaders()
+            });
+            if (res.ok) loadPlatformDomains();
+          } catch (_) {}
+        });
+      });
+
+      // Delete domain button
+      document.querySelectorAll('.btn-delete-domain').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+          var id = btn.getAttribute('data-id');
+          var host = btn.getAttribute('data-host');
+          if (!confirm('Hapus domain "' + host + '" dari Xentra Registry?')) return;
+          try {
+            var res = await fetch(API_BASE + '/platform/domains/' + id, {
+              method: 'DELETE',
+              headers: getAuthHeaders()
+            });
+            if (res.ok) loadPlatformDomains();
+          } catch (_) {}
+        });
+      });
+    }
+
+    function openVerifyDomainModal(domainId) {
+      currentVerifyDomainId = domainId;
+      var domain = (platformDomainsCache || []).find(function (d) { return d.id === domainId; });
+      if (!domain) return;
+
+      var modal = $('modal-verify-domain');
+      if (!modal) return;
+
+      var hostDisplay = $('verify-domain-hostname-display');
+      if (hostDisplay) hostDisplay.textContent = domain.hostname;
+
+      var recordName = $('verify-domain-record-name');
+      if (recordName) recordName.textContent = '_xentra-challenge.' + domain.hostname;
+
+      var recordVal = $('verify-domain-record-value');
+      if (recordVal) recordVal.textContent = domain.verification_token;
+
+      var alertBox = $('verify-result-alert');
+      if (alertBox) alertBox.style.display = 'none';
+
+      modal.style.display = 'flex';
+    }
+
+    function initPlatformDomainsUI() {
+      // Add Domain Modal
+      var btnOpenAdd = $('btn-open-add-domain');
+      var modalAdd = $('modal-add-domain');
+      var btnCloseAdd = $('btn-close-add-domain');
+      var btnCancelAdd = $('btn-cancel-add-domain');
+      var formAdd = $('form-add-domain');
+
+      if (btnOpenAdd && modalAdd) {
+        btnOpenAdd.addEventListener('click', function () {
+          modalAdd.style.display = 'flex';
+        });
+      }
+      if (btnCloseAdd && modalAdd) {
+        btnCloseAdd.addEventListener('click', function () {
+          modalAdd.style.display = 'none';
+        });
+      }
+      if (btnCancelAdd && modalAdd) {
+        btnCancelAdd.addEventListener('click', function () {
+          modalAdd.style.display = 'none';
+        });
+      }
+
+      if (formAdd) {
+        formAdd.addEventListener('submit', async function (e) {
+          e.preventDefault();
+          var hostname = ($('add-domain-hostname') ? $('add-domain-hostname').value : '').trim();
+          var brandId = ($('add-domain-brand-id') ? $('add-domain-brand-id').value : '').trim();
+          var orgId = ($('add-domain-org-id') ? $('add-domain-org-id').value : '').trim();
+          var surface = ($('add-domain-surface') ? $('add-domain-surface').value : 'customer');
+          var isPrimary = $('add-domain-is-primary') ? $('add-domain-is-primary').checked : false;
+
+          try {
+            var res = await fetch(API_BASE + '/platform/domains', {
+              method: 'POST',
+              headers: Object.assign({ 'Content-Type': 'application/json' }, getAuthHeaders()),
+              body: JSON.stringify({
+                hostname: hostname,
+                brand_id: brandId,
+                organization_id: orgId,
+                surface_type: surface,
+                is_primary: isPrimary
+              })
+            });
+
+            var json = await res.json();
+            if (!res.ok || !json.success) {
+              alert(json.message || json.error || 'Gagal mendaftarkan domain.');
+              return;
+            }
+
+            modalAdd.style.display = 'none';
+            formAdd.reset();
+            loadPlatformDomains();
+
+            // Open verification modal right away
+            if (json.domain && json.domain.id) {
+              openVerifyDomainModal(json.domain.id);
+            }
+          } catch (err) {
+            alert('Terjadi kesalahan: ' + err.message);
+          }
+        });
+      }
+
+      // Verify Modal
+      var modalVerify = $('modal-verify-domain');
+      var btnCloseVerify = $('btn-close-verify-domain');
+      var btnCloseVerifyModal = $('btn-close-verify-modal');
+      var btnTriggerVerify = $('btn-trigger-verify-dns');
+
+      if (btnCloseVerify && modalVerify) {
+        btnCloseVerify.addEventListener('click', function () {
+          modalVerify.style.display = 'none';
+        });
+      }
+      if (btnCloseVerifyModal && modalVerify) {
+        btnCloseVerifyModal.addEventListener('click', function () {
+          modalVerify.style.display = 'none';
+        });
+      }
+
+      if (btnTriggerVerify) {
+        btnTriggerVerify.addEventListener('click', async function () {
+          if (!currentVerifyDomainId) return;
+          btnTriggerVerify.disabled = true;
+          btnTriggerVerify.textContent = 'Memeriksa DNS...';
+
+          var alertBox = $('verify-result-alert');
+
+          try {
+            var res = await fetch(API_BASE + '/platform/domains/' + currentVerifyDomainId + '/verify', {
+              method: 'POST',
+              headers: getAuthHeaders()
+            });
+            var json = await res.json();
+
+            if (alertBox) {
+              alertBox.style.display = 'block';
+              if (json.success) {
+                alertBox.style.background = '#ecfdf5';
+                alertBox.style.color = '#047857';
+                alertBox.style.border = '1px solid #a7f3d0';
+                alertBox.textContent = '✓ ' + json.message;
+              } else {
+                alertBox.style.background = '#fef2f2';
+                alertBox.style.color = '#b91c1c';
+                alertBox.style.border = '1px solid #fecaca';
+                alertBox.textContent = '✗ ' + json.message;
+              }
+            }
+
+            loadPlatformDomains();
+          } catch (err) {
+            if (alertBox) {
+              alertBox.style.display = 'block';
+              alertBox.style.background = '#fef2f2';
+              alertBox.style.color = '#b91c1c';
+              alertBox.textContent = 'Terjadi kesalahan sistem: ' + err.message;
+            }
+          } finally {
+            btnTriggerVerify.disabled = false;
+            btnTriggerVerify.textContent = 'Periksa DNS Sekarang';
+          }
+        });
+      }
+
+      // Filter and Search Events
+      var searchInput = $('platform-domains-search');
+      if (searchInput) {
+        searchInput.addEventListener('input', function () {
+          var val = searchInput.value.trim().toLowerCase();
+          var filtered = (platformDomainsCache || []).filter(function (d) {
+            return (d.hostname || '').toLowerCase().indexOf(val) !== -1;
+          });
+          renderPlatformDomainsTable(filtered);
+        });
+      }
+
+      var surfaceSelect = $('platform-domains-filter-surface');
+      if (surfaceSelect) surfaceSelect.addEventListener('change', loadPlatformDomains);
+
+      var statusSelect = $('platform-domains-filter-status');
+      if (statusSelect) statusSelect.addEventListener('change', loadPlatformDomains);
+
+      var refreshBtn = $('btn-refresh-domains');
+      if (refreshBtn) refreshBtn.addEventListener('click', loadPlatformDomains);
+    }
+    initPlatformDomainsUI();
 
     // Check for handoff ticket from xentra.cloud before initial auth check
     await handleHandoffExchange();

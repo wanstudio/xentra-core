@@ -62,36 +62,35 @@ class BrandRepository {
       const cached = readDomainCache(clean);
       if (cached) return cached;
     }
-    let brand = this.db.queryOne(`
-      SELECT *
-      FROM brands
-      WHERE lower(trim(custom_domain)) = ?
-      LIMIT 1
-    `, [clean]);
 
-    if (!brand && typeof clean === 'string') {
-      const match = clean.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app|customer)\.(.+)$/);
-      if (match) {
-        const baseDomain = match[1];
-        const candidates = [
-          baseDomain,
-          'app.' + baseDomain,
-          'customer.' + baseDomain,
-          'dashboard.' + baseDomain,
-          'owner.' + baseDomain,
-          'm.' + baseDomain,
-          'merchant.' + baseDomain,
-          'pos.' + baseDomain,
-          'kasir.' + baseDomain
-        ];
-        const placeholders = candidates.map(() => '?').join(',');
-        brand = this.db.queryOne(`
-          SELECT *
-          FROM brands
-          WHERE lower(trim(custom_domain)) IN (${placeholders})
-          LIMIT 1
-        `, candidates);
+    // 1. CANONICAL RESOLUTION: Check Persistent Domain Registry (tenant_domains)
+    // Domain must be verified and active to serve as a valid tenant entry point.
+    let brand = undefined;
+    try {
+      const domainRecord = this.db.queryOne(`
+        SELECT td.brand_id, td.surface_type, td.status, td.verification_status, b.*
+        FROM tenant_domains td
+        JOIN brands b ON b.id = td.brand_id
+        WHERE lower(trim(td.hostname)) = ?
+          AND td.status = 'active'
+          AND td.verification_status = 'verified'
+        LIMIT 1
+      `, [clean]);
+
+      if (domainRecord) {
+        brand = domainRecord;
       }
+    } catch (_) {}
+
+    // 2. COMPATIBILITY FALLBACK: Exact match on brands.custom_domain
+    // Strictly fail closed if unregistered. No speculative regex / prefix guessing.
+    if (!brand) {
+      brand = this.db.queryOne(`
+        SELECT *
+        FROM brands
+        WHERE lower(trim(custom_domain)) = ?
+        LIMIT 1
+      `, [clean]);
     }
 
     if (cacheable && brand) writeDomainCache(clean, brand);

@@ -254,12 +254,12 @@ class PlatformBootstrapService {
 
     const cleanEmail = email.trim().toLowerCase();
 
-    // Query specifically for Platform Owner
+    // Query specifically for Platform Workforce (Platform Owner / Platform Admin)
     const user = this.db.prepare(`
       SELECT id, username, email, full_name, role, status, password_hash, mfa_enabled, mfa_enrolled_at, created_at, updated_at
       FROM users
-      WHERE (LOWER(email) = ? OR LOWER(username) = ?) AND role = ?
-    `).get(cleanEmail, cleanEmail, RoleModel.ROLES.PLATFORM_OWNER);
+      WHERE (LOWER(email) = ? OR LOWER(username) = ?) AND role IN (?, ?)
+    `).get(cleanEmail, cleanEmail, RoleModel.ROLES.PLATFORM_OWNER, RoleModel.ROLES.PLATFORM_ADMIN);
 
     if (!user) {
       this._logSecurityEvent({

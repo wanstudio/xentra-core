@@ -17,6 +17,7 @@ const registerCheckoutRoutes = require('./checkout');
 const registerCustomerAddressRoutes = require('./customer-addresses');
 const registerWorkforceRoutes = require('./workforce');
 const registerPlatformRoutes = require('./platform');
+const registerPlatformDomainRoutes = require('./platform-domains');
 const registerAdminCatalogRoutes = require('./admin-catalog');
 const registerAdminMenuCompositionRoutes = require('./admin-menu-composition');
 const registerAdminBrandRoutes = require('./admin-brand');
@@ -805,11 +806,12 @@ function requirePlatformAuth() {
     }
 
     // STRICT PLATFORM SCOPE ENFORCEMENT: Merchant Owner or other merchant roles CANNOT access
-    if (session.role !== 'platform_owner') {
+    const allowedPlatformRoles = ['platform_owner', 'platform_admin'];
+    if (!allowedPlatformRoles.includes(session.role)) {
       return res.status(403).json({
         success: false,
         error: 'FORBIDDEN_PLATFORM_ACCESS',
-        message: 'Akses ditolak: Operasi ini membutuhkan kewenangan Platform Owner.'
+        message: 'Akses ditolak: Operasi ini membutuhkan kewenangan Platform Workforce (Platform Owner / Platform Admin).'
       });
     }
 
@@ -838,6 +840,12 @@ registerPlatformRoutes(router, {
   TokenSessionStore,
   requirePlatformAuth,
   PlatformBootstrapService: require('../../core/identity').PlatformBootstrapService
+});
+
+// 6.1 Platform Domain Management Endpoints (LOCKED Architecture Contract)
+registerPlatformDomainRoutes(router, {
+  db,
+  requirePlatformAuth
 });
 
 // 7.1 Customer Order History (Protected by Customer Auth)
@@ -949,7 +957,7 @@ function serializePublicBrand(brand) {
     merchant_pwa_name: brand.merchant_pwa_name || null,
     pos_pwa_name: brand.pos_pwa_name || null,
     primary_color: brand.primary_color || '#b6ff00',
-    custom_domain: brand.custom_domain || 'app.mybangjo.com',
+    custom_domain: brand.custom_domain || '',
     tagline: brand.tagline || 'Official Online Food Ordering',
     banners
   };

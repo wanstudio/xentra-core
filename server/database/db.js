@@ -299,6 +299,50 @@ const memoryStore = {
       custom_domain: 'app.mybangjo.com'
     }
   ],
+  tenant_domains: [
+    {
+      id: 'td_bangjo_customer',
+      hostname: 'app.mybangjo.com',
+      organization_id: 'org_xentra_holding',
+      brand_id: 'brand_bangjo',
+      surface_type: 'customer',
+      is_primary: 1,
+      verification_status: 'verified',
+      verification_method: 'dns_txt',
+      verification_token: 'challenge_bangjo_auto',
+      provisioning_status: 'provisioned',
+      tls_status: 'active',
+      status: 'active'
+    },
+    {
+      id: 'td_bangjo_merchant',
+      hostname: 'm.mybangjo.com',
+      organization_id: 'org_xentra_holding',
+      brand_id: 'brand_bangjo',
+      surface_type: 'merchant',
+      is_primary: 0,
+      verification_status: 'verified',
+      verification_method: 'dns_txt',
+      verification_token: 'challenge_bangjo_auto',
+      provisioning_status: 'provisioned',
+      tls_status: 'active',
+      status: 'active'
+    },
+    {
+      id: 'td_bangjo_pos',
+      hostname: 'pos.mybangjo.com',
+      organization_id: 'org_xentra_holding',
+      brand_id: 'brand_bangjo',
+      surface_type: 'pos',
+      is_primary: 0,
+      verification_status: 'verified',
+      verification_method: 'dns_txt',
+      verification_token: 'challenge_bangjo_auto',
+      provisioning_status: 'provisioned',
+      tls_status: 'active',
+      status: 'active'
+    }
+  ],
   branches: [
     {
       id: 'branch_bangjo_barat',
@@ -703,11 +747,19 @@ const db = {
           if (params[0]) return memoryStore.promotions.filter(p => p.brand_id === params[0] && p.is_active === 1);
           return memoryStore.promotions;
         }
+        if (lowerSql.includes('from tenant_domains')) {
+          if (params[0]) return (memoryStore.tenant_domains || []).filter(d => d.brand_id === params[0]);
+          return memoryStore.tenant_domains || [];
+        }
         return [];
       },
       get: (...params) => {
         if (lowerSql.includes('select 1 as alive')) {
           return { alive: 1 };
+        }
+        if (lowerSql.includes('from tenant_domains')) {
+          if (params[0]) return (memoryStore.tenant_domains || []).find(d => d.hostname === params[0] || d.id === params[0]);
+          return undefined;
         }
         if (lowerSql.includes('from users')) {
           if (params[0]) return memoryStore.users.find(u => u.username === params[0] || u.email === params[0]);
@@ -761,6 +813,28 @@ function initSchema(targetDb) {
       updated_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS tenant_domains (
+      id TEXT PRIMARY KEY,
+      hostname TEXT UNIQUE NOT NULL,
+      organization_id TEXT NOT NULL,
+      brand_id TEXT NOT NULL,
+      surface_type TEXT NOT NULL, -- 'customer' | 'merchant' | 'pos'
+      is_primary INTEGER DEFAULT 0,
+      verification_status TEXT DEFAULT 'pending', -- 'pending' | 'verified' | 'failed'
+      verification_method TEXT DEFAULT 'dns_txt',
+      verification_token TEXT NOT NULL,
+      provisioning_status TEXT DEFAULT 'unprovisioned', -- 'unprovisioned' | 'provisioning' | 'provisioned' | 'failed'
+      tls_status TEXT DEFAULT 'pending', -- 'pending' | 'active' | 'failed'
+      status TEXT DEFAULT 'active', -- 'active' | 'disabled'
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+      FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_tenant_domains_brand_id ON tenant_domains(brand_id);
+    CREATE INDEX IF NOT EXISTS idx_tenant_domains_org_id ON tenant_domains(organization_id);
+    CREATE INDEX IF NOT EXISTS idx_tenant_domains_active ON tenant_domains(hostname, status, verification_status);
 
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
@@ -2486,6 +2560,20 @@ function bootstrapEssentialTenant(targetDb) {
       SET custom_domain = 'app.mybangjo.com'
       WHERE id = ? AND (custom_domain IS NULL OR custom_domain = 'xentra.cloud' OR custom_domain = '')
     `).run(brandId);
+  } catch (e) {}
+
+  // Seed canonical tenant_domains for brand_bangjo so runtime resolution is authoritative and data-driven
+  try {
+    const seedDomainStmt = targetDb.prepare(`
+      INSERT OR IGNORE INTO tenant_domains (
+        id, hostname, organization_id, brand_id, surface_type, is_primary,
+        verification_status, verification_method, verification_token,
+        provisioning_status, tls_status, status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, 'verified', 'dns_txt', 'challenge_bangjo_auto', 'provisioned', 'active', 'active', datetime('now'), datetime('now'))
+    `);
+    seedDomainStmt.run('td_bangjo_customer', 'app.mybangjo.com', orgId, brandId, 'customer', 1);
+    seedDomainStmt.run('td_bangjo_merchant', 'm.mybangjo.com', orgId, brandId, 'merchant', 0);
+    seedDomainStmt.run('td_bangjo_pos', 'pos.mybangjo.com', orgId, brandId, 'pos', 0);
   } catch (e) {}
 
   // In test environment only: seed default test merchant owner if users table is empty

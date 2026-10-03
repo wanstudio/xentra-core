@@ -187,7 +187,7 @@ router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
         merchant_pwa_name: targetBrand.merchant_pwa_name || null,
         pos_pwa_name: targetBrand.pos_pwa_name || null,
         primary_color: targetBrand.primary_color || '#b6ff00',
-        custom_domain: targetBrand.custom_domain || 'app.mybangjo.com',
+        custom_domain: targetBrand.custom_domain || '',
         tagline: targetBrand.tagline || 'Official Online Food Ordering',
         banners: Array.isArray(parsedBanners) ? parsedBanners : []
       }

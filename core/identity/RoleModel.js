@@ -14,6 +14,7 @@ class RoleModel {
    */
   static ROLES = {
     PLATFORM_OWNER: 'platform_owner',
+    PLATFORM_ADMIN: 'platform_admin',
     OWNER: 'owner',
     BRAND_MANAGER: 'brand_manager',
     BRANCH_MANAGER: 'branch_manager',
