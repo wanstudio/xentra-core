@@ -8,7 +8,8 @@
  * - SELECT only. This service MUST NOT mutate canonical or legacy tables.
  * - Product remains the inventory identity; Menu is the commercial authority.
  * - A legacy Product reference is migration-ready only when it maps to exactly
- *   one canonical Menu. Zero or multiple candidates require review.
+ *   one canonical Menu in the relevant scope. Zero or multiple candidates
+ *   require review.
  */
 const DataAccess = require('../../../core/data/DataAccess');
 
@@ -30,14 +31,11 @@ function nonEmpty(column) {
 }
 
 class LegacyDataReadinessService {
-  static inspect({ brandId = null, includeRows = true, limit = 100 } = {}) {
-    const params = [];
-    const brandScopeProduct = scopeSql('p', brandId, params);
-    const brandScopePromotion = scopeSql('p', brandId, params);
-    const brandScopeBranch = scopeSql('b', brandId, params);
-    const brandScopeCategory = scopeSql('b', brandId, params);
+  static inspect({ brandId = null, includeRows = true, limit = 100, dataAccess = DataAccess } = {}) {
+    const productStatusParams = [];
+    const brandScopeProduct = scopeSql('p', brandId, productStatusParams);
 
-    const productStatus = DataAccess.queryMany(`
+    const productStatus = dataAccess.queryMany(`
       SELECT
         p.menu_migration_status AS status,
         p.menu_schema_version AS schema_version,
@@ -46,15 +44,15 @@ class LegacyDataReadinessService {
       WHERE 1=1 ${brandScopeProduct}
       GROUP BY p.menu_migration_status, p.menu_schema_version
       ORDER BY p.menu_migration_status ASC, p.menu_schema_version ASC
-    `, params.slice(0, brandId ? 1 : 0));
+    `, productStatusParams);
 
     const productCoverageParams = [];
     const productScope = scopeSql('p', brandId, productCoverageParams);
-    const productCoverage = DataAccess.queryOne(`
+    const productCoverage = dataAccess.queryOne(`
       SELECT
         COUNT(*) AS total_products,
-        COUNT(DISTINCT CASE WHEN mi.product_id IS NOT NULL THEN p.id END) AS products_with_canonical_menu,
-        COUNT(DISTINCT CASE WHEN mi.product_id IS NULL THEN p.id END) AS products_without_canonical_menu,
+        COUNT(DISTINCT CASE WHEN m.id IS NOT NULL THEN p.id END) AS products_with_canonical_menu,
+        COUNT(DISTINCT CASE WHEN m.id IS NULL THEN p.id END) AS products_without_canonical_menu,
         COUNT(DISTINCT m.id) AS canonical_menu_count
       FROM products p
       LEFT JOIN menu_items mi ON mi.product_id = p.id
@@ -64,44 +62,55 @@ class LegacyDataReadinessService {
 
     const promotionParams = [];
     const promotionScope = scopeSql('p', brandId, promotionParams);
-    const legacyPromotions = DataAccess.queryMany(`
+    const legacyPromotions = dataAccess.queryMany(`
       SELECT
         pr.promotion_id,
         p.name AS promotion_name,
         pr.target_product_id,
-        COUNT(DISTINCT mi.menu_id) AS canonical_menu_candidates
+        COUNT(DISTINCT CASE
+          WHEN m.brand_id = p.brand_id THEN mi.menu_id
+        END) AS canonical_menu_candidates
       FROM promotion_rewards pr
       JOIN promotions p ON p.id = pr.promotion_id
       LEFT JOIN menu_items mi ON mi.product_id = pr.target_product_id
+      LEFT JOIN menus m ON m.id = mi.menu_id
       WHERE ${nonEmpty('pr.target_product_id')}
         AND (pr.target_menu_id IS NULL OR trim(CAST(pr.target_menu_id AS TEXT)) = '')
         ${promotionScope}
-      GROUP BY pr.promotion_id, p.name, pr.target_product_id
+      GROUP BY pr.promotion_id, p.name, p.brand_id, pr.target_product_id
       ORDER BY p.name ASC, pr.target_product_id ASC
     `, promotionParams);
 
     const branchParams = [];
     const branchScope = scopeSql('b', brandId, branchParams);
-    const legacyBranches = DataAccess.queryMany(`
+    const legacyBranches = dataAccess.queryMany(`
       SELECT
         bp.branch_id,
         b.name AS branch_name,
         bp.product_id,
         p.name AS product_name,
-        COUNT(DISTINCT mi.menu_id) AS canonical_menu_candidates
+        COUNT(DISTINCT CASE
+          WHEN m.brand_id = b.brand_id THEN bm.menu_id
+        END) AS canonical_menu_candidates
       FROM branch_products bp
       JOIN branches b ON b.id = bp.branch_id
       JOIN products p ON p.id = bp.product_id AND p.brand_id = b.brand_id
       LEFT JOIN menu_items mi ON mi.product_id = bp.product_id
+      LEFT JOIN menus m ON m.id = mi.menu_id
+      LEFT JOIN branch_menus bm
+        ON bm.menu_id = mi.menu_id
+       AND bm.branch_id = bp.branch_id
       WHERE 1=1 ${branchScope}
-      GROUP BY bp.branch_id, b.name, bp.product_id, p.name
-      HAVING COUNT(DISTINCT mi.menu_id) <> 1
+      GROUP BY bp.branch_id, b.name, b.brand_id, bp.product_id, p.name
+      HAVING COUNT(DISTINCT CASE
+        WHEN m.brand_id = b.brand_id THEN bm.menu_id
+      END) <> 1
       ORDER BY b.name ASC, p.name ASC, bp.product_id ASC
     `, branchParams);
 
     const branchProductTotalParams = [];
     const branchProductTotalScope = scopeSql('b', brandId, branchProductTotalParams);
-    const branchProductTotals = DataAccess.queryOne(`
+    const branchProductTotals = dataAccess.queryOne(`
       SELECT COUNT(*) AS total_legacy_branch_products
       FROM branch_products bp
       JOIN branches b ON b.id = bp.branch_id
@@ -110,7 +119,7 @@ class LegacyDataReadinessService {
 
     const branchCategoryParams = [];
     const branchCategoryScope = scopeSql('b', brandId, branchCategoryParams);
-    const legacyBranchCategories = DataAccess.queryOne(`
+    const legacyBranchCategories = dataAccess.queryOne(`
       SELECT COUNT(*) AS count
       FROM branch_product_categories bpc
       JOIN branches b ON b.id = bpc.branch_id
@@ -119,7 +128,7 @@ class LegacyDataReadinessService {
 
     const canonicalIntegrityParams = [];
     const canonicalIntegrityScope = scopeSql('p', brandId, canonicalIntegrityParams);
-    const integrity = DataAccess.queryMany(`
+    const integrity = dataAccess.queryMany(`
       SELECT p.id AS product_id, p.brand_id
       FROM products p
       JOIN menu_items mi ON mi.product_id = p.id
@@ -130,7 +139,9 @@ class LegacyDataReadinessService {
       ORDER BY p.id ASC
     `, canonicalIntegrityParams);
 
-    const promotionUnresolved = legacyPromotions.filter(row => Number(row.canonical_menu_candidates) !== 1).length;
+    const promotionUnresolved = legacyPromotions.filter(
+      row => Number(row.canonical_menu_candidates) !== 1
+    ).length;
     const branchUnresolved = legacyBranches.length;
     const blockers = integrity.length;
     const legacyPromotionCount = legacyPromotions.length;
