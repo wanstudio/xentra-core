@@ -339,6 +339,7 @@ CREATE TABLE branch_categories (
     name TEXT NOT NULL,
     slug TEXT NOT NULL,
     sort_order INTEGER DEFAULT 0,
+    is_active INTEGER DEFAULT 1,
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
@@ -396,17 +397,20 @@ CREATE TABLE menu_levels (
 );
 ```
 
-#### Product composition relations
+#### Legacy Product composition relations
 
 ```text
 products
-  ├── product_flavors      → menu_flavors   (0..1)
-  ├── product_complements  → menu_complements (0..N, ordered)
-  └── product_levels       → menu_levels    (0..1)
+  ├── product_flavors      → menu_flavors   (legacy migration source)
+  ├── product_complements  → menu_complements (legacy migration source)
+  └── product_levels       → menu_levels    (legacy migration source)
 ```
 
-The same-Brand relationship is enforced at database level. Existing product
-`category_id` remains the Master Category relation.
+These relations remain physical compatibility data for migration/reconciliation only. They are
+**not** the canonical customer-facing Menu composition. The canonical composition is
+`menus → menu_items → products`, with Menu taxonomy stored on `menus` and its Master references.
+The same-Brand relationship is enforced at database level. Existing product `category_id` is retained
+for legacy Product context and migration mapping.
 
 ### `orders`
 Master order record governed by state machine.
@@ -447,7 +451,10 @@ CREATE TABLE order_items (
     quantity INT NOT NULL,
     item_subtotal DECIMAL(12, 2) NOT NULL,
     item_note TEXT,
-    menu_snapshot JSON, -- Immutable resolved Master Menu composition snapshot
+    menu_id VARCHAR(36), -- Canonical commercial Menu identity; NULL only for legacy rows
+    menu_type VARCHAR(20), -- SINGLE | PACKAGE for canonical rows
+    menu_snapshot JSON, -- Immutable resolved Menu snapshot
+    component_snapshot JSON, -- Immutable Menu → Product composition snapshot
     modifiers_snapshot JSON, -- Immutable resolved POS option snapshot
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
