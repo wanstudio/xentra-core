@@ -92,6 +92,9 @@
           <button type="button" class="x-nav-sub-item" data-route="catalog/products" data-tab="catalog-products">
             <span>Produk Master</span>
           </button>
+          <button type="button" class="x-nav-sub-item" data-route="catalog/master-menus" data-tab="catalog-master-menus">
+            <span>Menu Master</span>
+          </button>
           <button type="button" class="x-nav-sub-item" data-route="catalog/menus" data-tab="catalog-menus">
             <span>Menu Cabang</span>
           </button>
@@ -1895,6 +1898,168 @@
     </form>
 
   </section>
+      </section>
+
+      <!-- TAB: CATALOG / MASTER MENUS (Owner commercial catalog) -->
+      <section id="tab-catalog-master-menus" class="x-tab-content" data-tab="catalog-master-menus">
+        <div id="master-menu-list-view" class="x-card-panel x-owner-child-page-shell">
+          <div class="x-panel-header-flex">
+            <div>
+              <h3 class="x-master-products-title x-owner-mobile-page-title">
+                <button type="button" class="x-title-back-btn x-owner-mobile-page-back" id="btn-master-menus-back" aria-label="Kembali ke Catalog" onclick="goBackFromChildPage()">
+                  <svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+                </button>
+                Menu Master
+              </h3>
+              <p class="x-master-products-sub x-owner-mobile-page-sub">Susun menu komersial brand yang kemudian diadopsi oleh cabang.</p>
+            </div>
+            <div class="x-header-buttons" id="master-menu-add-actions">
+              <button type="button" class="x-btn-secondary" id="btn-add-master-menu-single">+ Menu Satuan</button>
+              <button type="button" class="x-btn-primary" id="btn-add-master-menu-package">+ Menu Paket</button>
+            </div>
+          </div>
+
+          <div class="x-master-menu-toolbar" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:16px 0;">
+            <div style="flex:1;min-width:220px;position:relative;">
+              <input type="search" id="master-menu-search" class="x-input" placeholder="Cari menu..." autocomplete="off" style="padding-left:36px;">
+              <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </div>
+            <div class="x-master-menu-filter-tabs" id="master-menu-type-filter" role="tablist" aria-label="Filter tipe menu">
+              <button type="button" class="x-subnav-tab active" data-menu-filter="all" role="tab" aria-selected="true">Semua</button>
+              <button type="button" class="x-subnav-tab" data-menu-filter="SINGLE" role="tab" aria-selected="false">Satuan</button>
+              <button type="button" class="x-subnav-tab" data-menu-filter="PACKAGE" role="tab" aria-selected="false">Paket</button>
+            </div>
+          </div>
+
+          <div id="master-menu-list" class="x-master-menu-grid">
+            <div class="x-empty-state text-center py-6 text-muted">Memuat Menu Master...</div>
+          </div>
+        </div>
+
+        <!-- PAGE: ADD / EDIT COMPOSED MENU -->
+        <section id="master-menu-editor-view" class="x-card-panel x-owner-child-page-shell" style="display:none;">
+          <div class="x-owner-child-mobile-header">
+            <h3 class="x-owner-mobile-page-title">
+              <button type="button" class="x-title-back-btn x-owner-mobile-page-back" id="btn-master-menu-editor-back" aria-label="Kembali" onclick="goBackFromChildPage()">
+                <svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg>
+              </button>
+              <span id="master-menu-editor-mobile-title">Tambah Menu</span>
+            </h3>
+            <p class="x-owner-mobile-page-sub" id="master-menu-editor-mobile-subtitle">Menu adalah identitas komersial customer; Product hanya menjadi unit komposisi.</p>
+          </div>
+
+          <div class="x-product-editor-breadcrumb-row x-owner-child-legacy-nav" style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+            <button type="button" class="x-btn-secondary" id="btn-master-menu-editor-desktop-back" style="padding:6px 12px;font-size:13px;">
+              <svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg> Kembali ke Menu Master
+            </button>
+            <span class="text-muted" style="font-size:13px;">/</span>
+            <span id="master-menu-editor-breadcrumb" style="font-weight:600;font-size:14px;">Tambah Menu</span>
+          </div>
+
+          <form id="form-master-menu" class="x-form" style="max-width:920px;margin:0 auto;">
+            <input type="hidden" id="master-menu-id" value="">
+            <input type="hidden" id="master-menu-type" value="SINGLE">
+
+            <div class="x-card" style="margin-bottom:14px;">
+              <div style="margin-bottom:16px;">
+                <h3 id="master-menu-editor-title" style="margin:0;font-size:20px;">Tambah Menu Satuan</h3>
+                <p class="text-muted" style="margin:5px 0 0;font-size:13px;">Field berikut langsung menulis ke entitas Menu. Jangan gunakan nama Product sebagai judul customer.</p>
+              </div>
+
+              <div id="master-menu-single-fields">
+                <div class="x-form-group">
+                  <label for="cm-product">Product Komposisi <span class="x-required-mark">*</span></label>
+                  <select id="cm-product" class="x-input" required></select>
+                  <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Pilih tepat satu Product Master sebagai unit stok Menu Satuan.</small>
+                </div>
+              </div>
+
+              <div id="master-menu-package-fields" style="display:none;">
+                <div class="x-form-group">
+                  <label for="cm-package-name">Nama Menu Paket <span class="x-required-mark">*</span></label>
+                  <input type="text" id="cm-package-name" class="x-input" maxlength="255" autocomplete="off" placeholder="Contoh: Paket Hemat Ayam + Nasi">
+                  <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Nama ini adalah judul customer untuk Menu Paket.</small>
+                </div>
+
+                <div class="x-form-group">
+                  <label>Komposisi Product <span class="x-required-mark">*</span></label>
+                  <div id="cm-package-components" class="x-composed-menu-components"></div>
+                  <button type="button" class="x-btn-secondary" id="btn-cm-add-component" style="margin-top:8px;">+ Tambah Product</button>
+                  <small class="text-muted" style="display:block;margin-top:5px;font-size:11px;">Minimal 2 unit total. Satu Product tidak boleh muncul dua kali dalam paket.</small>
+                </div>
+              </div>
+
+              <div class="x-form-row">
+                <div class="x-form-group">
+                  <label for="cm-category">Kategori</label>
+                  <select id="cm-category" class="x-input"></select>
+                  <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Kategori adalah parent taxonomy; identitas Menu Satuan memakai Sub Category + Rasa.</small>
+                </div>
+                <div class="x-form-group">
+                  <label for="cm-sub-category">Sub Category <span id="cm-sub-required" class="x-required-mark">*</span></label>
+                  <select id="cm-sub-category" class="x-input"></select>
+                </div>
+              </div>
+
+              <div class="x-form-row">
+                <div class="x-form-group">
+                  <label for="cm-rasa">Rasa <span id="cm-rasa-help" class="text-muted">(Menu Satuan default Original)</span></label>
+                  <select id="cm-rasa" class="x-input"></select>
+                </div>
+                <div class="x-form-group">
+                  <label for="cm-level">Level Pedas</label>
+                  <select id="cm-level" class="x-input"></select>
+                </div>
+              </div>
+
+              <div class="x-form-row">
+                <div class="x-form-group">
+                  <label for="cm-price">Harga Jual Menu (Rp) <span class="x-required-mark">*</span></label>
+                  <input type="number" id="cm-price" class="x-input" min="0" step="1" inputmode="numeric" required placeholder="28000">
+                  <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Harga komersial berada di Menu, bukan di Product Master.</small>
+                </div>
+                <div class="x-form-group">
+                  <label for="cm-status">Status</label>
+                  <select id="cm-status" class="x-input">
+                    <option value="DRAFT">Draft</option>
+                    <option value="ACTIVE">Aktif</option>
+                    <option value="ARCHIVED">Arsip</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="x-card" style="margin-bottom:14px;">
+              <div class="x-master-composition-preview-head">
+                <div>
+                  <strong>Preview Customer PWA</strong>
+                  <span>Preview memakai resolver Menu canonical.</span>
+                </div>
+                <span class="x-badge x-badge-info">Live Preview</span>
+              </div>
+              <div class="x-master-customer-preview" id="composed-menu-customer-preview">
+                <div class="x-master-customer-preview-card">
+                  <div class="x-master-customer-preview-info">
+                    <div class="x-master-customer-preview-title" id="cm-preview-title">Pilih komposisi menu</div>
+                    <div class="x-master-customer-preview-subtitle" id="cm-preview-subtitle"></div>
+                    <div class="x-master-customer-preview-detail" id="cm-preview-detail"></div>
+                    <div class="x-master-customer-preview-price" id="cm-preview-price">Rp0</div>
+                  </div>
+                  <div class="x-master-customer-preview-media">
+                    <img id="cm-preview-image" alt="" style="display:none;width:100%;height:100%;object-fit:cover;">
+                    <span id="cm-preview-image-empty" style="display:inline-flex;align-items:center;justify-content:center;font-size:30px;width:100%;height:100%;">🍲</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="x-form-actions" style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">
+              <button type="button" class="x-btn-secondary" id="btn-cancel-master-menu">Batal</button>
+              <button type="button" class="x-btn-secondary" id="btn-save-master-menu-draft">Simpan Draft</button>
+              <button type="submit" class="x-btn-primary" id="btn-save-master-menu-active">Simpan &amp; Aktifkan</button>
+            </div>
+          </form>
+        </section>
       </section>
 
       <!-- TAB: CATALOG / MENUS (Branch Selling Assortment) -->
