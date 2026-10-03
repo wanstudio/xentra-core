@@ -1265,29 +1265,11 @@
         perfLog('home_api_catalog_end', 'error');
         console.warn('[Home] Canonical catalog load warn:', err);
 
-        // Legacy fallback is only for endpoint incompatibility/availability during
-        // rollout. Once canonical data returns successfully, it remains authoritative.
-        var legacyPath = branchId
-          ? '/catalog/menu?branch_id=' + encodeURIComponent(branchId)
-          : '/catalog/menu';
-
-        API.get(legacyPath)
-          .then(function (legacyData) {
-            if (seq !== catalogLoadSeq) return;
-            if (legacyData && legacyData.success && legacyData.categories && legacyData.categories.length > 0) {
-              if (!catalogBranchId) {
-                try { localStorage.setItem('xentra_catalog_cache', JSON.stringify(legacyData)); } catch (_) {}
-              }
-              applyCatalog(legacyData);
-              return;
-            }
-            if (catalogBranchId || !categories.length) renderEmptyBranchCatalog();
-          })
-          .catch(function () {
-            if (seq !== catalogLoadSeq) return;
-            if (catalogBranchId || !categories.length) renderEmptyBranchCatalog();
-          });
-      });
+        // Canonical Menu resolution is the only forward Customer PWA catalog source.
+        // A canonical failure must remain visible instead of silently reviving the
+        // legacy Product-centric catalog, which could produce a mixed/incorrect cart.
+        if (catalogBranchId || !categories.length) renderEmptyBranchCatalog();
+      }));
   }
 
   // ======================================================================
