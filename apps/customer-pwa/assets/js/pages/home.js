@@ -412,24 +412,19 @@
 
     var branchId = currentCustomerBranchId();
     var endpoint = branchId
-      ? '/catalog/menu?branch_id=' + encodeURIComponent(branchId)
-      : '/catalog/menu';
+      ? '/catalog/composed-menu?branch_id=' + encodeURIComponent(branchId)
+      : '/catalog/composed-menu';
 
-    return API.get(endpoint).then(function (data) {
+    return API.get(endpoint).then(function (rawData) {
+      var data = rawData && Array.isArray(rawData.menus)
+        ? adaptCanonicalHomeCatalog(rawData)
+        : rawData;
       var hit = null;
-      var cats = data && Array.isArray(data.categories) ? data.categories : [];
+      var products = data && Array.isArray(data.all_products) ? data.all_products : [];
 
-      cats.some(function (cat) {
-        var items = Array.isArray(cat.products) ? cat.products : [];
-        var found = items.find(function (product) {
-          return String(product.id) === String(productId);
-        });
-        if (found) {
-          hit = found;
-          return true;
-        }
-        return false;
-      });
+      hit = products.find(function (product) {
+        return String(product.id) === String(productId);
+      }) || null;
 
       if (hit) {
         openProductDetail(hit);
