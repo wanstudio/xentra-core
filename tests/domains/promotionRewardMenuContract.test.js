@@ -153,7 +153,7 @@ test.before(async () => {
 
   db.prepare(
     "INSERT OR IGNORE INTO promotions (id, brand_id, name, code, capability_type, stacking_policy, priority_weight, max_redemptions_per_customer, is_active) VALUES (?, ?, 'PRMV1 Promo', NULL, 'install_incentive', 'exclusive', 100, 1, 1)"
-  ).run(PROMO);
+  ).run(PROMO, BRAND);
 
   db.prepare(
     "INSERT OR IGNORE INTO promotion_rewards (id, promotion_id, reward_type, target_menu_id, target_product_id, amount_in_cents) VALUES (?, ?, 'freebie_product', ?, NULL, 0)"
