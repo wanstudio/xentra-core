@@ -118,11 +118,14 @@ router.get(['/catalog/menu', '/home'], async (req, res) => {
     // LEGACY COMPATIBILITY PATH.
     // New Customer PWA code must consume /catalog/composed-menu and must not
     // depend on this Product-centric endpoint for the forward Menu model.
-    const menu = MasterMenuResolver
-      ? (branchScope
-        ? MasterMenuResolver.resolveBranchMenu({ brandId, branchId: branchScope.id })
-        : MasterMenuResolver.resolveMasterMenu({ brandId }))
-      : CatalogService.getMenu({ brand_id: brandId, branch_id: null });
+    // LEGACY COMPATIBILITY AUTHORITY.
+    // Keep the historical Product-centric endpoint stable for legacy consumers/tests.
+    // Forward Customer PWA, Checkout, and POS do not use this route; they use
+    // /catalog/composed-menu and its Menu/Inventory contract instead.
+    const menu = CatalogService.getMenu({
+      brand_id: brandId,
+      branch_id: branchScope ? branchScope.id : null
+    });
 
     menu.products = (menu.products || []).map(function (p) {
       return {
