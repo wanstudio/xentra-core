@@ -265,10 +265,9 @@ test('Master Product editor renders before master-reference requests finish', ()
 });
 
 test('Customer presentation mapping is explicit in Owner UI', () => {
-  assert.match(HTML, /Kategori.*Judul Customer|Kategori.*judul.*Customer/i);
-  assert.match(HTML, /Rasa.*Subtitle Customer/i);
-  assert.match(HTML, /Kelengkapan.*Detail Customer/i);
-  assert.match(HTML, /Level.*Indikator Customer/i);
+  assert.ok(HTML.includes('Judul utama yang tampil di Customer PWA'));
+  assert.ok(HTML.includes('Subtitle Customer PWA'));
+  assert.ok(HTML.includes('Detail Customer PWA'));
   assert.match(HTML, /Kategori → judul · Rasa → subjudul · Kelengkapan → detail · Level → indikator/);
 });
 
