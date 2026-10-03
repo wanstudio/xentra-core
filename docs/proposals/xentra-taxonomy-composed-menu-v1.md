@@ -1224,3 +1224,6 @@ No further business-question loop is required for `target_menu_id` vs `target_pr
 Implementation status is still subject to full runtime tests, production-data migration review, and final consumer quarantine before PR #7 can be merged.
 
 > Audit note (2026-10-03): Promotion Reward Target Contract implementation completed on the proposal branch, including DB guards, canonical Menu resolver, legacy migration planner, checkout verification, order-persistence compatibility, and Owner Promotion UI. Runtime suite remains the final verification gate; production reward data migration is not applied automatically.
+
+
+> Audit note (2026-10-03): Owner Master Menu workspace construction is now implemented on the proposal branch. The Owner UI has a dedicated Menu Master route/editor, canonical SINGLE/PACKAGE save paths, Sub Category/Rasa/Level selectors, Menu-owned selling price, package composition guards, and canonical customer preview semantics. Branch assortment remains isolated under Menu Cabang. Runtime CI verification is still in progress; `main` remains unchanged.
