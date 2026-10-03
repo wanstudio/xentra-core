@@ -677,7 +677,9 @@
     var isSettingsRoute = !isPlatform && (route === 'settings' || route.indexOf('settings/') === 0);
     var settingsSubtab = isSettingsRoute ? (route.indexOf('settings/') === 0 ? route.split('settings/')[1] : 'business/profile') : 'business/profile';
 
-    var metaKey = (isProductDetail || isProductEditor || isMasterMenuEditor || route === 'catalog/master-menus') ? 'catalog/master-menus' : (isBranchEditor ? 'branches' : (isBranchDetail ? 'branches' : (isOrderDetail ? 'orders' : (isCustomerDetail ? 'customers/:id' : (isTeamRoute ? ('team/' + teamSubtab) : (isReportsRoute ? 'reports' : (isFinanceRoute ? ('finance/' + financeSubtab) : (isMarketingRoute ? ('marketing/' + marketingSubtab) : (isSettingsRoute ? ('settings/' + settingsSubtab) : route)))))))));
+    var metaKey = (isMasterMenuEditor || route === 'catalog/master-menus')
+      ? 'catalog/master-menus'
+      : ((isProductDetail || isProductEditor) ? 'catalog/products' : (isBranchEditor ? 'branches' : (isBranchDetail ? 'branches' : (isOrderDetail ? 'orders' : (isCustomerDetail ? 'customers/:id' : (isTeamRoute ? ('team/' + teamSubtab) : (isReportsRoute ? 'reports' : (isFinanceRoute ? ('finance/' + financeSubtab) : (isMarketingRoute ? ('marketing/' + marketingSubtab) : (isSettingsRoute ? ('settings/' + settingsSubtab) : route)))))))))));
     if (isMarketingEditor) metaKey = 'marketing/' + marketingSubtab;
     var meta = metaDict[metaKey] || metaDict[route] || metaDict['overview'];
     var tabId = meta.tab;
@@ -750,17 +752,16 @@
     // 5. Update topbar title
     var titleEl = $('dash-page-title');
     var subEl = $('dash-page-subtitle');
-    if (titleEl) titleEl.textContent = isProductEditor
-      ? (productEditorId ? 'Edit Produk Master' : 'Tambah Produk Master')
-      : (isMasterMenuEditor
-        ? (masterMenuEditorId ? 'Edit Menu Master' : 'Tambah Menu Master')
-        :
-      : (isBranchEditor ? (branchEditorId ? 'Edit Cabang' : 'Tambah Cabang') : (isProductDetail ? 'Product Detail' : (isBranchDetail ? 'Branch Detail' : (isOrderDetail ? 'Order Detail' : (isCustomerDetail ? 'Customer Detail' : (isReportsRoute ? 'Reports' : meta.title))))));
-    if (subEl) subEl.textContent = isProductEditor
-      ? 'Susun identitas, harga, foto, dan komposisi Master Menu'
-      : (isMasterMenuEditor
-        ? 'Susun Menu Satuan atau Menu Paket pada katalog komersial brand'
-        : (isBranchEditor ? 'Kelola identitas, lokasi, kontak, dan aturan operasional cabang' : (isProductDetail ? 'Detail produk master dan status adopsi di cabang' : (isBranchDetail ? 'Detail informasi, operasional, menu, dan tim cabang' : (isOrderDetail ? 'Detail transaksi, rincian biaya, dan status pesanan' : (isCustomerDetail ? 'Profil pelanggan, riwayat pesanan, dan loyalitas' : (isReportsRoute ? 'Laporan penjualan, analitik bisnis, dan kinerja cabang' : meta.sub))))));
+    if (titleEl) titleEl.textContent = isMasterMenuEditor
+      ? (masterMenuEditorId ? 'Edit Menu Master' : 'Tambah Menu Master')
+      : (isProductEditor
+        ? (productEditorId ? 'Edit Produk Master' : 'Tambah Produk Master')
+        : (isBranchEditor ? (branchEditorId ? 'Edit Cabang' : 'Tambah Cabang') : (isProductDetail ? 'Product Detail' : (isBranchDetail ? 'Branch Detail' : (isOrderDetail ? 'Order Detail' : (isCustomerDetail ? 'Customer Detail' : (isReportsRoute ? 'Reports' : meta.title))))));
+    if (subEl) subEl.textContent = isMasterMenuEditor
+      ? 'Susun Menu Satuan atau Menu Paket pada katalog komersial brand'
+      : (isProductEditor
+        ? 'Susun identitas, harga, foto, dan komposisi Master Menu'
+        : (isBranchEditor ? 'Kelola identitas, lokasi, kontak, dan aturan operasional cabang' : (isProductDetail ? 'Detail produk master dan status adopsi di cabang' : (isBranchDetail ? 'Detail informasi, operasional, menu, dan tim cabang' : (isOrderDetail ? 'Detail transaksi, rincian biaya, dan status pesanan' : (isCustomerDetail ? 'Profil pelanggan, riwayat pesanan, dan loyalitas' : (isReportsRoute ? 'Laporan penjualan, analitik bisnis, dan kinerja cabang' : meta.sub)))))));
 
     // 6. Sync Owner bottom nav active module (no-op on desktop, hidden by CSS)
     if (typeof syncOwnerBottomNavActive === 'function') {
