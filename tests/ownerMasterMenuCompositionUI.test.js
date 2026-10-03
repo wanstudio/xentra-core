@@ -217,8 +217,8 @@ test('Product Editor does not own POS commercial options', () => {
   assert.ok(section.includes('id="form-product"'));
   assert.ok(!section.includes('id="prod-options-editor"'));
   assert.ok(!section.includes('Opsi Penjualan POS'));
-  assert.ok(JS.includes('function normalizeProductOptionsDraft'));
-  assert.ok(JS.includes("API_BASE + '/admin/products/' + encodeURIComponent(productId) + '/options'"));
+  assert.ok(!JS.includes('function normalizeProductOptionsDraft'));
+  assert.ok(!JS.includes('/admin/products/'));
 });
 
 test('Atomic Product Editor does not block on Menu Master references', () => {
