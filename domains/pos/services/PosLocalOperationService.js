@@ -21,6 +21,7 @@ const {
   PosShiftRepository
 } = require('../../../core/data/repositories');
 const OfflineReconciliationService = require('./OfflineReconciliationService');
+const { ensureComposedMenuSchema } = require('../../catalog/schema/ComposedMenuSchema');
 
 const posOperationalRepository = new PosOperationalRepository();
 const inventoryRepository = new InventoryRepository();
@@ -153,24 +154,54 @@ class PosLocalOperationService {
     const randSuffix = `${Math.floor(1000 + Math.random() * 9000)}-${crypto.randomBytes(3).toString('hex')}`;
     const orderNumber = `POS-${today}-${randSuffix}`;
 
-    // Calculate subtotal
-    let subtotal = 0;
-    const verifiedItems = items.map(it => {
-      const qty = Number(it.quantity) || 1;
+    // Offline POS operates from its locally cached canonical Menu snapshot.
+    // It may not call the online resolver while disconnected, but the sale still
+    // preserves Menu identity and fixed Product composition for later reconciliation.
+    ensureComposedMenuSchema();
+
+    const normalizedItems = items.map(it => {
+      const qty = Number(it.quantity);
+      if (!Number.isSafeInteger(qty) || qty <= 0) {
+        throw new Error('[PosLocalOperation] Quantity POS offline harus berupa integer positif.');
+      }
+
       const price = Number(it.unit_price ?? it.expected_price ?? it.price ?? 0);
-      const itemSub = qty * price;
-      subtotal += itemSub;
+      if (!Number.isFinite(price) || price < 0) {
+        throw new Error('[PosLocalOperation] Harga POS offline tidak valid.');
+      }
+
+      const menuId = it.menu_id ? String(it.menu_id).trim() : null;
+      const componentSnapshot = Array.isArray(it.component_snapshot)
+        ? it.component_snapshot
+        : (Array.isArray(it.components) ? it.components : null);
+
+      if (menuId && (!componentSnapshot || componentSnapshot.length === 0)) {
+        throw new Error('[PosLocalOperation] Canonical Menu offline wajib membawa component_snapshot.');
+      }
+
       return {
-        product_id: it.product_id,
-        name: it.name || it.product_name || 'Item POS',
+        product_id: menuId ? (it.menu_type === 'SINGLE' ? (it.product_id || (componentSnapshot[0] && componentSnapshot[0].product_id) || null) : null) : it.product_id,
+        menu_id: menuId,
+        menu_type: menuId ? (it.menu_type || 'SINGLE') : null,
+        menu_snapshot: menuId ? (it.menu_snapshot || null) : null,
+        component_snapshot: menuId ? componentSnapshot : null,
+        name: it.name || it.product_name || it.title || 'Item POS',
         unit_price: price,
         quantity: qty,
-        subtotal: itemSub,
+        subtotal: qty * price,
         note: it.note || it.notes || '',
         options: Array.isArray(it.options) ? it.options : []
       };
     });
 
+    const hasCanonical = normalizedItems.some(item => item.menu_id);
+    const hasLegacy = normalizedItems.some(item => !item.menu_id);
+    if (hasCanonical && hasLegacy) {
+      throw new Error('[PosLocalOperation] Canonical Menu dan Product legacy tidak boleh dicampur dalam satu transaksi offline.');
+    }
+
+    const verifiedItems = normalizedItems;
+    const subtotal = verifiedItems.reduce((sum, item) => sum + item.subtotal, 0);
     const grandTotal = subtotal;
 
     if (amount_tendered != null && Number(amount_tendered) < grandTotal) {
@@ -225,9 +256,13 @@ class PosLocalOperationService {
         updatedAt: now
       });
 
-      // 2. Insert items & deduct inventory
+      // 2. Insert items & deduct inventory.
+      // Canonical Menu components are aggregated first so one Product shared by
+      // several Menu lines is deducted exactly once for the total requirement.
+      const canonicalRequirements = new Map();
+
       for (const item of verifiedItems) {
-        const itemId = `item_${crypto.randomBytes(6).toString('hex')}`;
+        const itemId = 'item_' + crypto.randomBytes(6).toString('hex');
         orderRepository.insertItem({
           id: itemId,
           orderId,
@@ -237,10 +272,40 @@ class PosLocalOperationService {
           quantity: item.quantity,
           itemSubtotal: item.subtotal,
           note: item.note,
-          modifiersSnapshot: JSON.stringify(item.options || [])
+          modifiersSnapshot: JSON.stringify(item.options || []),
+          menuSnapshot: item.menu_snapshot ? JSON.stringify(item.menu_snapshot) : null,
+          menuId: item.menu_id || null,
+          menuType: item.menu_type || null,
+          componentSnapshot: item.component_snapshot ? JSON.stringify(item.component_snapshot) : null
         });
 
-        // Deduct local branch stock
+        if (item.menu_id) {
+          for (const component of item.component_snapshot || []) {
+            const componentQty = Number(component.quantity);
+            if (!Number.isSafeInteger(componentQty) || componentQty <= 0) {
+              throw new Error('[INVALID_MENU_COMPOSITION] Komponen Menu offline memiliki quantity tidak valid.');
+            }
+
+            const productId = String(component.product_id || '').trim();
+            if (!productId) throw new Error('[INVALID_MENU_COMPOSITION] Product ID komponen Menu offline tidak ditemukan.');
+
+            const sku = component.sku == null ? '' : String(component.sku).trim();
+            if (!sku) continue;
+
+            const required = item.quantity * componentQty;
+            if (!canonicalRequirements.has(productId)) {
+              canonicalRequirements.set(productId, {
+                product_id: productId,
+                product_name: component.product_name || productId,
+                quantity: 0
+              });
+            }
+            canonicalRequirements.get(productId).quantity += required;
+          }
+          continue;
+        }
+
+        // Legacy Product compatibility path.
         const bpBefore = inventoryRepository.findBranchProduct(branch_id, item.product_id);
         const prevStock = bpBefore ? Number(bpBefore.stock || 0) : 0;
         const deductResult = inventoryRepository.deductBranchProduct({
@@ -250,12 +315,12 @@ class PosLocalOperationService {
         });
 
         if (!deductResult || deductResult.changes === 0) {
-          throw new Error(`[INSUFFICIENT_LOCAL_STOCK] Stok lokal produk "${item.name}" tidak mencukupi untuk penjualan offline.`);
+          throw new Error('[INSUFFICIENT_LOCAL_STOCK] Stok lokal produk ' + item.name + ' tidak mencukupi untuk penjualan offline.');
         }
 
         const currentStock = prevStock - item.quantity;
         inventoryRepository.insertSaleDeduction({
-          id: `mov_${crypto.randomBytes(6).toString('hex')}`,
+          id: 'mov_' + crypto.randomBytes(6).toString('hex'),
           branchId: branch_id,
           productId: item.product_id,
           quantity: item.quantity,
@@ -263,7 +328,35 @@ class PosLocalOperationService {
           currentStock,
           referenceId: orderNumber,
           actorId: terminal_id,
-          notes: `Pemotongan stok offline lokal ${orderNumber} (${terminal_id})`,
+          notes: 'Pemotongan stok offline lokal ' + orderNumber + ' (' + terminal_id + ')',
+          createdAt: now
+        });
+      }
+
+      for (const requirement of canonicalRequirements.values()) {
+        const before = inventoryRepository.findBranchProduct(branch_id, requirement.product_id);
+        const prevStock = before ? Number(before.stock || 0) : 0;
+        const deductResult = inventoryRepository.deductBranchProduct({
+          quantity: requirement.quantity,
+          branchId: branch_id,
+          productId: requirement.product_id
+        });
+
+        if (!deductResult || deductResult.changes === 0) {
+          throw new Error('[INSUFFICIENT_LOCAL_STOCK] Stok lokal komponen ' + requirement.product_name + ' tidak mencukupi untuk penjualan offline (tersisa ' + prevStock + ', diminta ' + requirement.quantity + ').');
+        }
+
+        const currentStock = prevStock - requirement.quantity;
+        inventoryRepository.insertSaleDeduction({
+          id: 'mov_' + crypto.randomBytes(6).toString('hex'),
+          branchId: branch_id,
+          productId: requirement.product_id,
+          quantity: requirement.quantity,
+          previousStock: prevStock,
+          currentStock,
+          referenceId: orderNumber,
+          actorId: terminal_id,
+          notes: 'Pemotongan stok offline komponen Menu ' + orderNumber + ' (' + terminal_id + ')',
           createdAt: now
         });
       }
@@ -373,7 +466,8 @@ class PosLocalOperationService {
   static mutateProductAvailabilityOffline({
     terminal_id,
     branch_id,
-    product_id,
+    product_id = null,
+    menu_id = null,
     is_available,
     actor_id = 'branch_manager'
   }) {
@@ -383,11 +477,13 @@ class PosLocalOperationService {
     const queueId = `queue_${crypto.randomBytes(6).toString('hex')}`;
     const now = new Date().toISOString();
 
+    const canonicalMenu = Boolean(menu_id);
     const payload = {
       client_transaction_id: clientTxId,
       terminal_id,
       branch_id,
-      product_id,
+      product_id: canonicalMenu ? null : product_id,
+      menu_id: canonicalMenu ? String(menu_id) : null,
       is_available: is_available ? 1 : 0,
       actor_id,
       mutated_at: now
@@ -395,11 +491,19 @@ class PosLocalOperationService {
 
     posOperationalRepository.beginTransaction();
     try {
-      // Update local product availability
-      inventoryRepository.db.execute(
-        'UPDATE branch_products SET is_available = ?, updated_at = ? WHERE branch_id = ? AND product_id = ?',
-        [is_available ? 1 : 0, now, branch_id, product_id]
-      );
+      // Canonical offline availability belongs to Branch Menu.
+      // Legacy Product availability remains as a compatibility path.
+      if (canonicalMenu) {
+        inventoryRepository.db.execute(
+          'UPDATE branch_menus SET is_available = ?, updated_at = ? WHERE branch_id = ? AND menu_id = ?',
+          [is_available ? 1 : 0, now, branch_id, String(menu_id)]
+        );
+      } else {
+        inventoryRepository.db.execute(
+          'UPDATE branch_products SET is_available = ?, updated_at = ? WHERE branch_id = ? AND product_id = ?',
+          [is_available ? 1 : 0, now, branch_id, product_id]
+        );
+      }
 
       // Enqueue sync operation
       posOperationalRepository.insertQueueEntry({
@@ -407,7 +511,7 @@ class PosLocalOperationService {
         terminalId: terminal_id,
         branchId: branch_id,
         clientTransactionId: clientTxId,
-        operationType: 'product_availability',
+        operationType: canonicalMenu ? 'menu_availability' : 'product_availability',
         payload,
         status: 'pending',
         createdAt: now
@@ -422,7 +526,8 @@ class PosLocalOperationService {
     return {
       success: true,
       branch_id,
-      product_id,
+      product_id: canonicalMenu ? null : product_id,
+      menu_id: canonicalMenu ? String(menu_id) : null,
       is_available: is_available ? 1 : 0,
       queue_id: queueId
     };
