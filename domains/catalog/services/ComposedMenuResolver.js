@@ -64,7 +64,7 @@ function resolveMenuBase(menu) {
   };
 }
 
-function calculateInventory(menuItems, inventoryRows, menuType = null) {
+function calculateInventory(menuItems, inventoryRows, menuType = null, checkStock = true) {
   const inventoryMap = new Map(
     (inventoryRows || []).map(row => [String(row.product_id), row])
   );
@@ -100,7 +100,7 @@ function calculateInventory(menuItems, inventoryRows, menuType = null) {
     const stockQty = stockManaged ? Number(inv ? inv.stock_qty : 0) : null;
     const quantity = Number(item.quantity);
     const capacity = stockManaged
-      ? Math.max(0, Math.floor(stockQty / quantity))
+      ? (checkStock ? Math.max(0, Math.floor(stockQty / quantity)) : null)
       : null;
 
     if (item.product_is_active === 0) {
@@ -113,7 +113,7 @@ function calculateInventory(menuItems, inventoryRows, menuType = null) {
     if (stockManaged) {
       stockManagedComponentCount += 1;
       packageCapacity = Math.min(packageCapacity, capacity);
-      if (capacity <= 0 && !blocking) blocking = 'OUT_OF_STOCK';
+      if (checkStock && capacity <= 0 && !blocking) blocking = 'OUT_OF_STOCK';
     } else {
       allStockManagedComponents = false;
     }
