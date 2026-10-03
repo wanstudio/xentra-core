@@ -30,6 +30,23 @@ function parseComponentSnapshot(value) {
   }
 }
 
+function resolveOrderItemProductId(item) {
+  const explicitProductId = String(item && item.product_id || '').trim();
+  if (explicitProductId) return explicitProductId;
+
+  if (item && item.menu_id) {
+    const components = parseComponentSnapshot(item.component_snapshot);
+    const firstProductId = String(components[0] && components[0].product_id || '').trim();
+    if (firstProductId) {
+      // order_items.product_id is a legacy NOT NULL compatibility pointer.
+      // It never becomes the commercial identity or inventory authority.
+      return firstProductId;
+    }
+  }
+
+  throw new Error('[OrderPlacementService] Order item Product compatibility pointer is missing.');
+}
+
 function aggregateComposedRequirements(items) {
   const requirements = new Map();
 
@@ -338,6 +355,7 @@ class OrderPlacementService {
 
       for (const item of verifiedItems) {
         const itemId = `item_${crypto.randomBytes(6).toString('hex')}`;
+        const persistedProductId = resolveOrderItemProductId(item);
         const formattedItemNote = item.promo_id
           ? `[PROMO:${item.promo_id}] ${item.notes || item.note || ''}`.trim()
           : (item.notes || item.note || '');
@@ -345,7 +363,7 @@ class OrderPlacementService {
         orderRepository.insertItem({
           id: itemId,
           orderId,
-          productId: item.product_id,
+          productId: persistedProductId,
           productName: item.name,
           unitPrice: item.unit_price,
           quantity: item.quantity,
