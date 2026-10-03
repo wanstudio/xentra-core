@@ -94,3 +94,26 @@ test('Forward Customer/POS/Checkout paths stay on the canonical Menu boundary', 
   );
   assert.ok(composedCheckout.includes('menu.selling_price'), 'canonical checkout pricing must come from Menu selling_price');
 });
+
+
+test('Checkout keeps MasterMenuResolver strictly behind the legacy Product fallback', () => {
+  const gate = fs.readFileSync(
+    path.join(ROOT, 'domains/commerce/services/PrePaymentVerificationGate.js'),
+    'utf8'
+  );
+  const canonicalGuard = "if (item.menu_id) continue;";
+  const masterCall = "MasterMenuResolver.resolveBranchMenu({";
+  const guardIndex = gate.indexOf(canonicalGuard);
+  const masterIndex = gate.indexOf(masterCall);
+
+  assert.ok(guardIndex >= 0, 'canonical menu items must exit the legacy Product verification loop');
+  assert.ok(masterIndex > guardIndex, 'MasterMenuResolver fallback must occur only after canonical menu items are skipped');
+  assert.ok(
+    gate.includes('const nonRewardLegacyItems = items.filter'),
+    'checkout must explicitly separate legacy Product items from canonical Menu items'
+  );
+  assert.ok(
+    gate.includes("status: 'MIXED_MENU_MODELS'"),
+    'checkout must reject mixing canonical Menu and legacy Product cart models'
+  );
+});
