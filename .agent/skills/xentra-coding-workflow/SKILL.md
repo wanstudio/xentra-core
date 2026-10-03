@@ -39,10 +39,10 @@ Configuration may select behavior but must not become an authorization bypass or
 
 ## Definition of done
 A coding task is done when:
-- the requested behavior is implemented at the correct owner boundary;
+- the requested behavior is implemented at the correct owner boundary using existing platform engines (never create bespoke shortcuts);
 - locked Notion invariants still hold;
 - no known caller is broken;
-- the relevant runtime path is wired;
+- the full 3-layer delivery is verified: (1) Domain/Service Engine, (2) Express Routing/Mount points, (3) Surface HTML DOM, Stylesheet, and Script wiring;
 - documentation is updated when the contract/decision changed;
 - the patch is committed with a clear WHAT + WHY.
 

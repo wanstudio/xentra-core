@@ -106,6 +106,20 @@ Use the smallest relevant skill set. Combine skills when a change crosses bounda
 - When a requirement genuinely crosses boundaries, introduce the smallest stable abstraction that satisfies it.
 - Before finishing, verify affected business logic, domain boundaries, runtime wiring, and callers remain coherent.
 
+## Anti-shortcutting & End-to-End Integration Discipline
+
+Never take lazy shortcuts or leave half-baked wiring. When adding or updating user-facing capabilities across any surface (POS, Dashboard, Merchant App, Customer PWA):
+
+1. **Check Existing Platform Engines & Shared UI First**:
+   - Xentra already has standard platform engines (e.g., Media Engine in `core/media/` and interactive UI primitives in `apps/merchant-shared/`).
+   - If an entity upload is required, **always** inspect and reuse `XentraCropEditor` (`window.XentraCropEditor`), the interactive crop modal `#modal-crop-editor`, and standard 1:1 framing before touching backend storage. Never write a raw file-to-API bypass that skips canonical user interactions.
+2. **Verify Full 3-Layer Delivery (Not Just Unit Tests)**:
+   - **Layer 1 (Contract & Engine)**: Use repository domain services (`MediaService`, etc.).
+   - **Layer 2 (Runtime Routing)**: Verify exact Express route mounting in `server/app.js` and ensure all client calling patterns (e.g., `/api/v1/auth/...` vs direct `/auth/...`) are covered without returning 404s.
+   - **Layer 3 (Surface DOM & Script Wiring)**: Ensure target surfaces (`index.html`, stylesheet, DOM modal elements, and scripts) have the necessary markup and script tags loaded. A feature is broken if the backend works in tests but the frontend DOM is missing.
+3. **Never Confuse YAGNI With Incomplete Work**:
+   - YAGNI means avoiding speculative architecture and unneeded dependencies; it does **not** mean taking shortcuts that deliver broken UX, bypassing existing platform engines, or leaving unmounted routes.
+
 ## Completion
 
 A coding task is complete only when the implementation matches the relevant contract, the correct runtime path is wired, affected callers remain coherent, and the changes are committed. Update durable documentation when the contract or architecture changes.
