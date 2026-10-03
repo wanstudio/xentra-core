@@ -1373,6 +1373,7 @@ function initSchema(targetDb) {
       id TEXT PRIMARY KEY,
       promotion_id TEXT NOT NULL,
       reward_type TEXT NOT NULL,
+      target_menu_id TEXT,
       target_product_id TEXT,
       amount_in_cents INTEGER NOT NULL DEFAULT 0,
       max_discount_in_cents INTEGER,
@@ -1380,6 +1381,13 @@ function initSchema(targetDb) {
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (promotion_id) REFERENCES promotions(id) ON DELETE CASCADE
     );
+
+    // Promotion Reward Target migration: Menu is the canonical commercial
+    // reward identity. target_product_id remains a legacy compatibility
+    // reference during migration. Existing databases receive target_menu_id
+    // additively without destructive table rebuilds.
+    try { targetDb.exec("ALTER TABLE promotion_rewards ADD COLUMN target_menu_id TEXT;"); } catch (_) {}
+    try { targetDb.exec("CREATE INDEX IF NOT EXISTS idx_promotion_rewards_target_menu ON promotion_rewards(target_menu_id);"); } catch (_) {}
 
     CREATE TABLE IF NOT EXISTS promotion_redemptions (
       id TEXT PRIMARY KEY,
