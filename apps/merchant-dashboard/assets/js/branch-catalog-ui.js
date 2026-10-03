@@ -167,7 +167,7 @@
       var price = comp.price != null ? Number(comp.price) : Number(p.master_price || p.price || 0);
             var availabilityToggle = '' +
         '<label class="x-toggle' + (isAvailable ? ' x-toggle-on' : '') + '" title="' + (isAvailable ? 'Menu tersedia' : 'Menu habis') + '">' +
-          '<input type="checkbox" ' + (isAvailable ? 'checked' : '') + ' onchange="toggleBranchMenuAvailability(\'' + p.product_id + '\', this.checked ? 1 : 0)" aria-label="Ubah ketersediaan menu cabang">' +
+          '<input type="checkbox" ' + (isAvailable ? 'checked' : '') + ' onchange="toggleBranchMenuAvailability(\'' + p.menu_id + '\', this.checked ? 1 : 0)" aria-label="Ubah ketersediaan menu cabang">' +
           '<span class="x-toggle-slider"></span>' +
         '</label>';
 
@@ -183,7 +183,7 @@
               '<div>' + availabilityToggle + '</div>',
               '<div class="x-item-actions">',
                 '<button type="button" class="x-action-menu-trigger" aria-label="Aksi menu cabang" onclick="XentraActionMenu.open(this, [' +
-                  '{ label: \'Hapus dari Cabang\', icon: \'🗑️\', destructive: true, onClick: function() { removeBranchMenu(\'' + p.product_id + '\'); } }' +
+                  '{ label: \'Hapus dari Cabang\', icon: \'🗑️\', destructive: true, onClick: function() { removeBranchMenu(\'' + p.menu_id + '\'); } }' +
                 '])">',
                 '</button>',
               '</div>',
@@ -206,8 +206,8 @@
 
     container.innerHTML = source.map(function (p) {
       var comp = p.menu_composition || null;
-      var ready = Boolean(comp && comp.title);
-      var img = (comp && comp.image) || p.image_url || '';
+      var ready = Boolean((p.menu_id || p.id) && comp && comp.title && String(comp.status || p.status || 'ACTIVE').toUpperCase() === 'ACTIVE');
+      var img = (comp && (comp.image_url || (comp.components && comp.components[0] && comp.components[0].image_url))) || p.image_url || '';
       var detailHtml = comp
         ? '<div style="font-size:11px;line-height:1.5;color:#475569;margin:5px 0 7px;">' +
             '<div><strong>' + esc(comp.title || '') + '</strong></div>' +
@@ -221,12 +221,12 @@
         '<div class="x-product-card-simple" style="background:#f8fafc;">',
           img ? '<img src="' + esc(img) + '" class="x-product-card-thumb" alt="' + esc((comp && comp.title) || p.name || 'Master Menu') + '">' : '',
           '<div class="x-product-card-content">',
-            '<h5>' + esc(p.name || 'Master Menu') + '</h5>',
+            '<h5>' + esc(p.name || p.title || 'Master Menu') + '</h5>',
             detailHtml,
             '<div class="x-product-card-price">Harga Owner: ' + formatMoney((comp && comp.price != null) ? comp.price : p.price) + '</div>',
             '<div class="x-product-card-actions">' +
               (ready
-                ? '<button type="button" class="x-btn-primary" data-master-adopt="' + esc(p.id) + '" style="padding:6px 12px;font-size:12px;">＋ Adopsi ke Cabang</button>'
+                ? '<button type="button" class="x-btn-primary" data-master-adopt="' + esc(p.menu_id || p.id) + '" style="padding:6px 12px;font-size:12px;">＋ Adopsi ke Cabang</button>'
                 : '<button type="button" class="x-btn-secondary" disabled style="padding:6px 12px;font-size:12px;opacity:.65;">Menunggu komposisi Owner</button>') +
             '</div>',
           '</div>',
@@ -240,10 +240,10 @@
       });
     });
   }
-  window.toggleBranchMenuAvailability = async function (productId, nextAvail) {
+  window.toggleBranchMenuAvailability = async function (menuId, nextAvail) {
     if (!currentManagingBranchId) return;
     try {
-      var res = await CatalogClient.setBranchProductAvailability(currentManagingBranchId, productId, nextAvail);
+      var res = await CatalogClient.setBranchMenuAvailability(currentManagingBranchId, menuId, nextAvail);
       var data = await res.json();
       if (data.success) {
         showToast('Ketersediaan menu cabang diperbarui.');
@@ -256,16 +256,16 @@
     }
   };
 
-  window.removeBranchMenu = async function (productId, productName) {
-    productName = productName || 'menu ini';
+  window.removeBranchMenu = async function (menuId, menuName) {
+    menuName = menuName || 'menu ini';
     if (!currentManagingBranchId) return;
-    if (!await confirmBranchCatalogAction('remove-branch-product', 'Hapus dari Katalog Cabang', 'Hapus "' + productName + '" dari katalog cabang ini? Menu tidak akan lagi tampil di halaman pemesanan pelanggan cabang ini.', 'Hapus')) return;
+    if (!await confirmBranchCatalogAction('remove-branch-menu', 'Hapus dari Katalog Cabang', 'Hapus "' + productName + '" dari katalog cabang ini? Menu tidak akan lagi tampil di halaman pemesanan pelanggan cabang ini.', 'Hapus')) return;
 
     try {
-      var res = await CatalogClient.removeBranchMenu(currentManagingBranchId, productId);
+      var res = await CatalogClient.removeBranchMenu(currentManagingBranchId, menuId);
       var data = await res.json();
       if (data.success) {
-        showToast('✅ Produk dihapus dari katalog cabang.');
+        showToast('✅ Menu dihapus dari katalog cabang.');
         reloadBranchCatalogView();
       } else {
         showToast('❌ ' + (data.error || 'Gagal menghapus produk.'));
