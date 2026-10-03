@@ -1006,45 +1006,39 @@ The major remaining work is implementation reconciliation against the existing p
 **Production/main must remain unchanged until the final Xentra contract is explicitly promoted.**
 
 
-## 24. Current implementation status — 2026-10-03
+## 26. Current implementation status — 2026-10-03
 
-The business/domain contract above is locked. Construction has started on `proposal/xentra-taxonomy-composed-menu-v1`; `main` remains untouched.
+The Product → Menu → Inventory business contract above is locked. Construction remains isolated on `proposal/xentra-taxonomy-composed-menu-v1`; `main` is unchanged.
 
-Implemented as the first additive foundation:
-- Product SKU field with normalized Brand-scoped uniqueness and audited SKU history.
-- Sub Category master with Brand-scoped normalized name uniqueness and Category parent relation.
-- Menu Satuan and Menu Paket persistence with fixed `menu_items` composition and quantity rules.
-- Branch Menu adoption separated from Product inventory.
-- Branch Product Inventory as the new Product/SKU stock boundary, with missing inventory row resolved as zero stock.
-- Canonical composed-menu resolver for customer title/subtitle, Branch availability, Package capacity, and live title/Rasa search.
-- Admin API surface for Menu creation, Sub Category/Rasa management, SKU management, Branch adoption, and menu status.
+Implemented in the proposal branch:
 
-Legacy Product-composition and Branch Product paths are intentionally still present. They are not silently rewritten; migration and consumer quarantine are later gates.
-
-
-
-
-
-The contract is locked, while implementation remains isolated on `proposal/xentra-taxonomy-composed-menu-v1`.
-
-Implemented in this proposal branch:
-
-- canonical Product/SKU, Menu Satuan, Menu Paket, Branch Menu and Branch Product Inventory schema foundation;
-- Product SKU audit/history and guarded SKU removal;
+- Product/SKU, Menu Satuan, Menu Paket, Branch Menu and Branch Product Inventory schema foundation;
+- Product SKU history plus guarded SKU removal;
 - deterministic legacy Product → Menu Satuan migration planner/apply/verify operator;
-- canonical Menu customer resolver and branch resolver, including Package stock-capacity math;
-- canonical checkout verification and shared-component stock aggregation;
-- canonical Menu order snapshots and Product/SKU component stock deduction at the existing order commitment/settlement boundary;
+- canonical Menu customer/master and Branch resolver, including Package stock-capacity math and invalid-component blocking;
+- canonical checkout verification, Menu snapshots, and shared-Product stock aggregation;
 - canonical inventory repository routing for SKU-managed Products;
 - Branch Menu availability mutation with Branch Manager scope;
-- additive composed-menu API endpoints and contract tests.
+- canonical Customer PWA catalog consumption without silent legacy catalog fallback;
+- canonical Menu endpoint compatibility envelope for older consumers;
+- Admin API surface for Product/Menu/Sub Category/Rasa/SKU/adoption operations;
+- contract tests covering canonical inventory and composed Menu/migration behavior.
 
-Not yet promoted to `main`:
+Still pending before promotion to `main`:
 
-- Owner/Branch/Catalog UI replacement;
-- full POS, Additional Order, receipt, KDS, reporting and promotion consumer migration;
-- legacy quarantine/column retirement;
-- production data migration execution;
-- full runtime test-suite verification.
+- Owner UI replacement/integration;
+- Branch/Merchant adoption UI integration;
+- final Customer PWA UI integration and all remaining consumer cleanup;
+- Payment, Receipt, KDS, Reporting, Promotion and remaining POS consumer migration;
+- complete legacy quarantine and retirement of compatibility paths;
+- production database migration execution and verification;
+- full runtime test-suite execution and production audit.
 
-Source-level audit has been performed for the newly modified JavaScript paths at the current proposal head. No independent parser/runtime execution has been performed in this audit environment, and GitHub Actions has not produced a workflow run for this branch. Therefore this audit must not be represented as full syntax/runtime/CI verification.
+Verification state:
+
+- Source-level audit has been performed on the modified implementation paths.
+- No independent parser/runtime execution was performed in this audit environment.
+- GitHub Actions has not produced a workflow run for the current proposal HEAD.
+- Therefore the branch is **not** test-verified or merge-ready solely from this audit.
+
+**Do not merge PR #7 to `main` yet.**
