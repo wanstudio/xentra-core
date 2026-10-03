@@ -68,7 +68,11 @@ test.before(async () => {
   ).run(PRODUCT_SIMPLE, PRODUCT_STOCK, PRODUCT_COMPLEMENT, PRODUCT_DUPLICATE);
 });
 
-test('dry-run plans deterministic SKU but does not mutate Product/Menu/Inventory', () => {
+test('dry-run plans deterministic SKU when legacy stock requires a Product SKU without mutating Product/Menu/Inventory', () => {
+  db.prepare(
+    "INSERT OR REPLACE INTO branch_products (branch_id, product_id, price, stock, is_available, low_stock_threshold) VALUES (?, ?, 30000, 7, 1, 2)"
+  ).run(BRANCH, PRODUCT_STOCK);
+
   const plan = ComposedMenuMigrationService.reconcileProduct({
     brandId: BRAND,
     productId: PRODUCT_STOCK
@@ -86,6 +90,7 @@ test('dry-run plans deterministic SKU but does not mutate Product/Menu/Inventory
     "SELECT id FROM menus WHERE brand_id = ? AND menu_type = 'SINGLE' AND id LIKE ?"
   ).get(BRAND, '%');
   assert.equal(menu, undefined);
+  db.prepare('DELETE FROM branch_products WHERE branch_id = ? AND product_id = ?').run(BRANCH, PRODUCT_STOCK);
 });
 
 test('apply migrates a simple legacy Product to one Menu Satuan with Original Rasa', () => {
@@ -289,13 +294,6 @@ test('existing Menu Satuan identity conflict is surfaced before mutation', () =>
   db.prepare(
     "INSERT OR IGNORE INTO menu_items (menu_id, product_id, quantity, sort_order) VALUES ('cmm_existing_menu', ?, 1, 0)"
   ).run(PRODUCT_SIMPLE);
-
-  // Product name points at the same Sub Category but its deterministic Rasa is Original,
-  // so the exact identity is the manually-created Original menu above only when its Rasa id is reused.
-  // The migration must never guess around an existing identity conflict.
-  db.prepare(
-    "INSERT OR IGNORE INTO menu_flavors (id, brand_id, name, slug, is_active) VALUES ('cmm_original_real', ?, 'Original', 'original', 1)"
-  ).run(BRAND);
 
   // Force the product to use the conflicting Rasa explicitly.
   db.prepare(
