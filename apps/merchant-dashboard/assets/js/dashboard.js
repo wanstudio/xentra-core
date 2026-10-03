@@ -11180,7 +11180,7 @@ async function loadMenusView() {
   /* =========================================================================
      OWNER MASTER MENU — CANONICAL COMMERCIAL MENU WORKSPACE
      Product remains an atomic stock/composition unit. This controller talks
-     directly to /admin/menus/* and never uses legacy /catalog/menu.
+     directly to /admin/menus/* and never uses the legacy customer catalog route.
      ========================================================================= */
 
   var _ownerMasterMenuState = {
