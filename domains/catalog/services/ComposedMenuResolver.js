@@ -247,9 +247,12 @@ class ComposedMenuResolver {
       const inventoryState = calculateInventory(itemMap.get(String(menu.id)) || [], inventory, menu.menu_type);
 
       const menuStatusValid = String(menu.status).toUpperCase() === 'ACTIVE';
+      const categoryMemberships = membershipMap.get(String(menu.id)) || [];
+      const activeBranchCategories = categoryMemberships.filter(row => row.branch_category_is_active !== 0);
       let blockingReason = null;
       if (!branchState.is_available) blockingReason = 'BRANCH_MENU_UNAVAILABLE';
       else if (!menuStatusValid) blockingReason = 'MENU_INACTIVE';
+      else if (categoryMemberships.length > 0 && activeBranchCategories.length === 0) blockingReason = 'BRANCH_CATEGORY_UNAVAILABLE';
       else if (inventoryState.blocking_reason) blockingReason = inventoryState.blocking_reason;
 
       const available = blockingReason == null;
@@ -263,13 +266,11 @@ class ComposedMenuResolver {
         branch: {
           id: branchId
         },
-        branch_categories: (membershipMap.get(String(menu.id)) || [])
-          .filter(row => row.branch_category_is_active !== 0)
-          .map(row => ({
-            id: row.branch_category_id,
-            name: row.branch_category_name,
-            slug: row.branch_category_slug
-          })),
+        branch_categories: activeBranchCategories.map(row => ({
+          id: row.branch_category_id,
+          name: row.branch_category_name,
+          slug: row.branch_category_slug
+        })),
         inventory: inventoryState
       };
 
