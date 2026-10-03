@@ -183,21 +183,34 @@ Gateway timeout is treated as `reconciliation_pending`; it must not be blindly r
 
 The same Xentra-Core payment authority remains the single source of truth. No second payment state machine is introduced.
 
-## POS Transaction UX — LOCKED REVISION 1.1
+## POS Transaction UX — LOCKED REVISION 1.2
 
 **Date:** 2026-10-03
 
+### Transaction Mode
+
+Every new POS sale starts with a transaction-mode selector inside the **Kasir** workspace:
+
+**Dine-In | Takeaway**
+
+This selector is **transaction context, not navigation**.
+
+- **Dine-In** → table context is required before payment/completion.
+- **Takeaway** → no table context.
+- Frontend label is **Takeaway**.
+- Backend/domain value remains **`pickup`** for the applicable POS sale contract.
+- **Delivery is not a cashier-facing POS sale mode** and is not shown in the new-sale selector.
+
+The underlying POS composer still uses the canonical backend order type value. Therefore the UX mapping is:
+
+`Dine-In` → `dine_in`  
+`Takeaway` → `pickup`
+
 ### Single Transaction Flow
 
-The POS cashier must not select a top-level transaction tab or mode for Dine-in, Pickup, or Delivery.
+**Select transaction mode → Select Menu → Cart → Table (Dine-In only) → Payment → Complete**
 
-The cashier's primary mental model is one transaction flow:
-
-**Select Menu → Cart → optional transaction context → Payment → Complete**
-
-Table is an **optional transaction context**. When a cashier selects a table, the transaction is a dine-in transaction. When no table is selected, the transaction may be treated as a normal non-table/takeaway sale according to the applicable Order contract.
-
-`pickup` and `delivery` remain valid Commerce/Fulfillment concepts where required by their originating flow, but they are **not POS navigation tabs and are not required cashier-facing transaction-mode choices**.
+The same Sale/Transaction Composer is used for both modes; only the required table context differs.
 
 ### Delivery Boundary
 
@@ -205,7 +218,7 @@ POS does not create or operate the Driver delivery lifecycle. Driver/Delivery re
 
 `unassigned → assigned → picked_up → on_delivery → delivered`
 
-A delivery order may still appear in POS transaction context when the cashier must perform a financial action, especially COD cash handover and payment settlement. That action belongs to the **transaction detail**, not to a Delivery tab.
+A delivery order may still appear in POS transaction context when the cashier must perform a financial action, especially COD cash handover and payment settlement. That action belongs to the **transaction detail**, not to a Delivery tab or new-sale mode.
 
 ### Shift Boundary
 
