@@ -562,15 +562,21 @@ class PosLocalOperationService {
       // Canonical offline availability belongs to Branch Menu.
       // Legacy Product availability remains as a compatibility path.
       if (canonicalMenu) {
-        inventoryRepository.db.execute(
+        const updateResult = inventoryRepository.db.execute(
           'UPDATE branch_menus SET is_available = ?, updated_at = ? WHERE branch_id = ? AND menu_id = ?',
           [is_available ? 1 : 0, now, branch_id, String(menu_id)]
         );
+        if (!updateResult || updateResult.changes !== 1) {
+          throw new Error('BRANCH_MENU_NOT_FOUND');
+        }
       } else {
-        inventoryRepository.db.execute(
+        const updateResult = inventoryRepository.db.execute(
           'UPDATE branch_products SET is_available = ?, updated_at = ? WHERE branch_id = ? AND product_id = ?',
           [is_available ? 1 : 0, now, branch_id, product_id]
         );
+        if (!updateResult || updateResult.changes !== 1) {
+          throw new Error('LEGACY_PRODUCT_AVAILABILITY_TARGET_NOT_FOUND');
+        }
       }
 
       // Enqueue sync operation
@@ -727,7 +733,7 @@ class PosLocalOperationService {
           });
           syncedCount++;
           results.push({ queue_id: item.id, status: 'SYNCED', operation: 'product_availability' });
-        }}
+        }
       } catch (err) {
         // Detect cross-channel inventory conflict
         const isStockConflict = err.message && (
@@ -760,7 +766,8 @@ class PosLocalOperationService {
             affectedOrderIds: [],
             posDemandQuantity: requirement.quantity,
             onlineDemandQuantity: 0,
-            availableStockAtReconciliation: currentStock          });
+            availableStockAtReconciliation: currentStock
+          });
 
           posOperationalRepository.updateQueueStatus({
             queueId: item.id,
