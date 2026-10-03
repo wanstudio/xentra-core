@@ -25,7 +25,69 @@ class InventoryRepository {
     return this.db.exec('ROLLBACK;');
   }
 
+  _findProductStockIdentity(productId) {
+    return this.db.queryOne(
+      'SELECT id, brand_id, sku FROM products WHERE id = ?',
+      [productId]
+    );
+  }
+
+  _isCanonicalStockProduct(productId) {
+    const product = this._findProductStockIdentity(productId);
+    return Boolean(product && product.sku != null && String(product.sku).trim() !== '');
+  }
+
+  ensureBranchProductInventory({ branchId, productId, lowStockThreshold = 5 }) {
+    const product = this._findProductStockIdentity(productId);
+    if (!product) return { changes: 0 };
+
+    const branch = this.db.queryOne(
+      'SELECT id, brand_id FROM branches WHERE id = ?',
+      [branchId]
+    );
+    if (!branch || branch.brand_id !== product.brand_id) {
+      throw new Error('[InventoryRepository] Branch/Product brand mismatch.');
+    }
+
+    return this.db.execute(
+      'INSERT OR IGNORE INTO branch_product_inventory (branch_id, product_id, stock_qty, low_stock_threshold) VALUES (?, ?, 0, ?)',
+      [branchId, productId, Number.isInteger(Number(lowStockThreshold)) && Number(lowStockThreshold) >= 0 ? Number(lowStockThreshold) : 5]
+    );
+  }
+
+  findCanonicalBranchInventory(branchId, productId) {
+    const product = this._findProductStockIdentity(productId);
+    if (!product || product.sku == null || String(product.sku).trim() === '') return null;
+
+    const row = this.db.queryOne(
+      'SELECT branch_id, product_id, stock_qty, low_stock_threshold, created_at, updated_at FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?',
+      [branchId, productId]
+    );
+
+    // Missing canonical inventory row is defined as zero stock, not unknown stock.
+    return row || {
+      branch_id: branchId,
+      product_id: productId,
+      stock_qty: 0,
+      low_stock_threshold: 5,
+      created_at: null,
+      updated_at: null
+    };
+  }
+
   findBranchProduct(branchId, productId) {
+    if (this._isCanonicalStockProduct(productId)) {
+      const canonical = this.findCanonicalBranchInventory(branchId, productId);
+      if (!canonical) return null;
+      return {
+        branch_id: canonical.branch_id,
+        product_id: canonical.product_id,
+        stock: Number(canonical.stock_qty || 0),
+        low_stock_threshold: Number(canonical.low_stock_threshold || 0),
+        canonical: true
+      };
+    }
+
     return this.db.queryOne(
       'SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?',
       [branchId, productId]
@@ -33,6 +95,15 @@ class InventoryRepository {
   }
 
   updateBranchProductStock({ branchId, productId, stock, updatedAt }) {
+    if (this._isCanonicalStockProduct(productId)) {
+      this.ensureBranchProductInventory({ branchId, productId });
+      return this.db.execute(`
+        UPDATE branch_product_inventory
+        SET stock_qty = ?, updated_at = ?
+        WHERE branch_id = ? AND product_id = ?
+      `, [Number(stock), updatedAt, branchId, productId]);
+    }
+
     return this.db.execute(`
       UPDATE branch_products
       SET stock = ?, updated_at = ?
@@ -41,6 +112,15 @@ class InventoryRepository {
   }
 
   deductBranchProduct({ branchId, productId, quantity }) {
+    if (this._isCanonicalStockProduct(productId)) {
+      this.ensureBranchProductInventory({ branchId, productId });
+      return this.db.execute(`
+        UPDATE branch_product_inventory
+        SET stock_qty = stock_qty - ?, updated_at = datetime('now')
+        WHERE branch_id = ? AND product_id = ? AND stock_qty >= ?
+      `, [quantity, branchId, productId, quantity]);
+    }
+
     return this.db.execute(`
       UPDATE branch_products
       SET stock = stock - ?, updated_at = datetime('now')
@@ -80,6 +160,15 @@ class InventoryRepository {
   }
 
   updateStock({ branchId, productId, quantity, updatedAt }) {
+    if (this._isCanonicalStockProduct(productId)) {
+      this.ensureBranchProductInventory({ branchId, productId });
+      return this.db.execute(`
+        UPDATE branch_product_inventory
+        SET stock_qty = stock_qty + ?, updated_at = ?
+        WHERE branch_id = ? AND product_id = ? AND (stock_qty + ?) >= 0
+      `, [quantity, updatedAt, branchId, productId, quantity]);
+    }
+
     return this.db.execute(`
       UPDATE branch_products
       SET stock = COALESCE(stock, 0) + ?, updated_at = ?
@@ -155,6 +244,11 @@ class InventoryRepository {
   getStock(branchId, productId) {
     const row = this.findBranchProduct(branchId, productId);
     return row ? Number(row.stock || 0) : 0;
+  }
+
+  getCanonicalStock(branchId, productId) {
+    const row = this.findCanonicalBranchInventory(branchId, productId);
+    return row ? Number(row.stock_qty || 0) : 0;
   }
 }
 
