@@ -770,6 +770,7 @@ class ComposedMenuService {
       Number.isFinite(Number(sortOrder)) ? Number(sortOrder) : 0
     );
     const nextIsActive = isActive === undefined ? Number(current.is_active) : (Boolean(isActive) ? 1 : 0);
+    if (currentIsOriginal && nextIsActive === 0) throw new Error('RASA_ORIGINAL_PROTECTED');
 
     repository.db.execute(
       "UPDATE menu_flavors SET name = ?, slug = ?, sort_order = ?, is_active = ?, updated_at = datetime('now') WHERE id = ? AND brand_id = ?",
