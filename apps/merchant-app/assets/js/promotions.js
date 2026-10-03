@@ -129,7 +129,7 @@
       var rewardText = '';
       if (Array.isArray(p.rewards) && p.rewards.length > 0) {
         var rw = p.rewards[0];
-        rewardText = (rw.reward_type === 'freebie_product' ? 'Gratis: ' : '') + (rw.target_product_name || rw.target_product_id || 'Produk Promo');
+        rewardText = (rw.reward_type === 'freebie_product' ? 'Gratis: ' : '') + (rw.target_menu_title || rw.target_product_name || rw.target_menu_id || rw.target_product_id || 'Menu Promo');
       } else if (p.discount_type) {
         rewardText = p.discount_type === 'percentage' ? (p.discount_value + '%') : formatMoney(p.discount_value);
       } else {
