@@ -974,7 +974,7 @@ registerAdminCatalogRoutes(router, { db, requireAuth });
 // Master Menu Composition routes use Owner-authoritative structured component data.
 registerAdminMenuCompositionRoutes(router, { requireAuth });
 // New locked Product → Menu → Inventory construction boundary.
-registerAdminComposedMenuRoutes(router, { requireAuth });
+registerAdminComposedMenuRoutes(router, { db, requireAuth });
 
 // Admin branch management routes are isolated in server/routes/admin-branches.js.
 registerAdminBranchRoutes(router, { db, crypto, requireAuth });
