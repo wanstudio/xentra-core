@@ -1,7 +1,5 @@
 'use strict';
 
-const DataAccess = require('../../../core/data/DataAccess');
-
 let ensured = false;
 
 function hasColumn(db, table, column) {
@@ -12,8 +10,9 @@ function normalizeName(value) {
   return String(value == null ? '' : value).trim();
 }
 
-function ensureComposedMenuSchema(db = DataAccess) {
+function ensureComposedMenuSchema(db) {
   if (ensured) return;
+  if (!db) db = require('../../../core/data/DataAccess');
 
   // Additive order snapshot fields. Existing order_items columns remain for legacy consumers.
   try { db.exec('ALTER TABLE order_items ADD COLUMN menu_id TEXT;'); } catch (_) {}
