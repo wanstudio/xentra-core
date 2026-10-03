@@ -18,6 +18,12 @@ test('Customer Home banner product CTA uses canonical composed catalog transport
   const helper = HOME.slice(start, end);
   assert.ok(helper.includes("'/catalog/composed-menu"));
   assert.ok(helper.includes('adaptCanonicalHomeCatalog(rawData)'));
-  assert.ok(helper.includes('data.all_products'));
+  assert.ok(helper.includes('Array.isArray(product.components)'));
+  assert.ok(helper.includes('component && component.product_id'));
+  assert.ok(helper.includes('componentHits.length === 1'));
+  assert.ok(helper.includes('componentHits.length > 1'));
   assert.ok(!helper.includes("'/catalog/menu"));
+  assert.ok(!helper.includes("'/products"));
+  assert.ok(!helper.includes('product.price'));
+  assert.ok(!helper.includes('product.category_id'));
 });
