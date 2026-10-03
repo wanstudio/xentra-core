@@ -1229,12 +1229,18 @@
     }
   }
 
+  function menuCartIdentity(item){
+    if (item && item.menu_id) return 'menu:' + String(item.menu_id);
+    return 'product:' + String(item && item.product_id != null ? item.product_id : '');
+  }
+
   function decrementProduct(p, e){
     if(e&&e.stopPropagation)e.stopPropagation();
     try{
+      var targetIdentity = p && p.menu_id ? 'menu:' + String(p.menu_id) : 'product:' + String(p.id);
       var items=composer().getDisplayItems();
       for(var i=items.length-1;i>=0;i--){
-        if(String(items[i].product_id)===String(p.id)){
+        if(menuCartIdentity(items[i])===targetIdentity){
           composer().changeQty(i,-1);
           renderCart();
           return;
@@ -1248,10 +1254,11 @@
   function incrementProduct(p,e){
     if(e&&e.stopPropagation)e.stopPropagation();
     try{
+      var targetIdentity = p && p.menu_id ? 'menu:' + String(p.menu_id) : 'product:' + String(p.id);
       var items=composer().getDisplayItems();
       if(optionGroups(p).length>0){
         for(var i=items.length-1;i>=0;i--){
-          if(String(items[i].product_id)===String(p.id)){
+          if(menuCartIdentity(items[i])===targetIdentity){
             composer().changeQty(i,1);
             renderCart();
             return;
@@ -1303,15 +1310,35 @@
     if (p.is_available === 0 || p.is_available === false) return toast('Menu sedang tidak tersedia.');
     var cleanSelections=Array.isArray(selections)?selections:[];
     var unitPrice=clientOptionPrice(p,cleanSelections);
+    var payload={
+      product_id:p.menu_id ? (p.product_id || null) : p.id,
+      name:p.name || p.product_name || p.title || 'Menu',
+      unit_price:unitPrice,
+      quantity:1,
+      options:cleanSelections,
+      note:note||''
+    };
+
+    if (p.menu_id) {
+      payload.menu_id=p.menu_id;
+      payload.menu_type=p.menu_type || 'SINGLE';
+      payload.component_snapshot=Array.isArray(p.components) ? p.components : (Array.isArray(p.component_snapshot) ? p.component_snapshot : []);
+      payload.menu_snapshot=p.menu_snapshot || {
+        menu_id:p.menu_id,
+        menu_type:p.menu_type || 'SINGLE',
+        title:p.name || p.title || '',
+        subtitle:p.subtitle || null,
+        price:Number(p.price || 0),
+        category:p.category || null,
+        sub_category:p.sub_category || null,
+        rasa:p.rasa || null,
+        level:p.level || null,
+        status:p.status || 'ACTIVE'
+      };
+    }
+
     try{
-      composer().addItem({
-        product_id:p.id,
-        name:p.name || p.product_name || 'Produk',
-        unit_price:unitPrice,
-        quantity:1,
-        options:cleanSelections,
-        note:note||''
-      });
+      composer().addItem(payload);
       renderCart();
     }catch(e){
       showOrderLockedWarning();
@@ -1472,8 +1499,9 @@
         var hasOpts=optionGroups(p).length>0;
 
         var composerCart=composer().getDisplayItems();
+        var targetIdentity = p.menu_id ? 'menu:' + String(p.menu_id) : 'product:' + String(p.id);
         var cartQty=composerCart.reduce(function(acc,item){
-          return String(item.product_id)===String(p.id)?acc+(Number(item.quantity)||0):acc;
+          return menuCartIdentity(item)===targetIdentity?acc+(Number(item.quantity)||0):acc;
         },0);
         var orderLocked=composer().isExisting();
 
@@ -1547,22 +1575,90 @@
     }
   }
 
+  function adaptCanonicalPosCatalog(data){
+    var menus=Array.isArray(data && data.menus)?data.menus:[];
+    var sourceCategories=Array.isArray(data && data.categories)?data.categories:[];
+    var categoryMap={};
+    var categories=[];
+
+    sourceCategories.forEach(function(cat){
+      var c={id:cat.id,name:cat.name||cat.title||'Menu',slug:cat.slug||'',products:[]};
+      categoryMap[String(c.id)]=c;
+      categories.push(c);
+    });
+
+    var products=[];
+    menus.forEach(function(menu){
+      var branchCategories=Array.isArray(menu.branch_categories)?menu.branch_categories:[];
+      var categoryRefs=branchCategories.length
+        ? branchCategories
+        : (menu.category ? [menu.category] : []);
+
+      var primaryCategory=categoryRefs[0] || menu.category || null;
+      var product=Object.assign({},menu,{
+        id:menu.menu_id || menu.id,
+        menu_id:menu.menu_id || menu.id,
+        product_id:menu.menu_type==='SINGLE' && Array.isArray(menu.components) && menu.components[0]
+          ? menu.components[0].product_id
+          : null,
+        name:menu.title || menu.package_name || 'Menu',
+        product_name:menu.title || menu.package_name || 'Menu',
+        subtitle:menu.subtitle || null,
+        price:Number(menu.price || 0),
+        regular_price:Number(menu.price || 0),
+        is_available:menu.is_available !== false,
+        components:Array.isArray(menu.components)?menu.components:[],
+        component_snapshot:Array.isArray(menu.components)?menu.components:[],
+        category_id:primaryCategory ? primaryCategory.id : null,
+        category_ids:categoryRefs.map(function(c){return c.id;}),
+        category:primaryCategory,
+        options_config:{version:1,groups:[]}
+      });
+
+      if(!products.some(function(existing){return String(existing.id)===String(product.id);})){
+        products.push(product);
+      }
+
+      categoryRefs.forEach(function(refCat){
+        var key=String(refCat.id);
+        if(!categoryMap[key]){
+          categoryMap[key]={id:refCat.id,name:refCat.name||'Menu',slug:refCat.slug||'',products:[]};
+          categories.push(categoryMap[key]);
+        }
+        categoryMap[key].products.push(product);
+      });
+    });
+
+    return {categories:categories,products:products};
+  }
+
   async function loadMenu(){
     if(!state.branchId)return;
     try{
-      var data=await request('/catalog/menu?branch_id='+encodeURIComponent(state.branchId),{headers:headers()});
-      var catalogProducts=Array.isArray(data.all_products)?data.all_products:(data.products&&Array.isArray(data.products.items)?data.products.items:[]);
-      state.menu={categories:data.categories||[],products:catalogProducts};
+      // Canonical Menu is the forward POS catalog source. Legacy endpoint remains
+      // the compatibility fallback until all environments are migrated.
+      var data=await request('/catalog/composed-menu?branch_id='+encodeURIComponent(state.branchId),{headers:headers()});
+      state.menu=adaptCanonicalPosCatalog(data);
       savePosMenuCache();
       renderMenu();
       state.coreConnection=true;
       updatePosReadiness();
     }catch(e){
-      state.coreConnection=false;
-      updatePosReadiness();
-      var cachedMenu=getPosMenuCache(state.branchId);
-      if(cachedMenu){ state.menu=cachedMenu; renderMenu(); return; }
-      if($('pos-product-grid'))$('pos-product-grid').innerHTML='<div class="pos-empty">Menu tidak dapat dimuat. Periksa koneksi.</div>';
+      try{
+        var legacy=await request('/catalog/menu?branch_id='+encodeURIComponent(state.branchId),{headers:headers()});
+        var catalogProducts=Array.isArray(legacy.all_products)?legacy.all_products:(legacy.products&&Array.isArray(legacy.products.items)?legacy.products.items:[]);
+        state.menu={categories:legacy.categories||[],products:catalogProducts};
+        savePosMenuCache();
+        renderMenu();
+        state.coreConnection=true;
+        updatePosReadiness();
+      }catch(legacyErr){
+        state.coreConnection=false;
+        updatePosReadiness();
+        var cachedMenu=getPosMenuCache(state.branchId);
+        if(cachedMenu){ state.menu=cachedMenu; renderMenu(); return; }
+        if($('pos-product-grid'))$('pos-product-grid').innerHTML='<div class="pos-empty">Menu tidak dapat dimuat. Periksa koneksi.</div>';
+      }
     }
   }
 
