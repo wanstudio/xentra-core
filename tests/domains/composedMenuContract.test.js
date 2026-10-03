@@ -124,6 +124,16 @@ test('Draft Package may reference an inactive Product, but ACTIVE Package may no
     /MASTER_PRODUCT_INACTIVE/
   );
 
+  // Direct status mutation must not bypass the ACTIVE Package publication gate.
+  assert.throws(
+    () => ComposedMenuService.setMenuStatus({
+      brandId: BRAND,
+      menuId: draft.id,
+      status: 'ACTIVE'
+    }),
+    /MASTER_PRODUCT_INACTIVE/
+  );
+
   db.prepare('DELETE FROM menu_items WHERE menu_id = (SELECT id FROM menus WHERE brand_id = ? AND package_name = ? LIMIT 1)').run(BRAND, 'Draft With Inactive Product CMV1');
   db.prepare('DELETE FROM menus WHERE brand_id = ? AND package_name = ?').run(BRAND, 'Draft With Inactive Product CMV1');
   db.prepare('DELETE FROM products WHERE id = ?').run(inactiveProduct);
