@@ -4249,32 +4249,6 @@ async function loadMenusView() {
     });
 
 
-    var flavorSelect = $('prod-flavor');
-    if (flavorSelect) flavorSelect.addEventListener('change', function() {
-      _masterMenuSelected.flavor_id = flavorSelect.value || '';
-      renderMasterMenuCustomerPreview();
-    });
-    var categorySelect = $('prod-category');
-    if (categorySelect) categorySelect.addEventListener('change', function() {
-      _masterMenuSelected.category_id = categorySelect.value || '';
-      renderMasterMenuCustomerPreview();
-      renderMasterMenuSelectors();
-    });
-    var nameInput = $('prod-name');
-    if (nameInput) nameInput.addEventListener('input', function() {
-      renderMasterMenuCustomerPreview();
-    });
-
-    var priceInput = $('prod-price');
-    if (priceInput) priceInput.addEventListener('input', function() {
-      renderMasterMenuCustomerPreview();
-    });
-
-    var prodPricingMode = $('prod-pricing-mode');
-    if (prodPricingMode) {
-      prodPricingMode.addEventListener('change', toggleRangeFields);
-    }
-
     var btnBackFromProductEditor = $('btn-back-from-product-editor');
     if (btnBackFromProductEditor && !btnBackFromProductEditor.dataset.bound) {
       btnBackFromProductEditor.dataset.bound = 'true';
@@ -4399,11 +4373,11 @@ async function loadMenusView() {
           source: file,
           assetType: 'product',
           aspectRatio: 1.0,
-          title: 'Potong & Posisikan Foto Menu (1:1)',
+          title: 'Potong & Posisikan Foto Product (1:1)',
           onConfirm: function (cropSpec, previewDataUrl) {
             _productCropSpec = cropSpec;
             setProductImagePreview(previewDataUrl || URL.createObjectURL(file), true);
-            showToast('✓ Potongan foto menu disesuaikan.');
+            showToast('✓ Potongan foto Product disesuaikan.');
           },
           onCancel: function () {
             _productImageFile = null;
