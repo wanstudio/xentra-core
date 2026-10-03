@@ -6,9 +6,12 @@
  */
 (function () {
   'use strict';
-  var S = window.XentraShared;
-  var $ = S.$;
-  var showToast = S.showToast;
+  var S = window.XentraShared || {};
+  var $ = S.$ || function (id) { return document.getElementById(id); };
+  var showToast = S.showToast || function (msg) {
+    if (typeof window.toast === 'function') window.toast(msg);
+    else console.warn(msg);
+  };
   var XentraCropEditor = (function () {
     var _modal = null;
     var _viewport = null;

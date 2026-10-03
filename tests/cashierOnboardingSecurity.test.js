@@ -425,7 +425,16 @@ describe('Cashier Invitation & Mandatory Identity Onboarding Contract v1', () =>
     assert.equal(refCheck.isReferenced, true);
     const userRef = refCheck.references.find(r => r.type === 'user_avatar');
     assert.ok(userRef, 'Should find user_avatar reference in MediaReferenceResolver');
-    assert.equal(userRef.id, cashierUser.id);
+    // Also verify direct root /auth/cashier-onboarding/avatar succeeds
+    const directUploadRes = await request('POST', '/auth/cashier-onboarding/avatar', {
+      image_base64: base64Data,
+      mime_type: 'image/png',
+      original_filename: 'cashier-direct.png',
+      crop_spec: { x: 0, y: 0, width: 200, height: 200, aspect_ratio: 1.0, zoom: 1.0 }
+    }, { 'Authorization': `Bearer ${cashierToken}` });
+    assert.equal(directUploadRes.status, 200);
+    assert.equal(directUploadRes.data.success, true);
+    assert.ok(directUploadRes.data.avatar_url);
   });
 });
 

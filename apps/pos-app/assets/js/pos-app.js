@@ -1730,26 +1730,38 @@
         var validTypes = ['image/jpeg', 'image/png', 'image/webp'];
         if (!validTypes.includes(file.type)) {
           toast('Format gambar harus JPG, PNG, atau WebP.');
+          avatarInput.value = '';
           return;
         }
         if (file.size > 10 * 1024 * 1024) {
           toast('Ukuran foto profil maksimal 10 MB.');
+          avatarInput.value = '';
           return;
         }
 
-        avatarBtn.classList.add('pos-profile-avatar-uploading');
-        var reader = new FileReader();
-        reader.onload = async function (evt) {
+        async function doUploadAvatar(cropSpec, previewDataUrl) {
+          avatarBtn.classList.add('pos-profile-avatar-uploading');
           try {
-            var base64Data = evt.target.result;
+            var base64Data = await new Promise(function (resolve, reject) {
+              var r = new FileReader();
+              r.onload = function () { resolve(r.result); };
+              r.onerror = function () { reject(new Error('Gagal membaca berkas gambar.')); };
+              r.readAsDataURL(file);
+            });
+
+            var payload = {
+              image_base64: base64Data,
+              mime_type: file.type,
+              original_filename: file.name
+            };
+            if (cropSpec) {
+              payload.crop_spec = cropSpec;
+            }
+
             var res = await request('/auth/cashier-onboarding/avatar', {
               method: 'POST',
               headers: headers(),
-              body: JSON.stringify({
-                image_base64: base64Data,
-                mime_type: file.type,
-                original_filename: file.name
-              })
+              body: JSON.stringify(payload)
             });
 
             if (res && res.success && res.avatar_url) {
@@ -1793,8 +1805,24 @@
             avatarBtn.classList.remove('pos-profile-avatar-uploading');
             avatarInput.value = '';
           }
-        };
-        reader.readAsDataURL(file);
+        }
+
+        if (window.XentraCropEditor && typeof window.XentraCropEditor.open === 'function') {
+          window.XentraCropEditor.open({
+            source: file,
+            assetType: 'avatar',
+            aspectRatio: 1.0,
+            title: 'Sesuaikan Potongan Foto Profil (1:1)',
+            onConfirm: function (cropSpec, previewDataUrl) {
+              doUploadAvatar(cropSpec, previewDataUrl);
+            },
+            onCancel: function () {
+              avatarInput.value = '';
+            }
+          });
+        } else {
+          doUploadAvatar(null, null);
+        }
       };
     }
 

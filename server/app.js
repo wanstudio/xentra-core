@@ -189,8 +189,16 @@ app.use(cors({
 app.use(express.json({ limit: '30mb' }));
 app.use(express.urlencoded({ extended: true, limit: '30mb' }));
 
-// REST API with Tenant Resolution (Support both /api/v1 and /api)
-app.use(['/api/v1', '/api'], tenantResolver, apiRoutes);
+// REST API with Tenant Resolution (Support /api/v1, /api, and root /auth)
+app.use(['/api/v1', '/api', '/auth'], (req, res, next) => {
+  // If requested at root /auth/..., normalize req.url so apiRoutes matches /auth/...
+  if (req.baseUrl === '/auth') {
+    req.url = '/auth' + (req.url === '/' ? '' : req.url);
+  }
+  tenantResolver(req, res, () => {
+    apiRoutes(req, res, next);
+  });
+});
 
 // Public Payment Gateway Webhooks (Support direct /webhooks/* root paths)
 app.post(['/webhooks/doku', '/webhooks/midtrans'], (req, res, next) => {

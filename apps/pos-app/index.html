@@ -19,8 +19,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/pos/assets/css/pos.css?v=1.0.11">
-  <!-- cache-compat: /pos/assets/css/pos.css?v=1.0.11 /pos/assets/js/TransactionComposer.js?v=1.0.11 /pos/assets/js/PosOfflineStore.js?v=1.0.0 /pos/assets/js/pos-app.js?v=1.0.13 -->
+  <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.1">
+  <link rel="stylesheet" href="/pos/assets/css/pos.css?v=1.0.12">
+  <!-- cache-compat: /merchant-shared/css/shared.css?v=1.0.1 /pos/assets/css/pos.css?v=1.0.12 /pos/assets/js/TransactionComposer.js?v=1.0.11 /pos/assets/js/PosOfflineStore.js?v=1.0.0 /pos/assets/js/pos-app.js?v=1.0.14 -->
 </head>
 <body>
   <div class="pos-shell">
@@ -372,9 +373,71 @@
   </div>
   <div id="pos-toast" class="pos-toast"></div>
 
+  <!-- MODAL: REUSABLE IMAGE CROP EDITOR (MEDIA SYSTEM M2) -->
+  <div id="modal-crop-editor" class="x-modal-backdrop" style="display:none; z-index: 12010;" role="dialog" aria-modal="true" aria-labelledby="crop-editor-title">
+    <div class="x-crop-modal-card">
+      <div class="x-modal-header">
+        <div>
+          <h3 id="crop-editor-title">Sesuaikan Posisi &amp; Potongan Foto</h3>
+          <p id="crop-editor-subtitle" class="text-muted" style="font-size:12px;margin:0;">Geser dan sesuaikan zoom untuk framing terbaik.</p>
+        </div>
+        <button type="button" class="x-modal-close" id="btn-crop-close" aria-label="Tutup Editor Crop">✕</button>
+      </div>
+
+      <div class="x-crop-body">
+        <!-- Interactive Viewport -->
+        <div id="crop-viewport" class="x-crop-viewport" tabindex="0" role="region" aria-label="Area Crop Interaktif">
+          <div id="crop-canvas-wrapper" class="x-crop-canvas-wrapper">
+            <img id="crop-target-image" class="x-crop-image" alt="Preview Gambar Crop" src="" />
+          </div>
+          <!-- Framing border overlay -->
+          <div id="crop-framing-box" class="x-crop-overlay">
+            <div class="x-crop-grid">
+              <div class="x-crop-grid-line-v x-crop-grid-line-h"></div>
+              <div class="x-crop-grid-line-v x-crop-grid-line-h"></div>
+              <div class="x-crop-grid-line-h"></div>
+              <div class="x-crop-grid-line-v x-crop-grid-line-h"></div>
+              <div class="x-crop-grid-line-v x-crop-grid-line-h"></div>
+              <div class="x-crop-grid-line-h"></div>
+              <div class="x-crop-grid-line-v"></div>
+              <div class="x-crop-grid-line-v"></div>
+              <div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Toolbar & Zoom Controls -->
+        <div class="x-crop-toolbar">
+          <div class="x-crop-slider-group">
+            <span class="x-crop-slider-label">🔍 Zoom:</span>
+            <input type="range" id="crop-zoom-slider" class="x-crop-slider" min="1.0" max="3.0" step="0.05" value="1.0" aria-label="Tingkat Zoom" />
+            <span id="crop-zoom-value" class="x-crop-slider-label" style="min-width:36px;">100%</span>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button type="button" id="btn-crop-zoom-out" class="x-crop-tool-btn" title="Perkecil">−</button>
+            <button type="button" id="btn-crop-zoom-in" class="x-crop-tool-btn" title="Perbesar">＋</button>
+            <button type="button" id="btn-crop-reset" class="x-crop-tool-btn" title="Reset Posisi &amp; Zoom">🔄 Reset</button>
+          </div>
+        </div>
+
+        <!-- Info Bar -->
+        <div class="x-crop-info-bar">
+          <span id="crop-dimensions-info">Dimensi: -</span>
+          <span id="crop-ratio-info">Rasio Target: 1:1</span>
+        </div>
+      </div>
+
+      <div class="x-modal-footer">
+        <button type="button" class="x-btn-secondary" id="btn-crop-cancel">Batal</button>
+        <button type="button" class="x-btn-primary" id="btn-crop-confirm">✓ Gunakan Potongan</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/merchant-shared/js/crop-editor.js?v=1.0.1"></script>
   <script src="/pos/assets/js/TransactionComposer.js?v=1.0.11"></script>
   <script src="/pos/assets/js/PosOfflineStore.js?v=1.0.0"></script>
-  <script src="/pos/assets/js/pos-app.js?v=1.0.13"></script>
+  <script src="/pos/assets/js/pos-app.js?v=1.0.14"></script>
 
   <!-- POS PWA Engine -->
   <script>
