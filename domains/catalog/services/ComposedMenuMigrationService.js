@@ -45,15 +45,6 @@ function numberOrNull(value) {
   return Number.isFinite(n) ? n : null;
 }
 
-function currentMenuForProduct(productId) {
-  return DataAccess.queryOne(
-    "SELECT m.id, m.brand_id, m.menu_type, m.sub_category_id, m.rasa_id, m.level_id, m.package_name, " +
-    "m.selling_price, m.status FROM menus m JOIN menu_items mi ON mi.menu_id = m.id " +
-    "WHERE mi.product_id = ? AND m.menu_type = 'SINGLE' AND mi.quantity = 1 LIMIT 1",
-    [productId]
-  );
-}
-
 function legacyRowsForProduct(productId) {
   const branchProducts = DataAccess.queryMany(
     "SELECT branch_id, product_id, branch_category_id, product_name, product_description, product_image_url, " +
@@ -131,7 +122,7 @@ function inspectProduct({ brandId, productId }) {
     product,
     category,
     legacy: legacyRowsForProduct(productId),
-    existingMenu: currentMenuForProduct(productId),
+    existingMenu: null,
     migration: migrationRepository.find({ brandId, productId })
   };
 }
@@ -309,46 +300,27 @@ function productIdFrom(inspected) {
 function buildPlan({ brandId, productId }) {
   const inspected = inspectProduct({ brandId, productId });
   const identity = planIdentity(inspected);
-  const existingMenu = inspected.existingMenu;
-
+  // Product reuse is explicitly allowed by the contract. Only the exact
+  // canonical Menu Satuan identity (Sub Category + Rasa) is relevant here;
+  // another Menu backed by the same Product is not a migration conflict.
   const identityMenu = identity.rasa && identity.rasa.id
     ? DataAccess.queryOne(
-      "SELECT m.id, mi.product_id, mi.quantity FROM menus m JOIN menu_items mi ON mi.menu_id = m.id " +
+      "SELECT m.id, m.brand_id, m.menu_type, m.sub_category_id, m.rasa_id, m.level_id, m.selling_price, m.status, " +
+      "mi.product_id, mi.quantity " +
+      "FROM menus m LEFT JOIN menu_items mi ON mi.menu_id = m.id " +
       "WHERE m.brand_id = ? AND m.menu_type = 'SINGLE' AND m.sub_category_id = ? AND m.rasa_id = ? LIMIT 1",
       [brandId, identity.subCategory.id, identity.rasa.id]
     )
     : null;
+
   const identityConflict = identityMenu && (
-    String(identityMenu.product_id) !== String(productId) || Number(identityMenu.quantity) !== 1
+    String(identityMenu.product_id || '') !== String(productId) ||
+    Number(identityMenu.quantity || 0) !== 1
   ) ? ['MENU_SATUAN_IDENTITY_CONFLICT'] : [];
-
-  const menuConflict = existingMenu && String(existingMenu.brand_id) !== String(brandId)
-    ? ['MENU_CROSS_BRAND']
-    : [];
-
-  const menuComponent = existingMenu
-    ? DataAccess.queryMany(
-      "SELECT menu_id, product_id, quantity FROM menu_items WHERE menu_id = ? ORDER BY product_id ASC",
-      [existingMenu.id]
-    )
-    : [];
-
-  const existingMenuConflict = existingMenu && (
-    String(existingMenu.sub_category_id || '') !== String(identity.subCategory.id || '') ||
-    String(existingMenu.rasa_id || '') !== String(identity.rasa ? identity.rasa.id : '') ||
-    Number(existingMenu.selling_price) !== Number(inspected.product.price)
-  );
 
   const issues = uniqueSorted([
     ...identity.issues,
-    ...identityConflict,
-    ...menuConflict,
-    ...(existingMenuConflict ? ['EXISTING_MENU_IDENTITY_CONFLICT'] : []),
-    ...(existingMenu && (
-      menuComponent.length !== 1 ||
-      String(menuComponent[0].product_id) !== String(productId) ||
-      Number(menuComponent[0].quantity) !== 1
-    ) ? ['EXISTING_MENU_COMPOSITION_CONFLICT'] : [])
+    ...identityConflict
   ]);
 
   const status = issues.length ? STATUS.NEEDS_REVIEW : STATUS.LEGACY;
@@ -384,7 +356,7 @@ function buildPlan({ brandId, productId }) {
       sku: identity.sku,
       sku_generated: !inspected.product.sku && identity.needsSku
     },
-    existing_menu_id: existingMenu ? existingMenu.id : null,
+    existing_menu_id: identityMenu ? identityMenu.id : null,
     target_requires_owner_review: issues.length > 0,
     note: issues.length
       ? 'Legacy data was not mutated. Owner review is required before canonical Product → Menu migration.'
@@ -518,12 +490,9 @@ function ensureSingleMenu({ brandId, productId, categoryId, productName, price, 
       throw new Error('MENU_SATUAN_IDENTITY_CONFLICT');
     }
 
-    DataAccess.execute(
-      "UPDATE menus SET level_id = ?, selling_price = ?, status = ?, updated_at = datetime('now') " +
-      "WHERE id = ? AND brand_id = ?",
-      [levelId, Number(price), productActive ? 'ACTIVE' : 'ARCHIVED', existing.id, brandId]
-    );
-
+    // An existing exact Menu identity is already a canonical commercial entity.
+    // Migration must not overwrite its selling price, lifecycle status, or level:
+    // Product price is legacy migration input, while Menu owns commercial price.
     return DataAccess.queryOne(
       "SELECT id, brand_id, menu_type, sub_category_id, rasa_id, level_id, selling_price, status " +
       "FROM menus WHERE id = ? AND brand_id = ?",
@@ -783,13 +752,17 @@ function applyProduct({ brandId, productId }) {
 
 function verifyProduct({ brandId, productId }) {
   const inspected = inspectProduct({ brandId, productId });
-  const menu = DataAccess.queryOne(
-    "SELECT m.id, m.brand_id, m.menu_type, m.sub_category_id, m.rasa_id, m.level_id, m.selling_price, " +
-    "mi.product_id AS item_product_id, mi.quantity AS item_quantity " +
-    "FROM menus m JOIN menu_items mi ON mi.menu_id = m.id " +
-    "WHERE m.brand_id = ? AND m.menu_type = 'SINGLE' AND mi.product_id = ? AND mi.quantity = 1 LIMIT 1",
-    [brandId, productId]
-  );
+  const identity = planIdentity(inspected);
+  const menu = identity.rasa && identity.rasa.id && identity.subCategory && identity.subCategory.id
+    ? DataAccess.queryOne(
+      "SELECT m.id, m.brand_id, m.menu_type, m.sub_category_id, m.rasa_id, m.level_id, m.selling_price, " +
+      "mi.product_id AS item_product_id, mi.quantity AS item_quantity " +
+      "FROM menus m JOIN menu_items mi ON mi.menu_id = m.id " +
+      "WHERE m.brand_id = ? AND m.menu_type = 'SINGLE' " +
+      "AND m.sub_category_id = ? AND m.rasa_id = ? LIMIT 1",
+      [brandId, identity.subCategory.id, identity.rasa.id]
+    )
+    : null;
 
   const errors = [];
   if (!menu) {
