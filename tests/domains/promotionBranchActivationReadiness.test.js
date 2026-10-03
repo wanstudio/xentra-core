@@ -267,5 +267,4 @@ describe('Promotion Branch Activation ↔ Reward Catalog Readiness', () => {
     assert.strictEqual(gateResult.applied_promos.length, 1);
     assert.strictEqual(gateResult.applied_promos[0].promo_id, 'prm_bangjo_pwa_install');
   });
-  });
 });
