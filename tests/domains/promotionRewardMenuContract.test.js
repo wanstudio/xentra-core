@@ -166,6 +166,7 @@ test('PromotionRepository persists target_menu_id as the canonical reward identi
     id: REPO_PROMO,
     brandId: BRAND,
     name: 'PRMV1 Repository Promo',
+    isActive: 0,
     rewards: [{
       id: 'prmv1_repo_reward',
       reward_type: 'freebie_product',
@@ -228,6 +229,25 @@ test('canonical Package reward carries Menu identity and component snapshot with
     [[PRODUCT_PACKAGE_A, 1], [PRODUCT_PACKAGE_B, 2]]
   );
   assert.equal(resolved.menu_snapshot.title, 'PRMV1 Paket');
+});
+
+test('PromotionEngine applies canonical Menu reward and does not require Product-only identity', () => {
+  const result = require('../../domains/promotion/services/PromotionEngineService').evaluate({
+    brand_id: BRAND,
+    branch_id: BRANCH,
+    is_pwa_installed: true,
+    customer_phone: '',
+    cart_items: []
+  });
+
+  const applied = result.applied.find(item => item.promo_id === PROMO);
+  assert.ok(applied, 'Canonical promotion is applied');
+  assert.equal(applied.reward.target_menu_id, MENU_SINGLE);
+  assert.equal(applied.reward.menu_id, MENU_SINGLE);
+  assert.equal(applied.reward.menu_type, 'SINGLE');
+  assert.equal(applied.reward.product_id, PRODUCT_SINGLE);
+  assert.equal(applied.reward.component_snapshot[0].product_id, PRODUCT_SINGLE);
+  assert.equal(applied.reward.resolution_source, 'menu');
 });
 
 test('legacy Product reward migration auto-maps only an unambiguous active Menu Satuan', () => {
