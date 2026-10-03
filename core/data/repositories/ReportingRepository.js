@@ -231,10 +231,9 @@ class ReportingRepository {
         COUNT(CASE WHEN p.sku IS NOT NULL AND TRIM(p.sku) <> '' AND bpi.stock_qty > 0 AND bpi.stock_qty <= bpi.low_stock_threshold THEN 1 END) AS low_stock_count,
         COUNT(CASE WHEN p.sku IS NOT NULL AND TRIM(p.sku) <> '' AND bpi.stock_qty <= 0 THEN 1 END) AS out_of_stock_count,
         COALESCE(SUM(CASE WHEN p.sku IS NOT NULL AND TRIM(p.sku) <> '' THEN bpi.stock_qty ELSE 0 END), 0) AS total_units
-      FROM products p
-      CROSS JOIN branches b
-      LEFT JOIN branch_product_inventory bpi
-        ON bpi.branch_id = b.id AND bpi.product_id = p.id
+      FROM branch_product_inventory bpi
+      JOIN products p ON bpi.product_id = p.id
+      JOIN branches b ON bpi.branch_id = b.id
       ${whereSql}
     `, params);
   }
@@ -262,10 +261,9 @@ class ReportingRepository {
         COUNT(CASE WHEN p.sku IS NOT NULL AND TRIM(p.sku) <> '' AND bpi.stock_qty > 0 AND bpi.stock_qty <= bpi.low_stock_threshold THEN 1 END) AS low_stock_count,
         COUNT(CASE WHEN p.sku IS NOT NULL AND TRIM(p.sku) <> '' AND bpi.stock_qty <= 0 THEN 1 END) AS out_of_stock_count,
         COALESCE(SUM(CASE WHEN p.sku IS NOT NULL AND TRIM(p.sku) <> '' THEN bpi.stock_qty ELSE 0 END), 0) AS total_units
-      FROM branches b
-      JOIN products p ON p.brand_id = b.brand_id
-      LEFT JOIN branch_product_inventory bpi
-        ON bpi.branch_id = b.id AND bpi.product_id = p.id
+      FROM branch_product_inventory bpi
+      JOIN products p ON bpi.product_id = p.id
+      JOIN branches b ON bpi.branch_id = b.id
       ${whereSql}
       GROUP BY b.id, b.name
       ORDER BY out_of_stock_count DESC, low_stock_count DESC, b.name ASC
