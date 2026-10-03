@@ -3,8 +3,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const db = require('../../server/database/db');
-const ComposedMenuService = require('../domains/catalog/services/ComposedMenuService');
-const ComposedMenuResolver = require('../domains/catalog/services/ComposedMenuResolver');
+const ComposedMenuService = require('../../domains/catalog/services/ComposedMenuService');
+const ComposedMenuResolver = require('../../domains/catalog/services/ComposedMenuResolver');
 
 const ORG = 'cmv1_test_org';
 const BRAND = 'cmv1_test_brand';
@@ -162,6 +162,19 @@ test('Master Menu resolver fails closed when an active Menu references an inacti
   db.prepare(
     'UPDATE products SET is_active = 1, updated_at = datetime(\'now\') WHERE id = ? AND brand_id = ?'
   ).run(PRODUCT_B, BRAND);
+});
+
+test('Original Rasa cannot be deactivated', () => {
+  const original = ComposedMenuService.ensureOriginalRasa({ brandId: BRAND });
+
+  assert.throws(
+    () => ComposedMenuService.updateRasa({
+      brandId: BRAND,
+      rasaId: original.id,
+      isActive: false
+    }),
+    /RASA_ORIGINAL_PROTECTED/
+  );
 });
 
 test('Rasa master uniqueness is normalized within one Brand', () => {
