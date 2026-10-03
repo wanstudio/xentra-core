@@ -11,12 +11,12 @@ const JS = fs.readFileSync(path.join(ROOT, 'apps/merchant-dashboard/assets/js/da
 const CSS = fs.readFileSync(path.join(ROOT, 'apps/merchant-shared/css/dashboard.css'), 'utf8');
 
 /**
- * OWNER MASTER MENU UI PENDING NOTE (2026-10-03)
- * The backend Menu Composition contract is active, but the full Owner Master
- * Menu editor is intentionally still a pending construction step in PR #7.
- * These historical UI cases describe the pre-contract Product-centric editor
- * or a UI surface not yet implemented; keep them skipped rather than weakening
- * the assertions or reintroducing Product as the commercial identity.
+ * OWNER MASTER MENU UI CONTRACT NOTE (2026-10-03)
+ * The Owner Master Menu editor is now implemented in PR #7.
+ * The remaining skipped cases below are historical/pre-contract assertions
+ * that target the old Product-centric editor or obsolete UI behavior. Keep
+ * them skipped rather than weakening active canonical Menu/Product assertions
+ * or reintroducing Product as the commercial identity.
  */
 
 test.skip('Owner Kategori/Rasa loading is independent and stale-safe', () => {
