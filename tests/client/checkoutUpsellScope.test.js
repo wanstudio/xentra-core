@@ -213,7 +213,7 @@ function freshHarness(seedCart, opts) {
       if (url.indexOf('/promotions/active') === 0) {
         return Promise.resolve({ success: true, promotions: [], applied: [], rejected: [] });
       }
-      if (url === '/catalog/composed-menu' || url.indexOf('/catalog/menu?') === 0) {
+      if (url === '/catalog/composed-menu' || url.indexOf('/catalog/composed-menu?') === 0 || url.indexOf('/catalog/menu?') === 0) {
         catalogCalls.push(url);
         if (url === '/catalog/composed-menu') return Promise.resolve(GLOBAL_CATALOG); // must never happen
         const q = url.indexOf('?branch_id=');
