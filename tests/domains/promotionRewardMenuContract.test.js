@@ -9,6 +9,7 @@ const PromotionRewardResolver = require('../../domains/promotion/services/Promot
 const PromotionRewardMigrationService = require('../../domains/promotion/services/PromotionRewardMigrationService');
 const ComposedMenuService = require('../../domains/catalog/services/ComposedMenuService');
 const ComposedMenuResolver = require('../../domains/catalog/services/ComposedMenuResolver');
+const { ensureComposedMenuSchema } = require('../../domains/catalog/schema/ComposedMenuSchema');
 
 const ORG = 'prmv1_test_org';
 const BRAND = 'prmv1_test_brand';
@@ -38,10 +39,11 @@ const MENU_AMBIG_B = 'prmv1_menu_amb_b';
 
 const PROMO = 'prmv1_promotion';
 const REWARD = 'prmv1_reward';
+const REPO_PROMO = 'prmv1_repo_promotion';
 
 test.before(async () => {
   await db.ready;
-  ComposedMenuResolver.resolveMenu({ brandId: BRAND, menuId: '__schema_probe__' });
+  ensureComposedMenuSchema(db);
 
   db.prepare(
     "INSERT OR IGNORE INTO organizations (id, name, slug) VALUES (?, 'Promotion Reward Menu Test Org', 'prmv1-test-org')"
@@ -158,6 +160,26 @@ test.before(async () => {
   ).run(REWARD, PROMO, MENU_SINGLE);
 });
 
+test('PromotionRepository persists target_menu_id as the canonical reward identity', () => {
+  const repo = new PromotionRepository();
+  const created = repo.createPromotion({
+    id: REPO_PROMO,
+    brandId: BRAND,
+    name: 'PRMV1 Repository Promo',
+    rewards: [{
+      id: 'prmv1_repo_reward',
+      reward_type: 'freebie_product',
+      target_menu_id: MENU_SINGLE,
+      amount_in_cents: 0
+    }]
+  });
+
+  assert.equal(created.id, REPO_PROMO);
+  assert.equal(created.rewards.length, 1);
+  assert.equal(created.rewards[0].target_menu_id, MENU_SINGLE);
+  assert.equal(created.rewards[0].target_product_id, null);
+});
+
 test('canonical reward persists and resolves by Menu, not Product', () => {
   const repo = new PromotionRepository();
   const row = db.prepare("SELECT target_menu_id, target_product_id FROM promotion_rewards WHERE id = ?").get(REWARD);
@@ -241,8 +263,10 @@ test('legacy Product reward migration auto-maps only an unambiguous active Menu 
 });
 
 test.after(() => {
-  db.prepare('DELETE FROM promotion_rewards WHERE promotion_id = ?').run(PROMO);
-  db.prepare('DELETE FROM promotions WHERE id = ?').run(PROMO);
+  db.prepare('DELETE FROM promotion_rewards WHERE promotion_id IN (?, ?)').run(PROMO, REPO_PROMO);
+  db.prepare('DELETE FROM promotion_rules WHERE promotion_id IN (?, ?)').run(PROMO, REPO_PROMO);
+  db.prepare('DELETE FROM promotion_branch_scope WHERE promotion_id IN (?, ?)').run(PROMO, REPO_PROMO);
+  db.prepare('DELETE FROM promotions WHERE id IN (?, ?)').run(PROMO, REPO_PROMO);
   db.prepare('DELETE FROM branch_menus WHERE branch_id = ?').run(BRANCH);
   db.prepare('DELETE FROM branch_product_inventory WHERE branch_id = ?').run(BRANCH);
   db.prepare('DELETE FROM menu_items WHERE menu_id IN (?, ?, ?, ?, ?)').run(
