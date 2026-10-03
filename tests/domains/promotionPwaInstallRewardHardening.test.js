@@ -149,7 +149,7 @@ describe('PWA Install Reward Flow Hardening', () => {
   test('2. Claimed reward has no premature branch assignment', () => {
     const claimRes = PromotionRewardCart.claim([], {
       promo_id: promoId,
-      product_id: rewardProductId,
+      menu_id: rewardMenuId,
       name: 'Es Teh Gratis',
       reward_price: 0
     });
@@ -162,18 +162,18 @@ describe('PWA Install Reward Flow Hardening', () => {
   // 3. Claim does not consume stock
   test('3. Claim does not consume stock', () => {
     const stockABefore = db.prepare('SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?').get(branchA, rewardProductId).stock_qty;
-    const stockBBefore = db.prepare('SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?').get(branchB, rewardProductId).stock;
+    const stockBBefore = db.prepare('SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?').get(branchB, rewardProductId).stock_qty;
 
     // Simulate claim action in client
     PromotionRewardCart.claim([], {
       promo_id: promoId,
-      product_id: rewardProductId,
+      menu_id: rewardMenuId,
       name: 'Es Teh Gratis',
       reward_price: 0
     });
 
-    const stockAAfter = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branchA, rewardProductId).stock;
-    const stockBAfter = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branchB, rewardProductId).stock;
+    const stockAAfter = db.prepare('SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?').get(branchA, rewardProductId).stock_qty;
+    const stockBAfter = db.prepare('SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?').get(branchB, rewardProductId).stock_qty;
 
     assert.strictEqual(stockAAfter, stockABefore, 'Branch A stock unchanged by claim');
     assert.strictEqual(stockBAfter, stockBBefore, 'Branch B stock unchanged by claim');
@@ -185,7 +185,7 @@ describe('PWA Install Reward Flow Hardening', () => {
 
     PromotionRewardCart.claim([], {
       promo_id: promoId,
-      product_id: rewardProductId,
+      menu_id: rewardMenuId,
       name: 'Es Teh Gratis',
       reward_price: 0
     });
@@ -251,7 +251,7 @@ describe('PWA Install Reward Flow Hardening', () => {
   test('8. Failed reward validation creates zero order/redemption/inventory side effects', async () => {
     const ordersCountBefore = db.prepare('SELECT COUNT(*) as cnt FROM orders WHERE branch_id = ?').get(branchB).cnt;
     const redemptionsBefore = db.prepare('SELECT COUNT(*) as cnt FROM promotion_redemptions WHERE branch_id = ?').get(branchB).cnt;
-    const stockFoodBefore = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branchB, foodProductId).stock;
+    const stockFoodBefore = db.prepare('SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?').get(branchB, foodProductId).stock_qty;
 
     const placementResult = await OrderPlacementService.submitOrder({
       brand_id: brandId,
@@ -269,7 +269,7 @@ describe('PWA Install Reward Flow Hardening', () => {
     assert.strictEqual(placementResult.success, false);
     const ordersCountAfter = db.prepare('SELECT COUNT(*) as cnt FROM orders WHERE branch_id = ?').get(branchB).cnt;
     const redemptionsAfter = db.prepare('SELECT COUNT(*) as cnt FROM promotion_redemptions WHERE branch_id = ?').get(branchB).cnt;
-    const stockFoodAfter = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branchB, foodProductId).stock;
+    const stockFoodAfter = db.prepare('SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?').get(branchB, foodProductId).stock_qty;
 
     assert.strictEqual(ordersCountAfter, ordersCountBefore, 'No order created');
     assert.strictEqual(redemptionsAfter, redemptionsBefore, 'No redemption created');
@@ -278,7 +278,7 @@ describe('PWA Install Reward Flow Hardening', () => {
 
   // 9. Valid reward commits exactly once
   test('9. Valid reward commits exactly once', async () => {
-    const stockRewardBefore = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branchA, rewardProductId).stock;
+    const stockRewardBefore = db.prepare('SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?').get(branchA, rewardProductId).stock_qty;
     const phone = '081299991004';
 
     const placementResult = await OrderPlacementService.submitOrder({
@@ -306,7 +306,7 @@ describe('PWA Install Reward Flow Hardening', () => {
     assert.strictEqual(redemptions[0].branch_id, branchA);
 
     // Verify stock deducted for reward
-    const stockRewardAfter = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branchA, rewardProductId).stock;
+    const stockRewardAfter = db.prepare('SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?').get(branchA, rewardProductId).stock_qty;
     assert.strictEqual(stockRewardAfter, stockRewardBefore - 1);
   });
 
