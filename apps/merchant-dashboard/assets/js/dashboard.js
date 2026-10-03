@@ -2201,7 +2201,7 @@
                 '{ label: \\'Lihat Detail\\', icon: \\'🔍\\', onClick: function() { navigateTo(\\'catalog/products/' + encodeURIComponent(prod.id) + '\\'); } },' +
                 '{ label: \\'Edit Product\\', icon: \\'✏️\\', onClick: function() { openEditProduct(\\'' + esc(prod.id) + '\\'); } },' +
                 '{ divider: true },' +
-                '{ label: \\'Hapus Product\\', icon: \\'🗑️\\', destructive: true, onClick: function() { deleteProduct(\\'' + esc(prod.id) + '\\'); } }' +
+                '{ label: \\'Arsipkan Product\\', icon: \\'🗑️\\', destructive: true, onClick: function() { deleteProduct(\\'' + esc(prod.id) + '\\'); } }' +
               '])">',
                 '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>',
               '</button>',
