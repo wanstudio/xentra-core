@@ -98,7 +98,7 @@ test('Existing inactive relations remain saveable but inactive replacements are 
   assert.deepEqual(preserved.complements.map(c => c.id), [COMPLEMENT_1]);
   assert.equal(preserved.level.id, LEVEL);
 
-  db.prepare('INSERT OR IGNORE INTO menu_flavors (id, brand_id, name, slug, is_active) VALUES (?, ?, 'Fresh', 'fresh', 0)')
+  db.prepare("INSERT OR IGNORE INTO menu_flavors (id, brand_id, name, slug, is_active) VALUES (?, ?, 'Fresh', 'fresh', 0)")
     .run('mmc_service_inactive_new_flavor', BRAND_A);
   assert.throws(() => MasterMenuCompositionService.saveComposition({
     brandId: BRAND_A, productId: PRODUCT, categoryId: CATEGORY_A,
