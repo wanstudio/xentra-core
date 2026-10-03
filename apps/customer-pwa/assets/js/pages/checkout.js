@@ -4027,7 +4027,7 @@
     diffs.forEach(function (d) {
       diffHtml +=
         '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f3f4f6;font-size:13px;">' +
-        '  <div><b>' + UI.escape(d.product_name || d.product_id) + '</b></div>' +
+        '  <div><b>' + UI.escape(d.menu_title || d.product_name || d.product_id) + '</b></div>' +
         '  <div><s style="color:#9ca3af;margin-right:6px;">' + fmtIDR(d.expected_price) + '</s> <b style="color:#16a34a;">' + fmtIDR(d.actual_price) + '</b></div>' +
         '</div>';
     });
