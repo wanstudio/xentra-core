@@ -45,7 +45,7 @@ test.before(async () => {
 
   db.prepare("INSERT OR IGNORE INTO products (id, brand_id, category_id, name, slug, price, is_active, sku) VALUES (?, ?, ?, 'Ayam Atomic CMC', 'ayam-atomic-cmc', 18000, 1, 'CMC-A-001')").run(PRODUCT_A, BRAND, CATEGORY);
   db.prepare("INSERT OR IGNORE INTO products (id, brand_id, category_id, name, slug, price, is_active, sku) VALUES (?, ?, ?, 'Nasi Atomic CMC', 'nasi-atomic-cmc', 8000, 1, 'CMC-B-001')").run(PRODUCT_B, BRAND, CATEGORY);
-  db.prepare("INSERT OR IGNORE INTO products (id, brand_id, category_id, name, slug, price, is_active) VALUES (?, ?, ?, 'Lalapan Non Stock CMC', 'lalapan-non-stock-cmc', 4000, 1)").run(PRODUCT_NOSTOCK);
+  db.prepare("INSERT OR IGNORE INTO products (id, brand_id, category_id, name, slug, price, is_active) VALUES (?, ?, ?, 'Lalapan Non Stock CMC', 'lalapan-non-stock-cmc', 4000, 1)").run(PRODUCT_NOSTOCK, BRAND, CATEGORY);
 
   db.prepare("INSERT OR IGNORE INTO menus (id, brand_id, menu_type, sub_category_id, rasa_id, selling_price, status) VALUES (?, ?, 'SINGLE', ?, ?, 22000, 'ACTIVE')").run(MENU_A, BRAND, SUB_A, ORIGINAL);
   db.prepare("INSERT OR IGNORE INTO menu_items (menu_id, product_id, quantity, sort_order) VALUES (?, ?, 1, 0)").run(MENU_A, PRODUCT_A);
