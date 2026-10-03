@@ -51,7 +51,7 @@ const RouteService = require('../services/RouteService');
 const { PromotionEngineService } = require('../../domains/promotion');
 const { InventoryStockService, InventoryMovementModel } = require('../../domains/inventory');
 const CatalogService = require('../../domains/catalog/services/CatalogService');
-const { PricingPolicyModel, MasterMenuResolver, ComposedMenuResolver } = require('../../domains/catalog');
+const { PricingPolicyModel, MasterMenuResolver, ComposedMenuResolver, ComposedMenuService } = require('../../domains/catalog');
 const { XentraConnectorClient, XentraConnectorError } = require('../../core/integration/XentraConnectorClient');
 const { BrandRepository: CoreBrandRepo, BranchRepository: CoreBranchRepo, UserRepository: CoreUserRepo } = require('../../core/data/repositories');
 const coreBrandRepo = new CoreBrandRepo();
@@ -984,7 +984,7 @@ registerAdminOrderRoutes(router, { db, requireAuth, AcceptanceTimeoutService });
 
 // Branch catalog adoption, availability, and pricing overrides are isolated in server/routes/admin-branch-catalog.js.
 // Canonical Branch Menu read model — structured Master Menu Composition + Branch Adoption.
-registerAdminBranchMenuRoutes(router, { db, requireAuth, resolver: MasterMenuResolver });
+registerAdminBranchMenuRoutes(router, { db, requireAuth, resolver: ComposedMenuResolver, service: ComposedMenuService });
 registerAdminBranchCatalogRoutes(router, {
   db,
   crypto,
