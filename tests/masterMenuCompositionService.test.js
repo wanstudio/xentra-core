@@ -73,6 +73,7 @@ test('Master Product composition is saved as structured relations', () => {
 });
 
 test('Inactive components cannot be selected into a new composition', () => {
+  db.prepare('DELETE FROM product_levels WHERE product_id = ?').run(PRODUCT);
   db.prepare('UPDATE menu_levels SET is_active = 0 WHERE id = ?').run(LEVEL);
   assert.throws(() => MasterMenuCompositionService.saveComposition({
     brandId: BRAND_A, productId: PRODUCT, categoryId: CATEGORY_A, levelId: LEVEL
