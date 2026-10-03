@@ -107,7 +107,7 @@ describe('Promotion Branch Activation ↔ Reward Catalog Readiness', () => {
     db.prepare(`
       INSERT INTO promotion_rewards (id, promotion_id, reward_type, target_menu_id, amount_in_cents, presentation_payload)
       VALUES ('rew_readiness_01', ?, 'freebie_product', ?, 0, '{"reward_title":"Hadiah Es Teh"}')
-    `).run(promoTestId, masterReward);
+    `).run(promoTestId, rewardMenu);
 
     // Assign scope initially with is_active = 0
     repo.assignBranchScope({ promotionId: promoTestId, brandId, branchId: branchA, isActive: 0 });
@@ -139,33 +139,34 @@ describe('Promotion Branch Activation ↔ Reward Catalog Readiness', () => {
     assert.strictEqual(bp, undefined, 'Reward product must not exist in Branch B');
 
     // Expected rejection error
-    const product = db.prepare('SELECT id, name FROM products WHERE id = ?').get(targetPid);
-    const expectedError = `Promo belum dapat diaktifkan karena produk hadiah '${product.name}' belum tersedia di katalog cabang ini.`;
+    const menu = db.prepare('SELECT id, title FROM menus WHERE id = ?').get(targetMid);
+    assert.ok(menu);
+    const expectedError = `Promo belum dapat diaktifkan karena Menu hadiah '${menu.title || targetMid}' belum tersedia di katalog cabang ini.`;
     assert.ok(expectedError.includes('belum tersedia di katalog cabang ini'));
   });
 
   test('ACT-03: Activating at Branch B fails validation when reward exists but is_available = 0', () => {
     // Add reward to Branch B but set is_available = 0
-    db.prepare('INSERT INTO branch_products (branch_id, product_id, price, stock, is_available) VALUES (?, ?, ?, ?, 0)')
-      .run(branchB, masterReward, 5000, 20);
+    db.prepare('UPDATE branch_menus SET is_available = 0 WHERE branch_id = ? AND menu_id = ?').run(branchB, rewardMenu);
 
     const rewards = repo.findRewards(promoTestId);
-    const targetPid = rewards[0].target_product_id;
-    const bp = db.prepare('SELECT is_available, stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branchB, targetPid);
-    assert.ok(bp);
-    assert.strictEqual(bp.is_available, 0);
+    const targetMid = rewards[0].target_menu_id;
+    const bm = db.prepare('SELECT is_available FROM branch_menus WHERE branch_id = ? AND menu_id = ?').get(branchB, targetMid);
+    assert.ok(bm);
+    assert.strictEqual(Number(bm.is_available), 0);
 
-    const product = db.prepare('SELECT id, name FROM products WHERE id = ?').get(targetPid);
-    const expectedError = `Promo belum dapat diaktifkan karena produk hadiah '${product.name}' sedang dinonaktifkan di cabang ini.`;
+    const menu = db.prepare('SELECT id, title FROM menus WHERE id = ?').get(targetMid);
+    assert.ok(menu);
+    const expectedError = `Promo belum dapat diaktifkan karena Menu hadiah '${menu.title || targetMid}' sedang dinonaktifkan di cabang ini.`;
     assert.ok(expectedError.includes('sedang dinonaktifkan di cabang ini'));
   });
 
   test('ACT-04: Activating at Branch A succeeds because reward exists and is_available = 1', () => {
     const rewards = repo.findRewards(promoTestId);
-    const targetPid = rewards[0].target_product_id;
-    const bp = db.prepare('SELECT is_available, stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branchA, targetMid);
-    assert.ok(bp);
-    assert.strictEqual(bp.is_available, 1);
+    const targetMid = rewards[0].target_menu_id;
+    const bm = db.prepare('SELECT is_available FROM branch_menus WHERE branch_id = ? AND menu_id = ?').get(branchA, targetMid);
+    assert.ok(bm);
+    assert.strictEqual(Number(bm.is_available), 1);
 
     // Update activation
     repo.setBranchScopeActivation({ promotionId: promoTestId, branchId: branchA, isActive: 1 });
@@ -211,8 +212,8 @@ describe('Promotion Branch Activation ↔ Reward Catalog Readiness', () => {
       pwa_runtime: { display_mode: 'standalone' },
       customer: { phone: '081288880002' },
       items: [
-        { product_id: masterFood, quantity: 1, price: 20000 },
-        { is_promo_reward: true, promo_id: promoTestId, product_id: masterReward, quantity: 1, price: 0 }
+        { menu_id: foodMenu, quantity: 1, expected_price: 20000 },
+        { is_promo_reward: true, promo_id: promoTestId, menu_id: rewardMenu, quantity: 1, expected_price: 0 }
       ]
     };
 
