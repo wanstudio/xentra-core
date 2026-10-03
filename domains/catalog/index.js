@@ -13,6 +13,7 @@ const MasterMenuCompositionService = require('./services/MasterMenuCompositionSe
 const ComposedMenuService = require('./services/ComposedMenuService');
 const ComposedMenuResolver = require('./services/ComposedMenuResolver');
 const ComposedProductService = require('./services/ComposedProductService');
+const { ComposedMenuMigrationService } = require('./services/ComposedMenuMigrationService');
 
 const CATALOG_IDENTITY = {
   name: 'catalog',
@@ -55,5 +56,6 @@ module.exports = {
   MasterMenuCompositionService,
   ComposedMenuService,
   ComposedMenuResolver,
-  ComposedProductService
+  ComposedProductService,
+  ComposedMenuMigrationService
 };
