@@ -222,7 +222,7 @@ test('SEC-08: Checkout requires valid customer auth (no unauthenticated checkout
       payment_method: 'cash',
       customer: { name: 'Hacker', phone: '089000000088' },
       order_type: 'pickup',
-      items: [{ id: '272', quantity: 1 }]
+      items: [{ menu_id: 'customer_auth_menu_272', quantity: 1, expected_price: 35000 }]
     })
   });
   assert.strictEqual(res.status, 401);
@@ -243,7 +243,7 @@ test('SEC-09: Checkout with a customer session binds authoritative phone from se
       payment_method: 'cash',
       customer: { name: 'Body Phone', phone: '089999999999' },
       order_type: 'pickup',
-      items: [{ id: '272', quantity: 1 }]
+      items: [{ menu_id: 'customer_auth_menu_272', quantity: 1, expected_price: 35000 }]
     })
   });
   assert.strictEqual(res.status, 201);
@@ -340,7 +340,7 @@ test('OTP-FLOW-04: Complete OTP flow end-to-end: send → verify → use token f
       payment_method: 'cash',
       customer: { name: 'Flow Test', phone },
       order_type: 'pickup',
-      items: [{ id: '272', quantity: 1 }]
+      items: [{ menu_id: 'customer_auth_menu_272', quantity: 1, expected_price: 35000 }]
     })
   });
   assert.strictEqual(orderRes.status, 201);
@@ -430,7 +430,7 @@ test('SEC-13: Unauthenticated /checkout/verify is rejected with 401', async () =
     body: JSON.stringify({
       branch_id: 'branch_sec_13',
       order_type: 'pickup',
-      items: [{ product_id: '272', id: '272', quantity: 1, expected_price: 35000 }]
+      items: [{ menu_id: 'customer_auth_menu_272', quantity: 1, expected_price: 35000 }]
     })
   });
   assert.strictEqual(res.status, 401);
@@ -448,7 +448,7 @@ test('SEC-14: Forged customer token on /checkout/verify is rejected with 401', a
     body: JSON.stringify({
       branch_id: 'branch_sec_14',
       order_type: 'pickup',
-      items: [{ product_id: '272', id: '272', quantity: 1, expected_price: 35000 }]
+      items: [{ menu_id: 'customer_auth_menu_272', quantity: 1, expected_price: 35000 }]
     })
   });
   assert.strictEqual(res.status, 401);
@@ -468,7 +468,7 @@ test('SEC-15: /checkout/verify uses session phone, not body phone', async () => 
       branch_id: 'branch_sec_15',
       order_type: 'pickup',
       customer: { name: 'Body Name', phone: '089999999999' },
-      items: [{ product_id: '272', id: '272', quantity: 1, expected_price: 35000 }]
+      items: [{ menu_id: 'customer_auth_menu_272', quantity: 1, expected_price: 35000 }]
     })
   });
   assert.strictEqual(res.status, 200);
@@ -487,7 +487,7 @@ test('SEC-16: Expired customer token on /checkout/verify is rejected with 401', 
     body: JSON.stringify({
       branch_id: 'branch_sec_16',
       order_type: 'pickup',
-      items: [{ product_id: '272', id: '272', quantity: 1, expected_price: 35000 }]
+      items: [{ menu_id: 'customer_auth_menu_272', quantity: 1, expected_price: 35000 }]
     })
   });
   assert.strictEqual(res.status, 401);
@@ -507,7 +507,7 @@ test('SEC-17: Valid customer session allows /checkout/verify to succeed', async 
       branch_id: 'branch_sec_17',
       order_type: 'pickup',
       customer: { name: 'Verify Customer', phone },
-      items: [{ product_id: '272', id: '272', quantity: 1, expected_price: 35000 }]
+      items: [{ menu_id: 'customer_auth_menu_272', quantity: 1, expected_price: 35000 }]
     })
   });
   assert.strictEqual(res.status, 200);
@@ -539,7 +539,7 @@ test('SEC-18: Customer session persists to SQLite and survives memory cache wipe
       payment_method: 'cash',
       customer: { name: 'Restart Survivor', phone },
       order_type: 'pickup',
-      items: [{ id: '272', quantity: 1 }]
+      items: [{ menu_id: 'customer_auth_menu_272', quantity: 1, expected_price: 35000 }]
     })
   });
   assert.strictEqual(res.status, 201, 'order must succeed with restored session');
@@ -581,7 +581,7 @@ test('SEC-20: Unauthenticated checkout returns CUSTOMER_AUTH_REQUIRED, while inv
       payment_method: 'cash',
       customer: { name: 'No Token', phone: '089000000020' },
       order_type: 'pickup',
-      items: [{ id: '272', quantity: 1 }]
+      items: [{ menu_id: 'customer_auth_menu_272', quantity: 1, expected_price: 35000 }]
     })
   });
   assert.strictEqual(noTokenRes.status, 401);
@@ -597,7 +597,7 @@ test('SEC-20: Unauthenticated checkout returns CUSTOMER_AUTH_REQUIRED, while inv
       payment_method: 'cash',
       customer: { name: 'Invalid Token', phone: '089000000020' },
       order_type: 'pickup',
-      items: [{ id: '272', quantity: 1 }]
+      items: [{ menu_id: 'customer_auth_menu_272', quantity: 1, expected_price: 35000 }]
     })
   });
   assert.strictEqual(invalidTokenRes.status, 401);
@@ -621,7 +621,7 @@ test('SEC-21: Returning customer with existing valid session creates multiple co
       payment_method: 'cash',
       customer: { name: 'Returning Customer', phone },
       order_type: 'pickup',
-      items: [{ id: '272', quantity: 1 }]
+      items: [{ menu_id: 'customer_auth_menu_272', quantity: 1, expected_price: 35000 }]
     })
   });
   assert.strictEqual(res1.status, 201, 'first order succeeds with existing valid session');
@@ -637,7 +637,7 @@ test('SEC-21: Returning customer with existing valid session creates multiple co
       payment_method: 'cash',
       customer: { name: 'Returning Customer', phone },
       order_type: 'pickup',
-      items: [{ id: '272', quantity: 2 }]
+      items: [{ menu_id: 'customer_auth_menu_272', quantity: 2, expected_price: 35000 }]
     })
   });
   assert.strictEqual(res2.status, 201, 'second order also succeeds immediately without re-OTP');
@@ -658,7 +658,7 @@ test('SEC-22: Invalid or expired customer session cannot initiate Midtrans payme
       payment_method: 'midtrans',
       customer: { name: 'Payment Attempter', phone: '089000000022' },
       order_type: 'pickup',
-      items: [{ id: '272', quantity: 1 }]
+      items: [{ menu_id: 'customer_auth_menu_272', quantity: 1, expected_price: 35000 }]
     })
   });
 
