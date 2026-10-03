@@ -117,6 +117,13 @@ class ComposedMenuRepository {
     );
   }
 
+  findProductSku({ brandId, productId }) {
+    return this.db.queryOne(
+      "SELECT id, brand_id, name, sku, is_active FROM products WHERE id = ? AND brand_id = ?",
+      [productId, brandId]
+    );
+  }
+
   findProduct({ brandId, productId }) {
     return this.db.queryOne(
       "SELECT id, brand_id, name, sku, description, image_url, image, is_active FROM products " +
