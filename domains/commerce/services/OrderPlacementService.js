@@ -564,10 +564,29 @@ class OrderPlacementService {
     const now = new Date().toISOString();
     const deductedItems = [];
     const ownsTransaction = !dbTransactionProvided;
+
+    const canonicalItems = items.filter(item => item && item.menu_id);
+    const legacyItems = items.filter(item => !item || !item.menu_id);
+    if (canonicalItems.length > 0 && legacyItems.length > 0) {
+      throw new Error('[OrderPlacementService] Canonical Menu and legacy Product items cannot be mixed in one stock mutation.');
+    }
+
     if (ownsTransaction) inventoryRepository.beginTransaction();
 
     try {
-      for (const item of items) {
+      if (canonicalItems.length > 0) {
+        const composedResult = deductComposedStock({
+          order,
+          items: canonicalItems,
+          referenceId: reference_id,
+          actorId: actor_id,
+          notes,
+          dbTransactionProvided: true
+        });
+        deductedItems.push(...composedResult.deducted_items);
+      }
+
+      for (const item of legacyItems) {
         const quantity = Number(item.quantity || 0);
         if (!Number.isSafeInteger(quantity) || quantity <= 0) {
           throw new Error('[OrderPlacementService] Quantity Additional Order tidak valid.');
