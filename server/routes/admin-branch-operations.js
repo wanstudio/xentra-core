@@ -66,12 +66,43 @@ router.get('/admin/branches/:id/inventory', requireAuth(['owner', 'brand_manager
     }
 
     const rows = db.prepare(`
-      SELECT bp.product_id, p.name AS product_name, bp.price, bp.stock, bp.is_available, bp.low_stock_threshold
-      FROM branch_products bp
-      JOIN products p ON p.id = bp.product_id AND p.brand_id = ?
-      WHERE bp.branch_id = ?
-      ORDER BY p.sort_order ASC, p.name ASC
-    `).all(req.brand_id, req.params.id);
+      SELECT
+        p.id AS product_id,
+        p.name AS product_name,
+        p.sku,
+        COALESCE(bpi.stock_qty, bp.stock, 0) AS stock,
+        COALESCE(bpi.low_stock_threshold, bp.low_stock_threshold, 5) AS low_stock_threshold,
+        CASE
+          WHEN p.sku IS NOT NULL AND trim(p.sku) <> '' THEN 'canonical'
+          WHEN bp.product_id IS NOT NULL THEN 'legacy'
+          ELSE 'none'
+        END AS stock_source,
+        COALESCE(bm.is_available, bp.is_available, 0) AS is_available,
+        bm.menu_id
+      FROM products p
+      LEFT JOIN branch_product_inventory bpi
+        ON bpi.branch_id = ? AND bpi.product_id = p.id
+      LEFT JOIN branch_products bp
+        ON bp.branch_id = ? AND bp.product_id = p.id
+      LEFT JOIN branch_menus bm
+        ON bm.branch_id = ? AND bm.menu_id IN (
+          SELECT m.id
+          FROM menus m
+          JOIN menu_items mi ON mi.menu_id = m.id
+          WHERE m.brand_id = p.brand_id AND mi.product_id = p.id
+        )
+      WHERE p.brand_id = ?
+        AND (
+          (p.sku IS NOT NULL AND trim(p.sku) <> '')
+          OR bp.product_id IS NOT NULL
+        )
+      ORDER BY p.name ASC, p.id ASC
+    `).all(
+      req.params.id,
+      req.params.id,
+      req.params.id,
+      req.brand_id
+    );
 
     res.json({ success: true, branch_id: req.params.id, inventory: rows || [] });
   } catch (err) {
@@ -136,15 +167,30 @@ router.patch('/admin/branches/:id/inventory/:productId', requireAuth(['owner', '
       });
     }
 
-    // Assignment + brand consistency must already hold (C1 trigger enforces it at the DB too).
-    const assignment = db.prepare(`
-      SELECT bp.branch_id
-      FROM branch_products bp
-      JOIN products p ON p.id = bp.product_id AND p.brand_id = ?
-      WHERE bp.branch_id = ? AND bp.product_id = ?
-    `).get(req.brand_id, req.params.id, req.params.productId);
-    if (!assignment) {
-      return res.status(404).json({ success: false, error: 'Produk tidak dialokasikan ke cabang ini.' });
+    // Forward inventory boundary:
+    // - SKU Product -> canonical branch_product_inventory; no Branch Menu adoption is required
+    //   for stock to exist.
+    // - Product without SKU -> legacy branch_products compatibility path.
+    const product = db.prepare(`
+      SELECT id, brand_id, sku
+      FROM products
+      WHERE id = ? AND brand_id = ?
+    `).get(req.params.productId, req.brand_id);
+    if (!product) {
+      return res.status(404).json({ success: false, error: 'Produk tidak ditemukan pada brand ini.' });
+    }
+
+    const canonicalStock = product.sku != null && String(product.sku).trim() !== '';
+    if (!canonicalStock) {
+      const assignment = db.prepare(`
+        SELECT bp.branch_id
+        FROM branch_products bp
+        JOIN products p ON p.id = bp.product_id AND p.brand_id = ?
+        WHERE bp.branch_id = ? AND bp.product_id = ?
+      `).get(req.brand_id, req.params.id, req.params.productId);
+      if (!assignment) {
+        return res.status(404).json({ success: false, error: 'Produk tidak dialokasikan ke cabang ini.' });
+      }
     }
 
     try {
@@ -160,11 +206,12 @@ router.patch('/admin/branches/:id/inventory/:productId', requireAuth(['owner', '
         notes
       });
 
-      const current = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(req.params.id, req.params.productId);
+      const stock = InventoryStockService.getStock(req.params.id, req.params.productId);
       res.json({
         success: true,
         movement,
-        stock: current ? current.stock : 0
+        stock,
+        stock_source: canonicalStock ? 'canonical' : 'legacy'
       });
     } catch (stockErr) {
       const msg = String(stockErr && stockErr.message || '');
