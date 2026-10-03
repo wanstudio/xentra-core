@@ -41,21 +41,24 @@ Primary navigation:
 - Kasir
 - Transaksi
 - Meja
-- Shift
+
+**Shift is not a primary navigation destination.** Shift is a cashier-session context and is exposed through the POS status/topbar and contextual modal actions.
 
 POS capabilities exposed in the execution surface:
 
+- single Sale / transaction flow;
 - menu selection inside Sale;
-- order type: dine-in / pickup / delivery;
+- optional table context for dine-in transactions;
 - cart quantity changes;
 - hold / resume dine-in bill;
 - cash payment and cash tender/change;
 - transaction history;
+- transaction-detail actions, including COD cash handover/settlement where applicable;
 - receipt printing / reprint;
-- table selection as transaction context;
-- shift open;
-- cash in / cash out;
-- shift close and cash variance;
+- shift open/status/break/cash-in/cash-out/close controls through the contextual Shift UI;
+- online/offline state indication;
+- offline local sale fallback;
+- sync outbox on reconnect;
 - online/offline state indication;
 - offline local sale fallback;
 - sync outbox on reconnect.
@@ -179,3 +182,62 @@ Offline POS remains **cash-only**. Payment Gateway and QRIS Statis require conne
 Gateway timeout is treated as `reconciliation_pending`; it must not be blindly retried or duplicated. A clear gateway failure cancels that failed payment attempt, allowing the cashier to create a new sale using another payment mode.
 
 The same Xentra-Core payment authority remains the single source of truth. No second payment state machine is introduced.
+
+## POS Transaction UX — LOCKED REVISION 1.1
+
+**Date:** 2026-10-03
+
+### Single Transaction Flow
+
+The POS cashier must not select a top-level transaction tab or mode for Dine-in, Pickup, or Delivery.
+
+The cashier's primary mental model is one transaction flow:
+
+**Select Menu → Cart → optional transaction context → Payment → Complete**
+
+Table is an **optional transaction context**. When a cashier selects a table, the transaction is a dine-in transaction. When no table is selected, the transaction may be treated as a normal non-table/takeaway sale according to the applicable Order contract.
+
+`pickup` and `delivery` remain valid Commerce/Fulfillment concepts where required by their originating flow, but they are **not POS navigation tabs and are not required cashier-facing transaction-mode choices**.
+
+### Delivery Boundary
+
+POS does not create or operate the Driver delivery lifecycle. Driver/Delivery remains authoritative for:
+
+`unassigned → assigned → picked_up → on_delivery → delivered`
+
+A delivery order may still appear in POS transaction context when the cashier must perform a financial action, especially COD cash handover and payment settlement. That action belongs to the **transaction detail**, not to a Delivery tab.
+
+### Shift Boundary
+
+Shift remains an authoritative POS operating state and is required by the existing cashier/shift contract, but it is **not a primary navigation destination**.
+
+Shift operations are exposed through the contextual POS header/status and modal:
+- open shift;
+- view current shift state;
+- start/end break;
+- Cash In;
+- Cash Out;
+- close shift and variance.
+
+A missing/closed shift may still gate transaction completion where required by the Core contract.
+
+### Manual Refresh Boundary
+
+The POS must not expose a permanent **Refresh** button on every page as the normal mechanism for data freshness.
+
+Normal freshness should be handled automatically by the existing POS re-fetch/synchronization behavior:
+- initial page/view load;
+- return to the relevant POS view/foreground where appropriate;
+- after successful mutations that affect the displayed data;
+- reconnect/resynchronization after offline operation;
+- explicit retry/recovery when a previous fetch failed.
+
+A manual refresh control may exist only as a secondary recovery/debug affordance when a concrete operational need requires it; it must not be repeated as a primary button on each POS page.
+
+### UX Invariant
+
+**POS is an execution surface, not a collection of workflow tabs.**
+
+Do not introduce a new top-level tab merely because a domain attribute exists in the underlying Order model. The existence of `dine_in`, `pickup`, or `delivery` in Core does not by itself justify a dedicated POS navigation mode.
+
+This revision supersedes the earlier POS UI wording that listed `dine-in / pickup / delivery` as an exposed POS order-type selection and the earlier primary-navigation listing that included Shift.
