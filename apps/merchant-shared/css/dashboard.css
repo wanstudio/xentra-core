@@ -9474,3 +9474,30 @@ body:not(.x-merchant-app) .x-owner-mobile-page-sub {
   }
 }
 
+
+
+.x-product-legacy-boundary-note {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.x-product-legacy-boundary-note strong {
+  color: #475569;
+  font-size: 11px;
+}
+
+@media (max-width: 560px) {
+  .x-product-legacy-boundary-note {
+    padding: 9px 10px;
+  }
+}
+
