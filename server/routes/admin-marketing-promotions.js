@@ -46,12 +46,11 @@ module.exports = function registerAdminMarketingPromotionRoutes(router, deps) {
     }
   }
 
-  // PROMOTION REWARD BOUNDARY NOTICE:
-  // `promotion_rewards.target_product_id` remains a Product reference for the
-  // existing promotion contract because the reward represents an inventory item.
-  // The Product → Menu migration does not silently reinterpret it as menu_id.
-  // A future Menu-targeted reward contract must be explicitly defined before
-  // this field is changed.
+  // PROMOTION REWARD TARGET CONTRACT:
+  // target_menu_id is the canonical commercial reward identity.
+  // target_product_id remains a legacy Product/fulfillment reference only.
+  // New reward configuration must target a Menu; legacy Product targets remain
+  // accepted during migration and are never silently reinterpreted.
   // 6. Marketing Promotions List API
   router.get('/admin/marketing/promotions', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
     try {
@@ -72,8 +71,21 @@ module.exports = function registerAdminMarketingPromotionRoutes(router, deps) {
           if (pres.media_id) {
             delivery = bannerMediaDelivery(req.brand_id, pres.media_id);
           }
+          let rewardTarget = null;
+          try {
+            rewardTarget = PromotionRewardResolver.resolveConfiguredReward({
+              brandId: req.brand_id,
+              branchId: null,
+              reward: r
+            });
+          } catch (_) {}
+
           return {
             ...r,
+            target_menu_title: rewardTarget && rewardTarget.menu_snapshot
+              ? rewardTarget.menu_snapshot.title
+              : (rewardTarget && rewardTarget.name) || null,
+            target_menu_type: rewardTarget ? rewardTarget.menu_type : null,
             presentation: pres,
             presentation_delivery: delivery
           };
@@ -138,12 +150,36 @@ router.post('/admin/marketing/promotions', requireAuth(['owner', 'brand_manager'
 
     if (Array.isArray(rewards) && rewards.length > 0) {
       for (const rw of rewards) {
-        if (rw.target_product_id) {
+        if (rw.target_menu_id && rw.target_product_id) {
+          return res.status(400).json({
+            success: false,
+            error: 'Reward canonical hanya boleh memiliki target_menu_id. target_product_id hanya untuk reward legacy.'
+          });
+        }
+
+        if (rw.reward_type === 'freebie_product' && !rw.target_menu_id && !rw.target_product_id) {
+          return res.status(400).json({
+            success: false,
+            error: 'Reward gratis wajib memiliki target_menu_id.'
+          });
+        }
+
+        if (rw.target_menu_id) {
+          const menu = db.prepare(
+            'SELECT id FROM menus WHERE id = ? AND brand_id = ?'
+          ).get(rw.target_menu_id, req.brand_id);
+          if (!menu) {
+            return res.status(400).json({
+              success: false,
+              error: 'Menu reward tidak valid atau bukan milik brand ini.'
+            });
+          }
+        } else if (rw.target_product_id) {
           const prod = db.prepare('SELECT id FROM products WHERE id = ? AND brand_id = ?').get(rw.target_product_id, req.brand_id);
           if (!prod) {
             return res.status(400).json({
               success: false,
-              error: 'Produk reward tidak valid atau bukan milik brand ini.'
+              error: 'Produk reward legacy tidak valid atau bukan milik brand ini.'
             });
           }
         }
@@ -238,12 +274,36 @@ router.put('/admin/marketing/promotions/:id', requireAuth(['owner', 'brand_manag
 
     if (Array.isArray(rewards) && rewards.length > 0) {
       for (const rw of rewards) {
-        if (rw.target_product_id) {
+        if (rw.target_menu_id && rw.target_product_id) {
+          return res.status(400).json({
+            success: false,
+            error: 'Reward canonical hanya boleh memiliki target_menu_id. target_product_id hanya untuk reward legacy.'
+          });
+        }
+
+        if (rw.reward_type === 'freebie_product' && !rw.target_menu_id && !rw.target_product_id) {
+          return res.status(400).json({
+            success: false,
+            error: 'Reward gratis wajib memiliki target_menu_id.'
+          });
+        }
+
+        if (rw.target_menu_id) {
+          const menu = db.prepare(
+            'SELECT id FROM menus WHERE id = ? AND brand_id = ?'
+          ).get(rw.target_menu_id, req.brand_id);
+          if (!menu) {
+            return res.status(400).json({
+              success: false,
+              error: 'Menu reward tidak valid atau bukan milik brand ini.'
+            });
+          }
+        } else if (rw.target_product_id) {
           const prod = db.prepare('SELECT id FROM products WHERE id = ? AND brand_id = ?').get(rw.target_product_id, req.brand_id);
           if (!prod) {
             return res.status(400).json({
               success: false,
-              error: 'Produk reward tidak valid atau bukan milik brand ini.'
+              error: 'Produk reward legacy tidak valid atau bukan milik brand ini.'
             });
           }
         }
