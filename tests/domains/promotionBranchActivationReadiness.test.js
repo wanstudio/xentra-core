@@ -225,34 +225,30 @@ describe('Promotion Branch Activation ↔ Reward Catalog Readiness', () => {
     db.prepare('UPDATE branch_product_inventory SET stock_qty = 25 WHERE branch_id = ? AND product_id = ?').run(branchA, masterReward);
   });
 
-  test('ACT-08: Real Bangjo brand prm_bangjo_pwa_install reward points to 401 and succeeds PrePaymentVerificationGate at Bangjo branch', () => {
-    let targetDb = db;
-    let bangjoBranch = 'branch_1789606246242_08knv';
+  test('ACT-08: Real Bangjo install reward resolves by canonical Menu identity', () => {
+    const bangjoBranch = 'branch_bangjo_utara';
 
-    // In current test db (which is :memory:), ensure brand, branch, product 401 and promo exist
     db.prepare("INSERT OR IGNORE INTO organizations (id, name, slug) VALUES ('org_bangjo', 'Bangjo Group', 'bangjo-group')").run();
     db.prepare("INSERT OR IGNORE INTO brands (id, organization_id, name, slug) VALUES ('brand_bangjo', 'org_bangjo', 'Bangjo', 'bangjo')").run();
-    db.prepare("INSERT OR IGNORE INTO products (id, brand_id, name, slug, price, is_active) VALUES ('401', 'brand_bangjo', 'Es Teh Manis', 'es-teh-manis', 7500, 1)").run();
+    db.prepare("INSERT OR IGNORE INTO categories (id, brand_id, name, slug, is_active) VALUES ('cat_bangjo_install', 'brand_bangjo', 'Minuman', 'minuman-bangjo-install', 1)").run();
+    db.prepare("INSERT OR IGNORE INTO products (id, brand_id, category_id, name, slug, price, is_active, sku) VALUES ('401', 'brand_bangjo', 'cat_bangjo_install', 'Es Teh Manis', 'es-teh-manis', 7500, 1, 'SKU-401')").run();
+
+    db.prepare("INSERT OR IGNORE INTO branches (id, brand_id, name, slug, address_text, is_active, latitude, longitude) VALUES (?, 'brand_bangjo', 'Bangjo Utara', 'bangjo-utara-install', 'Jl. Ahmad Yani', 1, -5.365, 104.983)").run(bangjoBranch);
+    db.prepare("INSERT OR IGNORE INTO branch_categories (id, brand_id, branch_id, name, slug, sort_order, is_active) VALUES ('bc_bangjo_install', 'brand_bangjo', ?, 'Minuman', 'minuman-install', 1, 1)").run(bangjoBranch);
+
+    const rasa = db.prepare("SELECT id FROM menu_flavors WHERE brand_id = 'brand_bangjo' AND lower(trim(name)) = 'original' AND is_active = 1 LIMIT 1").get()
+      || (db.prepare("INSERT INTO menu_flavors (id, brand_id, name, slug, is_active) VALUES ('rasa_bangjo_install', 'brand_bangjo', 'Original', 'original-bangjo-install', 1)").run(), db.prepare("SELECT id FROM menu_flavors WHERE id = 'rasa_bangjo_install'").get());
+    db.prepare("INSERT OR REPLACE INTO sub_categories (id, brand_id, category_id, name, slug, is_active) VALUES ('sub_bangjo_install', 'brand_bangjo', 'cat_bangjo_install', 'Es Teh Manis', 'es-teh-manis-install', 1)").run();
+    db.prepare("INSERT OR REPLACE INTO menus (id, brand_id, menu_type, sub_category_id, rasa_id, selling_price, status) VALUES ('menu_bangjo_install_401', 'brand_bangjo', 'SINGLE', 'sub_bangjo_install', ?, 7500, 'ACTIVE')").run(rasa.id);
+    db.prepare("INSERT OR REPLACE INTO menu_items (menu_id, product_id, quantity, sort_order) VALUES ('menu_bangjo_install_401', '401', 1, 0)").run();
+    db.prepare("INSERT OR REPLACE INTO branch_menus (branch_id, menu_id, is_available) VALUES (?, 'menu_bangjo_install_401', 1)").run(bangjoBranch);
+    db.prepare("INSERT OR REPLACE INTO branch_menu_categories (branch_id, menu_id, branch_category_id) VALUES (?, 'menu_bangjo_install_401', 'bc_bangjo_install')").run(bangjoBranch);
+    db.prepare("INSERT OR REPLACE INTO branch_product_inventory (branch_id, product_id, stock_qty, low_stock_threshold) VALUES (?, '401', 100, 5)").run(bangjoBranch);
+
     db.prepare("INSERT OR IGNORE INTO promotions (id, brand_id, name, code, capability_type, stacking_policy, priority_weight, is_active) VALUES ('prm_bangjo_pwa_install', 'brand_bangjo', 'Promo Hadiah Install PWA Es Teh', NULL, 'install_incentive', 'exclusive', 100, 1)").run();
     db.prepare("INSERT OR IGNORE INTO promotion_rules (id, promotion_id, rule_type, rule_payload) VALUES ('rul_pwa_install_01', 'prm_bangjo_pwa_install', 'eligibility', '{\"requires_pwa_installed\":true,\"target_audience\":\"new_user\",\"first_order_only\":true}')").run();
-
-    let testBp = db.prepare('SELECT is_available, stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(bangjoBranch, '401');
-    if (!testBp) {
-      // Use existing seeded branch in :memory: that has product 401 (e.g. branch_bangjo_utara)
-      const utaraBp = db.prepare("SELECT is_available, stock FROM branch_products WHERE branch_id = 'branch_bangjo_utara' AND product_id = '401'").get();
-      if (utaraBp) {
-        bangjoBranch = 'branch_bangjo_utara';
-      } else {
-        db.prepare("INSERT OR IGNORE INTO branches (id, brand_id, name, slug, address_text, is_active, latitude, longitude) VALUES (?, 'brand_bangjo', 'Bangjo Pringsewu', 'bangjo-pringsewu', 'Jl. Ahmad Yani', 1, -5.365, 104.983)").run(bangjoBranch);
-        db.prepare("INSERT OR IGNORE INTO branch_products (branch_id, product_id, price, stock, is_available) VALUES (?, '401', 7500, 100, 1)").run(bangjoBranch);
-      }
-    }
-
-    db.prepare("INSERT OR IGNORE INTO promotion_rewards (id, promotion_id, reward_type, target_product_id, amount_in_cents, presentation_payload) VALUES ('rew_pwa_install_01', 'prm_bangjo_pwa_install', 'freebie_product', '401', 0, '{\"reward_title\":\"Selamat! Es Teh Gratis untuk pesanan pertamamu!\"}') ON CONFLICT(id) DO UPDATE SET target_product_id = '401'").run();
+    db.prepare("INSERT INTO promotion_rewards (id, promotion_id, reward_type, target_menu_id, target_product_id, amount_in_cents, presentation_payload) VALUES ('rew_pwa_install_01', 'prm_bangjo_pwa_install', 'freebie_product', 'menu_bangjo_install_401', NULL, 0, '{\"reward_title\":\"Selamat! Es Teh Gratis untuk pesanan pertamamu!\"}') ON CONFLICT(id) DO UPDATE SET target_menu_id = 'menu_bangjo_install_401', target_product_id = NULL").run();
     db.prepare("INSERT OR IGNORE INTO promotion_branch_scope (id, promotion_id, brand_id, branch_id, is_active) VALUES ('pbs_bangjo_test_scope', 'prm_bangjo_pwa_install', 'brand_bangjo', ?, 1) ON CONFLICT(promotion_id, branch_id) DO UPDATE SET is_active = 1").run(bangjoBranch);
-
-    const catalogProduct = db.prepare('SELECT price FROM branch_products WHERE branch_id = ? AND product_id = ?').get(bangjoBranch, '401');
-    const authoritativePrice = catalogProduct ? catalogProduct.price : 6000;
 
     const orderPayload = {
       brand_id: 'brand_bangjo',
@@ -260,8 +256,8 @@ describe('Promotion Branch Activation ↔ Reward Catalog Readiness', () => {
       pwa_runtime: { display_mode: 'standalone' },
       customer: { phone: '081288889999' },
       items: [
-        { product_id: '401', quantity: 1, price: authoritativePrice },
-        { is_promo_reward: true, promo_id: 'prm_bangjo_pwa_install', product_id: '401', quantity: 1, price: 0 }
+        { menu_id: 'menu_bangjo_install_401', quantity: 1, expected_price: 7500 },
+        { is_promo_reward: true, promo_id: 'prm_bangjo_pwa_install', menu_id: 'menu_bangjo_install_401', quantity: 1, expected_price: 0 }
       ]
     };
 
@@ -270,5 +266,6 @@ describe('Promotion Branch Activation ↔ Reward Catalog Readiness', () => {
     assert.strictEqual(gateResult.status, PrePaymentVerificationGate.STATUS.VERIFIED);
     assert.strictEqual(gateResult.applied_promos.length, 1);
     assert.strictEqual(gateResult.applied_promos[0].promo_id, 'prm_bangjo_pwa_install');
+  });
   });
 });
