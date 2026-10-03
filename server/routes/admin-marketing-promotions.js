@@ -46,6 +46,12 @@ module.exports = function registerAdminMarketingPromotionRoutes(router, deps) {
     }
   }
 
+  // PROMOTION REWARD BOUNDARY NOTICE:
+  // `promotion_rewards.target_product_id` remains a Product reference for the
+  // existing promotion contract because the reward represents an inventory item.
+  // The Product → Menu migration does not silently reinterpret it as menu_id.
+  // A future Menu-targeted reward contract must be explicitly defined before
+  // this field is changed.
   // 6. Marketing Promotions List API
   router.get('/admin/marketing/promotions', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
     try {
