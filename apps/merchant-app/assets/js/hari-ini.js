@@ -208,21 +208,22 @@
     if (results[4].status === "fulfilled" && results[4].value && results[4].value.ok) {
       try {
         var pData = await results[4].value.json();
-        if (pData.success && Array.isArray(pData.assignments)) {
-          unavailItems = pData.assignments.filter(function (p) {
-            return p.is_available === 0 || p.is_available === false;
-          });
-        }
+        var menuAssignments = pData.success && Array.isArray(pData.adopted_menus)
+          ? pData.adopted_menus
+          : [];
+        unavailItems = menuAssignments.filter(function (menu) {
+          return menu.is_available === 0 || menu.is_available === false;
+        });
       } catch (e) {
-        console.warn("[BM Hari Ini Products Parse Error]:", e);
+        console.warn("[BM Hari Ini Menu Parse Error]:", e);
       }
     }
     renderHariIniAttention(lowItems, unavailItems);
 
-    // 5. Process Active Approved Promotions
-    if (results[5].status === "fulfilled" && results[5].value && results[5].value.ok) {
+    // 6. Process Active Approved Promotions
+    if (results[6].status === "fulfilled" && results[6].value && results[6].value.ok) {
       try {
-        var promoData = await results[5].value.json();
+        var promoData = await results[6].value.json();
         if (promoData.success && Array.isArray(promoData.promotions)) {
           var activePromos = promoData.promotions.filter(function (p) {
             var active = (p.is_active === 1 || p.is_active === true || p.status === "active");
@@ -237,10 +238,10 @@
       }
     }
 
-    // 6. Process Authoritative Recent Branch Operational Activity Logs
-    if (results[6].status === "fulfilled" && results[6].value && results[6].value.ok) {
+    // 7. Process Authoritative Recent Branch Operational Activity Logs
+    if (results[7].status === "fulfilled" && results[7].value && results[7].value.ok) {
       try {
-        var logsData = await results[6].value.json();
+        var logsData = await results[7].value.json();
         if (logsData.success && Array.isArray(logsData.logs)) {
           renderHariIniRecentActivity(logsData.logs);
         }
