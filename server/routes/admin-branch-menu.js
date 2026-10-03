@@ -42,7 +42,7 @@ function registerAdminBranchMenuRoutes(router, deps = {}) {
       });
       const allMasterMenus = resolver.resolveMasterMenu({ brandId: req.brand_id });
       const adoptedIds = new Set(adopted.map(menu => String(menu.menu_id)));
-      const availableMasterMenus = allMasterMenus.filter(menu => !adoptedIds.has(String(menu.menu_id)));
+      const availableMasterMenus = allMasterMenus.filter(menu => !adoptedIds.has(String(menu.menu_id)) && menu.is_available !== false);
 
       const categories = db.prepare(
         'SELECT id, brand_id, branch_id, name, slug, image_url, sort_order, COALESCE(is_active, 1) AS is_active FROM branch_categories WHERE branch_id = ? AND brand_id = ? ORDER BY sort_order ASC, name ASC'
