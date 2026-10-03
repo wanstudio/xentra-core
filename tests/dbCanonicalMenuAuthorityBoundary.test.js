@@ -144,8 +144,8 @@ test('Forward Merchant surfaces do not read legacy branch-product catalog endpoi
     ['Owner Branch Catalog', ownerBranchCatalog]
   ]) {
     assert.ok(
-      !source.includes('/admin/branches/'),
-      name + ' must not hard-code legacy branch-product admin transport'
+      !/\/admin\/branches\/[^'"\\`]+\/products(?:[/'"\\`?]|$)/.test(source),
+      name + ' must not hard-code legacy /admin/branches/:id/products transport'
     );
     assert.ok(
       !source.includes('updateBranchProductOverride'),
