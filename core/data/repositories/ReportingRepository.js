@@ -219,7 +219,7 @@ class ReportingRepository {
       params.push(filter.brand_id, filter.brand_id);
     }
     if (filter.branch_id) {
-      whereClauses.push('bp.branch_id = ?');
+      whereClauses.push('b.id = ?');
       params.push(filter.branch_id);
     }
 
@@ -227,13 +227,14 @@ class ReportingRepository {
 
     return this.db.queryOne(`
       SELECT
-        COUNT(CASE WHEN bp.stock IS NOT NULL THEN 1 END) AS tracked_item_count,
-        COUNT(CASE WHEN bp.stock IS NOT NULL AND bp.stock > 0 AND bp.stock <= bp.low_stock_threshold THEN 1 END) AS low_stock_count,
-        COUNT(CASE WHEN bp.stock IS NOT NULL AND bp.stock <= 0 THEN 1 END) AS out_of_stock_count,
-        COALESCE(SUM(CASE WHEN bp.stock IS NOT NULL THEN bp.stock ELSE 0 END), 0) AS total_units
-      FROM branch_products bp
-      JOIN products p ON bp.product_id = p.id
-      JOIN branches b ON bp.branch_id = b.id
+        COUNT(CASE WHEN p.sku IS NOT NULL AND TRIM(p.sku) <> '' THEN 1 END) AS tracked_item_count,
+        COUNT(CASE WHEN p.sku IS NOT NULL AND TRIM(p.sku) <> '' AND bpi.stock_qty > 0 AND bpi.stock_qty <= bpi.low_stock_threshold THEN 1 END) AS low_stock_count,
+        COUNT(CASE WHEN p.sku IS NOT NULL AND TRIM(p.sku) <> '' AND bpi.stock_qty <= 0 THEN 1 END) AS out_of_stock_count,
+        COALESCE(SUM(CASE WHEN p.sku IS NOT NULL AND TRIM(p.sku) <> '' THEN bpi.stock_qty ELSE 0 END), 0) AS total_units
+      FROM products p
+      CROSS JOIN branches b
+      LEFT JOIN branch_product_inventory bpi
+        ON bpi.branch_id = b.id AND bpi.product_id = p.id
       ${whereSql}
     `, params);
   }
@@ -243,11 +244,11 @@ class ReportingRepository {
     const params = [];
 
     if (filter.brand_id) {
-      whereClauses.push('p.brand_id = ? AND b.brand_id = ?');
+      whereClauses.push('b.brand_id = ? AND p.brand_id = ?');
       params.push(filter.brand_id, filter.brand_id);
     }
     if (filter.branch_id) {
-      whereClauses.push('bp.branch_id = ?');
+      whereClauses.push('b.id = ?');
       params.push(filter.branch_id);
     }
 
@@ -255,23 +256,28 @@ class ReportingRepository {
 
     return this.db.queryMany(`
       SELECT
-        bp.branch_id,
+        b.id AS branch_id,
         b.name AS branch_name,
-        COUNT(CASE WHEN bp.stock IS NOT NULL THEN 1 END) AS tracked_item_count,
-        COUNT(CASE WHEN bp.stock IS NOT NULL AND bp.stock > 0 AND bp.stock <= bp.low_stock_threshold THEN 1 END) AS low_stock_count,
-        COUNT(CASE WHEN bp.stock IS NOT NULL AND bp.stock <= 0 THEN 1 END) AS out_of_stock_count,
-        COALESCE(SUM(CASE WHEN bp.stock IS NOT NULL THEN bp.stock ELSE 0 END), 0) AS total_units
-      FROM branch_products bp
-      JOIN products p ON bp.product_id = p.id
-      JOIN branches b ON bp.branch_id = b.id
+        COUNT(CASE WHEN p.sku IS NOT NULL AND TRIM(p.sku) <> '' THEN 1 END) AS tracked_item_count,
+        COUNT(CASE WHEN p.sku IS NOT NULL AND TRIM(p.sku) <> '' AND bpi.stock_qty > 0 AND bpi.stock_qty <= bpi.low_stock_threshold THEN 1 END) AS low_stock_count,
+        COUNT(CASE WHEN p.sku IS NOT NULL AND TRIM(p.sku) <> '' AND bpi.stock_qty <= 0 THEN 1 END) AS out_of_stock_count,
+        COALESCE(SUM(CASE WHEN p.sku IS NOT NULL AND TRIM(p.sku) <> '' THEN bpi.stock_qty ELSE 0 END), 0) AS total_units
+      FROM branches b
+      JOIN products p ON p.brand_id = b.brand_id
+      LEFT JOIN branch_product_inventory bpi
+        ON bpi.branch_id = b.id AND bpi.product_id = p.id
       ${whereSql}
-      GROUP BY bp.branch_id, b.name
+      GROUP BY b.id, b.name
       ORDER BY out_of_stock_count DESC, low_stock_count DESC, b.name ASC
     `, params);
   }
 
   getLowStockItems(filter = {}) {
-    const whereClauses = ['bp.stock <= bp.low_stock_threshold'];
+    const whereClauses = [
+      "p.sku IS NOT NULL",
+      "TRIM(p.sku) <> ''",
+      "bpi.stock_qty <= bpi.low_stock_threshold"
+    ];
     const params = [];
 
     if (filter.brand_id) {
@@ -279,23 +285,24 @@ class ReportingRepository {
       params.push(filter.brand_id, filter.brand_id);
     }
     if (filter.branch_id) {
-      whereClauses.push('bp.branch_id = ?');
+      whereClauses.push('b.id = ?');
       params.push(filter.branch_id);
     }
 
     return this.db.queryMany(`
       SELECT
-        bp.branch_id,
-        b.name as branch_name,
-        p.id as product_id,
-        p.name as product_name,
-        bp.stock as current_stock,
-        bp.low_stock_threshold
-      FROM branch_products bp
-      JOIN products p ON bp.product_id = p.id
-      JOIN branches b ON bp.branch_id = b.id
+        b.id AS branch_id,
+        b.name AS branch_name,
+        p.id AS product_id,
+        p.name AS product_name,
+        bpi.stock_qty AS current_stock,
+        bpi.low_stock_threshold,
+        p.sku
+      FROM branch_product_inventory bpi
+      JOIN products p ON bpi.product_id = p.id
+      JOIN branches b ON bpi.branch_id = b.id
       WHERE ${whereClauses.join(' AND ')}
-      ORDER BY bp.stock ASC
+      ORDER BY bpi.stock_qty ASC
     `, params);
   }
 
@@ -303,17 +310,37 @@ class ReportingRepository {
     const { whereSql, params } = this._buildOrderFilter(filter, 'o');
     return this.db.queryMany(`
       SELECT
+        oi.menu_id,
+        m.menu_type,
+        COALESCE(
+          json_extract(oi.menu_snapshot, '$.title'),
+          m.package_name,
+          oi.product_name,
+          oi.product_id
+        ) AS product_name,
+        COALESCE(
+          json_extract(oi.menu_snapshot, '$.category.name'),
+          c_menu.name,
+          c_product.name,
+          'Uncategorized'
+        ) AS category_name,
         oi.product_id,
-        oi.product_name,
-        COALESCE(c.name, 'Uncategorized') as category_name,
-        SUM(oi.quantity) as total_units_sold,
-        SUM(COALESCE(oi.subtotal, oi.item_subtotal, oi.unit_price * oi.quantity)) as total_gross_sales
+        SUM(oi.quantity) AS total_units_sold,
+        SUM(COALESCE(oi.subtotal, oi.item_subtotal, oi.unit_price * oi.quantity)) AS total_gross_sales
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.id
+      LEFT JOIN menus m ON oi.menu_id = m.id AND m.brand_id = o.brand_id
+      LEFT JOIN sub_categories sc ON m.sub_category_id = sc.id
+      LEFT JOIN categories c_menu ON sc.category_id = c_menu.id
       LEFT JOIN products p ON oi.product_id = p.id
-      LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN categories c_product ON p.category_id = c_product.id
       ${whereSql}
-      GROUP BY oi.product_id, oi.product_name, c.name
+      GROUP BY
+        oi.menu_id,
+        m.menu_type,
+        product_name,
+        category_name,
+        oi.product_id
       ORDER BY total_units_sold DESC
       LIMIT 50
     `, params);
@@ -323,15 +350,23 @@ class ReportingRepository {
     const { whereSql, params } = this._buildOrderFilter(filter, 'o');
     return this.db.queryMany(`
       SELECT
-        COALESCE(c.name, 'Uncategorized') as category_name,
-        SUM(oi.quantity) as total_units_sold,
-        SUM(COALESCE(oi.subtotal, oi.item_subtotal, oi.unit_price * oi.quantity)) as total_gross_sales
+        COALESCE(
+          json_extract(oi.menu_snapshot, '$.category.name'),
+          c_menu.name,
+          c_product.name,
+          'Uncategorized'
+        ) AS category_name,
+        SUM(oi.quantity) AS total_units_sold,
+        SUM(COALESCE(oi.subtotal, oi.item_subtotal, oi.unit_price * oi.quantity)) AS total_gross_sales
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.id
+      LEFT JOIN menus m ON oi.menu_id = m.id AND m.brand_id = o.brand_id
+      LEFT JOIN sub_categories sc ON m.sub_category_id = sc.id
+      LEFT JOIN categories c_menu ON sc.category_id = c_menu.id
       LEFT JOIN products p ON oi.product_id = p.id
-      LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN categories c_product ON p.category_id = c_product.id
       ${whereSql}
-      GROUP BY c.name
+      GROUP BY category_name
       ORDER BY total_gross_sales DESC
     `, params);
   }
