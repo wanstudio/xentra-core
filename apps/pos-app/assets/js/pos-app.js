@@ -1612,6 +1612,195 @@
     });
   }
 
+  async function openCashierProfileModal(){
+    var u = state.user || user() || {};
+    var onb = null;
+    try {
+      onb = await requestWithTimeout('/auth/cashier-onboarding/status', { headers: headers() }, 5000);
+    } catch (_) {}
+
+    var fullName = (onb && onb.name) || u.full_name || u.name || '';
+    var email = (onb && onb.email) || u.email || 'kasir@xentra.cloud';
+    var branchName = (onb && onb.branch_name) || u.branch_name || (state.brand && state.brand.name) || 'Cabang POS';
+    var hasNik = Boolean(onb && onb.has_nik);
+    var maskedNik = (onb && onb.nik_masked) || '';
+
+    var nikHtml = '';
+    if (hasNik) {
+      nikHtml = '<div class="pos-profile-nik-status">' +
+        '<span class="pos-profile-nik-val">' + esc(maskedNik) + '</span>' +
+        '<span class="pos-profile-nik-badge">Terdaftar</span>' +
+      '</div>';
+    } else {
+      nikHtml = '<input id="pos-profile-input-nik" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="16" placeholder="Ketik 16 digit NIK / KTP" autocomplete="off">' +
+        '<small>Wajib 16 digit angka sesuai identitas KTP asli.</small>';
+    }
+
+    var html = '<div class="pos-modal-head-row">' +
+      '<h3>Profil & Identitas Kasir</h3>' +
+      '<button class="pos-icon-btn pos-btn-close-modal" id="btn-close-profile-modal" type="button" aria-label="Tutup">' +
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
+      '</button>' +
+    '</div>' +
+    '<div class="pos-profile-card">' +
+      '<div class="pos-profile-avatar">' +
+        '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>' +
+      '</div>' +
+      '<div class="pos-profile-info">' +
+        '<div class="pos-profile-name">' + esc(fullName || 'Kasir Bertugas') + '</div>' +
+        '<div class="pos-profile-badge">Kasir · ' + esc(branchName) + '</div>' +
+        '<div class="pos-profile-email">' + esc(email) + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="pos-profile-section-title">Data Identitas Operator</div>' +
+    '<div class="pos-profile-group">' +
+      '<div class="pos-profile-row">' +
+        '<label for="pos-profile-input-name">Nama Lengkap (Sesuai KTP)</label>' +
+        '<input id="pos-profile-input-name" type="text" placeholder="Masukkan nama lengkap" value="' + esc(fullName) + '" autocomplete="name">' +
+      '</div>' +
+      '<div class="pos-profile-row">' +
+        '<label>Nomor Induk Kependudukan (NIK)</label>' +
+        nikHtml +
+      '</div>' +
+    '</div>' +
+    '<div class="pos-profile-section-title">PIN Operasional POS</div>' +
+    '<div class="pos-profile-group">' +
+      '<div class="pos-profile-row">' +
+        '<label for="pos-profile-input-pin">Ubah PIN POS (Kosongkan jika tidak ingin diubah)</label>' +
+        '<input id="pos-profile-input-pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Ketik 6 digit PIN baru" autocomplete="new-password">' +
+      '</div>' +
+      '<div class="pos-profile-row" id="pos-profile-row-confirm-pin" style="display:none;">' +
+        '<label for="pos-profile-input-pin-confirm">Konfirmasi PIN Baru</label>' +
+        '<input id="pos-profile-input-pin-confirm" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Ketik ulang 6 digit PIN baru" autocomplete="new-password">' +
+      '</div>' +
+    '</div>' +
+    '<div id="pos-profile-error" class="pos-auth-error" style="margin-bottom:8px;"></div>' +
+    '<div class="pos-profile-actions">' +
+      '<button type="button" class="pos-btn-save-profile" id="btn-save-cashier-profile">Simpan Perubahan</button>' +
+      '<button type="button" class="pos-btn-logout-profile" id="btn-profile-logout">Keluar dari Kasir</button>' +
+    '</div>';
+
+    showModal(html);
+
+    if ($('btn-close-profile-modal')) {
+      $('btn-close-profile-modal').onclick = hideModal;
+    }
+
+    if ($('btn-profile-logout')) {
+      $('btn-profile-logout').onclick = function () {
+        hideModal();
+        clearPosSessionAndReturnToPin();
+      };
+    }
+
+    var pinInput = $('pos-profile-input-pin');
+    var pinConfirmRow = $('pos-profile-row-confirm-pin');
+    var pinConfirmInput = $('pos-profile-input-pin-confirm');
+    var nikInput = $('pos-profile-input-nik');
+    var nameInput = $('pos-profile-input-name');
+    var errEl = $('pos-profile-error');
+    var btnSave = $('btn-save-cashier-profile');
+
+    if (pinInput && pinConfirmRow) {
+      pinInput.oninput = function () {
+        this.value = this.value.replace(/\D/g, '').slice(0, 6);
+        if (this.value.length > 0) {
+          pinConfirmRow.style.display = 'flex';
+        } else {
+          pinConfirmRow.style.display = 'none';
+        }
+      };
+    }
+    if (pinConfirmInput) {
+      pinConfirmInput.oninput = function () {
+        this.value = this.value.replace(/\D/g, '').slice(0, 6);
+      };
+    }
+    if (nikInput) {
+      nikInput.oninput = function () {
+        this.value = this.value.replace(/\D/g, '').slice(0, 16);
+      };
+    }
+
+    if (btnSave) {
+      btnSave.onclick = async function () {
+        errEl.textContent = '';
+        var newName = (nameInput ? nameInput.value : '').trim();
+        var newNik = nikInput ? nikInput.value.trim() : null;
+        var newPin = pinInput ? pinInput.value.trim() : '';
+        var confirmPin = pinConfirmInput ? pinConfirmInput.value.trim() : '';
+
+        if (!newName || newName.length < 2) {
+          errEl.textContent = 'Nama lengkap wajib diisi minimal 2 karakter.';
+          return;
+        }
+
+        if (nikInput && (!newNik || !/^\d{16}$/.test(newNik))) {
+          errEl.textContent = 'NIK wajib terdiri dari tepat 16 digit angka.';
+          return;
+        }
+
+        if (newPin) {
+          if (!/^\d{6}$/.test(newPin)) {
+            errEl.textContent = 'PIN harus terdiri dari 6 digit angka.';
+            return;
+          }
+          if (newPin !== confirmPin) {
+            errEl.textContent = 'Konfirmasi PIN tidak cocok dengan PIN baru.';
+            return;
+          }
+        }
+
+        btnSave.disabled = true;
+        btnSave.textContent = 'Menyimpan...';
+
+        try {
+          // 1. If PIN was modified, save PIN first
+          if (newPin) {
+            await request('/auth/cashier-onboarding/pin', {
+              method: 'POST',
+              headers: headers(),
+              body: JSON.stringify({ pin: newPin, pin_confirmation: confirmPin })
+            });
+            // Update offline PIN cache
+            var updatedCred = await request('/auth/pos-pin', { headers: headers() });
+            if (updatedCred && updatedCred.offline_credential) {
+              savePosPinCache(updatedCred.user || state.user, updatedCred.offline_credential, state.branchId);
+            }
+          }
+
+          // 2. Save identity
+          var idPayload = { name: newName };
+          if (newNik) idPayload.nik = newNik;
+
+          var idRes = await request('/auth/cashier-onboarding/identity', {
+            method: 'POST',
+            headers: headers(),
+            body: JSON.stringify(idPayload)
+          });
+
+          if (idRes && idRes.success) {
+            if (state.user) state.user.full_name = newName;
+            var uStored = user();
+            if (uStored) {
+              uStored.full_name = newName;
+              try { localStorage.setItem(USER_KEY, JSON.stringify(uStored)); } catch (_) {}
+            }
+            if ($('pos-cashier-name')) $('pos-cashier-name').textContent = newName;
+            toast('Profil kasir berhasil diperbarui.');
+            hideModal();
+          } else {
+            throw new Error((idRes && (idRes.message || idRes.error)) || 'Gagal menyimpan profil.');
+          }
+        } catch (saveErr) {
+          errEl.textContent = saveErr.message || 'Gagal menyimpan data identitas.';
+          btnSave.disabled = false;
+          btnSave.textContent = 'Simpan Perubahan';
+        }
+      };
+    }
+  }
+
   async function consumeGoogleHandoff(){
     var params=new URLSearchParams(window.location.search);
     var handoff=params.get('handoff');
@@ -3460,6 +3649,7 @@
     if($('btn-pos-refresh-shift')) $('btn-pos-refresh-shift').onclick=function(){ renderShift(); openShiftModal(); };
     $('btn-pos-shift-status').onclick=openShiftModal;
     $('btn-pos-close-shift-top').onclick=openCloseShiftModal;
+    if($('pos-user-profile-btn')) $('pos-user-profile-btn').onclick=openCashierProfileModal;
     $('btn-pos-logout').onclick=function(){clearPosSessionAndReturnToPin();};
     bindPosStatus();
     $('pos-modal').onclick=function(e){if(e.target===this)hideModal();};

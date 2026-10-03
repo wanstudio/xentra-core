@@ -112,6 +112,14 @@ class CashierOnboardingService {
     const hasIdentity = Boolean(user.full_name && user.nik && user.nik.length === 16);
     const isCompleted = rawStatus === ONBOARDING_STATUS.IDENTITY_COMPLETED || (hasPin && hasIdentity);
 
+    let branchName = null;
+    if (user.branch_id) {
+      try {
+        const b = this.repository.prepare('SELECT name FROM branches WHERE id = ?').get(user.branch_id);
+        if (b) branchName = b.name;
+      } catch (_) {}
+    }
+
     return {
       status: isCompleted ? ONBOARDING_STATUS.IDENTITY_COMPLETED : rawStatus,
       step: isCompleted ? 4 : (rawStatus === ONBOARDING_STATUS.PIN_SET ? 3 : 2),
@@ -119,8 +127,12 @@ class CashierOnboardingService {
       has_identity: hasIdentity,
       can_access_pos: isCompleted,
       name: user.full_name || null,
+      username: user.username || null,
+      email: user.email || null,
       nik_masked: CashierOnboardingService.maskNik(user.nik),
+      has_nik: Boolean(user.nik && user.nik.length === 16),
       branch_id: user.branch_id,
+      branch_name: branchName,
       brand_id: user.brand_id
     };
   }
@@ -227,16 +239,26 @@ class CashierOnboardingService {
       }
     }
 
-    // Validate NIK: mandatory, exactly 16 digits
-    if (!nik || typeof nik !== 'string' || !CashierOnboardingService.validateNik(nik)) {
+    // Validate NIK: if provided, must be 16 digits. If user already has 16-digit NIK and nik parameter is omitted, keep existing NIK.
+    let cleanNik = null;
+    if (nik !== undefined && nik !== null && String(nik).trim() !== '') {
+      if (!CashierOnboardingService.validateNik(String(nik))) {
+        throw {
+          status: 400,
+          code: 'INVALID_NIK',
+          message: 'Nomor Induk Kependudukan (NIK) wajib terdiri dari tepat 16 digit angka.'
+        };
+      }
+      cleanNik = String(nik).trim();
+    } else if (user.nik && user.nik.length === 16) {
+      cleanNik = user.nik;
+    } else {
       throw {
         status: 400,
         code: 'INVALID_NIK',
         message: 'Nomor Induk Kependudukan (NIK) wajib terdiri dari tepat 16 digit angka.'
       };
     }
-
-    const cleanNik = nik.trim();
 
     const now = new Date().toISOString();
     this.repository.prepare(`

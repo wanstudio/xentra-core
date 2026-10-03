@@ -355,4 +355,33 @@ describe('Cashier Invitation & Mandatory Identity Onboarding Contract v1', () =>
     assert.match(inviteHtml, /\/auth\/cashier-onboarding\/pin/);
     assert.match(inviteHtml, /\/auth\/cashier-onboarding\/identity/);
   });
+
+  it('14. In-POS profile update allows existing cashier to update full name and retain registered NIK', async () => {
+    const updateRes = await request('POST', '/api/v1/auth/cashier-onboarding/identity', {
+      name: 'Budi Santoso S.E.'
+    }, { 'Authorization': `Bearer ${cashierToken}` });
+
+    assert.equal(updateRes.status, 200);
+    assert.equal(updateRes.data.success, true);
+    assert.equal(updateRes.data.user.name, 'Budi Santoso S.E.');
+    assert.equal(updateRes.data.user.nik_masked, '1871**********01');
+
+    const row = db.prepare('SELECT full_name, nik FROM users WHERE id = ?').get(cashierUser.id);
+    assert.equal(row.full_name, 'Budi Santoso S.E.');
+    assert.equal(row.nik, '1871020304050001');
+  });
+
+  it('15. POS app frontend wires profile modal to pos-user-profile-btn and provides profile styling', () => {
+    const posJs = fs.readFileSync(path.join(__dirname, '../apps/pos-app/assets/js/pos-app.js'), 'utf8');
+    const posCss = fs.readFileSync(path.join(__dirname, '../apps/pos-app/assets/css/pos.css'), 'utf8');
+
+    assert.match(posJs, /openCashierProfileModal/);
+    assert.match(posJs, /pos-user-profile-btn/);
+    assert.match(posJs, /btn-save-cashier-profile/);
+    assert.match(posCss, /\.pos-profile-card/);
+    assert.match(posCss, /\.pos-profile-avatar/);
+    assert.match(posCss, /\.pos-profile-nik-badge/);
+    assert.match(posCss, /\.pos-btn-save-profile/);
+  });
 });
+
