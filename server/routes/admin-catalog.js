@@ -212,12 +212,17 @@ router.post('/admin/products', requireAuth(['owner', 'brand_manager']), (req, re
       }
     }
 
+    const compatibilityPrice = price !== undefined && price !== null && price !== '' ? Number(price) : 0;
+    const compatibilityRegularPrice = regular_price !== undefined && regular_price !== null && regular_price !== ''
+      ? Number(regular_price)
+      : compatibilityPrice;
+
     const id = 'prod_' + Date.now();
     const slug = normalizedName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
     db.prepare(`
-      INSERT INTO products (id, brand_id, category_id, name, slug, description, price, regular_price, pricing_mode, min_price, max_price, is_active, sort_order)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM products WHERE brand_id = ?))
+      INSERT INTO products (id, brand_id, category_id, name, slug, description, price, regular_price, pricing_mode, min_price, max_price, is_active, sort_order, sku)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM products WHERE brand_id = ?), ?)
     `).run(
       id,
       req.brand_id,
@@ -225,14 +230,13 @@ router.post('/admin/products', requireAuth(['owner', 'brand_manager']), (req, re
       normalizedName,
       slug,
       description !== undefined ? description : '',
-      price !== undefined && price !== null && price !== '' ? Number(price) : 0,
-      regular_price !== undefined && regular_price !== null && regular_price !== ''
-        ? Number(regular_price)
-        : (price !== undefined && price !== null && price !== '' ? Number(price) : 0),
+      compatibilityPrice,
+      compatibilityRegularPrice,
       pricing_mode || 'lock',
       min_price !== undefined ? Number(min_price) : null,
       max_price !== undefined ? Number(max_price) : null,
-      req.brand_id
+      req.brand_id,
+      sku !== undefined && sku !== null ? (String(sku).trim() || null) : null
     );
 
     res.status(201).json({
@@ -241,8 +245,9 @@ router.post('/admin/products', requireAuth(['owner', 'brand_manager']), (req, re
         id,
         name: normalizedName,
         category_id,
-        price: Number(price),
-        regular_price: regular_price ? Number(regular_price) : Number(price),
+        price: compatibilityPrice,
+        regular_price: compatibilityRegularPrice,
+        sku: sku !== undefined && sku !== null ? (String(sku).trim() || null) : null,
         description: description !== undefined ? description : '',
         image: image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400',
         is_active: 1
@@ -300,7 +305,7 @@ router.put('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req,
           max_price = COALESCE(?, max_price),
           description = COALESCE(?, description),
           is_active = COALESCE(?, is_active),
-          sku = CASE WHEN ? IS NULL THEN sku ELSE ? END,
+          sku = CASE WHEN ? IS NULL THEN sku WHEN ? = '__NULL__' THEN NULL ELSE ? END,
           updated_at = datetime('now')
       WHERE id = ? AND brand_id = ?
     `).run(
@@ -313,6 +318,9 @@ router.put('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req,
       max_price !== undefined ? max_price : null,
       description !== undefined ? description : null,
       normIsActive !== null ? normIsActive : null,
+      sku === undefined ? null : String(sku),
+      sku === undefined ? null : (sku === null ? '__NULL__' : (String(sku).trim() ? String(sku).trim() : '__NULL__')),
+      sku === undefined ? null : (sku === null ? null : (String(sku).trim() ? String(sku).trim() : null)),
       req.params.id,
       req.brand_id
     );
@@ -323,6 +331,9 @@ router.put('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req,
 
     res.json({ success: true, message: 'Menu produk berhasil diperbarui.', product });
   } catch (err) {
+    if (err && (err.code === 'SQLITE_CONSTRAINT_UNIQUE' || String(err.message || '').toLowerCase().includes('unique constraint failed: products.brand_id, products.sku'))) {
+      return res.status(400).json({ success: false, error: 'PRODUCT_SKU_ALREADY_EXISTS' });
+    }
     res.status(500).json({ success: false, error: err.message });
   }
 });
