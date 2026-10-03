@@ -626,6 +626,41 @@ class ComposedMenuService {
 
     const menu = repository.findMenu({ brandId, menuId });
     if (!menu) throw new Error('MENU_NOT_FOUND');
+    if (String(menu.status || '').toUpperCase() !== 'ACTIVE') {
+      throw new Error('MENU_INACTIVE');
+    }
+
+    const branch = repository.db.queryOne(
+      'SELECT id, is_active FROM branches WHERE id = ? AND brand_id = ?',
+      [branchId, brandId]
+    );
+    if (!branch) throw new Error('BRANCH_NOT_FOUND');
+    if (branch.is_active === 0) throw new Error('BRANCH_INACTIVE');
+
+    const items = repository.listMenuItems({ brandId, menuIds: [menuId] });
+    if (!items.length) throw new Error('MENU_COMPOSITION_INVALID');
+    if (items.some(item => item.product_is_active === 0)) {
+      throw new Error('MENU_COMPONENT_UNAVAILABLE');
+    }
+
+    const normalizedCategoryIds = Array.from(new Set(
+      (Array.isArray(branchCategoryIds) ? branchCategoryIds : [])
+        .map(value => String(value || '').trim())
+        .filter(Boolean)
+    ));
+    if (!normalizedCategoryIds.length) throw new Error('BRANCH_CATEGORY_REQUIRED');
+
+    const categoryPlaceholders = normalizedCategoryIds.map(() => '?').join(', ');
+    const categoryRows = repository.db.queryMany(
+      'SELECT id, is_active FROM branch_categories WHERE brand_id = ? AND branch_id = ? AND id IN (' + categoryPlaceholders + ')',
+      [brandId, branchId, ...normalizedCategoryIds]
+    );
+    if (categoryRows.length !== normalizedCategoryIds.length) {
+      throw new Error('BRANCH_CATEGORY_NOT_FOUND');
+    }
+    if (categoryRows.some(row => row.is_active === 0)) {
+      throw new Error('BRANCH_CATEGORY_INACTIVE');
+    }
 
     const normalizedPriceOverride = priceOverride === null || priceOverride === undefined
       ? null
@@ -644,7 +679,7 @@ class ComposedMenuService {
         brandId,
         branchId,
         menuId,
-        branchCategoryIds
+        branchCategoryIds: normalizedCategoryIds
       });
       repository.commit();
     } catch (err) {
