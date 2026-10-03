@@ -106,6 +106,8 @@ However, this exception applies only to the outstanding COD cash settlement desc
 These are related but distinct events and MUST NOT be collapsed into one generic Order status.
 
 ## POS Boundary
+
+**POS COD settlement is a transaction action, not a Delivery workspace.** The cashier accesses COD handover/settlement from the relevant transaction detail. No dedicated Delivery tab or COD workspace is required for MVP.
 POS should NOT become a second delivery dashboard. Cashier should not need to:
 - accept online delivery orders;
 - mark food preparing/ready;
@@ -116,7 +118,7 @@ POS should NOT become a second delivery dashboard. Cashier should not need to:
 POS SHOULD provide:
 - normal POS/dine-in transactions;
 - cash drawer/shift operations;
-- COD cash handover queue;
+- COD cash handover/verification action from the relevant transaction detail;
 - expected vs actual cash comparison;
 - cashier confirmation of received cash;
 - authorized payment settlement.
