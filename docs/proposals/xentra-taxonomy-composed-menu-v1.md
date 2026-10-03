@@ -637,9 +637,12 @@ order_item
   quantity
   unit_price
   immutable menu_snapshot
-  immutable inventory_consumption_snapshot
+  immutable component_snapshot
   modifiers_snapshot
 ```
+
+The transition keeps the legacy `product_id/product_name` columns for compatibility. The proposal implementation adds `order_items.menu_id`, `order_items.menu_type`, and `order_items.component_snapshot` additively; the stored component snapshot is the inventory-consumption evidence for canonical Menu sales.
+
 
 The existing `product_id` field may remain during migration for compatibility, but it must not remain the authority for Package commercial identity.
 
@@ -1017,3 +1020,29 @@ Implemented as the first additive foundation:
 - Admin API surface for Menu creation, Sub Category/Rasa management, SKU management, Branch adoption, and menu status.
 
 Legacy Product-composition and Branch Product paths are intentionally still present. They are not silently rewritten; migration and consumer quarantine are later gates.
+
+## 24. Construction status — 2026-10-03
+
+The contract is locked, while implementation remains isolated on `proposal/xentra-taxonomy-composed-menu-v1`.
+
+Implemented in this proposal branch:
+
+- canonical Product/SKU, Menu Satuan, Menu Paket, Branch Menu and Branch Product Inventory schema foundation;
+- Product SKU audit/history and guarded SKU removal;
+- deterministic legacy Product → Menu Satuan migration planner/apply/verify operator;
+- canonical Menu customer resolver and branch resolver, including Package stock-capacity math;
+- canonical checkout verification and shared-component stock aggregation;
+- canonical Menu order snapshots and Product/SKU component stock deduction at the existing order commitment/settlement boundary;
+- canonical inventory repository routing for SKU-managed Products;
+- Branch Menu availability mutation with Branch Manager scope;
+- additive composed-menu API endpoints and contract tests.
+
+Not yet promoted to `main`:
+
+- Owner/Branch/Catalog UI replacement;
+- full POS, Additional Order, receipt, KDS, reporting and promotion consumer migration;
+- legacy quarantine/column retirement;
+- production data migration execution;
+- full runtime test-suite verification.
+
+Syntax validation has been completed for the new/modified JavaScript files at the current proposal head. GitHub Actions has not produced a workflow run for this branch, so syntax validation must not be represented as full runtime/CI verification.
