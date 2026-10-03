@@ -70,39 +70,37 @@ router.get('/admin/branches/:id/inventory', requireAuth(['owner', 'brand_manager
         p.id AS product_id,
         p.name AS product_name,
         p.sku,
-        COALESCE(bpi.stock_qty, bp.stock, 0) AS stock,
-        COALESCE(bpi.low_stock_threshold, bp.low_stock_threshold, 5) AS low_stock_threshold,
+        CASE
+          WHEN p.sku IS NOT NULL AND trim(p.sku) <> ''
+            THEN COALESCE(bpi.stock_qty, 0)
+          ELSE COALESCE(bp.stock, 0)
+        END AS stock,
+        CASE
+          WHEN p.sku IS NOT NULL AND trim(p.sku) <> ''
+            THEN COALESCE(bpi.low_stock_threshold, 5)
+          ELSE COALESCE(bp.low_stock_threshold, 5)
+        END AS low_stock_threshold,
         CASE
           WHEN p.sku IS NOT NULL AND trim(p.sku) <> '' THEN 'canonical'
           WHEN bp.product_id IS NOT NULL THEN 'legacy'
           ELSE 'none'
         END AS stock_source,
-        COALESCE(bm.is_available, bp.is_available, 0) AS is_available,
-        bm.menu_id
+        CASE
+          WHEN p.sku IS NOT NULL AND trim(p.sku) <> '' THEN NULL
+          ELSE bp.is_available
+        END AS is_available
       FROM products p
       LEFT JOIN branch_product_inventory bpi
         ON bpi.branch_id = ? AND bpi.product_id = p.id
       LEFT JOIN branch_products bp
         ON bp.branch_id = ? AND bp.product_id = p.id
-      LEFT JOIN branch_menus bm
-        ON bm.branch_id = ? AND bm.menu_id IN (
-          SELECT m.id
-          FROM menus m
-          JOIN menu_items mi ON mi.menu_id = m.id
-          WHERE m.brand_id = p.brand_id AND mi.product_id = p.id
-        )
       WHERE p.brand_id = ?
         AND (
           (p.sku IS NOT NULL AND trim(p.sku) <> '')
           OR bp.product_id IS NOT NULL
         )
       ORDER BY p.name ASC, p.id ASC
-    `).all(
-      req.params.id,
-      req.params.id,
-      req.params.id,
-      req.brand_id
-    );
+    `).all(req.params.id, req.params.id, req.brand_id);
 
     res.json({ success: true, branch_id: req.params.id, inventory: rows || [] });
   } catch (err) {
