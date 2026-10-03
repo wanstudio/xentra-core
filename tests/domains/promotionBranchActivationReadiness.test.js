@@ -13,6 +13,8 @@
 
 const { test, describe, before, after } = require('node:test');
 const assert = require('node:assert');
+const fs = require('node:fs');
+const path = require('node:path');
 const http = require('node:http');
 const db = require('../../server/database/db');
 const PromotionRepository = require('../../core/data/repositories/PromotionRepository');
@@ -116,6 +118,37 @@ describe('Promotion Branch Activation ↔ Reward Catalog Readiness', () => {
 
   after(() => {
     cleanup();
+  });
+
+  test('ACT-00: Branch activation route is Menu-first and preserves Product compatibility separately', () => {
+    const route = fs.readFileSync(
+      path.join(__dirname, '../../server/routes/admin-marketing-promotions.js'),
+      'utf8'
+    );
+
+    assert.ok(
+      route.includes('PromotionRewardResolver.resolveConfiguredReward'),
+      'canonical target_menu_id activation must use PromotionRewardResolver'
+    );
+    assert.ok(
+      route.includes('if (reward.target_menu_id)'),
+      'canonical Menu reward path must be checked before legacy Product path'
+    );
+    assert.ok(
+      route.includes('if (reward.target_product_id)'),
+      'legacy target_product_id compatibility path must remain explicit'
+    );
+    assert.ok(
+      route.includes("reward.reward_type === 'freebie_product'"),
+      'freebie reward without a valid canonical/legacy target must be rejected'
+    );
+
+    const activationBlockStart = route.indexOf('if (newActiveState === 1)');
+    const activationBlock = route.slice(activationBlockStart, route.indexOf('corePromotionRepo.setBranchScopeActivation', activationBlockStart));
+    assert.ok(
+      !activationBlock.includes("const targetPid = reward.target_product_id;\n          if (!targetPid)"),
+      'canonical freebie reward must not require target_product_id'
+    );
   });
 
   test('ACT-01: Direct DB & repo query confirms scope assigned as inactive initially', () => {
