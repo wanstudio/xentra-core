@@ -20,6 +20,8 @@ test('Customer Home banner product CTA uses canonical composed catalog transport
   assert.ok(helper.includes('adaptCanonicalHomeCatalog(rawData)'));
   assert.ok(helper.includes('Array.isArray(product.components)'));
   assert.ok(helper.includes('component && component.product_id'));
+  assert.ok(helper.includes('var matches = products.filter'));
+  assert.ok(helper.includes('return matches.length === 1 ? matches[0] : null'));
   assert.ok(helper.includes('componentHits.length === 1'));
   assert.ok(helper.includes('componentHits.length > 1'));
   assert.ok(!helper.includes("'/catalog/menu"));
