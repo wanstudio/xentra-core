@@ -25,18 +25,45 @@ test.before(() => {
     db.prepare(`INSERT OR IGNORE INTO categories (id, brand_id, name, slug) VALUES ('cat_rep', 'brand_rep', 'Menu Utama', 'menu-utama')`).run();
 
     db.prepare(`
-      INSERT OR REPLACE INTO products (id, brand_id, category_id, name, slug, price, pricing_mode, is_active)
+      INSERT OR REPLACE INTO products (id, brand_id, category_id, name, slug, price, pricing_mode, is_active, sku)
       VALUES 
-        ('prod_rep_1', 'brand_rep', 'cat_rep', 'Nasi Goreng Spesial', 'nasgor-spesial', 30000, 'lock', 1),
-        ('prod_rep_2', 'brand_rep', 'cat_rep', 'Es Teh Manis', 'es-teh', 5000, 'lock', 1)
+        ('prod_rep_1', 'brand_rep', 'cat_rep', 'Nasi Goreng Spesial', 'nasgor-spesial', 30000, 'lock', 1, 'REP-NASGOR-001'),
+        ('prod_rep_2', 'brand_rep', 'cat_rep', 'Es Teh Manis', 'es-teh', 5000, 'lock', 1, 'REP-ESTEH-001')
     `).run();
 
     db.prepare(`
+      INSERT OR REPLACE INTO branch_product_inventory (branch_id, product_id, stock_qty, low_stock_threshold)
+      VALUES 
+        ('branch_rep_1', 'prod_rep_1', 3, 5),
+        ('branch_rep_1', 'prod_rep_2', 50, 10),
+        ('branch_rep_2', 'prod_rep_1', 15, 5)
+    `).run();
+
+    // Keep legacy branch_products present with deliberately different values.
+    // Reporting must read the canonical inventory table, not this compatibility data.
+    db.prepare(`
       INSERT OR REPLACE INTO branch_products (branch_id, product_id, price, stock, is_available, low_stock_threshold)
       VALUES 
-        ('branch_rep_1', 'prod_rep_1', NULL, 3, 1, 5),
-        ('branch_rep_1', 'prod_rep_2', NULL, 50, 1, 10),
-        ('branch_rep_2', 'prod_rep_1', NULL, 15, 1, 5)
+        ('branch_rep_1', 'prod_rep_1', NULL, 99, 1, 1),
+        ('branch_rep_1', 'prod_rep_2', NULL, 99, 1, 1),
+        ('branch_rep_2', 'prod_rep_1', NULL, 99, 1, 1)
+    `).run();
+
+    db.prepare(`
+      INSERT OR REPLACE INTO sub_categories (id, brand_id, category_id, name, slug, is_active)
+      VALUES ('sub_rep_nasgor', 'brand_rep', 'cat_rep', 'Nasi Goreng Spesial', 'nasgor-spesial', 1)
+    `).run();
+    db.prepare(`
+      INSERT OR REPLACE INTO menu_flavors (id, brand_id, name, slug, is_active)
+      VALUES ('rasa_rep_original', 'brand_rep', 'Original', 'original-rep', 1)
+    `).run();
+    db.prepare(`
+      INSERT OR REPLACE INTO menus (id, brand_id, menu_type, sub_category_id, rasa_id, selling_price, status)
+      VALUES ('menu_rep_nasgor', 'brand_rep', 'SINGLE', 'sub_rep_nasgor', 'rasa_rep_original', 30000, 'ACTIVE')
+    `).run();
+    db.prepare(`
+      INSERT OR REPLACE INTO menu_items (menu_id, product_id, quantity, sort_order)
+      VALUES ('menu_rep_nasgor', 'prod_rep_1', 1, 0)
     `).run();
 
     // Orders Seed
@@ -50,12 +77,22 @@ test.before(() => {
 
     // Order Items Seed
     db.prepare(`
-      INSERT OR REPLACE INTO order_items (id, order_id, product_id, product_name, unit_price, quantity, subtotal)
+      INSERT OR REPLACE INTO order_items (
+        id, order_id, product_id, product_name, unit_price, quantity, subtotal,
+        menu_id, menu_type, menu_snapshot, component_snapshot
+      )
       VALUES
-        ('item_rep_1', 'ord_rep_1', 'prod_rep_1', 'Nasi Goreng Spesial', 30000, 2, 60000),
-        ('item_rep_2', 'ord_rep_2', 'prod_rep_1', 'Nasi Goreng Spesial', 30000, 1, 30000),
-        ('item_rep_3', 'ord_rep_2', 'prod_rep_2', 'Es Teh Manis', 5000, 1, 5000),
-        ('item_rep_4', 'ord_rep_3', 'prod_rep_1', 'Nasi Goreng Spesial', 30000, 1, 30000)
+        ('item_rep_1', 'ord_rep_1', 'prod_rep_1', 'Nasi Goreng Spesial', 30000, 2, 60000,
+          'menu_rep_nasgor', 'SINGLE', '{"menu_id":"menu_rep_nasgor","menu_type":"SINGLE","title":"Nasi Goreng Spesial","price":30000,"category":{"id":"cat_rep","name":"Menu Utama"}}',
+          '[{"product_id":"prod_rep_1","sku":"REP-NASGOR-001","quantity":1}]'),
+        ('item_rep_2', 'ord_rep_2', 'prod_rep_1', 'Nasi Goreng Spesial', 30000, 1, 30000,
+          'menu_rep_nasgor', 'SINGLE', '{"menu_id":"menu_rep_nasgor","menu_type":"SINGLE","title":"Nasi Goreng Spesial","price":30000,"category":{"id":"cat_rep","name":"Menu Utama"}}',
+          '[{"product_id":"prod_rep_1","sku":"REP-NASGOR-001","quantity":1}]'),
+        ('item_rep_3', 'ord_rep_2', 'prod_rep_2', 'Es Teh Manis', 5000, 1, 5000,
+          NULL, NULL, NULL, NULL),
+        ('item_rep_4', 'ord_rep_3', 'prod_rep_1', 'Nasi Goreng Spesial', 30000, 1, 30000,
+          'menu_rep_nasgor', 'SINGLE', '{"menu_id":"menu_rep_nasgor","menu_type":"SINGLE","title":"Nasi Goreng Spesial","price":30000,"category":{"id":"cat_rep","name":"Menu Utama"}}',
+          '[{"product_id":"prod_rep_1","sku":"REP-NASGOR-001","quantity":1}]')
     `).run();
 
     // Order Payments Seed
@@ -125,7 +162,7 @@ test('Reporting 4 — Inventory Report: detects low stock items below threshold 
   db.prepare(`INSERT OR IGNORE INTO branches (id, brand_id, name, slug, whatsapp_number, address_text, latitude, longitude) VALUES ('branch_other_1', 'brand_rep_other', 'Other Branch', 'other-br', '62899999999', 'Jl. Lain', 0, 0)`).run();
   db.prepare(`INSERT OR IGNORE INTO categories (id, brand_id, name, slug) VALUES ('cat_other', 'brand_rep_other', 'Kategori Lain', 'kat-lain')`).run();
   db.prepare(`INSERT OR IGNORE INTO products (id, brand_id, category_id, name, slug, price, pricing_mode, is_active) VALUES ('prod_other_1', 'brand_rep_other', 'cat_other', 'Other Product', 'other-p', 20000, 'lock', 1)`).run();
-  db.prepare(`INSERT OR REPLACE INTO branch_products (branch_id, product_id, stock, low_stock_threshold) VALUES ('branch_other_1', 'prod_other_1', 1, 10)`).run();
+  db.prepare(`INSERT OR REPLACE INTO branch_product_inventory (branch_id, product_id, stock_qty, low_stock_threshold) VALUES ('branch_other_1', 'prod_other_1', 1, 10)`).run();
 
   // Query inventory report for brand_rep (without branch_id)
   const invBrand = InventoryReportService.getInventoryReport({ brand_id: 'brand_rep' });
@@ -178,6 +215,8 @@ test('Reporting 5 — Shift Report: aggregates shift performance and variance wi
 test('Reporting 6 — Product Report: identifies top selling items and category sales', () => {
   const prodReport = ProductReportService.getProductReport({ brand_id: 'brand_rep' });
   assert.strictEqual(prodReport.top_products[0].product_id, 'prod_rep_1');
+  assert.strictEqual(prodReport.top_products[0].menu_id, 'menu_rep_nasgor');
+  assert.strictEqual(prodReport.top_products[0].product_name, 'Nasi Goreng Spesial');
   assert.strictEqual(prodReport.top_products[0].total_units_sold, 4); // 2 + 1 + 1
   assert.strictEqual(prodReport.top_products[0].total_gross_sales, 120000);
 });
