@@ -225,7 +225,8 @@ class ComposedMenuService {
         sortOrder: 0
       });
     } catch (err) {
-      if (!/UNIQUE constraint failed/i.test(String(err && err.message))) throw err;
+      const message = String(err && err.message || err);
+      if (!/UNIQUE constraint failed/i.test(message) && !/RASA_ALREADY_EXISTS/i.test(message)) throw err;
     }
     return repository.findRasaByName({ brandId, name: 'Original' });
   }
@@ -481,7 +482,10 @@ class ComposedMenuService {
     for (const component of normalizedComponents) {
       const product = repository.findProduct({ brandId, productId: component.productId });
       if (!product) throw new Error('MASTER_PRODUCT_NOT_FOUND');
-      if (product.is_active === 0 && !currentItems.some(item => String(item.product_id) === String(component.productId))) {
+      // Draft Packages may reference a Product that is not currently active as a
+      // standalone Menu. Publishing an ACTIVE Package, however, requires every
+      // component Product to be active and therefore saleable.
+      if (product.is_active === 0 && nextStatus !== 'DRAFT') {
         throw new Error('MASTER_PRODUCT_INACTIVE');
       }
     }
@@ -553,7 +557,11 @@ class ComposedMenuService {
     const products = normalizedComponents.map(component => {
       const product = repository.findProduct({ brandId, productId: component.productId });
       if (!product) throw new Error('MASTER_PRODUCT_NOT_FOUND');
-      if (product.is_active === 0) throw new Error('MASTER_PRODUCT_INACTIVE');
+      // The contract explicitly permits Draft Packages to reference Products that
+      // are not standalone-visible yet. Activation is the publication gate.
+      if (product.is_active === 0 && menuStatus !== 'DRAFT') {
+        throw new Error('MASTER_PRODUCT_INACTIVE');
+      }
       return product;
     });
 
