@@ -222,21 +222,25 @@
 
       XentraMerchantBranchCatalog.state.catalogData = data;
       _bmMenuState.categories = data.categories || [];
-      _bmMenuState.availableProducts = data.available_master_products || [];
+      _bmMenuState.availableProducts = data.available_master_menus || data.available_master_products || [];
 
       // The canonical Branch Menu endpoint already contains the complete
       // structured Master composition. Do not merge with the legacy
       // /admin/branches/:id/products assignment response.
-      _bmMenuState.products = (data.adopted_products || []).map(function (product) {
-        var comp = product.menu_composition || product;
-        var categories = Array.isArray(product.categories) ? product.categories : [];
-        return Object.assign({}, product, {
-          product_id: product.product_id || product.id,
-          product_name: product.display_name_override || (product.master && product.master.name ? product.master.name : (product.product_name || product.name || '')),
+      _bmMenuState.products = (data.adopted_menus || data.adopted_products || []).map(function (menu) {
+        var categories = Array.isArray(menu.categories) ? menu.categories : [];
+        var menuId = menu.menu_id || menu.id;
+        var displayName = menu.display_name_override || menu.title || menu.name || 'Menu';
+        return Object.assign({}, menu, {
+          id: menuId,
+          menu_id: menuId,
+          menu_name: displayName,
+          name: displayName,
+          master_name: menu.title || menu.name || 'Menu',
           category_ids: categories.map(function (cat) { return String(cat.id); }),
           categories: categories,
-          menu_composition: comp,
-          is_available: product.is_available !== false && product.availability !== false
+          menu_composition: menu,
+          is_available: menu.is_available !== false && menu.availability !== false
         });
       });
 
@@ -504,7 +508,7 @@
       var availabilityInput = row.querySelector('.x-menu-availability-input');
       if (availabilityInput) {
         availabilityInput.addEventListener('change', function () {
-          toggleBMProductAvailability(product.product_id, this.checked ? 1 : 0);
+          toggleBMMenuAvailability(product.menu_id, this.checked ? 1 : 0);
         });
       }
 
@@ -527,7 +531,7 @@
               icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 15H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>',
               destructive: true,
               onClick: function () {
-                removeBMBranchProduct(product.product_id, product.product_name || product.name || product.menu_title || 'Menu');
+                removeBMBranchMenu(product.menu_id, product.menu_name || product.name || 'Menu');
               }
             }
           ]);;
@@ -538,14 +542,14 @@
 
   async function openBMProductDisplayNameEditor(product) {
     var branchId = getBMTargetBranchId();
-    if (!branchId || !product || !product.product_id) return;
+    if (!branchId || !product || !product.menu_id) return;
 
     var currentOverride = product.display_name_override != null
       ? String(product.display_name_override)
       : '';
-    var masterName = product.master && product.master.name
-      ? String(product.master.name)
-      : String(product.name || product.title || 'Produk');
+    var masterName = product.master_name
+      ? String(product.master_name)
+      : String(product.title || product.name || 'Menu');
     var currentDisplay = product.title || masterName;
 
     if (!window.XentraPresentation || typeof window.XentraPresentation.open !== 'function') {
@@ -592,7 +596,7 @@
       saveBtn.textContent = 'Menyimpan...';
 
       try {
-        var res = await window.XentraCatalogClient.updateBranchProductDisplayName(branchId, product.product_id, value || null);
+        var res = await window.XentraCatalogClient.updateBranchMenuDisplayName(branchId, product.menu_id, value || null);
         var data = await res.json();
         if (!res.ok || !data.success) {
           throw new Error(data.error || data.message || 'Gagal menyimpan nama tampil.');
@@ -617,16 +621,12 @@
     return { currentDisplay: currentDisplay };
   }
 
-  async function toggleBMProductAvailability(productId, nextVal) {
+  async function toggleBMMenuAvailability(menuId, nextVal) {
     var branchId = getBMTargetBranchId();
     if (!branchId) return;
 
     try {
-      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/products/' + encodeURIComponent(productId), {
-        method: 'PATCH',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ is_available: nextVal })
-      });
+      var res = await window.XentraCatalogClient.setBranchMenuAvailability(branchId, menuId, nextVal);
       var data = await res.json();
       if (res.ok && data.success) {
         showToast(nextVal === 1 ? 'Produk berhasil ditandai Tersedia.' : 'Produk ditandai Habis.');
@@ -639,22 +639,19 @@
       showToast('Kesalahan jaringan.');
     }
   }
-  window.toggleBMProductAvailability = toggleBMProductAvailability;
+  window.toggleBMMenuAvailability = toggleBMMenuAvailability;
 
-  window.removeBMBranchProduct = async function (productId, productName) {
+  window.removeBMBranchMenu = async function (menuId, menuName) {
     var branchId = getBMTargetBranchId();
     if (!branchId) return;
 
     if (!confirm('Hapus "' + productName + '" dari katalog cabang ini? Menu tidak akan lagi tampil di halaman pemesanan pelanggan.')) return;
 
     try {
-      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/products/' + encodeURIComponent(productId), {
-        method: 'DELETE',
-        headers: getAuthHeaders()
-      });
+      var res = await window.XentraCatalogClient.removeBranchMenu(branchId, menuId);
       var data = await res.json();
       if (data.success) {
-        showToast('✅ Produk berhasil dihapus dari cabang.');
+        showToast('✅ Menu berhasil dihapus dari cabang.');
         loadBMMenu();
       } else {
         showToast('❌ ' + (data.error || 'Gagal menghapus produk.'));
@@ -698,26 +695,20 @@
       var data = await res.json();
       if (res.ok && data.success) {
         XentraMerchantBranchCatalog.state.catalogData = data;
-        _bmMenuState.availableProducts = data.available_master_products || [];
+        _bmMenuState.availableProducts = data.available_master_menus || data.available_master_products || [];
 
         // Distinguish between already adopted and available master products
-        var unadopted = (data.available_master_products || []).map(function (p) {
+        var unadopted = (data.available_master_menus || data.available_master_products || []).map(function (p) {
           return Object.assign({}, p, { is_adopted: false });
         });
 
-        var adopted = (data.adopted_products || []).map(function (ap) {
-          return {
-            id: ap.product_id,
-            name: ap.name,
-            price: ap.price,
-            master_price: ap.master_price,
-            image_url: ap.image_url,
-            pricing_mode: ap.pricing_mode,
-            min_price: ap.min_price,
-            max_price: ap.max_price,
-            description: ap.description,
+        var adopted = (data.adopted_menus || data.adopted_products || []).map(function (menu) {
+          return Object.assign({}, menu, {
+            id: menu.menu_id || menu.id,
+            menu_id: menu.menu_id || menu.id,
+            name: menu.display_name_override || menu.title || menu.name || 'Menu',
             is_adopted: true
-          };
+          });
         });
 
         // Unadopted first, then adopted marked
@@ -940,16 +931,8 @@
     for (var i = 0; i < pids.length; i++) {
       var pid = pids[i];
       try {
-        var adoptPayload = { product_id: pid };
-        if (targetCatId) {
-          adoptPayload.branch_category_id = targetCatId;
-          adoptPayload.category_ids = [targetCatId];
-        }
-
-        var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/adopt', {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify(adoptPayload)
+        var res = await window.XentraCatalogClient.adoptMenu(branchId, pid, {
+          branch_category_ids: [targetCatId]
         });
         var data = await res.json();
         if (res.ok && data.success) {
@@ -974,7 +957,7 @@
       closeBMAddCatalogModal();
       if (typeof loadBMMenu === 'function') await loadBMMenu();
     } else {
-      showToast('❌ ' + (lastError || 'Gagal mengadopsi produk terpilih.'));
+      showToast('❌ ' + (lastError || 'Gagal mengadopsi menu terpilih.'));
     }
   };
 
