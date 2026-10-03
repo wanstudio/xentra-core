@@ -255,7 +255,7 @@ test('CGA-05: Google-issued customer token accepted by /checkout/verify', async 
     body: JSON.stringify({
       branch_id: 'branch_cga05',
       order_type: 'pickup',
-      items: [{ id: '272', product_id: '272', quantity: 1, expected_price: 35000, branch_id: 'branch_cga05' }]
+      items: [{ menu_id: 'customer_google_menu_272', quantity: 1, expected_price: 35000, branch_id: 'branch_cga05' }]
     })
   });
   const verifyData = await verifyRes.json();
@@ -359,7 +359,7 @@ test('CGA-08: Google-issued customer token accepted by /checkout/create-order au
       payment_method: 'cash',
       customer: { name: 'Order Customer CGA08', phone: 'order_customer@example.com' },
       order_type: 'pickup',
-      items: [{ id: '272', quantity: 1 }]
+      items: [{ menu_id: 'customer_google_menu_272', quantity: 1, expected_price: 35000 }]
     })
   });
   const orderData = await orderRes.json();
@@ -417,7 +417,7 @@ test('CGA-10: Customer Google session is brand-scoped (tenant isolation)', async
     body: JSON.stringify({
       branch_id: 'branch_cga10',
       order_type: 'pickup',
-      items: [{ id: '272', product_id: '272', quantity: 1, expected_price: 35000, branch_id: 'branch_cga10' }]
+      items: [{ menu_id: 'customer_google_menu_272', quantity: 1, expected_price: 35000, branch_id: 'branch_cga10' }]
     })
   });
   // Must not be 401 on the same brand
