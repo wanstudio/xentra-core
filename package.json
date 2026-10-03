@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node server/app.js",
     "db:seed-demo": "node tools/seed-demo.js",
-    "test": "cross-env NODE_ENV=test node --test --test-concurrency=1 --test-force-exit tests/*.test.js tests/**/*.test.js"
+    "test": "cross-env NODE_ENV=test node --test --test-concurrency=1 --test-force-exit tests/*.test.js tests/**/*.test.js",
+    "db:audit-legacy": "node tools/audit-legacy-data.js"
   },
   "engines": {
     "node": ">=20.20.2"
