@@ -77,6 +77,34 @@ function addTestBranch(id) {
     .run('bds_' + id, id);
   db.prepare(`INSERT OR REPLACE INTO branch_products (branch_id, product_id, price, stock, is_available)
     VALUES (?, '272', 35000, 10, 1)`).run(id);
+
+  // Canonical test fixture: Product 272 is represented by a Menu Satuan and
+  // the branch sells the Menu while stock remains owned by Product/SKU inventory.
+  const rasa = db.prepare("SELECT id FROM menu_flavors WHERE brand_id = 'brand_bangjo' AND lower(trim(name)) = 'original' AND is_active = 1 LIMIT 1").get()
+    || (db.prepare("INSERT INTO menu_flavors (id, brand_id, name, slug, is_active) VALUES ('customer_auth_original', 'brand_bangjo', 'Original', 'customer-auth-original', 1)").run(), db.prepare("SELECT id FROM menu_flavors WHERE id = 'customer_auth_original'").get());
+  const subCategoryId = 'customer_auth_sub_272';
+  const menuId = 'customer_auth_menu_272';
+  db.prepare(
+    "INSERT OR IGNORE INTO sub_categories (id, brand_id, category_id, name, slug, is_active) VALUES (?, 'brand_bangjo', (SELECT category_id FROM products WHERE id = '272'), 'Makanan', 'customer-auth-makanan', 1)"
+  ).run(subCategoryId);
+  db.prepare(
+    "INSERT OR REPLACE INTO menus (id, brand_id, menu_type, sub_category_id, rasa_id, selling_price, status) VALUES (?, 'brand_bangjo', 'SINGLE', ?, ?, 35000, 'ACTIVE')"
+  ).run(menuId, subCategoryId, rasa.id);
+  db.prepare(
+    "INSERT OR REPLACE INTO menu_items (menu_id, product_id, quantity, sort_order) VALUES (?, '272', 1, 0)"
+  ).run(menuId);
+  db.prepare(
+    "INSERT OR IGNORE INTO branch_categories (id, brand_id, branch_id, name, slug, sort_order, is_active) VALUES (?, 'brand_bangjo', ?, 'Makanan', 'makanan-' || ?, 1, 1)"
+  ).run('customer_auth_bc_' + id, id, id);
+  db.prepare(
+    "INSERT OR REPLACE INTO branch_menus (branch_id, menu_id, is_available, price_override) VALUES (?, ?, 1, 35000)"
+  ).run(id, menuId);
+  db.prepare(
+    "INSERT OR REPLACE INTO branch_menu_categories (branch_id, menu_id, branch_category_id) VALUES (?, ?, ?)"
+  ).run(id, menuId, 'customer_auth_bc_' + id);
+  db.prepare(
+    "INSERT OR REPLACE INTO branch_product_inventory (branch_id, product_id, stock_qty, low_stock_threshold) VALUES (?, '272', 10, 5)"
+  ).run(id);
 }
 
 async function createOrder(phone, branchId) {
@@ -89,7 +117,7 @@ async function createOrder(phone, branchId) {
       payment_method: 'cash',
       customer: { name: 'Test Customer', phone },
       order_type: 'pickup',
-      items: [{ id: '272', quantity: 1 }]
+      items: [{ menu_id: 'customer_auth_menu_272', quantity: 1, expected_price: 35000 }]
     })
   });
   const data = await res.json();
