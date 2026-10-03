@@ -4,10 +4,10 @@
  * BM Phase 4B — Branch Manager Dashboard UI Hardening Test Suite
  *
  * Requirements Matrix (P4B-01 through P4B-10):
- * - P4B-01: BM catalog endpoint returns master products with adoption status for branch.
+ * - P4B-01: BM Branch Menu endpoint returns adopted and available Master Menus for branch.
  * - P4B-02: DOM modal-bm-add-catalog structure, multi-selection, and badge logic in JS.
  * - P4B-03: Already adopted products are marked with badge and disabled from selection.
- * - P4B-04: Batch adoption executes against /admin/branches/:id/adopt and updates branch menu.
+ * - P4B-04: Batch adoption executes against the canonical Menu adoption endpoint and updates Branch Menu.
  * - P4B-05: Server-side authorization strictly blocks cross-branch and cross-brand catalog adoption (403).
  * - P4B-06: Modal "Ubah/Tambah Kategori Cabang" (modal-branch-category-edit) is normalized with .x-file-upload-wrap and min-width: 0.
  * - P4B-07: Modal "Ubah Menu Cabang" (modal-branch-override) photo upload is wrapped in .x-file-upload-wrap.
@@ -189,22 +189,28 @@ describe('BM Phase 4B — Branch Manager Dashboard UI Hardening Suite', () => {
     }
   });
 
-  it('P4B-01: BM catalog endpoint returns master products with adoption status for branch', async () => {
+  it('P4B-01: BM Branch Menu endpoint returns adopted and available Master Menus for branch', async () => {
     const bmToken = seedStaffSession({ role: 'branch_manager', branchId: BRANCH_A_ID, brandId: BRAND_ID, userId: 'bm4b_user_1' });
-    const res = await request('GET', `/api/v1/admin/branches/${BRANCH_A_ID}/catalog`, null, {
+    const res = await request('GET', `/api/v1/admin/branches/${BRANCH_A_ID}/menu`, null, {
       Authorization: `Bearer ${bmToken}`
     });
 
     assert.equal(res.status, 200);
     assert.equal(res.body.success, true);
-    assert.ok(Array.isArray(res.body.available_master_products), 'Should return available_master_products array');
-    assert.ok(Array.isArray(res.body.adopted_products), 'Should return adopted_products array');
+    assert.equal(res.body.model, 'branch-menu-v1');
+    assert.ok(Array.isArray(res.body.available_master_menus), 'Should return available_master_menus array');
+    assert.ok(Array.isArray(res.body.adopted_menus), 'Should return adopted_menus array');
 
-    const p1 = res.body.adopted_products.find(p => p.product_id === testProduct1Id);
-    assert.ok(p1, 'testProduct1Id must be in adopted_products');
+    // Products are component/stock identities; adoption status is carried by Menu.
+    const p2 = res.body.available_master_menus.find(m =>
+      String(m.menu_id || m.id) === String(testMenu2Id)
+    );
+    assert.ok(p2, 'testMenu2Id must be in available_master_menus');
 
-    const p2 = res.body.available_master_products.find(p => p.id === testProduct2Id);
-    assert.ok(p2, 'testProduct2Id must be in available_master_products');
+    const p3 = res.body.available_master_menus.find(m =>
+      String(m.menu_id || m.id) === String(testMenu3Id)
+    );
+    assert.ok(p3, 'testMenu3Id must be in available_master_menus');
   });
 
   it('P4B-02 & P4B-03: DOM modal-bm-add-catalog structure, multi-selection, and badge logic in JS', () => {
@@ -230,8 +236,8 @@ describe('BM Phase 4B — Branch Manager Dashboard UI Hardening Suite', () => {
 
     // Verify JS implementation logic
     assert.ok(js.includes('window.openBMAddCatalogModal = async function'), 'openBMAddCatalogModal must be defined');
-    assert.ok(js.includes('window.onBMSelectCatalogProduct = function'), 'onBMSelectCatalogProduct must be defined');
-    assert.ok(js.includes('window.toggleBMSelectCatalogProduct = function'), 'toggleBMSelectCatalogProduct must be defined');
+    assert.ok(js.includes('window.onBMSelectCatalogProduct = function'), 'Menu selection handler must be defined');
+    assert.ok(js.includes('window.toggleBMSelectCatalogProduct = function'), 'Menu selection toggle must be defined');
     assert.ok(js.includes('function updateBMAddCatalogFooter('), 'updateBMAddCatalogFooter must be defined');
     assert.ok(js.includes('window.submitBMAdoptCatalogBatch = async function') || js.includes('function submitBMAdoptCatalogBatch('), 'submitBMAdoptCatalogBatch must be defined');
     assert.ok(js.includes('Sudah Diadopsi'), 'Sudah Diadopsi badge text must be in JS');
@@ -263,25 +269,34 @@ describe('BM Phase 4B — Branch Manager Dashboard UI Hardening Suite', () => {
     assert.ok(adopted.some(m => String(m.menu_id) === testMenu3Id));
   });
 
-  it('P4B-05: Server-side authorization strictly blocks cross-branch and cross-brand catalog adoption (403)', async () => {
-    // BM belongs to BRANCH_A_ID. Attempts to adopt into BRANCH_B_ID
+  it('P4B-05: Server-side authorization strictly blocks cross-branch and cross-brand Menu adoption (403)', async () => {
     const bmToken = seedStaffSession({ role: 'branch_manager', branchId: BRANCH_A_ID, brandId: BRAND_ID, userId: 'bm4b_user_3' });
 
-    const crossBranchRes = await request('POST', `/api/v1/admin/branches/${BRANCH_B_ID}/adopt`, {
-      product_id: testProduct1Id
+    const branchBCategory = db.prepare(
+      "SELECT id FROM branch_categories WHERE branch_id = ? AND brand_id = ? AND is_active = 1 ORDER BY sort_order, id LIMIT 1"
+    ).get(BRANCH_B_ID, BRAND_ID);
+    assert.ok(branchBCategory, 'Branch B must have an active Branch Category');
+
+    // Same-brand cross-branch adoption.
+    const crossBranchRes = await request('POST', `/api/v1/admin/menus/${testMenu2Id}/adopt`, {
+      branch_id: BRANCH_B_ID,
+      branch_category_ids: [branchBCategory.id],
+      is_available: true
     }, {
       Authorization: `Bearer ${bmToken}`
     });
-    assert.equal(crossBranchRes.status, 403, 'Cross branch adoption must be 403');
+    assert.equal(crossBranchRes.status, 403, 'Cross branch Menu adoption must be 403');
     assert.equal(crossBranchRes.body.error, 'FORBIDDEN_BRANCH_SCOPE');
 
-    // Attempts to adopt into OTHER_BRANCH_ID belonging to OTHER_BRAND_ID
-    const crossBrandRes = await request('POST', `/api/v1/admin/branches/${OTHER_BRANCH_ID}/adopt`, {
-      product_id: testProduct1Id
+    // Cross-brand adoption uses a Menu from Brand A and a branch from another brand.
+    const crossBrandRes = await request('POST', `/api/v1/admin/menus/${testMenu2Id}/adopt`, {
+      branch_id: OTHER_BRANCH_ID,
+      branch_category_ids: [],
+      is_available: true
     }, {
       Authorization: `Bearer ${bmToken}`
     });
-    assert.equal(crossBrandRes.status, 403, 'Cross brand adoption must be 403');
+    assert.equal(crossBrandRes.status, 403, 'Cross brand Menu adoption must be 403');
   });
 
   it('P4B-06 & P4B-07: Modal file upload wrappers use .x-file-upload-wrap and .x-file-upload-info with min-width: 0', () => {
