@@ -1136,42 +1136,157 @@
     if (branches.length > 1) updateBranchActiveState();
   }
 
+  function adaptCanonicalHomeCatalog(data) {
+    var sourceCategories = Array.isArray(data && data.categories) ? data.categories : [];
+    var sourceMenus = Array.isArray(data && data.menus) ? data.menus : [];
+    var categoryMap = {};
+
+    sourceCategories.forEach(function (cat) {
+      categoryMap[String(cat.id)] = Object.assign({}, cat, { products: [] });
+    });
+
+    var productsByMenu = {};
+    sourceMenus.forEach(function (menu) {
+      var categoryRefs = Array.isArray(menu.branch_categories) && menu.branch_categories.length
+        ? menu.branch_categories
+        : (menu.category ? [menu.category] : []);
+
+      categoryRefs.forEach(function (cat) {
+        var key = String(cat.id);
+        if (!categoryMap[key]) {
+          categoryMap[key] = {
+            id: cat.id,
+            name: cat.name || 'Menu',
+            slug: cat.slug || '',
+            products: []
+          };
+        }
+      });
+
+      var componentSnapshot = Array.isArray(menu.components) ? menu.components : [];
+      var product = Object.assign({}, menu, {
+        id: menu.menu_id || menu.id,
+        menu_id: menu.menu_id || menu.id,
+        menu_type: menu.menu_type || 'SINGLE',
+        product_id: menu.menu_type === 'SINGLE' && componentSnapshot[0]
+          ? componentSnapshot[0].product_id
+          : null,
+        name: menu.title || menu.package_name || 'Menu',
+        menu_title: menu.title || menu.package_name || 'Menu',
+        menu_subtitle: menu.subtitle || '',
+        menu_indicator_level: menu.level && menu.level.value != null ? menu.level.value : null,
+        price: Number(menu.price || 0),
+        regular_price: Number(menu.price || 0),
+        description: componentSnapshot.length === 1 ? (componentSnapshot[0].description || '') : '',
+        image_url: componentSnapshot.length === 1 ? (componentSnapshot[0].image_url || '') : '',
+        components: componentSnapshot,
+        component_snapshot: componentSnapshot,
+        menu_snapshot: {
+          menu_id: menu.menu_id || menu.id,
+          menu_type: menu.menu_type || 'SINGLE',
+          title: menu.title || menu.package_name || 'Menu',
+          subtitle: menu.subtitle || null,
+          price: Number(menu.price || 0),
+          category: menu.category || null,
+          sub_category: menu.sub_category || null,
+          rasa: menu.rasa || null,
+          level: menu.level || null,
+          status: menu.status || 'ACTIVE'
+        }
+      });
+
+      productsByMenu[String(product.id)] = product;
+    });
+
+    Object.keys(productsByMenu).forEach(function (menuId) {
+      var product = productsByMenu[menuId];
+      var categoryRefs = Array.isArray(product.branch_categories) && product.branch_categories.length
+        ? product.branch_categories
+        : (product.category ? [product.category] : []);
+
+      product.category_ids = categoryRefs.map(function (cat) { return cat.id; });
+      product.category_id = categoryRefs.length ? categoryRefs[0].id : null;
+
+      categoryRefs.forEach(function (cat) {
+        var key = String(cat.id);
+        if (!categoryMap[key]) {
+          categoryMap[key] = {
+            id: cat.id,
+            name: cat.name || 'Menu',
+            slug: cat.slug || '',
+            products: []
+          };
+        }
+        categoryMap[key].products.push(product);
+      });
+    });
+
+    return {
+      success: true,
+      categories: Object.keys(categoryMap).map(function (key) { return categoryMap[key]; }),
+      products: Object.keys(productsByMenu).map(function (key) { return productsByMenu[key]; }),
+      all_products: Object.keys(productsByMenu).map(function (key) { return productsByMenu[key]; })
+    };
+  }
+
   function loadCatalog(branchId) {
     var seq = ++catalogLoadSeq;
     catalogBranchId = branchId ? String(branchId) : null;
-    var path = branchId ? '/catalog/menu?branch_id=' + encodeURIComponent(branchId) : '/catalog/menu';
+    var path = branchId
+      ? '/catalog/composed-menu?branch_id=' + encodeURIComponent(branchId)
+      : '/catalog/composed-menu';
 
     perfLog('home_api_catalog_start');
     API.get(path)
-      .then(function (data) {
-        if (seq !== catalogLoadSeq) return; // superseded by a newer catalog load
+      .then(function (rawData) {
+        if (seq !== catalogLoadSeq) return;
         perfLog('home_api_catalog_end');
+
+        var data = rawData && Array.isArray(rawData.menus)
+          ? adaptCanonicalHomeCatalog(rawData)
+          : rawData;
+
         if (data && data.success && data.categories && data.categories.length > 0) {
-          // Only the brand-wide menu (no branch context) is cached; branch menus
-          // are never cached so a cache key can never cross branch identities.
           if (!catalogBranchId) {
             try { localStorage.setItem('xentra_catalog_cache', JSON.stringify(data)); } catch (_) {}
           }
           applyCatalog(data);
           return;
         }
-        // With a branch context, an empty/failed menu must be honest — a branch
-        // whose menu has no data is never filled with brand-wide/static content.
-        if (catalogBranchId) {
-          renderEmptyBranchCatalog();
-        } else if (!categories.length) {
+
+        // A successful empty canonical response is authoritative. Do not invent
+        // legacy products into a genuinely empty canonical branch catalog.
+        if (catalogBranchId || !categories.length) {
           renderEmptyBranchCatalog();
         }
       })
       .catch(function (err) {
-        if (seq !== catalogLoadSeq) return; // superseded by a newer catalog load
+        if (seq !== catalogLoadSeq) return;
         perfLog('home_api_catalog_end', 'error');
-        console.warn('[Home] Load catalog network warn:', err);
-        if (catalogBranchId) {
-          renderEmptyBranchCatalog();
-        } else if (!categories.length) {
-          renderEmptyBranchCatalog();
-        }
+        console.warn('[Home] Canonical catalog load warn:', err);
+
+        // Legacy fallback is only for endpoint incompatibility/availability during
+        // rollout. Once canonical data returns successfully, it remains authoritative.
+        var legacyPath = branchId
+          ? '/catalog/menu?branch_id=' + encodeURIComponent(branchId)
+          : '/catalog/menu';
+
+        API.get(legacyPath)
+          .then(function (legacyData) {
+            if (seq !== catalogLoadSeq) return;
+            if (legacyData && legacyData.success && legacyData.categories && legacyData.categories.length > 0) {
+              if (!catalogBranchId) {
+                try { localStorage.setItem('xentra_catalog_cache', JSON.stringify(legacyData)); } catch (_) {}
+              }
+              applyCatalog(legacyData);
+              return;
+            }
+            if (catalogBranchId || !categories.length) renderEmptyBranchCatalog();
+          })
+          .catch(function () {
+            if (seq !== catalogLoadSeq) return;
+            if (catalogBranchId || !categories.length) renderEmptyBranchCatalog();
+          });
       });
   }
 
