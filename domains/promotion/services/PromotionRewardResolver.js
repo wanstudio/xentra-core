@@ -111,7 +111,10 @@ class PromotionRewardResolver {
       source: 'menu',
       menu_id: menu.menu_id || menu.id,
       menu_type: menu.menu_type,
-      product_id: menu.menu_type === 'SINGLE' && primaryComponent ? primaryComponent.product_id : null,
+      // order_items.product_id is still NOT NULL for compatibility. For a package,
+      // store the first component only as a compatibility pointer; it is never the
+      // commercial package identity and must never drive package stock deduction.
+      product_id: primaryComponent ? primaryComponent.product_id : null,
       name: menu.title || 'Hadiah Promo',
       image_url: menu.image_url || (primaryComponent && primaryComponent.image_url) || '',
       regular_price: Number(menu.price || 0),
