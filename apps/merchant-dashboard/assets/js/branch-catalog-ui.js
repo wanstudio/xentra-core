@@ -122,11 +122,11 @@
       }
 
       currentBranchCatalogData = data;
-      if ($('branch-active-count')) $('branch-active-count').textContent = (data.adopted_products || []).length;
-      if ($('branch-available-count')) $('branch-available-count').textContent = (data.available_master_products || []).length;
+      if ($('branch-active-count')) $('branch-active-count').textContent = (data.adopted_menus || data.adopted_products || []).length;
+      if ($('branch-available-count')) $('branch-available-count').textContent = (data.available_master_menus || data.available_master_products || []).length;
 
-      renderBranchAdoptedProducts(data.adopted_products || []);
-      renderBranchAvailableMasterProducts(data.available_master_products || []);
+      renderBranchAdoptedProducts(data.adopted_menus || data.adopted_products || []);
+      renderBranchAvailableMasterProducts(data.available_master_menus || data.available_master_products || []);
     } catch (err) {
       console.error('[Branch Catalog Load Error]:', err);
       showToast('❌ Terjadi kesalahan jaringan saat memuat katalog cabang.');
@@ -146,7 +146,7 @@
     
     container.innerHTML = filtered.map(function (p) {
       var comp = p.menu_composition || {};
-      var img = comp.image || p.image_url || p.master_image_url || '';
+      var img = comp.image_url || (comp.components && comp.components[0] && comp.components[0].image_url) || p.image_url || p.master_image_url || '';
       var isAvailable = p.is_available === 1 || p.is_available === true;
       var categoryNames = (p.categories || []).map(function (c) { return c.name; }).filter(Boolean);
       var categoryHtml = categoryNames.length
@@ -167,7 +167,7 @@
       var price = comp.price != null ? Number(comp.price) : Number(p.master_price || p.price || 0);
             var availabilityToggle = '' +
         '<label class="x-toggle' + (isAvailable ? ' x-toggle-on' : '') + '" title="' + (isAvailable ? 'Menu tersedia' : 'Menu habis') + '">' +
-          '<input type="checkbox" ' + (isAvailable ? 'checked' : '') + ' onchange="toggleBranchProductAvailability(\'' + p.product_id + '\', this.checked ? 1 : 0)" aria-label="Ubah ketersediaan menu cabang">' +
+          '<input type="checkbox" ' + (isAvailable ? 'checked' : '') + ' onchange="toggleBranchMenuAvailability(\'' + p.product_id + '\', this.checked ? 1 : 0)" aria-label="Ubah ketersediaan menu cabang">' +
           '<span class="x-toggle-slider"></span>' +
         '</label>';
 
@@ -183,7 +183,7 @@
               '<div>' + availabilityToggle + '</div>',
               '<div class="x-item-actions">',
                 '<button type="button" class="x-action-menu-trigger" aria-label="Aksi menu cabang" onclick="XentraActionMenu.open(this, [' +
-                  '{ label: \'Hapus dari Cabang\', icon: \'🗑️\', destructive: true, onClick: function() { removeBranchProduct(\'' + p.product_id + '\'); } }' +
+                  '{ label: \'Hapus dari Cabang\', icon: \'🗑️\', destructive: true, onClick: function() { removeBranchMenu(\'' + p.product_id + '\'); } }' +
                 '])">',
                 '</button>',
               '</div>',
@@ -240,7 +240,7 @@
       });
     });
   }
-  window.toggleBranchProductAvailability = async function (productId, nextAvail) {
+  window.toggleBranchMenuAvailability = async function (productId, nextAvail) {
     if (!currentManagingBranchId) return;
     try {
       var res = await CatalogClient.setBranchProductAvailability(currentManagingBranchId, productId, nextAvail);
@@ -256,13 +256,13 @@
     }
   };
 
-  window.removeBranchProduct = async function (productId, productName) {
+  window.removeBranchMenu = async function (productId, productName) {
     productName = productName || 'menu ini';
     if (!currentManagingBranchId) return;
     if (!await confirmBranchCatalogAction('remove-branch-product', 'Hapus dari Katalog Cabang', 'Hapus "' + productName + '" dari katalog cabang ini? Menu tidak akan lagi tampil di halaman pemesanan pelanggan cabang ini.', 'Hapus')) return;
 
     try {
-      var res = await CatalogClient.removeBranchProduct(currentManagingBranchId, productId);
+      var res = await CatalogClient.removeBranchMenu(currentManagingBranchId, productId);
       var data = await res.json();
       if (data.success) {
         showToast('✅ Produk dihapus dari katalog cabang.');
@@ -467,7 +467,7 @@
   // Adopt Product Modal Actions
   window.openAdoptModal = function (productId) {
     if (!currentBranchCatalogData) return;
-    var p = currentBranchCatalogData.available_master_products.find(function (x) { return String(x.id) === String(productId); });
+    var p = (currentBranchCatalogData.available_master_menus || currentBranchCatalogData.available_master_products || []).find(function (x) { return String(x.menu_id || x.id) === String(productId); });
     if (!p) return;
 
     var resolvedBranchId = currentManagingBranchId ||
@@ -481,7 +481,7 @@
       return;
     }
 
-    $('adopt-product-id').value = p.id;
+    $('adopt-product-id').value = p.menu_id || p.id;
     $('adopt-product-name').value = p.name || p.id;
     if ($('adopt-menu-title')) $('adopt-menu-title').textContent = composition.title || '—';
     if ($('adopt-menu-subtitle')) $('adopt-menu-subtitle').textContent = composition.subtitle || 'Tanpa Rasa';
@@ -525,7 +525,7 @@
       btn.disabled = true;
       btn.textContent = 'Menyimpan...';
 
-      var prodId = $('adopt-product-id').value;
+      var menuId = $('adopt-product-id').value;
       var catId = $('adopt-branch-category').value;
       if (!catId) {
         showToast('❌ Pilih minimal satu Kategori Cabang.');
