@@ -117,6 +117,7 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
 
   await t.test('2. index.html is self-contained (no merchant-dashboard asset dependency)', () => {
     const html = fs.readFileSync(HTML_PATH, 'utf8');
+    const menu = fs.readFileSync(path.join(__dirname, '../apps/merchant-app/assets/js/menu.js'), 'utf8');
     assert.ok(!/\/dashboard\/assets\//.test(html), 'must not load merchant-dashboard assets');
     assert.ok(html.includes('/merchant-shared/css/shared.css'), 'must load merchant-shared css');
     assert.ok(html.includes('/merchant-shared/css/dashboard.css'), 'must load the shared surface stylesheet');
