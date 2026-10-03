@@ -2040,19 +2040,11 @@
   async function loadMasterProducts() {
     try {
       var authHeaders = getAuthHeaders();
-      var [catRes, prodRes] = await Promise.all([
-        adminFetch(API_BASE + '/admin/categories', { headers: authHeaders }),
-        adminFetch(API_BASE + '/admin/products', { headers: authHeaders })
-      ]);
-
-      var catData = await catRes.json();
+      var prodRes = await adminFetch(API_BASE + '/admin/products', { headers: authHeaders });
       var prodData = await prodRes.json();
 
-      if (catData.success) state.categories = catData.categories || [];
       if (prodData.success) state.products = prodData.products || [];
 
-      renderProductCategoryFilterChips();
-      populateProductCategorySelect();
       renderMasterProductsTable();
     } catch (err) {
       console.error('[Master Products Load Error]:', err);
@@ -2166,34 +2158,12 @@
 
   function getFilteredMasterProducts() {
     return state.products.filter(function (p) {
-      var matchesSearch = true;
-      if (_catalogState.searchQuery) {
-        var q = _catalogState.searchQuery.toLowerCase();
-        var nameMatch = (p.name || '').toLowerCase().indexOf(q) !== -1;
-        var descMatch = (p.description || '').toLowerCase().indexOf(q) !== -1;
-        matchesSearch = nameMatch || descMatch;
-      }
-
-      var matchesCat = true;
-      if (_catalogState.categoryFilter !== 'all') {
-        matchesCat = String(p.category_id) === String(_catalogState.categoryFilter);
-      }
-
-      return matchesSearch && matchesCat;
+      if (!_catalogState.searchQuery) return true;
+      var q = _catalogState.searchQuery.toLowerCase();
+      return String(p.name || '').toLowerCase().indexOf(q) !== -1 ||
+        String(p.description || '').toLowerCase().indexOf(q) !== -1 ||
+        String(p.sku || '').toLowerCase().indexOf(q) !== -1;
     });
-  }
-
-  function renderMasterProductSpiceIndicator(levelValue) {
-    var raw = Number(levelValue || 0);
-    if (!Number.isFinite(raw) || raw <= 0) return '';
-    var level = Math.max(1, Math.min(4, Math.floor(raw)));
-    var html = '<div class="x-master-product-spice-indicator" aria-label="Level Pedas ' + level + ' dari 4">' +
-      '<span class="x-master-product-spice-label">Pedas</span>' +
-      '<span class="x-master-product-spice-dots" aria-hidden="true">';
-    for (var i = 1; i <= 4; i += 1) {
-      html += '<span class="x-master-product-spice-dot' + (i <= level ? ' is-filled' : '') + '"></span>';
-    }
-    return html + '</span></div>';
   }
 
   function renderMasterProductsTable() {
@@ -2203,47 +2173,35 @@
     var filtered = getFilteredMasterProducts();
 
     if (!filtered.length) {
-      tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-muted">Belum ada produk yang cocok dengan pencarian / filter.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-muted">Belum ada Product yang cocok dengan pencarian.</td></tr>';
       return;
     }
 
     var rows = filtered.map(function (prod) {
-      var cat = state.categories.find(function (c) { return String(c.id) === String(prod.category_id); });
-      var catName = cat ? cat.name : 'Umum';
-      var img = prod.image || prod.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100';
+      var img = prod.image || prod.image_url || '';
       var isActive = prod.is_active !== 0;
-      var isRange = prod.pricing_mode === 'range';
-      var modeBadge = isRange
-        ? '<span class="x-badge x-badge-range">Range (' + formatMoney(prod.min_price || prod.price) + ' - ' + formatMoney(prod.max_price || prod.price) + ')</span>'
-        : '<span class="x-badge x-badge-lock">Lock</span>';
-
       var toggleSwitch = '' +
-        '<label class="x-toggle' + (isActive ? ' x-toggle-on' : '') + '" title="' + (isActive ? 'Produk aktif' : 'Produk nonaktif') + '">' +
-          '<input type="checkbox" ' + (isActive ? 'checked' : '') + ' onchange="toggleStock(\'' + prod.id + '\')" aria-label="Status aktif produk ' + esc(prod.name) + '">' +
+        '<label class="x-toggle' + (isActive ? ' x-toggle-on' : '') + '" title="' + (isActive ? 'Product aktif' : 'Product nonaktif') + '">' +
+          '<input type="checkbox" ' + (isActive ? 'checked' : '') + ' onchange="toggleStock(\\'' + esc(prod.id) + '\\')" aria-label="Status Product ' + esc(prod.name) + '">' +
           '<span class="x-toggle-slider"></span>' +
         '</label>';
 
       return [
         '<tr>',
-          '<td><img src="' + esc(img) + '" alt="" class="x-table-thumb"></td>',
+          '<td>' + (img ? '<img src="' + esc(img) + '" alt="" class="x-table-thumb">' : '<div class="x-table-thumb" aria-hidden="true">🍲</div>') + '</td>',
           '<td>',
-            '<a href="#catalog/products/' + prod.id + '" style="font-weight:700;color:var(--text-main);text-decoration:none;display:inline-block;" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">' + esc(prod.name) + '</a>',
-            '<p class="text-muted" style="font-size:12px;max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:2px 0 0;">' + esc(prod.description || '') + '</p>',
+            '<a href="#catalog/products/' + encodeURIComponent(prod.id) + '" style="font-weight:700;color:var(--text-main);text-decoration:none;display:inline-block;">' + esc(prod.name) + '</a>',
+            '<p class="text-muted" style="font-size:12px;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:2px 0 0;">' + esc(prod.description || '') + '</p>',
           '</td>',
-          '<td>' +
-            '<span class="x-badge x-badge-info">' + esc(catName) + '</span>' +
-            renderMasterProductSpiceIndicator(prod.level_sort_order) +
-          '</td>',
-          '<td><strong>' + formatMoney(prod.price) + '</strong>' + (prod.regular_price > prod.price ? ' <del class="text-muted" style="font-size:11px;">' + formatMoney(prod.regular_price) + '</del>' : '') + '</td>',
-          '<td>' + modeBadge + '</td>',
+          '<td><code style="font-size:11px;">' + esc(prod.sku || 'Belum ada SKU') + '</code></td>',
           '<td>' + toggleSwitch + '</td>',
           '<td class="text-right" style="white-space:nowrap;">',
             '<div class="x-item-actions">',
-              '<button type="button" class="x-action-menu-trigger" aria-label="Aksi produk ' + esc(prod.name) + '" onclick="XentraActionMenu.open(this, [' +
-                '{ label: \'Lihat Detail\', icon: \'🔍\', onClick: function() { navigateTo(\'catalog/products/' + prod.id + '\'); } },' +
-                '{ label: \'Edit Produk\', icon: \'✏️\', onClick: function() { openEditProduct(\'' + prod.id + '\'); } },' +
+              '<button type="button" class="x-action-menu-trigger" aria-label="Aksi Product ' + esc(prod.name) + '" onclick="XentraActionMenu.open(this, [' +
+                '{ label: \\'Lihat Detail\\', icon: \\'🔍\\', onClick: function() { navigateTo(\\'catalog/products/' + encodeURIComponent(prod.id) + '\\'); } },' +
+                '{ label: \\'Edit Product\\', icon: \\'✏️\\', onClick: function() { openEditProduct(\\'' + esc(prod.id) + '\\'); } },' +
                 '{ divider: true },' +
-                '{ label: \'Hapus Produk\', icon: \'🗑️\', destructive: true, onClick: function() { deleteProduct(\'' + prod.id + '\'); } }' +
+                '{ label: \\'Hapus Product\\', icon: \\'🗑️\\', destructive: true, onClick: function() { deleteProduct(\\'' + esc(prod.id) + '\\'); } }' +
               '])">',
                 '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>',
               '</button>',
@@ -2254,12 +2212,8 @@
     });
 
     tbody.innerHTML = rows.join('');
-
-    // Also populate legacy products-table-body if present in DOM
     var legacyBody = $('products-table-body');
-    if (legacyBody) {
-      legacyBody.innerHTML = rows.join('');
-    }
+    if (legacyBody) legacyBody.innerHTML = rows.join('');
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -3664,52 +3618,35 @@
   }
 
   function resetProductEditorForAdd() {
-    $('product-editor-title').textContent = 'Tambah Produk Master Baru';
-    $('prod-editor-breadcrumb').textContent = 'Tambah Produk';
-    $('prod-editor-subtitle').textContent = 'Susun identitas, harga, foto, dan komposisi Master Menu.';
-    if ($('product-editor-mobile-title')) $('product-editor-mobile-title').textContent = 'Tambah Produk';
-    if ($('product-editor-mobile-subtitle')) $('product-editor-mobile-subtitle').textContent = 'Susun identitas, harga, foto, dan komposisi Master Menu.';
+    $('product-editor-title').textContent = 'Tambah Product Atomic';
+    $('prod-editor-breadcrumb').textContent = 'Tambah Product';
+    $('prod-editor-subtitle').textContent = 'Product adalah unit catalog/stock. Taxonomy, harga jual, dan identitas customer dikelola oleh Menu.';
+    if ($('product-editor-mobile-title')) $('product-editor-mobile-title').textContent = 'Tambah Product';
+    if ($('product-editor-mobile-subtitle')) $('product-editor-mobile-subtitle').textContent = 'Buat unit Product atomic; harga dan taxonomy customer dikelola oleh Menu.';
     $('prod-id').value = '';
     $('prod-name').value = '';
-    $('prod-price').value = '';
-    $('prod-regular-price').value = '';
-    $('prod-pricing-mode').value = 'lock';
-    $('prod-min-price').value = '';
-    $('prod-max-price').value = '';
-    toggleRangeFields();
+    $('prod-sku').value = '';
     $('prod-desc').value = '';
+    $('prod-is-active').checked = true;
     _productImageFile = null;
     _productCropSpec = null;
     _productImageRemoved = false;
     var fileInput = $('prod-image-file');
     if (fileInput) fileInput.value = '';
     setProductImagePreview('', false);
-    clearLegacyMenuMigrationNotice();
-    _productOptionsDraft = [];
-    renderProductOptionsEditor();
-    populateProductCategorySelect();
-    _masterMenuSelected = { flavor_id: '', complement_ids: [], level_id: '' };
-    renderMasterMenuSelectors();
-    renderMasterMenuCustomerPreview();
   }
 
   function populateProductEditorForm(prod) {
-    $('product-editor-title').textContent = 'Edit Produk: ' + prod.name;
+    $('product-editor-title').textContent = 'Edit Product: ' + prod.name;
     $('prod-editor-breadcrumb').textContent = prod.name;
-    $('prod-editor-subtitle').textContent = 'Periksa dan perbarui data Master Menu.';
-    if ($('product-editor-mobile-title')) $('product-editor-mobile-title').textContent = 'Edit Produk';
-    if ($('product-editor-mobile-subtitle')) $('product-editor-mobile-subtitle').textContent = 'Periksa dan perbarui data Master Menu.';
+    $('prod-editor-subtitle').textContent = 'Perbarui data atomic Product. Menu tetap dikelola di workspace Menu Master.';
+    if ($('product-editor-mobile-title')) $('product-editor-mobile-title').textContent = 'Edit Product';
+    if ($('product-editor-mobile-subtitle')) $('product-editor-mobile-subtitle').textContent = 'Perbarui Product tanpa mengubah identitas komersial Menu.';
     $('prod-id').value = prod.id;
     $('prod-name').value = prod.name || '';
-    populateProductCategorySelect();
-    $('prod-category').value = prod.category_id || '';
-    $('prod-price').value = prod.price != null ? prod.price : '';
-    $('prod-regular-price').value = prod.regular_price || prod.price || '';
-    $('prod-pricing-mode').value = prod.pricing_mode || 'lock';
-    $('prod-min-price').value = prod.min_price || '';
-    $('prod-max-price').value = prod.max_price || '';
-    toggleRangeFields();
+    $('prod-sku').value = prod.sku || '';
     $('prod-desc').value = prod.description || '';
+    $('prod-is-active').checked = prod.is_active !== 0;
     _productImageFile = null;
     _productCropSpec = null;
     _productImageRemoved = false;
@@ -3717,84 +3654,35 @@
     if (fileInput) fileInput.value = '';
     var existingImage = prod.image_url || prod.image || '';
     setProductImagePreview(existingImage, existingImage !== '');
-    _productOptionsDraft = normalizeProductOptionsDraft(prod.options_config);
-    renderProductOptionsEditor();
   }
 
   async function loadProductEditorPage(productId) {
     var requestSeq = ++_productEditorLoadSeq;
     showProductEditorSection();
 
-    // The editor is a real page, not a blocking loading screen. Render the form
-    // immediately, then hydrate Master references and product data asynchronously.
     if (!productId) {
       resetProductEditorForAdd();
-
-      try {
-        await Promise.all([
-          loadMasterMenuComponents(),
-          adminFetch(API_BASE + '/admin/categories', { headers: getAuthHeaders() })
-            .then(function(res) { return res.json(); })
-            .then(function(data) {
-              if (requestSeq !== _productEditorLoadSeq) return;
-              if (data && data.success) {
-                state.categories = data.categories || [];
-                populateProductCategorySelect();
-                renderMasterMenuCustomerPreview();
-              }
-            })
-        ]);
-      } catch (err) {
-        if (requestSeq !== _productEditorLoadSeq) return;
-        console.error('[Product Editor Master Data Error]:', err);
-        showToast('⚠️ Sebagian data Master belum tersedia. Coba lagi setelah koneksi siap.');
-      }
       return;
     }
 
     try {
-      var productPromise = adminFetch(API_BASE + '/admin/products/' + encodeURIComponent(productId), {
+      var res = await adminFetch(API_BASE + '/admin/products/' + encodeURIComponent(productId), {
         headers: getAuthHeaders()
-      }).then(function(res) { return res.json(); });
-
-      var categoryPromise = adminFetch(API_BASE + '/admin/categories', {
-        headers: getAuthHeaders()
-      }).then(function(res) { return res.json(); });
-
-      var masterPromise = loadMasterMenuComponents();
-
-      var productData = await productPromise;
+      });
+      var data = await res.json();
       if (requestSeq !== _productEditorLoadSeq) return;
 
-      if (!productData.success || !productData.product) {
-        showToast('❌ ' + (productData.error || 'Produk tidak ditemukan.'));
+      if (!data.success || !data.product) {
+        showToast('❌ ' + (data.error || 'Product tidak ditemukan.'));
         navigateTo('catalog/products');
         return;
       }
 
-      populateProductEditorForm(productData.product);
-
-      // Master references and product data can arrive in either order. Once
-      // references are ready, render the selectors again against the current draft.
-      var categoryData = await categoryPromise;
-      if (requestSeq !== _productEditorLoadSeq) return;
-      if (categoryData && categoryData.success) {
-        state.categories = categoryData.categories || [];
-        populateProductCategorySelect();
-        $('prod-category').value = productData.product.category_id || '';
-      }
-
-      await masterPromise;
-      if (requestSeq !== _productEditorLoadSeq) return;
-
-      await loadMasterMenuComposition(productData.product.id, productData.product.name, true);
-      if (requestSeq !== _productEditorLoadSeq) return;
-
-      await loadProductOptionsEditor(productData.product.id);
+      populateProductEditorForm(data.product);
     } catch (err) {
       if (requestSeq !== _productEditorLoadSeq) return;
       console.error('[Product Editor Load Error]:', err);
-      showToast('❌ Gagal memuat editor Produk Master.');
+      showToast('❌ Gagal memuat Product Editor.');
     }
   }
 
@@ -4539,25 +4427,31 @@ async function loadMenusView() {
     // Product name is a first-class Master Product identity and the
     // authoritative Customer card title. Kategori is only the grouping/reference.
     // Form Master Product Submit
+    // Canonical Product Editor submit: Product owns only atomic identity,
+    // SKU/media, internal description, and lifecycle. Menu owns customer
+    // taxonomy, selling price, and commercial presentation.
     var formProduct = $('form-product');
     if (formProduct) {
       formProduct.addEventListener('submit', async function (e) {
         e.preventDefault();
+
         var id = $('prod-id').value;
-        var pricingMode = $('prod-pricing-mode').value;
+        var sku = String($('prod-sku').value || '').trim();
         var payload = {
-          // Product name is explicit user input and is the Customer card title.
           name: $('prod-name').value.trim(),
-          category_id: $('prod-category').value,
-          price: Number($('prod-price').value),
-          regular_price: Number($('prod-regular-price').value || $('prod-price').value),
-          pricing_mode: pricingMode,
-          min_price: pricingMode === 'range' ? Number($('prod-min-price').value || $('prod-price').value) : null,
-          max_price: pricingMode === 'range' ? Number($('prod-max-price').value || $('prod-price').value) : null,
-          description: $('prod-desc').value
+          sku: sku || null,
+          description: $('prod-desc').value,
+          is_active: $('prod-is-active').checked ? 1 : 0
         };
 
-        var url = id ? (API_BASE + '/admin/products/' + id) : (API_BASE + '/admin/products');
+        if (!payload.name) {
+          showToast('❌ Nama Product wajib diisi.');
+          return;
+        }
+
+        var url = id
+          ? (API_BASE + '/admin/products/' + encodeURIComponent(id))
+          : (API_BASE + '/admin/products');
         var method = id ? 'PUT' : 'POST';
 
         try {
@@ -4567,31 +4461,18 @@ async function loadMenusView() {
             body: JSON.stringify(payload)
           });
           var data = await res.json();
-          if (!data.success) {
-            showToast('❌ ' + (data.error || data.message || 'Gagal menyimpan menu.'));
+          if (!res.ok || !data.success) {
+            showToast('❌ ' + (data.error || data.message || 'Gagal menyimpan Product.'));
             return;
           }
 
           var savedId = (data.product && data.product.id) || id;
           if (!savedId) {
-            showToast('❌ Produk tersimpan tetapi ID produk tidak kembali dari server.');
+            showToast('❌ Product tersimpan tetapi ID Product tidak kembali dari server.');
             return;
           }
 
-          try {
-            await saveMasterMenuComposition(savedId);
-          } catch (compositionErr) {
-            showToast('❌ ' + compositionErr.message);
-            return;
-          }
-
-          try {
-            await saveProductOptions(savedId);
-          } catch (optionErr) {
-            showToast('❌ ' + optionErr.message);
-            return;
-          }
-          if (_productImageRemoved && savedId) {
+          if (_productImageRemoved) {
             var removeRes = await adminFetch(API_BASE + '/admin/media/entity/products/' + encodeURIComponent(savedId) + '/image', {
               method: 'DELETE',
               headers: getAuthHeaders()
@@ -4603,12 +4484,12 @@ async function loadMenusView() {
               removeData = { success: false, error: 'Gagal membaca respons penghapusan foto (HTTP ' + removeRes.status + ').' };
             }
             if (!removeRes.ok || !removeData.success) {
-              showToast('❌ ' + (removeData.error || removeData.message || 'Gagal menghapus foto menu.'));
+              showToast('❌ ' + (removeData.error || removeData.message || 'Gagal menghapus foto Product.'));
               return;
             }
           }
 
-          if (_productImageFile && savedId && !_productImageRemoved) {
+          if (_productImageFile && !_productImageRemoved) {
             var base64 = await new Promise(function (resolve, reject) {
               var imgReader = new FileReader();
               imgReader.onload = function () { resolve(imgReader.result); };
@@ -4632,27 +4513,22 @@ async function loadMenusView() {
             try {
               imageData = await imageRes.json();
             } catch (_) {
-              var rawBody = '';
-              try { rawBody = await imageRes.text(); } catch (_) {}
-              var detail = rawBody.length > 160 ? (rawBody.slice(0, 160) + '…') : rawBody;
-              imageData = { success: false, error: 'Upload foto gagal (HTTP ' + imageRes.status + '). ' + (detail ? detail + ' ' : '') };
+              imageData = { success: false, error: 'Upload foto Product gagal (HTTP ' + imageRes.status + ').' };
             }
             if (!imageRes.ok || !imageData.success) {
-              showToast('❌ ' + (imageData.error || imageData.message || 'Gagal mengunggah foto menu.'));
+              showToast('❌ ' + (imageData.error || imageData.message || 'Gagal mengunggah foto Product.'));
               return;
             }
           }
 
-          showToast('✅ Produk master berhasil disimpan!');
+          showToast('✅ Product berhasil disimpan.');
           await loadMasterProducts();
           navigateTo('catalog/products', { history: 'replace' });
         } catch (err) {
-          showToast('❌ ' + ((err && err.message) || 'Gagal menyimpan menu.'));
+          showToast('❌ ' + ((err && err.message) || 'Gagal menyimpan Product.'));
         }
       });
     }
-  }
-
   /* =========================================================================
      MODUL 3: CABANG & PENGATURAN ONGKIR CONTROLLER
      ========================================================================= */
