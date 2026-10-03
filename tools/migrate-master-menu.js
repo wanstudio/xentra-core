@@ -1,41 +1,30 @@
 'use strict';
 
-const DataAccess = require('../core/data/DataAccess');
-const { ProductMenuMigrationService } = require('../domains/catalog/services/ProductMenuMigrationService');
-
-function readArg(name) {
-  const index = process.argv.indexOf(name);
-  return index >= 0 ? process.argv[index + 1] : null;
+/**
+ * LEGACY MIGRATION CLI — DISABLED
+ *
+ * This entry point belonged to the superseded Product-centric
+ * Master Menu Composition migration. The current locked architecture is
+ * Product → Menu → Inventory (docs/proposals/xentra-taxonomy-composed-menu-v1.md).
+ *
+ * Keeping the file (rather than deleting it) makes historical references fail
+ * deterministically instead of silently executing the wrong migration model.
+ */
+function main() {
+  const err = new Error(
+    'LEGACY_MASTER_MENU_MIGRATION_DISABLED: tools/migrate-master-menu.js belongs to the superseded Product-centric migration. Use the current Product → Menu → Inventory migration contract; do not apply this tool to production data.'
+  );
+  err.code = 'LEGACY_MASTER_MENU_MIGRATION_DISABLED';
+  throw err;
 }
 
-async function main() {
-  await DataAccess.ready();
-
-  const brandId = readArg('--brand');
-  const productId = readArg('--product');
-  const verify = process.argv.includes('--verify');
-  const apply = process.argv.includes('--apply');
-
-  if (!brandId) {
-    throw new Error(
-      'Usage: node tools/migrate-master-menu.js --brand <brand-id> [--product <product-id>] [--verify] [--apply]'
-    );
+if (require.main === module) {
+  try {
+    main();
+  } catch (err) {
+    process.stderr.write(String((err && err.message) || err) + '\n');
+    process.exitCode = 2;
   }
-  if (verify && apply) {
-    throw new Error('VERIFY_APPLY_CONFLICT: --verify already performs the verification transition; do not combine it with --apply.');
-  }
-
-  const result = productId
-    ? (verify
-      ? ProductMenuMigrationService.verifyProduct({ brandId, productId })
-      : ProductMenuMigrationService.reconcileProduct({ brandId, productId, apply, persistReport: apply }))
-    : ProductMenuMigrationService.reconcileBrand({ brandId, verify, apply, persistReport: apply });
-
-  const mode = verify ? 'verify' : apply ? 'apply' : 'dry-run';
-  process.stdout.write(JSON.stringify({ mode, verify, apply, result }, null, 2) + '\n');
 }
 
-main().catch((err) => {
-  process.stderr.write(String((err && err.stack) || err) + '\n');
-  process.exitCode = 1;
-});
+module.exports = { main };
