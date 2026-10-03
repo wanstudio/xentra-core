@@ -1,7 +1,9 @@
-# XENTRA — Driver + COD Flow Contract v1
+# XENTRA — Driver + COD Flow Contract v1.1
 
 **Status: LOCKED BUSINESS / UX DIRECTION**
-**Date:** 2026-09-19
+**Date:** 2026-10-03
+
+> **Revision:** v1.1 supersedes the COD settlement wording in v1. The canonical payment state remains `settlement`; the UI may display this as **PAID/LUNAS**.
 
 ## Purpose
 This document locks the MVP business/UX boundary for Driver, Delivery, COD cash custody, Cashier/POS, Branch Manager, and Head Kitchen before implementation.
@@ -27,9 +29,11 @@ Do not create one giant status covering order, delivery, cash, and payment.
 
 **Delivery Job:** unassigned → assigned → picked_up → on_delivery → delivered
 
-**Cash Collection:** pending → collected → handed_over → settled (exact naming may be refined during state-contract phase)
+**Cash Collection:** pending → collected → handed_over
 
 **Payment:** pending → settlement
+
+Cash custody/handover is a separate operational record from Payment settlement.
 
 `delivered` is a Delivery state, not a canonical Order state. `completed` is the canonical fulfillment-complete Order state.
 
@@ -46,15 +50,60 @@ Do not create one giant status covering order, delivery, cash, and payment.
 10. Driver hands cash to Cashier.
 11. Cashier verifies expected vs received cash and confirms handover.
 12. Custody moves from Driver to Merchant/Cashier custody.
-13. Authorized Cashier/POS settlement changes the cash payment to settlement.
+13. Authorized Cashier/POS settlement changes the cash payment to `settlement` (the merchant-facing UI may show **PAID/LUNAS**).
+14. If the Order is already `completed`, the COD payment remains settlement-eligible until the outstanding cash is validly handed over and settled; Order completion does not close the payment lifecycle.
 
 ## Critical Invariant
 **Customer receiving the food is not the same event as merchant receiving the cash.**
 Therefore:
 - Order fulfillment may be completed while COD payment is still pending.
 - Cash collection must be auditable independently from Order state.
-- Payment settlement must remain possible after Order fulfillment is complete.
+- Payment settlement must remain possible after Order fulfillment is complete for an outstanding COD cash payment.
 - Cash custody must identify who currently holds collected COD cash.
+- `delivered` and `completed` MUST NOT automatically change a COD payment from `pending` to `settlement`.
+- Driver MUST NOT perform the final payment settlement transition.
+- Cashier/POS is the authority for the final cash-payment settlement, subject to RBAC and shift rules.
+
+## COD Payment Settlement Eligibility
+
+The following rule is LOCKED for the MVP:
+
+### Normal COD Case
+A COD order may reach:
+- Delivery Job = `delivered`;
+- Order = `completed`;
+- Payment = `pending`.
+
+This is valid and expected while the collected physical cash has not yet completed the cashier handover/settlement flow.
+
+### Cashier Settlement Gate
+Cashier/POS MAY transition Payment from `pending` to `settlement` only when all relevant guards pass:
+
+1. The order belongs to the cashier's authorized branch/scope.
+2. The payment method is COD/physical cash (`cash` in the current payment model).
+3. The payment is still outstanding and has not already reached `settlement`.
+4. The physical COD cash has been collected and handed over to Cashier/POS according to the Cash Collection/Custody contract.
+5. The authenticated cashier and applicable open-shift rules are satisfied.
+6. The amount being settled matches the outstanding amount; any over-tendered amount is handled as change, and any short amount is rejected or routed to the explicit variance flow.
+
+### Completed Order Exception
+`Order = completed` is explicitly **NOT** a reason to reject a valid COD cash settlement.
+
+The implementation MUST NOT use a blanket terminal-order guard that blocks all cash settlement merely because `order.status === 'completed'`.
+
+However, this exception applies only to the outstanding COD cash settlement described above. It MUST NOT permit:
+- cash settlement of online/non-cash payments;
+- settlement by Driver;
+- settlement for another branch without authorization;
+- duplicate settlement of an already-settled payment;
+- bypassing the cash handover/custody record where that record is required by the implementation.
+
+### Terminology
+- **Cash handover confirmed:** physical custody has moved from Driver to Cashier/POS.
+- **Payment settlement:** the authoritative payment state becomes `settlement`.
+- **PAID/LUNAS:** a UI presentation label for a payment whose canonical state is `settlement`.
+
+These are related but distinct events and MUST NOT be collapsed into one generic Order status.
 
 ## POS Boundary
 POS should NOT become a second delivery dashboard. Cashier should not need to:
@@ -80,7 +129,7 @@ POS SHOULD provide:
 - Delivery pickup/on-delivery/delivered: Driver.
 - COD cash collection: Driver.
 - Cash handover/receipt: Driver + Cashier.
-- Payment settlement: Cashier/POS (subject to existing RBAC/shift contract).
+- Payment settlement: Cashier/POS (subject to existing RBAC/shift contract). Driver has no settlement authority.
 
 ## Explicit Non-Goals for MVP
 - Separate Dispatcher role.
@@ -101,9 +150,11 @@ The next business/state contract must explicitly define failure/exception flows:
 - driver loses cash;
 - driver cancellation/reassignment;
 - cash collected but delivery state transition fails;
-- payment settlement attempted after order completion.
+- payment settlement attempted after order completion;
+- duplicate cash handover/settlement;
+- cashier/branch scope mismatch.
 
-Only after these states and transition guards are locked should database/API/Driver App implementation begin.
+The `Order = completed` + `Payment = pending` COD case is now explicitly locked as a valid state. Database/API/Driver App implementation MUST conform to this contract.
 ## Merchant Mobile Order Center — UX Direction v1 (LOCKED)
 
 This section locks the operational UX direction for the Branch Manager / Merchant order center based on the source audit and the agreed GoFood/GrabMerchant-style operational pattern. It is a UX/interaction contract, not a copy of any third-party UI.
