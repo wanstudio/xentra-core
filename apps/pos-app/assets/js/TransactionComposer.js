@@ -230,12 +230,18 @@
     if (this.isExisting()) {
       throw new Error('Pesanan sudah diproses Merchant. Gunakan Tambah Pesanan.');
     }
-    if (!item || !item.product_id) return this.snapshot();
+    if (!item || (!item.product_id && !item.menu_id)) return this.snapshot();
 
     var target = this.isAddition() ? this._additionItems : this._items;
     var clean = cloneItem(item);
+    var cleanIdentity = clean.menu_id
+      ? 'menu:' + String(clean.menu_id)
+      : 'product:' + String(clean.product_id);
     var same = target.find(function (current) {
-      return String(current.product_id) === String(clean.product_id) &&
+      var currentIdentity = current.menu_id
+        ? 'menu:' + String(current.menu_id)
+        : 'product:' + String(current.product_id);
+      return currentIdentity === cleanIdentity &&
         String(current.note || '') === String(clean.note || '') &&
         JSON.stringify(current.options || []) === JSON.stringify(clean.options || []);
     });
