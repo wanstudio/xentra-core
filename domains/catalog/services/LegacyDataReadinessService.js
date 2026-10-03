@@ -146,6 +146,8 @@ class LegacyDataReadinessService {
       .filter(row => String(row.status) === 'legacy')
       .reduce((sum, row) => sum + Number(row.count || 0), 0);
 
+    const productsWithoutCanonicalMenu = Number(productCoverage?.products_without_canonical_menu || 0);
+
     const promotionUnresolved = legacyPromotions.filter(
       row => Number(row.canonical_menu_candidates) !== 1
     ).length;
@@ -158,7 +160,7 @@ class LegacyDataReadinessService {
     let status = STATUS.CANONICAL_READY;
     if (blockers > 0) {
       status = STATUS.BLOCKED;
-    } else if (productNeedsReviewCount > 0 || promotionUnresolved > 0 || branchUnresolved > 0) {
+    } else if (productsWithoutCanonicalMenu > 0 || productNeedsReviewCount > 0 || promotionUnresolved > 0 || branchUnresolved > 0) {
       status = STATUS.NEEDS_REVIEW;
     } else if (productLegacyCount > 0 || legacyPromotionCount > 0 || legacyBranchProductCount > 0 || legacyBranchCategoryCount > 0) {
       status = STATUS.LEGACY_REQUIRES_MIGRATION;
@@ -174,6 +176,7 @@ class LegacyDataReadinessService {
         canonical_menu_count: Number(productCoverage?.canonical_menu_count || 0),
         legacy_status_count: productLegacyCount,
         needs_review_status_count: productNeedsReviewCount,
+        canonical_menu_gap_count: productsWithoutCanonicalMenu,
         migration_status: productStatus.map(row => ({
           status: row.status,
           schema_version: Number(row.schema_version),
