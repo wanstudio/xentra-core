@@ -152,6 +152,7 @@ if (!dbInstance) {
       console.log(`[Database] sql.js database adapter ready on Node ${nodeVersion} (PRAGMA foreign_keys = ON).`);
       try {
         initSchema(db);
+        initComposedMenuSchema(db);
         if (DB_PATH !== ':memory:') {
           saveSqlJsToDisk(true);
         }
@@ -734,6 +735,18 @@ const db = {
     };
   }
 };
+
+
+function initComposedMenuSchema(targetDb) {
+  // Base tables are initialized first. The composed-menu schema is then applied
+  // against the same concrete database object so direct domain/test consumers
+  // receive the canonical Product/SKU → Menu → Inventory schema as well.
+  const { ensureComposedMenuSchema } = require('../../domains/catalog/schema/ComposedMenuSchema');
+  ensureComposedMenuSchema({
+    queryMany: (sql, params = []) => targetDb.prepare(sql).all(...params),
+    exec: targetDb.exec.bind(targetDb)
+  });
+}
 
 function initSchema(targetDb) {
   targetDb.exec(`
@@ -1373,6 +1386,7 @@ function initSchema(targetDb) {
       id TEXT PRIMARY KEY,
       promotion_id TEXT NOT NULL,
       reward_type TEXT NOT NULL,
+      target_menu_id TEXT,
       target_product_id TEXT,
       amount_in_cents INTEGER NOT NULL DEFAULT 0,
       max_discount_in_cents INTEGER,
@@ -1380,6 +1394,7 @@ function initSchema(targetDb) {
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (promotion_id) REFERENCES promotions(id) ON DELETE CASCADE
     );
+
 
     CREATE TABLE IF NOT EXISTS promotion_redemptions (
       id TEXT PRIMARY KEY,
@@ -1898,6 +1913,105 @@ function initSchema(targetDb) {
     );
   `);
 
+  // Promotion Reward Target migration: Menu is the canonical commercial
+  // reward identity. target_product_id remains a legacy compatibility
+  // reference during migration. Existing databases receive target_menu_id
+  // additively without destructive table rebuilds.
+  try { targetDb.exec("ALTER TABLE promotion_rewards ADD COLUMN target_menu_id TEXT;"); } catch (_) {}
+  try { targetDb.exec("CREATE INDEX IF NOT EXISTS idx_promotion_rewards_target_menu ON promotion_rewards(target_menu_id);"); } catch (_) {}
+
+  try {
+    targetDb.exec(`
+      CREATE TRIGGER IF NOT EXISTS trg_promotion_rewards_target_exclusivity_insert
+      BEFORE INSERT ON promotion_rewards
+      FOR EACH ROW
+      WHEN NEW.target_menu_id IS NOT NULL AND trim(NEW.target_menu_id) <> ''
+       AND NEW.target_product_id IS NOT NULL AND trim(NEW.target_product_id) <> ''
+      BEGIN
+        SELECT RAISE(ABORT, 'PROMOTION_REWARD_TARGET_AMBIGUOUS');
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS trg_promotion_rewards_target_exclusivity_update
+      BEFORE UPDATE OF target_menu_id, target_product_id ON promotion_rewards
+      FOR EACH ROW
+      WHEN NEW.target_menu_id IS NOT NULL AND trim(NEW.target_menu_id) <> ''
+       AND NEW.target_product_id IS NOT NULL AND trim(NEW.target_product_id) <> ''
+      BEGIN
+        SELECT RAISE(ABORT, 'PROMOTION_REWARD_TARGET_AMBIGUOUS');
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS trg_promotion_rewards_menu_brand_insert
+      BEFORE INSERT ON promotion_rewards
+      FOR EACH ROW
+      WHEN NEW.target_menu_id IS NOT NULL
+       AND (SELECT brand_id FROM menus WHERE id = NEW.target_menu_id) IS NULL
+          OR NEW.target_menu_id IS NOT NULL
+       AND (SELECT brand_id FROM menus WHERE id = NEW.target_menu_id) <>
+           (SELECT brand_id FROM promotions WHERE id = NEW.promotion_id)
+      BEGIN
+        SELECT RAISE(ABORT, 'PROMOTION_REWARD_MENU_BRAND_MISMATCH');
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS trg_promotion_rewards_menu_brand_update
+      BEFORE UPDATE OF promotion_id, target_menu_id ON promotion_rewards
+      FOR EACH ROW
+      WHEN NEW.target_menu_id IS NOT NULL
+       AND (SELECT brand_id FROM menus WHERE id = NEW.target_menu_id) IS NULL
+          OR NEW.target_menu_id IS NOT NULL
+       AND (SELECT brand_id FROM menus WHERE id = NEW.target_menu_id) <>
+           (SELECT brand_id FROM promotions WHERE id = NEW.promotion_id)
+      BEGIN
+        SELECT RAISE(ABORT, 'PROMOTION_REWARD_MENU_BRAND_MISMATCH');
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS trg_promotion_rewards_product_brand_insert
+      BEFORE INSERT ON promotion_rewards
+      FOR EACH ROW
+      WHEN NEW.target_product_id IS NOT NULL
+       AND (SELECT brand_id FROM products WHERE id = NEW.target_product_id) IS NULL
+          OR NEW.target_product_id IS NOT NULL
+       AND (SELECT brand_id FROM products WHERE id = NEW.target_product_id) <>
+           (SELECT brand_id FROM promotions WHERE id = NEW.promotion_id)
+      BEGIN
+        SELECT RAISE(ABORT, 'PROMOTION_REWARD_PRODUCT_BRAND_MISMATCH');
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS trg_promotion_rewards_product_brand_update
+      BEFORE UPDATE OF promotion_id, target_product_id ON promotion_rewards
+      FOR EACH ROW
+      WHEN NEW.target_product_id IS NOT NULL
+       AND (SELECT brand_id FROM products WHERE id = NEW.target_product_id) IS NULL
+          OR NEW.target_product_id IS NOT NULL
+       AND (SELECT brand_id FROM products WHERE id = NEW.target_product_id) <>
+           (SELECT brand_id FROM promotions WHERE id = NEW.promotion_id)
+      BEGIN
+        SELECT RAISE(ABORT, 'PROMOTION_REWARD_PRODUCT_BRAND_MISMATCH');
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS trg_promotion_rewards_freebie_target_insert
+      BEFORE INSERT ON promotion_rewards
+      FOR EACH ROW
+      WHEN lower(trim(NEW.reward_type)) IN ('freebie_product', 'free_product')
+       AND (NEW.target_menu_id IS NULL OR trim(NEW.target_menu_id) = '')
+       AND (NEW.target_product_id IS NULL OR trim(NEW.target_product_id) = '')
+      BEGIN
+        SELECT RAISE(ABORT, 'PROMOTION_REWARD_TARGET_REQUIRED');
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS trg_promotion_rewards_freebie_target_update
+      BEFORE UPDATE OF reward_type, target_menu_id, target_product_id ON promotion_rewards
+      FOR EACH ROW
+      WHEN lower(trim(NEW.reward_type)) IN ('freebie_product', 'free_product')
+       AND (NEW.target_menu_id IS NULL OR trim(NEW.target_menu_id) = '')
+       AND (NEW.target_product_id IS NULL OR trim(NEW.target_product_id) = '')
+      BEGIN
+        SELECT RAISE(ABORT, 'PROMOTION_REWARD_TARGET_REQUIRED');
+      END;
+    `);
+  } catch (e) {
+    console.warn('[Database] Promotion reward guard trigger initialization warning:', e.message);
+  }
+
   try { targetDb.exec('ALTER TABLE media_assets ADD COLUMN crop_spec TEXT;'); } catch (e) {}
   try { targetDb.exec("ALTER TABLE pos_order_checks ADD COLUMN allocated_amount REAL NOT NULL DEFAULT 0;"); } catch (e) {}
   try {
@@ -2331,15 +2445,18 @@ function initSchema(targetDb) {
     `);
   } catch (e) {}
 
-  // Migrate existing branch_products:
+  // LEGACY BRANCH-PRODUCT COMPATIBILITY MIGRATION ONLY.
+  // This block must never write canonical Menu commercial state
+  // (menus.selling_price / branch_menus / branch_menu_categories).
+  //
   // 1. Fill legacy snapshot columns (product_name, etc.) idempotently from master for pre-override rows.
   // 2. Migrate legacy snapshot → override:
   //    If the legacy snapshot value DIFFERS from the current master value, that difference is
-  //    a genuine branch customisation — preserve it as an explicit override.
-  //    If identical to master (was just a copy), leave override NULL so the branch inherits live master.
-  //    Idempotent: only runs on rows where name_override IS NULL (not yet migrated).
-  // 3. Create/resolve branch-owned categories (NOT master category_id).
-  // 4. Establish branch selling price from master ONCE.
+  //    preserved for legacy compatibility. Only name_override has a separately-approved
+  //    canonical presentation role; description/image overrides remain quarantined.
+  // 3. Create/resolve legacy Product-scoped branch categories (NOT canonical Menu membership).
+  // 4. Populate legacy branch_products.price when NULL so old CatalogService/PricingPolicy
+  //    callers remain deterministic during migration. This is NOT selling-price authority.
   try {
     // Step 1: Fill legacy snapshot columns for rows that never had them (pre-override schema rows).
     targetDb.exec(`
@@ -2386,9 +2503,10 @@ function initSchema(targetDb) {
       WHERE image_override IS NULL AND product_image_url IS NOT NULL
     `);
 
-    // Step 3: Create branch-owned categories for adopted products.
-    // For each branch + master category combination, ensure a branch-owned category exists.
-    // This maps Master Category → Branch Category deterministically.
+    // Step 3: Legacy Product-category compatibility only.
+    // For each branch + master category combination, ensure a branch-owned category exists
+    // for old Product-scoped consumers. Canonical Menu membership lives in
+    // branch_menu_categories and must not be inferred or written here.
     // Each branch_product is updated by its own (branch_id, product_id) identity,
     // NOT by branch_id alone — multiple products in the same branch can map to
     // different master categories and therefore different branch categories.
@@ -2425,8 +2543,10 @@ function initSchema(targetDb) {
       ).run(branchCat.id, row.branch_id, row.product_id);
     }
 
-    // Step 4: Establish branch selling price from master ONCE for adopted products without price.
-    // After this, branch_products.price is the Branch selling authority.
+    // Step 4: Legacy pricing compatibility shadow only.
+    // Fill NULL branch_products.price from products.price so quarantined CatalogService
+    // callers remain deterministic. Canonical Menu selling price is menus.selling_price;
+    // branch_products.price MUST NOT be treated as authority by new Menu code.
     targetDb.exec(`
       UPDATE branch_products
       SET price = (SELECT price FROM products WHERE id = branch_products.product_id)
@@ -2837,6 +2957,7 @@ db.seedData = seedData;
 if (dbInstance) {
   try {
     initSchema(db);
+    initComposedMenuSchema(db);
   } catch (schemaErr) {
     if (process.env.NODE_ENV === 'production') {
       console.error('[Database Fatal Error] Failed to initialize schema in production:', schemaErr);

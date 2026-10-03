@@ -13,10 +13,163 @@ const { events } = require('../../../core');
 const PrePaymentVerificationGate = require('./PrePaymentVerificationGate');
 const LowStockThresholdModel = require('../models/LowStockThresholdModel');
 const { DiningTableService } = require('../../dining');
+const { ensureComposedMenuSchema } = require('../../catalog/schema/ComposedMenuSchema');
 
 const orderRepository = new OrderRepository();
 const inventoryRepository = new InventoryRepository();
 const posShiftRepository = new PosShiftRepository();
+
+function parseComponentSnapshot(value) {
+  if (Array.isArray(value)) return value;
+  if (value == null || value === '') return [];
+  try {
+    const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_) {
+    throw new Error('[OrderPlacementService] Canonical Menu component snapshot is invalid.');
+  }
+}
+
+function resolveOrderItemProductId(item) {
+  const explicitProductId = String(item && item.product_id || '').trim();
+  if (explicitProductId) return explicitProductId;
+
+  if (item && item.menu_id) {
+    const components = parseComponentSnapshot(item.component_snapshot);
+    const firstProductId = String(components[0] && components[0].product_id || '').trim();
+    if (firstProductId) {
+      // order_items.product_id is a legacy NOT NULL compatibility pointer.
+      // It never becomes the commercial identity or inventory authority.
+      return firstProductId;
+    }
+  }
+
+  throw new Error('[OrderPlacementService] Order item Product compatibility pointer is missing.');
+}
+
+function aggregateComposedRequirements(items) {
+  const requirements = new Map();
+
+  for (const item of Array.isArray(items) ? items : []) {
+    if (!item || !item.menu_id) continue;
+
+    const menuQuantity = Number(item.quantity);
+    if (!Number.isSafeInteger(menuQuantity) || menuQuantity <= 0) {
+      throw new Error('[OrderPlacementService] Canonical Menu quantity is invalid.');
+    }
+
+    const components = parseComponentSnapshot(item.component_snapshot);
+    if (!components.length) {
+      throw new Error('[OrderPlacementService] Canonical Menu has no component snapshot.');
+    }
+
+    for (const component of components) {
+      const componentQuantity = Number(component.quantity);
+      if (!Number.isSafeInteger(componentQuantity) || componentQuantity <= 0) {
+        throw new Error('[OrderPlacementService] Canonical Menu component quantity is invalid.');
+      }
+
+      const productId = String(component.product_id || '').trim();
+      if (!productId) throw new Error('[OrderPlacementService] Canonical Menu component Product ID is missing.');
+
+      // SKU-less Products are non-stock items and therefore do not participate
+      // in inventory deduction.
+      const sku = component.sku == null ? '' : String(component.sku).trim();
+      if (!sku) continue;
+
+      const key = productId;
+      if (!requirements.has(key)) {
+        requirements.set(key, {
+          product_id: productId,
+          product_name: component.product_name || productId,
+          quantity: 0,
+          sku
+        });
+      }
+      requirements.get(key).quantity += menuQuantity * componentQuantity;
+    }
+  }
+
+  return Array.from(requirements.values());
+}
+
+function deductComposedStock({
+  order,
+  items,
+  referenceId,
+  actorId,
+  notes,
+  dbTransactionProvided = false
+}) {
+  const requirements = aggregateComposedRequirements(items);
+  if (!requirements.length) return { success: true, deducted_items: [] };
+
+  const ownsTransaction = !dbTransactionProvided;
+  if (ownsTransaction) inventoryRepository.beginTransaction();
+
+  const now = new Date().toISOString();
+  const deductedItems = [];
+
+  try {
+    for (const requirement of requirements) {
+      const before = inventoryRepository.findBranchProduct(order.branch_id, requirement.product_id);
+      if (!before) {
+        throw new Error('[OUT_OF_STOCK_RACE] Canonical Menu component "' + requirement.product_name + '" is not registered in Branch Inventory.');
+      }
+
+      const previousStock = Number(before.stock || 0);
+      const result = inventoryRepository.deductBranchProduct({
+        quantity: requirement.quantity,
+        branchId: order.branch_id,
+        productId: requirement.product_id
+      });
+
+      if (!result || result.changes === 0) {
+        throw new Error(
+          '[OUT_OF_STOCK_RACE] Canonical Menu component "' + requirement.product_name +
+          '" does not have enough stock (available ' + previousStock +
+          ', required ' + requirement.quantity + ').'
+        );
+      }
+
+      const currentStock = previousStock - requirement.quantity;
+      inventoryRepository.insertSaleDeduction({
+        id: 'mov_' + crypto.randomBytes(6).toString('hex'),
+        branchId: order.branch_id,
+        productId: requirement.product_id,
+        quantity: requirement.quantity,
+        previousStock,
+        currentStock,
+        referenceId,
+        actorId,
+        notes,
+        createdAt: now
+      });
+
+      const inventoryRow = inventoryRepository.findCanonicalBranchInventory(
+        order.branch_id,
+        requirement.product_id
+      );
+
+      deductedItems.push({
+        product_id: requirement.product_id,
+        product_name: requirement.product_name,
+        quantity: requirement.quantity,
+        previous_stock: previousStock,
+        current_stock: currentStock,
+        low_stock_threshold: inventoryRow ? Number(inventoryRow.low_stock_threshold || 5) : 5
+      });
+    }
+
+    if (ownsTransaction) inventoryRepository.commitTransaction();
+    return { success: true, deducted_items: deductedItems };
+  } catch (err) {
+    if (ownsTransaction) {
+      try { inventoryRepository.rollbackTransaction(); } catch (_) {}
+    }
+    throw err;
+  }
+}
 
 class OrderPlacementService {
   static async submitOrder({
@@ -138,6 +291,9 @@ class OrderPlacementService {
 
 
 
+    // Canonical order fields are additive; ensure legacy test/app entry points
+    // have the Menu snapshot columns before persistence.
+    ensureComposedMenuSchema();
     const verification = PrePaymentVerificationGate.verify({ branch_id, brand_id, items, customer, pwa_runtime });
     if (!verification.is_valid) {
       return { success: false, status: verification.status, errors: verification.errors, price_diffs: verification.price_diffs };
@@ -162,6 +318,7 @@ class OrderPlacementService {
       : (recipientType === 'self' ? (customer.name || 'Pelanggan') : '');
     const recipientPhone = (recipient && recipient.phone) || '';
 
+    let confirmedComposedDeductions = [];
     try {
       orderRepository.beginTransaction();
       orderRepository.insertOrder({
@@ -198,6 +355,7 @@ class OrderPlacementService {
 
       for (const item of verifiedItems) {
         const itemId = `item_${crypto.randomBytes(6).toString('hex')}`;
+        const persistedProductId = resolveOrderItemProductId(item);
         const formattedItemNote = item.promo_id
           ? `[PROMO:${item.promo_id}] ${item.notes || item.note || ''}`.trim()
           : (item.notes || item.note || '');
@@ -205,19 +363,22 @@ class OrderPlacementService {
         orderRepository.insertItem({
           id: itemId,
           orderId,
-          productId: item.product_id,
+          productId: persistedProductId,
           productName: item.name,
           unitPrice: item.unit_price,
           quantity: item.quantity,
           itemSubtotal: item.subtotal,
           note: formattedItemNote,
           modifiersSnapshot: JSON.stringify(item.modifiers_snapshot || item.options || []),
-          menuSnapshot: item.menu_snapshot ? JSON.stringify(item.menu_snapshot) : null
+          menuSnapshot: item.menu_snapshot ? JSON.stringify(item.menu_snapshot) : null,
+          menuId: item.menu_id || null,
+          menuType: item.menu_type || null,
+          componentSnapshot: item.component_snapshot ? JSON.stringify(item.component_snapshot) : null
         });
 
         // Only deduct stock at creation if order is already confirmed (e.g. pos_cashier walk-in sales)
         // For orders that enter pending state (customer_app cash/online), stock is deducted upon merchant acceptance
-        if (insertedStatus === 'confirmed') {
+        if (insertedStatus === 'confirmed' && !item.menu_id) {
           const bpBefore = inventoryRepository.findBranchProduct(branch_id, item.product_id);
           const prevStock = bpBefore ? Number(bpBefore.stock || 0) : 0;
           const deductResult = inventoryRepository.deductBranchProduct({ quantity: item.quantity, branchId: branch_id, productId: item.product_id });
@@ -237,6 +398,23 @@ class OrderPlacementService {
             notes: `Pemotongan stok otomatis pesanan ${orderNumber} (${effectiveOrderType}/${order_channel})`,
             createdAt: now
           });
+        }
+      }
+
+      if (insertedStatus === 'confirmed') {
+        const composedItems = verifiedItems.filter(item => item && item.menu_id);
+        if (composedItems.length > 0) {
+          // Deduct component Products atomically, once per Product, after every
+          // canonical Menu line is persisted. This prevents shared components
+          // from being double-counted per Menu line.
+          confirmedComposedDeductions = deductComposedStock({
+            order: { branch_id },
+            items: composedItems,
+            referenceId: orderNumber,
+            actorId: customer.phone || 'customer_order',
+            notes: 'Pemotongan stok otomatis komponen Menu [' + orderNumber + ']',
+            dbTransactionProvided: true
+          }).deducted_items;
         }
       }
 
@@ -332,6 +510,7 @@ class OrderPlacementService {
 
     if (insertedStatus === 'confirmed') {
       for (const item of verifiedItems) {
+        if (item.menu_id) continue;
         const remainingStock = item.current_stock - item.quantity;
         const branchThreshold = item.branch_low_stock_threshold != null ? item.branch_low_stock_threshold : LowStockThresholdModel.DEFAULT_THRESHOLD;
         const stockEval = LowStockThresholdModel.evaluate(remainingStock, branchThreshold);
@@ -340,6 +519,28 @@ class OrderPlacementService {
             type: 'inventory.low_stock_warning',
             producer: 'commerce',
             payload: { branch_id, product_id: item.product_id, product_name: item.name, remaining_stock: remainingStock, threshold: stockEval.threshold, is_out_of_stock: stockEval.is_out_of_stock },
+            context: { correlation_id: trace_context.correlation_id, causation_id: orderId }
+          }).catch(() => {});
+        }
+      }
+
+      for (const item of confirmedComposedDeductions) {
+        const stockEval = LowStockThresholdModel.evaluate(
+          item.current_stock,
+          item.low_stock_threshold
+        );
+        if (stockEval.is_low || stockEval.is_out_of_stock) {
+          events.EventBus.publish({
+            type: 'inventory.low_stock_warning',
+            producer: 'commerce',
+            payload: {
+              branch_id,
+              product_id: item.product_id,
+              product_name: item.product_name,
+              remaining_stock: item.current_stock,
+              threshold: stockEval.threshold,
+              is_out_of_stock: stockEval.is_out_of_stock
+            },
             context: { correlation_id: trace_context.correlation_id, causation_id: orderId }
           }).catch(() => {});
         }
@@ -381,10 +582,29 @@ class OrderPlacementService {
     const now = new Date().toISOString();
     const deductedItems = [];
     const ownsTransaction = !dbTransactionProvided;
+
+    const canonicalItems = items.filter(item => item && item.menu_id);
+    const legacyItems = items.filter(item => !item || !item.menu_id);
+    if (canonicalItems.length > 0 && legacyItems.length > 0) {
+      throw new Error('[OrderPlacementService] Canonical Menu and legacy Product items cannot be mixed in one stock mutation.');
+    }
+
     if (ownsTransaction) inventoryRepository.beginTransaction();
 
     try {
-      for (const item of items) {
+      if (canonicalItems.length > 0) {
+        const composedResult = deductComposedStock({
+          order,
+          items: canonicalItems,
+          referenceId: reference_id,
+          actorId: actor_id,
+          notes,
+          dbTransactionProvided: true
+        });
+        deductedItems.push(...composedResult.deducted_items);
+      }
+
+      for (const item of legacyItems) {
         const quantity = Number(item.quantity || 0);
         if (!Number.isSafeInteger(quantity) || quantity <= 0) {
           throw new Error('[OrderPlacementService] Quantity Additional Order tidak valid.');
@@ -457,6 +677,7 @@ class OrderPlacementService {
 
     try {
       for (const item of items) {
+        if (item && item.menu_id) continue;
         const isVirtualPromo = (item.unit_price === 0 || Number(item.unit_price) === 0) &&
           (item.note?.includes('Promo') || item.note?.includes('Bonus') || String(item.product_id).startsWith('prm_') || String(item.product_id).startsWith('reward_'));
         const bpBefore = inventoryRepository.findBranchProduct(order.branch_id, item.product_id);
@@ -483,6 +704,19 @@ class OrderPlacementService {
         });
 
         deductedItems.push({ product_id: item.product_id, product_name: item.product_name, quantity: item.quantity, previous_stock: prevStock, current_stock: currentStock });
+      }
+
+      const canonicalItems = items.filter(item => item && item.menu_id);
+      if (canonicalItems.length > 0) {
+        const composedResult = deductComposedStock({
+          order,
+          items: canonicalItems,
+          referenceId: order.order_number,
+          actorId: order.customer_phone || 'online_payment',
+          notes: 'Pemotongan stok otomatis komponen Menu setelah pembayaran [' + order.order_number + ']',
+          dbTransactionProvided: true
+        });
+        deductedItems.push(...composedResult.deducted_items);
       }
 
       if (ownsTransaction) inventoryRepository.commitTransaction();

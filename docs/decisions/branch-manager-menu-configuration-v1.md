@@ -11,27 +11,30 @@ Branch Manager has explicit **branch-scoped Menu Configuration authority** for t
 The business boundary is:
 
 - **Owner / Brand:** owns the global Master Catalog, Master Products, Master Categories, Bundle/Composite definitions, and brand-wide catalog policy/universe.
-- **Branch Manager:** chooses which approved Master Products are sold by the Branch, creates and manages Branch Categories for that Branch, assigns adopted Branch Products to those categories, and operates Branch availability/sold-out/stock.
+- **Branch Manager:** chooses which approved Master Menus are sold by the Branch, creates and manages Branch Categories for that Branch, assigns adopted Branch Menus to those categories, and operates Branch Menu availability plus Product/SKU stock through Inventory.
 - **Xentra-Core:** authenticates, authorizes, enforces branch scope, persists mutations, validates invariants, and audits protected mutations.
 
 This is an explicit clarification/reconciliation of the existing Master Catalog + Branch selling-catalog model. It is **not** permission for Branch Manager to become a Master Product manager.
 
-> **ARCHITECTURE RECONCILIATION (2026-09-30):** This Branch Manager authority remains valid for **adoption, Branch Category classification, availability, stock**, plus the narrow **Customer Display Name Override** described in the forward Menu contract. It does **not** grant authority over Master Menu composition. The forward Menu contract is `docs/decisions/xentra-master-menu-composition-branch-adoption-contract-v1.md`. Legacy Branch Product description/image/price override behavior remains quarantined; `branch_products.name_override` is reserved for the optional Customer-facing display-name override only.
+
+> **CURRENT FORWARD CONTRACT (2026-10-03):** The selling/assortment unit is **Menu**, not Branch Product. Branch adoption is persisted in `branch_menus`; Branch Category membership is `branch_menu_categories`; Product/SKU stock is `branch_product_inventory`. Any "Branch Product" wording below is historical terminology and must be interpreted as the underlying Product component or as a legacy compatibility path, never as the forward commercial identity.
+
+> **ARCHITECTURE RECONCILIATION (2026-09-30):** This Branch Manager authority remains valid for **adoption, Branch Category classification, availability, stock**, plus the narrow **Customer Display Name Override** described in the forward Menu contract. It does **not** grant authority over Master Menu composition. The forward Menu contract is `docs/decisions/xentra-master-menu-composition-branch-adoption-contract-v1.md`. Legacy Branch Product description/image/price/name override behavior remains quarantined. The current optional Customer-facing display-name override is stored on `branch_menus.display_name_override`.
 
 
 ## Branch Manager capabilities
 
 Within the current Branch only, Branch Manager may:
 
-1. **Adopt/select** an approved Master Product into the Branch selling assortment.
-2. **Remove/unadopt** a Branch Product from the Branch assortment where the current data model permits removal.
+1. **Adopt/select** an approved Master Menu into the Branch selling assortment.
+2. **Remove/unadopt** a Branch Menu from the Branch assortment.
 3. **Create Branch Categories.**
 4. **Rename Branch Categories.**
 5. **Reorder Branch Categories.**
 6. **Delete Branch Categories** subject to existing referential/data-integrity rules.
-7. **Assign/remove Branch Products** from one or more Branch Categories.
-8. **Operate Branch Product availability / sold-out state.**
-9. **Operate Branch stock** under the Inventory contract.
+7. **Assign/remove Branch Menus** from one or more Branch Categories.
+8. **Operate Branch Menu availability / sold-out state.**
+9. **Operate Product/SKU stock** under the Inventory contract.
 
 A Branch Product may belong to multiple Branch Categories. Category membership is a branch-local many-to-many relationship.
 
@@ -51,21 +54,22 @@ Branch Manager must not:
 
 ```text
 Master Catalog (Owner / Brand)
-├── Master Products
-├── Master Categories
-└── Bundle / Composite composition
+├── Products / SKUs
+├── Master taxonomy + Menu composition
+└── Menu Satuan / Menu Paket
 
-        ↓ approved products
+        ↓ approved Menus
 
 Branch A
-├── adopted Branch Products
+├── adopted Branch Menus
 ├── Branch Categories
-│   ├── category membership → many-to-many
+│   ├── Menu membership → many-to-many
 │   └── branch-local ordering
-└── availability / stock
+├── Menu availability
+└── Product/SKU inventory
 
 Branch B
-├── adopted Branch Products (independent selection)
+├── adopted Branch Menus (independent selection)
 └── independent Branch Categories
 ```
 
@@ -79,7 +83,7 @@ The client UI may expose the capability according to role/scope, but UI visibili
 Authenticated identity
 → current role/permission
 → current Branch scope
-→ target Branch Product / Branch Category
+→ target Branch Menu / Branch Category
 → requested authority
 → business invariants
 → atomic mutation
@@ -101,12 +105,13 @@ The Branch Manager may select/adopt from the approved universe; the Branch Manag
 
 The Branch Manager Menu surface must provide a real branch-scoped path for:
 
-- `Tambah dari Master Catalog` / adopt product;
-- viewing current adopted assortment;
-- removing/unadopting where supported;
+- `Tambah dari Master Menu` / adopt Menu;
+- viewing current adopted Menu assortment;
+- removing/unadopting a Branch Menu;
 - Branch Category CRUD + ordering;
-- Branch Product ↔ Branch Category membership management;
-- availability/sold-out operation.
+- Branch Menu ↔ Branch Category membership management;
+- Branch Menu availability/sold-out operation;
+- Product/SKU inventory operation through the canonical Inventory boundary.
 
 Server authorization must prevent cross-Branch mutation and all Master Catalog mutation from the Branch Manager role.
 

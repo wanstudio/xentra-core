@@ -232,7 +232,7 @@ test('PRODUCT IMAGE 4 — validation and error handling', async () => {
   assert.strictEqual(resNoData.status, 400);
   const dataNoData = await resNoData.json();
   assert.strictEqual(dataNoData.success, false);
-  assert.strictEqual(dataNoData.error, 'Gambar menu wajib diunggah.');
+  assert.strictEqual(dataNoData.error, 'Data gambar produk wajib diunggah.');
 
   // D. File larger than 20MB
   const oversized = Buffer.alloc(MAX_BYTES + 1).toString('base64');

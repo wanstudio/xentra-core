@@ -39,12 +39,39 @@
   }
 
   // Canonical Branch Menu presentation control: optional customer-facing display name.
-  // Empty/null clears the override and restores the live Master presentation.
-  function updateBranchProductDisplayName(branchId, productId, name) {
-    return request('/admin/branches/' + encodeURIComponent(branchId) + '/menu/' + encodeURIComponent(productId) + '/display-name', {
+  // Empty/null clears the override and restores the live Master Menu title.
+  function updateBranchMenuDisplayName(branchId, menuId, name) {
+    return request('/admin/branches/' + encodeURIComponent(branchId) + '/menu/' + encodeURIComponent(menuId) + '/display-name', {
       method: 'PATCH',
       body: JSON.stringify({ name: name })
     });
+  }
+
+  function setBranchMenuAvailability(branchId, menuId, isAvailable) {
+    return request('/admin/menus/' + encodeURIComponent(menuId) + '/availability', {
+      method: 'PATCH',
+      body: JSON.stringify({ branch_id: branchId, is_available: isAvailable })
+    });
+  }
+
+  function removeBranchMenu(branchId, menuId) {
+    return request('/admin/branches/' + encodeURIComponent(branchId) + '/menu/' + encodeURIComponent(menuId), {
+      method: 'DELETE'
+    });
+  }
+
+  function adoptMenu(branchId, menuId, payload) {
+    var body = Object.assign({}, payload || {}, { branch_id: branchId });
+    return request('/admin/menus/' + encodeURIComponent(menuId) + '/adopt', {
+      method: 'POST',
+      body: JSON.stringify(body)
+    });
+  }
+
+  // Legacy Product transport aliases. Forward Merchant Menu code must use the
+  // Menu methods above; these remain readable for compatibility migration only.
+  function updateBranchProductDisplayName(branchId, productId, name) {
+    return updateBranchMenuDisplayName(branchId, productId, name);
   }
 
   function setBranchProductAvailability(branchId, productId, isAvailable) {
@@ -121,6 +148,10 @@
   window.XentraCatalogClient = {
     request: request,
     getBranchCatalog: getBranchCatalog,
+    setBranchMenuAvailability: setBranchMenuAvailability,
+    updateBranchMenuDisplayName: updateBranchMenuDisplayName,
+    removeBranchMenu: removeBranchMenu,
+    adoptMenu: adoptMenu,
     setBranchProductAvailability: setBranchProductAvailability,
     updateBranchProductDisplayName: updateBranchProductDisplayName,
     removeBranchProduct: removeBranchProduct,

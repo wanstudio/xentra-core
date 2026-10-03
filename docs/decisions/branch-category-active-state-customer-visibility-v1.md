@@ -1,12 +1,15 @@
 # Xentra — Branch Category Active State & Customer Visibility v1
 
-**Status:** 🔒 LOCKED — BRANCH CATEGORY OPERATIONAL STATE
+**Status:** SUPERSEDED — OPERATIONAL DETAIL RETAINED FOR HISTORY
 **Date:** 2026-09-30
-**Scope:** Merchant App (Menu), Branch Catalog, Customer PWA menu read path
+**Superseded by:** `docs/proposals/xentra-taxonomy-composed-menu-v1.md` (LOCKED TARGET CONTRACT, 2026-10-03)
+**Scope:** Merchant App, Branch Category operational state, Customer PWA visibility
 
-**Parent contract:** `docs/decisions/xentra-master-menu-composition-branch-adoption-contract-v1.md`
+**Parent contract:** `docs/proposals/xentra-taxonomy-composed-menu-v1.md`
 
-## 1. Why this document exists
+## 1. Why this historical detail exists
+
+> This document records the Branch Category active/inactive behavior from the 2026-09-30 implementation decision. The operational concept remains useful, but all Product-vs-Menu and Branch adoption authority is now governed by the 2026-10-03 Product → Menu → Inventory contract.
 
 The parent contract §19 states that a change to **Customer presentation mapping** requires an
 explicit revision. Deactivating a Branch Category changes what the Customer Menu contains, so the
@@ -34,8 +37,8 @@ ownership" as valid and **not** quarantined.
 
 ## 3. Customer Menu resolution rule
 
-For the Customer Menu path (`GET /api/v1/catalog/menu?branch_id=`, resolved by
-`MasterMenuResolver.resolveBranchMenu`):
+For the canonical Customer Menu path (`GET /api/v1/catalog/composed-menu?branch_id=`, resolved by
+`ComposedMenuResolver.resolveBranchMenu`):
 
 | Case | Customer Menu result |
 |---|---|
@@ -68,8 +71,7 @@ asymmetry is intentional: **deactivation is a visibility decision for customers,
 ## 5. What this does NOT do
 
 - It does **not** change Master Menu Composition or Branch Category membership authority.
-- `branch_products.name_override` is separately governed by the locked **Branch Customer Display Name Override**
-  contract: it is optional presentation state for the current Branch and falls back to Master when NULL/cleared.
+- `branch_products.name_override` is legacy compatibility data and is not a canonical Customer Menu override in the current contract.
 - `description_override`, `image_override`, the legacy `PATCH /admin/branches/:id/products/:productId/override`
   path for those fields, and legacy snapshot columns remain quarantined.
 The status control added here is a Branch Category operational control, not a Menu composition editor.
@@ -93,7 +95,7 @@ the Inventory domain.
 | Layer | Change |
 |---|---|
 | Schema | `branch_categories.is_active INTEGER DEFAULT 1` + idempotent `ALTER TABLE` migration |
-| Customer resolution | `MasterMenuCompositionRepository.listBranchCategoriesForMenu` (`activeOnly`), `findBranchProductCategoryMemberships` (returns `is_active`), `MasterMenuResolver.resolveBranchMenu` |
+| Customer resolution | `ComposedMenuResolver.resolveBranchMenu` (`activeOnly`), `findBranchProductCategoryMemberships` (returns `is_active`), `MasterMenuResolver.resolveBranchMenu` |
 | Support repository | `CatalogRepository.findBranchCategories` (`activeOnly`) |
 | API | `PATCH /admin/branches/:id/categories/:catId` accepts partial `name` and/or `is_active`; `GET /admin/branches/:id/catalog` returns `is_active` |
 | Merchant UI | Aktif/Nonaktif control in the Branch Category modal; status filter dropdown in the Merchant App menu |

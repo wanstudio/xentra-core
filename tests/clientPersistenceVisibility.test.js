@@ -207,10 +207,14 @@ test('4. Seed data bootstrap idempotency: restart does NOT overwrite branch prod
   assert.strictEqual(bp.stock, 42, 'Merchant custom stock must survive bootstrap/restart');
 });
 
-test('5. Explicitly empty banners array is preserved and not replaced by default Unsplash banners', async () => {
+test('5. Generic brand settings update does not mutate media-managed banners', async () => {
   const owner = await loginOwner('owner_p5');
 
-  // Set brand banners to empty array
+  const beforeRes = await mockFetch('/api/v1/brand/info');
+  const beforeData = await beforeRes.json();
+  assert.strictEqual(beforeData.success, true);
+  const beforeBanners = beforeData.brand.banners;
+
   const putRes = await mockFetch('/api/v1/admin/brand', {
     method: 'PUT',
     headers: owner.headers,
@@ -218,10 +222,9 @@ test('5. Explicitly empty banners array is preserved and not replaced by default
   });
   assert.strictEqual(putRes.status, 200);
 
-  // Check GET /brand/info
   const infoRes = await mockFetch('/api/v1/brand/info');
-  assert.strictEqual(infoRes.status, 200);
   const infoData = await infoRes.json();
   assert.strictEqual(infoData.success, true);
-  assert.deepStrictEqual(infoData.brand.banners, [], 'Explicit empty banners array must not be replaced with fallback images');
+  assert.deepStrictEqual(infoData.brand.banners, beforeBanners,
+    'Generic brand settings must not mutate banner state owned by the canonical media/banner flow');
 });

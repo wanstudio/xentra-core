@@ -367,7 +367,7 @@ test('Promotion 10 — Fully configuration-driven reward (dynamic A/B, no source
   const promoMissing = new Promotion({ ...base, id: 'prm_dyn_missing', name: 'No Reward', rewards: [{ id: 'rwM', reward_type: 'freebie_product', amount_in_cents: 0 }] });
   const resM = strategy.evaluate(promoMissing, { is_pwa_installed: true, customer_orders_count: 0 });
   assert.strictEqual(resM.isEligible, false);
-  assert.match(resM.reason, /target product is not configured/i);
+  assert.match(resM.reason, /target (?:menu|product) is not configured/i);
 });
 
 test('Promotion 7 — Scoped POS Offline Idempotency: True parallel sync requests against same (branch_id, client_transaction_id) yield exactly one order and one stock deduction', async () => {

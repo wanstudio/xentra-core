@@ -34,6 +34,8 @@ describe('PWA Install Reward Flow Hardening', () => {
   const foodProductId = 'prod_pwa_hard_food';
   const rewardProductId = 'prod_pwa_hard_reward';
   const promoId = 'prm_pwa_hard_install';
+  const foodMenuId = 'menu_pwa_hard_food';
+  const rewardMenuId = 'menu_pwa_hard_reward';
 
   const promoRepo = new PromotionRepository();
 
@@ -44,6 +46,12 @@ describe('PWA Install Reward Flow Hardening', () => {
       db.prepare("DELETE FROM promotion_rewards WHERE promotion_id = ?").run(promoId);
       db.prepare("DELETE FROM promotion_rules WHERE promotion_id = ?").run(promoId);
       db.prepare("DELETE FROM promotions WHERE brand_id = ?").run(brandId);
+      db.prepare("DELETE FROM branch_menu_categories WHERE branch_id IN (?, ?)").run(branchA, branchB);
+      db.prepare("DELETE FROM branch_menus WHERE branch_id IN (?, ?)").run(branchA, branchB);
+      db.prepare("DELETE FROM branch_product_inventory WHERE branch_id IN (?, ?)").run(branchA, branchB);
+      db.prepare("DELETE FROM menu_items WHERE menu_id IN (?, ?)").run(foodMenuId, rewardMenuId);
+      db.prepare("DELETE FROM menus WHERE id IN (?, ?)").run(foodMenuId, rewardMenuId);
+      db.prepare("DELETE FROM sub_categories WHERE id IN ('sub_pwa_hard_food','sub_pwa_hard_reward')").run();
       db.prepare("DELETE FROM branch_products WHERE branch_id IN (?, ?)").run(branchA, branchB);
       db.prepare("DELETE FROM products WHERE brand_id = ?").run(brandId);
       db.prepare("DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE brand_id = ?)").run(brandId);
@@ -72,6 +80,19 @@ describe('PWA Install Reward Flow Hardening', () => {
     db.prepare('INSERT INTO products (id, brand_id, name, slug, price, regular_price, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)')
       .run(rewardProductId, brandId, 'Es Teh Segar', 'es-teh-segar-hard', 5000, 5000);
 
+    const rasa = db.prepare("SELECT id FROM menu_flavors WHERE brand_id = ? AND lower(trim(name)) = 'original' AND is_active = 1 LIMIT 1").get(brandId)
+      || (db.prepare("INSERT INTO menu_flavors (id, brand_id, name, slug, is_active) VALUES ('pwa_hard_original', ?, 'Original', 'pwa-hard-original', 1)").run(brandId), db.prepare("SELECT id FROM menu_flavors WHERE id = 'pwa_hard_original'").get());
+    db.prepare("INSERT OR REPLACE INTO sub_categories (id, brand_id, category_id, name, slug, is_active) VALUES ('sub_pwa_hard_food', ?, (SELECT category_id FROM products WHERE id = ?), 'Nasi Ayam Penyet', 'sub-pwa-hard-food', 1)").run(brandId, foodProductId);
+    db.prepare("INSERT OR REPLACE INTO sub_categories (id, brand_id, category_id, name, slug, is_active) VALUES ('sub_pwa_hard_reward', ?, (SELECT category_id FROM products WHERE id = ?), 'Es Teh Segar', 'sub-pwa-hard-reward', 1)").run(brandId, rewardProductId);
+    db.prepare("INSERT OR REPLACE INTO menus (id, brand_id, menu_type, sub_category_id, rasa_id, selling_price, status) VALUES (?, ?, 'SINGLE', 'sub_pwa_hard_food', ?, 25000, 'ACTIVE'), (?, ?, 'SINGLE', 'sub_pwa_hard_reward', ?, 5000, 'ACTIVE')").run(foodMenuId, brandId, rasa.id, rewardMenuId, brandId, rasa.id);
+    db.prepare("INSERT OR REPLACE INTO menu_items (menu_id, product_id, quantity, sort_order) VALUES (?, ?, 1, 0), (?, ?, 1, 0)").run(foodMenuId, foodProductId, rewardMenuId, rewardProductId);
+    db.prepare("UPDATE products SET sku = ? WHERE id = ?").run('SKU-'+foodProductId, foodProductId);
+    db.prepare("UPDATE products SET sku = ? WHERE id = ?").run('SKU-'+rewardProductId, rewardProductId);
+    db.prepare("INSERT OR IGNORE INTO branch_categories (id, brand_id, branch_id, name, slug, is_active) VALUES ('bc_pwa_hard_A', ?, ?, 'Makanan', 'makanan-pwa-hard-a', 1), ('bc_pwa_hard_B', ?, ?, 'Makanan', 'makanan-pwa-hard-b', 1)").run(brandId, branchA, brandId, branchB);
+    db.prepare("INSERT OR REPLACE INTO branch_menus (branch_id, menu_id, is_available) VALUES (?, ?, 1), (?, ?, 1), (?, ?, 1), (?, ?, 1)").run(branchA, foodMenuId, branchA, rewardMenuId, branchB, foodMenuId, branchB, rewardMenuId);
+    db.prepare("INSERT OR REPLACE INTO branch_menu_categories (branch_id, menu_id, branch_category_id) VALUES (?, ?, 'bc_pwa_hard_A'), (?, ?, 'bc_pwa_hard_A'), (?, ?, 'bc_pwa_hard_B'), (?, ?, 'bc_pwa_hard_B')").run(branchA, foodMenuId, branchA, rewardMenuId, branchB, foodMenuId, branchB, rewardMenuId);
+    db.prepare("INSERT OR REPLACE INTO branch_product_inventory (branch_id, product_id, stock_qty, low_stock_threshold) VALUES (?, ?, 30, 5), (?, ?, 25, 5), (?, ?, 30, 5), (?, ?, 0, 5)").run(branchA, foodProductId, branchA, rewardProductId, branchB, foodProductId, branchB, rewardProductId);
+
     // 3. Branch A has both food and reward in stock (stock = 25)
     db.prepare('INSERT INTO branch_products (branch_id, product_id, price, stock, is_available) VALUES (?, ?, ?, ?, 1)')
       .run(branchA, foodProductId, 25000, 30);
@@ -96,9 +117,9 @@ describe('PWA Install Reward Flow Hardening', () => {
     `).run(promoId);
 
     db.prepare(`
-      INSERT INTO promotion_rewards (id, promotion_id, reward_type, target_product_id, amount_in_cents, presentation_payload)
+      INSERT INTO promotion_rewards (id, promotion_id, reward_type, target_menu_id, amount_in_cents, presentation_payload)
       VALUES ('rew_pwa_hard_01', ?, 'freebie_product', ?, 0, '{"reward_title":"Es Teh Gratis"}')
-    `).run(promoId, rewardProductId);
+    `).run(promoId, rewardMenuId);
 
     promoRepo.assignBranchScope({ promotionId: promoId, brandId, branchId: branchA, isActive: 1 });
     promoRepo.assignBranchScope({ promotionId: promoId, brandId, branchId: branchB, isActive: 1 });
@@ -113,7 +134,7 @@ describe('PWA Install Reward Flow Hardening', () => {
     const cart = [];
     const claimRes = PromotionRewardCart.claim(cart, {
       promo_id: promoId,
-      product_id: rewardProductId,
+      menu_id: rewardMenuId,
       name: 'Es Teh Gratis',
       reward_price: 0
     });
@@ -128,7 +149,7 @@ describe('PWA Install Reward Flow Hardening', () => {
   test('2. Claimed reward has no premature branch assignment', () => {
     const claimRes = PromotionRewardCart.claim([], {
       promo_id: promoId,
-      product_id: rewardProductId,
+      menu_id: rewardMenuId,
       name: 'Es Teh Gratis',
       reward_price: 0
     });
@@ -140,19 +161,19 @@ describe('PWA Install Reward Flow Hardening', () => {
 
   // 3. Claim does not consume stock
   test('3. Claim does not consume stock', () => {
-    const stockABefore = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branchA, rewardProductId).stock;
-    const stockBBefore = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branchB, rewardProductId).stock;
+    const stockABefore = db.prepare('SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?').get(branchA, rewardProductId).stock_qty;
+    const stockBBefore = db.prepare('SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?').get(branchB, rewardProductId).stock_qty;
 
     // Simulate claim action in client
     PromotionRewardCart.claim([], {
       promo_id: promoId,
-      product_id: rewardProductId,
+      menu_id: rewardMenuId,
       name: 'Es Teh Gratis',
       reward_price: 0
     });
 
-    const stockAAfter = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branchA, rewardProductId).stock;
-    const stockBAfter = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branchB, rewardProductId).stock;
+    const stockAAfter = db.prepare('SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?').get(branchA, rewardProductId).stock_qty;
+    const stockBAfter = db.prepare('SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?').get(branchB, rewardProductId).stock_qty;
 
     assert.strictEqual(stockAAfter, stockABefore, 'Branch A stock unchanged by claim');
     assert.strictEqual(stockBAfter, stockBBefore, 'Branch B stock unchanged by claim');
@@ -164,7 +185,7 @@ describe('PWA Install Reward Flow Hardening', () => {
 
     PromotionRewardCart.claim([], {
       promo_id: promoId,
-      product_id: rewardProductId,
+      menu_id: rewardMenuId,
       name: 'Es Teh Gratis',
       reward_price: 0
     });
@@ -176,8 +197,8 @@ describe('PWA Install Reward Flow Hardening', () => {
   // 5. Final checkout resolves one branch
   test('5. Final checkout resolves one branch', () => {
     const items = [
-      { product_id: foodProductId, branch_id: branchA, quantity: 1, expected_price: 25000 },
-      { product_id: 'reward_' + promoId, is_promo_reward: true, promo_id: promoId, branch_id: null, quantity: 1, expected_price: 0 }
+      { menu_id: foodMenuId, branch_id: branchA, quantity: 1, expected_price: 25000 },
+      { menu_id: rewardMenuId, is_promo_reward: true, promo_id: promoId, branch_id: null, quantity: 1, expected_price: 0 }
     ];
 
     // Assert that unassigned reward items do not cause single branch check to fail
@@ -191,8 +212,8 @@ describe('PWA Install Reward Flow Hardening', () => {
       branch_id: branchA,
       brand_id: brandId,
       items: [
-        { product_id: foodProductId, quantity: 1, expected_price: 25000 },
-        { product_id: 'reward_' + promoId, is_promo_reward: true, promo_id: promoId, quantity: 1, expected_price: 0 }
+        { menu_id: foodMenuId, quantity: 1, expected_price: 25000 },
+        { menu_id: rewardMenuId, is_promo_reward: true, promo_id: promoId, quantity: 1, expected_price: 0 }
       ],
       customer: { phone: '081299991001' },
       pwa_runtime: { display_mode: 'standalone' }
@@ -202,6 +223,7 @@ describe('PWA Install Reward Flow Hardening', () => {
     assert.strictEqual(verification.status, 'VERIFIED');
     assert.strictEqual(verification.verified_items.length, 2);
     const verifiedReward = verification.verified_items.find(it => it.is_promo_reward);
+    assert.equal(verifiedReward.menu_id, rewardMenuId);
     assert.ok(verifiedReward);
     assert.strictEqual(verifiedReward.product_id, rewardProductId);
     assert.strictEqual(verifiedReward.unit_price, 0);
@@ -213,8 +235,8 @@ describe('PWA Install Reward Flow Hardening', () => {
       branch_id: branchB, // Branch B has reward stock = 0
       brand_id: brandId,
       items: [
-        { product_id: foodProductId, quantity: 1, expected_price: 25000 },
-        { product_id: 'reward_' + promoId, is_promo_reward: true, promo_id: promoId, quantity: 1, expected_price: 0 }
+        { menu_id: foodMenuId, quantity: 1, expected_price: 25000 },
+        { menu_id: rewardMenuId, is_promo_reward: true, promo_id: promoId, quantity: 1, expected_price: 0 }
       ],
       customer: { phone: '081299991002' },
       pwa_runtime: { display_mode: 'standalone' }
@@ -229,7 +251,7 @@ describe('PWA Install Reward Flow Hardening', () => {
   test('8. Failed reward validation creates zero order/redemption/inventory side effects', async () => {
     const ordersCountBefore = db.prepare('SELECT COUNT(*) as cnt FROM orders WHERE branch_id = ?').get(branchB).cnt;
     const redemptionsBefore = db.prepare('SELECT COUNT(*) as cnt FROM promotion_redemptions WHERE branch_id = ?').get(branchB).cnt;
-    const stockFoodBefore = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branchB, foodProductId).stock;
+    const stockFoodBefore = db.prepare('SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?').get(branchB, foodProductId).stock_qty;
 
     const placementResult = await OrderPlacementService.submitOrder({
       brand_id: brandId,
@@ -239,15 +261,15 @@ describe('PWA Install Reward Flow Hardening', () => {
       customer: { phone: '081299991003' },
       pwa_runtime: { display_mode: 'standalone' },
       items: [
-        { product_id: foodProductId, quantity: 1, expected_price: 25000 },
-        { product_id: 'reward_' + promoId, is_promo_reward: true, promo_id: promoId, quantity: 1, expected_price: 0 }
+        { menu_id: foodMenuId, quantity: 1, expected_price: 25000 },
+        { menu_id: rewardMenuId, is_promo_reward: true, promo_id: promoId, quantity: 1, expected_price: 0 }
       ]
     });
 
     assert.strictEqual(placementResult.success, false);
     const ordersCountAfter = db.prepare('SELECT COUNT(*) as cnt FROM orders WHERE branch_id = ?').get(branchB).cnt;
     const redemptionsAfter = db.prepare('SELECT COUNT(*) as cnt FROM promotion_redemptions WHERE branch_id = ?').get(branchB).cnt;
-    const stockFoodAfter = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branchB, foodProductId).stock;
+    const stockFoodAfter = db.prepare('SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?').get(branchB, foodProductId).stock_qty;
 
     assert.strictEqual(ordersCountAfter, ordersCountBefore, 'No order created');
     assert.strictEqual(redemptionsAfter, redemptionsBefore, 'No redemption created');
@@ -256,7 +278,7 @@ describe('PWA Install Reward Flow Hardening', () => {
 
   // 9. Valid reward commits exactly once
   test('9. Valid reward commits exactly once', async () => {
-    const stockRewardBefore = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branchA, rewardProductId).stock;
+    const stockRewardBefore = db.prepare('SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?').get(branchA, rewardProductId).stock_qty;
     const phone = '081299991004';
 
     const placementResult = await OrderPlacementService.submitOrder({
@@ -268,8 +290,8 @@ describe('PWA Install Reward Flow Hardening', () => {
       customer: { phone, name: 'Eligible PWA User' },
       pwa_runtime: { display_mode: 'standalone' },
       items: [
-        { product_id: foodProductId, quantity: 1, expected_price: 25000 },
-        { product_id: 'reward_' + promoId, is_promo_reward: true, promo_id: promoId, quantity: 1, expected_price: 0 }
+        { menu_id: foodMenuId, quantity: 1, expected_price: 25000 },
+        { menu_id: rewardMenuId, is_promo_reward: true, promo_id: promoId, quantity: 1, expected_price: 0 }
       ]
     });
 
@@ -284,7 +306,7 @@ describe('PWA Install Reward Flow Hardening', () => {
     assert.strictEqual(redemptions[0].branch_id, branchA);
 
     // Verify stock deducted for reward
-    const stockRewardAfter = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branchA, rewardProductId).stock;
+    const stockRewardAfter = db.prepare('SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?').get(branchA, rewardProductId).stock_qty;
     assert.strictEqual(stockRewardAfter, stockRewardBefore - 1);
   });
 
@@ -298,7 +320,7 @@ describe('PWA Install Reward Flow Hardening', () => {
       branch_id: branchA,
       is_pwa_installed: true,
       customer_phone: '081299991005',
-      cart_items: [{ product_id: foodProductId, quantity: 1 }]
+      cart_items: [{ menu_id: foodMenuId, quantity: 1 }]
     });
 
     assert.strictEqual(evalResult.applied.length, 1, 'Exactly one reward granted regardless of participating branches count');
@@ -310,9 +332,9 @@ describe('PWA Install Reward Flow Hardening', () => {
       branch_id: branchA,
       brand_id: brandId,
       items: [
-        { product_id: foodProductId, quantity: 1, expected_price: 25000 },
+        { menu_id: foodMenuId, quantity: 1, expected_price: 25000 },
         // Client maliciously supplies fake reward product ID and price
-        { product_id: 'reward_' + promoId, is_promo_reward: true, promo_id: promoId, name: 'HACKED BEVERAGE', quantity: 1, expected_price: 99999 }
+        { menu_id: rewardMenuId, is_promo_reward: true, promo_id: promoId, name: 'HACKED BEVERAGE', quantity: 1, expected_price: 99999 }
       ],
       customer: { phone: '081299991006' },
       pwa_runtime: { display_mode: 'standalone' }
@@ -320,7 +342,7 @@ describe('PWA Install Reward Flow Hardening', () => {
 
     assert.strictEqual(verification.is_valid, true);
     const verifiedReward = verification.verified_items.find(it => it.is_promo_reward);
-    assert.strictEqual(verifiedReward.product_id, rewardProductId, 'Server enforced authoritative product_id');
+    assert.equal(verifiedReward.menu_id, rewardMenuId, 'Server enforced authoritative Menu identity');
     assert.strictEqual(verifiedReward.unit_price, 0, 'Server enforced authoritative price 0');
     assert.notStrictEqual(verifiedReward.name, 'HACKED BEVERAGE', 'Client spoofed name ignored');
   });
@@ -328,7 +350,7 @@ describe('PWA Install Reward Flow Hardening', () => {
   // 12. Client-provided branch cannot override server fulfillment resolution
   test('12. Client-provided branch cannot override server fulfillment resolution', () => {
     const items = [
-      { product_id: foodProductId, branch_id: branchB, quantity: 1, expected_price: 25000 }
+      { menu_id: foodMenuId, branch_id: branchB, quantity: 1, expected_price: 25000 }
     ];
 
     // Client attempts to submit cart containing Branch B item to Branch A fulfillment:
@@ -380,7 +402,7 @@ describe('PWA Install Reward Flow Hardening', () => {
       branch_id: branchA,
       brand_id: brandId,
       items: [
-        { product_id: foodProductId, quantity: 2, expected_price: 25000 }
+        { menu_id: foodMenuId, quantity: 2, expected_price: 25000 }
       ],
       customer: { phone: '081299991008' }
     });

@@ -10,6 +10,10 @@ const CatalogService = require('./services/CatalogService');
 const PricingPolicyModel = require('./models/PricingPolicyModel');
 const MasterMenuResolver = require('./services/MasterMenuResolver');
 const MasterMenuCompositionService = require('./services/MasterMenuCompositionService');
+const ComposedMenuService = require('./services/ComposedMenuService');
+const ComposedMenuResolver = require('./services/ComposedMenuResolver');
+const ComposedProductService = require('./services/ComposedProductService');
+const { ComposedMenuMigrationService } = require('./services/ComposedMenuMigrationService');
 
 const CATALOG_IDENTITY = {
   name: 'catalog',
@@ -27,6 +31,7 @@ const CATALOG_CAPABILITIES = {
     'branch_catalog',
     'branch_menu_resolution',
     'master_menu_composition',
+    'composed_menu_v1_construction',
     'pricing_policy_lock_range'
   ]
 };
@@ -48,5 +53,9 @@ module.exports = {
   CatalogService,
   PricingPolicyModel,
   MasterMenuResolver,
-  MasterMenuCompositionService
+  MasterMenuCompositionService,
+  ComposedMenuService,
+  ComposedMenuResolver,
+  ComposedProductService,
+  ComposedMenuMigrationService
 };

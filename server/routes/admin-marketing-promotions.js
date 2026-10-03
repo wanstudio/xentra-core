@@ -1,3 +1,6 @@
+'use strict';
+
+const PromotionRewardResolver = require('../../domains/promotion/services/PromotionRewardResolver');
 /**
  * XENTRA CORE — ADMIN MARKETING PROMOTION ROUTES
  *
@@ -46,6 +49,11 @@ module.exports = function registerAdminMarketingPromotionRoutes(router, deps) {
     }
   }
 
+  // PROMOTION REWARD TARGET CONTRACT:
+  // target_menu_id is the canonical commercial reward identity.
+  // target_product_id remains a legacy Product/fulfillment reference only.
+  // New reward configuration must target a Menu; legacy Product targets remain
+  // accepted during migration and are never silently reinterpreted.
   // 6. Marketing Promotions List API
   router.get('/admin/marketing/promotions', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
     try {
@@ -66,8 +74,21 @@ module.exports = function registerAdminMarketingPromotionRoutes(router, deps) {
           if (pres.media_id) {
             delivery = bannerMediaDelivery(req.brand_id, pres.media_id);
           }
+          let rewardTarget = null;
+          try {
+            rewardTarget = PromotionRewardResolver.resolveConfiguredReward({
+              brandId: req.brand_id,
+              branchId: null,
+              reward: r
+            });
+          } catch (_) {}
+
           return {
             ...r,
+            target_menu_title: rewardTarget && rewardTarget.menu_snapshot
+              ? rewardTarget.menu_snapshot.title
+              : (rewardTarget && rewardTarget.name) || null,
+            target_menu_type: rewardTarget ? rewardTarget.menu_type : null,
             presentation: pres,
             presentation_delivery: delivery
           };
@@ -132,12 +153,36 @@ router.post('/admin/marketing/promotions', requireAuth(['owner', 'brand_manager'
 
     if (Array.isArray(rewards) && rewards.length > 0) {
       for (const rw of rewards) {
-        if (rw.target_product_id) {
+        if (rw.target_menu_id && rw.target_product_id) {
+          return res.status(400).json({
+            success: false,
+            error: 'Reward canonical hanya boleh memiliki target_menu_id. target_product_id hanya untuk reward legacy.'
+          });
+        }
+
+        if (rw.reward_type === 'freebie_product' && !rw.target_menu_id && !rw.target_product_id) {
+          return res.status(400).json({
+            success: false,
+            error: 'Reward gratis wajib memiliki target_menu_id.'
+          });
+        }
+
+        if (rw.target_menu_id) {
+          const menu = db.prepare(
+            'SELECT id FROM menus WHERE id = ? AND brand_id = ?'
+          ).get(rw.target_menu_id, req.brand_id);
+          if (!menu) {
+            return res.status(400).json({
+              success: false,
+              error: 'Menu reward tidak valid atau bukan milik brand ini.'
+            });
+          }
+        } else if (rw.target_product_id) {
           const prod = db.prepare('SELECT id FROM products WHERE id = ? AND brand_id = ?').get(rw.target_product_id, req.brand_id);
           if (!prod) {
             return res.status(400).json({
               success: false,
-              error: 'Produk reward tidak valid atau bukan milik brand ini.'
+              error: 'Produk reward legacy tidak valid atau bukan milik brand ini.'
             });
           }
         }
@@ -232,12 +277,36 @@ router.put('/admin/marketing/promotions/:id', requireAuth(['owner', 'brand_manag
 
     if (Array.isArray(rewards) && rewards.length > 0) {
       for (const rw of rewards) {
-        if (rw.target_product_id) {
+        if (rw.target_menu_id && rw.target_product_id) {
+          return res.status(400).json({
+            success: false,
+            error: 'Reward canonical hanya boleh memiliki target_menu_id. target_product_id hanya untuk reward legacy.'
+          });
+        }
+
+        if (rw.reward_type === 'freebie_product' && !rw.target_menu_id && !rw.target_product_id) {
+          return res.status(400).json({
+            success: false,
+            error: 'Reward gratis wajib memiliki target_menu_id.'
+          });
+        }
+
+        if (rw.target_menu_id) {
+          const menu = db.prepare(
+            'SELECT id FROM menus WHERE id = ? AND brand_id = ?'
+          ).get(rw.target_menu_id, req.brand_id);
+          if (!menu) {
+            return res.status(400).json({
+              success: false,
+              error: 'Menu reward tidak valid atau bukan milik brand ini.'
+            });
+          }
+        } else if (rw.target_product_id) {
           const prod = db.prepare('SELECT id FROM products WHERE id = ? AND brand_id = ?').get(rw.target_product_id, req.brand_id);
           if (!prod) {
             return res.status(400).json({
               success: false,
-              error: 'Produk reward tidak valid atau bukan milik brand ini.'
+              error: 'Produk reward legacy tidak valid atau bukan milik brand ini.'
             });
           }
         }
@@ -554,19 +623,42 @@ router.patch('/admin/marketing/promotions/:id/branch-activation', requireAuth(['
 
     const newActiveState = (is_active === 1 || is_active === true) ? 1 : 0;
 
-    // Prerequisite validation when activating: reward products must be available in target branch catalog
+    // Reward readiness is Menu-first. Legacy Product targets remain a compatibility
+    // path only; canonical rewards must be validated through the same resolver used
+    // by PromotionEngine/Checkout so Menu identity and Branch availability cannot drift.
     if (newActiveState === 1) {
       const rewards = corePromotionRepo.findRewards(promotionId);
       for (const reward of rewards) {
-        if (reward.reward_type === 'freebie_product' || reward.target_product_id) {
-          const targetPid = reward.target_product_id;
-          if (!targetPid) {
+        if (reward.target_menu_id) {
+          try {
+            PromotionRewardResolver.resolveConfiguredReward({
+              brandId: req.brand_id,
+              branchId: targetBranchId,
+              reward
+            });
+          } catch (err) {
+            const messageByCode = {
+              BRANCH_MENU_NOT_ADOPTED: 'Menu hadiah belum diadopsi di katalog cabang ini.',
+              BRANCH_MENU_UNAVAILABLE: 'Menu hadiah sedang dinonaktifkan di cabang ini.',
+              REWARD_BRANCH_CATEGORY_UNAVAILABLE: 'Kategori cabang untuk menu hadiah sedang tidak tersedia.',
+              REWARD_OUT_OF_STOCK: 'Stok menu hadiah tidak mencukupi di cabang ini.',
+              REWARD_MENU_COMPONENT_UNAVAILABLE: 'Komponen menu hadiah sedang tidak tersedia.',
+              REWARD_MENU_INACTIVE: 'Menu hadiah saat ini tidak aktif.',
+              REWARD_MENU_COMPOSITION_INVALID: 'Komposisi Menu hadiah belum valid.',
+              REWARD_MENU_NOT_FOUND: 'Menu hadiah tidak ditemukan pada brand ini.'
+            };
             return res.status(422).json({
               success: false,
-              error: 'Promo belum dapat diaktifkan karena definisi produk hadiah tidak valid.'
+              error: 'Promo belum dapat diaktifkan karena ' + (messageByCode[err.message] || 'Menu hadiah belum siap untuk cabang ini.')
             });
           }
+          continue;
+        }
 
+        // Legacy Product reward compatibility. This path is retained only for
+        // existing rows and must not be used by the forward reward editor.
+        if (reward.target_product_id) {
+          const targetPid = reward.target_product_id;
           const product = db.prepare('SELECT id, name, brand_id, is_active FROM products WHERE id = ? AND brand_id = ?').get(targetPid, req.brand_id);
           if (!product || product.is_active === 0) {
             const prodName = product?.name || `ID ${targetPid}`;
@@ -590,6 +682,14 @@ router.patch('/admin/marketing/promotions/:id/branch-activation', requireAuth(['
               error: `Promo belum dapat diaktifkan karena produk hadiah '${product.name}' sedang dinonaktifkan di cabang ini.`
             });
           }
+          continue;
+        }
+
+        if (reward.reward_type === 'freebie_product') {
+          return res.status(422).json({
+            success: false,
+            error: 'Promo belum dapat diaktifkan karena definisi Menu hadiah tidak valid.'
+          });
         }
       }
     }

@@ -195,7 +195,7 @@
 
 
   window.toggleStockChecked = function (id, checked) {
-    window.toggleStock(id);
+    window.toggleStock(id, checked ? 1 : 0);
   };
 
 
@@ -228,6 +228,7 @@
     'catalog':            { title: 'Catalog',      sub: 'Kelola produk master, kategori, dan menu cabang', tab: 'catalog-products' },
     'catalog/products':   { title: 'Products',     sub: 'Kelola daftar produk master brand', tab: 'catalog-products' },
     'catalog/categories': { title: 'Kategori',     sub: 'Kelola kategori master untuk Produk Master', tab: 'catalog-categories' },
+    'catalog/master-menus': { title: 'Menu Master', sub: 'Susun menu komersial brand untuk diadopsi cabang', tab: 'catalog-master-menus' },
     
     'catalog/menus':      { title: 'Menu Cabang',  sub: 'Atur assortment dan kategori jual per cabang', tab: 'catalog-menus' },
     'branches':           { title: 'Branches',     sub: 'Atur lokasi cabang, radius, dan formula ongkir', tab: 'branches' },
@@ -319,6 +320,10 @@
       if (hash.indexOf('catalog/products/') === 0) {
         return hash;
       }
+      // Handle dynamic route: catalog/master-menus/:id/edit
+      if (hash.indexOf('catalog/master-menus/') === 0) {
+        return hash;
+      }
       // Handle dynamic route: branches/:id and branches/:id/:subtab
       if (hash.indexOf('branches/') === 0) {
         return hash;
@@ -394,6 +399,8 @@
     'catalog-menus': 'catalog/menus',
     'catalog-categories': 'catalog/categories',
     'catalog/categories': 'catalog/categories',
+    'catalog-master-menus': 'catalog/master-menus',
+    'catalog/master-menus': 'catalog/master-menus',
     'branches': 'branches',
     'tim': 'team',
     'team': 'team',
@@ -439,8 +446,14 @@
       return 'catalog/products';
     }
 
+    if (current === 'catalog/master-menus/new' ||
+        /^catalog\/master-menus\/[^/]+\/edit$/.test(current)) {
+      return 'catalog/master-menus';
+    }
+
     if (current === 'catalog/products' ||
         current === 'catalog/categories' ||
+        current === 'catalog/master-menus' ||
         current === 'catalog/menus') {
       return 'business';
     }
@@ -619,6 +632,14 @@
     var productEditorId = isProductEditor && route !== 'catalog/products/new'
       ? route.split('catalog/products/')[1].split('/edit')[0]
       : null;
+    
+    var isMasterMenuEditor = !isPlatform && (
+      route === 'catalog/master-menus/new' ||
+      /^catalog\/master-menus\/[^/]+\/edit$/.test(route)
+    );
+    var masterMenuEditorId = isMasterMenuEditor && route !== 'catalog/master-menus/new'
+      ? route.split('catalog/master-menus/')[1].split('/edit')[0]
+      : null;
     var isProductDetail = !isPlatform &&
       route.indexOf('catalog/products/') === 0 &&
       !isProductEditor;
@@ -656,7 +677,9 @@
     var isSettingsRoute = !isPlatform && (route === 'settings' || route.indexOf('settings/') === 0);
     var settingsSubtab = isSettingsRoute ? (route.indexOf('settings/') === 0 ? route.split('settings/')[1] : 'business/profile') : 'business/profile';
 
-    var metaKey = (isProductDetail || isProductEditor) ? 'catalog/products' : (isBranchEditor ? 'branches' : (isBranchDetail ? 'branches' : (isOrderDetail ? 'orders' : (isCustomerDetail ? 'customers/:id' : (isTeamRoute ? ('team/' + teamSubtab) : (isReportsRoute ? 'reports' : (isFinanceRoute ? ('finance/' + financeSubtab) : (isMarketingRoute ? ('marketing/' + marketingSubtab) : (isSettingsRoute ? ('settings/' + settingsSubtab) : route)))))))));
+    var metaKey = (isMasterMenuEditor || route === 'catalog/master-menus')
+      ? 'catalog/master-menus'
+      : ((isProductDetail || isProductEditor) ? 'catalog/products' : (isBranchEditor ? 'branches' : (isBranchDetail ? 'branches' : (isOrderDetail ? 'orders' : (isCustomerDetail ? 'customers/:id' : (isTeamRoute ? ('team/' + teamSubtab) : (isReportsRoute ? 'reports' : (isFinanceRoute ? ('finance/' + financeSubtab) : (isMarketingRoute ? ('marketing/' + marketingSubtab) : (isSettingsRoute ? ('settings/' + settingsSubtab) : route)))))))))));
     if (isMarketingEditor) metaKey = 'marketing/' + marketingSubtab;
     var meta = metaDict[metaKey] || metaDict[route] || metaDict['overview'];
     var tabId = meta.tab;
@@ -695,7 +718,7 @@
     if (!isPlatform) {
       document.querySelectorAll('.x-nav-sub-item[data-route]').forEach(function (btn) {
         var targetRoute = btn.dataset.route;
-        var isActiveSub = targetRoute === route || (isProductDetail && targetRoute === 'catalog/products');
+        var isActiveSub = targetRoute === route || (isProductDetail && targetRoute === 'catalog/products') || (isMasterMenuEditor && targetRoute === 'catalog/master-menus');
         btn.classList.toggle('active', isActiveSub);
       });
 
@@ -729,12 +752,16 @@
     // 5. Update topbar title
     var titleEl = $('dash-page-title');
     var subEl = $('dash-page-subtitle');
-    if (titleEl) titleEl.textContent = isProductEditor
-      ? (productEditorId ? 'Edit Produk Master' : 'Tambah Produk Master')
-      : (isBranchEditor ? (branchEditorId ? 'Edit Cabang' : 'Tambah Cabang') : (isProductDetail ? 'Product Detail' : (isBranchDetail ? 'Branch Detail' : (isOrderDetail ? 'Order Detail' : (isCustomerDetail ? 'Customer Detail' : (isReportsRoute ? 'Reports' : meta.title))))));
-    if (subEl) subEl.textContent = isProductEditor
-      ? 'Susun identitas, harga, foto, dan komposisi Master Menu'
-      : (isBranchEditor ? 'Kelola identitas, lokasi, kontak, dan aturan operasional cabang' : (isProductDetail ? 'Detail produk master dan status adopsi di cabang' : (isBranchDetail ? 'Detail informasi, operasional, menu, dan tim cabang' : (isOrderDetail ? 'Detail transaksi, rincian biaya, dan status pesanan' : (isCustomerDetail ? 'Profil pelanggan, riwayat pesanan, dan loyalitas' : (isReportsRoute ? 'Laporan penjualan, analitik bisnis, dan kinerja cabang' : meta.sub))))));
+    if (titleEl) titleEl.textContent = isMasterMenuEditor
+      ? (masterMenuEditorId ? 'Edit Menu Master' : 'Tambah Menu Master')
+      : (isProductEditor
+        ? (productEditorId ? 'Edit Produk Master' : 'Tambah Produk Master')
+        : (isBranchEditor ? (branchEditorId ? 'Edit Cabang' : 'Tambah Cabang') : (isProductDetail ? 'Product Detail' : (isBranchDetail ? 'Branch Detail' : (isOrderDetail ? 'Order Detail' : (isCustomerDetail ? 'Customer Detail' : (isReportsRoute ? 'Reports' : meta.title))))));
+    if (subEl) subEl.textContent = isMasterMenuEditor
+      ? 'Susun Menu Satuan atau Menu Paket pada katalog komersial brand'
+      : (isProductEditor
+        ? 'Susun identitas, harga, foto, dan komposisi Master Menu'
+        : (isBranchEditor ? 'Kelola identitas, lokasi, kontak, dan aturan operasional cabang' : (isProductDetail ? 'Detail produk master dan status adopsi di cabang' : (isBranchDetail ? 'Detail informasi, operasional, menu, dan tim cabang' : (isOrderDetail ? 'Detail transaksi, rincian biaya, dan status pesanan' : (isCustomerDetail ? 'Profil pelanggan, riwayat pesanan, dan loyalitas' : (isReportsRoute ? 'Laporan penjualan, analitik bisnis, dan kinerja cabang' : meta.sub)))))));
 
     // 6. Sync Owner bottom nav active module (no-op on desktop, hidden by CSS)
     if (typeof syncOwnerBottomNavActive === 'function') {
@@ -810,12 +837,18 @@
     if (isBranchManager()) {
       if (isCatalogChild) loadInlineBranchCatalog();
     } else {
-      if (isProductEditor) {
+      if (isMasterMenuEditor) {
+        showOwnerMasterMenuEditor();
+        loadOwnerMasterMenuEditor(masterMenuEditorId);
+      } else if (isProductEditor) {
         showProductEditorSection();
         loadProductEditorPage(productEditorId);
       } else if (isProductDetail && productDetailId) {
         showProductDetailSection();
         loadProductDetailView(productDetailId);
+      } else if (tabId === 'catalog-master-menus') {
+        showOwnerMasterMenuList();
+        loadOwnerMasterMenus();
       } else if (tabId === 'catalog-products') {
         showProductListSection();
         loadMasterProducts();
@@ -2007,19 +2040,11 @@
   async function loadMasterProducts() {
     try {
       var authHeaders = getAuthHeaders();
-      var [catRes, prodRes] = await Promise.all([
-        adminFetch(API_BASE + '/admin/categories', { headers: authHeaders }),
-        adminFetch(API_BASE + '/admin/products', { headers: authHeaders })
-      ]);
-
-      var catData = await catRes.json();
+      var prodRes = await adminFetch(API_BASE + '/admin/composed/products?active_only=0', { headers: authHeaders });
       var prodData = await prodRes.json();
 
-      if (catData.success) state.categories = catData.categories || [];
       if (prodData.success) state.products = prodData.products || [];
 
-      renderProductCategoryFilterChips();
-      populateProductCategorySelect();
       renderMasterProductsTable();
     } catch (err) {
       console.error('[Master Products Load Error]:', err);
@@ -2133,34 +2158,12 @@
 
   function getFilteredMasterProducts() {
     return state.products.filter(function (p) {
-      var matchesSearch = true;
-      if (_catalogState.searchQuery) {
-        var q = _catalogState.searchQuery.toLowerCase();
-        var nameMatch = (p.name || '').toLowerCase().indexOf(q) !== -1;
-        var descMatch = (p.description || '').toLowerCase().indexOf(q) !== -1;
-        matchesSearch = nameMatch || descMatch;
-      }
-
-      var matchesCat = true;
-      if (_catalogState.categoryFilter !== 'all') {
-        matchesCat = String(p.category_id) === String(_catalogState.categoryFilter);
-      }
-
-      return matchesSearch && matchesCat;
+      if (!_catalogState.searchQuery) return true;
+      var q = _catalogState.searchQuery.toLowerCase();
+      return String(p.name || '').toLowerCase().indexOf(q) !== -1 ||
+        String(p.description || '').toLowerCase().indexOf(q) !== -1 ||
+        String(p.sku || '').toLowerCase().indexOf(q) !== -1;
     });
-  }
-
-  function renderMasterProductSpiceIndicator(levelValue) {
-    var raw = Number(levelValue || 0);
-    if (!Number.isFinite(raw) || raw <= 0) return '';
-    var level = Math.max(1, Math.min(4, Math.floor(raw)));
-    var html = '<div class="x-master-product-spice-indicator" aria-label="Level Pedas ' + level + ' dari 4">' +
-      '<span class="x-master-product-spice-label">Pedas</span>' +
-      '<span class="x-master-product-spice-dots" aria-hidden="true">';
-    for (var i = 1; i <= 4; i += 1) {
-      html += '<span class="x-master-product-spice-dot' + (i <= level ? ' is-filled' : '') + '"></span>';
-    }
-    return html + '</span></div>';
   }
 
   function renderMasterProductsTable() {
@@ -2170,47 +2173,35 @@
     var filtered = getFilteredMasterProducts();
 
     if (!filtered.length) {
-      tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-muted">Belum ada produk yang cocok dengan pencarian / filter.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-muted">Belum ada Product yang cocok dengan pencarian.</td></tr>';
       return;
     }
 
     var rows = filtered.map(function (prod) {
-      var cat = state.categories.find(function (c) { return String(c.id) === String(prod.category_id); });
-      var catName = cat ? cat.name : 'Umum';
-      var img = prod.image || prod.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100';
+      var img = prod.image || prod.image_url || '';
       var isActive = prod.is_active !== 0;
-      var isRange = prod.pricing_mode === 'range';
-      var modeBadge = isRange
-        ? '<span class="x-badge x-badge-range">Range (' + formatMoney(prod.min_price || prod.price) + ' - ' + formatMoney(prod.max_price || prod.price) + ')</span>'
-        : '<span class="x-badge x-badge-lock">Lock</span>';
-
       var toggleSwitch = '' +
-        '<label class="x-toggle' + (isActive ? ' x-toggle-on' : '') + '" title="' + (isActive ? 'Produk aktif' : 'Produk nonaktif') + '">' +
-          '<input type="checkbox" ' + (isActive ? 'checked' : '') + ' onchange="toggleStock(\'' + prod.id + '\')" aria-label="Status aktif produk ' + esc(prod.name) + '">' +
+        '<label class="x-toggle' + (isActive ? ' x-toggle-on' : '') + '" title="' + (isActive ? 'Product aktif' : 'Product nonaktif') + '">' +
+          '<input type="checkbox" ' + (isActive ? 'checked' : '') + ' onchange="toggleStock(\\'' + esc(prod.id) + '\\', this.checked ? 1 : 0)" aria-label="Status Product ' + esc(prod.name) + '">' +
           '<span class="x-toggle-slider"></span>' +
         '</label>';
 
       return [
         '<tr>',
-          '<td><img src="' + esc(img) + '" alt="" class="x-table-thumb"></td>',
+          '<td>' + (img ? '<img src="' + esc(img) + '" alt="" class="x-table-thumb">' : '<div class="x-table-thumb" aria-hidden="true">🍲</div>') + '</td>',
           '<td>',
-            '<a href="#catalog/products/' + prod.id + '" style="font-weight:700;color:var(--text-main);text-decoration:none;display:inline-block;" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">' + esc(prod.name) + '</a>',
-            '<p class="text-muted" style="font-size:12px;max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:2px 0 0;">' + esc(prod.description || '') + '</p>',
+            '<a href="#catalog/products/' + encodeURIComponent(prod.id) + '" style="font-weight:700;color:var(--text-main);text-decoration:none;display:inline-block;">' + esc(prod.name) + '</a>',
+            '<p class="text-muted" style="font-size:12px;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:2px 0 0;">' + esc(prod.description || '') + '</p>',
           '</td>',
-          '<td>' +
-            '<span class="x-badge x-badge-info">' + esc(catName) + '</span>' +
-            renderMasterProductSpiceIndicator(prod.level_sort_order) +
-          '</td>',
-          '<td><strong>' + formatMoney(prod.price) + '</strong>' + (prod.regular_price > prod.price ? ' <del class="text-muted" style="font-size:11px;">' + formatMoney(prod.regular_price) + '</del>' : '') + '</td>',
-          '<td>' + modeBadge + '</td>',
+          '<td><code style="font-size:11px;">' + esc(prod.sku || 'Belum ada SKU') + '</code></td>',
           '<td>' + toggleSwitch + '</td>',
           '<td class="text-right" style="white-space:nowrap;">',
             '<div class="x-item-actions">',
-              '<button type="button" class="x-action-menu-trigger" aria-label="Aksi produk ' + esc(prod.name) + '" onclick="XentraActionMenu.open(this, [' +
-                '{ label: \'Lihat Detail\', icon: \'🔍\', onClick: function() { navigateTo(\'catalog/products/' + prod.id + '\'); } },' +
-                '{ label: \'Edit Produk\', icon: \'✏️\', onClick: function() { openEditProduct(\'' + prod.id + '\'); } },' +
+              '<button type="button" class="x-action-menu-trigger" aria-label="Aksi Product ' + esc(prod.name) + '" onclick="XentraActionMenu.open(this, [' +
+                '{ label: \\'Lihat Detail\\', icon: \\'🔍\\', onClick: function() { navigateTo(\\'catalog/products/' + encodeURIComponent(prod.id) + '\\'); } },' +
+                '{ label: \\'Edit Product\\', icon: \\'✏️\\', onClick: function() { openEditProduct(\\'' + esc(prod.id) + '\\'); } },' +
                 '{ divider: true },' +
-                '{ label: \'Hapus Produk\', icon: \'🗑️\', destructive: true, onClick: function() { deleteProduct(\'' + prod.id + '\'); } }' +
+                '{ label: \\'Arsipkan Product\\', icon: \\'🗑️\\', destructive: true, onClick: function() { deleteProduct(\\'' + esc(prod.id) + '\\'); } }' +
               '])">',
                 '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>',
               '</button>',
@@ -2221,12 +2212,8 @@
     });
 
     tbody.innerHTML = rows.join('');
-
-    // Also populate legacy products-table-body if present in DOM
     var legacyBody = $('products-table-body');
-    if (legacyBody) {
-      legacyBody.innerHTML = rows.join('');
-    }
+    if (legacyBody) legacyBody.innerHTML = rows.join('');
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -2252,54 +2239,30 @@
       var prod = data.product;
       var branchAdoptions = data.branch_adoptions || [];
 
-      // Update Header & Breadcrumb
+      // Product detail is intentionally atomic. Do not render legacy
+      // Product price/category as customer/commercial identity.
       if ($('prod-detail-breadcrumb')) $('prod-detail-breadcrumb').textContent = prod.name;
-    if ($('product-detail-mobile-title')) $('product-detail-mobile-title').textContent = 'Detail Produk · ' + (prod.name || 'Produk');
-      if ($('prod-detail-name')) $('prod-detail-name').textContent = prod.name;
+      if ($('product-detail-mobile-title')) $('product-detail-mobile-title').textContent = 'Detail Product · ' + (prod.name || 'Product');
+      if ($('prod-detail-name')) $('prod-detail-name').textContent = prod.name || 'Product';
       if ($('prod-detail-desc')) $('prod-detail-desc').textContent = prod.description || 'Tidak ada deskripsi.';
-      if ($('prod-detail-price')) $('prod-detail-price').textContent = formatMoney(prod.price);
+      if ($('prod-detail-sku')) $('prod-detail-sku').textContent = prod.sku || 'Belum ada SKU';
 
-      var img = prod.image || prod.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100';
-      if ($('prod-detail-img')) $('prod-detail-img').src = img;
-
-      // Category badge
-      var cat = state.categories.find(function (c) { return String(c.id) === String(prod.category_id); });
-      if ($('prod-detail-category-badge')) {
-        $('prod-detail-category-badge').textContent = cat ? cat.name : 'Umum';
-      }
-
-      // Pricing mode badge
-      var modeBadge = $('prod-detail-pricing-mode-badge');
-      if (modeBadge) {
-        var isRange = prod.pricing_mode === 'range';
-        modeBadge.className = 'x-badge ' + (isRange ? 'x-badge-range' : 'x-badge-lock');
-        modeBadge.textContent = isRange ? 'Mode: Range' : 'Mode: Fixed (Lock)';
-      }
-
-      var rangeBox = $('prod-detail-range-box');
-      if (rangeBox) {
-        if (prod.pricing_mode === 'range') {
-          rangeBox.style.display = 'block';
-          if ($('prod-detail-range')) {
-            $('prod-detail-range').textContent = formatMoney(prod.min_price || prod.price) + ' - ' + formatMoney(prod.max_price || prod.price);
-          }
+      var img = prod.image || prod.image_url || '';
+      if ($('prod-detail-img')) {
+        if (img) {
+          $('prod-detail-img').src = img;
+          $('prod-detail-img').style.display = 'block';
         } else {
-          rangeBox.style.display = 'none';
+          $('prod-detail-img').removeAttribute('src');
+          $('prod-detail-img').style.display = 'none';
         }
       }
 
-      // Status badge
       var statusBadge = $('prod-detail-status-badge');
       if (statusBadge) {
         var isActive = prod.is_active !== 0;
         statusBadge.className = 'x-badge ' + (isActive ? 'x-badge-success' : 'x-badge-warning');
-        statusBadge.textContent = isActive ? 'Master: Aktif' : 'Master: Nonaktif';
-      }
-
-      // Edit button handler
-      var editBtn = $('btn-edit-from-detail');
-      if (editBtn) {
-        editBtn.onclick = function () { openEditProduct(prod.id); };
+        statusBadge.textContent = isActive ? 'Aktif' : 'Nonaktif';
       }
 
       // Render branch adoptions table
@@ -3204,134 +3167,6 @@
       })[0] || null;
   }
 
-  function buildLegacyMenuCompositionSuggestion(legacyName) {
-    var flavor = findLegacyMenuMatch(legacyName, _masterMenuComponents.flavor, {});
-    var level = findLegacyMenuMatch(legacyName, _masterMenuComponents.level, {});
-
-    var excludedComplementIds = {};
-    if (flavor) excludedComplementIds[String(flavor.id)] = true;
-    if (level) excludedComplementIds[String(level.id)] = true;
-
-    var source = normalizeLegacyMenuText(legacyName);
-    var complements = (_masterMenuComponents.complement || [])
-      .filter(function(row) {
-        if (!row || !row.name || row.is_active === 0 || excludedComplementIds[String(row.id)]) return false;
-        var name = normalizeLegacyMenuText(row.name);
-        return name.length >= 3 && source.indexOf(name) !== -1;
-      })
-      .sort(function(a, b) {
-        var aLen = normalizeLegacyMenuText(a.name).length;
-        var bLen = normalizeLegacyMenuText(b.name).length;
-        if (bLen !== aLen) return bLen - aLen;
-        return String(a.name).localeCompare(String(b.name), 'id');
-      });
-
-    return {
-      flavor_id: flavor ? String(flavor.id) : '',
-      complement_ids: complements.map(function(row) { return String(row.id); }),
-      level_id: level ? String(level.id) : ''
-    };
-  }
-
-  function clearLegacyMenuMigrationNotice() {
-    var notice = $('master-legacy-migration-notice');
-    if (notice) notice.style.display = 'none';
-  }
-
-  function showLegacyMenuMigrationNotice(legacyName, suggestion) {
-    var notice = $('master-legacy-migration-notice');
-    var detail = $('master-legacy-migration-detail');
-    if (!notice || !detail) return;
-
-    var parts = [];
-    if (suggestion.flavor_id) parts.push('Rasa');
-    if (suggestion.complement_ids.length) parts.push('Kelengkapan');
-    if (suggestion.level_id) parts.push('Level');
-
-    detail.textContent = parts.length
-      ? 'Format lama terdeteksi. Pilihan di bawah disarankan dari nama lama "' + String(legacyName || '') + '". Periksa dan sesuaikan sebelum menyimpan.'
-      : 'Format lama terdeteksi. Lengkapi pilihan Master di bawah sebelum menyimpan menu ini.';
-
-    notice.style.display = 'block';
-  }
-
-  async function loadMasterMenuComposition(productId, legacyName, componentsAlreadyLoaded) {
-    _masterMenuSelected = { flavor_id: '', complement_ids: [], level_id: '' };
-    clearLegacyMenuMigrationNotice();
-    renderMasterMenuSelectors();
-
-    if (!productId) {
-      await loadMasterMenuComponents();
-      return;
-    }
-
-    var composition = null;
-    var compositionReadFailed = false;
-
-    try {
-      var res = await adminFetch(API_BASE + '/admin/products/' + encodeURIComponent(productId) + '/composition', { headers: getAuthHeaders() });
-      var data = await res.json();
-      if (!data.success || !data.composition) throw new Error(data.error || 'Komposisi Master belum tersedia.');
-      composition = data.composition;
-    } catch (err) {
-      compositionReadFailed = true;
-    }
-
-    if (composition) {
-      _masterMenuSelected.flavor_id = composition.flavor ? String(composition.flavor.id) : '';
-      _masterMenuSelected.complement_ids = (composition.complements || []).map(function(row) { return String(row.id); });
-      _masterMenuSelected.level_id = composition.level ? String(composition.level.id) : '';
-    }
-
-    // The dedicated Product Editor preloads all Master references once. Older
-    // callers may omit the flag and still get a self-contained hydration pass.
-    if (!componentsAlreadyLoaded) {
-      await loadMasterMenuComponents();
-    }
-
-    var hasStructuredComposition = Boolean(
-      composition &&
-      (composition.flavor || (composition.complements || []).length || composition.level)
-    );
-
-    if (!hasStructuredComposition && legacyName) {
-      var suggestion = buildLegacyMenuCompositionSuggestion(legacyName);
-      _masterMenuSelected.flavor_id = suggestion.flavor_id;
-      _masterMenuSelected.complement_ids = suggestion.complement_ids;
-      _masterMenuSelected.level_id = suggestion.level_id;
-      showLegacyMenuMigrationNotice(legacyName, suggestion);
-      renderMasterMenuSelectors();
-      renderMasterMenuCustomerPreview();
-      return;
-    }
-
-    if (compositionReadFailed) {
-      showToast('⚠️ Komposisi Master belum dapat dimuat. Pilih data sebelum menyimpan.');
-    }
-
-    renderMasterMenuSelectors();
-    renderMasterMenuCustomerPreview();
-  }
-
-  async function saveMasterMenuComposition(productId) {
-    var categoryId = String($('prod-category').value || '').trim();
-    if (!categoryId) throw new Error('Kategori Master wajib dipilih.');
-    var payload = {
-      category_id: categoryId,
-      flavor_id: $('prod-flavor').value || null,
-      complement_ids: _masterMenuSelected.complement_ids.slice(),
-      level_id: $('prod-level').value || null
-    };
-    var res = await adminFetch(API_BASE + '/admin/products/' + encodeURIComponent(productId) + '/composition', {
-      method: 'PUT',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(payload)
-    });
-    var data = await res.json();
-    if (!res.ok || !data.success) throw new Error(data.error || 'Gagal menyimpan komposisi Master.');
-    return data.composition;
-  }
-
   function renderMasterMenuComponentManager() {
     var box = $('master-menu-component-list');
     if (!box) return;
@@ -3455,142 +3290,6 @@
     }
   }
 
-  function normalizeProductOptionsDraft(raw) {
-    var cfg = raw;
-    if (typeof raw === 'string') {
-      try { cfg = JSON.parse(raw); } catch (_) { cfg = null; }
-    }
-    var groups = cfg && Array.isArray(cfg.groups) ? cfg.groups : [];
-    return groups.map(function (g, gi) {
-      var type = g && g.type === 'addon' ? 'addon' : 'variant';
-      var required = type === 'variant' ? g.required !== false : !!g.required;
-      return {
-        id: String((g && g.id) || ('group_' + (gi + 1))),
-        name: String((g && g.name) || ''),
-        type: type,
-        required: required,
-        min: Number.isInteger(Number(g && g.min)) ? Number(g.min) : 0,
-        max: g && g.max != null && Number.isInteger(Number(g.max)) ? Number(g.max) : null,
-        options: (Array.isArray(g && g.options) ? g.options : []).map(function (o, oi) {
-          return {
-            id: String((o && o.id) || ('option_' + (gi + 1) + '_' + (oi + 1))),
-            name: String((o && o.name) || ''),
-            price_adjustment: Number.isFinite(Number(o && o.price_adjustment)) ? Number(o.price_adjustment) : 0
-          };
-        })
-      };
-    });
-  }
-
-  function renderProductOptionsEditor() {
-    var box = $('prod-options-editor');
-    if (!box) return;
-    if (!_productOptionsDraft.length) {
-      box.innerHTML = '<div class="text-muted" style="padding:10px;border:1px dashed #cbd5e1;border-radius:8px;font-size:12px;">Belum ada opsi penjualan.</div>';
-      return;
-    }
-
-    box.innerHTML = _productOptionsDraft.map(function (g, gi) {
-      var groupHeader = '<div style="display:grid;grid-template-columns:minmax(0,1fr) 115px auto;gap:6px;align-items:center;">' +
-        '<input class="x-input" data-opt-group-name="' + gi + '" value="' + esc(g.name) + '" placeholder="Nama group, contoh: Ukuran">' +
-        '<select class="x-input" data-opt-group-type="' + gi + '">' +
-          '<option value="variant" ' + (g.type === 'variant' ? 'selected' : '') + '>Variant</option>' +
-          '<option value="addon" ' + (g.type === 'addon' ? 'selected' : '') + '>Add-on</option>' +
-        '</select>' +
-        '<button type="button" class="x-btn-secondary" data-opt-remove-group="' + gi + '" style="color:#ef4444;">Hapus</button>' +
-      '</div>';
-
-      var groupRules = g.type === 'addon'
-        ? '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:7px;">' +
-            '<label style="font-size:10px;color:#64748b;">Min <input type="number" min="0" class="x-input" data-opt-group-min="' + gi + '" value="' + Number(g.min || 0) + '"></label>' +
-            '<label style="font-size:10px;color:#64748b;">Max <input type="number" min="0" class="x-input" data-opt-group-max="' + gi + '" value="' + (g.max == null ? '' : Number(g.max)) + '" placeholder="tanpa batas"></label>' +
-          '</div>'
-        : '<label style="display:flex;align-items:center;gap:7px;font-size:11px;margin-top:7px;"><input type="checkbox" data-opt-group-required="' + gi + '" ' + (g.required ? 'checked' : '') + '> Wajib dipilih</label>';
-
-      var optionsHtml=(g.options||[]).map(function(o,oi){
-        return '<div style="display:grid;grid-template-columns:minmax(0,1fr) 110px auto;gap:6px;align-items:center;margin-top:6px;">' +
-          '<input class="x-input" data-opt-name="' + gi + ':' + oi + '" value="' + esc(o.name) + '" placeholder="Nama pilihan">' +
-          '<input type="number" class="x-input" data-opt-price="' + gi + ':' + oi + '" value="' + Number(o.price_adjustment || 0) + '" placeholder="Adjustment">' +
-          '<button type="button" class="x-btn-secondary" data-opt-remove="' + gi + ':' + oi + '" style="color:#ef4444;">✕</button>' +
-        '</div>';
-      }).join('');
-
-      return '<div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px;background:#f8fafc;">' +
-        '<div style="font-size:11px;font-weight:800;color:#334155;margin-bottom:7px;">Group ' + (gi + 1) + '</div>' +
-        groupHeader +
-        groupRules +
-        '<div style="margin-top:9px;"><div style="font-size:10px;font-weight:700;color:#64748b;">Pilihan</div>' + (optionsHtml || '<div class="text-muted" style="font-size:11px;padding:6px 0;">Belum ada pilihan.</div>') + '</div>' +
-        '<button type="button" class="x-btn-secondary" data-opt-add="' + gi + '" style="margin-top:8px;font-size:11px;">+ Tambah Pilihan</button>' +
-      '</div>';
-    }).join('');
-
-    box.querySelectorAll('[data-opt-group-name]').forEach(function(el){ el.oninput=function(){ _productOptionsDraft[Number(el.dataset.optGroupName)].name=el.value; }; });
-    box.querySelectorAll('[data-opt-group-type]').forEach(function(el){ el.onchange=function(){ var g=_productOptionsDraft[Number(el.dataset.optGroupType)]; g.type=el.value; if(g.type==='variant'){g.max=1;g.min=0;if(g.required==null)g.required=true;} renderProductOptionsEditor(); }; });
-    box.querySelectorAll('[data-opt-group-required]').forEach(function(el){ el.onchange=function(){ _productOptionsDraft[Number(el.dataset.optGroupRequired)].required=el.checked; }; });
-    box.querySelectorAll('[data-opt-group-min]').forEach(function(el){ el.oninput=function(){ _productOptionsDraft[Number(el.dataset.optGroupMin)].min=Math.max(0,Number(el.value||0)); }; });
-    box.querySelectorAll('[data-opt-group-max]').forEach(function(el){ el.oninput=function(){ var v=el.value.trim(); _productOptionsDraft[Number(el.dataset.optGroupMax)].max=v===''?null:Math.max(0,Number(v)); }; });
-    box.querySelectorAll('[data-opt-name]').forEach(function(el){ el.oninput=function(){ var parts=el.dataset.optName.split(':'); _productOptionsDraft[Number(parts[0])].options[Number(parts[1])].name=el.value; }; });
-    box.querySelectorAll('[data-opt-price]').forEach(function(el){ el.oninput=function(){ var parts=el.dataset.optPrice.split(':'); _productOptionsDraft[Number(parts[0])].options[Number(parts[1])].price_adjustment=Number(el.value||0); }; });
-    box.querySelectorAll('[data-opt-remove-group]').forEach(function(el){ el.onclick=function(){ _productOptionsDraft.splice(Number(el.dataset.optRemoveGroup),1); renderProductOptionsEditor(); }; });
-    box.querySelectorAll('[data-opt-remove]').forEach(function(el){ el.onclick=function(){ var parts=el.dataset.optRemove.split(':'); _productOptionsDraft[Number(parts[0])].options.splice(Number(parts[1]),1); renderProductOptionsEditor(); }; });
-    box.querySelectorAll('[data-opt-add]').forEach(function(el){ el.onclick=function(){ var gi=Number(el.dataset.optAdd); _productOptionsDraft[gi].options.push({id:'option_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),name:'',price_adjustment:0}); renderProductOptionsEditor(); }; });
-  }
-
-  function newProductOptionGroup() {
-    _productOptionsDraft.push({
-      id: 'group_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
-      name: '',
-      type: 'variant',
-      required: true,
-      min: 0,
-      max: 1,
-      options: [{ id: 'option_' + Date.now(), name: '', price_adjustment: 0 }]
-    });
-    renderProductOptionsEditor();
-  }
-
-  function productOptionsPayload() {
-    return {
-      version: 1,
-      groups: _productOptionsDraft.map(function(g){
-        return {
-          id: g.id,
-          name: String(g.name || '').trim(),
-          type: g.type,
-          required: !!g.required,
-          min: g.type === 'addon' ? Math.max(0, Number(g.min || 0)) : 0,
-          max: g.type === 'addon' ? (g.max == null ? null : Math.max(0, Number(g.max))) : 1,
-          options: (g.options || []).map(function(o){
-            return { id:o.id, name:String(o.name||'').trim(), price_adjustment:Number(o.price_adjustment||0) };
-          })
-        };
-      })
-    };
-  }
-
-  async function loadProductOptionsEditor(id) {
-    try {
-      var res=await adminFetch(API_BASE+'/admin/products/'+encodeURIComponent(id)+'/options',{headers:getAuthHeaders()});
-      var data=await res.json();
-      if(!data.success) throw new Error(data.error||'Gagal memuat opsi produk.');
-      _productOptionsDraft=normalizeProductOptionsDraft(data.options_config);
-      renderProductOptionsEditor();
-    } catch(e) {
-      showToast('❌ Opsi produk belum dapat dimuat.');
-    }
-  }
-
-  async function saveProductOptions(id) {
-    var res=await adminFetch(API_BASE+'/admin/products/'+encodeURIComponent(id)+'/options',{
-      method:'PUT',
-      headers:getAuthHeaders(),
-      body:JSON.stringify({options_config:productOptionsPayload()})
-    });
-    var data=await res.json();
-    if(!data.success) throw new Error(data.error||'Gagal menyimpan opsi produk.');
-    return data.options_config;
-  }
-
   // Product Image State — explicitly scoped to the Product Editor.
   // The file stays in memory only until the Product save pipeline uploads it.
   var _productImageFile = null;
@@ -3631,52 +3330,35 @@
   }
 
   function resetProductEditorForAdd() {
-    $('product-editor-title').textContent = 'Tambah Produk Master Baru';
-    $('prod-editor-breadcrumb').textContent = 'Tambah Produk';
-    $('prod-editor-subtitle').textContent = 'Susun identitas, harga, foto, dan komposisi Master Menu.';
-    if ($('product-editor-mobile-title')) $('product-editor-mobile-title').textContent = 'Tambah Produk';
-    if ($('product-editor-mobile-subtitle')) $('product-editor-mobile-subtitle').textContent = 'Susun identitas, harga, foto, dan komposisi Master Menu.';
+    $('product-editor-title').textContent = 'Tambah Product Atomic';
+    $('prod-editor-breadcrumb').textContent = 'Tambah Product';
+    $('prod-editor-subtitle').textContent = 'Product adalah unit catalog/stock. Taxonomy, harga jual, dan identitas customer dikelola oleh Menu.';
+    if ($('product-editor-mobile-title')) $('product-editor-mobile-title').textContent = 'Tambah Product';
+    if ($('product-editor-mobile-subtitle')) $('product-editor-mobile-subtitle').textContent = 'Buat unit Product atomic; harga dan taxonomy customer dikelola oleh Menu.';
     $('prod-id').value = '';
     $('prod-name').value = '';
-    $('prod-price').value = '';
-    $('prod-regular-price').value = '';
-    $('prod-pricing-mode').value = 'lock';
-    $('prod-min-price').value = '';
-    $('prod-max-price').value = '';
-    toggleRangeFields();
+    $('prod-sku').value = '';
     $('prod-desc').value = '';
+    $('prod-is-active').checked = true;
     _productImageFile = null;
     _productCropSpec = null;
     _productImageRemoved = false;
     var fileInput = $('prod-image-file');
     if (fileInput) fileInput.value = '';
     setProductImagePreview('', false);
-    clearLegacyMenuMigrationNotice();
-    _productOptionsDraft = [];
-    renderProductOptionsEditor();
-    populateProductCategorySelect();
-    _masterMenuSelected = { flavor_id: '', complement_ids: [], level_id: '' };
-    renderMasterMenuSelectors();
-    renderMasterMenuCustomerPreview();
   }
 
   function populateProductEditorForm(prod) {
-    $('product-editor-title').textContent = 'Edit Produk: ' + prod.name;
+    $('product-editor-title').textContent = 'Edit Product: ' + prod.name;
     $('prod-editor-breadcrumb').textContent = prod.name;
-    $('prod-editor-subtitle').textContent = 'Periksa dan perbarui data Master Menu.';
-    if ($('product-editor-mobile-title')) $('product-editor-mobile-title').textContent = 'Edit Produk';
-    if ($('product-editor-mobile-subtitle')) $('product-editor-mobile-subtitle').textContent = 'Periksa dan perbarui data Master Menu.';
+    $('prod-editor-subtitle').textContent = 'Perbarui data atomic Product. Menu tetap dikelola di workspace Menu Master.';
+    if ($('product-editor-mobile-title')) $('product-editor-mobile-title').textContent = 'Edit Product';
+    if ($('product-editor-mobile-subtitle')) $('product-editor-mobile-subtitle').textContent = 'Perbarui Product tanpa mengubah identitas komersial Menu.';
     $('prod-id').value = prod.id;
     $('prod-name').value = prod.name || '';
-    populateProductCategorySelect();
-    $('prod-category').value = prod.category_id || '';
-    $('prod-price').value = prod.price != null ? prod.price : '';
-    $('prod-regular-price').value = prod.regular_price || prod.price || '';
-    $('prod-pricing-mode').value = prod.pricing_mode || 'lock';
-    $('prod-min-price').value = prod.min_price || '';
-    $('prod-max-price').value = prod.max_price || '';
-    toggleRangeFields();
+    $('prod-sku').value = prod.sku || '';
     $('prod-desc').value = prod.description || '';
+    $('prod-is-active').checked = prod.is_active !== 0;
     _productImageFile = null;
     _productCropSpec = null;
     _productImageRemoved = false;
@@ -3684,84 +3366,35 @@
     if (fileInput) fileInput.value = '';
     var existingImage = prod.image_url || prod.image || '';
     setProductImagePreview(existingImage, existingImage !== '');
-    _productOptionsDraft = normalizeProductOptionsDraft(prod.options_config);
-    renderProductOptionsEditor();
   }
 
   async function loadProductEditorPage(productId) {
     var requestSeq = ++_productEditorLoadSeq;
     showProductEditorSection();
 
-    // The editor is a real page, not a blocking loading screen. Render the form
-    // immediately, then hydrate Master references and product data asynchronously.
     if (!productId) {
       resetProductEditorForAdd();
-
-      try {
-        await Promise.all([
-          loadMasterMenuComponents(),
-          adminFetch(API_BASE + '/admin/categories', { headers: getAuthHeaders() })
-            .then(function(res) { return res.json(); })
-            .then(function(data) {
-              if (requestSeq !== _productEditorLoadSeq) return;
-              if (data && data.success) {
-                state.categories = data.categories || [];
-                populateProductCategorySelect();
-                renderMasterMenuCustomerPreview();
-              }
-            })
-        ]);
-      } catch (err) {
-        if (requestSeq !== _productEditorLoadSeq) return;
-        console.error('[Product Editor Master Data Error]:', err);
-        showToast('⚠️ Sebagian data Master belum tersedia. Coba lagi setelah koneksi siap.');
-      }
       return;
     }
 
     try {
-      var productPromise = adminFetch(API_BASE + '/admin/products/' + encodeURIComponent(productId), {
+      var res = await adminFetch(API_BASE + '/admin/composed/products/' + encodeURIComponent(productId), {
         headers: getAuthHeaders()
-      }).then(function(res) { return res.json(); });
-
-      var categoryPromise = adminFetch(API_BASE + '/admin/categories', {
-        headers: getAuthHeaders()
-      }).then(function(res) { return res.json(); });
-
-      var masterPromise = loadMasterMenuComponents();
-
-      var productData = await productPromise;
+      });
+      var data = await res.json();
       if (requestSeq !== _productEditorLoadSeq) return;
 
-      if (!productData.success || !productData.product) {
-        showToast('❌ ' + (productData.error || 'Produk tidak ditemukan.'));
+      if (!data.success || !data.product) {
+        showToast('❌ ' + (data.error || 'Product tidak ditemukan.'));
         navigateTo('catalog/products');
         return;
       }
 
-      populateProductEditorForm(productData.product);
-
-      // Master references and product data can arrive in either order. Once
-      // references are ready, render the selectors again against the current draft.
-      var categoryData = await categoryPromise;
-      if (requestSeq !== _productEditorLoadSeq) return;
-      if (categoryData && categoryData.success) {
-        state.categories = categoryData.categories || [];
-        populateProductCategorySelect();
-        $('prod-category').value = productData.product.category_id || '';
-      }
-
-      await masterPromise;
-      if (requestSeq !== _productEditorLoadSeq) return;
-
-      await loadMasterMenuComposition(productData.product.id, productData.product.name, true);
-      if (requestSeq !== _productEditorLoadSeq) return;
-
-      await loadProductOptionsEditor(productData.product.id);
+      populateProductEditorForm(data.product);
     } catch (err) {
       if (requestSeq !== _productEditorLoadSeq) return;
       console.error('[Product Editor Load Error]:', err);
-      showToast('❌ Gagal memuat editor Produk Master.');
+      showToast('❌ Gagal memuat Product Editor.');
     }
   }
 
@@ -3779,49 +3412,56 @@
     navigateTo('catalog/products', { history: 'replace' });
   };
 
-  window.toggleStock = async function (id) {
+  window.toggleStock = async function (id, nextActive) {
     try {
-      var res = await adminFetch(API_BASE + '/admin/products/' + id + '/toggle', {
+      var desiredActive = nextActive === undefined ? true : (nextActive !== 0);
+      var res = await adminFetch(API_BASE + '/admin/composed/products/' + encodeURIComponent(id) + '/status', {
         method: 'PATCH',
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ is_active: desiredActive })
       });
       var data = await res.json();
-      if (data.success) {
-        showToast('Status ketersediaan menu diperbarui.');
-        loadMasterProducts();
-        if (_catalogState.activeDetailProductId) {
-          loadProductDetailView(_catalogState.activeDetailProductId);
-        }
+      if (!res.ok || !data.success) {
+        showToast('❌ ' + (data.error || data.message || 'Gagal mengubah status Product.'));
+        return;
+      }
+      showToast('Status Product diperbarui.');
+      loadMasterProducts();
+      if (_catalogState.activeDetailProductId) {
+        loadProductDetailView(_catalogState.activeDetailProductId);
       }
     } catch (e) {
-      showToast('Gagal mengubah status stok.');
+      showToast('Gagal mengubah status Product.');
     }
   };
 
   window.deleteProduct = async function (id) {
     if (window.XentraPresentation && !await window.XentraPresentation.confirm({
-      id: 'delete-master-product',
-      title: 'Hapus Produk Master',
-      message: 'Apakah Anda yakin ingin menghapus produk master ini? Tindakan ini tidak dapat dibatalkan.',
-      okLabel: 'Hapus',
+      id: 'archive-master-product',
+      title: 'Arsipkan Product Master',
+      message: 'Product akan dinonaktifkan dan tetap mempertahankan identitasnya untuk Menu, histori, dan inventory.',
+      okLabel: 'Arsipkan',
       cancelLabel: 'Batal'
     })) return;
     try {
-      var res = await adminFetch(API_BASE + '/admin/products/' + id, {
-        method: 'DELETE',
-        headers: getAuthHeaders()
+      var res = await adminFetch(API_BASE + '/admin/composed/products/' + encodeURIComponent(id) + '/status', {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ is_active: false })
       });
       var data = await res.json();
-      if (data.success) {
-        showToast('Produk master berhasil dihapus.');
-        if (_catalogState.activeDetailProductId === id) {
-          navigateTo('catalog/products');
-        } else {
-          loadMasterProducts();
-        }
+      if (!res.ok || !data.success) {
+        showToast('❌ ' + (data.error || data.message || 'Gagal mengarsipkan Product.'));
+        return;
+      }
+      showToast('Product Master diarsipkan.');
+      if (_catalogState.activeDetailProductId === id) {
+        navigateTo('catalog/products');
+      } else {
+        loadMasterProducts();
       }
     } catch (e) {
-      showToast('Gagal menghapus produk.');
+      showToast('Gagal mengarsipkan Product.');
     }
   };
 
@@ -4231,9 +3871,6 @@ async function loadMenusView() {
       });
     }
 
-    var btnOptionsAddGroup = $('btn-prod-options-add-group');
-    if (btnOptionsAddGroup) btnOptionsAddGroup.addEventListener('click', newProductOptionGroup);
-
     var btnAddCategoryFromProduct = $('btn-add-master-category-from-product');
     if (btnAddCategoryFromProduct) btnAddCategoryFromProduct.addEventListener('click', function () {
       openMasterReferenceQuickAdd('category');
@@ -4327,32 +3964,6 @@ async function loadMenusView() {
       }
     });
 
-
-    var flavorSelect = $('prod-flavor');
-    if (flavorSelect) flavorSelect.addEventListener('change', function() {
-      _masterMenuSelected.flavor_id = flavorSelect.value || '';
-      renderMasterMenuCustomerPreview();
-    });
-    var categorySelect = $('prod-category');
-    if (categorySelect) categorySelect.addEventListener('change', function() {
-      _masterMenuSelected.category_id = categorySelect.value || '';
-      renderMasterMenuCustomerPreview();
-      renderMasterMenuSelectors();
-    });
-    var nameInput = $('prod-name');
-    if (nameInput) nameInput.addEventListener('input', function() {
-      renderMasterMenuCustomerPreview();
-    });
-
-    var priceInput = $('prod-price');
-    if (priceInput) priceInput.addEventListener('input', function() {
-      renderMasterMenuCustomerPreview();
-    });
-
-    var prodPricingMode = $('prod-pricing-mode');
-    if (prodPricingMode) {
-      prodPricingMode.addEventListener('change', toggleRangeFields);
-    }
 
     var btnBackFromProductEditor = $('btn-back-from-product-editor');
     if (btnBackFromProductEditor && !btnBackFromProductEditor.dataset.bound) {
@@ -4478,11 +4089,11 @@ async function loadMenusView() {
           source: file,
           assetType: 'product',
           aspectRatio: 1.0,
-          title: 'Potong & Posisikan Foto Menu (1:1)',
+          title: 'Potong & Posisikan Foto Product (1:1)',
           onConfirm: function (cropSpec, previewDataUrl) {
             _productCropSpec = cropSpec;
             setProductImagePreview(previewDataUrl || URL.createObjectURL(file), true);
-            showToast('✓ Potongan foto menu disesuaikan.');
+            showToast('✓ Potongan foto Product disesuaikan.');
           },
           onCancel: function () {
             _productImageFile = null;
@@ -4506,25 +4117,31 @@ async function loadMenusView() {
     // Product name is a first-class Master Product identity and the
     // authoritative Customer card title. Kategori is only the grouping/reference.
     // Form Master Product Submit
+    // Canonical Product Editor submit: Product owns only atomic identity,
+    // SKU/media, internal description, and lifecycle. Menu owns customer
+    // taxonomy, selling price, and commercial presentation.
     var formProduct = $('form-product');
     if (formProduct) {
       formProduct.addEventListener('submit', async function (e) {
         e.preventDefault();
+
         var id = $('prod-id').value;
-        var pricingMode = $('prod-pricing-mode').value;
+        var sku = String($('prod-sku').value || '').trim();
         var payload = {
-          // Product name is explicit user input and is the Customer card title.
           name: $('prod-name').value.trim(),
-          category_id: $('prod-category').value,
-          price: Number($('prod-price').value),
-          regular_price: Number($('prod-regular-price').value || $('prod-price').value),
-          pricing_mode: pricingMode,
-          min_price: pricingMode === 'range' ? Number($('prod-min-price').value || $('prod-price').value) : null,
-          max_price: pricingMode === 'range' ? Number($('prod-max-price').value || $('prod-price').value) : null,
-          description: $('prod-desc').value
+          sku: sku || null,
+          description: $('prod-desc').value,
+          is_active: $('prod-is-active').checked ? 1 : 0
         };
 
-        var url = id ? (API_BASE + '/admin/products/' + id) : (API_BASE + '/admin/products');
+        if (!payload.name) {
+          showToast('❌ Nama Product wajib diisi.');
+          return;
+        }
+
+        var url = id
+          ? (API_BASE + '/admin/composed/products/' + encodeURIComponent(id))
+          : (API_BASE + '/admin/composed/products');
         var method = id ? 'PUT' : 'POST';
 
         try {
@@ -4534,31 +4151,18 @@ async function loadMenusView() {
             body: JSON.stringify(payload)
           });
           var data = await res.json();
-          if (!data.success) {
-            showToast('❌ ' + (data.error || data.message || 'Gagal menyimpan menu.'));
+          if (!res.ok || !data.success) {
+            showToast('❌ ' + (data.error || data.message || 'Gagal menyimpan Product.'));
             return;
           }
 
           var savedId = (data.product && data.product.id) || id;
           if (!savedId) {
-            showToast('❌ Produk tersimpan tetapi ID produk tidak kembali dari server.');
+            showToast('❌ Product tersimpan tetapi ID Product tidak kembali dari server.');
             return;
           }
 
-          try {
-            await saveMasterMenuComposition(savedId);
-          } catch (compositionErr) {
-            showToast('❌ ' + compositionErr.message);
-            return;
-          }
-
-          try {
-            await saveProductOptions(savedId);
-          } catch (optionErr) {
-            showToast('❌ ' + optionErr.message);
-            return;
-          }
-          if (_productImageRemoved && savedId) {
+          if (_productImageRemoved) {
             var removeRes = await adminFetch(API_BASE + '/admin/media/entity/products/' + encodeURIComponent(savedId) + '/image', {
               method: 'DELETE',
               headers: getAuthHeaders()
@@ -4570,12 +4174,12 @@ async function loadMenusView() {
               removeData = { success: false, error: 'Gagal membaca respons penghapusan foto (HTTP ' + removeRes.status + ').' };
             }
             if (!removeRes.ok || !removeData.success) {
-              showToast('❌ ' + (removeData.error || removeData.message || 'Gagal menghapus foto menu.'));
+              showToast('❌ ' + (removeData.error || removeData.message || 'Gagal menghapus foto Product.'));
               return;
             }
           }
 
-          if (_productImageFile && savedId && !_productImageRemoved) {
+          if (_productImageFile && !_productImageRemoved) {
             var base64 = await new Promise(function (resolve, reject) {
               var imgReader = new FileReader();
               imgReader.onload = function () { resolve(imgReader.result); };
@@ -4599,27 +4203,22 @@ async function loadMenusView() {
             try {
               imageData = await imageRes.json();
             } catch (_) {
-              var rawBody = '';
-              try { rawBody = await imageRes.text(); } catch (_) {}
-              var detail = rawBody.length > 160 ? (rawBody.slice(0, 160) + '…') : rawBody;
-              imageData = { success: false, error: 'Upload foto gagal (HTTP ' + imageRes.status + '). ' + (detail ? detail + ' ' : '') };
+              imageData = { success: false, error: 'Upload foto Product gagal (HTTP ' + imageRes.status + ').' };
             }
             if (!imageRes.ok || !imageData.success) {
-              showToast('❌ ' + (imageData.error || imageData.message || 'Gagal mengunggah foto menu.'));
+              showToast('❌ ' + (imageData.error || imageData.message || 'Gagal mengunggah foto Product.'));
               return;
             }
           }
 
-          showToast('✅ Produk master berhasil disimpan!');
+          showToast('✅ Product berhasil disimpan.');
           await loadMasterProducts();
           navigateTo('catalog/products', { history: 'replace' });
         } catch (err) {
-          showToast('❌ ' + ((err && err.message) || 'Gagal menyimpan menu.'));
+          showToast('❌ ' + ((err && err.message) || 'Gagal menyimpan Product.'));
         }
       });
     }
-  }
-
   /* =========================================================================
      MODUL 3: CABANG & PENGATURAN ONGKIR CONTROLLER
      ========================================================================= */
@@ -10249,10 +9848,10 @@ async function loadMenusView() {
 
   var _marketingPromotionsState = {
     promotions: [],
-    masterProducts: [],
+    masterMenus: [],
     branches: [],
-    productsLoadStatus: 'idle', // 'idle' | 'loading' | 'success' | 'error'
-    productsLoadError: null
+    menusLoadStatus: 'idle', // 'idle' | 'loading' | 'success' | 'error'
+    menusLoadError: null
   };
 
   async function loadMarketingPromotions() {
@@ -10302,7 +9901,7 @@ async function loadMenusView() {
         if (Array.isArray(p.rewards) && p.rewards.length > 0) {
           var r0 = p.rewards[0];
           if (r0.reward_type === 'freebie_product') {
-            rewardSummary = '<span style="font-weight:600;color:#0369a1;">🎁 ' + esc(r0.target_product_name || r0.target_product_id || 'Produk Gratis') + '</span>';
+            rewardSummary = '<span style="font-weight:600;color:#0369a1;">🎁 ' + esc(r0.target_menu_title || r0.target_menu_id || r0.target_product_name || r0.target_product_id || 'Menu Gratis') + '</span>';
           } else {
             rewardSummary = esc(r0.reward_type);
           }
@@ -10361,37 +9960,37 @@ async function loadMenusView() {
   window.loadMarketingPromotions = loadMarketingPromotions;
 
   async function ensureMarketingDependenciesLoaded(forceReload) {
-    var selectEl = $('mkt-promo-target-product');
-    var retryContainer = $('mkt-promo-target-product-retry-container');
+    var selectEl = $('mkt-promo-target-menu');
+    var retryContainer = $('mkt-promo-target-menu-retry-container');
 
-    if (!forceReload && _marketingPromotionsState.masterProducts.length > 0 && _marketingPromotionsState.branches.length > 0) {
+    if (!forceReload && _marketingPromotionsState.masterMenus.length > 0 && _marketingPromotionsState.branches.length > 0) {
       return;
     }
 
-    if (forceReload || !_marketingPromotionsState.masterProducts.length) {
-      _marketingPromotionsState.productsLoadStatus = 'loading';
-      _marketingPromotionsState.productsLoadError = null;
+    if (forceReload || !_marketingPromotionsState.masterMenus.length) {
+      _marketingPromotionsState.menusLoadStatus = 'loading';
+      _marketingPromotionsState.menusLoadError = null;
       if (selectEl) {
         selectEl.disabled = true;
-        selectEl.innerHTML = '<option value="">Memuat produk katalog...</option>';
+        selectEl.innerHTML = '<option value="">Memuat Menu Master...</option>';
       }
       if (retryContainer) retryContainer.style.display = 'none';
 
       try {
-        var pRes = await adminFetch(API_BASE + '/admin/products', { headers: getAuthHeaders() });
-        if (!pRes.ok) {
-          throw new Error('Gagal memuat produk (HTTP ' + pRes.status + ')');
+        var mRes = await adminFetch(API_BASE + '/admin/menus?status=ACTIVE', { headers: getAuthHeaders() });
+        if (!mRes.ok) {
+          throw new Error('Gagal memuat Menu Master (HTTP ' + mRes.status + ')');
         }
-        var pData = await pRes.json();
-        if (!pData || !pData.success) {
-          throw new Error((pData && pData.error) || 'Gagal memuat produk dari server.');
+        var mData = await mRes.json();
+        if (!mData || !mData.success) {
+          throw new Error((mData && mData.error) || 'Gagal memuat Menu Master dari server.');
         }
-        _marketingPromotionsState.masterProducts = Array.isArray(pData.products) ? pData.products : [];
-        _marketingPromotionsState.productsLoadStatus = 'success';
+        _marketingPromotionsState.masterMenus = Array.isArray(mData.menus) ? mData.menus : [];
+        _marketingPromotionsState.menusLoadStatus = 'success';
       } catch (err) {
-        console.error('[Marketing Products Load Error]:', err);
-        _marketingPromotionsState.productsLoadStatus = 'error';
-        _marketingPromotionsState.productsLoadError = err.message || 'Gagal memuat produk';
+        console.error('[Marketing Menus Load Error]:', err);
+        _marketingPromotionsState.menusLoadStatus = 'error';
+        _marketingPromotionsState.menusLoadError = err.message || 'Gagal memuat Menu Master';
       }
     }
 
@@ -10408,66 +10007,78 @@ async function loadMenusView() {
     }
   }
 
-  function renderPromoProductOptions(selectedProductId) {
-    var selectEl = $('mkt-promo-target-product');
-    var retryContainer = $('mkt-promo-target-product-retry-container');
+  function promotionMenuLabel(menu) {
+    if (!menu) return 'Menu Promo';
+    var name = menu.package_name || '';
+    if (!name) {
+      var parts = [];
+      if (menu.sub_category_name) parts.push(menu.sub_category_name);
+      if (menu.rasa_name && String(menu.rasa_name).trim().toLowerCase() !== 'original') {
+        parts.push(menu.rasa_name);
+      }
+      name = parts.join(' — ') || ('Menu ' + menu.id);
+    }
+    var typeLabel = String(menu.menu_type || '').toUpperCase() === 'PACKAGE' ? 'Paket' : 'Satuan';
+    var price = menu.selling_price !== undefined && menu.selling_price !== null
+      ? ' (' + formatMoney(menu.selling_price) + ')'
+      : '';
+    return name + ' · ' + typeLabel + price;
+  }
+
+  function renderPromoMenuOptions(selectedMenuId) {
+    var selectEl = $('mkt-promo-target-menu');
+    var retryContainer = $('mkt-promo-target-menu-retry-container');
     if (!selectEl) return;
 
-    // Handle Error State
-    if (_marketingPromotionsState.productsLoadStatus === 'error') {
+    if (_marketingPromotionsState.menusLoadStatus === 'error') {
       selectEl.disabled = true;
-      selectEl.innerHTML = '<option value="">Gagal memuat produk katalog</option>';
+      selectEl.innerHTML = '<option value="">Gagal memuat Menu Master</option>';
       if (retryContainer) retryContainer.style.display = 'block';
       return;
     }
 
     if (retryContainer) retryContainer.style.display = 'none';
 
-    // Handle Loading State
-    if (_marketingPromotionsState.productsLoadStatus === 'loading') {
+    if (_marketingPromotionsState.menusLoadStatus === 'loading') {
       selectEl.disabled = true;
-      selectEl.innerHTML = '<option value="">Memuat produk katalog...</option>';
+      selectEl.innerHTML = '<option value="">Memuat Menu Master...</option>';
       return;
     }
 
-    var prods = _marketingPromotionsState.masterProducts || [];
-
-    // Handle Empty State
-    if (!prods.length) {
+    var menus = _marketingPromotionsState.masterMenus || [];
+    if (!menus.length) {
       selectEl.disabled = true;
-      selectEl.innerHTML = '<option value="">Belum ada produk di Master Catalog</option>';
+      selectEl.innerHTML = '<option value="">Belum ada Menu Master aktif</option>';
       return;
     }
 
-    // Success State
     selectEl.disabled = false;
-    var html = '<option value="">-- Pilih Produk Hadiah --</option>';
-    var foundSavedProduct = false;
+    var html = '<option value="">-- Pilih Menu Hadiah --</option>';
+    var foundSavedMenu = false;
 
-    prods.forEach(function (p) {
-      var isSel = (selectedProductId !== null && selectedProductId !== undefined && String(p.id) === String(selectedProductId));
-      if (isSel) foundSavedProduct = true;
-      var priceText = (p.price !== undefined && p.price !== null) ? ' (' + formatMoney(p.price) + ')' : '';
-      var skuText = p.sku ? ' [SKU: ' + esc(p.sku) + ']' : '';
-      html += '<option value="' + esc(p.id) + '"' + (isSel ? ' selected' : '') + '>' + esc(p.name) + skuText + priceText + '</option>';
+    menus.forEach(function (menu) {
+      var isSel = selectedMenuId !== null && selectedMenuId !== undefined &&
+        String(menu.id) === String(selectedMenuId);
+      if (isSel) foundSavedMenu = true;
+      html += '<option value="' + esc(menu.id) + '"' + (isSel ? ' selected' : '') + '>' +
+        esc(promotionMenuLabel(menu)) + '</option>';
     });
 
-    // If a saved product ID was supplied but is no longer in the master catalog, display warning option
-    if (selectedProductId && !foundSavedProduct) {
-      html = '<option value="' + esc(selectedProductId) + '" selected disabled style="color:#ef4444;">⚠️ Produk reward tersimpan (ID: ' + esc(selectedProductId) + ') tidak lagi tersedia di Master Catalog</option>' + html;
+    if (selectedMenuId && !foundSavedMenu) {
+      html = '<option value="' + esc(selectedMenuId) + '" selected disabled style="color:#ef4444;">⚠️ Menu reward tersimpan tidak lagi aktif/tersedia (ID: ' + esc(selectedMenuId) + ')</option>' + html;
     }
 
     selectEl.innerHTML = html;
   }
 
-  async function retryLoadPromoProducts() {
+  async function retryLoadPromoMenus() {
     await ensureMarketingDependenciesLoaded(true);
-    var targetInput = $('mkt-promo-target-product');
+    var targetInput = $('mkt-promo-target-menu');
     var currentVal = targetInput ? targetInput.value : null;
-    renderPromoProductOptions(currentVal);
+    renderPromoMenuOptions(currentVal);
     onPromotionProductSelected();
   }
-  window.retryLoadPromoProducts = retryLoadPromoProducts;
+  window.retryLoadPromoMenus = retryLoadPromoMenus;
 
   function renderPromoBranchCheckboxes(selectedBranchIds) {
     var container = $('mkt-promo-branches-list');
@@ -10525,23 +10136,25 @@ async function loadMenusView() {
   window.onPromotionBenefitTypeUiChange = onPromotionBenefitTypeUiChange;
 
   function onPromotionProductSelected() {
-    var selectEl = $('mkt-promo-target-product');
+    var selectEl = $('mkt-promo-target-menu');
     var normalPriceEl = $('mkt-promo-product-normal-price');
+    var summaryLabel = document.querySelector('label[for="mkt-promo-target-menu"]');
     if (!selectEl || !normalPriceEl) return;
 
-    var prodId = selectEl.value;
-    if (!prodId) {
+    var menuId = selectEl.value;
+    if (!menuId) {
       normalPriceEl.textContent = '-';
       return;
     }
 
-    var prods = _marketingPromotionsState.masterProducts || [];
-    var prod = prods.find(function (p) { return String(p.id) === String(prodId); });
-    if (prod && prod.price !== undefined && prod.price !== null) {
-      normalPriceEl.textContent = formatMoney(prod.price);
+    var menus = _marketingPromotionsState.masterMenus || [];
+    var menu = menus.find(function (item) { return String(item.id) === String(menuId); });
+    if (menu && menu.selling_price !== undefined && menu.selling_price !== null) {
+      normalPriceEl.textContent = formatMoney(menu.selling_price);
     } else {
       normalPriceEl.textContent = '-';
     }
+    if (summaryLabel) summaryLabel.innerHTML = 'Menu yang Diberikan <span style="color:#ef4444;">*</span>';
   }
   window.onPromotionProductSelected = onPromotionProductSelected;
 
@@ -10810,7 +10423,7 @@ async function loadMenusView() {
     mountPromotionEditorPage();
 
     await ensureMarketingDependenciesLoaded();
-    renderPromoProductOptions(null);
+    renderPromoMenuOptions(null);
     onPromotionProductSelected();
     renderPromoBranchCheckboxes(null); // default all selected
     onPromotionCapabilityChange();
@@ -10846,11 +10459,13 @@ async function loadMenusView() {
     if ($('mkt-promo-start-at')) $('mkt-promo-start-at').value = formatDateTimeLocal(promo.start_at);
     if ($('mkt-promo-end-at')) $('mkt-promo-end-at').value = formatDateTimeLocal(promo.end_at);
 
-    var targetProdId = null;
+    var targetMenuId = null;
+    var legacyTargetProductId = null;
     var presPayload = {};
     if (Array.isArray(promo.rewards) && promo.rewards.length > 0) {
       var primaryReward = promo.rewards[0];
-      targetProdId = primaryReward.target_product_id;
+      targetMenuId = primaryReward.target_menu_id || primaryReward.menu_id || null;
+      legacyTargetProductId = primaryReward.target_product_id || null;
       $('mkt-promo-reward-type').value = primaryReward.reward_type || 'freebie_product';
       if (primaryReward.presentation) {
         presPayload = primaryReward.presentation;
@@ -10888,8 +10503,11 @@ async function loadMenusView() {
     mountPromotionEditorPage();
 
     await ensureMarketingDependenciesLoaded();
-    renderPromoProductOptions(targetProdId);
+    renderPromoMenuOptions(targetMenuId);
     onPromotionProductSelected();
+    if (!targetMenuId && legacyTargetProductId) {
+      showToast('Promo lama masih memakai target Product. Pilih Menu hadiah canonical sebelum menyimpan perubahan.');
+    }
     renderPromoBranchCheckboxes(selectedBranchIds.length ? selectedBranchIds : null);
     onPromotionCapabilityChange();
     updatePromotionPresentationPreview();
@@ -10931,14 +10549,14 @@ async function loadMenusView() {
     var startAtVal = $('mkt-promo-start-at') ? $('mkt-promo-start-at').value : '';
     var endAtVal = $('mkt-promo-end-at') ? $('mkt-promo-end-at').value : '';
     var rewardType = $('mkt-promo-reward-type').value;
-    var targetProductId = $('mkt-promo-target-product').value;
+    var targetMenuId = $('mkt-promo-target-menu').value;
 
     if (!name) {
       showToast('Nama promosi wajib diisi.');
       return;
     }
-    if (!targetProductId) {
-      showToast('Pilih produk gratis dari menu master.');
+    if (!targetMenuId) {
+      showToast('Pilih Menu hadiah dari Menu Master.');
       return;
     }
 
@@ -11000,7 +10618,7 @@ async function loadMenusView() {
 
     var rewards = [{
       reward_type: rewardType,
-      target_product_id: targetProductId,
+      target_menu_id: targetMenuId,
       amount_in_cents: 0,
       presentation_payload: presentationPayload
     }];
@@ -11124,6 +10742,684 @@ async function loadMenusView() {
   /* =========================================================================
      INITIALIZATION ON DOM READY
      ========================================================================= */
+
+  /* =========================================================================
+     OWNER MASTER MENU — CANONICAL COMMERCIAL MENU WORKSPACE
+     Product remains an atomic stock/composition unit. This controller talks
+     directly to /admin/menus/* and never uses the legacy customer catalog route.
+     ========================================================================= */
+
+  var _ownerMasterMenuState = {
+    menus: [],
+    products: [],
+    categories: [],
+    subCategories: [],
+    rasas: [],
+    levels: [],
+    search: '',
+    typeFilter: 'all',
+    editingId: null,
+    editingType: 'SINGLE',
+    createType: 'SINGLE',
+    packageComponents: []
+  };
+
+  function ownerMasterMenuStatusLabel(status) {
+    var value = String(status || '').toUpperCase();
+    if (value === 'ACTIVE') return 'Aktif';
+    if (value === 'ARCHIVED') return 'Arsip';
+    return 'Draft';
+  }
+
+  function ownerMasterMenuTitle(menu) {
+    if (!menu) return 'Menu';
+    if (String(menu.menu_type).toUpperCase() === 'PACKAGE') {
+      return menu.package_name || menu.sub_category_name || 'Paket';
+    }
+    return menu.sub_category_name || 'Menu Satuan';
+  }
+
+  function ownerMasterMenuRasaLabel(name) {
+    var value = String(name || '').trim();
+    return value && value.toLowerCase() !== 'original' ? value : '';
+  }
+
+  function showOwnerMasterMenuList() {
+    var list = $('master-menu-list-view');
+    var editor = $('master-menu-editor-view');
+    if (list) list.style.display = 'block';
+    if (editor) editor.style.display = 'none';
+  }
+
+  function showOwnerMasterMenuEditor() {
+    var list = $('master-menu-list-view');
+    var editor = $('master-menu-editor-view');
+    if (list) list.style.display = 'none';
+    if (editor) editor.style.display = 'block';
+  }
+
+  function ownerMasterMenuResetEditor(type) {
+    var nextType = type === 'PACKAGE' ? 'PACKAGE' : 'SINGLE';
+    _ownerMasterMenuState.editingId = null;
+    _ownerMasterMenuState.editingType = nextType;
+    _ownerMasterMenuState.createType = nextType;
+    _ownerMasterMenuState.packageComponents = nextType === 'PACKAGE'
+      ? [{ product_id: '', quantity: 1 }, { product_id: '', quantity: 1 }]
+      : [];
+
+    $('master-menu-id').value = '';
+    $('master-menu-type').value = nextType;
+    $('cm-product').value = '';
+    $('cm-package-name').value = '';
+    $('cm-price').value = '';
+    $('cm-status').value = 'DRAFT';
+    $('cm-category').value = '';
+    $('cm-sub-category').value = '';
+    $('cm-rasa').value = '';
+    $('cm-level').value = '';
+
+    var title = nextType === 'PACKAGE' ? 'Tambah Menu Paket' : 'Tambah Menu Satuan';
+    $('master-menu-editor-title').textContent = title;
+    $('master-menu-editor-breadcrumb').textContent = 'Tambah Menu';
+    $('master-menu-editor-mobile-title').textContent = 'Tambah Menu';
+    $('master-menu-editor-mobile-subtitle').textContent = nextType === 'PACKAGE'
+      ? 'Susun nama paket, Product penyusun, taxonomy, dan harga Menu.'
+      : 'Pilih Product penyusun, Sub Category, Rasa, taxonomy, dan harga Menu.';
+
+    renderOwnerMasterMenuEditorForm();
+  }
+
+  function ownerMasterMenuFindProduct(id) {
+    return _ownerMasterMenuState.products.find(function(p) {
+      return String(p.id) === String(id);
+    }) || null;
+  }
+
+  function ownerMasterMenuPopulateSelect(selectId, rows, valueKey, labelFn, emptyLabel) {
+    var select = $(selectId);
+    if (!select) return;
+    var html = '';
+    if (emptyLabel !== undefined) {
+      html += '<option value="">' + esc(emptyLabel) + '</option>';
+    }
+    (rows || []).forEach(function(row) {
+      var id = String(row[valueKey || 'id'] || '');
+      if (!id) return;
+      var label = typeof labelFn === 'function' ? labelFn(row) : String(row.name || id);
+      var inactive = row.is_active === 0 || row.is_active === false;
+      html += '<option value="' + esc(id) + '"' + (inactive ? ' data-inactive="1"' : '') + '>' +
+        esc(label + (inactive ? ' (Nonaktif)' : '')) + '</option>';
+    });
+    select.innerHTML = html;
+  }
+
+  function renderOwnerMasterMenuSubCategories() {
+    var categoryId = String(($('cm-category') && $('cm-category').value) || '');
+    var select = $('cm-sub-category');
+    if (!select) return;
+    var current = String(select.value || '');
+    var rows = _ownerMasterMenuState.subCategories.filter(function(row) {
+      return !categoryId || String(row.category_id) === categoryId;
+    });
+    var allowEmpty = _ownerMasterMenuState.editingType === 'PACKAGE';
+    var html = allowEmpty ? '<option value="">Tanpa Sub Category</option>' : '';
+    rows.forEach(function(row) {
+      var inactive = row.is_active === 0 || row.is_active === false;
+      html += '<option value="' + esc(row.id) + '"' +
+        (inactive ? ' data-inactive="1"' : '') + '>' +
+        esc(row.name + (inactive ? ' (Nonaktif)' : '')) + '</option>';
+    });
+    select.innerHTML = html;
+    if (current && rows.some(function(row) { return String(row.id) === current; })) {
+      select.value = current;
+    } else if (!allowEmpty && rows.length) {
+      select.value = String(rows[0].id);
+    }
+  }
+
+  function renderOwnerMasterMenuEditorForm() {
+    var type = String(($('master-menu-type') && $('master-menu-type').value) || _ownerMasterMenuState.editingType || 'SINGLE').toUpperCase();
+    _ownerMasterMenuState.editingType = type === 'PACKAGE' ? 'PACKAGE' : 'SINGLE';
+
+    var single = $('master-menu-single-fields');
+    var pkg = $('master-menu-package-fields');
+    if (single) single.style.display = _ownerMasterMenuState.editingType === 'SINGLE' ? 'block' : 'none';
+    if (pkg) pkg.style.display = _ownerMasterMenuState.editingType === 'PACKAGE' ? 'block' : 'none';
+
+    ownerMasterMenuPopulateSelect('cm-product', _ownerMasterMenuState.products, 'id', function(row) {
+      return row.name + (row.sku ? ' · SKU ' + row.sku : '');
+    });
+    ownerMasterMenuPopulateSelect('cm-category', _ownerMasterMenuState.categories, 'id');
+    renderOwnerMasterMenuSubCategories();
+    ownerMasterMenuPopulateSelect('cm-rasa', _ownerMasterMenuState.rasas, 'id', function(row) {
+      return row.name;
+    }, type === 'PACKAGE' ? 'Tidak ada Rasa' : 'Original');
+    ownerMasterMenuPopulateSelect('cm-level', _ownerMasterMenuState.levels, 'id', function(row) {
+      return row.name;
+    }, 'Tidak ada Level');
+
+    var currentRasa = $('cm-rasa');
+    if (currentRasa && !currentRasa.value && type === 'SINGLE') {
+      var original = _ownerMasterMenuState.rasas.find(function(row) {
+        return String(row.name || '').trim().toLowerCase() === 'original';
+      });
+      if (original) currentRasa.value = String(original.id);
+    }
+
+    var currentCategory = String(($('cm-category') && $('cm-category').value) || '');
+    var currentSub = String(($('cm-sub-category') && $('cm-sub-category').value) || '');
+    if (currentSub) {
+      var matchingSub = _ownerMasterMenuState.subCategories.find(function(row) {
+        return String(row.id) === currentSub;
+      });
+      if (matchingSub && (!currentCategory || String(matchingSub.category_id) === currentCategory)) {
+        $('cm-category').value = String(matchingSub.category_id);
+        renderOwnerMasterMenuSubCategories();
+        $('cm-sub-category').value = currentSub;
+      }
+    }
+
+    renderOwnerMasterMenuPackageComponents();
+    renderOwnerMasterMenuPreview();
+  }
+
+  function renderOwnerMasterMenuPackageComponents() {
+    var box = $('cm-package-components');
+    if (!box) return;
+    var rows = _ownerMasterMenuState.packageComponents || [];
+    if (!rows.length) {
+      box.innerHTML = '<div class="x-empty-state text-muted">Belum ada Product. Tambahkan minimal dua unit.</div>';
+      return;
+    }
+
+    box.innerHTML = rows.map(function(item, index) {
+      var options = '<option value="">Pilih Product</option>';
+      _ownerMasterMenuState.products.forEach(function(product) {
+        var inactive = product.is_active === 0 || product.is_active === false;
+        options += '<option value="' + esc(product.id) + '"' +
+          (String(item.product_id) === String(product.id) ? ' selected' : '') +
+          (inactive ? ' data-inactive="1"' : '') + '>' +
+          esc(product.name + (inactive ? ' (Nonaktif)' : '')) + '</option>';
+      });
+      return '<div class="x-composed-menu-component-row" data-cm-component-index="' + index + '">' +
+        '<div class="x-composed-menu-component-product">' +
+          '<label>Product ' + (index + 1) + '</label>' +
+          '<select class="x-input" data-cm-product>' + options + '</select>' +
+        '</div>' +
+        '<div class="x-composed-menu-component-qty">' +
+          '<label>Qty</label>' +
+          '<input type="number" class="x-input" min="1" step="1" inputmode="numeric" value="' + esc(item.quantity || 1) + '" data-cm-qty>' +
+        '</div>' +
+        '<button type="button" class="x-btn-secondary x-composed-menu-component-remove" data-cm-remove="' + index + '" aria-label="Hapus Product dari paket">Hapus</button>' +
+      '</div>';
+    }).join('');
+
+    box.querySelectorAll('[data-cm-product]').forEach(function(select) {
+      select.addEventListener('change', function() {
+        var row = select.closest('[data-cm-component-index]');
+        var index = row ? Number(row.dataset.cmComponentIndex) : -1;
+        if (index >= 0) _ownerMasterMenuState.packageComponents[index].product_id = select.value;
+        renderOwnerMasterMenuPreview();
+      });
+    });
+    box.querySelectorAll('[data-cm-qty]').forEach(function(input) {
+      input.addEventListener('input', function() {
+        var row = input.closest('[data-cm-component-index]');
+        var index = row ? Number(row.dataset.cmComponentIndex) : -1;
+        if (index >= 0) _ownerMasterMenuState.packageComponents[index].quantity = input.value;
+        renderOwnerMasterMenuPreview();
+      });
+    });
+    box.querySelectorAll('[data-cm-remove]').forEach(function(button) {
+      button.addEventListener('click', function() {
+        var index = Number(button.dataset.cmRemove);
+        _ownerMasterMenuState.packageComponents.splice(index, 1);
+        renderOwnerMasterMenuPackageComponents();
+      });
+    });
+  }
+
+  function addOwnerMasterMenuPackageComponent() {
+    _ownerMasterMenuState.packageComponents.push({ product_id: '', quantity: 1 });
+    renderOwnerMasterMenuPackageComponents();
+  }
+
+  function ownerMasterMenuSelectedSubCategory() {
+    var id = String(($('cm-sub-category') && $('cm-sub-category').value) || '');
+    return _ownerMasterMenuState.subCategories.find(function(row) {
+      return String(row.id) === id;
+    }) || null;
+  }
+
+  function ownerMasterMenuSelectedRasa() {
+    var id = String(($('cm-rasa') && $('cm-rasa').value) || '');
+    return _ownerMasterMenuState.rasas.find(function(row) {
+      return String(row.id) === id;
+    }) || null;
+  }
+
+  function ownerMasterMenuSelectedLevel() {
+    var id = String(($('cm-level') && $('cm-level').value) || '');
+    return _ownerMasterMenuState.levels.find(function(row) {
+      return String(row.id) === id;
+    }) || null;
+  }
+
+  function renderOwnerMasterMenuPreview() {
+    var titleEl = $('cm-preview-title');
+    var subtitleEl = $('cm-preview-subtitle');
+    var detailEl = $('cm-preview-detail');
+    var indicatorEl = $('cm-preview-indicator');
+    var priceEl = $('cm-preview-price');
+    var imageEl = $('cm-preview-image');
+    var emptyEl = $('cm-preview-image-empty');
+    if (!titleEl || !subtitleEl || !detailEl || !priceEl) return;
+
+    var type = String(($('master-menu-type') && $('master-menu-type').value) || 'SINGLE').toUpperCase();
+    var sub = ownerMasterMenuSelectedSubCategory();
+    var rasa = ownerMasterMenuSelectedRasa();
+    var rasaLabel = rasa ? ownerMasterMenuRasaLabel(rasa.name) : '';
+    var selectedLevel = ownerMasterMenuSelectedLevel();
+    if (selectedLevel) {
+      levelName = String(selectedLevel.name || '');
+      levelPosition = Number(selectedLevel.sort_order);
+      if (!Number.isFinite(levelPosition) || levelPosition < 1) levelPosition = 1;
+      levelPosition = Math.min(4, Math.floor(levelPosition));
+    }
+    var detail = '';
+    var image = '';
+    var title = '';
+    var levelName = '';
+    var levelPosition = 0;
+
+    if (type === 'PACKAGE') {
+      title = String(($('cm-package-name') && $('cm-package-name').value) || '').trim() || 'Nama Menu Paket';
+      detail = (_ownerMasterMenuState.packageComponents || []).map(function(item) {
+        var product = ownerMasterMenuFindProduct(item.product_id);
+        if (!product) return null;
+        var qty = Number(item.quantity || 1);
+        return product.name + (qty > 1 ? ' × ' + qty : '');
+      }).filter(Boolean).join(' · ');
+      var firstProduct = (_ownerMasterMenuState.packageComponents || []).map(function(item) {
+        return ownerMasterMenuFindProduct(item.product_id);
+      }).find(function(product) { return product && (product.image_url || product.image); });
+      image = firstProduct ? (firstProduct.image_url || firstProduct.image || '') : '';
+    } else {
+      // Canonical resolver title for SINGLE is Sub Category, never Product name.
+      title = sub ? sub.name : 'Pilih Sub Category';
+      detail = ownerMasterMenuFindProduct($('cm-product') && $('cm-product').value)
+        ? 'Product: ' + ownerMasterMenuFindProduct($('cm-product').value).name
+        : '';
+      var singleProduct = ownerMasterMenuFindProduct($('cm-product') && $('cm-product').value);
+      image = singleProduct ? (singleProduct.image_url || singleProduct.image || '') : '';
+    }
+
+    titleEl.textContent = title;
+    subtitleEl.textContent = rasaLabel;
+    detailEl.textContent = detail;
+    priceEl.textContent = formatMoney(Number(($('cm-price') && $('cm-price').value) || 0));
+
+    if (imageEl && emptyEl) {
+      if (image) {
+        imageEl.src = image;
+        imageEl.alt = title;
+        imageEl.style.display = 'block';
+        emptyEl.style.display = 'none';
+      } else {
+        imageEl.removeAttribute('src');
+        imageEl.alt = '';
+        imageEl.style.display = 'none';
+        emptyEl.style.display = 'inline-flex';
+      }
+    }
+  }
+
+  async function loadOwnerMasterMenuReferences() {
+    var headers = getAuthHeaders();
+    var levelsPromise = adminFetch(API_BASE + '/admin/menu/components/level/ensure-defaults', {
+      method: 'POST',
+      headers: headers
+    }).then(function(res) {
+      return res.json().then(function(data) {
+        if (!res.ok || !data.success) throw new Error(data.error || 'Gagal menyiapkan Level.');
+        return data;
+      });
+    }).then(function() {
+      return adminFetch(API_BASE + '/admin/menu/components/level', { headers: headers });
+    }).then(function(res) { return res.json(); });
+
+    var results = await Promise.all([
+      adminFetch(API_BASE + '/admin/composed/products?active_only=1', { headers: headers }).then(function(res){ return res.json(); }),
+      adminFetch(API_BASE + '/admin/categories', { headers: headers }).then(function(res){ return res.json(); }),
+      adminFetch(API_BASE + '/admin/sub-categories', { headers: headers }).then(function(res){ return res.json(); }),
+      adminFetch(API_BASE + '/admin/rasas', { headers: headers }).then(function(res){ return res.json(); }),
+      levelsPromise
+    ]);
+
+    var productData = results[0] || {};
+    var categoryData = results[1] || {};
+    var subCategoryData = results[2] || {};
+    var rasaData = results[3] || {};
+    var levelData = results[4] || {};
+
+    if (!productData.success) throw new Error(productData.error || 'Produk Master gagal dimuat.');
+    if (!categoryData.success) throw new Error(categoryData.error || 'Kategori gagal dimuat.');
+    if (!subCategoryData.success) throw new Error(subCategoryData.error || 'Sub Category gagal dimuat.');
+    if (!rasaData.success) throw new Error(rasaData.error || 'Rasa gagal dimuat.');
+    if (!levelData.success) throw new Error(levelData.error || 'Level gagal dimuat.');
+
+    _ownerMasterMenuState.products = productData.products || [];
+    _ownerMasterMenuState.categories = categoryData.categories || [];
+    _ownerMasterMenuState.subCategories = subCategoryData.sub_categories || [];
+    _ownerMasterMenuState.rasas = rasaData.rasas || [];
+    _ownerMasterMenuState.levels = levelData.components || [];
+  }
+
+  async function loadOwnerMasterMenus() {
+    try {
+      var res = await adminFetch(API_BASE + '/admin/menus', { headers: getAuthHeaders() });
+      var data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Menu Master gagal dimuat.');
+      _ownerMasterMenuState.menus = data.menus || [];
+      renderOwnerMasterMenuList();
+    } catch (err) {
+      console.error('[Owner Master Menu Load Error]:', err);
+      var box = $('master-menu-list');
+      if (box) box.innerHTML = '<div class="x-empty-state text-muted">Gagal memuat Menu Master.</div>';
+    }
+  }
+
+  function renderOwnerMasterMenuList() {
+    var box = $('master-menu-list');
+    if (!box) return;
+    var query = String(_ownerMasterMenuState.search || '').trim().toLowerCase();
+    var filter = String(_ownerMasterMenuState.typeFilter || 'all').toUpperCase();
+
+    var menus = (_ownerMasterMenuState.menus || []).filter(function(menu) {
+      var hay = [
+        ownerMasterMenuTitle(menu),
+        menu.sub_category_name || '',
+        menu.category_name || '',
+        menu.rasa_name || ''
+      ].join(' ').toLowerCase();
+      return (!query || hay.indexOf(query) !== -1) &&
+        (filter === 'ALL' || String(menu.menu_type).toUpperCase() === filter);
+    });
+
+    if (!menus.length) {
+      box.innerHTML = '<div class="x-empty-state text-center py-6 text-muted">Belum ada Menu Master yang cocok.</div>';
+      return;
+    }
+
+    box.innerHTML = menus.map(function(menu) {
+      var type = String(menu.menu_type || '').toUpperCase();
+      var title = ownerMasterMenuTitle(menu);
+      var rasa = ownerMasterMenuRasaLabel(menu.rasa_name);
+      var status = String(menu.status || 'DRAFT').toUpperCase();
+      var typeLabel = type === 'PACKAGE' ? 'Paket' : 'Satuan';
+      var statusClass = status === 'ACTIVE' ? 'x-badge-success' : (status === 'ARCHIVED' ? 'x-badge-warning' : 'x-badge-info');
+      var taxonomy = [menu.category_name, menu.sub_category_name].filter(Boolean).join(' › ');
+      return '<article class="x-master-menu-card">' +
+        '<div class="x-master-menu-card-header">' +
+          '<div>' +
+            '<span class="x-badge x-badge-info">' + typeLabel + '</span>' +
+            '<h4>' + esc(title) + '</h4>' +
+            (rasa ? '<p>' + esc(rasa) + '</p>' : '') +
+          '</div>' +
+          '<span class="x-badge ' + statusClass + '">' + ownerMasterMenuStatusLabel(status) + '</span>' +
+        '</div>' +
+        '<div class="x-master-menu-card-meta">' +
+          '<span>' + esc(taxonomy || 'Tanpa taxonomy') + '</span>' +
+          '<strong>' + formatMoney(menu.selling_price) + '</strong>' +
+        '</div>' +
+        '<div class="x-master-menu-card-footer">' +
+          '<button type="button" class="x-btn-secondary" onclick="openEditOwnerMasterMenu(\'' + esc(menu.id) + '\')">Edit</button>' +
+          '<button type="button" class="x-btn-secondary" onclick="setOwnerMasterMenuStatus(\'' + esc(menu.id) + '\', \'' + (status === 'ACTIVE' ? 'ARCHIVED' : 'ACTIVE') + '\')">' +
+            (status === 'ACTIVE' ? 'Arsipkan' : 'Aktifkan') +
+          '</button>' +
+        '</div>' +
+      '</article>';
+    }).join('');
+  }
+
+  async function loadOwnerMasterMenuEditor(menuId) {
+    showOwnerMasterMenuEditor();
+
+    if (!menuId) {
+      ownerMasterMenuResetEditor(_ownerMasterMenuState.createType);
+      try {
+        await loadOwnerMasterMenuReferences();
+        renderOwnerMasterMenuEditorForm();
+      } catch (err) {
+        console.error('[Owner Master Menu References Error]:', err);
+        showToast('⚠️ Referensi Menu Master belum tersedia.');
+      }
+      return;
+    }
+
+    try {
+      await loadOwnerMasterMenuReferences();
+      var res = await adminFetch(API_BASE + '/admin/menus/' + encodeURIComponent(menuId), { headers: getAuthHeaders() });
+      var data = await res.json();
+      if (!data.success || !data.menu) throw new Error(data.error || 'Menu tidak ditemukan.');
+
+      var menu = data.menu;
+      var type = String(menu.menu_type || 'SINGLE').toUpperCase() === 'PACKAGE' ? 'PACKAGE' : 'SINGLE';
+      _ownerMasterMenuState.editingId = menu.id;
+      _ownerMasterMenuState.editingType = type;
+      _ownerMasterMenuState.createType = type;
+      _ownerMasterMenuState.packageComponents = (menu.components || []).map(function(item) {
+        return { product_id: String(item.product_id), quantity: Number(item.quantity) };
+      });
+
+      $('master-menu-id').value = String(menu.id);
+      $('master-menu-type').value = type;
+      $('cm-product').value = type === 'SINGLE' && menu.components && menu.components[0] ? String(menu.components[0].product_id) : '';
+      $('cm-package-name').value = menu.package_name || '';
+      $('cm-category').value = menu.category_id ? String(menu.category_id) : '';
+      renderOwnerMasterMenuSubCategories();
+      $('cm-sub-category').value = menu.sub_category_id ? String(menu.sub_category_id) : '';
+      $('cm-rasa').value = menu.rasa_id ? String(menu.rasa_id) : '';
+      $('cm-level').value = menu.level_id ? String(menu.level_id) : '';
+      $('cm-price').value = menu.selling_price != null ? menu.selling_price : '';
+      $('cm-status').value = String(menu.status || 'DRAFT').toUpperCase();
+
+      $('master-menu-editor-title').textContent = type === 'PACKAGE' ? 'Edit Menu Paket' : 'Edit Menu Satuan';
+      $('master-menu-editor-breadcrumb').textContent = ownerMasterMenuTitle(menu);
+      $('master-menu-editor-mobile-title').textContent = 'Edit Menu';
+      $('master-menu-editor-mobile-subtitle').textContent = type === 'PACKAGE'
+        ? 'Perbarui nama paket, komposisi Product, taxonomy, harga, dan status.'
+        : 'Perbarui Product penyusun, Sub Category, Rasa, taxonomy, harga, dan status.';
+
+      renderOwnerMasterMenuEditorForm();
+      // renderOwnerMasterMenuEditorForm repopulates selects, so re-apply exact current values.
+      $('cm-product').value = type === 'SINGLE' && menu.components && menu.components[0] ? String(menu.components[0].product_id) : '';
+      $('cm-category').value = menu.category_id ? String(menu.category_id) : '';
+      renderOwnerMasterMenuSubCategories();
+      $('cm-sub-category').value = menu.sub_category_id ? String(menu.sub_category_id) : '';
+      $('cm-rasa').value = menu.rasa_id ? String(menu.rasa_id) : '';
+      $('cm-level').value = menu.level_id ? String(menu.level_id) : '';
+      $('cm-price').value = menu.selling_price != null ? menu.selling_price : '';
+      $('cm-status').value = String(menu.status || 'DRAFT').toUpperCase();
+      renderOwnerMasterMenuPackageComponents();
+      renderOwnerMasterMenuPreview();
+    } catch (err) {
+      console.error('[Owner Master Menu Editor Load Error]:', err);
+      showToast('❌ ' + (err.message || 'Gagal memuat Menu Master.'));
+      navigateTo('catalog/master-menus');
+    }
+  }
+
+  async function saveOwnerMasterMenu(statusOverride) {
+    var type = String(($('master-menu-type') && $('master-menu-type').value) || 'SINGLE').toUpperCase();
+    var menuId = String(($('master-menu-id') && $('master-menu-id').value) || '');
+    var status = statusOverride || String(($('cm-status') && $('cm-status').value) || 'DRAFT').toUpperCase();
+    var price = Number(($('cm-price') && $('cm-price').value) || NaN);
+    if (!Number.isFinite(price) || price < 0) {
+      showToast('❌ Harga Menu tidak valid.');
+      return;
+    }
+
+    var subCategoryId = String(($('cm-sub-category') && $('cm-sub-category').value) || '') || null;
+    var rasaId = String(($('cm-rasa') && $('cm-rasa').value) || '') || null;
+    var levelId = String(($('cm-level') && $('cm-level').value) || '') || null;
+
+    try {
+      var endpoint = '';
+      var method = menuId ? 'PUT' : 'POST';
+      var payload = {
+        sub_category_id: subCategoryId,
+        rasa_id: rasaId,
+        level_id: levelId,
+        selling_price: price,
+        status: status
+      };
+
+      if (type === 'SINGLE') {
+        var productId = String(($('cm-product') && $('cm-product').value) || '');
+        if (!productId) throw new Error('Product komposisi wajib dipilih.');
+        if (!subCategoryId) throw new Error('Sub Category wajib dipilih untuk Menu Satuan.');
+        endpoint = menuId
+          ? API_BASE + '/admin/menus/' + encodeURIComponent(menuId) + '/single'
+          : API_BASE + '/admin/menus/single';
+        payload.product_id = productId;
+      } else {
+        var packageName = String(($('cm-package-name') && $('cm-package-name').value) || '').trim();
+        if (!packageName) throw new Error('Nama Menu Paket wajib diisi.');
+
+        var seen = {};
+        var totalUnits = 0;
+        var components = (_ownerMasterMenuState.packageComponents || []).map(function(item) {
+          var productId = String(item.product_id || '').trim();
+          var quantity = Number(item.quantity);
+          if (!productId) throw new Error('Semua baris Product Paket wajib dipilih.');
+          if (!Number.isSafeInteger(quantity) || quantity <= 0) throw new Error('Qty Product Paket harus bilangan bulat positif.');
+          if (seen[productId]) throw new Error('Satu Product tidak boleh muncul dua kali dalam paket.');
+          seen[productId] = true;
+          totalUnits += quantity;
+          return { product_id: productId, quantity: quantity };
+        });
+        if (components.length === 0) throw new Error('Komposisi Menu Paket wajib diisi.');
+        if (totalUnits < 2) throw new Error('Menu Paket membutuhkan minimal 2 unit Product.');
+
+        endpoint = menuId
+          ? API_BASE + '/admin/menus/' + encodeURIComponent(menuId) + '/package'
+          : API_BASE + '/admin/menus/package';
+        payload.package_name = packageName;
+        payload.components = components;
+      }
+
+      var res = await adminFetch(endpoint, {
+        method: method,
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload)
+      });
+      var data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Gagal menyimpan Menu Master.');
+
+      showToast(status === 'ACTIVE' ? '✅ Menu Master aktif.' : '✅ Menu Master tersimpan sebagai draft.');
+      navigateTo('catalog/master-menus', { history: 'replace' });
+    } catch (err) {
+      console.error('[Owner Master Menu Save Error]:', err);
+      showToast('❌ ' + (err.message || 'Gagal menyimpan Menu Master.'));
+    }
+  }
+
+  async function setOwnerMasterMenuStatus(id, status) {
+    try {
+      var res = await adminFetch(API_BASE + '/admin/menus/' + encodeURIComponent(id) + '/status', {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ status: status })
+      });
+      var data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Gagal mengubah status Menu Master.');
+      showToast('✅ Status Menu Master diperbarui.');
+      loadOwnerMasterMenus();
+    } catch (err) {
+      showToast('❌ ' + (err.message || 'Gagal mengubah status Menu Master.'));
+    }
+  }
+
+  function openNewOwnerMasterMenu(type) {
+    _ownerMasterMenuState.createType = type === 'PACKAGE' ? 'PACKAGE' : 'SINGLE';
+    navigateTo('catalog/master-menus/new');
+  }
+
+  window.openAddMasterMenuSingle = function() {
+    openNewOwnerMasterMenu('SINGLE');
+  };
+  window.openAddMasterMenuPackage = function() {
+    openNewOwnerMasterMenu('PACKAGE');
+  };
+  window.openEditOwnerMasterMenu = function(id) {
+    if (id) navigateTo('catalog/master-menus/' + encodeURIComponent(id) + '/edit');
+  };
+  window.setOwnerMasterMenuStatus = setOwnerMasterMenuStatus;
+
+  function initOwnerMasterMenuUI() {
+    var addSingle = $('btn-add-master-menu-single');
+    var addPackage = $('btn-add-master-menu-package');
+    var search = $('master-menu-search');
+    var typeFilter = $('master-menu-type-filter');
+    var category = $('cm-category');
+    var product = $('cm-product');
+    var subCategory = $('cm-sub-category');
+    var rasa = $('cm-rasa');
+    var level = $('cm-level');
+    var packageName = $('cm-package-name');
+    var price = $('cm-price');
+    var form = $('form-master-menu');
+    var saveDraft = $('btn-save-master-menu-draft');
+    var addComponent = $('btn-cm-add-component');
+
+    if (addSingle) addSingle.addEventListener('click', function() { openNewOwnerMasterMenu('SINGLE'); });
+    if (addPackage) addPackage.addEventListener('click', function() { openNewOwnerMasterMenu('PACKAGE'); });
+
+    if (search) search.addEventListener('input', function() {
+      _ownerMasterMenuState.search = search.value || '';
+      renderOwnerMasterMenuList();
+    });
+
+    if (typeFilter) typeFilter.querySelectorAll('[data-menu-filter]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        _ownerMasterMenuState.typeFilter = btn.dataset.menuFilter || 'all';
+        typeFilter.querySelectorAll('[data-menu-filter]').forEach(function(other) {
+          var active = other === btn;
+          other.classList.toggle('active', active);
+          other.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        renderOwnerMasterMenuList();
+      });
+    });
+
+    if (category) category.addEventListener('change', function() {
+      renderOwnerMasterMenuSubCategories();
+      renderOwnerMasterMenuPreview();
+    });
+
+    [product, subCategory, rasa, level, packageName, price].forEach(function(el) {
+      if (!el) return;
+      el.addEventListener('input', renderOwnerMasterMenuPreview);
+      el.addEventListener('change', renderOwnerMasterMenuPreview);
+    });
+
+    if (addComponent) addComponent.addEventListener('click', addOwnerMasterMenuPackageComponent);
+    if (form) form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      saveOwnerMasterMenu('ACTIVE');
+    });
+    if (saveDraft) saveDraft.addEventListener('click', function() {
+      saveOwnerMasterMenu('DRAFT');
+    });
+
+    var cancel = $('btn-cancel-master-menu');
+    var desktopBack = $('btn-master-menu-editor-desktop-back');
+    if (cancel) cancel.addEventListener('click', function() { navigateTo('catalog/master-menus'); });
+    if (desktopBack) desktopBack.addEventListener('click', function() { goBackFromChildPage(); });
+  }
+
+
   var _isInitialized = false;
   async function initializeDashboard() {
     if (_isInitialized) return;
@@ -11172,6 +11468,7 @@ async function loadMenusView() {
     initBrandListeners();
     initSettingsProfileListeners();
     initCatalogListeners();
+    initOwnerMasterMenuUI();
     initBranchSearchAndFilter();
     initBranchOperationsForm();
 

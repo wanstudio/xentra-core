@@ -1,0 +1,33 @@
+name: Xentra Proposal Tests
+
+on:
+  push:
+    branches:
+      - proposal/xentra-taxonomy-composed-menu-v1
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: xentra-proposal-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Full test suite
+        run: npm test

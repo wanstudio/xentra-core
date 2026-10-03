@@ -3,11 +3,11 @@
  *
  * Branch Manager UI only. API/data transport is provided by
  * merchant-shared/js/catalog-client.js.
-
- * Branch content override compatibility remains for legacy fields. The narrow
- * Customer display-name override is now canonical and is edited from the Merchant
- * Menu action surface via the dedicated display-name endpoint. Description/image
- * override behavior remains legacy compatibility only.
+ *
+ * Forward Branch Menu operations use canonical Menu APIs. The former Product
+ * override editor is intentionally quarantined and has no active UI caller.
+ * Customer display-name override is edited from the Merchant Menu action surface
+ * through the dedicated Menu display-name endpoint.
  */
 (function () {
   'use strict';
@@ -35,181 +35,9 @@
 
 
 
-  /* =========================================================================
-     MODUL 3.2: BRANCH PRODUCT OVERRIDE — text / price / category only
-     PHOTO OVERRIDE IS LOCKED: Master Product Owner controls the image.
-     ========================================================================= */
-  var _overrideProductId = null;
-
-  window.openBranchOverrideModal = function (productDataRaw) {
-    var p;
-    try { p = JSON.parse(productDataRaw.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'")); } catch (e) { showToast('❌ Gagal membuka override.'); return; }
-    _overrideProductId = p.product_id;
-
-    var modal = $('modal-branch-override');
-    if (!modal) { showToast('❌ Modal override tidak ditemukan di HTML.'); return; }
-
-    // Product heading
-    $('override-product-heading').textContent = 'Edit Menu: ' + (p.master_name || p.name || p.product_id);
-
-    // Name row
-    $('override-name-input').value     = p.name_override != null ? p.name_override : '';
-    $('override-name-master').textContent = p.master_name || '(tidak ada)';
-    $('override-name-status').textContent  = p.name_override ? '🟡 OVERRIDE aktif' : '🟢 DEFAULT (ikut Master)';
-
-    // Description row
-    $('override-desc-input').value     = p.description_override != null ? p.description_override : '';
-    $('override-desc-master').textContent = p.master_description || '(tidak ada)';
-    $('override-desc-status').textContent  = p.description_override ? '🟡 OVERRIDE aktif' : '🟢 DEFAULT (ikut Master)';
-
-    // Photo row — live override URL preview'd from the catalog payload
-    var imgInput = $('override-img-file');
-    if (imgInput) imgInput.value = '';
-    var hasImg = p.image_url || p.master_image_url;
-    var previewImg = $('override-img-preview');
-    var previewMono = $('override-img-preview-mono');
-    if (hasImg) {
-      previewImg.src = p.image_url || p.master_image_url;
-      previewImg.style.display = 'block';
-      previewMono.style.display = 'none';
-    } else {
-      previewImg.style.display = 'none';
-      previewMono.style.display = 'block';
-      previewMono.textContent = (p.name || p.master_name || '?').trim().slice(0, 1).toUpperCase();
-    }
-    $('override-img-status').textContent = p.image_override ? '🟠 OVERRIDE legacy tersimpan (tidak digunakan)' : '🟢 DEFAULT (ikut Master)';
-
-    // Price row — pricing policy drives editability (same UX as adopt modal)
-    var isRange = String(p.pricing_mode).toLowerCase() === 'range';
-    var priceInput = $('override-price-input');
-    var priceHint = $('override-price-hint');
-    if (isRange) {
-      priceInput.readOnly = false;
-      priceInput.value = p.price != null ? p.price : (p.master_price != null ? p.master_price : '');
-      priceInput.min = p.min_price != null ? p.min_price : p.master_price;
-      priceInput.max = p.max_price != null ? p.max_price : p.master_price;
-      priceHint.innerHTML = '💡 <strong>Range Harga Fleksibel:</strong> Cabang diizinkan menentukan harga antara <strong>' + formatMoney(p.min_price) + '</strong> s/d <strong>' + formatMoney(p.max_price) + '</strong>.';
-    } else {
-      priceInput.readOnly = true;
-      priceInput.value = p.price != null ? p.price : (p.master_price != null ? p.master_price : '');
-      priceHint.innerHTML = '🔒 <strong>Harga Terkunci:</strong> Ditetapkan paten oleh Pemilik Resto (Owner) sebesar <strong>' + formatMoney(p.master_price) + '</strong>.';
-    }
-
-    // Category row — branch categories of the currently managed branch
-    var cats = (currentBranchCatalogData && currentBranchCatalogData.categories) || (bmMenuState && bmMenuState.categories) || [];
-    var catSelect = $('override-category-select');
-    if (catSelect) {
-      var catOptions = cats.map(function (c) {
-        return '<option value="' + c.id + '"' + (String(p.branch_category_id) === String(c.id) ? ' selected' : '') + '>' + esc(c.name) + '</option>';
-      });
-      catOptions.unshift('<option value="">Tanpa Kategori</option>');
-      catSelect.innerHTML = catOptions.join('');
-    }
-
-    // M:N Category Checkbox List (Phase 3)
-    var catListEl = $('override-categories-list');
-    if (catListEl) {
-      var activeCatIds = Array.isArray(p.category_ids) && p.category_ids.length > 0
-        ? p.category_ids.map(String)
-        : (p.branch_category_id ? [String(p.branch_category_id)] : []);
-      if (!cats.length) {
-        catListEl.innerHTML = '<span class="text-muted" style="font-size:12px; grid-column:1/-1; padding:12px 0;">Belum ada kategori cabang dibuat. Buat kategori terlebih dahulu di tab Kategori Cabang.</span>';
-      } else {
-        catListEl.innerHTML = cats.map(function (c) {
-          var isChecked = activeCatIds.indexOf(String(c.id)) !== -1;
-          return '<label class="x-category-chip-card' + (isChecked ? ' is-checked' : '') + '">' +
-            '<input type="checkbox" class="override-cat-checkbox" value="' + esc(c.id) + '"' + (isChecked ? ' checked' : '') + ' onchange="this.closest(\'.x-category-chip-card\').classList.toggle(\'is-checked\', this.checked)" />' +
-            '<span title="' + esc(c.name) + '">' + esc(c.name) + '</span>' +
-          '</label>';
-        }).join('');
-      }
-    }
-
-    modal.style.display = 'flex';
-  };
-
-  window.closeBranchOverrideModal = function () {
-    var modal = $('modal-branch-override');
-    if (modal) modal.style.display = 'none';
-    _overrideProductId = null;
-  };
-
-  window.saveBranchProductOverride = async function () {
-    if (!currentManagingBranchId || !_overrideProductId) return;
-    var btn = $('btn-save-override');
-    btn.disabled = true;
-    btn.textContent = 'Menyimpan...';
-
-    // Empty string = user wants to clear the override (send null)
-    var nameVal = $('override-name-input').value;
-    var descVal = $('override-desc-input').value;
-
-    var payload = {};
-    payload.name        = nameVal.trim()  !== '' ? nameVal.trim()  : null;
-    payload.description = descVal.trim()  !== '' ? descVal.trim()  : null;
-
-    // price — lock mode is readonly (input disabled); range mode always sent so
-    // the server re-validates against the locked PricingPolicyModel.
-    var pricingMode = String($('override-price-input').readOnly ? 'lock' : 'range').toLowerCase();
-    if (pricingMode === 'range') {
-      payload.price = Number($('override-price-input').value);
-    }
-
-    // category — collect M:N checkboxes if present, otherwise fallback to select
-    var catListEl = $('override-categories-list');
-    if (catListEl && catListEl.querySelectorAll('.override-cat-checkbox').length > 0) {
-      var checkedCbs = catListEl.querySelectorAll('.override-cat-checkbox:checked');
-      var checkedIds = Array.from(checkedCbs).map(function (cb) { return cb.value; });
-      payload.category_ids = checkedIds;
-      payload.branch_category_id = checkedIds.length > 0 ? checkedIds[0] : null;
-    } else {
-      var catVal = $('override-category-select') ? $('override-category-select').value : '';
-      payload.branch_category_id = catVal !== '' ? catVal : null;
-      if (catVal !== '') payload.category_ids = [catVal];
-    }
-
-    try {
-      // 2. Text + price + category overrides
-      var res = await CatalogClient.updateBranchProductOverride(currentManagingBranchId, _overrideProductId, payload);
-      var data = await res.json();
-      if (data.success) {
-        showToast('✅ Perubahan menu cabang berhasil disimpan!');
-        window.closeBranchOverrideModal();
-        if (isBranchManager()) {
-          if (typeof hooks.refreshBMMenu === 'function') hooks.refreshBMMenu();
-          if (typeof loadInlineBranchCatalog === 'function') loadInlineBranchCatalog();
-        } else {
-          loadInlineBranchCatalog();
-        }
-      } else {
-        showToast('❌ ' + (data.message || data.error || 'Gagal menyimpan perubahan.'));
-      }
-    } catch (err) {
-      showToast('❌ Kesalahan jaringan saat menyimpan perubahan.');
-    } finally {
-      btn.disabled = false;
-      btn.textContent = 'Simpan';
-    }
-  };
-
-  window.clearBranchProductOverride = async function () {
-    if (!currentManagingBranchId || !_overrideProductId) return;
-    if (!confirm('Kembalikan nilai teks, harga, dan kategori ke Master? Foto Menu tetap mengikuti Master Product Owner.')) return;
-    var res = await CatalogClient.updateBranchProductOverride(currentManagingBranchId, _overrideProductId, { name: null, description: null, price: null, branch_category_id: null, category_ids: [] });
-    var data = await res.json();
-    if (data.success) {
-      showToast('✅ Semua nilai dikembalikan ke Master.');
-      window.closeBranchOverrideModal();
-      if (isBranchManager()) {
-        if (typeof hooks.refreshBMMenu === 'function') hooks.refreshBMMenu();
-        if (typeof loadInlineBranchCatalog === 'function') loadInlineBranchCatalog();
-      } else {
-        loadInlineBranchCatalog();
-      }
-    } else {
-      showToast('❌ ' + (data.error || 'Gagal menghapus override.'));
-    }
-  };
+  // Legacy Product Override editor is intentionally removed from the forward UI.
+  // Branch Menu presentation uses the canonical display-name endpoint; availability,
+  // category membership, adoption, and removal use canonical Menu APIs.
 
   window.promptAddBranchCategory = async function () {
     if (!currentManagingBranchId) return;
@@ -231,9 +59,9 @@
   };
 
   // Adopt Product Modal Actions
-  window.openMerchantAdoptModal = function (productId) {
+  window.openMerchantAdoptModal = function (menuId) {
     if (!currentBranchCatalogData) return;
-    var p = currentBranchCatalogData.available_master_products.find(function (x) { return String(x.id) === String(productId); });
+    var p = currentBranchCatalogData.available_master_products.find(function (x) { return String(x.menu_id || x.id) === String(menuId); });
     if (!p) return;
 
     var resolvedBranchId = currentManagingBranchId ||
@@ -247,7 +75,7 @@
       return;
     }
 
-    $('adopt-product-id').value = p.id;
+    $('adopt-product-id').value = p.menu_id || p.id;
     $('adopt-product-name').value = p.name || p.id;
 
     if ($('adopt-menu-title')) $('adopt-menu-title').textContent = composition.title || '—';
@@ -289,7 +117,7 @@
       btn.disabled = true;
       btn.textContent = 'Menyimpan...';
 
-      var prodId = $('adopt-product-id').value;
+      var menuId = $('adopt-product-id').value;
       var catId = $('adopt-branch-category').value;
       if (!catId) {
         showToast('❌ Pilih minimal satu Kategori Cabang.');
@@ -299,9 +127,9 @@
       }
 
       try {
-        var res = await CatalogClient.adoptProduct(currentManagingBranchId, {
-          product_id: prodId,
-          category_ids: [catId]
+        var res = await CatalogClient.adoptMenu(currentManagingBranchId, {
+          menu_id: menuId,
+          branch_category_ids: [catId]
         });
         var data = await res.json();
         if (data.success) {
@@ -314,7 +142,7 @@
             loadInlineBranchCatalog();
           }
         } else {
-          showToast('❌ ' + (data.message || data.error || 'Gagal mengadopsi produk.'));
+          showToast('❌ ' + (data.message || data.error || 'Gagal mengadopsi menu.'));
         }
       } catch (err) {
         showToast('❌ Kesalahan jaringan.');
@@ -372,8 +200,8 @@
       currentBranchCatalogData = data;
 
       var categories = data.categories || [];
-      var adopted = data.adopted_products || [];
-      var available = data.available_master_products || [];
+      var adopted = data.adopted_menus || data.adopted_products || [];
+      var available = data.available_master_menus || data.available_master_products || [];
 
       // Update subtitle
       var subtitle = $('branch-catalog-subtitle');
@@ -947,7 +775,7 @@
     
     container.innerHTML = filtered.map(function (p) {
       var comp = p.menu_composition || {};
-      var img = comp.image || p.image_url || p.master_image_url || '';
+      var img = comp.image_url || (comp.components && comp.components[0] && comp.components[0].image_url) || p.image_url || p.master_image_url || '';
       var isAvailable = p.is_available === 1 || p.is_available === true;
       var categoryNames = (p.categories || []).map(function (c) { return c.name; }).filter(Boolean);
       var categoryHtml = categoryNames.length
@@ -968,7 +796,7 @@
       var price = comp.price != null ? Number(comp.price) : Number(p.master_price || p.price || 0);
             var availabilityToggle = '' +
         '<label class="x-toggle' + (isAvailable ? ' x-toggle-on' : '') + '" title="' + (isAvailable ? 'Menu tersedia' : 'Menu habis') + '">' +
-          '<input type="checkbox" ' + (isAvailable ? 'checked' : '') + ' onchange="toggleBranchProductAvailability(\'' + p.product_id + '\', this.checked ? 1 : 0)" aria-label="Ubah ketersediaan menu cabang">' +
+          '<input type="checkbox" ' + (isAvailable ? 'checked' : '') + ' onchange="toggleBranchMenuAvailability(\'' + p.product_id + '\', this.checked ? 1 : 0)" aria-label="Ubah ketersediaan menu cabang">' +
           '<span class="x-toggle-slider"></span>' +
         '</label>';
 
@@ -984,7 +812,7 @@
               '<div>' + availabilityToggle + '</div>',
               '<div class="x-item-actions">',
                 '<button type="button" class="x-action-menu-trigger" aria-label="Aksi menu cabang" onclick="XentraActionMenu.open(this, [' +
-                  '{ label: \'Hapus dari Cabang\', icon: \'🗑️\', destructive: true, onClick: function() { removeBranchProduct(\'' + p.product_id + '\'); } }' +
+                  '{ label: \'Hapus dari Cabang\', icon: \'🗑️\', destructive: true, onClick: function() { removeBranchMenu(\'' + p.product_id + '\'); } }' +
                 '])">',
                 '</button>',
               '</div>',
@@ -1042,12 +870,12 @@
       });
     });
   }
-  // Override removeBranchProduct and toggleBranchProductAvailability to also refresh inline panel
-  var _origToggleBranchAvail = window.toggleBranchProductAvailability;
-  window.toggleBranchProductAvailability = async function (productId, nextAvail) {
+  // Override removeBranchMenu and toggleBranchMenuAvailability to also refresh inline panel
+  var _origToggleBranchAvail = window.toggleBranchMenuAvailability;
+  window.toggleBranchMenuAvailability = async function (menuId, nextAvail) {
     if (!currentManagingBranchId) return;
     try {
-      var res = await CatalogClient.setBranchProductAvailability(currentManagingBranchId, productId, nextAvail);
+      var res = await CatalogClient.setBranchMenuAvailability(currentManagingBranchId, menuId, nextAvail);
       var data = await res.json();
       if (data.success) {
         showToast('Ketersediaan menu cabang diperbarui.');
@@ -1061,17 +889,17 @@
     }
   };
 
-  var _origRemoveBranchProduct = window.removeBranchProduct;
-  window.removeBranchProduct = async function (productId, productName) {
-    productName = productName || 'menu ini';
+  var _origRemoveBranchProduct = window.removeBranchMenu;
+  window.removeBranchMenu = async function (menuId, menuName) {
+    menuName = menuName || 'menu ini';
     if (!currentManagingBranchId) return;
-    if (!confirm('Hapus "' + productName + '" dari katalog cabang ini? Menu tidak akan lagi tampil di halaman pemesanan pelanggan.')) return;
+    if (!confirm('Hapus "' + menuName + '" dari katalog cabang ini? Menu tidak akan lagi tampil di halaman pemesanan pelanggan.')) return;
 
     try {
-      var res = await CatalogClient.removeBranchProduct(currentManagingBranchId, productId);
+      var res = await CatalogClient.removeBranchMenu(currentManagingBranchId, menuId);
       var data = await res.json();
       if (data.success) {
-        showToast('\u2705 Produk dihapus dari katalog cabang.');
+        showToast('\u2705 Menu dihapus dari katalog cabang.');
         if (isBranchManager()) loadInlineBranchCatalog();
         else loadInlineBranchCatalog();
       } else {

@@ -40,14 +40,26 @@
   function buildRewardItem(reward) {
     if (!reward) return null;
     var promoId = promoIdOf(reward.promo_id || reward.promotion_id);
-    if (!promoId || !reward.product_id) return null;
+    var menuId = reward.menu_id || reward.target_menu_id || null;
+    var productId = reward.product_id || reward.target_product_id || null;
+    if (!promoId || (!menuId && !productId)) return null;
+
     var rewardPrice = reward.reward_price !== undefined && reward.reward_price !== null
       ? Number(reward.reward_price)
       : (reward.price !== undefined && reward.price !== null ? Number(reward.price) : 0);
+
     return {
+      // Synthetic row id is retained only as the cart-row key for the one
+      // reward entitlement. Commercial identity is menu_id when available.
       id: 'reward_' + promoId,
-      product_id: String(reward.product_id),
-      name: reward.name || 'Hadiah Promo',
+      product_id: menuId ? (productId ? String(productId) : null) : String(productId),
+      menu_id: menuId ? String(menuId) : null,
+      menu_type: reward.menu_type || null,
+      menu_snapshot: reward.menu_snapshot || null,
+      component_snapshot: Array.isArray(reward.component_snapshot)
+        ? reward.component_snapshot
+        : null,
+      name: reward.name || reward.menu_title || 'Hadiah Promo',
       price: rewardPrice,
       regular_price: reward.regular_price !== undefined && reward.regular_price !== null
         ? Number(reward.regular_price)

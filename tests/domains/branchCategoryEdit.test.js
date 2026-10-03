@@ -253,7 +253,7 @@ test('CATEGORY EDIT 4 — Validation and error handling', async () => {
   assert.strictEqual(resNoData.status, 400);
   const dataNoData = await resNoData.json();
   assert.strictEqual(dataNoData.success, false);
-  assert.strictEqual(dataNoData.error, 'Gambar kategori wajib diunggah.');
+  assert.strictEqual(dataNoData.error, 'Data gambar kategori cabang wajib diunggah.');
 });
 
 test('CATEGORY EDIT 5 — status-only update changes is_active without touching the name', async () => {

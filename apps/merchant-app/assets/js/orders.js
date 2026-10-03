@@ -413,6 +413,19 @@
     return '<div class="bm-order-payment-line unpaid">Belum dibayar · ' + formatMoney(pay.amount) + '</div>';
   }
 
+  function getBMOrderItemTitle(item) {
+    if (!item) return 'Item';
+    var snapshot = item.menu_snapshot;
+    if (typeof snapshot === 'string') {
+      try { snapshot = JSON.parse(snapshot); } catch (_) { snapshot = null; }
+    }
+    return (snapshot && (snapshot.title || snapshot.package_name)) ||
+      item.product_name ||
+      (item.menu_id ? ('Menu ' + item.menu_id) : '') ||
+      item.product_id ||
+      'Item';
+  }
+
   function renderBMOrdersFeed() {
     var container = $('bm-orders-cards-container');
     if (!container) return;
@@ -509,7 +522,7 @@
           : type === 'pickup' ? 'Pickup' : 'Pengantaran');
       var itemCount = (ord.items || []).reduce(function (sum, i) { return sum + (Number(i.quantity) || 0); }, 0);
       var preview = (ord.items || []).slice(0, 2).map(function (i) {
-        return esc(i.product_name || i.product_id || 'Item') + ' ×' + (Number(i.quantity) || 0);
+        return esc(getBMOrderItemTitle(i)) + ' ×' + (Number(i.quantity) || 0);
       }).join(' · ');
       if ((ord.items || []).length > 2) preview += ' · +' + ((ord.items || []).length - 2) + ' lainnya';
       var deadline = '';

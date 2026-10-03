@@ -123,25 +123,25 @@ async function mockFetch(path, options = {}) {
 
 // Set up a test branch and product
 function addTestBranch(branchId) {
-  // Ensure product 272 exists in the test DB (brand_bangjo) before inserting
-  // branch_products — the trg_branch_products_brand_consistency_insert trigger
-  // requires products.brand_id == branches.brand_id.
-  db.prepare(`INSERT OR IGNORE INTO products
-    (id, brand_id, name, slug, description, price, is_active)
-    VALUES ('272', 'brand_bangjo', 'Test Product 272', 'test-product-272', 'Test', 35000, 1)`)
-    .run();
-  db.prepare(`INSERT OR REPLACE INTO branches
-    (id, brand_id, name, slug, address_text, latitude, longitude, phone, is_active, is_open_override)
-    VALUES (?, 'brand_bangjo', ?, ?, 'Jl. Test', -7.2912, 112.7154, '081000000001', 1, 1)`)
-    .run(branchId, 'Branch ' + branchId, branchId);
-  db.prepare(`INSERT OR REPLACE INTO branch_delivery_settings
-    (id, branch_id, is_delivery_active, is_pickup_active, max_radius_km, free_delivery_km, price_per_km, min_order_amount)
-    VALUES (?, ?, 1, 1, 25, 5, 3000, 0)`)
-    .run('bds_' + branchId, branchId);
-  db.prepare(`INSERT OR REPLACE INTO branch_products (branch_id, product_id, price, stock, is_available)
-    VALUES (?, '272', 35000, 10, 1)`).run(branchId);
+  const productId = 'customer_google_product_272';
+  const categoryId = 'customer_google_category';
+  const subCategoryId = 'customer_google_sub_272';
+  const menuId = 'customer_google_menu_272';
+  db.prepare("INSERT OR IGNORE INTO categories (id, brand_id, name, slug, is_active) VALUES (?, 'brand_bangjo', 'Makanan Google Test', 'customer-google-makanan', 1)").run(categoryId);
+  db.prepare("INSERT OR REPLACE INTO products (id, brand_id, category_id, name, slug, description, price, is_active) VALUES (?, 'brand_bangjo', ?, 'Test Customer Google Menu', ?, 'Test', 35000, 1)").run(productId, categoryId, 'customer-google-product-272');
+  db.prepare("INSERT OR REPLACE INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, is_active, is_open_override) VALUES (?, 'brand_bangjo', ?, ?, 'Jl. Test', -7.2912, 112.7154, '081000000001', 1, 1)").run(branchId, 'Branch ' + branchId, branchId);
+  db.prepare("INSERT OR REPLACE INTO branch_delivery_settings (id, branch_id, is_delivery_active, is_pickup_active, max_radius_km, free_delivery_km, price_per_km, min_order_amount) VALUES (?, ?, 1, 1, 25, 5, 3000, 0)").run('bds_' + branchId, branchId);
+  const rasa = db.prepare("SELECT id FROM menu_flavors WHERE brand_id = 'brand_bangjo' AND lower(trim(name)) = 'original' AND is_active = 1 LIMIT 1").get()
+    || (db.prepare("INSERT INTO menu_flavors (id, brand_id, name, slug, is_active) VALUES ('customer_google_original', 'brand_bangjo', 'Original', 'customer-google-original', 1)").run(), db.prepare("SELECT id FROM menu_flavors WHERE id = 'customer_google_original'").get());
+  db.prepare("INSERT OR REPLACE INTO sub_categories (id, brand_id, category_id, name, slug, is_active) VALUES (?, 'brand_bangjo', ?, 'Test Customer Google Menu', 'customer-google-makanan', 1)").run(subCategoryId, categoryId);
+  db.prepare("INSERT OR REPLACE INTO menus (id, brand_id, menu_type, sub_category_id, rasa_id, selling_price, status) VALUES (?, 'brand_bangjo', 'SINGLE', ?, ?, 35000, 'ACTIVE')").run(menuId, subCategoryId, rasa.id);
+  db.prepare("INSERT OR REPLACE INTO menu_items (menu_id, product_id, quantity, sort_order) VALUES (?, ?, 1, 0)").run(menuId, productId);
+  db.prepare("INSERT OR IGNORE INTO branch_categories (id, brand_id, branch_id, name, slug, sort_order, is_active) VALUES (?, 'brand_bangjo', ?, 'Makanan', ?, 1, 1)").run('customer_google_bc_' + branchId, branchId, 'customer-google-makanan-' + branchId);
+  db.prepare("INSERT OR REPLACE INTO branch_menus (branch_id, menu_id, is_available, price_override) VALUES (?, ?, 1, 35000)").run(branchId, menuId);
+  db.prepare("INSERT OR REPLACE INTO branch_menu_categories (branch_id, menu_id, branch_category_id) VALUES (?, ?, ?)").run(branchId, menuId, 'customer_google_bc_' + branchId);
+  db.prepare("INSERT OR REPLACE INTO branch_product_inventory (branch_id, product_id, stock_qty, low_stock_threshold) VALUES (?, ?, 10, 5)").run(branchId, productId);
+  return { productId, menuId };
 }
-
 
 // ── CGA-01: Missing credential → 400 ──────────────────────────────────────
 test('CGA-00: customer auth routes are isolated from api.js', () => {
@@ -255,7 +255,7 @@ test('CGA-05: Google-issued customer token accepted by /checkout/verify', async 
     body: JSON.stringify({
       branch_id: 'branch_cga05',
       order_type: 'pickup',
-      items: [{ id: '272', product_id: '272', quantity: 1, expected_price: 35000, branch_id: 'branch_cga05' }]
+      items: [{ menu_id: 'customer_google_menu_272', quantity: 1, expected_price: 35000, branch_id: 'branch_cga05' }]
     })
   });
   const verifyData = await verifyRes.json();
@@ -359,7 +359,7 @@ test('CGA-08: Google-issued customer token accepted by /checkout/create-order au
       payment_method: 'cash',
       customer: { name: 'Order Customer CGA08', phone: 'order_customer@example.com' },
       order_type: 'pickup',
-      items: [{ id: '272', quantity: 1 }]
+      items: [{ menu_id: 'customer_google_menu_272', quantity: 1, expected_price: 35000 }]
     })
   });
   const orderData = await orderRes.json();
@@ -417,7 +417,7 @@ test('CGA-10: Customer Google session is brand-scoped (tenant isolation)', async
     body: JSON.stringify({
       branch_id: 'branch_cga10',
       order_type: 'pickup',
-      items: [{ id: '272', product_id: '272', quantity: 1, expected_price: 35000, branch_id: 'branch_cga10' }]
+      items: [{ menu_id: 'customer_google_menu_272', quantity: 1, expected_price: 35000, branch_id: 'branch_cga10' }]
     })
   });
   // Must not be 401 on the same brand
@@ -627,7 +627,7 @@ test('CGA-17: Order created with Google customer session records customer_id', a
       order_type: 'pickup',
       payment_method: 'cash',
       customer: { name: 'Order Customer 17', phone: '081999999017' },
-      items: [{ id: '272', product_id: '272', quantity: 1, expected_price: 35000, branch_id: 'branch_cga17' }]
+      items: [{ menu_id: 'customer_google_menu_272', quantity: 1, expected_price: 35000, branch_id: 'branch_cga17' }]
     })
   });
   const orderData = await orderRes.json();

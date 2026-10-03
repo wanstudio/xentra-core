@@ -4,10 +4,10 @@
  * BM Phase 4B — Branch Manager Dashboard UI Hardening Test Suite
  *
  * Requirements Matrix (P4B-01 through P4B-10):
- * - P4B-01: BM catalog endpoint returns master products with adoption status for branch.
+ * - P4B-01: BM Branch Menu endpoint returns adopted and available Master Menus for branch.
  * - P4B-02: DOM modal-bm-add-catalog structure, multi-selection, and badge logic in JS.
  * - P4B-03: Already adopted products are marked with badge and disabled from selection.
- * - P4B-04: Batch adoption executes against /admin/branches/:id/adopt and updates branch menu.
+ * - P4B-04: Batch adoption executes against the canonical Menu adoption endpoint and updates Branch Menu.
  * - P4B-05: Server-side authorization strictly blocks cross-branch and cross-brand catalog adoption (403).
  * - P4B-06: Modal "Ubah/Tambah Kategori Cabang" (modal-branch-category-edit) is normalized with .x-file-upload-wrap and min-width: 0.
  * - P4B-07: Modal "Ubah Menu Cabang" (modal-branch-override) photo upload is wrapped in .x-file-upload-wrap.
@@ -118,6 +118,8 @@ describe('BM Phase 4B — Branch Manager Dashboard UI Hardening Suite', () => {
   let testProduct1Id = 'prod_bm4b_catalog_1';
   let testProduct2Id = 'prod_bm4b_catalog_2';
   let testProduct3Id = 'prod_bm4b_catalog_3';
+  const testMenu2Id = 'menu_bm4b_catalog_2';
+  const testMenu3Id = 'menu_bm4b_catalog_3';
 
   before(async () => {
     server = http.createServer(app);
@@ -141,20 +143,44 @@ describe('BM Phase 4B — Branch Manager Dashboard UI Hardening Suite', () => {
       VALUES (?, ?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
     `).run(testProduct3Id, BRAND_ID, 'Nasi Putih Wangi', 'nasi-putih-wangi', 'Nasi putih pulen hangat', 5000);
 
-    // Ensure testProduct1 is already adopted in Branch A, but testProduct2 and testProduct3 are not
-    db.prepare(`
-      INSERT OR REPLACE INTO branch_products (branch_id, product_id, is_available, created_at, updated_at)
-      VALUES (?, ?, 1, datetime('now'), datetime('now'))
-    `).run(BRANCH_A_ID, testProduct1Id);
+    const originalRasa = db.prepare("SELECT id FROM menu_flavors WHERE brand_id = ? AND lower(trim(name)) = 'original' AND is_active = 1 LIMIT 1").get(BRAND_ID);
+    const branchCategory = db.prepare("SELECT id FROM branch_categories WHERE branch_id = ? AND brand_id = ? AND is_active = 1 ORDER BY sort_order, id LIMIT 1").get(BRANCH_A_ID, BRAND_ID);
+    assert.ok(originalRasa && branchCategory, 'canonical demo fixtures must provide Original Rasa and Branch Category');
 
-    // Clean up testProduct2 and testProduct3 from Branch A
-    db.prepare(`DELETE FROM branch_products WHERE branch_id = ? AND product_id IN (?, ?)`).run(BRANCH_A_ID, testProduct2Id, testProduct3Id);
+    for (const [productId, menuId, suffix] of [
+      [testProduct2Id, testMenu2Id, '2'],
+      [testProduct3Id, testMenu3Id, '3']
+    ]) {
+      const subCategoryId = 'bm4b_sub_' + suffix;
+      db.prepare(
+        "INSERT OR REPLACE INTO sub_categories (id, brand_id, category_id, name, slug, sort_order, is_active) VALUES (?, ?, (SELECT id FROM categories WHERE brand_id = ? ORDER BY id LIMIT 1), ?, ?, ?, 1)"
+      ).run(subCategoryId, BRAND_ID, BRAND_ID, 'BM4B Menu ' + suffix, 'bm4b-menu-' + suffix, Number(suffix));
+
+      db.prepare(
+        "INSERT OR REPLACE INTO menus (id, brand_id, menu_type, sub_category_id, rasa_id, selling_price, status) VALUES (?, ?, 'SINGLE', ?, ?, ?, 'ACTIVE')"
+      ).run(menuId, BRAND_ID, subCategoryId, originalRasa.id, productId === testProduct2Id ? 22000 : 5000);
+
+      db.prepare(
+        "INSERT OR REPLACE INTO menu_items (menu_id, product_id, quantity, sort_order) VALUES (?, ?, 1, 0)"
+      ).run(menuId, productId);
+    }
+
+    // Menu 1 remains unneeded for this batch-adoption contract; products 2 and 3 are the unadopted candidates.
+    db.prepare(`DELETE FROM branch_menus WHERE branch_id = ? AND menu_id IN (?, ?)`).run(BRANCH_A_ID, testMenu2Id, testMenu3Id);
+    db.prepare(`DELETE FROM branch_products WHERE branch_id = ? AND product_id IN (?, ?, ?)`).run(BRANCH_A_ID, testProduct1Id, testProduct2Id, testProduct3Id);
   });
 
   after(async () => {
-    // Clean up seeded records
+    // Clean up canonical Menu fixtures before deleting their Product components.
     try {
+      db.prepare(`DELETE FROM branch_menu_categories WHERE branch_id = ? AND menu_id IN (?, ?)`).run(BRANCH_A_ID, testMenu2Id, testMenu3Id);
+      db.prepare(`DELETE FROM branch_menus WHERE branch_id = ? AND menu_id IN (?, ?)`).run(BRANCH_A_ID, testMenu2Id, testMenu3Id);
+      db.prepare(`DELETE FROM menu_items WHERE menu_id IN (?, ?)`).run(testMenu2Id, testMenu3Id);
+      db.prepare(`DELETE FROM menus WHERE id IN (?, ?)`).run(testMenu2Id, testMenu3Id);
+      db.prepare(`DELETE FROM sub_categories WHERE id IN ('bm4b_sub_2', 'bm4b_sub_3')`).run();
       db.prepare(`DELETE FROM branch_products WHERE branch_id = ? AND product_id IN (?, ?, ?)`).run(BRANCH_A_ID, testProduct1Id, testProduct2Id, testProduct3Id);
+      db.prepare(`DELETE FROM branch_product_categories WHERE branch_id = ? AND product_id IN (?, ?, ?)`).run(BRANCH_A_ID, testProduct1Id, testProduct2Id, testProduct3Id);
+      db.prepare(`DELETE FROM branch_product_inventory WHERE branch_id = ? AND product_id IN (?, ?, ?)`).run(BRANCH_A_ID, testProduct1Id, testProduct2Id, testProduct3Id);
       db.prepare(`DELETE FROM products WHERE id IN (?, ?, ?)`).run(testProduct1Id, testProduct2Id, testProduct3Id);
     } catch {}
 
@@ -163,22 +189,28 @@ describe('BM Phase 4B — Branch Manager Dashboard UI Hardening Suite', () => {
     }
   });
 
-  it('P4B-01: BM catalog endpoint returns master products with adoption status for branch', async () => {
+  it('P4B-01: BM Branch Menu endpoint returns adopted and available Master Menus for branch', async () => {
     const bmToken = seedStaffSession({ role: 'branch_manager', branchId: BRANCH_A_ID, brandId: BRAND_ID, userId: 'bm4b_user_1' });
-    const res = await request('GET', `/api/v1/admin/branches/${BRANCH_A_ID}/catalog`, null, {
+    const res = await request('GET', `/api/v1/admin/branches/${BRANCH_A_ID}/menu`, null, {
       Authorization: `Bearer ${bmToken}`
     });
 
     assert.equal(res.status, 200);
     assert.equal(res.body.success, true);
-    assert.ok(Array.isArray(res.body.available_master_products), 'Should return available_master_products array');
-    assert.ok(Array.isArray(res.body.adopted_products), 'Should return adopted_products array');
+    assert.equal(res.body.model, 'branch-menu-v1');
+    assert.ok(Array.isArray(res.body.available_master_menus), 'Should return available_master_menus array');
+    assert.ok(Array.isArray(res.body.adopted_menus), 'Should return adopted_menus array');
 
-    const p1 = res.body.adopted_products.find(p => p.product_id === testProduct1Id);
-    assert.ok(p1, 'testProduct1Id must be in adopted_products');
+    // Products are component/stock identities; adoption status is carried by Menu.
+    const p2 = res.body.available_master_menus.find(m =>
+      String(m.menu_id || m.id) === String(testMenu2Id)
+    );
+    assert.ok(p2, 'testMenu2Id must be in available_master_menus');
 
-    const p2 = res.body.available_master_products.find(p => p.id === testProduct2Id);
-    assert.ok(p2, 'testProduct2Id must be in available_master_products');
+    const p3 = res.body.available_master_menus.find(m =>
+      String(m.menu_id || m.id) === String(testMenu3Id)
+    );
+    assert.ok(p3, 'testMenu3Id must be in available_master_menus');
   });
 
   it('P4B-02 & P4B-03: DOM modal-bm-add-catalog structure, multi-selection, and badge logic in JS', () => {
@@ -204,65 +236,67 @@ describe('BM Phase 4B — Branch Manager Dashboard UI Hardening Suite', () => {
 
     // Verify JS implementation logic
     assert.ok(js.includes('window.openBMAddCatalogModal = async function'), 'openBMAddCatalogModal must be defined');
-    assert.ok(js.includes('window.onBMSelectCatalogProduct = function'), 'onBMSelectCatalogProduct must be defined');
-    assert.ok(js.includes('window.toggleBMSelectCatalogProduct = function'), 'toggleBMSelectCatalogProduct must be defined');
+    assert.ok(js.includes('window.onBMSelectCatalogProduct = function'), 'Menu selection handler must be defined');
+    assert.ok(js.includes('window.toggleBMSelectCatalogProduct = function'), 'Menu selection toggle must be defined');
     assert.ok(js.includes('function updateBMAddCatalogFooter('), 'updateBMAddCatalogFooter must be defined');
     assert.ok(js.includes('window.submitBMAdoptCatalogBatch = async function') || js.includes('function submitBMAdoptCatalogBatch('), 'submitBMAdoptCatalogBatch must be defined');
     assert.ok(js.includes('Sudah Diadopsi'), 'Sudah Diadopsi badge text must be in JS');
   });
 
-  it('P4B-04: Batch adoption endpoint adopts multiple products into branch menu', async () => {
+  it('P4B-04: Batch adoption contract adopts multiple canonical Menus into the branch', async () => {
     const bmToken = seedStaffSession({ role: 'branch_manager', branchId: BRANCH_A_ID, brandId: BRAND_ID, userId: 'bm4b_user_2' });
+    const branchCategory = db.prepare("SELECT id FROM branch_categories WHERE branch_id = ? AND brand_id = ? AND is_active = 1 ORDER BY sort_order, id LIMIT 1").get(BRANCH_A_ID, BRAND_ID);
+    assert.ok(branchCategory);
 
-    // Adopt testProduct2Id
-    const res2 = await request('POST', `/api/v1/admin/branches/${BRANCH_A_ID}/adopt`, {
-      product_id: testProduct2Id
-    }, {
-      Authorization: `Bearer ${bmToken}`
-    });
-    assert.ok(res2.status === 200 || res2.status === 201, 'Adopt res2 status should be 200 or 201');
-    assert.equal(res2.body.success, true);
+    for (const menuId of [testMenu2Id, testMenu3Id]) {
+      const res = await request('POST', `/api/v1/admin/menus/${menuId}/adopt`, {
+        branch_id: BRANCH_A_ID,
+        branch_category_ids: [branchCategory.id],
+        is_available: true
+      }, {
+        Authorization: `Bearer ${bmToken}`
+      });
+      assert.equal(res.status, 200);
+      assert.equal(res.body.success, true);
+    }
 
-    // Adopt testProduct3Id
-    const res3 = await request('POST', `/api/v1/admin/branches/${BRANCH_A_ID}/adopt`, {
-      product_id: testProduct3Id
-    }, {
-      Authorization: `Bearer ${bmToken}`
-    });
-    assert.ok(res3.status === 200 || res3.status === 201, 'Adopt res3 status should be 200 or 201');
-    assert.equal(res3.body.success, true);
-
-    // Verify both now show in branch catalog (/api/v1/admin/branches/:id/catalog)
-    const catalogRes = await request('GET', `/api/v1/admin/branches/${BRANCH_A_ID}/catalog`, null, {
+    const catalogRes = await request('GET', `/api/v1/admin/branches/${BRANCH_A_ID}/menu`, null, {
       Authorization: `Bearer ${bmToken}`
     });
     assert.equal(catalogRes.status, 200);
-    const adopted = catalogRes.body.adopted_products || [];
-    const item2 = adopted.find(m => m.product_id === testProduct2Id);
-    const item3 = adopted.find(m => m.product_id === testProduct3Id);
-    assert.ok(item2, 'Adopted product 2 must now exist in branch catalog adopted_products');
-    assert.ok(item3, 'Adopted product 3 must now exist in branch catalog adopted_products');
+    const adopted = catalogRes.body.adopted_menus || [];
+    assert.ok(adopted.some(m => String(m.menu_id) === testMenu2Id));
+    assert.ok(adopted.some(m => String(m.menu_id) === testMenu3Id));
   });
 
-  it('P4B-05: Server-side authorization strictly blocks cross-branch and cross-brand catalog adoption (403)', async () => {
-    // BM belongs to BRANCH_A_ID. Attempts to adopt into BRANCH_B_ID
+  it('P4B-05: Server-side authorization strictly blocks cross-branch and cross-brand Menu adoption (403)', async () => {
     const bmToken = seedStaffSession({ role: 'branch_manager', branchId: BRANCH_A_ID, brandId: BRAND_ID, userId: 'bm4b_user_3' });
 
-    const crossBranchRes = await request('POST', `/api/v1/admin/branches/${BRANCH_B_ID}/adopt`, {
-      product_id: testProduct1Id
+    const branchBCategory = db.prepare(
+      "SELECT id FROM branch_categories WHERE branch_id = ? AND brand_id = ? AND is_active = 1 ORDER BY sort_order, id LIMIT 1"
+    ).get(BRANCH_B_ID, BRAND_ID);
+    assert.ok(branchBCategory, 'Branch B must have an active Branch Category');
+
+    // Same-brand cross-branch adoption.
+    const crossBranchRes = await request('POST', `/api/v1/admin/menus/${testMenu2Id}/adopt`, {
+      branch_id: BRANCH_B_ID,
+      branch_category_ids: [branchBCategory.id],
+      is_available: true
     }, {
       Authorization: `Bearer ${bmToken}`
     });
-    assert.equal(crossBranchRes.status, 403, 'Cross branch adoption must be 403');
+    assert.equal(crossBranchRes.status, 403, 'Cross branch Menu adoption must be 403');
     assert.equal(crossBranchRes.body.error, 'FORBIDDEN_BRANCH_SCOPE');
 
-    // Attempts to adopt into OTHER_BRANCH_ID belonging to OTHER_BRAND_ID
-    const crossBrandRes = await request('POST', `/api/v1/admin/branches/${OTHER_BRANCH_ID}/adopt`, {
-      product_id: testProduct1Id
+    // Cross-brand adoption uses a Menu from Brand A and a branch from another brand.
+    const crossBrandRes = await request('POST', `/api/v1/admin/menus/${testMenu2Id}/adopt`, {
+      branch_id: OTHER_BRANCH_ID,
+      branch_category_ids: [],
+      is_available: true
     }, {
       Authorization: `Bearer ${bmToken}`
     });
-    assert.equal(crossBrandRes.status, 403, 'Cross brand adoption must be 403');
+    assert.equal(crossBrandRes.status, 403, 'Cross brand Menu adoption must be 403');
   });
 
   it('P4B-06 & P4B-07: Modal file upload wrappers use .x-file-upload-wrap and .x-file-upload-info with min-width: 0', () => {

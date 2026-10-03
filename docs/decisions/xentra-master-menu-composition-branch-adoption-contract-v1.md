@@ -1,5 +1,8 @@
 # Xentra — Master Menu Composition & Branch Adoption Contract v1
 
+
+> **Authoritative-contract notice (2026-10-03):** This document preserves earlier product/master-menu decisions for history and context. Its Product/Customer-title/Branch-adoption/name-override semantics are **not normative anymore**. Do not implement new behavior from those historical sections. The current authoritative model is **Product → Menu → Inventory** from `docs/proposals/xentra-taxonomy-composed-menu-v1.md`: Product is the atomic reusable stock unit; Menu Satuan/Paket is the commercial/customer-facing entity; Branch adoption is `branch_menus`; Branch Category membership is `branch_menu_categories`; stock is `branch_product_inventory`; forward Customer PWA reads the resolved Menu View Model.
+
 **Status:** 🔒 LOCKED — MASTER MENU ARCHITECTURE / IMPLEMENTATION CONTRACT  
 **Date:** 2026-09-29  
 **Scope:** Owner Dashboard, Merchant App, Master Catalog, Branch Catalog, Customer PWA, Checkout, Orders

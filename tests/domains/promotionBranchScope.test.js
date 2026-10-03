@@ -25,6 +25,9 @@ describe('Promotion Phase 1 — Campaign <-> Branch Scope Domain Audit & Impleme
   const foodProdA = 'prod_food_scope_A';
   const rewardProdA = 'prod_reward_scope_A';
   const rewardProdB = 'prod_reward_scope_B';
+  const foodMenu = 'menu_food_scope_A';
+  const rewardMenuA = 'menu_reward_scope_A';
+  const rewardMenuB = 'menu_reward_scope_B';
 
   const promoGlobalMulti = 'prm_multi_branch_01';
   const promoExclusiveA = 'prm_exclusive_branch_A';
@@ -40,6 +43,12 @@ describe('Promotion Phase 1 — Campaign <-> Branch Scope Domain Audit & Impleme
       db.prepare("DELETE FROM order_payments WHERE order_id IN (SELECT id FROM orders WHERE brand_id IN (?, ?))").run(brandId, otherBrandId);
       db.prepare("DELETE FROM orders WHERE brand_id IN (?, ?)").run(brandId, otherBrandId);
       db.prepare("DELETE FROM promotions WHERE brand_id IN (?, ?)").run(brandId, otherBrandId);
+      db.prepare("DELETE FROM branch_menu_categories WHERE branch_id IN (?, ?, ?, ?)").run(branchA, branchB, branchC, branchForeign);
+      db.prepare("DELETE FROM branch_menus WHERE branch_id IN (?, ?, ?, ?)").run(branchA, branchB, branchC, branchForeign);
+      db.prepare("DELETE FROM branch_product_inventory WHERE branch_id IN (?, ?, ?, ?)").run(branchA, branchB, branchC, branchForeign);
+      db.prepare("DELETE FROM menu_items WHERE menu_id IN (?, ?, ?)").run(foodMenu, rewardMenuA, rewardMenuB);
+      db.prepare("DELETE FROM menus WHERE id IN (?, ?, ?)").run(foodMenu, rewardMenuA, rewardMenuB);
+      db.prepare("DELETE FROM sub_categories WHERE id IN ('sub_scope_food','sub_scope_reward_a','sub_scope_reward_b')").run();
       db.prepare("DELETE FROM branch_products WHERE branch_id IN (?, ?, ?, ?)").run(branchA, branchB, branchC, branchForeign);
       db.prepare("DELETE FROM products WHERE brand_id IN (?, ?)").run(brandId, otherBrandId);
       db.prepare("DELETE FROM branches WHERE id IN (?, ?, ?, ?)").run(branchA, branchB, branchC, branchForeign);
@@ -75,6 +84,36 @@ describe('Promotion Phase 1 — Campaign <-> Branch Scope Domain Audit & Impleme
     db.prepare('INSERT INTO products (id, brand_id, name, slug, price, is_active) VALUES (?, ?, ?, ?, ?, 1)')
       .run(rewardProdB, brandId, 'Puding Coklat Promo', 'puding-promo', 8000);
 
+    const rasa = db.prepare("SELECT id FROM menu_flavors WHERE brand_id = ? AND lower(trim(name)) = 'original' AND is_active = 1 LIMIT 1").get(brandId)
+      || (db.prepare("INSERT INTO menu_flavors (id, brand_id, name, slug, is_active) VALUES ('scope_original_rasa', ?, 'Original', 'scope-original', 1)").run(brandId), db.prepare("SELECT id FROM menu_flavors WHERE id = 'scope_original_rasa'").get());
+
+    for (const [productId, subId, menuId, name, price] of [
+      [foodProdA, 'sub_scope_food', foodMenu, 'Nasi Ayam Penyet', 25000],
+      [rewardProdA, 'sub_scope_reward_a', rewardMenuA, 'Es Teh Promo', 5000],
+      [rewardProdB, 'sub_scope_reward_b', rewardMenuB, 'Puding Coklat Promo', 8000]
+    ]) {
+      db.prepare("INSERT OR REPLACE INTO sub_categories (id, brand_id, category_id, name, slug, is_active) VALUES (?, ?, (SELECT category_id FROM products WHERE id = ?), ?, ?, 1)")
+        .run(subId, brandId, productId, name, subId.replace(/_/g,'-'));
+      db.prepare("INSERT OR REPLACE INTO menus (id, brand_id, menu_type, sub_category_id, rasa_id, selling_price, status) VALUES (?, ?, 'SINGLE', ?, ?, ?, 'ACTIVE')")
+        .run(menuId, brandId, subId, rasa.id, price);
+      db.prepare("INSERT OR REPLACE INTO menu_items (menu_id, product_id, quantity, sort_order) VALUES (?, ?, 1, 0)")
+        .run(menuId, productId);
+      db.prepare("UPDATE products SET sku = ? WHERE id = ? AND brand_id = ?").run('SKU-'+productId, productId, brandId);
+    }
+
+    for (const [branchId, suffix] of [[branchA,'A'],[branchB,'B'],[branchC,'C']]) {
+      db.prepare("INSERT OR IGNORE INTO branch_categories (id, brand_id, branch_id, name, slug, sort_order, is_active) VALUES (?, ?, ?, 'Makanan', ?, 1, 1)")
+        .run('bc_scope_'+suffix, brandId, branchId, 'makanan-scope-'+suffix.toLowerCase());
+    }
+    db.prepare("INSERT OR REPLACE INTO branch_menus (branch_id, menu_id, is_available) VALUES (?, ?, 1), (?, ?, 1), (?, ?, 1)")
+      .run(branchA, foodMenu, branchA, rewardMenuA, branchB, foodMenu);
+    db.prepare("INSERT OR REPLACE INTO branch_menus (branch_id, menu_id, is_available) VALUES (?, ?, 1), (?, ?, 1), (?, ?, 0)")
+      .run(branchB, rewardMenuA, branchC, foodMenu, branchC, rewardMenuA);
+    db.prepare("INSERT OR REPLACE INTO branch_menu_categories (branch_id, menu_id, branch_category_id) VALUES (?, ?, 'bc_scope_A'), (?, ?, 'bc_scope_A'), (?, ?, 'bc_scope_B'), (?, ?, 'bc_scope_B'), (?, ?, 'bc_scope_C'), (?, ?, 'bc_scope_C')")
+      .run(branchA, foodMenu, branchA, rewardMenuA, branchB, foodMenu, branchB, rewardMenuA, branchC, foodMenu, branchC, rewardMenuA);
+    db.prepare("INSERT OR REPLACE INTO branch_product_inventory (branch_id, product_id, stock_qty, low_stock_threshold) VALUES (?, ?, 50, 5), (?, ?, 20, 5), (?, ?, 50, 5), (?, ?, 15, 5), (?, ?, 50, 5), (?, ?, 0, 5)")
+      .run(branchA, foodProdA, branchA, rewardProdA, branchB, foodProdA, branchB, rewardProdA, branchC, foodProdA, branchC, rewardProdA);
+
     // 4. Seed Branch Products
     // Branch A: food + reward A available (stock 20)
     db.prepare('INSERT INTO branch_products (branch_id, product_id, price, stock, is_available) VALUES (?, ?, ?, ?, 1)')
@@ -104,9 +143,9 @@ describe('Promotion Phase 1 — Campaign <-> Branch Scope Domain Audit & Impleme
       VALUES ('rul_multi_01', ?, 'eligibility', '{"requires_pwa_installed":true}')
     `).run(promoGlobalMulti);
     db.prepare(`
-      INSERT INTO promotion_rewards (id, promotion_id, reward_type, target_product_id, amount_in_cents, presentation_payload)
+      INSERT INTO promotion_rewards (id, promotion_id, reward_type, target_menu_id, amount_in_cents, presentation_payload)
       VALUES ('rew_multi_01', ?, 'freebie_product', ?, 0, '{"banner_title":"Multi Promo"}')
-    `).run(promoGlobalMulti, rewardProdA);
+    `).run(promoGlobalMulti, rewardMenuA);
 
     // Assign scope: branchA and branchB are active
     repo.assignBranchScope({ promotionId: promoGlobalMulti, brandId, branchId: branchA, isActive: 1 });
@@ -122,9 +161,9 @@ describe('Promotion Phase 1 — Campaign <-> Branch Scope Domain Audit & Impleme
       VALUES ('rul_excl_01', ?, 'eligibility', '{"requires_pwa_installed":true}')
     `).run(promoExclusiveA);
     db.prepare(`
-      INSERT INTO promotion_rewards (id, promotion_id, reward_type, target_product_id, amount_in_cents, presentation_payload)
+      INSERT INTO promotion_rewards (id, promotion_id, reward_type, target_menu_id, amount_in_cents, presentation_payload)
       VALUES ('rew_excl_01', ?, 'freebie_product', ?, 0, '{"banner_title":"Exclusive A"}')
-    `).run(promoExclusiveA, rewardProdA);
+    `).run(promoExclusiveA, rewardMenuA);
 
     repo.assignBranchScope({ promotionId: promoExclusiveA, brandId, branchId: branchA, isActive: 1 });
 
@@ -138,9 +177,9 @@ describe('Promotion Phase 1 — Campaign <-> Branch Scope Domain Audit & Impleme
       VALUES ('rul_paused_01', ?, 'eligibility', '{"requires_pwa_installed":true}')
     `).run(promoPausedBranchB);
     db.prepare(`
-      INSERT INTO promotion_rewards (id, promotion_id, reward_type, target_product_id, amount_in_cents, presentation_payload)
+      INSERT INTO promotion_rewards (id, promotion_id, reward_type, target_menu_id, amount_in_cents, presentation_payload)
       VALUES ('rew_paused_01', ?, 'freebie_product', ?, 0, '{"banner_title":"Paused B"}')
-    `).run(promoPausedBranchB, rewardProdA);
+    `).run(promoPausedBranchB, rewardMenuA);
 
     repo.assignBranchScope({ promotionId: promoPausedBranchB, brandId, branchId: branchB, isActive: 0 });
   });
@@ -227,8 +266,8 @@ describe('Promotion Phase 1 — Campaign <-> Branch Scope Domain Audit & Impleme
       branch_id: branchA,
       brand_id: brandId,
       items: [
-        { product_id: foodProdA, quantity: 1, expected_price: 25000 },
-        { product_id: 'reward_' + promoGlobalMulti, is_promo_reward: true, quantity: 1, expected_price: 0 }
+        { menu_id: foodMenu, quantity: 1, expected_price: 25000 },
+        { menu_id: rewardMenuA, is_promo_reward: true, promo_id: promoGlobalMulti, quantity: 1, expected_price: 0 }
       ],
       customer: { phone: '0812340001' },
       pwa_runtime: { display_mode: 'standalone' }
@@ -246,8 +285,8 @@ describe('Promotion Phase 1 — Campaign <-> Branch Scope Domain Audit & Impleme
       branch_id: branchC,
       brand_id: brandId,
       items: [
-        { product_id: foodProdA, quantity: 1, expected_price: 25000 },
-        { product_id: 'reward_' + promoGlobalMulti, is_promo_reward: true, quantity: 1, expected_price: 0 }
+        { menu_id: foodMenu, quantity: 1, expected_price: 25000 },
+        { menu_id: rewardMenuA, is_promo_reward: true, promo_id: promoGlobalMulti, quantity: 1, expected_price: 0 }
       ],
       customer: { phone: '0812340002' },
       pwa_runtime: { display_mode: 'standalone' }
@@ -265,8 +304,8 @@ describe('Promotion Phase 1 — Campaign <-> Branch Scope Domain Audit & Impleme
       branch_id: branchA,
       brand_id: brandId,
       items: [
-        { product_id: foodProdA, quantity: 1, expected_price: 25000 },
-        { product_id: 'reward_' + promoGlobalMulti, is_promo_reward: true, quantity: 1, expected_price: 0 }
+        { menu_id: foodMenu, quantity: 1, expected_price: 25000 },
+        { menu_id: rewardMenuA, is_promo_reward: true, promo_id: promoGlobalMulti, quantity: 1, expected_price: 0 }
       ],
       customer: { phone: '0812340003' },
       pwa_runtime: { display_mode: 'standalone' }
@@ -283,9 +322,9 @@ describe('Promotion Phase 1 — Campaign <-> Branch Scope Domain Audit & Impleme
       branch_id: branchA,
       brand_id: brandId,
       items: [
-        { product_id: foodProdA, quantity: 1, expected_price: 25000 },
-        { product_id: 'reward_' + promoGlobalMulti, is_promo_reward: true, quantity: 1, expected_price: 0 },
-        { product_id: 'reward_' + promoGlobalMulti, is_promo_reward: true, quantity: 1, expected_price: 0 } // duplicate attempt
+        { menu_id: foodMenu, quantity: 1, expected_price: 25000 },
+        { menu_id: rewardMenuA, is_promo_reward: true, promo_id: promoGlobalMulti, quantity: 1, expected_price: 0 },
+        { menu_id: rewardMenuA, is_promo_reward: true, promo_id: promoGlobalMulti, quantity: 1, expected_price: 0 } // duplicate attempt
       ],
       customer: { phone: '0812340004' },
       pwa_runtime: { display_mode: 'standalone' }
@@ -482,9 +521,9 @@ describe('Promotion Phase 1 — Campaign <-> Branch Scope Domain Audit & Impleme
       branch_id: branchB, // Resolved authoritative branch
       brand_id: brandId,
       items: [
-        { product_id: foodProdA, quantity: 1, expected_price: 25000 },
+        { menu_id: foodMenu, quantity: 1, expected_price: 25000 },
         // Client maliciously claims promoExclusiveA which is only scoped to branchA
-        { product_id: 'reward_' + promoExclusiveA, is_promo_reward: true, promo_id: promoExclusiveA, quantity: 1, expected_price: 0 }
+        { menu_id: rewardMenuA, is_promo_reward: true, promo_id: promoExclusiveA, quantity: 1, expected_price: 0 }
       ],
       customer: { phone: '081299990099' },
       pwa_runtime: { display_mode: 'standalone' }

@@ -117,6 +117,7 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
 
   await t.test('2. index.html is self-contained (no merchant-dashboard asset dependency)', () => {
     const html = fs.readFileSync(HTML_PATH, 'utf8');
+    const menu = fs.readFileSync(path.join(__dirname, '../apps/merchant-app/assets/js/menu.js'), 'utf8');
     assert.ok(!/\/dashboard\/assets\//.test(html), 'must not load merchant-dashboard assets');
     assert.ok(html.includes('/merchant-shared/css/shared.css'), 'must load merchant-shared css');
     assert.ok(html.includes('/merchant-shared/css/dashboard.css'), 'must load the shared surface stylesheet');
@@ -125,9 +126,9 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
     assert.ok(html.includes('/merchant-app/assets/js/context.js'), 'must load context.js');
     assert.ok(html.includes('/merchant-app/assets/js/menu.js'), 'must load menu.js');
     assert.ok(menu.includes('Ubah Nama Tampil'), 'Merchant Menu must expose customer display-name override');
-    assert.ok(menu.includes('updateBranchProductDisplayName'), 'Merchant Menu must use canonical display-name transport');
+    assert.ok(menu.includes('updateBranchMenuDisplayName'), 'Merchant Menu must use canonical display-name transport');
     assert.ok(menu.includes("Kosongkan untuk otomatis mengikuti nama Master."), 'Override editor must define null fallback behavior');
-    assert.ok(menu.includes('product.display_name_override'), 'Merchant Menu must read branch override state');
+    assert.ok(menu.includes('display_name_override'), 'Merchant Menu must read branch Menu display-name override state');
     assert.ok(html.includes('/merchant-app/assets/js/hari-ini.js'), 'must load hari-ini.js');
     assert.ok(html.includes('/merchant-app/assets/js/jam-operasional.js'), 'must load jam-operasional.js');
     assert.ok(html.includes('/merchant-app/assets/js/reports.js'), 'must load reports.js');
@@ -218,7 +219,7 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
       'setBMMenuCategoryFilter',
       'renderBMMenuCategoriesBar',
       'renderBMMenuTable',
-      'toggleBMProductAvailability',
+      'toggleBMMenuAvailability',
       'updateBMAddCatalogFooter',
       'renderBMAddCatalogList',
       'saveBMBranchCategoryOrder'

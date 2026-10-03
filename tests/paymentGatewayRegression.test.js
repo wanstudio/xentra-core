@@ -502,9 +502,23 @@ test('PAYMENT GATEWAY AUDIT & REGRESSION SUITE', async (t) => {
     db.prepare('UPDATE brands SET default_payment_config = ? WHERE id = ?')
       .run(JSON.stringify(dokuConfig), BRAND_ID);
 
+    const menuId = 'demo_bangjo_menu_287';
+    const branchCategory = db.prepare(
+      "SELECT id FROM branch_categories WHERE branch_id = ? AND brand_id = ? AND is_active = 1 ORDER BY sort_order, id LIMIT 1"
+    ).get(BRANCH_ID, BRAND_ID);
+    assert.ok(branchCategory, 'canonical branch fixture must have an active Branch Category');
+
     db.prepare(`
-      INSERT OR REPLACE INTO branch_products (branch_id, product_id, price, is_available, stock)
-      VALUES (?, '287', 18000, 1, 100)
+      INSERT OR REPLACE INTO branch_menus (branch_id, menu_id, is_available, price_override)
+      VALUES (?, ?, 1, 18000)
+    `).run(BRANCH_ID, menuId);
+    db.prepare(`
+      INSERT OR REPLACE INTO branch_menu_categories (branch_id, menu_id, branch_category_id)
+      VALUES (?, ?, ?)
+    `).run(BRANCH_ID, menuId, branchCategory.id);
+    db.prepare(`
+      INSERT OR REPLACE INTO branch_product_inventory (branch_id, product_id, stock_qty, low_stock_threshold)
+      VALUES (?, '287', 100, 5)
     `).run(BRANCH_ID);
 
     const OrderPlacementService = require('../domains/commerce/services/OrderPlacementService');
@@ -512,7 +526,7 @@ test('PAYMENT GATEWAY AUDIT & REGRESSION SUITE', async (t) => {
       brand_id: BRAND_ID,
       branch_id: BRANCH_ID,
       customer: { name: 'Doku Customer', phone: '081299990001' },
-      items: [{ product_id: '287', quantity: 1, expected_price: 18000 }],
+      items: [{ menu_id: menuId, quantity: 1, expected_price: 18000 }],
       payment_method: 'doku',
       order_type: 'takeaway',
       order_channel: 'customer_app'

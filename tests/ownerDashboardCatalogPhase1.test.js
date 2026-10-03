@@ -145,6 +145,27 @@ test('PHASE 1: OWNER DASHBOARD CATALOG IMPLEMENTATION', async (t) => {
 
   // 2. MASTER PRODUCTS
   await t.test('2. Master Products CRUD and Product Detail API', async (t2) => {
+    await t2.test('2.0 Create atomic Product without commercial category/price', async () => {
+      const sku = 'ATOMIC-' + Date.now();
+      const res = await makeRequest(server, {
+        method: 'POST',
+        path: '/api/v1/admin/products',
+        headers: { Authorization: `Bearer ${ownerToken}` }
+      }, {
+        name: 'Atomic Product Contract Test',
+        sku,
+        description: 'Atomic Product only'
+      });
+
+      assert.strictEqual(res.status, 201);
+      assert.strictEqual(res.body.success, true);
+      assert.ok(res.body.product && res.body.product.id);
+      assert.strictEqual(res.body.product.sku, sku);
+      assert.strictEqual(res.body.product.price, 0);
+
+      db.prepare('DELETE FROM products WHERE id = ? AND brand_id = ?').run(res.body.product.id, BRAND_ID);
+    });
+
     await t2.test('2.1 Create Master Product assigned to category', async () => {
       const res = await makeRequest(server, {
         method: 'POST',
@@ -278,86 +299,128 @@ test('PHASE 1: OWNER DASHBOARD CATALOG IMPLEMENTATION', async (t) => {
     });
   });
 
-  // 3. BRANCH MENUS & ADOPTION FLOW
+  // 3. BRANCH MENUS — canonical Master Menu adoption boundary
+  let createdMenuId = null;
   await t.test('3. Branch Menus / Assortment Workflow', async (t2) => {
-    await t2.test('3.1 Inspect Branch Catalog (Available Master Products contains new product)', async () => {
+    await t2.test('3.1 Inspect canonical Branch Menu catalog', async () => {
       const res = await makeRequest(server, {
         method: 'GET',
-        path: `/api/v1/admin/branches/${BRANCH_ID}/catalog`,
+        path: `/api/v1/admin/branches/${BRANCH_ID}/menu`,
         headers: { Authorization: `Bearer ${ownerToken}` }
       });
 
       assert.strictEqual(res.status, 200);
       assert.strictEqual(res.body.success, true);
-      const available = res.body.available_master_products.find(p => p.id === createdProductId);
-      assert.ok(available, 'Product must be in available master products list');
+      assert.ok(Array.isArray(res.body.adopted_menus));
+      assert.ok(Array.isArray(res.body.available_master_menus));
+      assert.equal(res.body.model, 'branch-menu-v1');
     });
 
-    await t2.test('3.2 Adopt Product into Branch Catalog with Range Price', async () => {
-      const res = await makeRequest(server, {
+    await t2.test('3.2 Create and adopt a canonical Menu Satuan', async () => {
+      const subCategoryId = 'phase1_sub_' + Date.now();
+      const rasa = db.prepare("SELECT id FROM menu_flavors WHERE brand_id = ? AND lower(trim(name)) = 'original' AND is_active = 1 LIMIT 1").get(BRAND_ID);
+      assert.ok(rasa, 'Original Rasa must exist');
+
+      db.prepare(
+        "INSERT INTO sub_categories (id, brand_id, category_id, name, slug, is_active) VALUES (?, ?, ?, ?, ?, 1)"
+      ).run(subCategoryId, BRAND_ID, createdCategoryId, 'Menu Uji Coba Phase 1', 'menu-uji-coba-phase-1-' + Date.now());
+
+      const menuRes = await makeRequest(server, {
         method: 'POST',
-        path: `/api/v1/admin/branches/${BRANCH_ID}/adopt`,
+        path: '/api/v1/admin/menus/single',
         headers: { Authorization: `Bearer ${ownerToken}` }
       }, {
         product_id: createdProductId,
-        price: 28000 // Valid within 25000 - 40000 range
+        sub_category_id: subCategoryId,
+        rasa_id: rasa.id,
+        selling_price: 28000,
+        status: 'ACTIVE'
       });
 
-      assert.strictEqual(res.status, 201);
-      assert.strictEqual(res.body.success, true);
-    });
+      assert.strictEqual(menuRes.status, 201);
+      assert.strictEqual(menuRes.body.success, true);
+      createdMenuId = menuRes.body.menu.id;
 
-    await t2.test('3.3 Verify Product Detail now reflects branch adoption', async () => {
-      const res = await makeRequest(server, {
-        method: 'GET',
-        path: `/api/v1/admin/products/${createdProductId}`,
-        headers: { Authorization: `Bearer ${ownerToken}` }
-      });
+      const branchCategory = db.prepare(
+        "SELECT id FROM branch_categories WHERE branch_id = ? AND brand_id = ? AND is_active = 1 ORDER BY sort_order, id LIMIT 1"
+      ).get(BRANCH_ID, BRAND_ID);
+      assert.ok(branchCategory, 'Branch Category must exist before Menu adoption');
 
-      assert.strictEqual(res.status, 200);
-      const bBarat = res.body.branch_adoptions.find(b => b.branch_id === BRANCH_ID);
-      assert.ok(bBarat);
-      assert.strictEqual(bBarat.is_adopted, 1, 'Product is now adopted at branch');
-      assert.strictEqual(bBarat.branch_price, 28000);
-    });
-
-    await t2.test('3.4 Branch Product Override (Name, Description, Price)', async () => {
-      const res = await makeRequest(server, {
-        method: 'PATCH',
-        path: `/api/v1/admin/branches/${BRANCH_ID}/products/${createdProductId}/override`,
+      const adoptRes = await makeRequest(server, {
+        method: 'POST',
+        path: `/api/v1/admin/menus/${createdMenuId}/adopt`,
         headers: { Authorization: `Bearer ${ownerToken}` }
       }, {
-        name: 'Spesial Cabang Barat Phase 1',
-        description: 'Resep khas cabang barat',
-        price: 35000
+        branch_id: BRANCH_ID,
+        branch_category_ids: [branchCategory.id],
+        is_available: true,
+        price_override: 28000
       });
 
-      assert.strictEqual(res.status, 200);
-      assert.strictEqual(res.body.success, true);
+      assert.strictEqual(adoptRes.status, 200);
+      assert.strictEqual(adoptRes.body.success, true);
 
-      // Verify branch catalog returns overridden attributes
-      const cRes = await makeRequest(server, {
-        method: 'GET',
-        path: `/api/v1/admin/branches/${BRANCH_ID}/catalog`,
-        headers: { Authorization: `Bearer ${ownerToken}` }
-      });
-
-      const adopted = cRes.body.adopted_products.find(p => p.product_id === createdProductId);
-      assert.ok(adopted);
-      assert.strictEqual(adopted.name, 'Spesial Cabang Barat Phase 1');
-      assert.strictEqual(adopted.price, 35000);
-      assert.strictEqual(adopted.master_name, 'Produk Uji Coba Phase 1 Updated');
+      const bm = db.prepare(
+        "SELECT menu_id, price_override, is_available FROM branch_menus WHERE branch_id = ? AND menu_id = ?"
+      ).get(BRANCH_ID, createdMenuId);
+      assert.ok(bm);
+      assert.strictEqual(Number(bm.price_override), 28000);
+      assert.strictEqual(Number(bm.is_available), 1);
     });
 
-    await t2.test('3.5 Remove product from branch catalog', async () => {
+    await t2.test('3.3 Branch Menu read reflects canonical adoption and branch price', async () => {
+      assert.ok(createdMenuId);
+      const res = await makeRequest(server, {
+        method: 'GET',
+        path: `/api/v1/admin/branches/${BRANCH_ID}/menu`,
+        headers: { Authorization: `Bearer ${ownerToken}` }
+      });
+
+      assert.strictEqual(res.status, 200);
+      const adopted = res.body.adopted_menus.find(m => String(m.menu_id) === String(createdMenuId));
+      assert.ok(adopted, 'Canonical Menu must be adopted at branch');
+      assert.strictEqual(Number(adopted.price), 28000);
+      assert.strictEqual(adopted.menu_type, 'SINGLE');
+    });
+
+    await t2.test('3.4 Branch Menu display-name override uses canonical Branch Menu transport', async () => {
+      assert.ok(createdMenuId);
+      const res = await makeRequest(server, {
+        method: 'PATCH',
+        path: `/api/v1/admin/branches/${BRANCH_ID}/menu/${createdMenuId}/display-name`,
+        headers: { Authorization: `Bearer ${ownerToken}` }
+      }, {
+        name: 'Spesial Cabang Barat Phase 1'
+      });
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.success, true);
+
+      const cRes = await makeRequest(server, {
+        method: 'GET',
+        path: `/api/v1/admin/branches/${BRANCH_ID}/menu`,
+        headers: { Authorization: `Bearer ${ownerToken}` }
+      });
+      const adopted = cRes.body.adopted_menus.find(m => String(m.menu_id) === String(createdMenuId));
+      assert.ok(adopted);
+      assert.strictEqual(adopted.name, 'Spesial Cabang Barat Phase 1');
+    });
+
+    await t2.test('3.5 Remove canonical Menu from branch catalog', async () => {
+      assert.ok(createdMenuId);
       const res = await makeRequest(server, {
         method: 'DELETE',
-        path: `/api/v1/admin/branches/${BRANCH_ID}/products/${createdProductId}`,
+        path: `/api/v1/admin/branches/${BRANCH_ID}/menu/${createdMenuId}`,
         headers: { Authorization: `Bearer ${ownerToken}` }
       });
 
       assert.strictEqual(res.status, 200);
       assert.strictEqual(res.body.success, true);
+
+      const row = db.prepare(
+        "SELECT 1 FROM branch_menus WHERE branch_id = ? AND menu_id = ?"
+      ).get(BRANCH_ID, createdMenuId);
+      assert.equal(row, undefined);
     });
   });
 
@@ -375,6 +438,11 @@ test('PHASE 1: OWNER DASHBOARD CATALOG IMPLEMENTATION', async (t) => {
     });
 
     await t2.test('4.2 Delete created product and delete category', async () => {
+      if (createdMenuId) {
+        db.prepare('DELETE FROM menu_items WHERE menu_id = ?').run(createdMenuId);
+        db.prepare('DELETE FROM menus WHERE id = ?').run(createdMenuId);
+      }
+      db.prepare("DELETE FROM sub_categories WHERE brand_id = ? AND name = 'Menu Uji Coba Phase 1'").run(BRAND_ID);
       const pRes = await makeRequest(server, {
         method: 'DELETE',
         path: `/api/v1/admin/products/${createdProductId}`,
@@ -411,7 +479,7 @@ test('PHASE 1: OWNER DASHBOARD CATALOG IMPLEMENTATION', async (t) => {
         assert.strictEqual(res.status, 200);
         assert.ok(typeof res.body === 'string');
         assert.ok(res.body.includes('tab-catalog-products'));
-        assert.ok(!res.body.includes('tab-catalog-categories'));
+        assert.ok(res.body.includes('tab-catalog-categories'));
         assert.ok(res.body.includes('tab-catalog-menus'));
       });
     }

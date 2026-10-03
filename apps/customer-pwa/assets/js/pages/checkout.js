@@ -10,7 +10,7 @@
  * 3. Pre-Payment Verification Gate: Realtime price/stock check with "Ada perubahan di pesananmu, cek dulu yuk" modal
  * 4. Dual Payment: Tunai (COD / Bayar di Kasir) & Online Payment (Midtrans Snap)
  * 5. PWA Install Incentive: configuration-driven reward (promotion domain)
- * 6. Add-on recommendation rail — Branch-scoped ONLY (GET /catalog/menu?branch_id=<Checkout fulfillment branch>)
+ * 6. Add-on recommendation rail — Branch-scoped ONLY (GET /catalog/composed-menu?branch_id=<Checkout fulfillment branch>)
  */
 (function () {
   'use strict';
@@ -1324,6 +1324,41 @@
   function extractCatalogProducts(data) {
     var list = [];
     if (!data) return list;
+
+    // Canonical endpoint returns Menu View Models. Normalize only the fields
+    // needed by the existing upsell card/cart bridge; identity remains menu_id.
+    if (Array.isArray(data.menus)) {
+      data.menus.forEach(function (menu) {
+        if (!menu || !(menu.menu_id || menu.id)) return;
+        var components = Array.isArray(menu.components) ? menu.components : [];
+        var first = components.length === 1 ? components[0] : null;
+        list.push(Object.assign({}, menu, {
+          id: menu.menu_id || menu.id,
+          menu_id: menu.menu_id || menu.id,
+          name: menu.title || menu.package_name || 'Menu',
+          menu_title: menu.title || menu.package_name || 'Menu',
+          menu_subtitle: menu.subtitle || '',
+          price: Number(menu.price || 0),
+          regular_price: Number(menu.price || 0),
+          product_id: menu.menu_type === 'SINGLE' && first ? first.product_id : null,
+          description: first ? (first.description || '') : '',
+          image_url: first ? (first.image_url || '') : '',
+          component_snapshot: components,
+          components: components,
+          menu_snapshot: menu.menu_snapshot || {
+            menu_id: menu.menu_id || menu.id,
+            menu_type: menu.menu_type,
+            title: menu.title || menu.package_name || 'Menu',
+            subtitle: menu.subtitle || null,
+            price: Number(menu.price || 0)
+          }
+        }));
+      });
+      return list;
+    }
+
+    // Compatibility parsing for a legacy response is retained only for legacy
+    // callers/tests. The canonical Checkout path never requests that endpoint.
     if (Array.isArray(data.categories)) {
       data.categories.forEach(function (cat) {
         if (Array.isArray(cat.products)) {
@@ -1450,9 +1485,9 @@
   // Locked rule (docs/XENTRA_CART_CHECKOUT_CONTRACT.md — Checkout Upsell Branch
   // Scope): Checkout is exactly ONE fulfillment cycle for exactly ONE Branch, so
   // this rail may contain products from the Checkout fulfillment Branch ONLY.
-  // Its source is the authoritative Branch-scoped catalog contract
-  // `GET /catalog/menu?branch_id=<id>` (Catalog domain returns only products
-  // assigned to that Branch). There is strictly NO global-catalog fallback and
+  // Its source is the canonical Branch-scoped Menu contract
+  // `GET /catalog/composed-menu?branch_id=<id>` (Catalog domain returns only
+  // adopted Menus for that Branch). There is strictly NO global-catalog fallback and
   // NO other-Branch fallback on this page: if the Branch cannot be resolved the
   // rail stays hidden until the Branch is known.
   var upsellFetchedBranch = null; // branch id the current rail was sourced for
@@ -1601,7 +1636,7 @@
       applyUpsellPool([]); // drop any previous-scope rail immediately
       if (!branch) return; // fulfillment Branch unresolved: NEVER fall back to a global catalog
       if (!API) return;
-      API.get('/catalog/menu?branch_id=' + encodeURIComponent(branch.id))
+      API.get('/catalog/composed-menu?branch_id=' + encodeURIComponent(branch.id))
         .then(function (data) {
           if (upsellFetchedBranch !== branchKey) return; // superseded by a newer scope
           var freshPool = extractCatalogProducts(data);
@@ -3992,7 +4027,7 @@
     diffs.forEach(function (d) {
       diffHtml +=
         '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f3f4f6;font-size:13px;">' +
-        '  <div><b>' + UI.escape(d.product_name || d.product_id) + '</b></div>' +
+        '  <div><b>' + UI.escape(d.menu_title || d.product_name || d.product_id) + '</b></div>' +
         '  <div><s style="color:#9ca3af;margin-right:6px;">' + fmtIDR(d.expected_price) + '</s> <b style="color:#16a34a;">' + fmtIDR(d.actual_price) + '</b></div>' +
         '</div>';
     });
@@ -4296,8 +4331,12 @@
       pwa_runtime: pwaRuntime,
       items: items.map(function (i) {
         return {
-          product_id: i.product_id || i.id,
+          product_id: i.menu_id ? (i.product_id || null) : (i.product_id || i.id),
           id: i.id,
+          menu_id: i.menu_id || null,
+          menu_type: i.menu_type || null,
+          component_snapshot: Array.isArray(i.component_snapshot) ? i.component_snapshot : null,
+          menu_snapshot: i.menu_snapshot || null,
           quantity: Number(i.quantity) || 1,
           expected_price: Number(i.price) || 0,
           name: i.name,
@@ -4416,7 +4455,11 @@
     var payloadItems = items.map(function (i) {
       return {
         id: i.id,
-        product_id: i.product_id || i.id,
+        product_id: i.menu_id ? (i.product_id || null) : (i.product_id || i.id),
+        menu_id: i.menu_id || null,
+        menu_type: i.menu_type || null,
+        component_snapshot: Array.isArray(i.component_snapshot) ? i.component_snapshot : null,
+        menu_snapshot: i.menu_snapshot || null,
         quantity: Number(i.quantity) || 1,
         expected_price: Number(i.price) || 0,
         name: i.name || '',
@@ -4557,7 +4600,11 @@
       items: items.map(function (i) {
         return {
           id: i.id,
-          product_id: i.product_id || i.id,
+          product_id: i.menu_id ? (i.product_id || null) : (i.product_id || i.id),
+          menu_id: i.menu_id || null,
+          menu_type: i.menu_type || null,
+          component_snapshot: Array.isArray(i.component_snapshot) ? i.component_snapshot : null,
+          menu_snapshot: i.menu_snapshot || null,
           quantity: Number(i.quantity) || 1,
           expected_price: Number(i.price) || 0,
           note: i.note || (typeof Store !== 'undefined' && Store.getNote ? Store.getNote(i.id, i.branch_id) : '') || '',

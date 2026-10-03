@@ -133,31 +133,34 @@ test('Each branch shows its own stock_estimate for the same product', async () =
 });
 
 
-test('Customer catalog uses Product name as title and Category as grouping', async () => {
-  const res = await mockFetch('/api/v1/catalog/menu?branch_id=' + BARAT);
+test('Customer catalog uses canonical Menu title and Master Category grouping', async () => {
+  const res = await mockFetch('/api/v1/catalog/composed-menu?branch_id=' + BARAT);
   const data = await res.json();
   assert.strictEqual(data.success, true);
-  const product = (data.all_products || []).find((p) => String(p.id) === '272');
-  assert.ok(product, 'expected product exists');
-  assert.ok(product.menu_title, 'Customer title must be present');
-  assert.strictEqual(product.menu_title, product.name, 'Customer title must come from Product name');
-  assert.ok(product.category_id != null, 'Product retains Category grouping');
-  assert.ok(product.menu_subtitle == null || typeof product.menu_subtitle === 'string');
+  assert.strictEqual(data.model, 'product-menu-inventory-v1');
+  const menu = (data.menus || []).find((m) => String(m.menu_id) === 'demo_bangjo_menu_272');
+  assert.ok(menu, 'expected canonical Menu exists');
+  assert.ok(menu.title, 'Customer title must be present');
+  assert.ok(menu.sub_category && menu.sub_category.name, 'Menu must resolve its Sub Category');
+  assert.strictEqual(menu.title, menu.sub_category.name, 'Customer title must come from Menu/Sub Category identity');
+  assert.ok(menu.category && menu.category.id != null, 'Menu retains Master Category grouping');
+  assert.ok(menu.subtitle == null || typeof menu.subtitle === 'string');
 });
 
-test('Branch-scoped catalog exposes structured Master Menu presentation fields', async () => {
-  const res = await mockFetch(`/api/v1/catalog/menu?branch_id=${BARAT}`);
+test('Branch-scoped canonical catalog exposes Menu presentation fields without legacy Product overrides', async () => {
+  const res = await mockFetch('/api/v1/catalog/composed-menu?branch_id=' + BARAT + '&include_unavailable=1');
   const data = await res.json();
   assert.strictEqual(data.success, true);
 
-  const product = (data.all_products || []).find((p) => p && p.menu_title);
-  assert.ok(product, 'at least one branch product should expose Master Menu title');
-  assert.ok(Object.prototype.hasOwnProperty.call(product, 'menu_subtitle'));
-  assert.ok(Object.prototype.hasOwnProperty.call(product, 'menu_detail'));
-  assert.ok(Object.prototype.hasOwnProperty.call(product, 'menu_indicator'));
-  assert.ok(!Object.prototype.hasOwnProperty.call(product, 'name_override'));
-  assert.ok(!Object.prototype.hasOwnProperty.call(product, 'description_override'));
-  assert.ok(!Object.prototype.hasOwnProperty.call(product, 'image_override'));
+  const menu = (data.menus || []).find((m) => m && m.menu_id);
+  assert.ok(menu, 'at least one canonical branch Menu should be exposed');
+  assert.ok(Object.prototype.hasOwnProperty.call(menu, 'title'));
+  assert.ok(Object.prototype.hasOwnProperty.call(menu, 'subtitle'));
+  assert.ok(Object.prototype.hasOwnProperty.call(menu, 'level'));
+  assert.ok(Object.prototype.hasOwnProperty.call(menu, 'components'));
+  assert.ok(!Object.prototype.hasOwnProperty.call(menu, 'name_override'));
+  assert.ok(!Object.prototype.hasOwnProperty.call(menu, 'description_override'));
+  assert.ok(!Object.prototype.hasOwnProperty.call(menu, 'image_override'));
 });
 
 test('Customer catalog exposes structured Pedas intensity for four-dot presentation', () => {
@@ -190,11 +193,12 @@ test('Customer detail presentation uses square image, padded content, and black 
   assert.ok(subtitleCss.includes('color: #111111;'), 'Rasa must be black');
 });
 
-test('Customer catalog route uses Master resolver for both branch and brand-wide reads', () => {
+test('Customer canonical catalog route uses Composed Menu resolver for branch and brand-wide reads', () => {
   const route = fs.readFileSync(path.resolve(__dirname, '../../server/routes/catalog.js'), 'utf8');
-  assert.ok(route.includes('MasterMenuResolver.resolveBranchMenu'));
-  assert.ok(route.includes('MasterMenuResolver.resolveMasterMenu'));
-  assert.ok(route.includes('menu_indicator_level: p.indicator_level'));
+  assert.ok(route.includes('ComposedMenuResolver.resolveBranchMenu'));
+  assert.ok(route.includes('ComposedMenuResolver.resolveMasterMenu'));
+  assert.ok(route.includes("router.get('/catalog/composed-menu'"));
+  assert.ok(route.includes("model: 'product-menu-inventory-v1'"));
 });
 
 // ── PRODUCTS ENDPOINT: brand-wide (NOT branch-scoped) ──
@@ -375,8 +379,7 @@ test('Test 5 — Branch-less endpoint: loadProducts short-circuits when catalogB
   const catalogBranchCheck = funcBody.indexOf('if (catalogBranchId)');
   const apiCall = funcBody.indexOf('/products?category=');
   assert.ok(catalogBranchCheck >= 0, 'loadProducts must check catalogBranchId');
-  assert.ok(apiCall >= 0, 'loadProducts must have /products?category= for brand-wide mode');
-  assert.ok(catalogBranchCheck < apiCall, 'catalogBranchId check must come BEFORE /products?category= call');
+  assert.strictEqual(apiCall, -1, 'loadProducts must not call the legacy Product endpoint');
 
   // When catalogBranchId is set, it must return empty array (no fallback)
   const afterCatalogCheck = funcBody.substring(catalogBranchCheck, catalogBranchCheck + 200);

@@ -69,9 +69,10 @@ class InstallIncentiveStrategy extends BasePromotionStrategy {
     const presentation = safeParseObject(primaryReward.presentation_payload);
 
     const amountInCents = Number(primaryReward.amount_in_cents || 0);
-    // No synthetic/fallback product id: the reward target MUST be configured in
-    // the promotion reward row (data config) or no reward is granted.
-    const targetProductId = primaryReward.target_product_id;
+    // Canonical reward identity is target_menu_id. target_product_id remains
+    // only as a legacy compatibility target during migration.
+    const targetMenuId = primaryReward.target_menu_id || null;
+    const targetProductId = primaryReward.target_product_id || null;
     const isPwaInstalled = Boolean(context.is_pwa_installed);
 
     // Case A: Opened in web browser (PWA install requirement not satisfied) -> Prompt to install
@@ -89,11 +90,12 @@ class InstallIncentiveStrategy extends BasePromotionStrategy {
       };
     }
 
-    // A grant requires an authoritative reward product from the configuration.
-    if (!targetProductId) {
+    // A grant requires an authoritative canonical Menu target. Legacy Product
+    // targets remain accepted only for already-existing compatibility rows.
+    if (!targetMenuId && !targetProductId) {
       return {
         isEligible: false,
-        reason: 'Reward target product is not configured for this promotion.'
+        reason: 'Reward target Menu is not configured for this promotion.'
       };
     }
 
@@ -110,6 +112,9 @@ class InstallIncentiveStrategy extends BasePromotionStrategy {
       reward: {
         promo_id: promotion.id,
         reward_type: primaryReward.reward_type || 'freebie_product',
+        target_menu_id: targetMenuId,
+        target_product_id: targetProductId,
+        menu_id: targetMenuId,
         product_id: targetProductId,
         reward_price: amountInCents, // Integer Rupiah
         description: presentation.reward_title || 'Promo PWA Spesial'

@@ -9,6 +9,7 @@ const shellCss = fs.readFileSync(path.join(root, 'apps/merchant-shared/css/prese
 const dashboardJs = fs.readFileSync(path.join(root, 'apps/merchant-dashboard/assets/js/dashboard.js'), 'utf8');
 const dashboardHtml = fs.readFileSync(path.join(root, 'apps/merchant-dashboard/index.html'), 'utf8');
 const branchCatalogJs = fs.readFileSync(path.join(root, 'apps/merchant-dashboard/assets/js/branch-catalog-ui.js'), 'utf8');
+const merchantMenuJs = fs.readFileSync(path.join(root, 'apps/merchant-app/assets/js/menu.js'), 'utf8');
 
 test('PRES-01: reusable presentation shell exposes composition API', () => {
   assert.ok(shellJs.includes('window.XentraPresentation'));
@@ -113,7 +114,7 @@ test('PRES-12: Marketing Banner assignment is Bottom Sheet and preview is Dialog
 test('PRES-14: Merchant Menu display-name editor uses canonical presentation transport', () => {
   assert.ok(merchantMenuJs.includes('XentraPresentation.open({'));
   assert.ok(merchantMenuJs.includes("type: 'bottom-sheet'"));
-  assert.ok(merchantMenuJs.includes('updateBranchProductDisplayName'));
+  assert.ok(merchantMenuJs.includes('updateBranchMenuDisplayName'));
   assert.ok(merchantMenuJs.includes("label: 'Ubah Nama Tampil'"));
 });
 

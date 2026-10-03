@@ -6,9 +6,9 @@
  * Requirements Matrix:
  * - BM3-01: Branch Manager can view menu assignments for their assigned branch.
  * - BM3-02: Cross-branch menu read is denied (403 FORBIDDEN_BRANCH_SCOPE).
- * - BM3-03: Branch Manager can toggle product availability (is_available 0/1) for their assigned branch.
- * - BM3-04: Cross-branch product availability toggle is denied (403 FORBIDDEN_BRANCH_SCOPE).
- * - BM3-05: Toggling branch_products.is_available DOES NOT alter master catalog products.is_active.
+ * - BM3-03: Branch Manager can toggle Menu availability (is_available 0/1) for their assigned branch.
+ * - BM3-04: Cross-branch Menu availability toggle is denied (403 FORBIDDEN_BRANCH_SCOPE).
+ * - BM3-05: Toggling Branch Menu availability DOES NOT alter Master Product is_active.
  * - BM3-06: Branch Manager CANNOT create, update, or delete master products (403).
  * - BM3-07: Branch Manager CANNOT create, update, or delete master categories (403).
  * - BM3-08: Branch Manager can view branch inventory stock and low stock thresholds.
@@ -23,7 +23,7 @@
  * - BM3-17: Branch Manager can view promotion redemptions automatically scoped to assigned branch.
  * - BM3-18: Cross-tenant brand isolation is strictly preserved across menu, stock, and promo.
  * - BM3-19: index.html contains full operational UI for tab-bm-menu, tab-bm-promo, and tab-bm-stok with adjustment modal.
- * - BM3-20: dashboard.js implements loadBMMenu, toggleBMProductAvailability, loadBMStock, submitBMStockAdjustment, and loadBMPromotions.
+ * - BM3-20: dashboard.js implements loadBMMenu, toggleBMMenuAvailability, loadBMStock, submitBMStockAdjustment, and loadBMPromotions.
  */
 
 const { describe, it, before, after } = require('node:test');
@@ -41,6 +41,7 @@ const db = require('../../server/database/db');
 
 let server;
 let baseUrl;
+let adoptableMenuId = null;
 
 const BRAND_ID = 'brand_bangjo';
 const ORG_ID = 'org_xentra_holding';
@@ -582,7 +583,7 @@ describe('BM-3 — Branch Manager Dashboard: Menu + Stok + Promo', () => {
     assert.ok(html.includes('id="form-bm-stock-adjust"'), 'Missing form-bm-stock-adjust');
   });
 
-  it('BM3-20: dashboard.js implements loadBMMenu, toggleBMProductAvailability, loadBMStock, submitBMStockAdjustment, and loadBMPromotions', () => {
+  it('BM3-20: canonical Menu module implements loadBMMenu, toggleBMMenuAvailability, loadBMStock, submitBMStockAdjustment, and loadBMPromotions', () => {
     const jsPath = path.join(__dirname, '../../apps/merchant-app/assets/js/merchant-app.js');
     const menuPath = path.join(__dirname, '../../apps/merchant-app/assets/js/menu.js');
     const stockPath = path.join(__dirname, '../../apps/merchant-app/assets/js/stock.js');
@@ -593,7 +594,7 @@ describe('BM-3 — Branch Manager Dashboard: Menu + Stok + Promo', () => {
       .join('\n');
 
     assert.ok(js.includes('async function loadBMMenu()'), 'Missing loadBMMenu');
-    assert.ok(js.includes('async function toggleBMProductAvailability('), 'Missing toggleBMProductAvailability');
+    assert.ok(js.includes('async function toggleBMMenuAvailability('), 'Missing toggleBMMenuAvailability');
     assert.ok(js.includes('async function loadBMStock()'), 'Missing loadBMStock');
     assert.ok(js.includes('async function submitBMStockAdjustment('), 'Missing submitBMStockAdjustment');
     assert.ok(js.includes('async function loadBMPromotions()'), 'Missing loadBMPromotions');
@@ -607,7 +608,7 @@ describe('BM-3 — Branch Manager Dashboard: Menu + Stok + Promo', () => {
     assert.ok(js.includes('x-menu-action-trigger'), 'Menu action trigger must be rendered');
     assert.ok(js.includes("actionTrigger.addEventListener('click'"), 'Menu actions must use DOM event listeners');
     const menuRenderStart = js.indexOf('function renderBMMenuTable()');
-    const menuRenderEnd = js.indexOf('async function toggleBMProductAvailability', menuRenderStart);
+    const menuRenderEnd = js.indexOf('async function toggleBMMenuAvailability', menuRenderStart);
     const menuRender = js.slice(menuRenderStart, menuRenderEnd);
     assert.equal(menuRender.includes('onclick='), false, 'Menu renderer must not embed inline onclick attributes');
     const cssPath = path.join(__dirname, '../../apps/merchant-shared/css/dashboard.css');
@@ -620,71 +621,76 @@ describe('BM-3 — Branch Manager Dashboard: Menu + Stok + Promo', () => {
      BM-3 PHASE 2: MENU WORKSPACE, ADOPTION & BRANCH CATEGORIES
      ───────────────────────────────────────────────────────────────────────── */
 
-  it('BM3-21: Branch Manager can query branch catalog (/admin/branches/:id/catalog) for assigned branch', async () => {
+  it('BM3-21: Branch Manager can query canonical Branch Menu catalog for assigned branch', async () => {
     const token = seedStaffSession({ role: 'branch_manager', branchId: BRANCH_A_ID, brandId: BRAND_ID });
 
-    const res = await request('GET', `/api/v1/admin/branches/${BRANCH_A_ID}/catalog`, null, {
+    const res = await request('GET', `/api/v1/admin/branches/${BRANCH_A_ID}/menu`, null, {
       Authorization: `Bearer ${token}`
     });
 
     assert.equal(res.status, 200);
     assert.equal(res.body.success, true);
+    assert.equal(res.body.model, 'branch-menu-v1');
     assert.ok(Array.isArray(res.body.categories));
-    assert.ok(Array.isArray(res.body.adopted_products));
-    assert.ok(Array.isArray(res.body.available_master_products));
+    assert.ok(Array.isArray(res.body.adopted_menus));
+    assert.ok(Array.isArray(res.body.available_master_menus));
 
-    // Cross-branch must be denied
-    const crossRes = await request('GET', `/api/v1/admin/branches/${BRANCH_B_ID}/catalog`, null, {
+    const crossRes = await request('GET', `/api/v1/admin/branches/${BRANCH_B_ID}/menu`, null, {
       Authorization: `Bearer ${token}`
     });
     assert.equal(crossRes.status, 403);
     assert.equal(crossRes.body.error, 'FORBIDDEN_BRANCH_SCOPE');
   });
 
-  it('BM3-22: Branch Manager can adopt a master product into assigned branch with price policy enforcement', async () => {
-    // Seed an unadopted master product with range pricing
-    db.prepare(`
-      INSERT OR REPLACE INTO products (id, brand_id, category_id, name, slug, price, pricing_mode, min_price, max_price, is_active, sort_order, created_at, updated_at)
-      VALUES ('prod_bm3_adoptable', ?, 'cat_bm3_1', 'Es Teh Manis Jumbo', 'es-teh-jumbo', 8000, 'range', 7000, 12000, 1, 10, datetime('now'), datetime('now'))
-    `).run(BRAND_ID);
-
+  it('BM3-22: Branch Manager can adopt a Master Menu into the assigned branch', async () => {
     const token = seedStaffSession({ role: 'branch_manager', branchId: BRANCH_A_ID, brandId: BRAND_ID });
 
-    // 1. Invalid price below min_price must be rejected (400 INVALID_BRANCH_PRICE)
-    const failRes = await request('POST', `/api/v1/admin/branches/${BRANCH_A_ID}/adopt`, {
-      product_id: 'prod_bm3_adoptable',
-      price: 5000
+    const rasa = db.prepare("SELECT id FROM menu_flavors WHERE brand_id = ? AND lower(trim(name)) = 'original' AND is_active = 1 LIMIT 1").get(BRAND_ID);
+    if (!rasa) {
+      db.prepare("INSERT INTO menu_flavors (id, brand_id, name, slug, sort_order, is_active) VALUES ('bm3_original_rasa', ?, 'Original', 'original-bm3', 1, 1)").run(BRAND_ID);
+    }
+    const originalRasa = rasa || db.prepare("SELECT id FROM menu_flavors WHERE brand_id = ? AND lower(trim(name)) = 'original' LIMIT 1").get(BRAND_ID);
+
+    const adoptableProductId = 'prod_bm3_adoptable';
+    db.prepare(
+      "INSERT OR REPLACE INTO products (id, brand_id, category_id, name, slug, price, is_active) VALUES (?, ?, 'cat_bm3_1', 'Menu BM3 Adoptable', 'menu-bm3-adoptable', 8000, 1)"
+    ).run(adoptableProductId, BRAND_ID);
+
+    const subCategoryId = 'bm3_adopt_sub';
+    db.prepare(
+      "INSERT OR IGNORE INTO sub_categories (id, brand_id, category_id, name, slug, sort_order, is_active) VALUES (?, ?, 'cat_bm3_1', 'Menu BM3 Adoptable', 'menu-bm3-adoptable', 1, 1)"
+    ).run(subCategoryId, BRAND_ID);
+    adoptableMenuId = 'bm3_menu_adoptable';
+    db.prepare(
+      "INSERT OR IGNORE INTO menus (id, brand_id, menu_type, sub_category_id, rasa_id, selling_price, status) VALUES (?, ?, 'SINGLE', ?, ?, 8000, 'ACTIVE')"
+    ).run(adoptableMenuId, BRAND_ID, subCategoryId, originalRasa.id);
+    db.prepare(
+      "INSERT OR IGNORE INTO menu_items (menu_id, product_id, quantity, sort_order) VALUES (?, 'prod_bm3_adoptable', 1, 0)"
+    ).run(adoptableMenuId);
+    db.prepare(
+      "INSERT OR IGNORE INTO branch_categories (id, brand_id, branch_id, name, slug, sort_order, is_active) VALUES ('bc_bm3_adopt', ?, ?, 'Menu Utama BM3', 'menu-utama-bm3', 1, 1)"
+    ).run(BRAND_ID, BRANCH_A_ID);
+
+    const res = await request('POST', `/api/v1/admin/menus/${adoptableMenuId}/adopt`, {
+      branch_id: BRANCH_A_ID,
+      branch_category_ids: ['bc_bm3_adopt'],
+      is_available: true,
+      price_override: 9000
     }, {
       Authorization: `Bearer ${token}`
     });
-    assert.equal(failRes.status, 400);
-    assert.equal(failRes.body.error, 'INVALID_BRANCH_PRICE');
+    assert.equal(res.status, 200);
+    assert.equal(res.body.success, true);
 
-    // 2. Cross-branch adoption must be denied (403 FORBIDDEN_BRANCH_SCOPE)
-    const crossRes = await request('POST', `/api/v1/admin/branches/${BRANCH_B_ID}/adopt`, {
-      product_id: 'prod_bm3_adoptable',
-      price: 9000
-    }, {
-      Authorization: `Bearer ${token}`
-    });
-    assert.equal(crossRes.status, 403);
-    assert.equal(crossRes.body.error, 'FORBIDDEN_BRANCH_SCOPE');
+    const bm = db.prepare('SELECT menu_id, price_override, is_available FROM branch_menus WHERE branch_id = ? AND menu_id = ?')
+      .get(BRANCH_A_ID, adoptableMenuId);
+    assert.ok(bm);
+    assert.equal(Number(bm.price_override), 9000);
+    assert.equal(Number(bm.is_available), 1);
 
-    // 3. Valid adoption within range must succeed
-    const okRes = await request('POST', `/api/v1/admin/branches/${BRANCH_A_ID}/adopt`, {
-      product_id: 'prod_bm3_adoptable',
-      price: 9000
-    }, {
-      Authorization: `Bearer ${token}`
-    });
-    assert.equal(okRes.status, 201);
-    assert.equal(okRes.body.success, true);
-    assert.equal((okRes.body.adopted || okRes.body.assignment).price, 9000);
-
-    // Verify persisted in DB
-    const bp = db.prepare('SELECT * FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH_A_ID, 'prod_bm3_adoptable');
-    assert.ok(bp);
-    assert.equal(bp.price, 9000);
+    const membership = db.prepare('SELECT branch_category_id FROM branch_menu_categories WHERE branch_id = ? AND menu_id = ?')
+      .get(BRANCH_A_ID, adoptableMenuId);
+    assert.equal(membership.branch_category_id, 'bc_bm3_adopt');
   });
 
   it('BM3-23: Branch Manager can create, rename, reorder, and delete branch categories', async () => {
@@ -748,65 +754,54 @@ describe('BM-3 — Branch Manager Dashboard: Menu + Stok + Promo', () => {
     assert.equal(checkDel, undefined);
   });
 
-  it('BM3-24: Branch Manager can assign and clear category override on adopted branch product', async () => {
+  it('BM3-24: Branch Manager can configure canonical Menu category membership', async () => {
     const token = seedStaffSession({ role: 'branch_manager', branchId: BRANCH_A_ID, brandId: BRAND_ID });
+    assert.ok(adoptableMenuId);
 
-    // Create a branch category
-    const catRes = await request('POST', `/api/v1/admin/branches/${BRANCH_A_ID}/categories`, {
-      name: 'Spesial Cabang'
+    db.prepare("INSERT OR IGNORE INTO branch_categories (id, brand_id, branch_id, name, slug, sort_order, is_active) VALUES ('bc_bm3_extra', ?, ?, 'Promo BM3', 'promo-bm3', 2, 1)")
+      .run(BRAND_ID, BRANCH_A_ID);
+
+    const adoptRes = await request('POST', `/api/v1/admin/menus/${adoptableMenuId}/adopt`, {
+      branch_id: BRANCH_A_ID,
+      branch_category_ids: ['bc_bm3_adopt', 'bc_bm3_extra'],
+      is_available: true,
+      price_override: 9000
     }, {
       Authorization: `Bearer ${token}`
     });
-    assert.equal(catRes.status, 201);
-    const catId = catRes.body.category.id;
+    assert.equal(adoptRes.status, 200);
+    assert.equal(adoptRes.body.success, true);
 
-    // Assign category to adopted product prod_bm3_adoptable
-    const assignRes = await request('PATCH', `/api/v1/admin/branches/${BRANCH_A_ID}/products/prod_bm3_adoptable/override`, {
-      branch_category_id: catId
-    }, {
-      Authorization: `Bearer ${token}`
-    });
-    assert.equal(assignRes.status, 200);
-    assert.equal(assignRes.body.success, true);
-
-    const bp = db.prepare('SELECT branch_category_id FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH_A_ID, 'prod_bm3_adoptable');
-    assert.equal(bp.branch_category_id, catId);
-
-    // Clear category assignment
-    const clearRes = await request('PATCH', `/api/v1/admin/branches/${BRANCH_A_ID}/products/prod_bm3_adoptable/override`, {
-      branch_category_id: null
-    }, {
-      Authorization: `Bearer ${token}`
-    });
-    assert.equal(clearRes.status, 200);
-    assert.equal(clearRes.body.success, true);
-
-    const bpCleared = db.prepare('SELECT branch_category_id FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH_A_ID, 'prod_bm3_adoptable');
-    assert.equal(bpCleared.branch_category_id, null);
+    const memberships = db.prepare(
+      'SELECT branch_category_id FROM branch_menu_categories WHERE branch_id = ? AND menu_id = ? ORDER BY branch_category_id'
+    ).all(BRANCH_A_ID, adoptableMenuId);
+    assert.deepEqual(Array.from(memberships).map(row => row.branch_category_id), ['bc_bm3_adopt', 'bc_bm3_extra']);
   });
 
-  it('BM3-25: Branch Manager can unadopt (remove) product from branch without affecting master catalog', async () => {
+  it('BM3-25: Branch Manager can unadopt a canonical Menu without affecting its Product', async () => {
     const token = seedStaffSession({ role: 'branch_manager', branchId: BRANCH_A_ID, brandId: BRAND_ID });
 
-    // Cross-branch unadopt denied
-    const crossRes = await request('DELETE', `/api/v1/admin/branches/${BRANCH_B_ID}/products/prod_bm3_adoptable`, null, {
+    const crossRes = await request('DELETE', `/api/v1/admin/branches/${BRANCH_B_ID}/menu/${adoptableMenuId}`, null, {
       Authorization: `Bearer ${token}`
     });
     assert.equal(crossRes.status, 403);
     assert.equal(crossRes.body.error, 'FORBIDDEN_BRANCH_SCOPE');
 
-    // Unadopt from own branch
-    const delRes = await request('DELETE', `/api/v1/admin/branches/${BRANCH_A_ID}/products/prod_bm3_adoptable`, null, {
+    const delRes = await request('DELETE', `/api/v1/admin/branches/${BRANCH_A_ID}/menu/${adoptableMenuId}`, null, {
       Authorization: `Bearer ${token}`
     });
     assert.equal(delRes.status, 200);
     assert.equal(delRes.body.success, true);
 
-    // Verify branch_product row is removed
-    const bp = db.prepare('SELECT * FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH_A_ID, 'prod_bm3_adoptable');
-    assert.equal(bp, undefined);
+    assert.equal(
+      db.prepare('SELECT * FROM branch_menus WHERE branch_id = ? AND menu_id = ?').get(BRANCH_A_ID, adoptableMenuId),
+      undefined
+    );
+    assert.equal(
+      db.prepare('SELECT * FROM branch_menu_categories WHERE branch_id = ? AND menu_id = ?').get(BRANCH_A_ID, adoptableMenuId),
+      undefined
+    );
 
-    // Verify master product is completely intact
     const master = db.prepare('SELECT * FROM products WHERE id = ?').get('prod_bm3_adoptable');
     assert.ok(master);
     assert.equal(master.name, 'Es Teh Manis Jumbo');
@@ -835,7 +830,7 @@ describe('BM-3 — Branch Manager Dashboard: Menu + Stok + Promo', () => {
     assert.ok(js.includes('openBMAddCatalogModal'), 'Missing openBMAddCatalogModal');
     assert.ok(js.includes('promptAddBMBranchCategory'), 'Missing promptAddBMBranchCategory');
     assert.ok(js.includes('deleteBMBranchCategory'), 'Missing deleteBMBranchCategory');
-    assert.ok(js.includes('removeBMBranchProduct'), 'Missing removeBMBranchProduct');
+    assert.ok(js.includes('removeBMBranchMenu'), 'Missing removeBMBranchMenu');
     assert.ok(js.includes('renderBMMenuCategoriesBar'), 'Missing renderBMMenuCategoriesBar');
   });
 });
