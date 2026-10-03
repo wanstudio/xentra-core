@@ -24,6 +24,7 @@ function statusForError(message) {
     case 'LEVEL_NOT_FOUND':
     case 'BRANCH_NOT_FOUND':
     case 'BRANCH_CATEGORY_NOT_FOUND':
+    case 'BRANCH_MENU_NOT_FOUND':
       return 404;
     case 'BRAND_CONTEXT_REQUIRED':
     case 'BRANCH_CONTEXT_REQUIRED':
