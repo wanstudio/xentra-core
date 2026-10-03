@@ -12,6 +12,7 @@
 const CatalogRepository = require('../../../core/data/repositories/CatalogRepository');
 const ProductOptionsModel = require('../../catalog/models/ProductOptionsModel');
 const MasterMenuResolver = require('../../catalog/services/MasterMenuResolver');
+const { verifyComposedCheckout } = require('./ComposedMenuCheckoutService');
 
 const catalogRepository = new CatalogRepository();
 
@@ -105,12 +106,52 @@ class PrePaymentVerificationGate {
     const verifiedItems = [];
     const appliedPromos = [];
 
+    const canonicalItems = items.filter(item => item && item.menu_id);
+    const nonRewardLegacyItems = items.filter(item => {
+      const isReward = Boolean(item && (
+        item.is_promo_reward ||
+        item.promo_id ||
+        String(item.product_id || item.id || '').startsWith('reward_')
+      ));
+      return !item.menu_id && !isReward;
+    });
+
+    if (canonicalItems.length > 0 && nonRewardLegacyItems.length > 0) {
+      return {
+        status: 'MIXED_MENU_MODELS',
+        is_valid: false,
+        verified_items: [],
+        price_diffs: [],
+        errors: ['Checkout canonical Menu tidak boleh dicampur dengan item Product legacy dalam satu pesanan.']
+      };
+    }
+
+    if (canonicalItems.length > 0) {
+      const canonicalVerification = verifyComposedCheckout({
+        brandId: brand_id,
+        branchId: branch_id,
+        items: canonicalItems
+      });
+
+      if (!canonicalVerification.is_valid) {
+        return {
+          status: canonicalVerification.status,
+          is_valid: false,
+          verified_items: canonicalVerification.verified_items || [],
+          price_diffs: canonicalVerification.price_diffs || [],
+          errors: canonicalVerification.errors || []
+        };
+      }
+
+      verifiedItems.push(...canonicalVerification.verified_items);
+    }
+
     let PromotionEngineService = null;
     try {
       PromotionEngineService = require('../../promotion/services/PromotionEngineService');
     } catch (_) {}
 
-    for (const item of items) {
+    for (const item of items.filter(function (entry) { return !(entry && entry.menu_id); })) {
       const productId = item.product_id || item.id;
       const rawQty = item.quantity != null ? item.quantity : item.qty;
       const requestedQty = Number(rawQty);
@@ -252,7 +293,7 @@ class PrePaymentVerificationGate {
       if ((hasExplicitExpectedPrice || hasExplicitItemPrice) && expectedPrice !== actualPrice) {
         priceDiffs.push({
           product_id: productId,
-          name: masterProduct.name,
+          name: resolvedMenuProduct.master.name,
           expected_price: expectedPrice,
           actual_price: actualPrice,
           difference: actualPrice - expectedPrice
