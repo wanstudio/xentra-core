@@ -252,7 +252,8 @@ class ComposedMenuService {
         sortOrder: Number.isFinite(Number(sortOrder)) ? Number(sortOrder) : 0
       });
     } catch (err) {
-      if (/UNIQUE constraint failed/i.test(String(err && err.message))) {
+      const message = String(err && err.message || err);
+      if (/UNIQUE constraint failed/i.test(message) || /RASA_ALREADY_EXISTS/i.test(message)) {
         throw new Error('RASA_ALREADY_EXISTS');
       }
       throw err;
