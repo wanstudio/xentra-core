@@ -81,7 +81,7 @@ test('dry-run plans deterministic SKU but does not mutate Product/Menu/Inventory
   assert.equal(plan.persisted, false);
 
   const product = db.prepare('SELECT sku FROM products WHERE id = ?').get(PRODUCT_STOCK);
-  assert.equal(product.sku, undefined);
+  assert.equal(product.sku, null);
   const menu = db.prepare(
     "SELECT id FROM menus WHERE brand_id = ? AND menu_type = 'SINGLE' AND id LIKE ?"
   ).get(BRAND, '%');
@@ -205,13 +205,6 @@ test('existing Menu Satuan identity conflict is surfaced before mutation', () =>
   db.prepare(
     "INSERT OR IGNORE INTO menus (id, brand_id, menu_type, sub_category_id, rasa_id, selling_price, status) VALUES ('cmm_existing_menu', ?, 'SINGLE', ?, ?, 25000, 'ACTIVE')"
   ).run(BRAND, subId, rasaId);
-  db.prepare(
-    "INSERT OR IGNORE INTO menu_items (menu_id, product_id, quantity, sort_order) VALUES ('cmm_existing_menu', ?, 1, 0)"
-  ).run(PRODUCT_DUPLICATE);
-
-  db.prepare(
-    "DELETE FROM menus WHERE id = 'cmm_existing_menu'"
-  ).run();
   db.prepare(
     "INSERT OR IGNORE INTO menus (id, brand_id, menu_type, sub_category_id, rasa_id, selling_price, status) VALUES ('cmm_existing_menu', ?, 'SINGLE', ?, ?, 25000, 'ACTIVE')"
   ).run(BRAND, subId, rasaId);
