@@ -616,6 +616,6 @@ describe('Promotion Security & RBAC Scope Authorization Suite', () => {
 
     assert.equal(createRes.status, 400);
     assert.equal(createRes.body.success, false);
-    assert.ok(createRes.body.error.includes('Produk reward tidak valid atau bukan milik brand ini'));
+    assert.ok(/Produk reward legacy tidak valid atau bukan milik brand ini|Menu reward tidak valid atau bukan milik brand ini/.test(createRes.body.error));
   });
 });
