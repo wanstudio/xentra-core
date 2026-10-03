@@ -368,32 +368,18 @@
     var targetId = String(productId || '');
 
     // Banner PRODUCT CTA stores a Product identity for compatibility, while
-    // Customer Home now renders Menu objects. A Menu ID is accepted first for
-    // forward compatibility; otherwise resolve the Product reference through
-    // its canonical Menu component snapshot. Never read Product price/category
+    // Customer Home now renders Menu objects. Resolve that Product only through
+    // the canonical Menu component snapshot. Never read Product price/category
     // here—the canonical Menu remains the customer commercial authority.
-    var local = products.find(function (product) {
-      if (String(product.id) === targetId) return true;
-      if (String(product.product_id || '') === targetId) return true;
+    var matches = products.filter(function (product) {
       return Array.isArray(product.components) && product.components.some(function (component) {
         return String(component && component.product_id || '') === targetId;
       });
     });
-    if (local) return local;
 
-    for (var i = 0; i < categories.length; i++) {
-      var items = Array.isArray(categories[i].products) ? categories[i].products : [];
-      var hit = items.find(function (product) {
-        if (String(product.id) === targetId) return true;
-        if (String(product.product_id || '') === targetId) return true;
-        return Array.isArray(product.components) && product.components.some(function (component) {
-          return String(component && component.product_id || '') === targetId;
-        });
-      });
-      if (hit) return hit;
-    }
-
-    return null;
+    // A Product can legally participate in multiple Menus. A banner PRODUCT
+    // target must not silently choose one commercial Menu in that case.
+    return matches.length === 1 ? matches[0] : null;
   }
 
   function goToBannerCategory(categoryId) {
@@ -437,18 +423,10 @@
       var products = data && Array.isArray(data.all_products) ? data.all_products : [];
 
       // The Banner CONTENT contract historically stores PRODUCT CTA by
-      // Product ID. Resolve that identity only through canonical Menu output:
-      // first Menu ID, then a unique Menu whose component references the Product.
-      // Do not query Product price/category or invent a commercial mapping.
+      // Product ID. Resolve that identity only through canonical Menu output.
+      // A Product used by multiple Menus is intentionally ambiguous; never
+      // invent which commercial Menu the banner should open.
       var targetId = String(productId || '');
-      var menuIdHit = products.find(function (product) {
-        return String(product.id) === targetId;
-      }) || null;
-      if (menuIdHit) {
-        openProductDetail(menuIdHit);
-        return true;
-      }
-
       var componentHits = products.filter(function (product) {
         return Array.isArray(product.components) && product.components.some(function (component) {
           return String(component && component.product_id || '') === targetId;
