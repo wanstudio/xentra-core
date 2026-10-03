@@ -199,13 +199,13 @@ test('apply migrates legacy branch adoption, branch categories and stock into ca
 
   const menu = db.prepare(
     "SELECT m.id, m.sub_category_id, m.rasa_id FROM menus m JOIN menu_items mi ON mi.menu_id = m.id " +
-    "WHERE m.brand_id = ? AND m.menu_type = 'SINGLE' AND mi.product_id = ?"
-  ).get(BRAND, PRODUCT_STOCK);
+    "WHERE m.id = ? AND m.brand_id = ? AND m.menu_type = 'SINGLE' AND mi.product_id = ?"
+  ).get(result.menu_id, BRAND, PRODUCT_STOCK);
   assert.ok(menu);
 
   const branchMenu = db.prepare(
     'SELECT is_available, price_override FROM branch_menus WHERE branch_id = ? AND menu_id = ?'
-  ).get(BRANCH, menu.id);
+  ).get(BRANCH, result.menu_id);
   assert.equal(Number(branchMenu.is_available), 1);
   assert.equal(Number(branchMenu.price_override), 30500);
 
