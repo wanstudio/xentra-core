@@ -286,6 +286,29 @@ function ensureComposedMenuSchema(db = DataAccess) {
       FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT
     );
 
+    CREATE TABLE IF NOT EXISTS composed_menu_migrations (
+      product_id TEXT PRIMARY KEY,
+      brand_id TEXT NOT NULL,
+      source_model TEXT NOT NULL DEFAULT 'legacy_product',
+      target_model TEXT NOT NULL DEFAULT 'composed_menu_v1',
+      status TEXT NOT NULL DEFAULT 'legacy'
+        CHECK (status IN ('legacy', 'needs_review', 'migrated', 'verified', 'failed')),
+      attempt_count INTEGER NOT NULL DEFAULT 0,
+      canonical_fingerprint TEXT,
+      source_snapshot TEXT,
+      last_error TEXT,
+      notes TEXT,
+      migrated_at TEXT,
+      verified_at TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+      FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_composed_menu_migrations_brand_status
+      ON composed_menu_migrations(brand_id, status);
+
     CREATE TABLE IF NOT EXISTS product_sku_history (
       id TEXT PRIMARY KEY,
       brand_id TEXT NOT NULL,
