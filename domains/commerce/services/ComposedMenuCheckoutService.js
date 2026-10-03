@@ -158,6 +158,7 @@ function verifyComposedCheckout({ brandId, branchId, items }) {
       }
 
       resolved.push({
+        item,
         menu_id: item.menu_id,
         menu,
         quantity,
