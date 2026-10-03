@@ -254,6 +254,49 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
     }
   });
 
+  router.patch('/admin/menus/:id/availability', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+    try {
+      const branchId = req.body && req.body.branch_id;
+      if (!branchId) return res.status(400).json({ success: false, error: 'BRANCH_CONTEXT_REQUIRED' });
+
+      if (req.user && req.user.role === 'branch_manager') {
+        const assignedBranchId = req.user.branchId || req.user.branch_id;
+        if (assignedBranchId && assignedBranchId !== branchId) {
+          return res.status(403).json({
+            success: false,
+            error: 'FORBIDDEN_BRANCH_SCOPE',
+            message: 'Branch Manager hanya memiliki kewenangan pada cabang yang ditugaskan.'
+          });
+        }
+      }
+
+      const raw = req.body && req.body.is_available;
+      if (raw !== true && raw !== false && Number(raw) !== 0 && Number(raw) !== 1) {
+        return res.status(400).json({
+          success: false,
+          error: 'INVALID_AVAILABILITY',
+          message: 'is_available harus berupa true/false atau 0/1.'
+        });
+      }
+
+      const branch = deps.db
+        ? deps.db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(branchId, req.brand_id)
+        : null;
+      if (!branch) return res.status(404).json({ success: false, error: 'BRANCH_NOT_FOUND' });
+
+      const branchMenu = service.setBranchMenuAvailability({
+        brandId: req.brand_id,
+        branchId,
+        menuId: req.params.id,
+        isAvailable: raw === true || Number(raw) === 1
+      });
+
+      res.json({ success: true, branch_menu: branchMenu });
+    } catch (err) {
+      sendError(res, err, 'COMPOSED_BRANCH_MENU_AVAILABILITY_UPDATE_FAILED');
+    }
+  });
+
   router.get('/admin/sub-categories', requireAuth(ownerRoles), (req, res) => {
     try {
       const categoryId = req.query && req.query.category_id ? req.query.category_id : null;
