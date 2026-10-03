@@ -398,7 +398,7 @@ class PromotionRepository {
           presStr = typeof rw.presentation_payload === 'object' ? JSON.stringify(rw.presentation_payload) : (rw.presentation_payload || null);
         } else {
           // Preserve existing presentation_payload for this reward if it existed
-          const existingRw = (existing.rewards || []).find(r => r.id === rewId || r.target_product_id === rw.target_product_id);
+          const existingRw = (existing.rewards || []).find(r =>\n            r.id === rewId ||\n            (rw.target_menu_id && r.target_menu_id === rw.target_menu_id) ||\n            (rw.target_product_id && r.target_product_id === rw.target_product_id)\n          );
           if (existingRw && existingRw.presentation_payload) {
             presStr = typeof existingRw.presentation_payload === 'object'
               ? JSON.stringify(existingRw.presentation_payload)
@@ -490,6 +490,16 @@ class PromotionRepository {
       FROM products
       WHERE id = ? AND brand_id = ?
     `, [productId, brandId]);
+  }
+
+  findRewardMenu({ menuId, brandId }) {
+    return this.db.queryOne(`
+      SELECT m.id, m.brand_id, m.menu_type, m.package_name, m.selling_price, m.status,
+             sc.name AS sub_category_name
+      FROM menus m
+      LEFT JOIN sub_categories sc ON sc.id = m.sub_category_id AND sc.brand_id = m.brand_id
+      WHERE m.id = ? AND m.brand_id = ?
+    `, [menuId, brandId]);
   }
 
   recordRedemption({
