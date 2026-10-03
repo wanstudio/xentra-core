@@ -9,6 +9,7 @@ const shellCss = fs.readFileSync(path.join(root, 'apps/merchant-shared/css/prese
 const dashboardJs = fs.readFileSync(path.join(root, 'apps/merchant-dashboard/assets/js/dashboard.js'), 'utf8');
 const dashboardHtml = fs.readFileSync(path.join(root, 'apps/merchant-dashboard/index.html'), 'utf8');
 const branchCatalogJs = fs.readFileSync(path.join(root, 'apps/merchant-dashboard/assets/js/branch-catalog-ui.js'), 'utf8');
+const merchantMenuJs = fs.readFileSync(path.join(root, 'apps/merchant-app/assets/js/menu.js'), 'utf8');
 
 test('PRES-01: reusable presentation shell exposes composition API', () => {
   assert.ok(shellJs.includes('window.XentraPresentation'));
