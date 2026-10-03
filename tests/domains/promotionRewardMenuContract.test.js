@@ -250,6 +250,15 @@ test('PromotionEngine applies canonical Menu reward and does not require Product
   assert.equal(applied.reward.resolution_source, 'menu');
 });
 
+test('database rejects ambiguous reward target configuration', () => {
+  assert.throws(
+    () => db.prepare(
+      "INSERT INTO promotion_rewards (id, promotion_id, reward_type, target_menu_id, target_product_id, amount_in_cents) VALUES (?, ?, 'freebie_product', ?, ?, 0)"
+    ).run('prmv1_ambiguous_target', PROMO, MENU_SINGLE, PRODUCT_SINGLE),
+    /PROMOTION_REWARD_TARGET_AMBIGUOUS/
+  );
+});
+
 test('legacy Product reward migration auto-maps only an unambiguous active Menu Satuan', () => {
   const legacyUniqueReward = 'prmv1_reward_unique';
   const legacyMissingReward = 'prmv1_reward_missing';
@@ -280,6 +289,19 @@ test('legacy Product reward migration auto-maps only an unambiguous active Menu 
   assert.equal(missing.target_menu_id, null);
   assert.equal(ambiguous.status, 'NEEDS_REVIEW');
   assert.equal(ambiguous.target_menu_id, null);
+
+  const appliedResult = PromotionRewardMigrationService.apply({
+    brandId: BRAND,
+    promotionId: PROMO
+  });
+
+  assert.equal(appliedResult.applied.length, 1);
+  assert.equal(appliedResult.applied[0].reward_id, legacyUniqueReward);
+  const migratedRow = db.prepare(
+    'SELECT target_menu_id, target_product_id FROM promotion_rewards WHERE id = ?'
+  ).get(legacyUniqueReward);
+  assert.equal(migratedRow.target_menu_id, MENU_UNIQUE);
+  assert.equal(migratedRow.target_product_id, null);
 });
 
 test.after(() => {
