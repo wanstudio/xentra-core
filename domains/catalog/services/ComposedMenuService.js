@@ -435,6 +435,25 @@ class ComposedMenuService {
       ? currentItems.map(item => ({ productId: item.product_id, quantity: Number(item.quantity) }))
       : normalizeProductComponents(components);
 
+    // A persisted/corrupted Package can never be "validated" merely because
+    // the caller omitted components. Re-apply the package invariant to the
+    // effective composition before writing.
+    if (!Array.isArray(normalizedComponents) || normalizedComponents.length === 0) {
+      throw new Error('MENU_PACKAGE_COMPONENTS_REQUIRED');
+    }
+    const normalizedProductIds = new Set();
+    for (const component of normalizedComponents) {
+      if (!component || !component.productId || !Number.isSafeInteger(Number(component.quantity)) || Number(component.quantity) <= 0) {
+        throw new Error('MENU_PACKAGE_COMPONENT_INVALID');
+      }
+      if (normalizedProductIds.has(String(component.productId))) {
+        throw new Error('MENU_PACKAGE_DUPLICATE_PRODUCT');
+      }
+      normalizedProductIds.add(String(component.productId));
+    }
+    const totalUnits = normalizedComponents.reduce((sum, item) => sum + Number(item.quantity), 0);
+    if (totalUnits < 2) throw new Error('MENU_PACKAGE_MIN_TWO_UNITS');
+
     const nextPackageName = packageName === undefined
       ? current.package_name
       : normalizeName(packageName, 'MENU_PACKAGE_NAME_REQUIRED');
