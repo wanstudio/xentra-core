@@ -1,9 +1,13 @@
 # 🔒 Xentra — Product Name vs Category Display Boundary v1
 
-**Status:** LOCKED / AUTHORITATIVE  
+**Status:** SUPERSEDED — HISTORICAL REFERENCE ONLY  
 **Decision date:** 2026-10-01  
-**Scope:** Master Catalog, Owner Product Editor, Master Menu Resolver, Customer PWA, Merchant Branch Menu
+**Superseded by:** docs/proposals/xentra-taxonomy-composed-menu-v1.md (LOCKED TARGET CONTRACT, 2026-10-03)
+**Scope:** Historical Product Name / Category / display mapping
 
+## 0. Supersession notice
+
+> This document is retained for historical context. Its Product-centric Customer title/composition rules are no longer the forward Menu authority. Under the current locked contract, Menu owns customer-facing title, taxonomy, selling price and composition; Product remains the atomic reusable stock/catalog unit. Do not use this document to implement new Menu APIs, Customer PWA behavior, or Branch adoption.
 ## 1. Decision
 
 A **Master Product has its own explicit Product Name**.
@@ -178,4 +182,4 @@ Required regression coverage:
 - Branch display-name override still overrides only the Customer title.
 - Customer catalog route preserves both Product title and Category grouping.
 
-**Git source of truth:** this document.
+**Historical source only. Current implementation source of truth:** docs/proposals/xentra-taxonomy-composed-menu-v1.md.
