@@ -2,7 +2,7 @@
 
 **Status:** LOCKED — LEGACY QUARANTINE / NON-CANONICAL  
 **Date:** 2026-09-29  
-**Superseded by:** `docs/decisions/xentra-master-menu-composition-branch-adoption-contract-v1.md`
+**Superseded by:** `docs/proposals/xentra-taxonomy-composed-menu-v1.md` (LOCKED TARGET CONTRACT, 2026-10-03)
 
 ## 1. Purpose
 
@@ -12,23 +12,23 @@ The quarantine is an **architecture boundary**, not a destructive data purge.
 
 ## 2. New canonical direction
 
-The canonical direction is:
+The canonical forward direction is defined by the locked Product → Menu → Inventory contract:
 
 ```
-Owner creates Master data
+Owner creates Product / Menu composition
     ↓
-Owner assembles Master Product
+Menu Satuan / Menu Paket becomes the commercial selling entity
     ↓
-Merchant adopts Master Product
+Branch adopts Menu
     ↓
-Merchant classifies adopted Product with Branch Categories
+Branch Menu Category membership + Branch operational state
     ↓
-Customer PWA renders resolved Master composition in Branch context
+Customer PWA consumes resolved Menu View Model
+    ↓
+Order stores immutable Menu + component snapshots
 ```
 
-Owner-owned structured Master data includes the customer-facing composition vocabulary such as Kategori, Rasa, Kelengkapan, and Level.
-
-Merchant does not author or override that composition.
+Product remains the reusable atomic stock identity. Menu owns the customer-facing selling identity, taxonomy, composition and selling price. Branch adoption is Menu-scoped; Product inventory is separate.
 
 ## 3. Legacy behavior now quarantined
 
@@ -43,20 +43,11 @@ branch_products.image_override
 
 These legacy fields MUST NOT be used for new Customer Menu composition work. They remain temporarily for compatibility and migration only.
 
-### Reclassified canonical field — Branch Customer Display Name
+### Branch Product name override
 
-`branch_products.name_override TEXT NULL` is now a narrow canonical presentation field.
+`branch_products.name_override` is **legacy compatibility data only** under the locked Product → Menu contract. It is not a forward Customer Menu source of truth and must not be introduced into the canonical Menu resolver or new Merchant UI.
 
-It is optional and scoped to one Branch adoption:
-- non-empty string → Customer title override for that Branch;
-- `NULL` / cleared → inherit the live Master Customer presentation;
-- `branch_products.product_id` remains the Master Product reference;
-- no new Product or Master composition is created.
-
-Canonical transport:
-`PATCH /admin/branches/:id/menu/:productId/display-name`
-
-This reclassification does not activate `description_override` or `image_override`.
+Existing values may be inspected by migration/reconciliation tooling only. The forward Customer title comes from the resolved Menu contract.
 
 ### Legacy Branch override UI
 
@@ -115,7 +106,8 @@ These concepts remain valid:
 
 - Master Product identity;
 - Master Category ownership by Owner/Brand;
-- Branch Product adoption relationship;
+- Menu ownership of customer-facing selling identity;
+- Branch Menu adoption (`branch_menus`);
 - Branch Category ownership;
 - Branch availability;
 - Branch stock / Inventory authority;
