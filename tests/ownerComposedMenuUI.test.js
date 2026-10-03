@@ -60,7 +60,7 @@ test('Master Menu controller uses canonical administration endpoints', () => {
   assert.ok(JS.includes("API_BASE + '/admin/rasas'"));
   assert.ok(JS.includes("API_BASE + '/admin/menu/components/level/ensure-defaults'"));
   assert.ok(JS.includes("API_BASE + '/admin/menu/components/level'"));
-  assert.ok(JS.includes("API_BASE + '/admin/products'"));
+  assert.ok(JS.includes("API_BASE + '/admin/composed/products'"));
   assert.ok(JS.includes("'/status'"));
   assert.ok(!JS.includes('/catalog/menu'));
 });
