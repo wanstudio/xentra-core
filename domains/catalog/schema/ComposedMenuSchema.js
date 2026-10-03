@@ -202,6 +202,7 @@ function ensureComposedMenuSchema(db) {
       menu_id TEXT NOT NULL,
       is_available INTEGER NOT NULL DEFAULT 1,
       price_override REAL CHECK (price_override IS NULL OR price_override >= 0),
+      display_name_override TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
       PRIMARY KEY (branch_id, menu_id),
@@ -359,6 +360,8 @@ function ensureComposedMenuSchema(db) {
   // at the write boundary so quick-add/update can never create a duplicate master.
   // Triggers are used instead of a new unique index because legacy rows may
   // predate this contract and must not make additive schema initialization fail.
+  try { db.exec('ALTER TABLE branch_menus ADD COLUMN display_name_override TEXT;'); } catch (_) {}
+
   db.exec(`
     CREATE TRIGGER IF NOT EXISTS trg_menu_flavors_brand_name_unique_insert
     BEFORE INSERT ON menu_flavors
