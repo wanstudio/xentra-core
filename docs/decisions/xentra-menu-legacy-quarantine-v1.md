@@ -208,3 +208,18 @@ Quarantine is considered complete only when:
 - legacy compatibility fields can be removed or formally archived.
 
 **LOCKED — Legacy Menu/Snapshot/Branch-Override architecture is quarantined. It is retained only as compatibility material until the new Master Menu Composition migration is accepted.**
+
+
+## 6. Legacy endpoint retirement readiness — 2026-10-04
+
+Forward runtime inventory now confirms:
+
+- Customer catalog uses `/catalog/composed-menu`; `/products` and `/catalog/menu` are compatibility-only.
+- Merchant/Owner Branch Catalog uses canonical Branch Menu transport.
+- Merchant `Hari Ini` availability alerts use `GET /admin/branches/:id/menu`; the previous legacy `GET /admin/branches/:id/products` read has been removed.
+- The quarantined `GET /admin/branches/:id/products` route has exactly one registration owner: `server/routes/admin-branch-catalog.js`. Its duplicate registration in `admin-branch-operations.js` was removed.
+- Shared client methods `setBranchProductAvailability`, `removeBranchProduct`, and `updateBranchProductOverride` remain exported only for compatibility; forward Owner/Merchant branch-catalog UI must not call them.
+- Owner Promotion Builder writes `target_menu_id` only. Existing legacy promotions with only `target_product_id` must be migrated by selecting a canonical Menu before the UI will save edits.
+- API/repository support for `target_product_id` remains compatibility-only until legacy rows are explicitly migrated; it must not regain forward UI authority.
+
+Retirement rule: do not delete compatibility routes/fields solely because forward UI no longer calls them. Removal requires a separate data migration and compatibility-consumer inventory proving no deployed older client still depends on them.
