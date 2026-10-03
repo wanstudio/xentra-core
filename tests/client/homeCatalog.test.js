@@ -375,8 +375,7 @@ test('Test 5 — Branch-less endpoint: loadProducts short-circuits when catalogB
   const catalogBranchCheck = funcBody.indexOf('if (catalogBranchId)');
   const apiCall = funcBody.indexOf('/products?category=');
   assert.ok(catalogBranchCheck >= 0, 'loadProducts must check catalogBranchId');
-  assert.ok(apiCall >= 0, 'loadProducts must have /products?category= for brand-wide mode');
-  assert.ok(catalogBranchCheck < apiCall, 'catalogBranchId check must come BEFORE /products?category= call');
+  assert.strictEqual(apiCall, -1, 'loadProducts must not call the legacy Product endpoint');
 
   // When catalogBranchId is set, it must return empty array (no fallback)
   const afterCatalogCheck = funcBody.substring(catalogBranchCheck, catalogBranchCheck + 200);
