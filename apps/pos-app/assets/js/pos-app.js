@@ -527,6 +527,17 @@
     if ($('pos-branch-name-desktop')) $('pos-branch-name-desktop').textContent=cleanBranchName;
     if (userData.brand_name && $('pos-brand-name')) $('pos-brand-name').textContent=userData.brand_name;
     if ($('pos-cashier-name')) $('pos-cashier-name').textContent=userData.full_name || userData.username || 'Kasir';
+    var userIcon = document.querySelector('#pos-user-profile-btn .pos-user-icon');
+    if (userIcon) {
+      if (userData.avatar_url) {
+        userIcon.innerHTML = '<img src="' + esc(userData.avatar_url) + '" alt="' + esc(userData.full_name || 'Kasir') + '">';
+      } else {
+        userIcon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>' +
+          '<circle cx="12" cy="7" r="4"></circle>' +
+        '</svg>';
+      }
+    }
     loadBrandInfo();
     updateHeldCount();
   }
@@ -1622,6 +1633,7 @@
     var fullName = (onb && onb.name) || u.full_name || u.name || '';
     var email = (onb && onb.email) || u.email || 'kasir@xentra.cloud';
     var branchName = (onb && onb.branch_name) || u.branch_name || (state.brand && state.brand.name) || 'Cabang POS';
+    var avatarUrl = (onb && onb.avatar_url) || u.avatar_url || '';
     var hasNik = Boolean(onb && onb.has_nik);
     var maskedNik = (onb && onb.nik_masked) || '';
 
@@ -1636,16 +1648,25 @@
         '<small>Wajib 16 digit angka sesuai identitas KTP asli.</small>';
     }
 
+    var avatarImgHtml = avatarUrl
+      ? '<img src="' + esc(avatarUrl) + '" alt="' + esc(fullName || 'Kasir') + '" class="pos-profile-avatar-img" id="pos-profile-avatar-preview">'
+      : '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="pos-profile-avatar-placeholder"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>';
+
     var html = '<div class="pos-modal-head-row">' +
-      '<h3>Profil & Identitas Kasir</h3>' +
-      '<button class="pos-icon-btn pos-btn-close-modal" id="btn-close-profile-modal" type="button" aria-label="Tutup">' +
-        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
-      '</button>' +
+      '<div class="pos-modal-head-title">' +
+        '<h3>Profil &amp; Identitas Kasir</h3>' +
+        '<p>Kelola identitas dan keamanan operasional kasir</p>' +
+      '</div>' +
+      '<button type="button" class="pos-modal-close-icon" id="btn-close-profile-modal" title="Tutup" aria-label="Tutup">✕</button>' +
     '</div>' +
     '<div class="pos-profile-card">' +
-      '<div class="pos-profile-avatar">' +
-        '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>' +
+      '<div class="pos-profile-avatar" id="pos-profile-avatar-btn" title="Klik untuk ubah foto profil">' +
+        avatarImgHtml +
+        '<div class="pos-profile-avatar-badge" title="Ubah Foto">' +
+          '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>' +
+        '</div>' +
       '</div>' +
+      '<input type="file" id="pos-profile-avatar-input" accept="image/jpeg,image/png,image/webp" style="display:none;" aria-hidden="true">' +
       '<div class="pos-profile-info">' +
         '<div class="pos-profile-name">' + esc(fullName || 'Kasir Bertugas') + '</div>' +
         '<div class="pos-profile-badge">Kasir · ' + esc(branchName) + '</div>' +
@@ -1690,6 +1711,90 @@
       $('btn-profile-logout').onclick = function () {
         hideModal();
         clearPosSessionAndReturnToPin();
+      };
+    }
+
+    // Avatar upload handling via Xentra Media Engine
+    var avatarBtn = $('pos-profile-avatar-btn');
+    var avatarInput = $('pos-profile-avatar-input');
+    if (avatarBtn && avatarInput) {
+      avatarBtn.onclick = function () {
+        avatarInput.click();
+      };
+
+      avatarInput.onchange = function (e) {
+        var file = e.target.files && e.target.files[0];
+        if (!file) return;
+
+        // Basic client validation
+        var validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+        if (!validTypes.includes(file.type)) {
+          toast('Format gambar harus JPG, PNG, atau WebP.');
+          return;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+          toast('Ukuran foto profil maksimal 10 MB.');
+          return;
+        }
+
+        avatarBtn.classList.add('pos-profile-avatar-uploading');
+        var reader = new FileReader();
+        reader.onload = async function (evt) {
+          try {
+            var base64Data = evt.target.result;
+            var res = await request('/auth/cashier-onboarding/avatar', {
+              method: 'POST',
+              headers: headers(),
+              body: JSON.stringify({
+                image_base64: base64Data,
+                mime_type: file.type,
+                original_filename: file.name
+              })
+            });
+
+            if (res && res.success && res.avatar_url) {
+              var newAvatarUrl = res.avatar_url;
+              // Update state & stored user
+              if (state.user) state.user.avatar_url = newAvatarUrl;
+              var uStored = user();
+              if (uStored) {
+                uStored.avatar_url = newAvatarUrl;
+                try { localStorage.setItem(USER_KEY, JSON.stringify(uStored)); } catch (_) {}
+              }
+
+              // Update avatar in modal
+              var existingPreview = $('pos-profile-avatar-preview');
+              if (existingPreview) {
+                existingPreview.src = newAvatarUrl;
+              } else {
+                var placeholder = $('pos-profile-avatar-placeholder');
+                if (placeholder) placeholder.remove();
+                var newImg = document.createElement('img');
+                newImg.src = newAvatarUrl;
+                newImg.alt = fullName || 'Kasir';
+                newImg.className = 'pos-profile-avatar-img';
+                newImg.id = 'pos-profile-avatar-preview';
+                avatarBtn.insertBefore(newImg, avatarBtn.firstChild);
+              }
+
+              // Update avatar in POS top header
+              var userIcon = document.querySelector('#pos-user-profile-btn .pos-user-icon');
+              if (userIcon) {
+                userIcon.innerHTML = '<img src="' + esc(newAvatarUrl) + '" alt="' + esc(fullName || 'Kasir') + '">';
+              }
+
+              toast('Foto profil kasir berhasil diperbarui.');
+            } else {
+              throw new Error((res && (res.message || res.error)) || 'Gagal mengunggah foto profil.');
+            }
+          } catch (uploadErr) {
+            toast(uploadErr.message || 'Gagal mengunggah foto profil.');
+          } finally {
+            avatarBtn.classList.remove('pos-profile-avatar-uploading');
+            avatarInput.value = '';
+          }
+        };
+        reader.readAsDataURL(file);
       };
     }
 

@@ -927,7 +927,8 @@ registerMerchantAuthRoutes(router, {
   RateLimiter,
   TokenSessionStore,
   requireAuth,
-  serializePublicBrand
+  serializePublicBrand,
+  mediaService
 });
 
 // Workforce routes are isolated in server/routes/workforce.js.

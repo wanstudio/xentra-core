@@ -78,13 +78,13 @@ class CashierOnboardingService {
     if (brandId) {
       user = this.repository.prepare(`
         SELECT id, brand_id, organization_id, branch_id, username, email, full_name, role, status,
-               cashier_onboarding_status, nik, pos_pin_hash, pos_pin_salt
+               cashier_onboarding_status, nik, avatar_url, avatar_media_id, pos_pin_hash, pos_pin_salt
         FROM users WHERE id = ? AND brand_id = ?
       `).get(userId, brandId);
     } else {
       user = this.repository.prepare(`
         SELECT id, brand_id, organization_id, branch_id, username, email, full_name, role, status,
-               cashier_onboarding_status, nik, pos_pin_hash, pos_pin_salt
+               cashier_onboarding_status, nik, avatar_url, avatar_media_id, pos_pin_hash, pos_pin_salt
         FROM users WHERE id = ?
       `).get(userId);
     }
@@ -129,6 +129,8 @@ class CashierOnboardingService {
       name: user.full_name || null,
       username: user.username || null,
       email: user.email || null,
+      avatar_url: user.avatar_url || null,
+      avatar_media_id: user.avatar_media_id || null,
       nik_masked: CashierOnboardingService.maskNik(user.nik),
       has_nik: Boolean(user.nik && user.nik.length === 16),
       branch_id: user.branch_id,

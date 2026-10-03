@@ -29,7 +29,8 @@ const ENTITY_MEDIA_ASSET_TYPES = Object.freeze({
   category: ['category'],
   branch_category: ['category'],
   brand_banner: ['banner'],
-  banner_content_revision: ['banner']
+  banner_content_revision: ['banner'],
+  user_avatar: ['avatar']
 });
 
 function assertEntityMediaContract(asset, entityType) {

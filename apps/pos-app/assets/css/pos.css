@@ -21,7 +21,8 @@ button,input,select,textarea{font:inherit;font-family:inherit}.pos-shell{min-hei
 .pos-tool-badge-dot{position:absolute;top:8px;right:8px;width:8px;height:8px;background:#38bdf8;border-radius:50%;box-shadow:0 0 0 1.5px #0f172a}
 .pos-user-area{display:flex;align-items:center;gap:8px;margin-left:6px}
 .pos-user-pill{display:inline-flex;align-items:center;gap:10px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);padding:0 16px;border-radius:12px;font-size:13.5px;font-weight:700;color:#f1f5f9;height:44px}
-.pos-user-icon{color:#94a3b8;display:inline-flex;align-items:center}
+.pos-user-icon{color:#94a3b8;display:inline-flex;align-items:center;width:24px;height:24px;border-radius:50%;overflow:hidden;justify-content:center}
+.pos-user-icon img{width:100%;height:100%;object-fit:cover;border-radius:50%}
 .pos-user-name{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pos-btn-logout-clean{color:#f87171;border-color:rgba(239,68,68,.35);background:rgba(239,68,68,.12);width:44px;height:44px;border-radius:12px}
 .pos-btn-logout-clean:hover{background:rgba(239,68,68,.25);color:#fee2e2;border-color:rgba(239,68,68,.5)}
@@ -748,8 +749,12 @@ button,input,select,textarea{font:inherit;font-family:inherit}.pos-shell{min-hei
 .pos-check-empty{padding:8px 0;font-size:12px}
 /* Cashier Profile Modal (matches Bangjo PWA UI style) */
 .pos-profile-card{display:flex;align-items:center;gap:14px;background:#f8fafc;border-radius:16px;padding:16px;border:1px solid #e2e8f0;margin-bottom:16px}
-.pos-profile-avatar{width:50px;height:50px;border-radius:50%;background:#ffffff;border:1px solid #e2e8f0;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#0f172a}
-.pos-profile-info{display:flex;flex-direction:column;gap:3px;min-width:0}
+.pos-profile-avatar{position:relative;width:56px;height:56px;border-radius:50%;background:#ffffff;border:1px solid #e2e8f0;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#0f172a;cursor:pointer;overflow:visible}
+.pos-profile-avatar-img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.pos-profile-avatar-badge{position:absolute;bottom:-2px;right:-2px;width:20px;height:20px;border-radius:50%;background:#0f172a;color:#ffffff;display:flex;align-items:center;justify-content:center;border:2px solid #ffffff;box-shadow:0 1px 3px rgba(0,0,0,0.15);pointer-events:none}
+.pos-profile-avatar:hover .pos-profile-avatar-badge{background:#2563eb}
+.pos-profile-avatar-uploading{opacity:0.6;pointer-events:none}
+.pos-profile-info{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
 .pos-profile-name{font-size:15px;font-weight:800;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pos-profile-badge{font-size:12px;color:#16a34a;font-weight:700}
 .pos-profile-email{font-size:12px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

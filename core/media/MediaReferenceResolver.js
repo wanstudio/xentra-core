@@ -206,6 +206,23 @@ class MediaReferenceResolver {
       }
     } catch (_) {}
 
+    // 8. Check Users table (avatar_media_id or avatar_url)
+    try {
+      let userSql = 'SELECT id, brand_id, avatar_media_id, avatar_url FROM users WHERE (avatar_media_id = ? OR avatar_url LIKE ?)';
+      const userParams = [mediaId, mediaIdPattern];
+      if (brandId) {
+        userSql += ' AND brand_id = ?';
+        userParams.push(brandId);
+      }
+      const users = this.db.queryMany(userSql, userParams);
+      for (const u of users) {
+        references.push({
+          type: 'user_avatar',
+          id: u.id,
+          field: u.avatar_media_id === mediaId ? 'avatar_media_id' : 'avatar_url'
+        });
+      }
+    } catch (_) {}
 
     return {
       isReferenced: references.length > 0,

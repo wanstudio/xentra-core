@@ -855,6 +855,8 @@ function initSchema(targetDb) {
       pos_pin_updated_at TEXT,
       cashier_onboarding_status TEXT DEFAULT 'IDENTITY_COMPLETED',
       nik TEXT,
+      avatar_url TEXT,
+      avatar_media_id TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
@@ -2160,6 +2162,8 @@ function initSchema(targetDb) {
   try { targetDb.exec('ALTER TABLE users ADD COLUMN email_verified_at TEXT;'); } catch (e) {}
   try { targetDb.exec("ALTER TABLE users ADD COLUMN cashier_onboarding_status TEXT DEFAULT 'IDENTITY_COMPLETED';"); } catch (e) {}
   try { targetDb.exec('ALTER TABLE users ADD COLUMN nik TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE users ADD COLUMN avatar_url TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE users ADD COLUMN avatar_media_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL;'); } catch (e) {}
 
   // M5 DASHBOARD MEDIA INTEGRATION: canonical media_id reference columns.
   // Each entity gets a nullable media_id FK referencing media_assets.id.

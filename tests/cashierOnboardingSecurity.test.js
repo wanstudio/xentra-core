@@ -378,10 +378,55 @@ describe('Cashier Invitation & Mandatory Identity Onboarding Contract v1', () =>
     assert.match(posJs, /openCashierProfileModal/);
     assert.match(posJs, /pos-user-profile-btn/);
     assert.match(posJs, /btn-save-cashier-profile/);
+    assert.match(posJs, /pos-modal-close-icon/);
+    assert.match(posJs, /pos-profile-avatar-btn/);
+    assert.match(posJs, /pos-profile-avatar-input/);
+    assert.match(posJs, /\/auth\/cashier-onboarding\/avatar/);
+    assert.match(posCss, /\.pos-modal-close-icon/);
     assert.match(posCss, /\.pos-profile-card/);
     assert.match(posCss, /\.pos-profile-avatar/);
+    assert.match(posCss, /\.pos-profile-avatar-badge/);
     assert.match(posCss, /\.pos-profile-nik-badge/);
     assert.match(posCss, /\.pos-btn-save-profile/);
   });
+
+  it('16. Cashier avatar upload via Media Engine: processes image, updates user record, and protects reference', async () => {
+    const { createPngBuffer } = require('./helpers/testImageHelper');
+    const pngBuf = createPngBuffer(200, 200);
+    const base64Data = 'data:image/png;base64,' + pngBuf.toString('base64');
+
+    const uploadRes = await request('POST', '/api/v1/auth/cashier-onboarding/avatar', {
+      image_base64: base64Data,
+      mime_type: 'image/png',
+      original_filename: 'cashier-budi.png'
+    }, { 'Authorization': `Bearer ${cashierToken}` });
+
+    assert.equal(uploadRes.status, 200);
+    assert.equal(uploadRes.data.success, true);
+    assert.ok(uploadRes.data.media_id);
+    assert.ok(uploadRes.data.avatar_url);
+
+    // Verify DB updated
+    const userRow = db.prepare('SELECT avatar_url, avatar_media_id FROM users WHERE id = ?').get(cashierUser.id);
+    assert.equal(userRow.avatar_media_id, uploadRes.data.media_id);
+    assert.equal(userRow.avatar_url, uploadRes.data.avatar_url);
+
+    // Verify onboarding status endpoint returns avatar_url
+    const statusRes = await request('GET', '/api/v1/auth/cashier-onboarding/status', null, {
+      'Authorization': `Bearer ${cashierToken}`
+    });
+    assert.equal(statusRes.status, 200);
+    assert.equal(statusRes.data.avatar_url, uploadRes.data.avatar_url);
+
+    // Verify MediaReferenceResolver identifies user_avatar reference (garbage collection protection)
+    const { MediaReferenceResolver } = require('../core/media');
+    const resolver = new MediaReferenceResolver();
+    const refCheck = await resolver.checkReference({ mediaId: uploadRes.data.media_id, brandId: testBrandId });
+    assert.equal(refCheck.isReferenced, true);
+    const userRef = refCheck.references.find(r => r.type === 'user_avatar');
+    assert.ok(userRef, 'Should find user_avatar reference in MediaReferenceResolver');
+    assert.equal(userRef.id, cashierUser.id);
+  });
 });
+
 
