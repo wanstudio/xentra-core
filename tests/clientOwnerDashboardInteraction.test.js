@@ -12,6 +12,7 @@ const CSS_PATH = path.join(__dirname, '../apps/merchant-shared/css/dashboard.css
 const SHARED_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/shared.js');
 const CATALOG_CLIENT_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/catalog-client.js');
 const BRANCH_CATALOG_JS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/js/branch-catalog-ui.js');
+const OWNER_NAVIGATION_JS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/js/owner-navigation.js');
 
 test('CLIENT OWNER DASHBOARD — Interaction, Navigation & Mobile Shell', async (t) => {
   const html = fs.readFileSync(HTML_PATH, 'utf8');
@@ -29,6 +30,7 @@ test('CLIENT OWNER DASHBOARD — Interaction, Navigation & Mobile Shell', async 
     win.eval(branchCatalogJs);
     win.eval(ownerBottomNavJs);
     win.eval(presentationShellsJs);
+    win.eval(fs.readFileSync(OWNER_NAVIGATION_JS_PATH, 'utf8'));
     win.eval(js);
   }
 
