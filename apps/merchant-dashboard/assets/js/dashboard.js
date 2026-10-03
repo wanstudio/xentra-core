@@ -10249,10 +10249,10 @@ async function loadMenusView() {
 
   var _marketingPromotionsState = {
     promotions: [],
-    masterProducts: [],
+    masterMenus: [],
     branches: [],
-    productsLoadStatus: 'idle', // 'idle' | 'loading' | 'success' | 'error'
-    productsLoadError: null
+    menusLoadStatus: 'idle', // 'idle' | 'loading' | 'success' | 'error'
+    menusLoadError: null
   };
 
   async function loadMarketingPromotions() {
@@ -10302,7 +10302,7 @@ async function loadMenusView() {
         if (Array.isArray(p.rewards) && p.rewards.length > 0) {
           var r0 = p.rewards[0];
           if (r0.reward_type === 'freebie_product') {
-            rewardSummary = '<span style="font-weight:600;color:#0369a1;">🎁 ' + esc(r0.target_product_name || r0.target_product_id || 'Produk Gratis') + '</span>';
+            rewardSummary = '<span style="font-weight:600;color:#0369a1;">🎁 ' + esc(r0.target_menu_title || r0.target_menu_id || r0.target_product_name || r0.target_product_id || 'Menu Gratis') + '</span>';
           } else {
             rewardSummary = esc(r0.reward_type);
           }
@@ -10361,37 +10361,37 @@ async function loadMenusView() {
   window.loadMarketingPromotions = loadMarketingPromotions;
 
   async function ensureMarketingDependenciesLoaded(forceReload) {
-    var selectEl = $('mkt-promo-target-product');
-    var retryContainer = $('mkt-promo-target-product-retry-container');
+    var selectEl = $('mkt-promo-target-menu');
+    var retryContainer = $('mkt-promo-target-menu-retry-container');
 
-    if (!forceReload && _marketingPromotionsState.masterProducts.length > 0 && _marketingPromotionsState.branches.length > 0) {
+    if (!forceReload && _marketingPromotionsState.masterMenus.length > 0 && _marketingPromotionsState.branches.length > 0) {
       return;
     }
 
-    if (forceReload || !_marketingPromotionsState.masterProducts.length) {
-      _marketingPromotionsState.productsLoadStatus = 'loading';
-      _marketingPromotionsState.productsLoadError = null;
+    if (forceReload || !_marketingPromotionsState.masterMenus.length) {
+      _marketingPromotionsState.menusLoadStatus = 'loading';
+      _marketingPromotionsState.menusLoadError = null;
       if (selectEl) {
         selectEl.disabled = true;
-        selectEl.innerHTML = '<option value="">Memuat produk katalog...</option>';
+        selectEl.innerHTML = '<option value="">Memuat Menu Master...</option>';
       }
       if (retryContainer) retryContainer.style.display = 'none';
 
       try {
-        var pRes = await adminFetch(API_BASE + '/admin/products', { headers: getAuthHeaders() });
-        if (!pRes.ok) {
-          throw new Error('Gagal memuat produk (HTTP ' + pRes.status + ')');
+        var mRes = await adminFetch(API_BASE + '/admin/menus?status=ACTIVE', { headers: getAuthHeaders() });
+        if (!mRes.ok) {
+          throw new Error('Gagal memuat Menu Master (HTTP ' + mRes.status + ')');
         }
-        var pData = await pRes.json();
-        if (!pData || !pData.success) {
-          throw new Error((pData && pData.error) || 'Gagal memuat produk dari server.');
+        var mData = await mRes.json();
+        if (!mData || !mData.success) {
+          throw new Error((mData && mData.error) || 'Gagal memuat Menu Master dari server.');
         }
-        _marketingPromotionsState.masterProducts = Array.isArray(pData.products) ? pData.products : [];
-        _marketingPromotionsState.productsLoadStatus = 'success';
+        _marketingPromotionsState.masterMenus = Array.isArray(mData.menus) ? mData.menus : [];
+        _marketingPromotionsState.menusLoadStatus = 'success';
       } catch (err) {
-        console.error('[Marketing Products Load Error]:', err);
-        _marketingPromotionsState.productsLoadStatus = 'error';
-        _marketingPromotionsState.productsLoadError = err.message || 'Gagal memuat produk';
+        console.error('[Marketing Menus Load Error]:', err);
+        _marketingPromotionsState.menusLoadStatus = 'error';
+        _marketingPromotionsState.menusLoadError = err.message || 'Gagal memuat Menu Master';
       }
     }
 
@@ -10408,66 +10408,78 @@ async function loadMenusView() {
     }
   }
 
-  function renderPromoProductOptions(selectedProductId) {
-    var selectEl = $('mkt-promo-target-product');
-    var retryContainer = $('mkt-promo-target-product-retry-container');
+  function promotionMenuLabel(menu) {
+    if (!menu) return 'Menu Promo';
+    var name = menu.package_name || '';
+    if (!name) {
+      var parts = [];
+      if (menu.sub_category_name) parts.push(menu.sub_category_name);
+      if (menu.rasa_name && String(menu.rasa_name).trim().toLowerCase() !== 'original') {
+        parts.push(menu.rasa_name);
+      }
+      name = parts.join(' — ') || ('Menu ' + menu.id);
+    }
+    var typeLabel = String(menu.menu_type || '').toUpperCase() === 'PACKAGE' ? 'Paket' : 'Satuan';
+    var price = menu.selling_price !== undefined && menu.selling_price !== null
+      ? ' (' + formatMoney(menu.selling_price) + ')'
+      : '';
+    return name + ' · ' + typeLabel + price;
+  }
+
+  function renderPromoMenuOptions(selectedMenuId) {
+    var selectEl = $('mkt-promo-target-menu');
+    var retryContainer = $('mkt-promo-target-menu-retry-container');
     if (!selectEl) return;
 
-    // Handle Error State
-    if (_marketingPromotionsState.productsLoadStatus === 'error') {
+    if (_marketingPromotionsState.menusLoadStatus === 'error') {
       selectEl.disabled = true;
-      selectEl.innerHTML = '<option value="">Gagal memuat produk katalog</option>';
+      selectEl.innerHTML = '<option value="">Gagal memuat Menu Master</option>';
       if (retryContainer) retryContainer.style.display = 'block';
       return;
     }
 
     if (retryContainer) retryContainer.style.display = 'none';
 
-    // Handle Loading State
-    if (_marketingPromotionsState.productsLoadStatus === 'loading') {
+    if (_marketingPromotionsState.menusLoadStatus === 'loading') {
       selectEl.disabled = true;
-      selectEl.innerHTML = '<option value="">Memuat produk katalog...</option>';
+      selectEl.innerHTML = '<option value="">Memuat Menu Master...</option>';
       return;
     }
 
-    var prods = _marketingPromotionsState.masterProducts || [];
-
-    // Handle Empty State
-    if (!prods.length) {
+    var menus = _marketingPromotionsState.masterMenus || [];
+    if (!menus.length) {
       selectEl.disabled = true;
-      selectEl.innerHTML = '<option value="">Belum ada produk di Master Catalog</option>';
+      selectEl.innerHTML = '<option value="">Belum ada Menu Master aktif</option>';
       return;
     }
 
-    // Success State
     selectEl.disabled = false;
-    var html = '<option value="">-- Pilih Produk Hadiah --</option>';
-    var foundSavedProduct = false;
+    var html = '<option value="">-- Pilih Menu Hadiah --</option>';
+    var foundSavedMenu = false;
 
-    prods.forEach(function (p) {
-      var isSel = (selectedProductId !== null && selectedProductId !== undefined && String(p.id) === String(selectedProductId));
-      if (isSel) foundSavedProduct = true;
-      var priceText = (p.price !== undefined && p.price !== null) ? ' (' + formatMoney(p.price) + ')' : '';
-      var skuText = p.sku ? ' [SKU: ' + esc(p.sku) + ']' : '';
-      html += '<option value="' + esc(p.id) + '"' + (isSel ? ' selected' : '') + '>' + esc(p.name) + skuText + priceText + '</option>';
+    menus.forEach(function (menu) {
+      var isSel = selectedMenuId !== null && selectedMenuId !== undefined &&
+        String(menu.id) === String(selectedMenuId);
+      if (isSel) foundSavedMenu = true;
+      html += '<option value="' + esc(menu.id) + '"' + (isSel ? ' selected' : '') + '>' +
+        esc(promotionMenuLabel(menu)) + '</option>';
     });
 
-    // If a saved product ID was supplied but is no longer in the master catalog, display warning option
-    if (selectedProductId && !foundSavedProduct) {
-      html = '<option value="' + esc(selectedProductId) + '" selected disabled style="color:#ef4444;">⚠️ Produk reward tersimpan (ID: ' + esc(selectedProductId) + ') tidak lagi tersedia di Master Catalog</option>' + html;
+    if (selectedMenuId && !foundSavedMenu) {
+      html = '<option value="' + esc(selectedMenuId) + '" selected disabled style="color:#ef4444;">⚠️ Menu reward tersimpan tidak lagi aktif/tersedia (ID: ' + esc(selectedMenuId) + ')</option>' + html;
     }
 
     selectEl.innerHTML = html;
   }
 
-  async function retryLoadPromoProducts() {
+  async function retryLoadPromoMenus() {
     await ensureMarketingDependenciesLoaded(true);
-    var targetInput = $('mkt-promo-target-product');
+    var targetInput = $('mkt-promo-target-menu');
     var currentVal = targetInput ? targetInput.value : null;
-    renderPromoProductOptions(currentVal);
+    renderPromoMenuOptions(currentVal);
     onPromotionProductSelected();
   }
-  window.retryLoadPromoProducts = retryLoadPromoProducts;
+  window.retryLoadPromoMenus = retryLoadPromoMenus;
 
   function renderPromoBranchCheckboxes(selectedBranchIds) {
     var container = $('mkt-promo-branches-list');
@@ -10525,23 +10537,25 @@ async function loadMenusView() {
   window.onPromotionBenefitTypeUiChange = onPromotionBenefitTypeUiChange;
 
   function onPromotionProductSelected() {
-    var selectEl = $('mkt-promo-target-product');
+    var selectEl = $('mkt-promo-target-menu');
     var normalPriceEl = $('mkt-promo-product-normal-price');
+    var summaryLabel = document.querySelector('label[for="mkt-promo-target-menu"]');
     if (!selectEl || !normalPriceEl) return;
 
-    var prodId = selectEl.value;
-    if (!prodId) {
+    var menuId = selectEl.value;
+    if (!menuId) {
       normalPriceEl.textContent = '-';
       return;
     }
 
-    var prods = _marketingPromotionsState.masterProducts || [];
-    var prod = prods.find(function (p) { return String(p.id) === String(prodId); });
-    if (prod && prod.price !== undefined && prod.price !== null) {
-      normalPriceEl.textContent = formatMoney(prod.price);
+    var menus = _marketingPromotionsState.masterMenus || [];
+    var menu = menus.find(function (item) { return String(item.id) === String(menuId); });
+    if (menu && menu.selling_price !== undefined && menu.selling_price !== null) {
+      normalPriceEl.textContent = formatMoney(menu.selling_price);
     } else {
       normalPriceEl.textContent = '-';
     }
+    if (summaryLabel) summaryLabel.innerHTML = 'Menu yang Diberikan <span style="color:#ef4444;">*</span>';
   }
   window.onPromotionProductSelected = onPromotionProductSelected;
 
@@ -10810,7 +10824,7 @@ async function loadMenusView() {
     mountPromotionEditorPage();
 
     await ensureMarketingDependenciesLoaded();
-    renderPromoProductOptions(null);
+    renderPromoMenuOptions(null);
     onPromotionProductSelected();
     renderPromoBranchCheckboxes(null); // default all selected
     onPromotionCapabilityChange();
@@ -10846,11 +10860,13 @@ async function loadMenusView() {
     if ($('mkt-promo-start-at')) $('mkt-promo-start-at').value = formatDateTimeLocal(promo.start_at);
     if ($('mkt-promo-end-at')) $('mkt-promo-end-at').value = formatDateTimeLocal(promo.end_at);
 
-    var targetProdId = null;
+    var targetMenuId = null;
+    var legacyTargetProductId = null;
     var presPayload = {};
     if (Array.isArray(promo.rewards) && promo.rewards.length > 0) {
       var primaryReward = promo.rewards[0];
-      targetProdId = primaryReward.target_product_id;
+      targetMenuId = primaryReward.target_menu_id || primaryReward.menu_id || null;
+      legacyTargetProductId = primaryReward.target_product_id || null;
       $('mkt-promo-reward-type').value = primaryReward.reward_type || 'freebie_product';
       if (primaryReward.presentation) {
         presPayload = primaryReward.presentation;
@@ -10888,8 +10904,11 @@ async function loadMenusView() {
     mountPromotionEditorPage();
 
     await ensureMarketingDependenciesLoaded();
-    renderPromoProductOptions(targetProdId);
+    renderPromoMenuOptions(targetMenuId);
     onPromotionProductSelected();
+    if (!targetMenuId && legacyTargetProductId) {
+      showToast('Promo lama masih memakai target Product. Pilih Menu hadiah canonical sebelum menyimpan perubahan.');
+    }
     renderPromoBranchCheckboxes(selectedBranchIds.length ? selectedBranchIds : null);
     onPromotionCapabilityChange();
     updatePromotionPresentationPreview();
@@ -10931,14 +10950,14 @@ async function loadMenusView() {
     var startAtVal = $('mkt-promo-start-at') ? $('mkt-promo-start-at').value : '';
     var endAtVal = $('mkt-promo-end-at') ? $('mkt-promo-end-at').value : '';
     var rewardType = $('mkt-promo-reward-type').value;
-    var targetProductId = $('mkt-promo-target-product').value;
+    var targetMenuId = $('mkt-promo-target-menu').value;
 
     if (!name) {
       showToast('Nama promosi wajib diisi.');
       return;
     }
-    if (!targetProductId) {
-      showToast('Pilih produk gratis dari menu master.');
+    if (!targetMenuId) {
+      showToast('Pilih Menu hadiah dari Menu Master.');
       return;
     }
 
@@ -11000,7 +11019,7 @@ async function loadMenusView() {
 
     var rewards = [{
       reward_type: rewardType,
-      target_product_id: targetProductId,
+      target_menu_id: targetMenuId,
       amount_in_cents: 0,
       presentation_payload: presentationPayload
     }];
