@@ -411,8 +411,8 @@ class PromotionRepository {
         }
         this.db.execute(`
           INSERT INTO promotion_rewards (
-            id, promotion_id, reward_type, target_product_id, amount_in_cents, max_discount_in_cents, presentation_payload, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+            id, promotion_id, reward_type, target_menu_id, target_product_id, amount_in_cents, max_discount_in_cents, presentation_payload, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
         `, [
           rewId, promotionId, rw.reward_type || 'freebie_product', rw.target_menu_id || null, rw.target_product_id || null,
           Number(rw.amount_in_cents || 0), rw.max_discount_in_cents || null, presStr
