@@ -1227,3 +1227,5 @@ Implementation status is still subject to full runtime tests, production-data mi
 
 
 > Audit note (2026-10-03): Owner Master Menu workspace construction is now implemented on the proposal branch. The Owner UI has a dedicated Menu Master route/editor, canonical SINGLE/PACKAGE save paths, Sub Category/Rasa/Level selectors, Menu-owned selling price, package composition guards, and canonical customer preview semantics. Branch assortment remains isolated under Menu Cabang. Runtime CI verification is still in progress; `main` remains unchanged.
+
+> Audit note (2026-10-03): Canonical Product Editor construction is now aligned with the Composed Product domain. The Owner Product workspace exposes only atomic Product identity (name, SKU, internal description, media, lifecycle), reads/writes through `/admin/composed/products`, no longer edits Product Options or commercial taxonomy/price, and uses archive/deactivation rather than destructive Product deletion so Product identity remains stable for Menu, inventory, and history.
