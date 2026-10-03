@@ -219,7 +219,7 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
       'setBMMenuCategoryFilter',
       'renderBMMenuCategoriesBar',
       'renderBMMenuTable',
-      'toggleBMProductAvailability',
+      'toggleBMMenuAvailability',
       'updateBMAddCatalogFooter',
       'renderBMAddCatalogList',
       'saveBMBranchCategoryOrder'
