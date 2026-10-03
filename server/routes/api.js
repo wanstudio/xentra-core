@@ -51,7 +51,7 @@ const RouteService = require('../services/RouteService');
 const { PromotionEngineService } = require('../../domains/promotion');
 const { InventoryStockService, InventoryMovementModel } = require('../../domains/inventory');
 const CatalogService = require('../../domains/catalog/services/CatalogService');
-const { PricingPolicyModel, MasterMenuResolver } = require('../../domains/catalog');
+const { PricingPolicyModel, MasterMenuResolver, ComposedMenuResolver } = require('../../domains/catalog');
 const { XentraConnectorClient, XentraConnectorError } = require('../../core/integration/XentraConnectorClient');
 const { BrandRepository: CoreBrandRepo, BranchRepository: CoreBranchRepo, UserRepository: CoreUserRepo } = require('../../core/data/repositories');
 const coreBrandRepo = new CoreBrandRepo();
@@ -496,7 +496,7 @@ registerLegacyCustomerOtpRoutes(router, {
 
 // 5. Menu Catalog & Home
 // Canonical public catalog menu route is isolated in server/routes/catalog.js.
-registerCatalogRoutes(router, { db, CatalogService, MasterMenuResolver, batchResolveCustomerMediaDelivery });
+registerCatalogRoutes(router, { db, CatalogService, MasterMenuResolver, ComposedMenuResolver, batchResolveCustomerMediaDelivery });
 
 // Product/upsell/checkout-session support routes are isolated in server/routes/storefront.js.
 registerStorefrontRoutes(router, { db, crypto, batchResolveCustomerMediaDelivery });
