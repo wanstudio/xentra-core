@@ -103,16 +103,19 @@ function calculateInventory(menuItems, inventoryRows, menuType = null) {
       ? Math.max(0, Math.floor(stockQty / quantity))
       : null;
 
+    if (item.product_is_active === 0) {
+      // Product lifecycle invalidity is distinct from temporary stock depletion.
+      // It must win so the customer receives the repair-required reason rather
+      // than a misleading OUT_OF_STOCK result.
+      blocking = blocking || 'COMPONENT_UNAVAILABLE';
+    }
+
     if (stockManaged) {
       stockManagedComponentCount += 1;
       packageCapacity = Math.min(packageCapacity, capacity);
       if (capacity <= 0 && !blocking) blocking = 'OUT_OF_STOCK';
     } else {
       allStockManagedComponents = false;
-    }
-
-    if (item.product_is_active === 0 && !blocking) {
-      blocking = 'COMPONENT_UNAVAILABLE';
     }
 
     return {
