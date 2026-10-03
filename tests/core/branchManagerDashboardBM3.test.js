@@ -583,7 +583,7 @@ describe('BM-3 — Branch Manager Dashboard: Menu + Stok + Promo', () => {
     assert.ok(html.includes('id="form-bm-stock-adjust"'), 'Missing form-bm-stock-adjust');
   });
 
-  it('BM3-20: dashboard.js implements loadBMMenu, toggleBMProductAvailability, loadBMStock, submitBMStockAdjustment, and loadBMPromotions', () => {
+  it('BM3-20: canonical Menu module implements loadBMMenu, toggleBMMenuAvailability, loadBMStock, submitBMStockAdjustment, and loadBMPromotions', () => {
     const jsPath = path.join(__dirname, '../../apps/merchant-app/assets/js/merchant-app.js');
     const menuPath = path.join(__dirname, '../../apps/merchant-app/assets/js/menu.js');
     const stockPath = path.join(__dirname, '../../apps/merchant-app/assets/js/stock.js');
@@ -594,7 +594,7 @@ describe('BM-3 — Branch Manager Dashboard: Menu + Stok + Promo', () => {
       .join('\n');
 
     assert.ok(js.includes('async function loadBMMenu()'), 'Missing loadBMMenu');
-    assert.ok(js.includes('async function toggleBMProductAvailability('), 'Missing toggleBMProductAvailability');
+    assert.ok(js.includes('async function toggleBMMenuAvailability('), 'Missing toggleBMMenuAvailability');
     assert.ok(js.includes('async function loadBMStock()'), 'Missing loadBMStock');
     assert.ok(js.includes('async function submitBMStockAdjustment('), 'Missing submitBMStockAdjustment');
     assert.ok(js.includes('async function loadBMPromotions()'), 'Missing loadBMPromotions');
@@ -608,7 +608,7 @@ describe('BM-3 — Branch Manager Dashboard: Menu + Stok + Promo', () => {
     assert.ok(js.includes('x-menu-action-trigger'), 'Menu action trigger must be rendered');
     assert.ok(js.includes("actionTrigger.addEventListener('click'"), 'Menu actions must use DOM event listeners');
     const menuRenderStart = js.indexOf('function renderBMMenuTable()');
-    const menuRenderEnd = js.indexOf('async function toggleBMProductAvailability', menuRenderStart);
+    const menuRenderEnd = js.indexOf('async function toggleBMMenuAvailability', menuRenderStart);
     const menuRender = js.slice(menuRenderStart, menuRenderEnd);
     assert.equal(menuRender.includes('onclick='), false, 'Menu renderer must not embed inline onclick attributes');
     const cssPath = path.join(__dirname, '../../apps/merchant-shared/css/dashboard.css');
