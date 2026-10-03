@@ -139,9 +139,9 @@ describe('Promotion Branch Activation ↔ Reward Catalog Readiness', () => {
     assert.strictEqual(bp, undefined, 'Reward product must not exist in Branch B');
 
     // Expected rejection error
-    const menu = db.prepare('SELECT id, title FROM menus WHERE id = ?').get(targetMid);
+    const menu = db.prepare('SELECT id, package_name FROM menus WHERE id = ?').get(targetMid);
     assert.ok(menu);
-    const expectedError = `Promo belum dapat diaktifkan karena Menu hadiah '${menu.title || targetMid}' belum tersedia di katalog cabang ini.`;
+    const expectedError = `Promo belum dapat diaktifkan karena Menu hadiah '${targetMid}' belum tersedia di katalog cabang ini.`;
     assert.ok(expectedError.includes('belum tersedia di katalog cabang ini'));
   });
 
