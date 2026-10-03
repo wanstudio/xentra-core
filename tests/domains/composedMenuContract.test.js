@@ -260,7 +260,7 @@ test('Branch Menu adoption is separate from Product Inventory and package availa
   assert.equal(resolved[0].inventory.available_quantity, 2);
 
   db.prepare(
-    'UPDATE branch_product_inventory SET stock_qty = 3, updated_at = datetime('now') WHERE branch_id = ? AND product_id = ?'
+    "UPDATE branch_product_inventory SET stock_qty = 3, updated_at = datetime('now') WHERE branch_id = ? AND product_id = ?"
   ).run(BRANCH, PRODUCT_A);
 
   const stockout = ComposedMenuResolver.resolveBranchMenu({
