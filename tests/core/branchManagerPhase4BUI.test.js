@@ -171,9 +171,16 @@ describe('BM Phase 4B — Branch Manager Dashboard UI Hardening Suite', () => {
   });
 
   after(async () => {
-    // Clean up seeded records
+    // Clean up canonical Menu fixtures before deleting their Product components.
     try {
+      db.prepare(`DELETE FROM branch_menu_categories WHERE branch_id = ? AND menu_id IN (?, ?)`).run(BRANCH_A_ID, testMenu2Id, testMenu3Id);
+      db.prepare(`DELETE FROM branch_menus WHERE branch_id = ? AND menu_id IN (?, ?)`).run(BRANCH_A_ID, testMenu2Id, testMenu3Id);
+      db.prepare(`DELETE FROM menu_items WHERE menu_id IN (?, ?)`).run(testMenu2Id, testMenu3Id);
+      db.prepare(`DELETE FROM menus WHERE id IN (?, ?)`).run(testMenu2Id, testMenu3Id);
+      db.prepare(`DELETE FROM sub_categories WHERE id IN ('bm4b_sub_2', 'bm4b_sub_3')`).run();
       db.prepare(`DELETE FROM branch_products WHERE branch_id = ? AND product_id IN (?, ?, ?)`).run(BRANCH_A_ID, testProduct1Id, testProduct2Id, testProduct3Id);
+      db.prepare(`DELETE FROM branch_product_categories WHERE branch_id = ? AND product_id IN (?, ?, ?)`).run(BRANCH_A_ID, testProduct1Id, testProduct2Id, testProduct3Id);
+      db.prepare(`DELETE FROM branch_product_inventory WHERE branch_id = ? AND product_id IN (?, ?, ?)`).run(BRANCH_A_ID, testProduct1Id, testProduct2Id, testProduct3Id);
       db.prepare(`DELETE FROM products WHERE id IN (?, ?, ?)`).run(testProduct1Id, testProduct2Id, testProduct3Id);
     } catch {}
 
