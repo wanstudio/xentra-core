@@ -525,6 +525,7 @@ branch_menus
   menu_id
   is_available
   price_override NULL
+  display_name_override NULL
   created_at
   updated_at
 ```
@@ -811,6 +812,26 @@ Legacy `product_complements` / Kelengkapan must **not** automatically become a M
 
 Legacy Branch Product adoption must be reconciled into Branch Menu adoption.
 
+The forward Branch/merchant runtime is now Menu-authoritative:
+
+```text
+Owner / Merchant selects Master Menu
+→ POST /admin/menus/:menuId/adopt
+→ branch_menus
+→ branch_menu_categories
+→ Branch Menu resolver
+```
+
+Forward availability and optional customer-facing display-name operations use the same Menu identity:
+
+```text
+PATCH /admin/menus/:menuId/availability
+PATCH /admin/branches/:branchId/menu/:menuId/display-name
+DELETE /admin/branches/:branchId/menu/:menuId
+```
+
+The old Product adoption/override routes remain compatibility paths only and are not the authority for forward Merchant Menu behavior.
+
 For an existing adopted legacy Product:
 
 ```text
@@ -967,7 +988,7 @@ These are engineering decisions that can be solved during implementation/reconci
 - exact inventory SKU-history table versus snapshot representation;
 - exact media binding for Menu Paket;
 - final endpoint naming/versioning;
-- exact Branch Menu repository and API shape;
+- exact Branch Menu repository and API shape; **resolved** — canonical repository/service/resolver and `/admin/branches/:id/menu` boundary are implemented;
 - legacy Product Options adapter shape;
 - exact Category/Sub Category restoration UI;
 - test fixtures and migration tooling;
@@ -1024,7 +1045,8 @@ Implemented in the proposal branch:
 - Promotion rewards now use `target_menu_id` as the canonical commercial target, while `target_product_id` remains legacy compatibility/fulfillment evidence during migration;
 - canonical Promotion Reward Resolver resolves Menu → immutable Menu snapshot + component snapshot → Product/SKU inventory;
 - legacy promotion reward migration planner auto-maps only an unambiguous active Menu Satuan and marks ambiguous/missing mappings `NEEDS_REVIEW`;
-- Branch Menu availability mutation with Branch Manager scope;
+- Branch Menu adoption, category membership, availability, and optional display-name override on the canonical Menu boundary;
+- Owner Branch Catalog and Merchant Menu adoption/availability/removal flows now use Menu IDs and canonical Branch Menu transport;
 - canonical Customer PWA catalog consumption without silent legacy catalog fallback;
 - canonical Menu endpoint compatibility envelope for older consumers;
 - Admin API surface for Product/Menu/Sub Category/Rasa/SKU/adoption operations;
@@ -1032,11 +1054,11 @@ Implemented in the proposal branch:
 
 Still pending before promotion to `main`:
 
-- Owner UI replacement/integration;
-- Branch/Merchant adoption UI integration;
+- remaining Owner Master Menu composition/editor UI integration and legacy Product editor quarantine;
 - final Customer PWA UI integration and all remaining consumer cleanup;
 - Payment, Receipt, KDS, Reporting and remaining POS consumer migration;
 - remaining Promotion UI/client cleanup and legacy reward migration execution;
+- remove/quarantine unused legacy Branch Product override presentation controllers from Merchant/Owner bundles;
 - complete legacy quarantine and retirement of compatibility paths;
 - production database migration execution and verification;
 - full runtime test-suite execution and production audit.
@@ -1044,9 +1066,9 @@ Still pending before promotion to `main`:
 Verification state:
 
 - Source-level audit has been performed on the modified implementation paths.
-- No independent parser/runtime execution was performed in this audit environment.
-- GitHub Actions has not produced a workflow run for the current proposal HEAD.
-- Therefore the branch is **not** test-verified or merge-ready solely from this audit.
+- GitHub Actions is executing the full Node 24 test suite against the proposal branch HEAD.
+- The latest runs are still in progress, so the branch is **not yet test-verified or merge-ready**.
+- No claim of a passing full suite is made until a completed successful run exists for the latest HEAD.
 
 **Do not merge PR #7 to `main` yet.**
 
