@@ -5,7 +5,7 @@
  * from CatalogService; media delivery is resolved through the injected batch helper.
  */
 module.exports = function registerCatalogRoutes(router, deps) {
-  const { db, CatalogService, ComposedMenuResolver, batchResolveCustomerMediaDelivery } = deps;
+  const { db, ComposedMenuResolver } = deps;
 
 
 // Forward Product → Menu → Inventory read boundary.
@@ -182,7 +182,5 @@ router.get(['/catalog/menu', '/home'], async (req, res) => {
     console.error('[API Error /catalog/menu]:', err);
     res.status(500).json({ success: false, error: err.message });
   }
-})
-
-
+});
 };
