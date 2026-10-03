@@ -158,3 +158,27 @@ test('Forward Merchant surfaces do not read legacy branch-product catalog endpoi
     'Merchant Hari Ini must read canonical Branch Menu state'
   );
 });
+
+
+test('Legacy Branch Product GET route has a single compatibility owner', () => {
+  const branchCatalogRoutes = fs.readFileSync(
+    path.join(ROOT, 'server/routes/admin-branch-catalog.js'),
+    'utf8'
+  );
+  const branchOperationsRoutes = fs.readFileSync(
+    path.join(ROOT, 'server/routes/admin-branch-operations.js'),
+    'utf8'
+  );
+
+  const routeLiteral = "router.get('/admin/branches/:id/products'";
+  assert.strictEqual(
+    (branchCatalogRoutes.split(routeLiteral).length - 1),
+    1,
+    'admin-branch-catalog must be the single compatibility owner of GET /admin/branches/:id/products'
+  );
+  assert.strictEqual(
+    branchOperationsRoutes.includes(routeLiteral),
+    false,
+    'admin-branch-operations must not re-register the legacy Branch Product GET route'
+  );
+});
