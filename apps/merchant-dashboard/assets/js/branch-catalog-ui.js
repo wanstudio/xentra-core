@@ -465,9 +465,9 @@
   };
 
   // Adopt Product Modal Actions
-  window.openAdoptModal = function (productId) {
+  window.openAdoptModal = function (menuId) {
     if (!currentBranchCatalogData) return;
-    var p = (currentBranchCatalogData.available_master_menus || currentBranchCatalogData.available_master_products || []).find(function (x) { return String(x.menu_id || x.id) === String(productId); });
+    var p = (currentBranchCatalogData.available_master_menus || currentBranchCatalogData.available_master_products || []).find(function (x) { return String(x.menu_id || x.id) === String(menuId); });
     if (!p) return;
 
     var resolvedBranchId = currentManagingBranchId ||
@@ -503,7 +503,7 @@
     if (window.XentraPresentation && window.XentraPresentation.isOpen('branch-adopt-product')) {
       window.XentraPresentation.close('branch-adopt-product');
     } else {
-      window.closeAdoptModal();
+      var modal = $('modal-adopt-product'); if (modal) modal.style.display = 'none';
     }
   };
 
@@ -535,9 +535,8 @@
       }
 
       try {
-        var res = await CatalogClient.adoptProduct(currentManagingBranchId, {
-          product_id: prodId,
-          category_ids: [catId]
+        var res = await CatalogClient.adoptMenu(currentManagingBranchId, menuId, {
+          branch_category_ids: [catId]
         });
         var data = await res.json();
         if (data.success) {
