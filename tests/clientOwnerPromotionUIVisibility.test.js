@@ -169,7 +169,10 @@ test('CLIENT OWNER DASHBOARD — Marketing / Promotion Workspace Visibility & Li
     createBtn.click();
     await new Promise(res => setTimeout(res, 50));
 
-    assert.strictEqual(modal.style.display, 'flex', 'Modal must open with display: flex');
+    const editorPage = win.document.getElementById('marketing-promotion-editor-view');
+    assert.ok(editorPage, 'Marketing promotion editor page must exist');
+    assert.notStrictEqual(editorPage.style.display, 'none', 'Promotion editor page must be visible');
+    assert.notStrictEqual(modal.style.display, 'flex', 'Legacy modal backdrop must remain closed after editor is promoted to a focused page');
     const modalTitle = win.document.getElementById('modal-mkt-promo-title');
     assert.strictEqual(modalTitle.textContent, 'Buat Program Promosi Baru');
 
