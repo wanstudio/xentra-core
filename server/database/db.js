@@ -152,6 +152,7 @@ if (!dbInstance) {
       console.log(`[Database] sql.js database adapter ready on Node ${nodeVersion} (PRAGMA foreign_keys = ON).`);
       try {
         initSchema(db);
+        initComposedMenuSchema(db);
         if (DB_PATH !== ':memory:') {
           saveSqlJsToDisk(true);
         }
@@ -734,6 +735,18 @@ const db = {
     };
   }
 };
+
+
+function initComposedMenuSchema(targetDb) {
+  // Base tables are initialized first. The composed-menu schema is then applied
+  // against the same concrete database object so direct domain/test consumers
+  // receive the canonical Product/SKU → Menu → Inventory schema as well.
+  const { ensureComposedMenuSchema } = require('../../domains/catalog/schema/ComposedMenuSchema');
+  ensureComposedMenuSchema({
+    queryMany: (sql, params = []) => targetDb.prepare(sql).all(...params),
+    exec: targetDb.exec.bind(targetDb)
+  });
+}
 
 function initSchema(targetDb) {
   targetDb.exec(`
@@ -2938,6 +2951,7 @@ db.seedData = seedData;
 if (dbInstance) {
   try {
     initSchema(db);
+    initComposedMenuSchema(db);
   } catch (schemaErr) {
     if (process.env.NODE_ENV === 'production') {
       console.error('[Database Fatal Error] Failed to initialize schema in production:', schemaErr);
