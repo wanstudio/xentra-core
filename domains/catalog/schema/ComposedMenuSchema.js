@@ -3,9 +3,12 @@
 const ensuredDbs = new WeakSet();
 
 function hasColumn(db, table, column) {
-  const result = typeof db.queryMany === 'function'
-    ? db.queryMany(`PRAGMA table_info(${table})`)
-    : (typeof db.prepare === 'function' ? db.prepare(`PRAGMA table_info(${table})`).all() : []);
+  let result = [];
+  if (db && typeof db.prepare === 'function') {
+    result = db.prepare(`PRAGMA table_info(${table})`).all();
+  } else if (db && typeof db.queryMany === 'function') {
+    result = db.queryMany(`PRAGMA table_info(${table})`);
+  }
   const rows = Array.isArray(result)
     ? result
     : (result && Array.isArray(result.rows) ? result.rows : []);
