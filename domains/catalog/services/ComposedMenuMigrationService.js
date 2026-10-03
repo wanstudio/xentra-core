@@ -252,6 +252,11 @@ function planIdentity(inspected) {
       if (available !== 0 && available !== 1) issues.push('LEGACY_BRANCH_AVAILABILITY_INVALID');
     }
 
+    const branchPrice = numberOrNull(row.price);
+    if (branchPrice !== null && branchPrice < 0) {
+      issues.push('LEGACY_BRANCH_PRICE_INVALID');
+    }
+
     const threshold = numberOrNull(row.low_stock_threshold);
     if (threshold !== null && (!Number.isInteger(threshold) || threshold < 0)) {
       issues.push('LEGACY_LOW_STOCK_THRESHOLD_INVALID');
@@ -796,7 +801,11 @@ function verifyProduct({ brandId, productId }) {
       "SELECT id, brand_id, category_id, is_active FROM sub_categories WHERE id = ? AND brand_id = ?",
       [menu.sub_category_id, brandId]
     );
-    if (!sub) errors.push('SUB_CATEGORY_NOT_FOUND');
+    if (!sub) {
+      errors.push('SUB_CATEGORY_NOT_FOUND');
+    } else if (String(sub.category_id) !== String(inspected.product.category_id)) {
+      errors.push('SUB_CATEGORY_PARENT_MISMATCH');
+    }
 
     const rasa = DataAccess.queryOne(
       "SELECT id, brand_id, name, is_active FROM menu_flavors WHERE id = ? AND brand_id = ?",
@@ -827,6 +836,14 @@ function verifyProduct({ brandId, productId }) {
     }
 
     const sku = normalizeText(inspected.product.sku);
+    const sourcePositiveStock = inspected.legacy.branchProducts.some(row => {
+      const stock = numberOrNull(row.stock);
+      return stock !== null && stock > 0;
+    });
+    if ((sourcePositiveStock || inspected.legacy.historicalMovementCount > 0) && !sku) {
+      errors.push('SKU_REQUIRED_FOR_STOCK');
+    }
+
     if (sku) {
       const conflicts = DataAccess.queryOne(
         "SELECT COUNT(*) AS count FROM products WHERE brand_id = ? AND lower(trim(sku)) = lower(trim(?)) AND id <> ?",
