@@ -170,6 +170,38 @@ test('apply migrates legacy branch adoption, branch categories and stock into ca
   assert.equal(Number(inventory.low_stock_threshold), 2);
 });
 
+test('migration is idempotent and verification is explicit', () => {
+  const first = ComposedMenuMigrationService.reconcileProduct({
+    brandId: BRAND,
+    productId: PRODUCT_SIMPLE,
+    apply: true
+  });
+  assert.equal(first.status, 'migrated');
+
+  const firstCount = db.prepare(
+    "SELECT COUNT(*) AS n FROM menu_items mi JOIN menus m ON m.id = mi.menu_id WHERE m.brand_id = ? AND mi.product_id = ? AND m.menu_type = 'SINGLE'"
+  ).get(BRAND, PRODUCT_SIMPLE).n;
+
+  const second = ComposedMenuMigrationService.reconcileProduct({
+    brandId: BRAND,
+    productId: PRODUCT_SIMPLE,
+    apply: true
+  });
+  assert.equal(second.status, 'migrated');
+
+  const secondCount = db.prepare(
+    "SELECT COUNT(*) AS n FROM menu_items mi JOIN menus m ON m.id = mi.menu_id WHERE m.brand_id = ? AND mi.product_id = ? AND m.menu_type = 'SINGLE'"
+  ).get(BRAND, PRODUCT_SIMPLE).n;
+  assert.equal(Number(secondCount), Number(firstCount));
+
+  const verified = ComposedMenuMigrationService.verifyProduct({
+    brandId: BRAND,
+    productId: PRODUCT_SIMPLE
+  });
+  assert.equal(verified.status, 'verified');
+  assert.deepEqual(verified.errors, []);
+});
+
 test('legacy Complement data is not silently converted into Menu Paket', () => {
   db.prepare(
     "INSERT INTO product_complements (product_id, complement_id, sort_order) VALUES (?, ?, 0)"
