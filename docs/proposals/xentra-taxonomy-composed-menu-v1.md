@@ -985,9 +985,9 @@ This proposal was cross-checked against current official documentation from matu
 
 These references validate the architectural patterns only. They do not override Xentra business rules.
 
-## 25. Final audit conclusion
+## 25. Contract conclusion
 
-The business/domain model is now internally coherent enough for **final contract review and implementation planning**.
+The business/domain model is the **locked target contract** for the proposal branch. Implementation still requires reconciliation, runtime testing, consumer migration, and final production verification.
 
 The previous blockers caused by mixed Product/Package/Kelengkapan semantics have been resolved in the proposal:
 
