@@ -572,7 +572,7 @@ describe('Promotion Security & RBAC Scope Authorization Suite', () => {
 
     assert.equal(createRes.status, 400);
     assert.equal(createRes.body.success, false);
-    assert.ok(createRes.body.error.includes('Produk reward tidak valid'));
+    assert.ok(/Produk reward legacy tidak valid|Menu reward tidak valid/.test(createRes.body.error));
 
     // 2. PUT update
     const promoValidId = 'promo_sec_a_for_put_prod';
