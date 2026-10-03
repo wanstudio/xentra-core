@@ -3,11 +3,11 @@
  *
  * Branch Manager UI only. API/data transport is provided by
  * merchant-shared/js/catalog-client.js.
-
- * Branch content override compatibility remains for legacy fields. The narrow
- * Customer display-name override is now canonical and is edited from the Merchant
- * Menu action surface via the dedicated display-name endpoint. Description/image
- * override behavior remains legacy compatibility only.
+ *
+ * Forward Branch Menu operations use canonical Menu APIs. The former Product
+ * override editor is intentionally quarantined and has no active UI caller.
+ * Customer display-name override is edited from the Merchant Menu action surface
+ * through the dedicated Menu display-name endpoint.
  */
 (function () {
   'use strict';
