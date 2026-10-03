@@ -11,7 +11,8 @@ const {
 } = require('../../domains/commerce');
 const {
   PricingPolicyModel,
-  CatalogService
+  CatalogService,
+  ComposedMenuService
 } = require('../../domains/catalog');
 const { domain, events } = require('../../core');
 
@@ -59,6 +60,40 @@ test.before(() => {
     db.prepare('DELETE FROM product_flavors WHERE product_id IN (\'prod_lock\', \'prod_range\', \'prod_limited\')').run();
     db.prepare('DELETE FROM product_complements WHERE product_id IN (\'prod_lock\', \'prod_range\', \'prod_limited\')').run();
     db.prepare('DELETE FROM product_levels WHERE product_id IN (\'prod_lock\', \'prod_range\', \'prod_limited\')').run();
+
+    // Canonical Product → Menu → Inventory fixtures for forward checkout.
+    const rasaId = 'flavor_test';
+    for (const [productId, subCategoryId, menuId, name, price] of [
+      ['prod_lock', 'sub_commerce_lock', 'menu_commerce_lock', 'Ayam Lock', 25000],
+      ['prod_range', 'sub_commerce_range', 'menu_commerce_range', 'Bebek Range', 30000],
+      ['prod_limited', 'sub_commerce_limited', 'menu_commerce_limited', 'Makanan', 50000]
+    ]) {
+      db.prepare(
+        "INSERT OR REPLACE INTO sub_categories (id, brand_id, category_id, name, slug, sort_order, is_active) VALUES (?, 'brand_test', 'cat_test', ?, ?, 1, 1)"
+      ).run(subCategoryId, name, subCategoryId.replace(/_/g, '-'));
+      db.prepare(
+        "INSERT OR REPLACE INTO menus (id, brand_id, menu_type, sub_category_id, rasa_id, selling_price, status) VALUES (?, 'brand_test', 'SINGLE', ?, ?, ?, 'ACTIVE')"
+      ).run(menuId, subCategoryId, rasaId, price);
+      db.prepare(
+        "INSERT OR REPLACE INTO menu_items (menu_id, product_id, quantity, sort_order) VALUES (?, ?, 1, 0)"
+      ).run(menuId, productId);
+      db.prepare("UPDATE products SET sku = ? WHERE id = ? AND brand_id = 'brand_test'").run('SKU-' + productId, productId);
+    }
+
+    db.prepare(
+      "INSERT OR IGNORE INTO branch_categories (id, brand_id, branch_id, name, slug, sort_order, is_active) VALUES ('bc_commerce_test', 'brand_test', 'branch_test', 'Makanan Test', 'makanan-test', 1, 1)"
+    ).run();
+    db.prepare("DELETE FROM branch_menu_categories WHERE branch_id = 'branch_test'").run();
+    db.prepare("DELETE FROM branch_menus WHERE branch_id = 'branch_test'").run();
+    db.prepare(
+      "INSERT OR REPLACE INTO branch_menus (branch_id, menu_id, is_available, price_override) VALUES ('branch_test', 'menu_commerce_lock', 1, NULL), ('branch_test', 'menu_commerce_range', 1, 32000), ('branch_test', 'menu_commerce_limited', 1, NULL)"
+    ).run();
+    db.prepare(
+      "INSERT OR REPLACE INTO branch_menu_categories (branch_id, menu_id, branch_category_id) VALUES ('branch_test', 'menu_commerce_lock', 'bc_commerce_test'), ('branch_test', 'menu_commerce_range', 'bc_commerce_test'), ('branch_test', 'menu_commerce_limited', 'bc_commerce_test')"
+    ).run();
+    db.prepare(
+      "INSERT OR REPLACE INTO branch_product_inventory (branch_id, product_id, stock_qty, low_stock_threshold) VALUES ('branch_test', 'prod_lock', 100, 10), ('branch_test', 'prod_range', 50, 5), ('branch_test', 'prod_limited', 4, 8)"
+    ).run();
 
     db.prepare('INSERT INTO product_flavors (product_id, flavor_id) VALUES (?, ?)').run('prod_lock', 'flavor_test');
     db.prepare('INSERT INTO product_flavors (product_id, flavor_id) VALUES (?, ?)').run('prod_range', 'flavor_test');
