@@ -7,6 +7,8 @@ const ConflictResolver = require('./domain/ConflictResolver');
 const BasePromotionStrategy = require('./strategies/BasePromotionStrategy');
 const InstallIncentiveStrategy = require('./strategies/InstallIncentiveStrategy');
 const PromotionEngineService = require('./services/PromotionEngineService');
+const PromotionRewardResolver = require('./services/PromotionRewardResolver');
+const PromotionRewardMigrationService = require('./services/PromotionRewardMigrationService');
 
 const PROMOTION_IDENTITY = {
   name: 'promotion',
@@ -56,5 +58,7 @@ module.exports = {
   ConflictResolver,
   BasePromotionStrategy,
   InstallIncentiveStrategy,
-  PromotionEngineService
+  PromotionEngineService,
+  PromotionRewardResolver,
+  PromotionRewardMigrationService
 };
