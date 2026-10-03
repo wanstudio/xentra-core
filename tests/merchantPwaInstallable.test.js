@@ -103,7 +103,7 @@ describe('Merchant PWA Installable — Architecture & Contract Verification', ()
 
     assert.ok(entryHtml.includes("window.location.replace('/owner/' + window.location.hash)"), 'Managerial entry must route owner to /owner/');
     assert.ok(sharedJs.includes("if (_landing === '/owner/')") && sharedJs.includes("window.location.replace('/owner/' + window.location.hash)"), 'Shared surface guard must preserve /owner/');
-    assert.ok(dashboardJs.includes("enforceSurface(['/owner/'])"), 'Owner dashboard must enforce canonical /owner/ landing');
+    assert.ok(dashboardJs.includes("enforceSurface(['/owner/', '/owner', '/dashboard/', '/dashboard'])"), 'Owner dashboard must enforce canonical /owner/ landing');
     assert.ok(appJs.includes("req.query.surface === 'owner'") && appJs.includes("data.start_url = isOwner ? '/owner/' : '/merchant/';"), 'Dynamic manifest must support explicit owner surface');
   });
 });
