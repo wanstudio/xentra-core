@@ -1635,8 +1635,8 @@
   async function loadMenu(){
     if(!state.branchId)return;
     try{
-      // Canonical Menu is the forward POS catalog source. Legacy endpoint remains
-      // the compatibility fallback until all environments are migrated.
+      // Canonical Menu is the sole forward POS catalog source. A canonical
+      // failure must not silently revive the legacy Product catalog.
       var data=await request('/catalog/composed-menu?branch_id='+encodeURIComponent(state.branchId),{headers:headers()});
       state.menu=adaptCanonicalPosCatalog(data);
       savePosMenuCache();
@@ -1644,21 +1644,11 @@
       state.coreConnection=true;
       updatePosReadiness();
     }catch(e){
-      try{
-        var legacy=await request('/catalog/menu?branch_id='+encodeURIComponent(state.branchId),{headers:headers()});
-        var catalogProducts=Array.isArray(legacy.all_products)?legacy.all_products:(legacy.products&&Array.isArray(legacy.products.items)?legacy.products.items:[]);
-        state.menu={categories:legacy.categories||[],products:catalogProducts};
-        savePosMenuCache();
-        renderMenu();
-        state.coreConnection=true;
-        updatePosReadiness();
-      }catch(legacyErr){
-        state.coreConnection=false;
-        updatePosReadiness();
-        var cachedMenu=getPosMenuCache(state.branchId);
-        if(cachedMenu){ state.menu=cachedMenu; renderMenu(); return; }
-        if($('pos-product-grid'))$('pos-product-grid').innerHTML='<div class="pos-empty">Menu tidak dapat dimuat. Periksa koneksi.</div>';
-      }
+      state.coreConnection=false;
+      updatePosReadiness();
+      var cachedMenu=getPosMenuCache(state.branchId);
+      if(cachedMenu){ state.menu=cachedMenu; renderMenu(); return; }
+      if($('pos-product-grid'))$('pos-product-grid').innerHTML='<div class="pos-empty">Menu tidak dapat dimuat. Periksa koneksi.</div>';
     }
   }
 
