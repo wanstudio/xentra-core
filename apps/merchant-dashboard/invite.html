@@ -265,7 +265,49 @@
       border-color: #94a3b8;
       background: #fff;
     }
-  </style>
+
+    .x-btn-flow {
+      width: 100%;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 13px;
+      font-size: 14px;
+      font-weight: 700;
+      margin-top: 16px;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .x-btn-flow.disabled, .x-btn-flow:disabled {
+      background-color: #ef4444 !important;
+      color: #ffffff !important;
+      cursor: not-allowed !important;
+      opacity: 0.9;
+    }
+
+    .x-btn-flow.enabled {
+      background-color: #22c55e !important;
+      color: #ffffff !important;
+      cursor: pointer !important;
+      box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+    }
+
+    .x-btn-flow.enabled:hover {
+      background-color: #16a34a !important;
+    }
+
+    .x-step-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #64748b;
+      background: #f1f5f9;
+      padding: 4px 8px;
+      border-radius: 4px;
+      margin-bottom: 8px;
+    }
 </head>
 <body>
 
@@ -347,7 +389,53 @@
         </form>
       </div>
 
-      <!-- State 3: Invalid / Revoked / Expired View -->
+      <!-- State 3: Cashier Mandatory Step 2 — Set PIN -->
+      <div id="section-cashier-pin" style="display:none;">
+        <span class="x-step-badge">Langkah 1 dari 2 · Keamanan POS</span>
+        <h2 style="font-size:16px;font-weight:800;margin-bottom:6px;color:#0f172a;">SET PIN KASIR</h2>
+        <p style="font-size:13px;color:#64748b;margin-bottom:16px;">
+          Buat 6 digit PIN kasir untuk autentikasi transaksi dan operasional di terminal kasir.
+        </p>
+
+        <form id="form-cashier-pin" onsubmit="return false;">
+          <div class="x-form-group">
+            <label for="input-cashier-pin">PIN (6 digit angka)</label>
+            <input type="password" id="input-cashier-pin" class="x-input" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Misal: 123456" autocomplete="new-password">
+          </div>
+          <div class="x-form-group">
+            <label for="input-cashier-pin-confirm">Konfirmasi PIN</label>
+            <input type="password" id="input-cashier-pin-confirm" class="x-input" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Ketik ulang 6 digit PIN" autocomplete="new-password">
+          </div>
+          <button type="button" class="x-btn-flow disabled" id="btn-submit-pin" disabled>
+            Lanjutkan
+          </button>
+        </form>
+      </div>
+
+      <!-- State 4: Cashier Mandatory Step 3 — Set Identity -->
+      <div id="section-cashier-identity" style="display:none;">
+        <span class="x-step-badge">Langkah 2 dari 2 · Identitas Kasir</span>
+        <h2 style="font-size:16px;font-weight:800;margin-bottom:6px;color:#0f172a;">DATA KASIR</h2>
+        <p style="font-size:13px;color:#64748b;margin-bottom:16px;">
+          Lengkapi nama lengkap dan NIK sesuai KTP Anda untuk verifikasi identitas operator kasir.
+        </p>
+
+        <form id="form-cashier-identity" onsubmit="return false;">
+          <div class="x-form-group">
+            <label for="input-cashier-name">Nama Lengkap</label>
+            <input type="text" id="input-cashier-name" class="x-input" placeholder="Masukkan nama lengkap asli" autocomplete="name" required minlength="2">
+          </div>
+          <div class="x-form-group">
+            <label for="input-cashier-nik">No. KTP / NIK (16 digit angka)</label>
+            <input type="text" id="input-cashier-nik" class="x-input" inputmode="numeric" pattern="[0-9]*" maxlength="16" placeholder="Contoh: 1871xxxxxxxxxxxx" autocomplete="off" required>
+          </div>
+          <button type="button" class="x-btn-flow disabled" id="btn-submit-identity" disabled>
+            Lanjutkan
+          </button>
+        </form>
+      </div>
+
+      <!-- State 5: Invalid / Revoked / Expired View -->
       <div id="section-invalid" style="display:none;">
         <a href="/signin" class="x-btn-submit" style="display:block;text-align:center;text-decoration:none;margin-top:16px;">
           Menuju Halaman Login
@@ -488,6 +576,145 @@
         sectionAuthChoice.style.display = 'block';
       }
 
+      var sectionCashierPin = document.getElementById('section-cashier-pin');
+      var sectionCashierIdentity = document.getElementById('section-cashier-identity');
+      var inputCashierPin = document.getElementById('input-cashier-pin');
+      var inputCashierPinConfirm = document.getElementById('input-cashier-pin-confirm');
+      var btnSubmitPin = document.getElementById('btn-submit-pin');
+      var inputCashierName = document.getElementById('input-cashier-name');
+      var inputCashierNik = document.getElementById('input-cashier-nik');
+      var btnSubmitIdentity = document.getElementById('btn-submit-identity');
+
+      // Cashier PIN Validation
+      function validatePinInputs() {
+        var p1 = (inputCashierPin.value || '').trim();
+        var p2 = (inputCashierPinConfirm.value || '').trim();
+        var isValid = /^\d{6}$/.test(p1) && p1 === p2;
+        if (isValid) {
+          btnSubmitPin.disabled = false;
+          btnSubmitPin.className = 'x-btn-flow enabled';
+        } else {
+          btnSubmitPin.disabled = true;
+          btnSubmitPin.className = 'x-btn-flow disabled';
+        }
+      }
+
+      inputCashierPin.addEventListener('input', function () {
+        this.value = this.value.replace(/\D/g, '').slice(0, 6);
+        validatePinInputs();
+      });
+      inputCashierPinConfirm.addEventListener('input', function () {
+        this.value = this.value.replace(/\D/g, '').slice(0, 6);
+        validatePinInputs();
+      });
+
+      // Cashier Identity Validation
+      function validateIdentityInputs() {
+        var name = (inputCashierName.value || '').trim();
+        var nik = (inputCashierNik.value || '').trim();
+        var isNameValid = name.length >= 2 && (!invitationData || !invitationData.email || name.toLowerCase() !== invitationData.email.toLowerCase());
+        var isNikValid = /^\d{16}$/.test(nik);
+        var isValid = isNameValid && isNikValid;
+
+        if (isValid) {
+          btnSubmitIdentity.disabled = false;
+          btnSubmitIdentity.className = 'x-btn-flow enabled';
+        } else {
+          btnSubmitIdentity.disabled = true;
+          btnSubmitIdentity.className = 'x-btn-flow disabled';
+        }
+      }
+
+      inputCashierName.addEventListener('input', validateIdentityInputs);
+      inputCashierNik.addEventListener('input', function () {
+        this.value = this.value.replace(/\D/g, '').slice(0, 16);
+        validateIdentityInputs();
+      });
+
+      // Cashier Step 2 Handler: Save PIN
+      btnSubmitPin.addEventListener('click', async function () {
+        var p1 = (inputCashierPin.value || '').trim();
+        var p2 = (inputCashierPinConfirm.value || '').trim();
+        if (!/^\d{6}$/.test(p1) || p1 !== p2) return;
+
+        var tokenToUse = localStorage.getItem(TOKEN_KEY);
+        btnSubmitPin.disabled = true;
+        btnSubmitPin.textContent = 'Menyimpan PIN...';
+
+        try {
+          var res = await fetch('/api/v1/auth/cashier-onboarding/pin', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + tokenToUse
+            },
+            body: JSON.stringify({ pin: p1, pin_confirmation: p2 })
+          });
+          var data = await res.json();
+          if (data && data.success) {
+            showAlert('PIN berhasil disimpan. Silakan lengkapi data identitas.', 'success');
+            sectionCashierPin.style.display = 'none';
+            sectionCashierIdentity.style.display = 'block';
+            setTimeout(function () { inputCashierName.focus(); }, 100);
+          } else {
+            showAlert(data.error || data.message || 'Gagal menyimpan PIN.', 'error');
+            btnSubmitPin.disabled = false;
+            btnSubmitPin.textContent = 'Lanjutkan';
+          }
+        } catch (err) {
+          showAlert('Kesalahan jaringan saat menyimpan PIN.', 'error');
+          btnSubmitPin.disabled = false;
+          btnSubmitPin.textContent = 'Lanjutkan';
+        }
+      });
+
+      // Cashier Step 3 Handler: Save Identity
+      btnSubmitIdentity.addEventListener('click', async function () {
+        var name = (inputCashierName.value || '').trim();
+        var nik = (inputCashierNik.value || '').trim();
+        if (name.length < 2 || !/^\d{16}$/.test(nik)) return;
+
+        var tokenToUse = localStorage.getItem(TOKEN_KEY);
+        btnSubmitIdentity.disabled = true;
+        btnSubmitIdentity.textContent = 'Memverifikasi identitas...';
+
+        try {
+          var res = await fetch('/api/v1/auth/cashier-onboarding/identity', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + tokenToUse
+            },
+            body: JSON.stringify({ name: name, nik: nik })
+          });
+          var data = await res.json();
+          if (data && data.success) {
+            showAlert('Onboarding berhasil! Mengalihkan ke aplikasi POS...', 'success');
+            btnSubmitIdentity.textContent = 'Berhasil! Membuka POS...';
+            setTimeout(function () {
+              window.location.replace('/pos/');
+            }, 1000);
+          } else {
+            showAlert(data.error || data.message || 'Gagal menyimpan identitas kasir.', 'error');
+            btnSubmitIdentity.disabled = false;
+            btnSubmitIdentity.textContent = 'Lanjutkan';
+          }
+        } catch (err) {
+          showAlert('Kesalahan jaringan saat menyimpan identitas.', 'error');
+          btnSubmitIdentity.disabled = false;
+          btnSubmitIdentity.textContent = 'Lanjutkan';
+        }
+      });
+
+      function startCashierOnboarding() {
+        sectionAcceptNow.style.display = 'none';
+        sectionAuthChoice.style.display = 'none';
+        detailsEl.style.display = 'none';
+        descEl.textContent = 'Lengkapi onboarding wajib sebelum menggunakan POS:';
+        sectionCashierPin.style.display = 'block';
+        setTimeout(function () { inputCashierPin.focus(); }, 100);
+      }
+
       // Action: Accept Invitation
       async function acceptInvitation(authToken) {
         var tokenToUse = authToken || localStorage.getItem(TOKEN_KEY);
@@ -511,12 +738,15 @@
           var data = await res.json();
 
           if (data.success) {
-            var landingLabel = invitationData && invitationData.role === 'cashier' ? 'POS' : 'dashboard';
-            showAlert('Selamat! Anda berhasil bergabung dengan tim. Mengalihkan ke ' + landingLabel + '...', 'success');
-            setTimeout(function () {
-              var fallbackLanding = invitationLanding(invitationData && invitationData.role);
-              window.location.replace(data.redirect_url || fallbackLanding);
-            }, 1000);
+            if (invitationData && invitationData.role === 'cashier') {
+              showAlert('Undangan diterima. Silakan atur PIN kasir Anda.', 'info');
+              startCashierOnboarding();
+            } else {
+              showAlert('Selamat! Anda berhasil bergabung dengan tim. Mengalihkan ke dashboard...', 'success');
+              setTimeout(function () {
+                window.location.replace(data.redirect_url || '/dashboard/');
+              }, 1000);
+            }
           } else {
             showAlert(data.message || 'Gagal menerima undangan.', 'error');
             btnAccept.disabled = false;

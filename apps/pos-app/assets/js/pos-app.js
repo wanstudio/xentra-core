@@ -1684,6 +1684,23 @@
         return false;
       }
       if(!state.branchId){ toast('Akun kasir belum memiliki cabang.'); return false; }
+
+      // Mandatory Cashier Identity Onboarding Gate (Contract v1)
+      try {
+        var onb = await requestWithTimeout('/auth/cashier-onboarding/status', { headers: headers() }, 5000);
+        if (onb && !onb.can_access_pos) {
+          toast('Onboarding kasir belum selesai. Silakan lengkapi PIN dan identitas.');
+          window.location.replace('/login');
+          return false;
+        }
+      } catch (onbErr) {
+        if (onbErr && (onbErr.code === 'CASHIER_ONBOARDING_REQUIRED' || onbErr.status === 403)) {
+          toast('Onboarding kasir belum selesai. Silakan lengkapi PIN dan identitas.');
+          window.location.replace('/login');
+          return false;
+        }
+      }
+
       await ensurePosPinConfigured();
       return true;
     } catch(err) {

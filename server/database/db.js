@@ -853,6 +853,8 @@ function initSchema(targetDb) {
       pos_pin_failed_attempts INTEGER DEFAULT 0,
       pos_pin_locked_until TEXT,
       pos_pin_updated_at TEXT,
+      cashier_onboarding_status TEXT DEFAULT 'IDENTITY_COMPLETED',
+      nik TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
@@ -2156,6 +2158,8 @@ function initSchema(targetDb) {
   try { targetDb.exec('ALTER TABLE users ADD COLUMN mfa_enrolled_at TEXT;'); } catch (e) {}
 
   try { targetDb.exec('ALTER TABLE users ADD COLUMN email_verified_at TEXT;'); } catch (e) {}
+  try { targetDb.exec("ALTER TABLE users ADD COLUMN cashier_onboarding_status TEXT DEFAULT 'IDENTITY_COMPLETED';"); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE users ADD COLUMN nik TEXT;'); } catch (e) {}
 
   // M5 DASHBOARD MEDIA INTEGRATION: canonical media_id reference columns.
   // Each entity gets a nullable media_id FK referencing media_assets.id.

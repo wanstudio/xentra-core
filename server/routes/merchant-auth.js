@@ -521,6 +521,58 @@ module.exports = function registerMerchantAuthRoutes(router, deps) {
     }
   });
 
+  // 10.1.2 Mandatory Cashier Identity Onboarding Endpoints (Contract v1)
+  router.get('/auth/cashier-onboarding/status', requireAuth(['cashier']), (req, res) => {
+    try {
+      const { CashierOnboardingService } = require('../../core/identity');
+      const service = new CashierOnboardingService();
+      const userId = req.user.id || req.user.userId;
+      const state = service.getOnboardingState(userId, req.brand_id);
+      res.json({ success: true, ...state });
+    } catch (err) {
+      const status = err.status || 500;
+      res.status(status).json({ success: false, code: err.code || 'ONBOARDING_STATUS_ERROR', error: err.message || 'Gagal memuat status onboarding kasir.' });
+    }
+  });
+
+  router.post('/auth/cashier-onboarding/pin', requireAuth(['cashier']), (req, res) => {
+    try {
+      const { CashierOnboardingService } = require('../../core/identity');
+      const service = new CashierOnboardingService();
+      const userId = req.user.id || req.user.userId;
+      const body = req.body || {};
+      const result = service.setPin({
+        userId,
+        brandId: req.brand_id,
+        pin: body.pin,
+        pin_confirmation: body.pin_confirmation
+      });
+      res.json({ success: true, ...result });
+    } catch (err) {
+      const status = err.status || 500;
+      res.status(status).json({ success: false, code: err.code || 'SET_PIN_ERROR', error: err.message || 'Gagal menyimpan PIN kasir.' });
+    }
+  });
+
+  router.post('/auth/cashier-onboarding/identity', requireAuth(['cashier']), (req, res) => {
+    try {
+      const { CashierOnboardingService } = require('../../core/identity');
+      const service = new CashierOnboardingService();
+      const userId = req.user.id || req.user.userId;
+      const body = req.body || {};
+      const result = service.setIdentity({
+        userId,
+        brandId: req.brand_id,
+        name: body.name,
+        nik: body.nik
+      });
+      res.json({ success: true, ...result });
+    } catch (err) {
+      const status = err.status || 500;
+      res.status(status).json({ success: false, code: err.code || 'SET_IDENTITY_ERROR', error: err.message || 'Gagal menyimpan identitas kasir.' });
+    }
+  });
+
   router.post('/auth/pos/pin', (req, res) => {
     try {
       const { PosPinCredentialService, WorkforceService } = require('../../core/identity');

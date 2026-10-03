@@ -349,7 +349,7 @@ router.post('/admin/brand/pos-icon', requireAuth(['owner', 'brand_manager']), as
       entityType: 'brand_pos_pwa_icon',
       entityId: req.brand_id,
       persistReference: function () { coreBrandRepo.updatePosPwaIcon(req.brand_id, { iconUrl, mediaId: asset.media_id }); }
-    }.
+    });
     if (req.brand) req.brand.pos_pwa_icon_url = iconUrl;
     res.status(201).json({
       success: true,

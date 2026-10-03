@@ -752,6 +752,40 @@ function requireAuth(allowedRoles = []) {
       }
     }
 
+    // MANDATORY CASHIER IDENTITY ONBOARDING GATE (Contract v1)
+    // Cashiers who haven't completed onboarding (PIN + Name + NIK) are blocked from POS operations
+    if (session.role === 'cashier' && !isInvitationAcceptRoute) {
+      const cashierExemptPaths = [
+        '/auth/merchant/me',
+        '/auth/logout',
+        '/auth/pos-pin',
+        '/auth/cashier-onboarding',
+        '/auth/cashier-onboarding/status',
+        '/auth/cashier-onboarding/pin',
+        '/auth/cashier-onboarding/identity'
+      ];
+      const isCashierExempt = cashierExemptPaths.includes(req.path) ||
+        (req.originalUrl && cashierExemptPaths.some(p => req.originalUrl.includes(p)));
+
+      if (!isCashierExempt) {
+        const userId = session.userId || session.id;
+        const userRow = db.prepare('SELECT cashier_onboarding_status, pos_pin_hash, full_name, nik FROM users WHERE id = ?').get(userId);
+        const onboardingStatus = userRow ? userRow.cashier_onboarding_status : null;
+        const hasPinAndIdentity = Boolean(userRow && userRow.pos_pin_hash && userRow.full_name && userRow.nik && userRow.nik.length === 16);
+        const isCompleted = onboardingStatus === 'IDENTITY_COMPLETED' || hasPinAndIdentity;
+
+        if (!isCompleted) {
+          return res.status(403).json({
+            success: false,
+            code: 'CASHIER_ONBOARDING_REQUIRED',
+            error: 'CASHIER_ONBOARDING_REQUIRED',
+            onboarding_status: onboardingStatus || 'ACCEPTED',
+            message: 'Kasir wajib menyelesaikan onboarding identitas dan PIN sebelum mengakses POS.'
+          });
+        }
+      }
+    }
+
     req.session = session;
     req.user = session;
     next();
