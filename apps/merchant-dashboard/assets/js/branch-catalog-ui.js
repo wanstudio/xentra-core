@@ -259,7 +259,7 @@
   window.removeBranchMenu = async function (menuId, menuName) {
     menuName = menuName || 'menu ini';
     if (!currentManagingBranchId) return;
-    if (!await confirmBranchCatalogAction('remove-branch-menu', 'Hapus dari Katalog Cabang', 'Hapus "' + productName + '" dari katalog cabang ini? Menu tidak akan lagi tampil di halaman pemesanan pelanggan cabang ini.', 'Hapus')) return;
+    if (!await confirmBranchCatalogAction('remove-branch-menu', 'Hapus dari Katalog Cabang', 'Hapus "' + menuName + '" dari katalog cabang ini? Menu tidak akan lagi tampil di halaman pemesanan pelanggan cabang ini.', 'Hapus')) return;
 
     try {
       var res = await CatalogClient.removeBranchMenu(currentManagingBranchId, menuId);
