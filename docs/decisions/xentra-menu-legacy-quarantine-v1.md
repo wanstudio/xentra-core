@@ -131,7 +131,17 @@ Quarantine applies to the **old Menu composition/override mechanism**, not to th
 
 ## 5. Runtime compatibility rule
 
-Until migration is complete, legacy runtime paths may continue to exist because existing data and current application flows depend on them.
+Until migration is complete, legacy runtime paths may continue to exist because old data, tests, and compatibility clients can still depend on them. They are not permission for forward code to consume the legacy model.
+
+Current forward runtime boundary:
+
+- Customer Home/catalog → `/catalog/composed-menu` / `/catalog/composed-menu/search` → `ComposedMenuResolver`.
+- Customer Checkout canonical verification → `ComposedMenuCheckoutService` → `ComposedMenuResolver` and `menus.selling_price`.
+- POS catalog → `/catalog/composed-menu?branch_id=...`.
+- Banner Product CTA → canonical composed Menu component resolution only; Product ID is an identity pointer, never commercial authority.
+- `/catalog/menu` and `/home` are legacy compatibility endpoints and may call `CatalogService` only for compatibility consumers/tests.
+- `/products` is a legacy Product listing endpoint; it must not become a source for canonical Customer/POS/Checkout Menu state.
+- `MasterMenuResolver` is retained only for explicit legacy compatibility/admin paths and must not replace `ComposedMenuResolver` in forward commerce.
 
 However:
 
