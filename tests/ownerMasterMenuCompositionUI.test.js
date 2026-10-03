@@ -175,7 +175,7 @@ test('Atomic Product Editor exposes only Product-owned controls', () => {
     assert.ok(!section.includes(legacyField), 'Legacy Product/commercial control leaked into Product Editor: ' + legacyField);
   }
 
-  assert.ok(JS.includes('Product is the atomic inventory entity'));
+  assert.ok(JS.includes('Canonical Product Editor submit: Product owns only atomic identity'));
   assert.ok(JS.includes('sku: sku || null'));
   assert.ok(JS.includes("is_active: $('prod-is-active').checked ? 1 : 0"));
 });
