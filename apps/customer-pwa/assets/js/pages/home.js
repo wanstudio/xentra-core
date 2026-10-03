@@ -366,15 +366,29 @@
 
   function findCurrentProductForBanner(productId) {
     var targetId = String(productId || '');
+
+    // Banner PRODUCT CTA stores a Product identity for compatibility, while
+    // Customer Home now renders Menu objects. A Menu ID is accepted first for
+    // forward compatibility; otherwise resolve the Product reference through
+    // its canonical Menu component snapshot. Never read Product price/category
+    // here—the canonical Menu remains the customer commercial authority.
     var local = products.find(function (product) {
-      return String(product.id) === targetId;
+      if (String(product.id) === targetId) return true;
+      if (String(product.product_id || '') === targetId) return true;
+      return Array.isArray(product.components) && product.components.some(function (component) {
+        return String(component && component.product_id || '') === targetId;
+      });
     });
     if (local) return local;
 
     for (var i = 0; i < categories.length; i++) {
       var items = Array.isArray(categories[i].products) ? categories[i].products : [];
       var hit = items.find(function (product) {
-        return String(product.id) === targetId;
+        if (String(product.id) === targetId) return true;
+        if (String(product.product_id || '') === targetId) return true;
+        return Array.isArray(product.components) && product.components.some(function (component) {
+          return String(component && component.product_id || '') === targetId;
+        });
       });
       if (hit) return hit;
     }
@@ -422,13 +436,33 @@
       var hit = null;
       var products = data && Array.isArray(data.all_products) ? data.all_products : [];
 
-      hit = products.find(function (product) {
-        return String(product.id) === String(productId);
+      // The Banner CONTENT contract historically stores PRODUCT CTA by
+      // Product ID. Resolve that identity only through canonical Menu output:
+      // first Menu ID, then a unique Menu whose component references the Product.
+      // Do not query Product price/category or invent a commercial mapping.
+      var targetId = String(productId || '');
+      var menuIdHit = products.find(function (product) {
+        return String(product.id) === targetId;
       }) || null;
-
-      if (hit) {
-        openProductDetail(hit);
+      if (menuIdHit) {
+        openProductDetail(menuIdHit);
         return true;
+      }
+
+      var componentHits = products.filter(function (product) {
+        return Array.isArray(product.components) && product.components.some(function (component) {
+          return String(component && component.product_id || '') === targetId;
+        });
+      });
+
+      if (componentHits.length === 1) {
+        openProductDetail(componentHits[0]);
+        return true;
+      }
+
+      if (componentHits.length > 1) {
+        UI.toast('Produk Banner terhubung ke lebih dari satu Menu. Buka Menu tersebut dari katalog.');
+        return false;
       }
 
       UI.toast('Produk Banner tidak tersedia di cabang ini.');
