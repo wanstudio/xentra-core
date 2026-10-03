@@ -66,7 +66,7 @@ test('Menu Satuan is backed by exactly one Product and resolves title from Sub C
 
   assert.equal(menu.menu_type, 'SINGLE');
   const items = db.prepare('SELECT menu_id, product_id, quantity FROM menu_items WHERE menu_id = ?').all(menu.id);
-  assert.deepEqual(items, [{ menu_id: menu.id, product_id: PRODUCT_A, quantity: 1 }]);
+  assert.deepEqual(Array.from(items).map(row => ({ menu_id: row.menu_id, product_id: row.product_id, quantity: row.quantity })), [{ menu_id: menu.id, product_id: PRODUCT_A, quantity: 1 }]);
 
   const resolved = ComposedMenuResolver.resolveMenu({ brandId: BRAND, menuId: menu.id });
   assert.equal(resolved.title, 'Ayam Bakar CMV1');
@@ -124,6 +124,8 @@ test('Draft Package may reference an inactive Product, but ACTIVE Package may no
     /MASTER_PRODUCT_INACTIVE/
   );
 
+  db.prepare('DELETE FROM menu_items WHERE menu_id = (SELECT id FROM menus WHERE brand_id = ? AND package_name = ? LIMIT 1)').run(BRAND, 'Draft With Inactive Product CMV1');
+  db.prepare('DELETE FROM menus WHERE brand_id = ? AND package_name = ?').run(BRAND, 'Draft With Inactive Product CMV1');
   db.prepare('DELETE FROM products WHERE id = ?').run(inactiveProduct);
 });
 
