@@ -24,10 +24,28 @@ function seedCanonicalDemoCatalog(db) {
     exec(sql) { return db.exec(sql); }
   });
 
-  const originalRasaId = 'demo_bangjo_rasa_original';
-  db.prepare(
-    "INSERT OR IGNORE INTO menu_flavors (id, brand_id, name, slug, sort_order, is_active) VALUES (?, 'brand_bangjo', 'Original', 'original', 1, 1)"
-  ).run(originalRasaId);
+  // menu_flavors enforces normalized brand+name uniqueness through a trigger
+  // (RASA_ALREADY_EXISTS), so INSERT OR IGNORE is not sufficient here.
+  // Reuse the existing Brand Master row when it already exists.
+  let originalRasa = db.prepare(
+    "SELECT id FROM menu_flavors WHERE brand_id = 'brand_bangjo' AND lower(trim(name)) = 'original' LIMIT 1"
+  ).get();
+  if (!originalRasa) {
+    const originalRasaId = 'demo_bangjo_rasa_original';
+    try {
+      db.prepare(
+        "INSERT INTO menu_flavors (id, brand_id, name, slug, sort_order, is_active) VALUES (?, 'brand_bangjo', 'Original', 'original', 1, 1)"
+      ).run(originalRasaId);
+      originalRasa = { id: originalRasaId };
+    } catch (err) {
+      if (!String(err && err.message || err).includes('RASA_ALREADY_EXISTS')) throw err;
+      originalRasa = db.prepare(
+        "SELECT id FROM menu_flavors WHERE brand_id = 'brand_bangjo' AND lower(trim(name)) = 'original' LIMIT 1"
+      ).get();
+    }
+  }
+  if (!originalRasa || !originalRasa.id) throw new Error('DEMO_ORIGINAL_RASA_UNAVAILABLE');
+  const originalRasaId = String(originalRasa.id);
 
   const products = db.prepare(
     "SELECT id, brand_id, category_id, name, slug, description, price, regular_price, image_url, image, is_active FROM products WHERE brand_id = 'brand_bangjo' ORDER BY id"
