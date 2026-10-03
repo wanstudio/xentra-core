@@ -156,12 +156,52 @@ class ComposedMenuResolver {
       components: items.map(item => ({
         product_id: item.product_id,
         product_name: item.product_name,
+        product_slug: item.product_slug || null,
         sku: item.sku || null,
         quantity: Number(item.quantity),
         description: item.product_description || '',
-        image_url: item.product_image_url || item.product_image || ''
+        image_url: item.product_image_url || item.product_image || '',
+        media_id: item.product_media_id || null,
+        product_is_active: item.product_is_active !== 0
       }))
     };
+  }
+
+  static resolveMasterMenu({ brandId, menuIds = null }) {
+    ensureSchema();
+    if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
+
+    const menus = Array.isArray(menuIds)
+      ? menuIds.map(String).filter(Boolean).map(id => repository.findMenu({ brandId, menuId: id })).filter(Boolean)
+      : repository.listMenus({ brandId, status: 'ACTIVE' });
+
+    if (!menus.length) return [];
+
+    const normalizedIds = menus.map(menu => menu.id);
+    const items = repository.listMenuItems({ brandId, menuIds: normalizedIds });
+    const itemMap = groupRows(items, 'menu_id');
+
+    return menus.map(menu => {
+      const base = resolveMenuBase(menu);
+      const menuItems = itemMap.get(String(menu.id)) || [];
+      return {
+        ...base,
+        is_available: true,
+        availability: true,
+        blocking_reason: null,
+        components: menuItems.map(item => ({
+          product_id: item.product_id,
+          product_name: item.product_name,
+          product_slug: item.product_slug || null,
+          sku: item.sku || null,
+          quantity: Number(item.quantity),
+          description: item.product_description || '',
+          image_url: item.product_image_url || item.product_image || '',
+          media_id: item.product_media_id || null,
+          product_is_active: item.product_is_active !== 0
+        }))
+      };
+    });
   }
 
   static resolveBranchMenu({
