@@ -1357,22 +1357,13 @@
       return;
     }
 
-    API.get('/products?category=' + encodeURIComponent(categoryId))
-      .then(function (data) {
-        if (seq !== productLoadSeq) return;
-        if (data.success && Array.isArray(data.items) && data.items.length > 0) {
-          products = data.items;
-          if (found) found.products = products;
-        } else {
-          products = [];
-        }
-        renderProducts();
-      })
-      .catch(function () {
-        if (seq !== productLoadSeq) return;
-        products = [];
-        renderProducts();
-      });
+    // Canonical Menu endpoint is the sole forward Customer catalog source.
+    // Missing category payload means an empty category, not a permission to
+    // resurrect the legacy Product catalog.
+    if (seq !== productLoadSeq) return;
+    products = [];
+    if (found) found.products = [];
+    renderProducts();
   }
 
   // Customer presentation contract: Level Pedas is always a four-dot horizontal
