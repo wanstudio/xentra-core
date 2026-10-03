@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const db = require('../server/database/db');
+const db = require('../../server/database/db');
 const ComposedMenuService = require('../domains/catalog/services/ComposedMenuService');
 const ComposedMenuResolver = require('../domains/catalog/services/ComposedMenuResolver');
 
