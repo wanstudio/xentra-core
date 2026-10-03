@@ -337,9 +337,10 @@
     if (existing) {
       existing.quantity += qty;
     } else {
-      // Promo-line identity is canonical only (flag / promotion_id / synthetic
-      // reward_ id). Price-0 or name "Gratis" heuristics are NOT used, so a
-      // legitimately discounted or free catalog product is never misflagged.
+      // Canonical promo reward identity is promotion_id + menu_id +
+      // is_promo_reward; the synthetic reward_ id remains only a cart-row key.
+      // Legacy Product-only reward lines remain readable during migration.
+      // Price-0 or name "Gratis" heuristics are NOT used.
       var isPromo = Boolean(
         product.is_promo_reward ||
         product.promotion_id ||
