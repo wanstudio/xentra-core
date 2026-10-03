@@ -19,10 +19,11 @@ router.get('/admin/categories', requireAuth(['owner', 'brand_manager']), (req, r
 router.post('/admin/categories', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const { name, image } = req.body;
-    if (!name) return res.status(400).json({ success: false, error: 'Nama kategori wajib diisi.' });
+    const normalizedName = typeof name === 'string' ? name.trim() : '';
+    if (!normalizedName) return res.status(400).json({ success: false, error: 'Nama kategori wajib diisi.' });
 
     const id = 'cat_' + Date.now();
-    const slug = normalizedName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const slug = normalizedName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
     
     db.prepare(`
       INSERT INTO categories (id, brand_id, name, slug, sort_order)
