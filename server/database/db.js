@@ -1382,12 +1382,6 @@ function initSchema(targetDb) {
       FOREIGN KEY (promotion_id) REFERENCES promotions(id) ON DELETE CASCADE
     );
 
-    // Promotion Reward Target migration: Menu is the canonical commercial
-    // reward identity. target_product_id remains a legacy compatibility
-    // reference during migration. Existing databases receive target_menu_id
-    // additively without destructive table rebuilds.
-    try { targetDb.exec("ALTER TABLE promotion_rewards ADD COLUMN target_menu_id TEXT;"); } catch (_) {}
-    try { targetDb.exec("CREATE INDEX IF NOT EXISTS idx_promotion_rewards_target_menu ON promotion_rewards(target_menu_id);"); } catch (_) {}
 
     CREATE TABLE IF NOT EXISTS promotion_redemptions (
       id TEXT PRIMARY KEY,
@@ -1905,6 +1899,13 @@ function initSchema(targetDb) {
       updated_at TEXT DEFAULT (datetime('now'))
     );
   `);
+
+/  // Promotion Reward Target migration: Menu is the canonical commercial
+  // reward identity. target_product_id remains a legacy compatibility
+  // reference during migration. Existing databases receive target_menu_id
+  // additively without destructive table rebuilds.
+  try { targetDb.exec("ALTER TABLE promotion_rewards ADD COLUMN target_menu_id TEXT;"); } catch (_) {}
+  try { targetDb.exec("CREATE INDEX IF NOT EXISTS idx_promotion_rewards_target_menu ON promotion_rewards(target_menu_id);"); } catch (_) {}
 
   try { targetDb.exec('ALTER TABLE media_assets ADD COLUMN crop_spec TEXT;'); } catch (e) {}
   try { targetDb.exec("ALTER TABLE pos_order_checks ADD COLUMN allocated_amount REAL NOT NULL DEFAULT 0;"); } catch (e) {}
