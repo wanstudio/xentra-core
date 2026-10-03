@@ -122,7 +122,7 @@ test('Legacy readiness inventory is read-only and classifies unresolved mappings
   }
 });
 
-test('Canonical-ready report does not claim migration safety while legacy compatibility rows remain', () => {
+test('Canonical-ready report permits retirement only when compatibility data is absent', () => {
   const db = fakeDataAccess([
     { method: 'queryMany', value: [{ status: 'verified', schema_version: 2, count: 4 }] },
     { method: 'queryOne', value: { total_products: 4, products_with_canonical_menu: 4, products_without_canonical_menu: 0, canonical_menu_count: 4 } },
