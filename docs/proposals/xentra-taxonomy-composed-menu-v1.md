@@ -1006,7 +1006,7 @@ The major remaining work is implementation reconciliation against the existing p
 **Production/main must remain unchanged until the final Xentra contract is explicitly promoted.**
 
 
-## Implementation status — 2026-10-03
+## 24. Current implementation status — 2026-10-03
 
 The business/domain contract above is locked. Construction has started on `proposal/xentra-taxonomy-composed-menu-v1`; `main` remains untouched.
 
@@ -1021,7 +1021,9 @@ Implemented as the first additive foundation:
 
 Legacy Product-composition and Branch Product paths are intentionally still present. They are not silently rewritten; migration and consumer quarantine are later gates.
 
-## 24. Construction status — 2026-10-03
+
+
+
 
 The contract is locked, while implementation remains isolated on `proposal/xentra-taxonomy-composed-menu-v1`.
 
@@ -1045,4 +1047,4 @@ Not yet promoted to `main`:
 - production data migration execution;
 - full runtime test-suite verification.
 
-Syntax validation has been completed for the new/modified JavaScript files at the current proposal head. GitHub Actions has not produced a workflow run for this branch, so syntax validation must not be represented as full runtime/CI verification.
+Source-level audit has been performed for the newly modified JavaScript paths at the current proposal head. No independent parser/runtime execution has been performed in this audit environment, and GitHub Actions has not produced a workflow run for this branch. Therefore this audit must not be represented as full syntax/runtime/CI verification.
