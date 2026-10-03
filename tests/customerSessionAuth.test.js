@@ -71,56 +71,50 @@ async function mockFetch(path, options = {}) {
   });
 }
 
+function ensureCanonicalFixture({ brandId, branchId, productId, menuId, categoryId, subCategoryId, price, categoryName }) {
+  db.prepare("INSERT OR IGNORE INTO categories (id, brand_id, name, slug, is_active) VALUES (?, ?, ?, ?, 1)")
+    .run(categoryId, brandId, categoryName || 'Makanan', categoryId + '-slug');
+  db.prepare("INSERT OR REPLACE INTO products (id, brand_id, category_id, name, slug, description, price, is_active) VALUES (?, ?, ?, ?, ?, 'Desc', ?, 1)")
+    .run(productId, brandId, categoryId, 'CSA Product ' + productId, productId + '-slug', price);
+  const rasaId = 'csa_rasa_' + brandId;
+  db.prepare("INSERT OR IGNORE INTO menu_flavors (id, brand_id, name, slug, is_active) VALUES (?, ?, 'Original', ?, 1)")
+    .run(rasaId, brandId, 'original-' + brandId);
+  db.prepare("INSERT OR REPLACE INTO sub_categories (id, brand_id, category_id, name, slug, is_active) VALUES (?, ?, ?, ?, ?, 1)")
+    .run(subCategoryId, brandId, categoryId, 'CSA Menu', subCategoryId + '-slug');
+  db.prepare("INSERT OR REPLACE INTO menus (id, brand_id, menu_type, sub_category_id, rasa_id, selling_price, status) VALUES (?, ?, 'SINGLE', ?, ?, ?, 'ACTIVE')")
+    .run(menuId, brandId, subCategoryId, rasaId, price);
+  db.prepare("INSERT OR REPLACE INTO menu_items (menu_id, product_id, quantity, sort_order) VALUES (?, ?, 1, 0)")
+    .run(menuId, productId);
+  db.prepare("INSERT OR REPLACE INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, is_active, is_open_override) VALUES (?, ?, ?, ?, ?, -7.2, 112.7, '0811111111', 1, 1)")
+    .run(branchId, brandId, 'CSA Branch ' + branchId, branchId + '-slug', 'Jl. Test');
+  db.prepare("INSERT OR REPLACE INTO branch_delivery_settings (id, branch_id, is_delivery_active, is_pickup_active, max_radius_km, free_delivery_km, price_per_km, min_order_amount) VALUES (?, ?, 1, 1, 25, 5, 3000, 0)")
+    .run('bds_' + branchId, branchId);
+  const branchCategoryId = 'csa_bc_' + branchId;
+  db.prepare("INSERT OR REPLACE INTO branch_categories (id, brand_id, branch_id, name, slug, sort_order, is_active) VALUES (?, ?, ?, 'Makanan', ?, 1, 1)")
+    .run(branchCategoryId, brandId, branchId, branchCategoryId + '-slug');
+  db.prepare("INSERT OR REPLACE INTO branch_menus (branch_id, menu_id, is_available, price_override) VALUES (?, ?, 1, NULL)")
+    .run(branchId, menuId);
+  db.prepare("INSERT OR REPLACE INTO branch_menu_categories (branch_id, menu_id, branch_category_id) VALUES (?, ?, ?)")
+    .run(branchId, menuId, branchCategoryId);
+  db.prepare("INSERT OR REPLACE INTO branch_product_inventory (branch_id, product_id, stock_qty, low_stock_threshold) VALUES (?, ?, 10, 5)")
+    .run(branchId, productId);
+}
+
 function setupFixtures() {
   const bangjoBrand = db.prepare('SELECT organization_id FROM brands WHERE id = ?').get('brand_bangjo');
   const orgBangjo = bangjoBrand ? bangjoBrand.organization_id : 'org_bangjo';
-
-  // Ensure sister brand exists in same org
   const sisterBrandId = 'brand_csa_sister';
   db.prepare('INSERT OR IGNORE INTO brands (id, organization_id, name, slug, custom_domain) VALUES (?, ?, ?, ?, ?)')
     .run(sisterBrandId, orgBangjo, 'CSA Sister Brand', 'csa-sister', 'csa-sister.mybangjo.com');
-
-  // Ensure other organization and brand exist
   const otherOrgId = 'org_csa_other';
   const otherBrandId = 'brand_csa_other';
   db.prepare('INSERT OR IGNORE INTO organizations (id, name, slug) VALUES (?, ?, ?)')
     .run(otherOrgId, 'CSA Other Org', 'csa-other-org');
   db.prepare('INSERT OR IGNORE INTO brands (id, organization_id, name, slug, custom_domain) VALUES (?, ?, ?, ?, ?)')
     .run(otherBrandId, otherOrgId, 'CSA Other Brand', 'csa-other-brand', 'csa.other.test');
-
-  // Setup branch and product for brand_bangjo
-  db.prepare(`INSERT OR IGNORE INTO products (id, brand_id, name, slug, description, price, is_active)
-    VALUES ('csa_p1', 'brand_bangjo', 'CSA Product 1', 'csa-product-1', 'Desc', 20000, 1)`).run();
-  db.prepare(`INSERT OR REPLACE INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, is_active, is_open_override)
-    VALUES ('branch_csa_bangjo', 'brand_bangjo', 'CSA Branch Bangjo', 'csa-branch-bangjo', 'Jl. Bangjo', -7.2, 112.7, '0811111111', 1, 1)`).run();
-  db.prepare(`INSERT OR REPLACE INTO branch_delivery_settings
-    (id, branch_id, is_delivery_active, is_pickup_active, max_radius_km, free_delivery_km, price_per_km, min_order_amount)
-    VALUES ('bds_branch_csa_bangjo', 'branch_csa_bangjo', 1, 1, 25, 5, 3000, 0)`).run();
-  db.prepare(`INSERT OR REPLACE INTO branch_products (branch_id, product_id, price, stock, is_available)
-    VALUES ('branch_csa_bangjo', 'csa_p1', 20000, 10, 1)`).run();
-
-  // Setup branch and product for sister brand
-  db.prepare(`INSERT OR IGNORE INTO products (id, brand_id, name, slug, description, price, is_active)
-    VALUES ('csa_p2', 'brand_csa_sister', 'CSA Product Sister', 'csa-product-sister', 'Desc', 25000, 1)`).run();
-  db.prepare(`INSERT OR REPLACE INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, is_active, is_open_override)
-    VALUES ('branch_csa_sister', 'brand_csa_sister', 'CSA Branch Sister', 'csa-branch-sister', 'Jl. Sister', -7.2, 112.7, '0822222222', 1, 1)`).run();
-  db.prepare(`INSERT OR REPLACE INTO branch_delivery_settings
-    (id, branch_id, is_delivery_active, is_pickup_active, max_radius_km, free_delivery_km, price_per_km, min_order_amount)
-    VALUES ('bds_branch_csa_sister', 'branch_csa_sister', 1, 1, 25, 5, 3000, 0)`).run();
-  db.prepare(`INSERT OR REPLACE INTO branch_products (branch_id, product_id, price, stock, is_available)
-    VALUES ('branch_csa_sister', 'csa_p2', 25000, 10, 1)`).run();
-
-  // Setup branch and product for other org brand
-  db.prepare(`INSERT OR IGNORE INTO products (id, brand_id, name, slug, description, price, is_active)
-    VALUES ('csa_p3', 'brand_csa_other', 'CSA Product Other', 'csa-product-other', 'Desc', 30000, 1)`).run();
-  db.prepare(`INSERT OR REPLACE INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, is_active, is_open_override)
-    VALUES ('branch_csa_other', 'brand_csa_other', 'CSA Branch Other', 'csa-branch-other', 'Jl. Other', -7.2, 112.7, '0833333333', 1, 1)`).run();
-  db.prepare(`INSERT OR REPLACE INTO branch_delivery_settings
-    (id, branch_id, is_delivery_active, is_pickup_active, max_radius_km, free_delivery_km, price_per_km, min_order_amount)
-    VALUES ('bds_branch_csa_other', 'branch_csa_other', 1, 1, 25, 5, 3000, 0)`).run();
-  db.prepare(`INSERT OR REPLACE INTO branch_products (branch_id, product_id, price, stock, is_available)
-    VALUES ('branch_csa_other', 'csa_p3', 30000, 10, 1)`).run();
-
+  ensureCanonicalFixture({ brandId: 'brand_bangjo', branchId: 'branch_csa_bangjo', productId: 'csa_p1', menuId: 'csa_menu_p1', categoryId: 'csa_cat_p1', subCategoryId: 'csa_sub_p1', price: 20000, categoryName: 'Makanan' });
+  ensureCanonicalFixture({ brandId: sisterBrandId, branchId: 'branch_csa_sister', productId: 'csa_p2', menuId: 'csa_menu_p2', categoryId: 'csa_cat_p2', subCategoryId: 'csa_sub_p2', price: 25000, categoryName: 'Makanan' });
+  ensureCanonicalFixture({ brandId: otherBrandId, branchId: 'branch_csa_other', productId: 'csa_p3', menuId: 'csa_menu_p3', categoryId: 'csa_cat_p3', subCategoryId: 'csa_sub_p3', price: 30000, categoryName: 'Makanan' });
   return { orgBangjo, sisterBrandId, otherOrgId, otherBrandId };
 }
 
@@ -349,7 +343,7 @@ test('CSA-08: Cross-Organization checkout (/checkout/create-order) -> 403 TENANT
       payment_method: 'cash',
       customer: { name: 'CSA 08 User', phone: '081200000008' },
       order_type: 'pickup',
-      items: [{ id: 'csa_p1', quantity: 1 }]
+      items: [{ menu_id: 'csa_menu_p1', quantity: 1, expected_price: 20000 }]
     })
   });
   const data = await res.json();
@@ -382,7 +376,7 @@ test('CSA-09: Same-Organization Cross-Brand checkout (/checkout/create-order) ->
       payment_method: 'cash',
       customer: { name: 'CSA 09 User', phone: '081200000009' },
       order_type: 'pickup',
-      items: [{ id: 'csa_p2', quantity: 1 }]
+      items: [{ menu_id: 'csa_menu_p2', quantity: 1, expected_price: 25000 }]
     })
   });
   const data = await res.json();
