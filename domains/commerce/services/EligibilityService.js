@@ -1,9 +1,9 @@
 /**
- * Xentra Commerce — Branch/Product Eligibility Service (C3 / Phase D)
+ * Xentra Commerce — Branch/Menu Eligibility Service (canonical + legacy compatibility)
  *
  * Canonical, deterministic decision layer answering:
  *
- *   "Can this Branch currently satisfy a requested product / cart requirement?"
+ *   "Can this Branch currently satisfy a requested Menu / cart requirement?"
  *
  * It consumes authoritative operational facts only and NEVER decides:
  *   - which branch to select (nearest / best / cheapest)      -> later Matching
@@ -23,7 +23,7 @@
  * One canonical source of eligibility logic. Consumers must not re-implement
  * these rules:
  *   - BranchMatcher (server/services/BranchMatcher.js) narrows delivery
- *     candidates through evaluateCart().
+ *     candidates through evaluateCart(); canonical carts are evaluated by Menu.
  *   - PrePaymentVerificationGate keeps its own STRONGER final checks executed
  *     at the exact Pay/commit moment (assignment, active, availability, stock,
  *     pricing, promotion). Those checks operate on the same facts with the
