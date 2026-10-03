@@ -105,6 +105,7 @@ test('Legacy readiness inventory is read-only and classifies unresolved mappings
   assert.equal(report.products.total, 5);
   assert.equal(report.products.with_canonical_menu, 2);
   assert.equal(report.products.without_canonical_menu, 3);
+  assert.equal(report.products.canonical_menu_gap_count, 3);
   assert.equal(report.promotions.legacy_product_target_count, 2);
   assert.equal(report.promotions.unresolved_or_ambiguous_count, 1);
   assert.equal(report.branches.legacy_branch_product_count, 4);
@@ -136,6 +137,7 @@ test('Canonical-ready report permits retirement only when compatibility data is 
   const report = LegacyDataReadinessService.inspect({ dataAccess: db });
 
   assert.equal(report.status, STATUS.CANONICAL_READY);
+  assert.equal(report.products.canonical_menu_gap_count, 0);
   assert.equal(report.retirement.compatibility_data_present, false);
   assert.equal(report.retirement.safe_to_retire_legacy_data, true);
 });
