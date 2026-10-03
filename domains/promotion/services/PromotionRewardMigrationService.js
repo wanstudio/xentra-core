@@ -100,7 +100,7 @@ class PromotionRewardMigrationService {
 
         DataAccess.execute(`
           UPDATE promotion_rewards
-          SET target_menu_id = ?
+          SET target_menu_id = ?, target_product_id = NULL
           WHERE id = ?
             AND target_menu_id IS NULL
         `, [entry.target_menu_id, entry.reward_id]);
