@@ -2040,7 +2040,7 @@
   async function loadMasterProducts() {
     try {
       var authHeaders = getAuthHeaders();
-      var prodRes = await adminFetch(API_BASE + '/admin/products', { headers: authHeaders });
+      var prodRes = await adminFetch(API_BASE + '/admin/composed/products?active_only=0', { headers: authHeaders });
       var prodData = await prodRes.json();
 
       if (prodData.success) state.products = prodData.products || [];
@@ -2182,7 +2182,7 @@
       var isActive = prod.is_active !== 0;
       var toggleSwitch = '' +
         '<label class="x-toggle' + (isActive ? ' x-toggle-on' : '') + '" title="' + (isActive ? 'Product aktif' : 'Product nonaktif') + '">' +
-          '<input type="checkbox" ' + (isActive ? 'checked' : '') + ' onchange="toggleStock(\\'' + esc(prod.id) + '\\')" aria-label="Status Product ' + esc(prod.name) + '">' +
+          '<input type="checkbox" ' + (isActive ? 'checked' : '') + ' onchange="toggleStock(\\'' + esc(prod.id) + '\\', this.checked ? 1 : 0)" aria-label="Status Product ' + esc(prod.name) + '">' +
           '<span class="x-toggle-slider"></span>' +
         '</label>';
 
@@ -3514,7 +3514,7 @@
     }
 
     try {
-      var res = await adminFetch(API_BASE + '/admin/products/' + encodeURIComponent(productId), {
+      var res = await adminFetch(API_BASE + '/admin/composed/products/' + encodeURIComponent(productId), {
         headers: getAuthHeaders()
       });
       var data = await res.json();
@@ -3548,19 +3548,23 @@
     navigateTo('catalog/products', { history: 'replace' });
   };
 
-  window.toggleStock = async function (id) {
+  window.toggleStock = async function (id, nextActive) {
     try {
-      var res = await adminFetch(API_BASE + '/admin/products/' + id + '/toggle', {
+      var desiredActive = nextActive === undefined ? true : (nextActive !== 0);
+      var res = await adminFetch(API_BASE + '/admin/composed/products/' + encodeURIComponent(id) + '/status', {
         method: 'PATCH',
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ is_active: desiredActive })
       });
       var data = await res.json();
-      if (data.success) {
-        showToast('Status Product diperbarui.');
-        loadMasterProducts();
-        if (_catalogState.activeDetailProductId) {
-          loadProductDetailView(_catalogState.activeDetailProductId);
-        }
+      if (!res.ok || !data.success) {
+        showToast('❌ ' + (data.error || data.message || 'Gagal mengubah status Product.'));
+        return;
+      }
+      showToast('Status Product diperbarui.');
+      loadMasterProducts();
+      if (_catalogState.activeDetailProductId) {
+        loadProductDetailView(_catalogState.activeDetailProductId);
       }
     } catch (e) {
       showToast('Gagal mengubah status Product.');
@@ -3569,28 +3573,31 @@
 
   window.deleteProduct = async function (id) {
     if (window.XentraPresentation && !await window.XentraPresentation.confirm({
-      id: 'delete-master-product',
-      title: 'Hapus Product Master',
-      message: 'Apakah Anda yakin ingin menghapus Product Master ini? Tindakan ini tidak dapat dibatalkan.',
-      okLabel: 'Hapus',
+      id: 'archive-master-product',
+      title: 'Arsipkan Product Master',
+      message: 'Product akan dinonaktifkan dan tetap mempertahankan identitasnya untuk Menu, histori, dan inventory.',
+      okLabel: 'Arsipkan',
       cancelLabel: 'Batal'
     })) return;
     try {
-      var res = await adminFetch(API_BASE + '/admin/products/' + id, {
-        method: 'DELETE',
-        headers: getAuthHeaders()
+      var res = await adminFetch(API_BASE + '/admin/composed/products/' + encodeURIComponent(id) + '/status', {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ is_active: false })
       });
       var data = await res.json();
-      if (data.success) {
-        showToast('Product Master berhasil dihapus.');
-        if (_catalogState.activeDetailProductId === id) {
-          navigateTo('catalog/products');
-        } else {
-          loadMasterProducts();
-        }
+      if (!res.ok || !data.success) {
+        showToast('❌ ' + (data.error || data.message || 'Gagal mengarsipkan Product.'));
+        return;
+      }
+      showToast('Product Master diarsipkan.');
+      if (_catalogState.activeDetailProductId === id) {
+        navigateTo('catalog/products');
+      } else {
+        loadMasterProducts();
       }
     } catch (e) {
-      showToast('Gagal menghapus Product.');
+      showToast('Gagal mengarsipkan Product.');
     }
   };
 
@@ -4272,8 +4279,8 @@ async function loadMenusView() {
         }
 
         var url = id
-          ? (API_BASE + '/admin/products/' + encodeURIComponent(id))
-          : (API_BASE + '/admin/products');
+          ? (API_BASE + '/admin/composed/products/' + encodeURIComponent(id))
+          : (API_BASE + '/admin/composed/products');
         var method = id ? 'PUT' : 'POST';
 
         try {
@@ -11221,7 +11228,7 @@ async function loadMenusView() {
     }).then(function(res) { return res.json(); });
 
     var results = await Promise.all([
-      adminFetch(API_BASE + '/admin/products', { headers: headers }).then(function(res){ return res.json(); }),
+      adminFetch(API_BASE + '/admin/composed/products?active_only=1', { headers: headers }).then(function(res){ return res.json(); }),
       adminFetch(API_BASE + '/admin/categories', { headers: headers }).then(function(res){ return res.json(); }),
       adminFetch(API_BASE + '/admin/sub-categories', { headers: headers }).then(function(res){ return res.json(); }),
       adminFetch(API_BASE + '/admin/rasas', { headers: headers }).then(function(res){ return res.json(); }),
