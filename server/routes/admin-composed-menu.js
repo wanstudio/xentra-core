@@ -48,6 +48,7 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
   const service = deps.service || ComposedMenuService;
   const resolver = deps.resolver || ComposedMenuResolver;
   const ownerRoles = ['owner', 'brand_manager'];
+  const menuAdoptionRoles = ['owner', 'brand_manager', 'branch_manager'];
 
   router.get('/admin/composed/products', requireAuth(ownerRoles), (req, res) => {
     try {
@@ -238,12 +239,26 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
     }
   });
 
-  router.post('/admin/menus/:id/adopt', requireAuth(ownerRoles), (req, res) => {
+  router.post('/admin/menus/:id/adopt', requireAuth(menuAdoptionRoles), (req, res) => {
     try {
       const body = req.body || {};
+      const branchId = body.branch_id;
+      if (!branchId) return res.status(400).json({ success: false, error: 'BRANCH_CONTEXT_REQUIRED' });
+
+      if (req.user && req.user.role === 'branch_manager') {
+        const assignedBranchId = req.user.branchId || req.user.branch_id;
+        if (assignedBranchId && String(assignedBranchId) !== String(branchId)) {
+          return res.status(403).json({
+            success: false,
+            error: 'FORBIDDEN_BRANCH_SCOPE',
+            message: 'Branch Manager hanya memiliki kewenangan pada cabang yang ditugaskan.'
+          });
+        }
+      }
+
       const result = service.adoptMenuToBranch({
         brandId: req.brand_id,
-        branchId: body.branch_id,
+        branchId,
         menuId: req.params.id,
         isAvailable: body.is_available === undefined ? true : body.is_available,
         priceOverride: body.price_override,
