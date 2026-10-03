@@ -1008,7 +1008,7 @@ The major remaining work is implementation reconciliation against the existing p
 
 ## 26. Current implementation status — 2026-10-03
 
-The Product → Menu → Inventory business contract above is locked. Construction remains isolated on `proposal/xentra-taxonomy-composed-menu-v1`; `main` is unchanged.
+The Product → Menu → Inventory business contract above, including the Promotion Reward Target Contract, is locked. Construction remains isolated on `proposal/xentra-taxonomy-composed-menu-v1`; `main` is unchanged.
 
 Implemented in the proposal branch:
 
@@ -1021,7 +1021,9 @@ Implemented in the proposal branch:
 - canonical Reporting stock summaries from `branch_product_inventory` and Menu-aware sales/item grouping with legacy order-history fallback;
 - canonical POS and Checkout catalog consumers with no silent Product-catalog fallback;
 - canonical Merchant Order item presentation from immutable Menu snapshots;
-- Promotion reward `target_product_id` explicitly retained as Product inventory reference until a separate Menu-targeted promotion contract is approved;
+- Promotion rewards now use `target_menu_id` as the canonical commercial target, while `target_product_id` remains legacy compatibility/fulfillment evidence during migration;
+- canonical Promotion Reward Resolver resolves Menu → immutable Menu snapshot + component snapshot → Product/SKU inventory;
+- legacy promotion reward migration planner auto-maps only an unambiguous active Menu Satuan and marks ambiguous/missing mappings `NEEDS_REVIEW`;
 - Branch Menu availability mutation with Branch Manager scope;
 - canonical Customer PWA catalog consumption without silent legacy catalog fallback;
 - canonical Menu endpoint compatibility envelope for older consumers;
@@ -1033,7 +1035,8 @@ Still pending before promotion to `main`:
 - Owner UI replacement/integration;
 - Branch/Merchant adoption UI integration;
 - final Customer PWA UI integration and all remaining consumer cleanup;
-- Payment, Receipt, KDS, Reporting, Promotion and remaining POS consumer migration;
+- Payment, Receipt, KDS, Reporting and remaining POS consumer migration;
+- remaining Promotion UI/client cleanup and legacy reward migration execution;
 - complete legacy quarantine and retirement of compatibility paths;
 - production database migration execution and verification;
 - full runtime test-suite execution and production audit.
@@ -1046,3 +1049,154 @@ Verification state:
 - Therefore the branch is **not** test-verified or merge-ready solely from this audit.
 
 **Do not merge PR #7 to `main` yet.**
+
+## 27. Promotion Reward Target Contract — LOCKED
+
+Promotion rewards follow the same commercial-vs-inventory separation as normal sales.
+
+### Canonical target
+
+```text
+Promotion
+  ↓
+Promotion Reward
+  ↓
+target_menu_id
+  ↓
+Menu
+  ↓
+immutable menu_snapshot + component_snapshot
+  ↓
+Product / SKU inventory
+```
+
+Therefore:
+
+```text
+promotion_rewards.target_menu_id
+= CANONICAL reward identity
+
+promotion_rewards.target_product_id
+= LEGACY compatibility / fulfillment reference
+```
+
+The implementation must **not** destructively replace `target_product_id` with `target_menu_id`.
+
+The two fields have different roles. A canonical reward is selected and displayed as a Menu because Menu is the customer-facing commercial identity. Inventory deduction still resolves through the Menu's Product components.
+
+### Why Product-only reward identity is no longer sufficient
+
+Product reuse is explicitly allowed by this contract:
+
+```text
+Product P1
+├─ Menu Satuan A
+├─ Menu Satuan B
+└─ Menu Paket C
+```
+
+A promotion that stores only `P1` cannot prove which commercial Menu the customer is meant to receive.
+
+Therefore the forward reward contract must not infer:
+
+```text
+target_product_id → "some Menu using that Product"
+```
+
+That inference is non-deterministic once Product reuse exists.
+
+### Reward configuration invariant
+
+For `freebie_product` rewards:
+
+```text
+New / canonical reward
+→ target_menu_id required
+
+Legacy reward
+→ target_product_id may remain temporarily
+
+Canonical reward
+→ must not depend on target_product_id as its commercial identity
+```
+
+The Admin Promotion API validates canonical Menu ownership by Brand. A reward with both `target_menu_id` and `target_product_id` is rejected as ambiguous configuration; `target_product_id` is retained only on legacy rows or as migration evidence.
+
+### Redemption resolution
+
+The final server-side reward resolution is:
+
+```text
+1. authenticate promotion eligibility;
+2. resolve target Menu by Brand;
+3. verify Menu is ACTIVE;
+4. verify all Menu components are valid/active;
+5. verify Branch has adopted the Menu and the Menu is operationally available;
+6. resolve Menu component snapshot;
+7. verify current Product/SKU inventory for the fulfillment Branch;
+8. produce one reward order line with:
+   - menu_id
+   - menu_type
+   - immutable menu_snapshot
+   - immutable component_snapshot
+   - promotion_id
+   - is_promo_reward
+9. let the existing canonical OrderPlacement/Inventory path consume Product/SKU stock atomically.
+```
+
+The client may carry `menu_id` for cart identity, but the server remains authoritative and rejects a reward Menu that differs from the promotion definition.
+
+### Package reward
+
+A Promotion may target a Menu Paket.
+
+The order line still represents one commercial Menu Paket. `product_id` is not the commercial identity for the package and may be `NULL`.
+
+Inventory is deducted from the package component snapshot exactly like any other canonical Menu sale.
+
+### Legacy reward migration
+
+A legacy `target_product_id` is eligible for automatic migration only when there is exactly one ACTIVE Menu Satuan whose only composition is that Product.
+
+```text
+exactly one active Menu Satuan
+→ SAFE_TO_MIGRATE
+→ populate target_menu_id
+
+zero matches
+→ NEEDS_REVIEW
+
+multiple matches
+→ NEEDS_REVIEW
+→ never guess
+```
+
+A package-only match is not sufficient evidence for automatic migration because the historical Product-only reward did not identify a commercial Package Menu.
+
+The migration utility is intentionally a planner/apply operation so production data can be reviewed before changing reward identity.
+
+### Compatibility boundary
+
+Legacy consumers may continue reading `target_product_id` only while their contract explicitly remains Product-based.
+
+Forward Customer PWA, checkout verification, promotion redemption, and order placement use the canonical Menu reward resolution path.
+
+The legacy field is not allowed to become a second source of truth for canonical reward identity.
+
+### Reference cross-check
+
+This contract was checked against mature commerce patterns:
+
+- WooCommerce free gift mechanisms select Products/Variations as gift items added to the cart.
+- commercetools represents a free gift as a `giftLineItem` whose value identifies a Product/Variant, with inventory validity evaluated for the gift item.
+- Shopify's BXGY model explicitly separates the products purchased from the products given for free.
+
+These references support the general distinction between the commercial cart item and its underlying stock/inventory identity; they do not override Xentra's Menu/Product contract.
+
+### Lock state
+
+This promotion reward target contract is now part of the locked Product → Menu → Inventory proposal.
+
+No further business-question loop is required for `target_menu_id` vs `target_product_id`.
+
+Implementation status is still subject to full runtime tests, production-data migration review, and final consumer quarantine before PR #7 can be merged.
