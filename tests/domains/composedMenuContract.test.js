@@ -88,6 +88,45 @@ test('Duplicate Menu Satuan identity is blocked by Sub Category + Rasa', () => {
   );
 });
 
+test('Draft Package may reference an inactive Product, but ACTIVE Package may not', () => {
+  const inactiveProduct = 'cmv1_test_inactive_package_product';
+  db.prepare(
+    "INSERT OR IGNORE INTO products (id, brand_id, category_id, name, slug, price, is_active) VALUES (?, ?, ?, 'Inactive Package Product', 'inactive-package-product', 0, 0)"
+  ).run(inactiveProduct, BRAND, CATEGORY);
+
+  const draft = ComposedMenuService.createPackageMenu({
+    brandId: BRAND,
+    packageName: 'Draft With Inactive Product CMV1',
+    sellingPrice: 19000,
+    components: [{ product_id: inactiveProduct, quantity: 2 }],
+    status: 'DRAFT'
+  });
+  assert.equal(draft.menu_type, 'PACKAGE');
+  assert.equal(draft.status, 'DRAFT');
+
+  assert.throws(
+    () => ComposedMenuService.createPackageMenu({
+      brandId: BRAND,
+      packageName: 'Active With Inactive Product CMV1',
+      sellingPrice: 19000,
+      components: [{ product_id: inactiveProduct, quantity: 2 }],
+      status: 'ACTIVE'
+    }),
+    /MASTER_PRODUCT_INACTIVE/
+  );
+
+  assert.throws(
+    () => ComposedMenuService.updatePackageMenu({
+      brandId: BRAND,
+      menuId: draft.id,
+      status: 'ACTIVE'
+    }),
+    /MASTER_PRODUCT_INACTIVE/
+  );
+
+  db.prepare('DELETE FROM products WHERE id = ?').run(inactiveProduct);
+});
+
 test('Menu Paket requires at least two total component units and uses fixed quantities', () => {
   assert.throws(
     () => ComposedMenuService.createPackageMenu({
