@@ -634,6 +634,27 @@ class ComposedMenuService {
     };
   }
 
+  static setBranchMenuAvailability({
+    brandId, branchId, menuId, isAvailable
+  }) {
+    ensureSchema();
+    if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
+    if (!branchId) throw new Error('BRANCH_CONTEXT_REQUIRED');
+
+    const menu = repository.findMenu({ brandId, menuId });
+    if (!menu) throw new Error('MENU_NOT_FOUND');
+
+    const normalized = Boolean(isAvailable);
+    repository.setBranchMenuAvailability({
+      brandId,
+      branchId,
+      menuId,
+      isAvailable: normalized
+    });
+
+    return repository.findBranchMenu({ brandId, branchId, menuId });
+  }
+
   static listMenus({
     brandId, menuType = null, status = null
   }) {
