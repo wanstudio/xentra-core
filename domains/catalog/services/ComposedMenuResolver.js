@@ -129,7 +129,7 @@ function calculateInventory(menuItems, inventoryRows, menuType = null, checkStoc
     };
   });
 
-  const stockAvailability = stockManagedComponentCount === 0
+  const stockAvailability = !checkStock || stockManagedComponentCount === 0
     ? true
     : packageCapacity > 0;
 
@@ -187,11 +187,13 @@ class ComposedMenuResolver {
     return menus.map(menu => {
       const base = resolveMenuBase(menu);
       const menuItems = itemMap.get(String(menu.id)) || [];
+      const inventoryState = calculateInventory(menuItems, [], menu.menu_type, false);
+      const available = inventoryState.blocking_reason == null && String(menu.status).toUpperCase() === 'ACTIVE';
       return {
         ...base,
-        is_available: true,
-        availability: true,
-        blocking_reason: null,
+        is_available: available,
+        availability: available,
+        blocking_reason: inventoryState.blocking_reason,
         components: menuItems.map(item => ({
           product_id: item.product_id,
           product_name: item.product_name,
