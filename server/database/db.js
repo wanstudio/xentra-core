@@ -1900,7 +1900,7 @@ function initSchema(targetDb) {
     );
   `);
 
-/  // Promotion Reward Target migration: Menu is the canonical commercial
+  // Promotion Reward Target migration: Menu is the canonical commercial
   // reward identity. target_product_id remains a legacy compatibility
   // reference during migration. Existing databases receive target_menu_id
   // additively without destructive table rebuilds.
