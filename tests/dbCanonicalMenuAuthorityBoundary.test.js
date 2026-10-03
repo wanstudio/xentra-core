@@ -182,3 +182,60 @@ test('Legacy Branch Product GET route has a single compatibility owner', () => {
     'admin-branch-operations must not re-register the legacy Branch Product GET route'
   );
 });
+
+
+test('Forward promotion builder writes Menu reward identity only', () => {
+  const ownerDashboard = fs.readFileSync(
+    path.join(ROOT, 'apps/merchant-dashboard/assets/js/dashboard.js'),
+    'utf8'
+  );
+
+  const submitStart = ownerDashboard.indexOf('async function submitPromotionForm');
+  const submitEnd = ownerDashboard.indexOf('window.submitPromotionForm', submitStart);
+  assert.ok(submitStart >= 0, 'Owner promotion submit handler must exist');
+  const submitSource = ownerDashboard.slice(submitStart, submitEnd > submitStart ? submitEnd : submitStart + 12000);
+
+  assert.ok(
+    submitSource.includes('target_menu_id: targetMenuId'),
+    'forward promotion submit must write target_menu_id'
+  );
+  assert.strictEqual(
+    submitSource.includes('target_product_id:'),
+    false,
+    'forward promotion submit must not write legacy target_product_id'
+  );
+  assert.ok(
+    ownerDashboard.includes('Promo lama masih memakai target Product. Pilih Menu hadiah canonical sebelum menyimpan perubahan.'),
+    'editing legacy Product-target promotions must require canonical Menu migration before save'
+  );
+});
+
+test('Legacy Branch Product client mutations remain compatibility-only and unused by forward branch catalog UI', () => {
+  const catalogClient = fs.readFileSync(
+    path.join(ROOT, 'apps/merchant-shared/js/catalog-client.js'),
+    'utf8'
+  );
+  const merchantBranchCatalog = fs.readFileSync(
+    path.join(ROOT, 'apps/merchant-app/assets/js/branch-catalog-ui.js'),
+    'utf8'
+  );
+  const ownerBranchCatalog = fs.readFileSync(
+    path.join(ROOT, 'apps/merchant-dashboard/assets/js/branch-catalog-ui.js'),
+    'utf8'
+  );
+
+  for (const method of [
+    'setBranchProductAvailability',
+    'removeBranchProduct',
+    'updateBranchProductOverride'
+  ]) {
+    assert.ok(catalogClient.includes('function ' + method), method + ' remains available only as compatibility transport');
+    assert.strictEqual(merchantBranchCatalog.includes('CatalogClient.' + method), false, 'Merchant forward UI must not call ' + method);
+    assert.strictEqual(ownerBranchCatalog.includes('CatalogClient.' + method), false, 'Owner forward UI must not call ' + method);
+  }
+
+  assert.ok(
+    catalogClient.includes('Legacy Product transport aliases'),
+    'compatibility methods must stay visibly quarantined in the shared client'
+  );
+});
