@@ -1120,7 +1120,7 @@ Canonical reward
 → must not depend on target_product_id as its commercial identity
 ```
 
-The Admin Promotion API validates canonical Menu ownership by Brand. A reward with both `target_menu_id` and `target_product_id` is rejected as ambiguous configuration; `target_product_id` is retained only on legacy rows or as migration evidence.
+The Admin Promotion API validates canonical Menu ownership by Brand. A reward with both `target_menu_id` and `target_product_id` is rejected as ambiguous configuration. Migration tooling reports the legacy Product target as evidence, but a successfully migrated canonical row clears `target_product_id`.
 
 ### Redemption resolution
 
