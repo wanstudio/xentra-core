@@ -242,29 +242,35 @@ test('TEST 5: Branch B checkout in multi-branch cart includes Branch B item and 
   assert.strictEqual(checkoutItems.find(i => i.id === 'reward_promo_pwa_001').branch_id, null);
 });
 
-test('TEST 6: PrePaymentVerificationGate.assertSingleBranchCheckout & verify succeed with unassigned reward', () => {
+test('TEST 6: PrePaymentVerificationGate.assertSingleBranchCheckout & verify succeed with unassigned canonical Menu reward', () => {
   const brandId = 'brand_test_reward_verify';
   const branchA = 'branch_test_reward_A';
   const foodProductId = 'prod_test_rf_food';
   const rewardProductId = 'prod_test_rf_reward';
+  const foodMenuId = 'menu_test_rf_food';
+  const rewardMenuId = 'menu_test_rf_reward';
   const promoId = 'promo_test_rf_pwa';
 
   const checkoutItems = [
-    { product_id: foodProductId, branch_id: branchA, quantity: 1, expected_price: 25000 },
-    { product_id: 'reward_' + promoId, is_promo_reward: true, promo_id: promoId, branch_id: null, quantity: 1, expected_price: 0 }
+    { menu_id: foodMenuId, branch_id: branchA, quantity: 1, expected_price: 25000 },
+    { menu_id: rewardMenuId, is_promo_reward: true, promo_id: promoId, branch_id: null, quantity: 1, expected_price: 0 }
   ];
 
-  // 1. assertSingleBranchCheckout: unassigned reward must not trigger single branch error
   const scopeError = PrePaymentVerificationGate.assertSingleBranchCheckout(branchA, checkoutItems);
   assert.strictEqual(scopeError, null, 'Unassigned reward must not trigger CHECKOUT_SINGLE_BRANCH_REQUIRED');
 
-  // 2. Setup DB fixtures for full PrePaymentVerificationGate.verify
   try {
     db.prepare("DELETE FROM promotion_redemptions WHERE brand_id = ?").run(brandId);
     db.prepare("DELETE FROM promotion_branch_scope WHERE brand_id = ?").run(brandId);
     db.prepare("DELETE FROM promotion_rewards WHERE promotion_id = ?").run(promoId);
     db.prepare("DELETE FROM promotion_rules WHERE promotion_id = ?").run(promoId);
     db.prepare("DELETE FROM promotions WHERE brand_id = ?").run(brandId);
+    db.prepare("DELETE FROM branch_menu_categories WHERE branch_id = ?").run(branchA);
+    db.prepare("DELETE FROM branch_menus WHERE branch_id = ?").run(branchA);
+    db.prepare("DELETE FROM branch_product_inventory WHERE branch_id = ?").run(branchA);
+    db.prepare("DELETE FROM menu_items WHERE menu_id IN (?, ?)").run(foodMenuId, rewardMenuId);
+    db.prepare("DELETE FROM menus WHERE id IN (?, ?)").run(foodMenuId, rewardMenuId);
+    db.prepare("DELETE FROM sub_categories WHERE id IN ('sub_test_rf_food','sub_test_rf_reward')").run();
     db.prepare("DELETE FROM branch_products WHERE branch_id = ?").run(branchA);
     db.prepare("DELETE FROM products WHERE brand_id = ?").run(brandId);
     db.prepare("DELETE FROM branches WHERE id = ?").run(branchA);
@@ -274,37 +280,39 @@ test('TEST 6: PrePaymentVerificationGate.assertSingleBranchCheckout & verify suc
   db.prepare('INSERT OR IGNORE INTO organizations (id, name, slug) VALUES (?, ?, ?)').run('org_test_rf', 'RF Org', 'rf-org');
   db.prepare('INSERT INTO brands (id, organization_id, name, slug) VALUES (?, ?, ?, ?)').run(brandId, 'org_test_rf', 'RF Brand', 'rf-brand');
   db.prepare('INSERT INTO branches (id, brand_id, name, slug, address_text, is_active, latitude, longitude) VALUES (?, ?, ?, ?, ?, 1, -5.35, 105.25)').run(branchA, brandId, 'Branch A', 'branch-a', 'Jl. Test A');
+  db.prepare('INSERT INTO categories (id, brand_id, name, slug, is_active) VALUES (?, ?, ?, ?, 1)').run('cat_test_rf', brandId, 'Makanan', 'makanan-rf');
 
-  db.prepare('INSERT INTO products (id, brand_id, name, slug, price, is_active) VALUES (?, ?, ?, ?, ?, 1)').run(foodProductId, brandId, 'Nasi Goreng', 'nasi-goreng-rf', 25000);
-  db.prepare('INSERT INTO products (id, brand_id, name, slug, price, regular_price, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)').run(rewardProductId, brandId, 'Es Teh Manis', 'es-teh-rf', 5000, 5000);
+  db.prepare('INSERT INTO products (id, brand_id, category_id, name, slug, price, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)').run(foodProductId, brandId, 'cat_test_rf', 'Nasi Goreng', 'nasi-goreng-rf', 25000);
+  db.prepare('INSERT INTO products (id, brand_id, category_id, name, slug, price, regular_price, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, 1)').run(rewardProductId, brandId, 'cat_test_rf', 'Es Teh Manis', 'es-teh-rf', 5000, 5000);
 
-  db.prepare('INSERT INTO branch_products (branch_id, product_id, price, stock, is_available) VALUES (?, ?, ?, ?, 1)').run(branchA, foodProductId, 25000, 50);
-  db.prepare('INSERT INTO branch_products (branch_id, product_id, price, stock, is_available) VALUES (?, ?, ?, ?, 1)').run(branchA, rewardProductId, 5000, 50);
+  const rasa = db.prepare("SELECT id FROM menu_flavors WHERE brand_id = ? AND lower(trim(name)) = 'original' AND is_active = 1 LIMIT 1").get(brandId) || (
+    db.prepare("INSERT INTO menu_flavors (id, brand_id, name, slug, is_active) VALUES ('rf_original_rasa', ?, 'Original', 'rf-original', 1)").run(brandId),
+    db.prepare("SELECT id FROM menu_flavors WHERE id = 'rf_original_rasa'").get()
+  );
 
-  db.prepare(`
-    INSERT INTO promotions (id, brand_id, name, capability_type, stacking_policy, priority_weight, is_active)
-    VALUES (?, ?, 'Promo PWA Test', 'install_incentive', 'exclusive', 100, 1)
-  `).run(promoId, brandId);
+  db.prepare('INSERT INTO sub_categories (id, brand_id, category_id, name, slug, is_active) VALUES (?,?,?,?,?,1)').run('sub_test_rf_food', brandId, 'cat_test_rf', 'Nasi Goreng', 'sub-test-rf-food');
+  db.prepare('INSERT INTO sub_categories (id, brand_id, category_id, name, slug, is_active) VALUES (?,?,?,?,?,1)').run('sub_test_rf_reward', brandId, 'cat_test_rf', 'Es Teh Manis', 'sub-test-rf-reward');
 
-  db.prepare(`
-    INSERT INTO promotion_rules (id, promotion_id, rule_type, rule_payload)
-    VALUES ('rul_rf_01', ?, 'eligibility', '{"requires_pwa_installed":true}')
-  `).run(promoId);
+  db.prepare("INSERT INTO menus (id, brand_id, menu_type, sub_category_id, rasa_id, selling_price, status) VALUES (?, ?, 'SINGLE', ?, ?, 25000, 'ACTIVE')").run(foodMenuId, brandId, 'sub_test_rf_food', rasa.id);
+  db.prepare("INSERT INTO menus (id, brand_id, menu_type, sub_category_id, rasa_id, selling_price, status) VALUES (?, ?, 'SINGLE', ?, ?, 5000, 'ACTIVE')").run(rewardMenuId, brandId, 'sub_test_rf_reward', rasa.id);
+  db.prepare('INSERT INTO menu_items (menu_id, product_id, quantity, sort_order) VALUES (?, ?, 1, 0), (?, ?, 1, 0)').run(foodMenuId, foodProductId, rewardMenuId, rewardProductId);
 
-  db.prepare(`
-    INSERT INTO promotion_rewards (id, promotion_id, reward_type, target_product_id, amount_in_cents, presentation_payload)
-    VALUES ('rew_rf_01', ?, 'freebie_product', ?, 0, '{"reward_title":"Es Teh Gratis"}')
-  `).run(promoId, rewardProductId);
+  db.prepare('INSERT INTO branch_categories (id, brand_id, branch_id, name, slug, sort_order, is_active) VALUES (?,?,?,?,?,1,1)').run('bc_test_rf_food', brandId, branchA, 'Makanan', 'bc-test-rf-food');
+  db.prepare('INSERT INTO branch_menus (branch_id, menu_id, is_available, price_override) VALUES (?, ?, 1, NULL), (?, ?, 1, NULL)').run(branchA, foodMenuId, branchA, rewardMenuId);
+  db.prepare('INSERT INTO branch_menu_categories (branch_id, menu_id, branch_category_id) VALUES (?, ?, ?), (?, ?, ?)').run(branchA, foodMenuId, 'bc_test_rf_food', branchA, rewardMenuId, 'bc_test_rf_food');
+  db.prepare('INSERT INTO branch_product_inventory (branch_id, product_id, stock_qty, low_stock_threshold) VALUES (?, ?, 50, 5), (?, ?, 50, 5)').run(branchA, foodProductId, branchA, rewardProductId);
 
-  db.prepare('INSERT INTO promotion_branch_scope (id, promotion_id, brand_id, branch_id, is_active) VALUES (?, ?, ?, ?, 1)')
-    .run('pbs_rf_01', promoId, brandId, branchA);
+  db.prepare("INSERT INTO promotions (id, brand_id, name, capability_type, stacking_policy, priority_weight, is_active) VALUES (?, ?, 'Promo PWA Test', 'install_incentive', 'exclusive', 100, 1)").run(promoId, brandId);
+  db.prepare("INSERT INTO promotion_rules (id, promotion_id, rule_type, rule_payload) VALUES ('rul_rf_01', ?, 'eligibility', '{\"requires_pwa_installed\":true}')").run(promoId);
+  db.prepare("INSERT INTO promotion_rewards (id, promotion_id, reward_type, target_menu_id, target_product_id, amount_in_cents, presentation_payload) VALUES ('rew_rf_01', ?, 'freebie_product', ?, NULL, 0, '{\"reward_title\":\"Es Teh Gratis\"}')").run(promoId, rewardMenuId);
+  db.prepare('INSERT INTO promotion_branch_scope (id, promotion_id, brand_id, branch_id, is_active) VALUES (?, ?, ?, ?, 1)').run('pbs_rf_01', promoId, brandId, branchA);
 
   const verification = PrePaymentVerificationGate.verify({
     branch_id: branchA,
     brand_id: brandId,
     items: [
-      { product_id: foodProductId, quantity: 1, expected_price: 25000 },
-      { product_id: 'reward_' + promoId, is_promo_reward: true, promo_id: promoId, quantity: 1, expected_price: 0 }
+      { menu_id: foodMenuId, quantity: 1, expected_price: 25000 },
+      { menu_id: rewardMenuId, is_promo_reward: true, promo_id: promoId, quantity: 1, expected_price: 0 }
     ],
     customer: { phone: '081299993003' },
     pwa_runtime: { display_mode: 'standalone' }
@@ -315,22 +323,29 @@ test('TEST 6: PrePaymentVerificationGate.assertSingleBranchCheckout & verify suc
   assert.strictEqual(verification.verified_items.length, 2);
   const verifiedReward = verification.verified_items.find(it => it.is_promo_reward);
   assert.ok(verifiedReward);
+  assert.strictEqual(verifiedReward.menu_id, rewardMenuId);
   assert.strictEqual(verifiedReward.product_id, rewardProductId);
   assert.strictEqual(verifiedReward.unit_price, 0);
 
-  // Cleanup
   try {
     db.prepare("DELETE FROM promotion_branch_scope WHERE brand_id = ?").run(brandId);
     db.prepare("DELETE FROM promotion_rewards WHERE promotion_id = ?").run(promoId);
     db.prepare("DELETE FROM promotion_rules WHERE promotion_id = ?").run(promoId);
     db.prepare("DELETE FROM promotions WHERE brand_id = ?").run(brandId);
-    db.prepare("DELETE FROM branch_products WHERE branch_id = ?").run(branchA);
+    db.prepare("DELETE FROM branch_menu_categories WHERE branch_id = ?").run(branchA);
+    db.prepare("DELETE FROM branch_menus WHERE branch_id = ?").run(branchA);
+    db.prepare("DELETE FROM branch_product_inventory WHERE branch_id = ?").run(branchA);
+    db.prepare("DELETE FROM menu_items WHERE menu_id IN (?, ?)").run(foodMenuId, rewardMenuId);
+    db.prepare("DELETE FROM menus WHERE id IN (?, ?)").run(foodMenuId, rewardMenuId);
+    db.prepare("DELETE FROM sub_categories WHERE id IN ('sub_test_rf_food','sub_test_rf_reward')").run();
+    db.prepare("DELETE FROM menu_flavors WHERE id = 'rf_original_rasa'").run();
+    db.prepare("DELETE FROM branch_categories WHERE id = 'bc_test_rf_food'").run();
+    db.prepare("DELETE FROM categories WHERE id = 'cat_test_rf'").run();
     db.prepare("DELETE FROM products WHERE brand_id = ?").run(brandId);
     db.prepare("DELETE FROM branches WHERE id = ?").run(branchA);
     db.prepare("DELETE FROM brands WHERE id = ?").run(brandId);
   } catch (_) {}
 });
-
 test('TEST 7: Reward maintains branch_id === null in cart store throughout state changes', () => {
   const Store = freshStore();
 
