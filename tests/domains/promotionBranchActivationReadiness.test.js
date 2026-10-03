@@ -1,14 +1,14 @@
 /**
- * Regression Test Suite: Promotion Branch Activation ↔ Reward Catalog Readiness
+ * Regression Test Suite: Promotion Branch Activation ↔ Reward Readiness
  *
  * Ensures:
- * 1. Activation fails (422) if reward product does not exist in branch catalog.
- * 2. Activation fails (422) if reward product is disabled (is_available = 0) in branch catalog.
- * 3. Activation succeeds (200) when reward product exists and is_available = 1 in branch catalog.
- * 4. Deactivation (is_active = 0) always succeeds regardless of catalog availability.
- * 5. PrePaymentVerificationGate integrity is strictly preserved (stock, availability, single-branch).
- * 6. Real brand_bangjo 'prm_bangjo_pwa_install' reward correctly points to '401' (Es Teh Manis)
- *    and succeeds gate verification at 'branch_1789606246242_08knv'.
+ * 1. Canonical Menu rewards are checked against Branch Menu readiness.
+ * 2. Activation fails when a canonical reward Menu is not adopted or available in the target Branch.
+ * 3. Activation succeeds when the canonical reward Menu is adopted and available.
+ * 4. Legacy Product reward rows remain isolated to an explicit compatibility path.
+ * 5. Deactivation (is_active = 0) succeeds without activation-time catalog prerequisites.
+ * 6. PrePaymentVerificationGate integrity is preserved (stock, availability, single-branch).
+ * 7. Real Bangjo install reward resolves by canonical Menu identity.
  */
 
 const { test, describe, before, after } = require('node:test');
