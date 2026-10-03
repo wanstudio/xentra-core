@@ -311,13 +311,11 @@ class ReportingRepository {
         oi.menu_id,
         m.menu_type,
         COALESCE(
-          json_extract(oi.menu_snapshot, '$.title'),
           m.package_name,
           oi.product_name,
           oi.product_id
         ) AS product_name,
         COALESCE(
-          json_extract(oi.menu_snapshot, '$.category.name'),
           c_menu.name,
           c_product.name,
           'Uncategorized'
