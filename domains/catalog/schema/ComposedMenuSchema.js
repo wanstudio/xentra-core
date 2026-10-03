@@ -3,7 +3,13 @@
 const ensuredDbs = new WeakSet();
 
 function hasColumn(db, table, column) {
-  return db.queryMany(`PRAGMA table_info(${table})`).some(row => String(row.name) === column);
+  const result = typeof db.queryMany === 'function'
+    ? db.queryMany(`PRAGMA table_info(${table})`)
+    : (typeof db.prepare === 'function' ? db.prepare(`PRAGMA table_info(${table})`).all() : []);
+  const rows = Array.isArray(result)
+    ? result
+    : (result && Array.isArray(result.rows) ? result.rows : []);
+  return rows.some(row => String(row.name) === column);
 }
 
 function normalizeName(value) {
