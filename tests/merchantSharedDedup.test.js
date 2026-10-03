@@ -43,6 +43,10 @@ test('MERCHANT SHARED — boundary ownership', async (t) => {
     assert.ok(CATALOG_CLIENT_JS.includes('window.XentraCatalogClient'));
     [
       'getBranchCatalog',
+      'setBranchMenuAvailability',
+      'removeBranchMenu',
+      'updateBranchMenuDisplayName',
+      'adoptMenu',
       'setBranchProductAvailability',
       'removeBranchProduct',
       'uploadBranchProductImage',
