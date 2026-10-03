@@ -630,44 +630,35 @@ class PosLocalOperationService {
           // In a shared branch inventory pool, if online orders depleted the stock while POS was offline,
           // the central branch product stock cannot fulfill the offline sale.
           // According to contract: DO NOT silently prioritize. Surface conflict to Branch Manager.
-          let hasStockDeficit = false;
-          let deficitItem = null;
-          let currentAvailableStock = 0;
+          const stockDeficit = findFirstOfflineStockDeficit(branch_id, payload.items);
+          if (stockDeficit) {
+            const conflictId = 'conf_' + crypto.randomBytes(6).toString('hex');
+            const requirement = stockDeficit.requirement;
 
-          if (Array.isArray(payload.items)) {
-            for (const it of payload.items) {
-              const bp = inventoryRepository.findBranchProduct(branch_id, it.product_id);
-              const available = bp ? Number(bp.stock || 0) : 0;
-              const demanded = Number(it.quantity) || 1;
-              if (available < demanded) {
-                hasStockDeficit = true;
-                deficitItem = it;
-                currentAvailableStock = available;
-                break;
-              }
-            }
-          }
-
-          if (hasStockDeficit && deficitItem) {
-            const conflictId = `conf_${crypto.randomBytes(6).toString('hex')}`;
             posOperationalRepository.insertConflict({
               id: conflictId,
               branchId: branch_id,
-              productId: deficitItem.product_id,
+              productId: requirement.product_id,
               terminalId: terminal_id,
               clientTransactionId: payload.client_transaction_id,
               posSaleReference: item.id,
               affectedOrderIds: [],
-              posDemandQuantity: deficitItem.quantity || 1,
+              posDemandQuantity: requirement.quantity,
               onlineDemandQuantity: 0,
-              availableStockAtReconciliation: currentAvailableStock
+              availableStockAtReconciliation: stockDeficit.available
             });
 
             posOperationalRepository.updateQueueStatus({
               queueId: item.id,
               status: 'conflict',
               conflictId,
-              lastError: `Konflik stok multi-channel: stok pusat (${currentAvailableStock}) tidak mencukupi permintaan offline POS (${deficitItem.quantity}).`
+              lastError: 'Konflik stok multi-channel: stok pusat (' +
+                stockDeficit.available +
+                ') tidak mencukupi permintaan offline POS (' +
+                requirement.quantity +
+                ') untuk ' +
+                requirement.product_name +
+                '.'
             });
 
             conflictCount++;
@@ -705,20 +696,38 @@ class PosLocalOperationService {
             failedCount++;
             results.push({ queue_id: item.id, status: 'FAILED', result: reconResult });
           }
-        } else if (item.operation_type === 'product_availability') {
-          // Apply availability to server authoritative branch_products
-          inventoryRepository.db.execute(
-            'UPDATE branch_products SET is_available = ?, updated_at = ? WHERE branch_id = ? AND product_id = ?',
-            [payload.is_available, new Date().toISOString(), branch_id, payload.product_id]
+        } else if (item.operation_type === 'menu_availability') {
+          const updateResult = inventoryRepository.db.execute(
+            'UPDATE branch_menus SET is_available = ?, updated_at = ? WHERE branch_id = ? AND menu_id = ?',
+            [payload.is_available, new Date().toISOString(), branch_id, payload.menu_id]
           );
+          if (!updateResult || updateResult.changes !== 1) {
+            throw new Error('BRANCH_MENU_NOT_FOUND');
+          }
           posOperationalRepository.updateQueueStatus({
             queueId: item.id,
             status: 'synced',
             syncedAt: new Date().toISOString()
           });
           syncedCount++;
-          results.push({ queue_id: item.id, status: 'SYNCED' });
-        }
+          results.push({ queue_id: item.id, status: 'SYNCED', operation: 'menu_availability' });
+        } else if (item.operation_type === 'product_availability') {
+          // Legacy compatibility operation only. New POS availability uses Branch Menu.
+          const updateResult = inventoryRepository.db.execute(
+            'UPDATE branch_products SET is_available = ?, updated_at = ? WHERE branch_id = ? AND product_id = ?',
+            [payload.is_available, new Date().toISOString(), branch_id, payload.product_id]
+          );
+          if (!updateResult || updateResult.changes !== 1) {
+            throw new Error('LEGACY_PRODUCT_AVAILABILITY_TARGET_NOT_FOUND');
+          }
+          posOperationalRepository.updateQueueStatus({
+            queueId: item.id,
+            status: 'synced',
+            syncedAt: new Date().toISOString()
+          });
+          syncedCount++;
+          results.push({ queue_id: item.id, status: 'SYNCED', operation: 'product_availability' });
+        }}
       } catch (err) {
         // Detect cross-channel inventory conflict
         const isStockConflict = err.message && (
@@ -730,23 +739,28 @@ class PosLocalOperationService {
 
         if (isStockConflict) {
           const conflictId = `conf_${crypto.randomBytes(6).toString('hex')}`;
-          const firstItem = payload.items?.[0] || {};
-          const bp = inventoryRepository.findBranchProduct(branch_id, firstItem.product_id);
-          const currentStock = bp ? Number(bp.stock || 0) : 0;
+          const stockDeficit = findFirstOfflineStockDeficit(branch_id, payload.items);
+          const requirement = stockDeficit
+            ? stockDeficit.requirement
+            : (buildOfflineStockRequirements(payload.items)[0] || {
+              product_id: '',
+              product_name: 'Item POS',
+              quantity: 1
+            });
+          const currentStock = stockDeficit ? stockDeficit.available : 0;
 
           // Record business conflict for Branch Manager review
           posOperationalRepository.insertConflict({
             id: conflictId,
             branchId: branch_id,
-            productId: firstItem.product_id || '',
+            productId: requirement.product_id,
             terminalId: terminal_id,
             clientTransactionId: payload.client_transaction_id,
             posSaleReference: item.id,
             affectedOrderIds: [],
-            posDemandQuantity: firstItem.quantity || 1,
+            posDemandQuantity: requirement.quantity,
             onlineDemandQuantity: 0,
-            availableStockAtReconciliation: currentStock
-          });
+            availableStockAtReconciliation: currentStock          });
 
           posOperationalRepository.updateQueueStatus({
             queueId: item.id,
