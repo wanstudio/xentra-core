@@ -7,9 +7,9 @@ const branchRepository = new BranchRepository();
 
 class BranchMatcher {
   /**
-   * Matches customer coordinates to the nearest eligible branch for a brand.
- * Cart eligibility is delegated to EligibilityService, which supports both
- * legacy Product carts and canonical Menu carts during migration.
+     * Matches customer coordinates to the nearest eligible branch for a brand.
+   * Cart eligibility is delegated to EligibilityService, which supports both
+   * legacy Product carts and canonical Menu carts during migration.
    * 
    * @param {Object} params
    * @param {string} params.brand_id
