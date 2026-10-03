@@ -145,6 +145,27 @@ test('PHASE 1: OWNER DASHBOARD CATALOG IMPLEMENTATION', async (t) => {
 
   // 2. MASTER PRODUCTS
   await t.test('2. Master Products CRUD and Product Detail API', async (t2) => {
+    await t2.test('2.0 Create atomic Product without commercial category/price', async () => {
+      const sku = 'ATOMIC-' + Date.now();
+      const res = await makeRequest(server, {
+        method: 'POST',
+        path: '/api/v1/admin/products',
+        headers: { Authorization: `Bearer ${ownerToken}` }
+      }, {
+        name: 'Atomic Product Contract Test',
+        sku,
+        description: 'Atomic Product only'
+      });
+
+      assert.strictEqual(res.status, 201);
+      assert.strictEqual(res.body.success, true);
+      assert.ok(res.body.product && res.body.product.id);
+      assert.strictEqual(res.body.product.sku, sku);
+      assert.strictEqual(res.body.product.price, 0);
+
+      db.prepare('DELETE FROM products WHERE id = ? AND brand_id = ?').run(res.body.product.id, BRAND_ID);
+    });
+
     await t2.test('2.1 Create Master Product assigned to category', async () => {
       const res = await makeRequest(server, {
         method: 'POST',
