@@ -154,7 +154,7 @@ test('Menu Paket requires at least two total component units and uses fixed quan
   const items = db.prepare(
     'SELECT product_id, quantity FROM menu_items WHERE menu_id = ? ORDER BY sort_order'
   ).all(menu.id);
-  assert.deepEqual(items, [{ product_id: PRODUCT_A, quantity: 2 }]);
+  assert.deepEqual(Array.from(items).map(row => ({ product_id: row.product_id, quantity: row.quantity })), [{ product_id: PRODUCT_A, quantity: 2 }]);
 });
 
 test('Package update revalidates the effective composition and rejects an empty Package', () => {
