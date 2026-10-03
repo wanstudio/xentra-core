@@ -26,6 +26,46 @@ const { ensureComposedMenuSchema } = require('../../catalog/schema/ComposedMenuS
 const posOperationalRepository = new PosOperationalRepository();
 const inventoryRepository = new InventoryRepository();
 const orderRepository = new OrderRepository();
+function buildOfflineStockRequirements(items) {
+  const requirements = new Map();
+  for (const item of Array.isArray(items) ? items : []) {
+    const menuId = item && item.menu_id ? String(item.menu_id).trim() : '';
+    const menuType = menuId ? String(item.menu_type || '').trim().toUpperCase() : null;
+    if (menuId) {
+      const components = Array.isArray(item.component_snapshot) ? item.component_snapshot : [];
+      for (const component of components) {
+        const sku = component && component.sku != null ? String(component.sku).trim() : '';
+        if (!sku) continue;
+        const productId = String(component.product_id || '').trim();
+        const componentQty = Number(component.quantity);
+        const menuQty = Number(item.quantity);
+        if (!productId || !Number.isSafeInteger(componentQty) || componentQty <= 0 || !Number.isSafeInteger(menuQty) || menuQty <= 0) continue;
+        const required = menuQty * componentQty;
+        const existing = requirements.get(productId);
+        if (existing) existing.quantity += required;
+        else requirements.set(productId, { product_id: productId, product_name: component.product_name || productId, quantity: required, menu_type: menuType });
+      }
+      continue;
+    }
+    const productId = String(item && item.product_id || '').trim();
+    const quantity = Number(item && item.quantity);
+    if (!productId || !Number.isSafeInteger(quantity) || quantity <= 0) continue;
+    const existing = requirements.get(productId);
+    if (existing) existing.quantity += quantity;
+    else requirements.set(productId, { product_id: productId, product_name: (item && (item.name || item.product_name)) || productId, quantity, menu_type: null });
+  }
+  return Array.from(requirements.values());
+}
+
+function findFirstOfflineStockDeficit(branchId, items) {
+  for (const requirement of buildOfflineStockRequirements(items)) {
+    const branchProduct = inventoryRepository.findBranchProduct(branchId, requirement.product_id);
+    const available = branchProduct ? Number(branchProduct.stock || 0) : 0;
+    if (available < requirement.quantity) return { requirement, available };
+  }
+  return null;
+}
+
 const posShiftRepository = new PosShiftRepository();
 
 class PosLocalOperationService {
@@ -171,19 +211,47 @@ class PosLocalOperationService {
       }
 
       const menuId = it.menu_id ? String(it.menu_id).trim() : null;
+      const menuType = menuId ? String(it.menu_type || '').trim().toUpperCase() : null;
       const componentSnapshot = Array.isArray(it.component_snapshot)
         ? it.component_snapshot
         : (Array.isArray(it.components) ? it.components : null);
 
-      if (menuId && (!componentSnapshot || componentSnapshot.length === 0)) {
-        throw new Error('[PosLocalOperation] Canonical Menu offline wajib membawa component_snapshot.');
+      if (menuId) {
+        if (!['SINGLE', 'PACKAGE'].includes(menuType)) {
+          throw new Error('[PosLocalOperation] Canonical Menu offline memiliki menu_type tidak valid.');
+        }
+        if (!componentSnapshot || componentSnapshot.length === 0) {
+          throw new Error('[PosLocalOperation] Canonical Menu offline wajib membawa component_snapshot.');
+        }
+        if (!it.menu_snapshot || typeof it.menu_snapshot !== 'object' || Array.isArray(it.menu_snapshot)) {
+          throw new Error('[PosLocalOperation] Canonical Menu offline wajib membawa menu_snapshot immutable.');
+        }
+
+        let totalUnits = 0;
+        for (const component of componentSnapshot) {
+          const componentQty = Number(component && component.quantity);
+          const productId = String(component && component.product_id || '').trim();
+          if (!productId || !Number.isSafeInteger(componentQty) || componentQty <= 0) {
+            throw new Error('[INVALID_MENU_COMPOSITION] Komponen Menu offline tidak valid.');
+          }
+          totalUnits += componentQty;
+        }
+
+        if (menuType === 'SINGLE' && (componentSnapshot.length !== 1 || Number(componentSnapshot[0].quantity) !== 1)) {
+          throw new Error('[INVALID_MENU_COMPOSITION] Menu Satuan offline wajib memiliki tepat 1 Product x1.');
+        }
+        if (menuType === 'PACKAGE' && totalUnits < 2) {
+          throw new Error('[INVALID_MENU_COMPOSITION] Menu Paket offline wajib memiliki minimal 2 unit Product.');
+        }
       }
 
       return {
-        product_id: menuId ? (it.menu_type === 'SINGLE' ? (it.product_id || (componentSnapshot[0] && componentSnapshot[0].product_id) || null) : null) : it.product_id,
+        product_id: menuId ? (menuType === 'SINGLE'
+          ? (it.product_id || (componentSnapshot[0] && componentSnapshot[0].product_id) || null)
+          : null) : it.product_id,
         menu_id: menuId,
-        menu_type: menuId ? (it.menu_type || 'SINGLE') : null,
-        menu_snapshot: menuId ? (it.menu_snapshot || null) : null,
+        menu_type: menuId ? menuType : null,
+        menu_snapshot: menuId ? it.menu_snapshot : null,
         component_snapshot: menuId ? componentSnapshot : null,
         name: it.name || it.product_name || it.title || 'Item POS',
         unit_price: price,
