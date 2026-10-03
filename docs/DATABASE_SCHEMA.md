@@ -254,106 +254,81 @@ CREATE TABLE products (
 );
 ```
 
-### Product Menu Migration State
+### Composed Menu Migration State
 
-The forward Menu architecture uses temporary migration metadata rather than
-duplicating legacy and canonical business fields inside Products.
+The proposal implementation records Product → Menu reconciliation evidence in the actual
+`composed_menu_migrations` table created by `ComposedMenuSchema`. This table is the migration
+report/evidence boundary during the transition window.
 
-~~~sql
-CREATE TABLE product_menu_migrations (
-    product_id TEXT PRIMARY KEY,
-    brand_id TEXT NOT NULL,
-    source_schema TEXT NOT NULL DEFAULT 'legacy',
-    target_schema TEXT NOT NULL DEFAULT 'master-menu-composition-v1',
-    status TEXT NOT NULL DEFAULT 'legacy',
-    attempt_count INTEGER NOT NULL DEFAULT 0,
-    canonical_fingerprint TEXT,
-    last_error TEXT,
-    notes TEXT,
-    migrated_at TEXT,
-    verified_at TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
-    FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
-);
-~~~
+Key state values:
 
-Product fields:
-- menu_schema_version = 1 → legacy/unreconciled.
-- menu_schema_version = 2 → Master Menu Composition v1.
-- menu_migration_status → legacy, needs_review, migrated, verified, or failed.
-
-`products` stores the lightweight current lifecycle state. `product_menu_migrations`
-stores reconciliation evidence/fingerprint. Legacy component relations may exist on Product for migration/backward compatibility. **Canonical customer-facing Menu semantics are stored in `menus`, `menu_items`, and the Menu taxonomy references; do not use Product relations as a substitute for Menu identity.**
-
-Migration lifecycle: Expand → Migrate → Verify → Contract.
-Legacy fields are not removed until a separate verification/consumer audit gate is passed.
-### Branch Catalog (Branch-owned)
-
-> **ARCHITECTURE MIGRATION NOTICE — 2026-09-29:** The forward Menu model is
-> **Master Menu Composition + Branch Adoption**. See
-> `docs/decisions/xentra-master-menu-composition-branch-adoption-contract-v1.md`.
-> The physical columns marked LEGACY below remain only for compatibility during migration.
-> See `docs/decisions/xentra-menu-legacy-quarantine-v1.md`.
-
-The Branch Catalog records which Master Products a Branch has adopted plus Branch-scoped
-classification and operational state.
-
-#### Forward ownership model
-
-- `branch_products.product_id` → adopted Master Product.
-- `branch_product_categories` → canonical Branch Category membership (M:N).
-- `branch_products.is_available` → Branch availability.
-- physical stock remains owned by Inventory.
-- Master Menu composition is resolved from `products` + Master component relations.
-- Merchant does not create Branch copies of Master Menu composition.
-
-#### LEGACY compatibility columns
-
-The following remain in the physical schema temporarily:
-
-- `product_name`
-- `product_description`
-- `product_image_url`
-- `name_override`
-- `description_override`
-- `image_override`
-- `price`
-
-They are **not** the forward Menu source of truth and must not receive new Menu behavior.
-Migration may read them for reconciliation only.
-
-#### Branch Product schema (current physical compatibility shape)
-
-```sql
-CREATE TABLE branch_products (
-    branch_id TEXT NOT NULL,
-    product_id TEXT NOT NULL,
-    branch_category_id TEXT,
-    -- LEGACY snapshot/override compatibility columns. Do not extend.
-    product_name TEXT,
-    product_description TEXT,
-    product_image_url TEXT,
-    name_override TEXT,
-    description_override TEXT,
-    image_override TEXT,
-    -- LEGACY Branch price compatibility. New Menu uses Owner-defined price/policy.
-    price REAL,
-    stock INTEGER DEFAULT NULL,
-    is_available INTEGER DEFAULT 1,
-    low_stock_threshold INTEGER DEFAULT 5,
-    created_at TEXT DEFAULT (datetime('now')),
-    updated_at TEXT DEFAULT (datetime('now')),
-    PRIMARY KEY (branch_id, product_id),
-    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
-    FOREIGN KEY (branch_category_id) REFERENCES branch_categories(id) ON DELETE SET NULL
-);
+```text
+legacy
+needs_review
+migrated
+verified
+failed
 ```
 
-`branch_products.branch_category_id` remains in the physical schema for compatibility,
-but `branch_product_categories` is the canonical M:N membership authority for the forward model.
+`products.menu_schema_version` / `products.menu_migration_status` are legacy physical fields
+where they already exist; they are not the canonical Menu identity or migration ledger for the
+proposal implementation. The canonical business state remains `menus` + `menu_items` and the
+migration evidence remains `composed_menu_migrations`.
+
+Migration lifecycle: Expand → Migrate → Verify → Contract.
+Legacy fields are not removed until the consumer/verification gate has passed.
+
+### Branch Catalog / Branch Adoption
+
+> **ARCHITECTURE MIGRATION NOTICE — 2026-10-03:** The forward adoption boundary is **Menu**.
+> The physical `branch_products` table remains compatibility storage during migration.
+> The authoritative forward relationships are `branch_menus` + `branch_menu_categories`.
+> Product stock is authoritative in `branch_product_inventory`.
+
+Forward ownership model:
+
+- `branch_menus` → adopted customer-facing Menu + Branch availability + optional Menu price override;
+- `branch_menu_categories` → canonical Branch Category membership (M:N);
+- `branch_product_inventory` → Product/SKU stock quantity;
+- `inventory_movements` → immutable Product inventory ledger;
+- `branch_products` → legacy compatibility/migration source only.
+
+#### `branch_products` (LEGACY compatibility shape)
+
+The following physical fields may remain during migration:
+
+```text
+product_id
+branch_category_id
+product_name
+product_description
+product_image_url
+name_override
+description_override
+image_override
+price
+stock
+is_available
+low_stock_threshold
+```
+
+These fields are **not** the forward Menu or Inventory authority. Migration tooling may read
+them to reconcile existing data. New Customer Menu code must not use them as a substitute for
+`branch_menus`, `branch_menu_categories`, or `branch_product_inventory`.
+
+`branch_products.branch_category_id` is legacy scalar classification. The forward M:N
+membership authority is `branch_menu_categories`.
+
+`branch_products.name_override`, `description_override`, and `image_override` are legacy
+compatibility data; the current Product → Menu contract does not permit them to override the
+resolved Customer Menu.
+
+`branch_products.price` is legacy Branch Product pricing data. The forward commercial selling
+price belongs to `menus.selling_price`, with `branch_menus.price_override` representing the
+Branch Menu configuration where that override is supported by the current implementation.
+
+`branch_products.stock` is legacy inventory data. The forward Product/SKU stock quantity is
+`branch_product_inventory.stock_qty`.
 
 ### `branch_categories` (Branch-owned Categories)
 ```sql
@@ -369,53 +344,6 @@ CREATE TABLE branch_categories (
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
 );
 ```
-
-### `branch_products` (Branch Catalog — Adopted Products with Optional Overrides)
-```sql
-CREATE TABLE branch_products (
-    branch_id TEXT NOT NULL,
-    product_id TEXT NOT NULL,
-    branch_category_id TEXT,
-    -- Legacy snapshot columns (backward compat, no longer read by CatalogService):
-    product_name TEXT,
-    product_description TEXT,
-    product_image_url TEXT,
-    -- Override columns (current architecture — Master Product Default + Branch Optional Override):
-    name_override TEXT,           -- NULL = inherit live master; non-NULL = branch value wins
-    description_override TEXT,    -- NULL = inherit live master; non-NULL = branch value wins
-    image_override TEXT,          -- NULL = inherit live master; non-NULL = branch value wins
-    price REAL,
-    stock INTEGER DEFAULT 100,
-    is_available INTEGER DEFAULT 1,
-    low_stock_threshold INTEGER DEFAULT 5,
-    created_at TEXT DEFAULT (datetime('now')),
-    updated_at TEXT DEFAULT (datetime('now')),
-    PRIMARY KEY (branch_id, product_id),
-    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
-    FOREIGN KEY (branch_category_id) REFERENCES branch_categories(id) ON DELETE SET NULL
-);
-```
-
-#### Column semantics
-
-- `product_id` → FK to Master Product (provenance; CASCADE DELETE if master deleted).
-- `branch_category_id` → FK to **Branch-owned** category (NOT Master Category).
-- `name_override` → Optional **Customer-facing Branch display-name override**. **NULL = inherit live Master presentation**; non-NULL = Branch-specific Customer title. It does not change `branch_products.product_id` or Master Product identity.
-- `description_override` → Same override semantics as `name_override` for description.
-- `image_override` → Same override semantics for image URL.
-- `product_name` / `product_description` / `product_image_url` → **Legacy snapshot columns**. Kept for backward compatibility. Not read by `CatalogService`. Migration: if legacy value differs from current master → promoted to override column; if identical → override stays NULL.
-- `price` → **Branch selling price**. Established at adoption/migration time. This is the authoritative selling price for Branch Catalog reads.
-- `stock` → Branch-owned physical stock (Inventory domain).
-- `is_available` → **Branch-owned availability flag**. Master `is_active` does NOT gate Branch Catalog availability.
-
-#### Triggers
-
-- `trg_branch_products_brand_consistency_insert/update`: Enforces that `product.brand_id = branch.brand_id` (C1 cross-brand guard).
-- `trg_branch_products_stock_non_negative_insert/update`: Enforces `stock >= 0` (C2 non-negative stock guard).
-
----
-
 ## 3. Order & Fulfillment Tables (Immutable Snapshots)
 
 ### Master Menu Composition
