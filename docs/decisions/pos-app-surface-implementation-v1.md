@@ -206,52 +206,95 @@ The underlying POS composer still uses the canonical backend order type value. T
 `Dine-In` → `dine_in`  
 `Takeaway` → `pickup`
 
-### Hold Bill UX — Exact Placement
+### Hold Bill UX — Exact Placement & Lifecycle v1.3
 
-Hold Bill is a **transaction action/state**, not a payment method and not a navigation mode.
+Hold Bill is a **cashier-side Draft Sale state**, not a payment method, not a purchase type, and not a navigation mode.
 
 #### 1. Current Draft Sale — action "Tahan"
 
-**Mobile:**
-The active Draft Sale is opened through the **Rincian Pesanan** modal. The modal footer must place:
+**Mobile — Rincian Pesanan modal:**
 
 **[ Tahan ]    [ Bayar Rp… ]**
 
-- **Tahan** is the left/secondary action.
-- **Bayar** is the right/primary action.
-- Tahan saves the current Draft Sale as a Hold Bill and returns the cashier to a clean/new Sale context.
-- Tahan is available for both **Dine-In** and **Takeaway** while the Sale is still a draft.
-- For Dine-In, the selected table remains part of the held Sale and the table hold follows Dining/Core authority.
-- The modal must **not** contain a **"Ditahan (N)"** button.
+- **Tahan** is the left/secondary action for the currently open Draft Sale.
+- **Bayar** is the right/primary payment action.
+- Pressing **Tahan** is a direct operational action; **no confirmation modal is required** for the normal Hold path.
+- The POS first validates the draft. If valid, it persists the current Draft Sale as a Hold Bill, then returns the cashier to a clean/new Sale context.
+- Hold is available for both **Dine-In** and **Takeaway** while the Sale is still a draft.
+- For Dine-In, the selected table remains part of the held Sale and the table hold continues to follow Dining/Core authority.
+- The current Draft Sale is **not submitted to Merchant** by pressing Tahan.
 
 **Desktop/tablet:**
-The active Draft Sale may expose the same **Tahan** action in the current **Pesanan/cart action area**. It performs the same Hold mutation. It must not create a second Hold workflow.
 
-#### 2. Already-Held Sales — location "Ditahan"
+The active Draft Sale exposes **Tahan** in the current Pesanan/cart action area. It has the same semantics as the mobile Tahan action.
 
-The held-sales list is a **separate list view**, not part of the current-sale review/checkout modal.
+#### 2. Hold Bill is not an operational Order
 
-Exact navigation:
+Pressing **Tahan** must **not**:
+- create/materialize a canonical Commerce Order;
+- place the order into the Merchant Order Center;
+- trigger kitchen/production workflow;
+- start `pending → preparing → ready` or another fulfillment lifecycle;
+- imply payment settlement;
+- consume or finalize the sale as a completed transaction.
 
-**Bottom Nav → Transaksi → local tab "Pesanan Ditahan (N)"**
+The Hold Bill is a cashier-side working record until the cashier explicitly resumes it and submits it into the applicable Sale/Order flow.
 
-That tab is the authoritative cashier entry point to:
-- see already-held Sales;
-- choose **Buka/Resume**;
-- choose **Batal** according to the existing Hold Bill contract.
+#### 3. Already-Held Sales — location "Pesanan Ditahan"
 
-The **"Ditahan (N)"** entry therefore belongs to the **Transaksi workspace**, not inside **Rincian Pesanan**.
+Canonical entry point:
 
-The POS cart/header must not duplicate this as a second competing Hold-list workflow. If an implementation currently exposes a **"Ditahan (N)"** shortcut beside the current Draft Sale actions, that shortcut is legacy UI and is to be removed/reconciled to the Transaksi → Pesanan Ditahan entry point.
+**Bottom Nav → Transaksi → Pesanan Ditahan (N)**
 
-#### 3. Semantic separation
+The list shows Sales already saved as Hold Bill and provides:
+- **Buka / Resume**;
+- **Batal**, subject to the existing Hold Bill cancellation contract.
 
-- **Tahan** = save/mutate the **current Draft Sale** into Hold Bill state.
-- **Pesanan Ditahan (N)** = open/list **Sales that were already saved as Hold Bill**.
+The current-sale review modal must **not** contain a **Ditahan (N)** shortcut.
+
+#### 4. Resume and explicit continuation
+
+When a held Sale is opened:
+
+**Transaksi → Pesanan Ditahan → Buka/Resume → Sale workspace**
+
+The held Sale remains a draft until the cashier explicitly chooses to continue/submit it.
+
+The continuation action must be explicit and semantically named **Kirim Pesanan** / **Teruskan Pesanan** (final copy may follow the shared POS terminology contract).
+
+Only that explicit continuation may promote the held cashier draft into the applicable canonical operational transaction flow and make it visible to the Merchant/fulfillment lifecycle.
+
+**Tahan ≠ Kirim Pesanan.**
+
+Payment is a separate financial action and must not be silently implied by the Hold transition. Exact payment-versus-submit sequencing follows the locked POS Sale/Payment contract; neither action is triggered merely by saving a Hold Bill.
+
+#### 5. No confirmation modal on normal Tahan
+
+For the normal Hold action, do **not** add a redundant confirmation step such as:
+**Tahan → "Yakin?" → Tahan**.
+
+POS Hold is intentionally a fast reversible workflow. Confirmation may still be used for destructive actions such as **Batal/Delete/Void** where the applicable contract requires it.
+
+#### 6. Semantic separation
+
+- **Tahan** = save the **current Draft Sale** as Hold Bill.
+- **Pesanan Ditahan (N)** = open the list of already-held Sales.
 - **Buka/Resume** = restore one held Sale into the Sale workspace.
-- **Bayar** = begin payment for the current Sale.
+- **Kirim/Teruskan Pesanan** = explicit submission from held draft into the operational transaction flow.
+- **Bayar** = payment action for the current Sale/order according to the payment contract.
 
 A Hold Bill is not a payment status and not a separate transaction type.
+
+#### 7. Implementation reconciliation note
+
+Source audit on `fix/cod-settlement-contract-v1-1` found that the current `POST /pos/held-orders` path still calls `PosOrderService.materializeHeldOrder()` immediately after creating the Hold Bill. That behavior is **legacy/non-compliant with this revision**.
+
+Implementation work following this contract must:
+- stop materializing the canonical Commerce Order inside the Hold endpoint;
+- preserve the Hold Bill as a cashier-side draft;
+- introduce/reuse an explicit continuation action for promotion/submission from Hold into the operational transaction flow;
+- keep existing Dining table-hold/release semantics intact;
+- keep Core authoritative for order, payment, inventory, and audit state.
 
 ### Single Transaction Flow
 
