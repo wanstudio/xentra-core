@@ -36,18 +36,24 @@ test('Forward Branch Catalog UI is Menu-only and does not call legacy Product ov
 });
 
 test('Merchant App inline Menu actions pass menu_id, never component product_id', () => {
-  assert.ok(
-    merchantApp.includes("toggleBranchMenuAvailability(\\'" + p.menu_id + "\\'"),
+  assert.match(
+    merchantApp,
+    /toggleBranchMenuAvailability\(\\'\s*\+\s*p\.menu_id\s*\+\s*\\'/,
     'availability toggle must receive the Menu ID'
   );
-  assert.ok(
-    merchantApp.includes("removeBranchMenu(\\'" + p.menu_id + "\\'"),
+  assert.match(
+    merchantApp,
+    /removeBranchMenu\(\\'\s*\+\s*p\.menu_id\s*\+\s*\\'/,
     'remove action must receive the Menu ID'
   );
-  assert.ok(!merchantApp.includes("toggleBranchMenuAvailability(\\'" + p.product_id"),
+  assert.doesNotMatch(
+    merchantApp,
+    /toggleBranchMenuAvailability\(\\'\s*\+\s*p\.product_id/,
     'availability must not receive Product ID'
   );
-  assert.ok(!merchantApp.includes("removeBranchMenu(\\'" + p.product_id"),
+  assert.doesNotMatch(
+    merchantApp,
+    /removeBranchMenu\(\\'\s*\+\s*p\.product_id/,
     'remove must not receive Product ID'
   );
 });
