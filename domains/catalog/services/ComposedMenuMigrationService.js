@@ -206,6 +206,20 @@ function planIdentity(inspected) {
       issues.push('SUB_CATEGORY_PARENT_CONFLICT');
     } else if (subCategory && subCategory.is_active === 0) {
       issues.push('SUB_CATEGORY_INACTIVE');
+    } else if (!subCategory) {
+      const candidateSlug = normalizeKey(product.name)
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 120);
+      if (candidateSlug) {
+        const slugConflict = DataAccess.queryOne(
+          "SELECT id, name FROM sub_categories WHERE brand_id = ? AND slug = ? LIMIT 1",
+          [brandId, candidateSlug]
+        );
+        if (slugConflict && normalizeKey(slugConflict.name) !== normalizedProductName) {
+          issues.push('SUB_CATEGORY_SLUG_CONFLICT');
+        }
+      }
     }
   }
 
@@ -225,6 +239,38 @@ function planIdentity(inspected) {
     );
     if (collision) issues.push('GENERATED_SKU_COLLISION');
     warnings.push('SKU_GENERATED_DETERMINISTICALLY');
+  }
+
+  for (const row of legacy.branchProducts) {
+    const stock = numberOrNull(row.stock);
+    if (stock !== null && (!Number.isInteger(stock) || stock < 0)) {
+      issues.push('LEGACY_STOCK_NOT_NON_NEGATIVE_INTEGER');
+    }
+
+    if (row.is_available !== null && row.is_available !== undefined) {
+      const available = Number(row.is_available);
+      if (available !== 0 && available !== 1) issues.push('LEGACY_BRANCH_AVAILABILITY_INVALID');
+    }
+
+    const threshold = numberOrNull(row.low_stock_threshold);
+    if (threshold !== null && (!Number.isInteger(threshold) || threshold < 0)) {
+      issues.push('LEGACY_LOW_STOCK_THRESHOLD_INVALID');
+    }
+
+    const branch = DataAccess.queryOne(
+      "SELECT id, brand_id FROM branches WHERE id = ? AND brand_id = ?",
+      [row.branch_id, brandId]
+    );
+    if (!branch) issues.push('BRANCH_NOT_FOUND');
+  }
+
+  const membershipBranchIds = new Set(legacy.branchMemberships.map(row => String(row.branch_id)));
+  const sourceBranchIds = new Set(legacy.branchProducts.map(row => String(row.branch_id)));
+  for (const branchId of membershipBranchIds) {
+    if (!sourceBranchIds.has(branchId)) {
+      issues.push('ORPHAN_BRANCH_CATEGORY_MEMBERSHIP');
+      break;
+    }
   }
 
   if (legacy.historicalMovementCount > 0 && legacy.branchProducts.length === 0) {
@@ -260,6 +306,17 @@ function buildPlan({ brandId, productId }) {
   const identity = planIdentity(inspected);
   const existingMenu = inspected.existingMenu;
 
+  const identityMenu = identity.rasa && identity.rasa.id
+    ? DataAccess.queryOne(
+      "SELECT m.id, mi.product_id, mi.quantity FROM menus m JOIN menu_items mi ON mi.menu_id = m.id " +
+      "WHERE m.brand_id = ? AND m.menu_type = 'SINGLE' AND m.sub_category_id = ? AND m.rasa_id = ? LIMIT 1",
+      [brandId, identity.subCategory.id, identity.rasa.id]
+    )
+    : null;
+  const identityConflict = identityMenu && (
+    String(identityMenu.product_id) !== String(productId) || Number(identityMenu.quantity) !== 1
+  ) ? ['MENU_SATUAN_IDENTITY_CONFLICT'] : [];
+
   const menuConflict = existingMenu && String(existingMenu.brand_id) !== String(brandId)
     ? ['MENU_CROSS_BRAND']
     : [];
@@ -279,6 +336,7 @@ function buildPlan({ brandId, productId }) {
 
   const issues = uniqueSorted([
     ...identity.issues,
+    ...identityConflict,
     ...menuConflict,
     ...(existingMenuConflict ? ['EXISTING_MENU_IDENTITY_CONFLICT'] : []),
     ...(existingMenu && (
