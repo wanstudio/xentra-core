@@ -254,6 +254,9 @@ router.post('/admin/products', requireAuth(['owner', 'brand_manager']), (req, re
       }
     });
   } catch (err) {
+    if (err && (err.code === 'SQLITE_CONSTRAINT_UNIQUE' || String(err.message || '').toLowerCase().includes('unique constraint failed: products.brand_id, products.sku'))) {
+      return res.status(400).json({ success: false, error: 'PRODUCT_SKU_ALREADY_EXISTS' });
+    }
     res.status(500).json({ success: false, error: err.message });
   }
 });
