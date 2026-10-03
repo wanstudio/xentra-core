@@ -926,11 +926,21 @@ function reconcileBrand({ brandId, verify = false, apply = false, persistReport 
     [brandId]
   );
 
-  const results = products.map(row => (
-    verify
-      ? verifyProduct({ brandId, productId: row.id })
-      : reconcileProduct({ brandId, productId: row.id, apply, persistReport })
-  ));
+  const results = products.map(row => {
+    try {
+      return verify
+        ? verifyProduct({ brandId, productId: row.id })
+        : reconcileProduct({ brandId, productId: row.id, apply, persistReport });
+    } catch (err) {
+      return {
+        product_id: row.id,
+        status: STATUS.FAILED,
+        applied: false,
+        persisted: Boolean(apply || persistReport),
+        errors: [String(err && err.message || err)]
+      };
+    }
+  });
 
   const summary = results.reduce((acc, item) => {
     acc.total += 1;
