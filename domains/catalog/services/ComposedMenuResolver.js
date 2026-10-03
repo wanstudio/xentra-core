@@ -39,15 +39,18 @@ function resolveCustomerTitle(menu) {
     : (menu.sub_category_name || '');
 }
 
-function resolveMenuBase(menu) {
+function resolveMenuBase(menu, branchState = null) {
   const level = normalizeLevel(menu);
   const rasaIsOriginal = isOriginalRasa(menu.rasa_name);
+  const displayNameOverride = branchState && branchState.display_name_override
+    ? String(branchState.display_name_override).trim()
+    : null;
 
   return {
     id: menu.id,
     menu_id: menu.id,
     menu_type: menu.menu_type,
-    title: resolveCustomerTitle(menu),
+    title: displayNameOverride || resolveCustomerTitle(menu),
     subtitle: menu.rasa_name && !rasaIsOriginal ? menu.rasa_name : null,
     price: Number(menu.selling_price),
     category: menu.category_id
@@ -60,7 +63,10 @@ function resolveMenuBase(menu) {
       ? { id: menu.rasa_id, name: menu.rasa_name, slug: menu.rasa_slug }
       : null,
     level: level,
-    status: menu.status
+    status: menu.status,
+    ...(branchState ? {
+      display_name_override: displayNameOverride
+    } : {})
   };
 }
 
@@ -239,7 +245,7 @@ class ComposedMenuResolver {
       const branchState = branchMap.get(String(menu.id));
       if (!branchState) return null;
 
-      const base = resolveMenuBase(menu);
+      const base = resolveMenuBase(menu, branchState);
       const price = branchState.price_override == null
         ? base.price
         : Number(branchState.price_override);
