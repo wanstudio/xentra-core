@@ -222,7 +222,7 @@ test('canonical Package reward carries Menu identity and component snapshot with
 
   assert.equal(resolved.menu_id, MENU_PACKAGE);
   assert.equal(resolved.menu_type, 'PACKAGE');
-  assert.equal(resolved.product_id, null);
+  assert.equal(resolved.product_id, PRODUCT_PACKAGE_A);
   assert.equal(resolved.component_snapshot.length, 2);
   assert.deepEqual(
     resolved.component_snapshot.map(item => [item.product_id, item.quantity]),
