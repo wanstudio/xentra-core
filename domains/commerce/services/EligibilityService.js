@@ -11,14 +11,16 @@
  *   - stock mutation / reservation                            -> Inventory (C2)
  *   - split fulfillment (Core v1 = 1 cart -> 1 fulfillment branch)
  *
- * Facts consumed (all read server-side, never from the client):
- *   branches.is_active / is_open_override           (B1 branch operational state)
- *   products.is_active + brand scope                (C1 product master)
- *   branch_products row = assignment                (C1 product <-> branch)
- *   branch_products.is_available                    (C1 operational availability flag)
- *   branch_products.stock                           (C2 branch inventory)
- *   branch_delivery_settings.is_delivery_active /
- *       is_pickup_active                            (B1 fulfillment capability)
+ * Facts consumed:
+ *   Canonical Menu path:
+ *     menus / menu_items                         (commercial Menu + composition)
+ *     branch_menus                               (Branch Menu adoption/availability)
+ *     branch_product_inventory                   (Product stock by Branch)
+ *   Legacy Product compatibility path:
+ *     products / branch_products                 (temporary migration compatibility)
+ *   Fulfillment capability:
+ *     branch_delivery_settings.is_delivery_active /
+ *       is_pickup_active
  *
  * One canonical source of eligibility logic. Consumers must not re-implement
  * these rules:
@@ -271,6 +273,11 @@ class EligibilityService {
           reasons = [EligibilityService.REASONS.INSUFFICIENT_STOCK];
         } else if (canonicalVerification.status === 'MENU_UNAVAILABLE') {
           reasons = [EligibilityService.REASONS.MENU_UNAVAILABLE];
+        } else if (verification.status === 'PRICE_CHANGED') {
+          // Should be unreachable after stripping client prices above, but keep
+          // the mapping explicit so a future verifier change cannot mislabel a
+          // price-only result as a missing Menu.
+          reasons = [];
         } else {
           reasons = [EligibilityService.REASONS.MENU_NOT_FOUND];
         }
