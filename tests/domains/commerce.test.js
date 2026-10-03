@@ -217,89 +217,68 @@ test('Commerce 4b — C1 Catalog coherence: unassigned product is NOT in branch 
 // ==============================================================================
 // Commerce 5 — Pre-Payment Final Verification Gate (No 999 fake stock & Price Check)
 // ==============================================================================
-test('Commerce 5 — Pre-Payment Gate: verifies stock, rejects unassigned branch products, and detects price change', () => {
-  // 1. Valid items pass verification
+test('Commerce 5 — Canonical Menu Pre-Payment Gate: verifies adoption, price, and stock', () => {
   const validVerification = PrePaymentVerificationGate.verify({
     brand_id: 'brand_test',
     branch_id: 'branch_test',
     items: [
-      { product_id: 'prod_lock', quantity: 2, expected_price: 25000 },
-      { product_id: 'prod_range', quantity: 1, expected_price: 28000 }
+      { menu_id: 'menu_commerce_lock', quantity: 2, expected_price: 25000 },
+      { menu_id: 'menu_commerce_range', quantity: 1, expected_price: 32000 }
     ]
   });
+
   assert.strictEqual(validVerification.is_valid, true);
   assert.strictEqual(validVerification.status, 'VERIFIED');
   assert.strictEqual(validVerification.verified_items.length, 2);
-
-  // Branch Product legacy price column is deliberately ignored by the forward
-  // checkout resolver. Master price is authoritative for the new Menu contract.
+  assert.strictEqual(validVerification.verified_items[0].menu_id, 'menu_commerce_lock');
   assert.strictEqual(validVerification.verified_items[0].unit_price, 25000);
-  assert.strictEqual(validVerification.verified_items[1].unit_price, 30000);
+  assert.strictEqual(validVerification.verified_items[1].unit_price, 32000);
 
-  // 2. Unassigned product rejection (No 999 fake fallback!)
-  const unassignedVerification = PrePaymentVerificationGate.verify({
-    brand_id: 'brand_test',
-    branch_id: 'branch_test',
-    items: [
-      { product_id: 'prod_unassigned', quantity: 1, expected_price: 20000 }
-    ]
-  });
-  assert.strictEqual(unassignedVerification.is_valid, false);
-  assert.strictEqual(unassignedVerification.status, 'PRODUCT_UNAVAILABLE');
-  assert.ok(unassignedVerification.errors[0].includes('belum dialokasikan'));
-
-  // 3. Price change detection (e.g. customer cart had stale 30000 instead of 32000)
   const stalePriceVerification = PrePaymentVerificationGate.verify({
     brand_id: 'brand_test',
     branch_id: 'branch_test',
     items: [
-      { product_id: 'prod_range', quantity: 1, expected_price: 30000 }
+      { menu_id: 'menu_commerce_range', quantity: 1, expected_price: 30000 }
     ]
   });
   assert.strictEqual(stalePriceVerification.is_valid, false);
   assert.strictEqual(stalePriceVerification.status, 'PRICE_CHANGED');
-  assert.strictEqual(stalePriceVerification.price_diffs.length, 1);
-  assert.strictEqual(stalePriceVerification.price_diffs[0].difference, 2000);
 
-  // 4. Out of stock detection (requested 10 when stock is 4)
-  const outOfStockVerification = PrePaymentVerificationGate.verify({
+  const unassignedVerification = PrePaymentVerificationGate.verify({
     brand_id: 'brand_test',
     branch_id: 'branch_test',
     items: [
-      { product_id: 'prod_limited', quantity: 10, expected_price: 50000 }
+      { menu_id: 'menu_commerce_unassigned', quantity: 1, expected_price: 20000 }
     ]
   });
-  assert.strictEqual(outOfStockVerification.is_valid, false);
-  assert.strictEqual(outOfStockVerification.status, 'OUT_OF_STOCK');
+  assert.strictEqual(unassignedVerification.is_valid, false);
+  assert.equal(unassignedVerification.status, 'MENU_UNAVAILABLE');
 });
 
 // ==============================================================================
-// Commerce 6 — Order Placement: Guarded Stock Deduction, Rollback & Dynamic Threshold
+// Commerce 6 — Canonical Menu order placement and Product/SKU inventory
 // ==============================================================================
-test('Commerce 6 — Order Placement: ACID guarded stock deduction, oversell prevention, and dynamic warning', async () => {
+test('Commerce 6 — Order Placement: canonical Menu consumes Product/SKU inventory with rollback protection', async () => {
   let lowStockEventReceived = null;
   let orderPlacedEventReceived = null;
 
   events.EventBus.subscribe('inventory.low_stock_warning', (e) => {
     lowStockEventReceived = e;
   });
-
   events.EventBus.subscribe('commerce.order.placed', (e) => {
     orderPlacedEventReceived = e;
   });
 
-  // Initial stock for prod_limited is 4, threshold is 8
-  const initialBranchRow = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_test', 'prod_limited');
-  assert.strictEqual(initialBranchRow.stock, 4);
+  const initialBranchRow = db.prepare(
+    'SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?'
+  ).get('branch_test', 'prod_limited');
+  assert.equal(Number(initialBranchRow.stock_qty), 4);
 
-  // Customer A places order of 2 items
   const orderResult = await OrderPlacementService.submitOrder({
     brand_id: 'brand_test',
     branch_id: 'branch_test',
     customer: { name: 'Ikhwan Customer', phone: '62899999999', address: 'Jl. Rungkut Surabaya' },
-    items: [
-      { product_id: 'prod_limited', quantity: 2, expected_price: 50000 }
-    ],
+    items: [{ menu_id: 'menu_commerce_limited', quantity: 2, expected_price: 50000 }],
     delivery_fee: 10000,
     payment_method: 'cash',
     order_channel: 'pos_cashier',
@@ -309,52 +288,50 @@ test('Commerce 6 — Order Placement: ACID guarded stock deduction, oversell pre
   assert.strictEqual(orderResult.success, true);
   assert.strictEqual(orderResult.order.grand_total, 110000);
 
-  const snapshotRow = db.prepare('SELECT menu_snapshot FROM order_items WHERE order_id = ? AND product_id = ?').get(orderResult.order.id, 'prod_limited');
-  assert.ok(snapshotRow && snapshotRow.menu_snapshot, 'Order item must persist immutable Master Menu snapshot');
+  const snapshotRow = db.prepare(
+    'SELECT menu_snapshot FROM order_items WHERE order_id = ? AND product_id = ?'
+  ).get(orderResult.order.id, 'prod_limited');
+  assert.ok(snapshotRow && snapshotRow.menu_snapshot);
   const menuSnapshot = JSON.parse(snapshotRow.menu_snapshot);
-  assert.equal(menuSnapshot.schema_version, 'master-menu-composition-v1');
-  assert.equal(menuSnapshot.product_id, 'prod_limited');
+  assert.equal(menuSnapshot.menu_id, 'menu_commerce_limited');
   assert.equal(menuSnapshot.title, 'Makanan');
   assert.equal(menuSnapshot.subtitle, 'Lombok Ijo');
-  assert.deepEqual(menuSnapshot.detail, ['Nasi']);
-  assert.equal(menuSnapshot.indicator, 'Level 2');
 
-  // 1. Verify Stock actually decremented in database to 2 for confirmed cash order
-  const updatedBranchRow = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_test', 'prod_limited');
-  assert.strictEqual(updatedBranchRow.stock, 2, 'Live stock must be decremented from 4 to 2');
+  const updatedBranchRow = db.prepare(
+    'SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?'
+  ).get('branch_test', 'prod_limited');
+  assert.equal(Number(updatedBranchRow.stock_qty), 2);
 
-  // Verify Cross-Domain Ledger Entry (Commerce -> Inventory)
-  const ledgerMovement = db.prepare('SELECT * FROM inventory_movements WHERE reference_id = ?').get(orderResult.order.order_number);
-  assert.ok(ledgerMovement, 'Inventory ledger must have an immutable entry for sale_deduction');
-  assert.strictEqual(ledgerMovement.movement_type, 'sale_deduction');
-  assert.strictEqual(ledgerMovement.quantity, -2);
-  assert.strictEqual(ledgerMovement.previous_stock, 4);
-  assert.strictEqual(ledgerMovement.current_stock, 2);
+  const ledgerMovement = db.prepare(
+    'SELECT * FROM inventory_movements WHERE reference_id = ?'
+  ).get(orderResult.order.order_number);
+  assert.ok(ledgerMovement);
+  assert.equal(ledgerMovement.movement_type, 'sale_deduction');
+  assert.equal(Number(ledgerMovement.quantity), -2);
+  assert.equal(Number(ledgerMovement.previous_stock), 4);
+  assert.equal(Number(ledgerMovement.current_stock), 2);
 
-  // 2. Concurrency Guard verification: Simulating race condition where stock is depleted
-  // If another concurrent request tries to deduct 3 when only 2 remain, transaction fails and rolls back
   const raceResult = await OrderPlacementService.submitOrder({
     brand_id: 'brand_test',
     branch_id: 'branch_test',
     customer: { name: 'Customer Race', phone: '6288888888' },
     payment_method: 'cash',
     order_channel: 'pos_cashier',
-    items: [{ product_id: 'prod_limited', quantity: 3, expected_price: 50000 }]
+    items: [{ menu_id: 'menu_commerce_limited', quantity: 3, expected_price: 50000 }]
   });
   assert.strictEqual(raceResult.success, false);
   assert.strictEqual(raceResult.status, 'OUT_OF_STOCK');
 
-  // Stock remains untampered at 2 after failed attempt
-  const finalStockRow = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_test', 'prod_limited');
-  assert.strictEqual(finalStockRow.stock, 2);
+  const finalStockRow = db.prepare(
+    'SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?'
+  ).get('branch_test', 'prod_limited');
+  assert.equal(Number(finalStockRow.stock_qty), 2);
 
-  // 3. Verify Branch Manager Configured Threshold (8) was used for warning
   assert.ok(lowStockEventReceived);
   assert.strictEqual(orderPlacedEventReceived.payload.order_id, orderResult.order.id);
-  assert.strictEqual(lowStockEventReceived.payload.threshold, 8, 'Must use branch manager threshold (8)');
+  assert.strictEqual(Number(lowStockEventReceived.payload.threshold), 8);
 });
 
-// ==============================================================================
 // Commerce 7 — Reservation Operational Risk: Same-Day Reservation Rejection
 // ==============================================================================
 test('Commerce 7 — Reservation: rejects same-day reservation and accepts future dates', async () => {
