@@ -45,22 +45,32 @@ These legacy fields MUST NOT be used for new Customer Menu composition work. The
 
 ### Branch Product name override
 
-`branch_products.name_override` is **legacy compatibility data only** under the locked Product → Menu contract. It is not a forward Customer Menu source of truth and must not be introduced into the canonical Menu resolver or new Merchant UI.
+`branch_products.name_override` is **not legacy anymore**. It is the narrow canonical Branch Customer Display Name Override governed by:
 
-Existing values may be inspected by migration/reconciliation tooling only. The forward Customer title comes from the resolved Menu contract.
+`docs/decisions/xentra-product-name-category-display-boundary-v1.md`
+
+and the corresponding Master Menu Composition branch-adoption contract.
+
+It is presentation-only, Branch-scoped, and does not change Master Product identity, taxonomy, composition, image ownership, or Menu pricing.
+
+Forward Merchant UI must use the canonical Menu display-name endpoint:
+
+```
+PATCH /admin/branches/:branchId/menu/:menuId/display-name
+```
 
 ### Legacy Branch override UI
 
-The existing Branch Catalog UI that exposes:
+The former Branch Catalog UI that exposed:
 
-- Edit Menu Cabang;
-- free-form branch name override;
 - free-form branch description override;
 - branch image override;
+- branch price override;
+- legacy scalar category override;
 
 is legacy compatibility UI.
 
-It must not be expanded or treated as the new Merchant Menu editor.
+It has been removed from the forward Branch Catalog surfaces in PR #7. The remaining Product Override modal/transport is retained only for historical/compatibility boundaries and must not regain an active caller.
 
 ### Legacy Branch override API
 
@@ -70,7 +80,7 @@ PATCH /admin/branches/:id/products/:productId/override
 
 is legacy compatibility infrastructure.
 
-No new field may be added to this endpoint for the new Menu Composition model.
+No new field may be added to this endpoint for the new Menu Composition model. Forward Branch Catalog UI must not call it.
 
 ### Legacy snapshot columns
 
