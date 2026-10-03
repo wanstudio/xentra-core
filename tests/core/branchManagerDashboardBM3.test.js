@@ -6,9 +6,9 @@
  * Requirements Matrix:
  * - BM3-01: Branch Manager can view menu assignments for their assigned branch.
  * - BM3-02: Cross-branch menu read is denied (403 FORBIDDEN_BRANCH_SCOPE).
- * - BM3-03: Branch Manager can toggle product availability (is_available 0/1) for their assigned branch.
- * - BM3-04: Cross-branch product availability toggle is denied (403 FORBIDDEN_BRANCH_SCOPE).
- * - BM3-05: Toggling branch_products.is_available DOES NOT alter master catalog products.is_active.
+ * - BM3-03: Branch Manager can toggle Menu availability (is_available 0/1) for their assigned branch.
+ * - BM3-04: Cross-branch Menu availability toggle is denied (403 FORBIDDEN_BRANCH_SCOPE).
+ * - BM3-05: Toggling Branch Menu availability DOES NOT alter Master Product is_active.
  * - BM3-06: Branch Manager CANNOT create, update, or delete master products (403).
  * - BM3-07: Branch Manager CANNOT create, update, or delete master categories (403).
  * - BM3-08: Branch Manager can view branch inventory stock and low stock thresholds.
@@ -825,7 +825,7 @@ describe('BM-3 — Branch Manager Dashboard: Menu + Stok + Promo', () => {
     assert.ok(js.includes('openBMAddCatalogModal'), 'Missing openBMAddCatalogModal');
     assert.ok(js.includes('promptAddBMBranchCategory'), 'Missing promptAddBMBranchCategory');
     assert.ok(js.includes('deleteBMBranchCategory'), 'Missing deleteBMBranchCategory');
-    assert.ok(js.includes('removeBMBranchProduct'), 'Missing removeBMBranchProduct');
+    assert.ok(js.includes('removeBMBranchMenu'), 'Missing removeBMBranchMenu');
     assert.ok(js.includes('renderBMMenuCategoriesBar'), 'Missing renderBMMenuCategoriesBar');
   });
 });
