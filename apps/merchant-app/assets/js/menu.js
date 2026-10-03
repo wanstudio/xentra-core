@@ -440,7 +440,7 @@
 
     var selectedCategoryId = _bmMenuState.selectedCategoryId;
     var filtered = (_bmMenuState.products || []).filter(function (p) {
-      var name = (p.product_name || p.name || '').toLowerCase();
+      var name = (p.menu_name || p.name || p.title || '').toLowerCase();
       if (_bmMenuState.searchQuery && name.indexOf(_bmMenuState.searchQuery) === -1) return false;
 
       var isAvail = (p.is_available === 1 || p.is_available === true);
@@ -479,7 +479,7 @@
 
       var toggleBtn = '<label class="x-toggle x-menu-availability-toggle' + (isAvail ? ' x-toggle-on' : '') + '" title="' + (isAvail ? 'Tersedia' : 'Tidak tersedia') + '">' +
         '<input type="checkbox" class="x-menu-availability-input" ' + (isAvail ? 'checked' : '') +
-        ' aria-label="Ubah ketersediaan ' + esc(p.product_name || p.name) + '">' +
+        ' aria-label="Ubah ketersediaan ' + esc(p.menu_name || p.name || p.title) + '">' +
         '<span class="x-toggle-slider"></span></label>';
 
       return '<tr class="x-merchant-data-row x-menu-row" data-menu-index="' + index + '">' +
@@ -523,7 +523,7 @@
               label: 'Ubah Nama Tampil',
               icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16"/><path d="M4 12h10"/><path d="M4 18h7"/></svg>',
               onClick: function () {
-                openBMProductDisplayNameEditor(product);
+                openBMMenuDisplayNameEditor(product);
               }
             },
             {
@@ -540,7 +540,7 @@
     });
   }
 
-  async function openBMProductDisplayNameEditor(product) {
+  async function openBMMenuDisplayNameEditor(product) {
     var branchId = getBMTargetBranchId();
     if (!branchId || !product || !product.menu_id) return;
 
@@ -575,7 +575,7 @@
     var field = wrap.querySelector('#bm-display-name-input');
 
     window.XentraPresentation.open({
-      id: 'merchant-product-display-name',
+      id: 'merchant-menu-display-name',
       type: 'bottom-sheet',
       title: 'Nama Tampil Customer',
       content: content,
@@ -583,8 +583,8 @@
     });
 
     function closeSheet() {
-      if (window.XentraPresentation && window.XentraPresentation.isOpen('merchant-product-display-name')) {
-        window.XentraPresentation.close('merchant-product-display-name');
+      if (window.XentraPresentation && window.XentraPresentation.isOpen('merchant-menu-display-name')) {
+        window.XentraPresentation.close('merchant-menu-display-name');
       }
     }
 
@@ -629,7 +629,7 @@
       var res = await window.XentraCatalogClient.setBranchMenuAvailability(branchId, menuId, nextVal);
       var data = await res.json();
       if (res.ok && data.success) {
-        showToast(nextVal === 1 ? 'Produk berhasil ditandai Tersedia.' : 'Produk ditandai Habis.');
+        showToast(nextVal === 1 ? 'Menu berhasil ditandai Tersedia.' : 'Menu ditandai Tidak Tersedia.');
         loadBMMenu();
       } else {
         showToast('Gagal mengubah ketersediaan: ' + (data.error || 'Terjadi kesalahan'));
@@ -645,7 +645,7 @@
     var branchId = getBMTargetBranchId();
     if (!branchId) return;
 
-    if (!confirm('Hapus "' + productName + '" dari katalog cabang ini? Menu tidak akan lagi tampil di halaman pemesanan pelanggan.')) return;
+    if (!confirm('Hapus "' + (menuName || 'menu ini') + '" dari katalog cabang ini? Menu tidak akan lagi tampil di halaman pemesanan pelanggan.')) return;
 
     try {
       var res = await window.XentraCatalogClient.removeBranchMenu(branchId, menuId);
@@ -654,7 +654,7 @@
         showToast('✅ Menu berhasil dihapus dari cabang.');
         loadBMMenu();
       } else {
-        showToast('❌ ' + (data.error || 'Gagal menghapus produk.'));
+        showToast('❌ ' + (data.error || 'Gagal menghapus menu.'));
       }
     } catch (err) {
       showToast('❌ Kesalahan jaringan.');
@@ -677,7 +677,7 @@
     if (container) {
       container.innerHTML = '<div style="padding:32px 16px; text-align:center; color:#64748b; font-size:13px;">' +
         '<div style="font-size:24px; margin-bottom:8px;">⏳</div>' +
-        '<div>Memuat katalog produk master...</div>' +
+        '<div>Memuat Master Menu...</div>' +
       '</div>';
     }
     modal.style.display = 'flex';
