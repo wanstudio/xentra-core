@@ -13,6 +13,7 @@ const { events } = require('../../../core');
 const PrePaymentVerificationGate = require('./PrePaymentVerificationGate');
 const LowStockThresholdModel = require('../models/LowStockThresholdModel');
 const { DiningTableService } = require('../../dining');
+const { ensureComposedMenuSchema } = require('../../catalog/schema/ComposedMenuSchema');
 
 const orderRepository = new OrderRepository();
 const inventoryRepository = new InventoryRepository();
@@ -273,6 +274,9 @@ class OrderPlacementService {
 
 
 
+    // Canonical order fields are additive; ensure legacy test/app entry points
+    // have the Menu snapshot columns before persistence.
+    ensureComposedMenuSchema();
     const verification = PrePaymentVerificationGate.verify({ branch_id, brand_id, items, customer, pwa_runtime });
     if (!verification.is_valid) {
       return { success: false, status: verification.status, errors: verification.errors, price_diffs: verification.price_diffs };
@@ -608,6 +612,19 @@ class OrderPlacementService {
         });
       }
 
+      const canonicalItems = items.filter(item => item && item.menu_id);
+      if (canonicalItems.length > 0) {
+        const composedResult = deductComposedStock({
+          order,
+          items: canonicalItems,
+          referenceId: order.order_number,
+          actorId: order.customer_phone || 'online_payment',
+          notes: 'Pemotongan stok otomatis komponen Menu setelah pembayaran [' + order.order_number + ']',
+          dbTransactionProvided: true
+        });
+        deductedItems.push(...composedResult.deducted_items);
+      }
+
       if (ownsTransaction) inventoryRepository.commitTransaction();
       return { success: true, deducted_items: deductedItems };
     } catch (err) {
@@ -636,6 +653,7 @@ class OrderPlacementService {
 
     try {
       for (const item of items) {
+        if (item && item.menu_id) continue;
         const isVirtualPromo = (item.unit_price === 0 || Number(item.unit_price) === 0) &&
           (item.note?.includes('Promo') || item.note?.includes('Bonus') || String(item.product_id).startsWith('prm_') || String(item.product_id).startsWith('reward_'));
         const bpBefore = inventoryRepository.findBranchProduct(order.branch_id, item.product_id);
