@@ -131,6 +131,7 @@ function planIdentity(inspected) {
   const issues = [];
   const warnings = [];
   const { product, category, legacy } = inspected;
+  const brandId = product && product.brand_id ? String(product.brand_id) : '';
 
   if (!category) {
     issues.push('MASTER_CATEGORY_REQUIRED');
