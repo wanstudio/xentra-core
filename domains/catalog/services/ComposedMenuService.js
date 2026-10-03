@@ -606,6 +606,52 @@ class ComposedMenuService {
     if (!menu) throw new Error('MENU_NOT_FOUND');
 
     const nextStatus = normalizeStatus(status);
+
+    // Status changes are a public mutation path, so ACTIVE publication must
+    // enforce the same canonical composition invariants as create/update.
+    // Without this guard, a Draft Package containing an inactive Product could
+    // be promoted through PATCH /admin/menus/:id/status and bypass the service
+    // checks used by createPackageMenu/updatePackageMenu.
+    if (nextStatus === 'ACTIVE') {
+      const items = repository.listMenuItems({ brandId, menuIds: [menuId] });
+      if (!Array.isArray(items) || items.length === 0) {
+        throw new Error('MENU_COMPOSITION_INVALID');
+      }
+
+      if (menu.menu_type === 'SINGLE') {
+        if (items.length !== 1 || Number(items[0].quantity) !== 1) {
+          throw new Error('MENU_COMPOSITION_INVALID');
+        }
+      } else if (menu.menu_type === 'PACKAGE') {
+        const seenProducts = new Set();
+        let totalUnits = 0;
+        for (const item of items) {
+          const quantity = Number(item.quantity);
+          if (!Number.isSafeInteger(quantity) || quantity <= 0) {
+            throw new Error('MENU_PACKAGE_COMPONENT_INVALID');
+          }
+          const productId = String(item.product_id);
+          if (seenProducts.has(productId)) {
+            throw new Error('MENU_PACKAGE_DUPLICATE_PRODUCT');
+          }
+          seenProducts.add(productId);
+          totalUnits += quantity;
+          if (item.product_is_active === 0) {
+            throw new Error('MASTER_PRODUCT_INACTIVE');
+          }
+        }
+        if (totalUnits < 2) {
+          throw new Error('MENU_PACKAGE_MIN_TWO_UNITS');
+        }
+      } else {
+        throw new Error('MENU_TYPE_MISMATCH');
+      }
+
+      if (menu.menu_type === 'SINGLE' && items[0].product_is_active === 0) {
+        throw new Error('MASTER_PRODUCT_INACTIVE');
+      }
+    }
+
     repository.db.execute(
       "UPDATE menus SET status = ?, updated_at = datetime('now') WHERE id = ? AND brand_id = ?",
       [nextStatus, menuId, brandId]
