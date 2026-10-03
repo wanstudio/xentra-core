@@ -39,8 +39,8 @@ function buildMenuSnapshot({ brandId, productId }) {
       }
     };
   } catch (_) {
-    // Compatibility window: legacy products without structured composition may
-    // still be ordered until migration reconciliation is complete.
+    // Legacy compatibility only: canonical Menu orders build their snapshot from
+    // ComposedMenuCheckoutService and do not use this Product-based snapshot path.
     return null;
   }
 }
@@ -236,10 +236,10 @@ class PrePaymentVerificationGate {
       }
 
       const expectedPrice = Number(item.expected_price ?? item.price);
-      // FORWARD MENU AUTHORITY:
-      // Resolve the exact Master Product through the selected Branch adoption.
-      // This deliberately bypasses legacy Branch name/description/image/price
-      // overrides for Checkout. The Branch controls availability and stock only.
+      // LEGACY PRODUCT compatibility path:
+      // Canonical checkout must provide menu_id and use ComposedMenuCheckoutService.
+      // This path remains only while existing legacy clients/data are being migrated;
+      // it deliberately bypasses legacy Branch presentation overrides for pricing/content.
       const branchMenu = MasterMenuResolver.resolveBranchMenu({
         brandId: brand_id,
         branchId: branch_id,
