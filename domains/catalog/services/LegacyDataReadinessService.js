@@ -139,6 +139,13 @@ class LegacyDataReadinessService {
       ORDER BY p.id ASC
     `, canonicalIntegrityParams);
 
+    const productNeedsReviewCount = productStatus
+      .filter(row => ['needs_review', 'failed'].includes(String(row.status)))
+      .reduce((sum, row) => sum + Number(row.count || 0), 0);
+    const productLegacyCount = productStatus
+      .filter(row => String(row.status) === 'legacy')
+      .reduce((sum, row) => sum + Number(row.count || 0), 0);
+
     const promotionUnresolved = legacyPromotions.filter(
       row => Number(row.canonical_menu_candidates) !== 1
     ).length;
@@ -151,9 +158,9 @@ class LegacyDataReadinessService {
     let status = STATUS.CANONICAL_READY;
     if (blockers > 0) {
       status = STATUS.BLOCKED;
-    } else if (promotionUnresolved > 0 || branchUnresolved > 0) {
+    } else if (productNeedsReviewCount > 0 || promotionUnresolved > 0 || branchUnresolved > 0) {
       status = STATUS.NEEDS_REVIEW;
-    } else if (legacyPromotionCount > 0 || legacyBranchProductCount > 0 || legacyBranchCategoryCount > 0) {
+    } else if (productLegacyCount > 0 || legacyPromotionCount > 0 || legacyBranchProductCount > 0 || legacyBranchCategoryCount > 0) {
       status = STATUS.LEGACY_REQUIRES_MIGRATION;
     }
 
@@ -165,6 +172,8 @@ class LegacyDataReadinessService {
         with_canonical_menu: Number(productCoverage?.products_with_canonical_menu || 0),
         without_canonical_menu: Number(productCoverage?.products_without_canonical_menu || 0),
         canonical_menu_count: Number(productCoverage?.canonical_menu_count || 0),
+        legacy_status_count: productLegacyCount,
+        needs_review_status_count: productNeedsReviewCount,
         migration_status: productStatus.map(row => ({
           status: row.status,
           schema_version: Number(row.schema_version),
