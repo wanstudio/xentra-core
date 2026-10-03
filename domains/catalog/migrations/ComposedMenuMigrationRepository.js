@@ -63,7 +63,8 @@ class ComposedMenuMigrationRepository {
       'ON CONFLICT(product_id) DO UPDATE SET ' +
       'brand_id = excluded.brand_id, target_model = excluded.target_model, status = excluded.status, ' +
       'attempt_count = composed_menu_migrations.attempt_count + 1, ' +
-      'canonical_fingerprint = excluded.canonical_fingerprint, source_snapshot = excluded.source_snapshot, ' +
+      'canonical_fingerprint = COALESCE(excluded.canonical_fingerprint, composed_menu_migrations.canonical_fingerprint), ' +
+      'source_snapshot = COALESCE(excluded.source_snapshot, composed_menu_migrations.source_snapshot), ' +
       'last_error = excluded.last_error, notes = excluded.notes, ' +
       'migrated_at = CASE WHEN excluded.status IN (\'migrated\', \'verified\') ' +
       'THEN COALESCE(composed_menu_migrations.migrated_at, datetime(\'now\')) ELSE composed_menu_migrations.migrated_at END, ' +
