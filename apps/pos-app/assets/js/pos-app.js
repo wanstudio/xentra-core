@@ -2513,7 +2513,7 @@
         phone:'',
         table_number:table?table.table_number:null
       },
-      items:items.map(function(i){return {product_id:i.product_id,name:i.name,quantity:i.quantity,unit_price:i.unit_price,expected_price:i.unit_price,options:i.options||[],note:i.note||''};}),
+      items:items.map(function(i){return {product_id:i.menu_id ? (i.product_id || null) : i.product_id,name:i.name,quantity:i.quantity,unit_price:i.unit_price,expected_price:i.unit_price,menu_id:i.menu_id||null,menu_type:i.menu_type||null,component_snapshot:Array.isArray(i.component_snapshot)?i.component_snapshot:null,menu_snapshot:i.menu_snapshot||null,options:i.options||[],note:i.note||''};}),
       client_transaction_id:'pos_'+Date.now()+'_'+Math.random().toString(36).slice(2,8)
     };
 
@@ -2582,9 +2582,25 @@
 
     var existing=composer().snapshot();
     var canonicalItems=(data.items||[]).map(function(it){
+      var componentSnapshot=[];
+      try {
+        componentSnapshot = Array.isArray(it.component_snapshot)
+          ? it.component_snapshot
+          : JSON.parse(it.component_snapshot || '[]');
+      } catch (_) { componentSnapshot=[]; }
+      var menuSnapshot=null;
+      try {
+        menuSnapshot = it.menu_snapshot && typeof it.menu_snapshot === 'object'
+          ? it.menu_snapshot
+          : JSON.parse(it.menu_snapshot || 'null');
+      } catch (_) { menuSnapshot=null; }
       return {
-        product_id:it.product_id,
-        name:it.product_name||it.name||'Produk',
+        product_id:it.menu_id ? (it.product_id || null) : it.product_id,
+        menu_id:it.menu_id||null,
+        menu_type:it.menu_type||null,
+        component_snapshot:componentSnapshot,
+        menu_snapshot:menuSnapshot,
+        name:it.product_name||it.name||'Menu',
         unit_price:Number(it.unit_price||0),
         quantity:Number(it.quantity||0),
         note:it.note||'',
