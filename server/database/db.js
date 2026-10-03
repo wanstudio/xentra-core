@@ -1907,6 +1907,98 @@ function initSchema(targetDb) {
   try { targetDb.exec("ALTER TABLE promotion_rewards ADD COLUMN target_menu_id TEXT;"); } catch (_) {}
   try { targetDb.exec("CREATE INDEX IF NOT EXISTS idx_promotion_rewards_target_menu ON promotion_rewards(target_menu_id);"); } catch (_) {}
 
+  try {
+    targetDb.exec(`
+      CREATE TRIGGER IF NOT EXISTS trg_promotion_rewards_target_exclusivity_insert
+      BEFORE INSERT ON promotion_rewards
+      FOR EACH ROW
+      WHEN NEW.target_menu_id IS NOT NULL AND trim(NEW.target_menu_id) <> ''
+       AND NEW.target_product_id IS NOT NULL AND trim(NEW.target_product_id) <> ''
+      BEGIN
+        SELECT RAISE(ABORT, 'PROMOTION_REWARD_TARGET_AMBIGUOUS');
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS trg_promotion_rewards_target_exclusivity_update
+      BEFORE UPDATE OF target_menu_id, target_product_id ON promotion_rewards
+      FOR EACH ROW
+      WHEN NEW.target_menu_id IS NOT NULL AND trim(NEW.target_menu_id) <> ''
+       AND NEW.target_product_id IS NOT NULL AND trim(NEW.target_product_id) <> ''
+      BEGIN
+        SELECT RAISE(ABORT, 'PROMOTION_REWARD_TARGET_AMBIGUOUS');
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS trg_promotion_rewards_menu_brand_insert
+      BEFORE INSERT ON promotion_rewards
+      FOR EACH ROW
+      WHEN NEW.target_menu_id IS NOT NULL
+       AND (SELECT brand_id FROM menus WHERE id = NEW.target_menu_id) IS NULL
+          OR NEW.target_menu_id IS NOT NULL
+       AND (SELECT brand_id FROM menus WHERE id = NEW.target_menu_id) <>
+           (SELECT brand_id FROM promotions WHERE id = NEW.promotion_id)
+      BEGIN
+        SELECT RAISE(ABORT, 'PROMOTION_REWARD_MENU_BRAND_MISMATCH');
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS trg_promotion_rewards_menu_brand_update
+      BEFORE UPDATE OF promotion_id, target_menu_id ON promotion_rewards
+      FOR EACH ROW
+      WHEN NEW.target_menu_id IS NOT NULL
+       AND (SELECT brand_id FROM menus WHERE id = NEW.target_menu_id) IS NULL
+          OR NEW.target_menu_id IS NOT NULL
+       AND (SELECT brand_id FROM menus WHERE id = NEW.target_menu_id) <>
+           (SELECT brand_id FROM promotions WHERE id = NEW.promotion_id)
+      BEGIN
+        SELECT RAISE(ABORT, 'PROMOTION_REWARD_MENU_BRAND_MISMATCH');
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS trg_promotion_rewards_product_brand_insert
+      BEFORE INSERT ON promotion_rewards
+      FOR EACH ROW
+      WHEN NEW.target_product_id IS NOT NULL
+       AND (SELECT brand_id FROM products WHERE id = NEW.target_product_id) IS NULL
+          OR NEW.target_product_id IS NOT NULL
+       AND (SELECT brand_id FROM products WHERE id = NEW.target_product_id) <>
+           (SELECT brand_id FROM promotions WHERE id = NEW.promotion_id)
+      BEGIN
+        SELECT RAISE(ABORT, 'PROMOTION_REWARD_PRODUCT_BRAND_MISMATCH');
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS trg_promotion_rewards_product_brand_update
+      BEFORE UPDATE OF promotion_id, target_product_id ON promotion_rewards
+      FOR EACH ROW
+      WHEN NEW.target_product_id IS NOT NULL
+       AND (SELECT brand_id FROM products WHERE id = NEW.target_product_id) IS NULL
+          OR NEW.target_product_id IS NOT NULL
+       AND (SELECT brand_id FROM products WHERE id = NEW.target_product_id) <>
+           (SELECT brand_id FROM promotions WHERE id = NEW.promotion_id)
+      BEGIN
+        SELECT RAISE(ABORT, 'PROMOTION_REWARD_PRODUCT_BRAND_MISMATCH');
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS trg_promotion_rewards_freebie_target_insert
+      BEFORE INSERT ON promotion_rewards
+      FOR EACH ROW
+      WHEN lower(trim(NEW.reward_type)) IN ('freebie_product', 'free_product')
+       AND (NEW.target_menu_id IS NULL OR trim(NEW.target_menu_id) = '')
+       AND (NEW.target_product_id IS NULL OR trim(NEW.target_product_id) = '')
+      BEGIN
+        SELECT RAISE(ABORT, 'PROMOTION_REWARD_TARGET_REQUIRED');
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS trg_promotion_rewards_freebie_target_update
+      BEFORE UPDATE OF reward_type, target_menu_id, target_product_id ON promotion_rewards
+      FOR EACH ROW
+      WHEN lower(trim(NEW.reward_type)) IN ('freebie_product', 'free_product')
+       AND (NEW.target_menu_id IS NULL OR trim(NEW.target_menu_id) = '')
+       AND (NEW.target_product_id IS NULL OR trim(NEW.target_product_id) = '')
+      BEGIN
+        SELECT RAISE(ABORT, 'PROMOTION_REWARD_TARGET_REQUIRED');
+      END;
+    `);
+  } catch (e) {
+    console.warn('[Database] Promotion reward guard trigger initialization warning:', e.message);
+  }
+
   try { targetDb.exec('ALTER TABLE media_assets ADD COLUMN crop_spec TEXT;'); } catch (e) {}
   try { targetDb.exec("ALTER TABLE pos_order_checks ADD COLUMN allocated_amount REAL NOT NULL DEFAULT 0;"); } catch (e) {}
   try {
