@@ -206,25 +206,52 @@ The underlying POS composer still uses the canonical backend order type value. T
 `Dine-In` → `dine_in`  
 `Takeaway` → `pickup`
 
-### Hold Bill UX
+### Hold Bill UX — Exact Placement
 
 Hold Bill is a **transaction action/state**, not a payment method and not a navigation mode.
 
-For the currently active Draft Sale:
-- **Tahan** saves the current Sale as a Hold Bill and returns the cashier to a clean/new Sale context.
-- Hold is available for both **Dine-In** and **Takeaway** while the Sale is still a draft.
-- For Dine-In, the selected table remains part of the held Sale and the table hold must follow the existing Dining/Core authority.
-- A held Sale can later be **Buka/Resume** from the POS Hold Bill list.
+#### 1. Current Draft Sale — action "Tahan"
 
-The **Rincian Pesanan** mobile modal is the review/checkout surface for the current Sale. It must provide the action that applies to the current Sale:
-**Tahan | Bayar**.
+**Mobile:**
+The active Draft Sale is opened through the **Rincian Pesanan** modal. The modal footer must place:
 
-It must **not** use "Ditahan (N)" in that modal as a substitute for the current Sale's Hold action. "Ditahan (N)" is an entry to the separate Hold Bill list and belongs in the transaction/history context or another explicit Hold-list entry point.
+**[ Tahan ]    [ Bayar Rp… ]**
 
-Semantic separation:
-- **Tahan** = mutate/save the current draft Sale into Hold Bill state.
-- **Ditahan** = open/list already-held Sales.
+- **Tahan** is the left/secondary action.
+- **Bayar** is the right/primary action.
+- Tahan saves the current Draft Sale as a Hold Bill and returns the cashier to a clean/new Sale context.
+- Tahan is available for both **Dine-In** and **Takeaway** while the Sale is still a draft.
+- For Dine-In, the selected table remains part of the held Sale and the table hold follows Dining/Core authority.
+- The modal must **not** contain a **"Ditahan (N)"** button.
+
+**Desktop/tablet:**
+The active Draft Sale may expose the same **Tahan** action in the current **Pesanan/cart action area**. It performs the same Hold mutation. It must not create a second Hold workflow.
+
+#### 2. Already-Held Sales — location "Ditahan"
+
+The held-sales list is a **separate list view**, not part of the current-sale review/checkout modal.
+
+Exact navigation:
+
+**Bottom Nav → Transaksi → local tab "Pesanan Ditahan (N)"**
+
+That tab is the authoritative cashier entry point to:
+- see already-held Sales;
+- choose **Buka/Resume**;
+- choose **Batal** according to the existing Hold Bill contract.
+
+The **"Ditahan (N)"** entry therefore belongs to the **Transaksi workspace**, not inside **Rincian Pesanan**.
+
+The POS cart/header must not duplicate this as a second competing Hold-list workflow. If an implementation currently exposes a **"Ditahan (N)"** shortcut beside the current Draft Sale actions, that shortcut is legacy UI and is to be removed/reconciled to the Transaksi → Pesanan Ditahan entry point.
+
+#### 3. Semantic separation
+
+- **Tahan** = save/mutate the **current Draft Sale** into Hold Bill state.
+- **Pesanan Ditahan (N)** = open/list **Sales that were already saved as Hold Bill**.
+- **Buka/Resume** = restore one held Sale into the Sale workspace.
 - **Bayar** = begin payment for the current Sale.
+
+A Hold Bill is not a payment status and not a separate transaction type.
 
 ### Single Transaction Flow
 
