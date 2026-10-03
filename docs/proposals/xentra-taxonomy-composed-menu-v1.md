@@ -1200,3 +1200,5 @@ This promotion reward target contract is now part of the locked Product → Menu
 No further business-question loop is required for `target_menu_id` vs `target_product_id`.
 
 Implementation status is still subject to full runtime tests, production-data migration review, and final consumer quarantine before PR #7 can be merged.
+
+> Audit note (2026-10-03): Promotion Reward Target Contract implementation completed on the proposal branch. Runtime suite remains the final verification gate; production reward data migration is not applied automatically.
