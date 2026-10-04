@@ -19,6 +19,103 @@ function normalizeName(value) {
   return String(value == null ? '' : value).trim();
 }
 
+function tableDefinition(db, table) {
+  let rows = [];
+  if (db && typeof db.prepare === 'function') {
+    rows = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").all(table);
+  } else if (db && typeof db.queryMany === 'function') {
+    rows = db.queryMany("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?", [table]);
+  }
+  const list = Array.isArray(rows) ? rows : (rows && Array.isArray(rows.rows) ? rows.rows : []);
+  return list.length ? String(list[0].sql || '') : '';
+}
+
+function tableColumns(db, table) {
+  let rows = [];
+  if (db && typeof db.prepare === 'function') {
+    rows = db.prepare(`PRAGMA table_info(${table})`).all();
+  } else if (db && typeof db.queryMany === 'function') {
+    rows = db.queryMany(`PRAGMA table_info(${table})`);
+  }
+  const list = Array.isArray(rows) ? rows : (rows && Array.isArray(rows.rows) ? rows.rows : []);
+  return list.map(row => String(row.name));
+}
+
+/**
+ * Contract v1 migration — docs/decisions/catalog-menu-domain-contract-v1.md
+ *
+ * Menu tidak lagi punya subtype forward: `menu_type NOT NULL CHECK (SINGLE|PACKAGE)`
+ * dan CHECK identitas (wajib package_name untuk PACKAGE, wajib rasa untuk SINGLE)
+ * memblokir Menu forward (rasa opsional, 1..N Item, tanpa package_name).
+ *
+ * SQLite tidak bisa melonggarkan NOT NULL/CHECK lewat ALTER, jadi tabel dibangun ulang
+ * sekali. Idempotent: hanya berjalan saat bentuk legacy terdeteksi, kolom yang disalin
+ * mengikuti kolom yang benar-benar ada, dan berjalan SEBELUM batch schema supaya
+ * index/trigger dibuat pada tabel hasil rebuild.
+ */
+function migrateLegacyMenuShape(db) {
+  const sql = tableDefinition(db, 'menus');
+  if (!sql) return;
+  const legacyShape = /menu_type\s+TEXT\s+NOT\s+NULL/i.test(sql) || /menu_type\s+IN\s*\(/i.test(sql);
+  if (!legacyShape) return;
+
+  const copyable = [
+    'id', 'brand_id', 'sub_category_id', 'rasa_id', 'menu_type', 'package_name', 'level_id',
+    'selling_price', 'spice_enabled', 'spice_level', 'status', 'created_at', 'updated_at',
+    'media_id', 'image_url', 'image'
+  ];
+  const existing = tableColumns(db, 'menus');
+  const columns = copyable.filter(column => existing.includes(column));
+  if (!columns.includes('id')) return;
+
+  // Prosedur rebuild tabel SQLite: FK off + legacy_alter_table on, supaya trigger/view
+  // lain yang menyebut `menus` tidak membuat DROP/RENAME gagal saat schema berubah.
+  db.exec('PRAGMA foreign_keys = OFF');
+  db.exec('PRAGMA legacy_alter_table = ON');
+  try {
+    db.exec('BEGIN');
+    db.exec(`
+      CREATE TABLE menus__contract_v1 (
+        id TEXT PRIMARY KEY,
+        brand_id TEXT NOT NULL,
+        sub_category_id TEXT,
+        rasa_id TEXT,
+        menu_type TEXT,
+        package_name TEXT,
+        level_id TEXT,
+        selling_price REAL NOT NULL CHECK (selling_price >= 0),
+        spice_enabled INTEGER NOT NULL DEFAULT 0,
+        spice_level INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'DRAFT',
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now')),
+        media_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL,
+        image_url TEXT,
+        image TEXT,
+        FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
+        FOREIGN KEY (sub_category_id) REFERENCES sub_categories(id) ON DELETE RESTRICT,
+        FOREIGN KEY (rasa_id) REFERENCES menu_flavors(id) ON DELETE RESTRICT
+      )
+    `);
+    db.exec(
+      'INSERT INTO menus__contract_v1 (' + columns.join(', ') + ') ' +
+      'SELECT ' + columns.join(', ') + ' FROM menus'
+    );
+    db.exec('DROP TABLE menus');
+    db.exec('ALTER TABLE menus__contract_v1 RENAME TO menus');
+    db.exec('COMMIT');
+  } catch (err) {
+    try { db.exec('ROLLBACK'); } catch (_) {}
+    throw err;
+  } finally {
+    try { db.exec('PRAGMA legacy_alter_table = OFF'); } catch (_) {}
+    try { db.exec('PRAGMA foreign_keys = ON'); } catch (_) {}
+  }
+
+  // Index legacy hanya berlaku untuk menu_type = 'SINGLE'; identitas forward berbeda.
+  try { db.exec('DROP INDEX IF EXISTS idx_menus_single_identity;'); } catch (_) {}
+}
+
 function ensureComposedMenuSchema(db) {
   if (!db) db = require('../../../core/data/DataAccess');
   if (ensuredDbs.has(db)) return;
@@ -34,6 +131,10 @@ function ensureComposedMenuSchema(db) {
   if (!hasColumn(db, 'products', 'sku')) {
     db.exec('ALTER TABLE products ADD COLUMN sku TEXT;');
   }
+
+  // Contract v1: longgarkan bentuk legacy menus SEBELUM batch schema, supaya index/trigger
+  // di batch itu terpasang pada tabel hasil rebuild.
+  migrateLegacyMenuShape(db);
 
   db.exec(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_products_brand_sku_normalized
@@ -94,37 +195,28 @@ function ensureComposedMenuSchema(db) {
       SELECT RAISE(ABORT, 'SUB_CATEGORY_CROSS_BRAND');
     END;
 
+    -- Contract v1 (docs/decisions/catalog-menu-domain-contract-v1.md):
+    -- Menu tanpa subtype forward. menu_type/package_name/level_id tetap ada sebagai
+    -- storage legacy untuk kompatibilitas, tetapi nullable dan bukan authority bisnis.
+    -- Rasa opsional, spice adalah field forward.
     CREATE TABLE IF NOT EXISTS menus (
       id TEXT PRIMARY KEY,
       brand_id TEXT NOT NULL,
-      menu_type TEXT NOT NULL CHECK (menu_type IN ('SINGLE', 'PACKAGE')),
       sub_category_id TEXT,
       rasa_id TEXT,
-      level_id TEXT,
+      menu_type TEXT,
       package_name TEXT,
+      level_id TEXT,
       selling_price REAL NOT NULL CHECK (selling_price >= 0),
+      spice_enabled INTEGER NOT NULL DEFAULT 0,
+      spice_level INTEGER NOT NULL DEFAULT 0,
       status TEXT NOT NULL DEFAULT 'DRAFT',
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
       FOREIGN KEY (sub_category_id) REFERENCES sub_categories(id) ON DELETE RESTRICT,
-      FOREIGN KEY (rasa_id) REFERENCES menu_flavors(id) ON DELETE RESTRICT,
-      FOREIGN KEY (level_id) REFERENCES menu_levels(id) ON DELETE RESTRICT,
-      CHECK (
-        (menu_type = 'SINGLE'
-          AND sub_category_id IS NOT NULL
-          AND rasa_id IS NOT NULL
-          AND package_name IS NULL)
-        OR
-        (menu_type = 'PACKAGE'
-          AND package_name IS NOT NULL
-          AND trim(package_name) <> '')
-      )
+      FOREIGN KEY (rasa_id) REFERENCES menu_flavors(id) ON DELETE RESTRICT
     );
-
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_menus_single_identity
-      ON menus(brand_id, sub_category_id, rasa_id)
-      WHERE menu_type = 'SINGLE';
 
     CREATE INDEX IF NOT EXISTS idx_menus_brand_type_status
       ON menus(brand_id, menu_type, status);
@@ -379,6 +471,18 @@ function ensureComposedMenuSchema(db) {
   try { db.exec('ALTER TABLE menus ADD COLUMN image_url TEXT;'); } catch (_) {}
   try { db.exec('ALTER TABLE menus ADD COLUMN image TEXT;'); } catch (_) {}
   try { db.exec('CREATE INDEX IF NOT EXISTS idx_menus_media_id ON menus(media_id) WHERE media_id IS NOT NULL;'); } catch (_) {}
+  try { db.exec('ALTER TABLE menus ADD COLUMN spice_enabled INTEGER NOT NULL DEFAULT 0;'); } catch (_) {}
+  try { db.exec('ALTER TABLE menus ADD COLUMN spice_level INTEGER NOT NULL DEFAULT 0;'); } catch (_) {}
+
+  // Contract v1 identity — satu Menu per (Brand, Sub Category, Rasa) dengan proteksi
+  // duplikat NULL-safe (rasa opsional). Data legacy bisa saja sudah melanggar aturan
+  // forward ini: jangan menebak, tandai untuk review dan jangan gagalkan boot.
+  try {
+    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_menus_identity_v1 ON menus(brand_id, sub_category_id, COALESCE(rasa_id, ''));");
+    try { db.exec('DROP INDEX IF EXISTS idx_menus_single_identity;'); } catch (_) {}
+  } catch (err) {
+    console.error('[ComposedMenuSchema] idx_menus_identity_v1 tertunda — data Menu legacy perlu review:', err.message);
+  }
 
   // Migration evidence for the explicit one-time backfill of legacy Menu presentation media.
   // Runtime fallback is not a migration mechanism, so every copy is recorded here.
