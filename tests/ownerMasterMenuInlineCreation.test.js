@@ -49,4 +49,10 @@ test('Inline creation has contextual mobile UX and dependency guardrails', () =>
   assert.ok(INLINE.includes('refreshSubCategoryDependencyState'));
   assert.ok(INLINE.includes('action.disabled = disabled'));
   assert.ok(INLINE.includes('Pilih Kategori terlebih dahulu'));
-  assert.ok(INLINE.includes('Product adalah identitas dasar'));\n});
+  assert.ok(INLINE.includes('Product adalah identitas dasar'));
+  assert.ok(INLINE.includes('Simpan & Tambahkan ke Paket'));
+  assert.ok(INLINE.includes('packageContext'));
+  assert.ok(INLINE.includes('addPackageProduct'));
+  assert.ok(INLINE.includes('upsertDependency'));
+  assert.ok(!INLINE.includes('Nama Product Internal'));
+});
