@@ -358,7 +358,6 @@
           ? product.product_id
           : (product.menu_id ? null : product.id),
         menu_id: product.menu_id || null,
-        menu_type: product.menu_type || null,
         component_snapshot: Array.isArray(product.component_snapshot)
           ? product.component_snapshot
           : (Array.isArray(product.components) ? product.components : null),
