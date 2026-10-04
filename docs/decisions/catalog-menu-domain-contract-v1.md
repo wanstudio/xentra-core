@@ -2,232 +2,213 @@
 
 Status: LOCKED / AUTHORITATIVE
 Effective: 2026-10-05
-Applies to: Owner Catalog UI, Menu authoring, Item/stock identity, Customer PWA Menu resolution, Branch Menu adoption, related API/service/schema/tests
-Production rule: This contract defines forward behavior. Legacy fields/routes may remain only as compatibility or migration paths and must not become a second source of truth.
+Scope: Owner Catalog UI, Master Menu, Master Category, Item/stock identity, Customer PWA resolution, Branch Menu adoption, API/service/schema/tests
 
 ## 1. Canonical Catalog Information Architecture
-
-Catalog has exactly two top-level areas:
 
     Catalog
     ├── Master Menu
     └── Master Category
         ├── Category
-        ├── Judul
         ├── Rasa
         └── Item
 
-Rules:
-- Master Menu is a top-level Catalog area.
-- Master Category is a top-level Catalog area.
-- Category, Judul, Rasa, and Item are four independent Master Category vocabularies.
-- They are not a parent-child hierarchy with one another.
-- Do not introduce additional Catalog top-level nodes named Produk Master, Menu Cabang, Kelengkapan, Level, or synonyms for these concepts.
-- Branch selling configuration is a separate Branch/assortment surface, not a third Master Catalog area.
-- User-facing terminology must use Item, not Product, when referring to the atomic internal composition/stock unit.
+Catalog has exactly two top-level areas: Master Menu and Master Category.
+Master Category contains exactly Category, Rasa, and Item.
+Sub Category, when used by the food taxonomy, belongs inside the Category domain and is not a separate top-level Catalog area.
+Category, Rasa, and Item are independent master areas; they do not form a parent-child hierarchy with one another.
+Do not introduce Produk Master, Menu Cabang, Kelengkapan, Level, or any additional top-level Catalog node as a synonym for these areas.
+Owner forward UI must use Item, not Product, when referring to the atomic internal composition/stock unit.
 
-Canonical UI labels:
-- Master Menu
-- Master Category
-- Category
-- Judul
-- Rasa
-- Item
-
-## 2. Entity Ownership
+## 2. Master Category Ownership
 
 ### Category
-Category is Master Category vocabulary used to classify and group Menus.
-Category does not own Judul, Rasa, Item, price, stock, or Menu composition.
-Category is brand-scoped.
-
-### Judul
-Judul is a reusable Master Category vocabulary for the customer-facing Menu title.
-Judul is independent from Category.
-A Menu selects a Judul; it does not replace Master Judul with a free-text customer title.
-Judul is brand-scoped.
+Category classifies and groups Menus.
+Sub Category, when used, belongs to exactly one Category and is managed inside the Category domain.
+Category/Sub Category is customer-facing taxonomy context.
+Category and Sub Category do not own Rasa, Item, price, stock, or Menu composition.
 
 ### Rasa
-Rasa is a reusable optional Master Category vocabulary.
-Rasa is independent from Category and Judul.
-Rasa may be reused by many Menus.
+Rasa is reusable and optional.
+Rasa is independent from Category/Sub Category and may be reused by many Menus.
 Rasa is brand-scoped.
 
 ### Item
-Item is the atomic internal composition/stock identity used by a Menu.
-Item owns Item identity, Item name, optional SKU/stock-managed state, internal description/media where supported by the Item domain, and lifecycle.
-Item does not own customer Menu title, Menu Category, Menu Rasa, Menu price, or Branch Menu adoption.
-The Owner UI must use Item terminology. Legacy Product columns/classes may remain internally during migration, but that does not change forward business vocabulary.
+Item is the atomic internal composition and inventory identity used by Menu.
+Item owns Item identity, Item name, optional SKU/stock-managed state, internal description/media where supported, and lifecycle.
+Item does not own customer Menu title, Menu taxonomy, Menu Rasa, Menu price, or Branch Menu adoption.
+Legacy physical Product names/columns may remain during migration, but forward business terminology is Item.
 
 ## 3. Menu Ownership
 
 Menu is the commercial/customer-facing entity.
-A Menu owns immutable Menu ID, selected Category, selected Judul, optional Rasa, optional Pedas presentation, Menu media/presentation, selling price, lifecycle status, and composition of one or many Items.
-A Menu does not become a different business entity based on the number of Items it contains.
-There is no forward Menu subtype called Menu Satuan, Menu Paket, or Package Menu.
-There is no forward menu_type=SINGLE or menu_type=PACKAGE business rule.
-Legacy menu_type, package_name, SINGLE/PACKAGE routes, and equivalent fields may remain temporarily for migration compatibility only.
+Menu owns Category/Sub Category context, optional Rasa, optional Pedas presentation, Menu presentation media, selling price, lifecycle status, immutable Menu ID, and one-or-many Item composition.
 
-## 4. Menu Composition
+Menu does not become a different business entity based on Item count.
+There is no forward business concept called Menu Satuan, Menu Paket, Package Menu, SINGLE Menu, or PACKAGE Menu.
+Legacy menu_type, package_name, SINGLE/PACKAGE routes, and equivalent storage may remain temporarily for migration compatibility only.
 
-Canonical relation:
+## 4. Menu Identity and Customer Presentation
+
+Canonical Menu identity for the current food model:
+
+    Category + Sub Category + Rasa
+
+Rules:
+- Category and Sub Category establish taxonomy context.
+- Rasa is part of identity when present; duplicate protection must be NULL-safe.
+- The same Category/Sub Category/Rasa combination must not create duplicate active canonical Menus within a Brand.
+
+Customer presentation:
+
+    Title    → Sub Category
+    Subtitle → Rasa when configured and customer-visible
+    Category → grouping/filter context
+
+Rasa named Original is the baseline and is not shown as the customer subtitle.
+The Menu editor must not replace this identity with an arbitrary free-text customer title.
+
+## 5. Menu Composition
+
     Master Menu
-      ↓
+       ↓
     Menu
-      ↓
+       ↓
     Menu Items
-      ├── Item A × quantity
-      ├── Item B × quantity
-      └── Item C × quantity
+       ├── Item A × quantity
+       ├── Item B × quantity
+       └── Item C × quantity
 
 Rules:
 - A Menu may contain one or many Items.
 - One Item may be reused by many Menus.
-- The same Item may not appear more than once in the same Menu composition; repeated use is represented by quantity.
-- Quantity is a positive integer.
-- Quantity is part of the Menu composition and is not inferred from cart quantity.
-- A Menu with one Item is valid.
-- A Menu with multiple Items is valid.
-- Composition count does not create or imply a Package entity.
-- Promotion does not create a Package entity.
-- Cart combinations do not create a Package entity.
+- The same Item appears at most once in one Menu composition; repeated units use quantity.
+- Quantity is a positive integer and belongs to the Menu composition.
+- A one-Item Menu is valid.
+- A multi-Item Menu is valid.
+- Item count never creates a Package entity.
+- Promotion and cart combinations never create a Package entity.
 
-### Customer boundary
-Item is internal.
-Customer PWA must never expose Item name as a customer-facing Menu field, Item SKU, Item stock-management flag, internal Item ID, or internal composition metadata that is not explicitly part of Menu presentation.
-The fact that a Menu contains Items is an implementation detail unless a future explicit customer-facing feature says otherwise.
+Customer boundary:
+- Item is internal implementation data.
+- Customer PWA must not expose Item name as a Menu field, Item SKU, stock-managed flag, internal Item ID, or raw internal composition metadata.
 
-## 5. Menu Authoring UI
+## 6. Master Menu UI Contract
 
-Master Menu editor must expose these commercial fields consistently:
-    Judul       → select from Master Category / Judul
-    Category    → select from Master Category / Category
-    Rasa        → optional select from Master Category / Rasa
-    Item        → one or more internal composition rows
-    Pedas       → optional checkbox + horizontal scale
-    Harga Jual  → required Menu field
-    Media       → Menu presentation media
-    Status      → lifecycle
+Master Menu is the Owner authoring area for the commercial Menu.
+The editor must provide:
+- Category/Sub Category selection from Master Category.
+- Optional Rasa selection from Master Category.
+- One-or-many Item composition rows.
+- Optional Pedas checkbox plus horizontal scale.
+- Required Menu selling price.
+- Menu presentation media.
+- Lifecycle status.
 
-The Menu editor must not replace Judul with a free-text Nama Menu field.
-
-The Menu editor may offer inline creation of missing Master dependencies, but the created entity must belong to the proper Master Category vocabulary:
+The editor must not introduce a free-text customer title that bypasses Category/Sub Category identity.
+Inline creation may be provided without leaving the editor:
 - + Category creates Category.
-- + Judul creates Judul.
+- + Sub Category creates a Sub Category under the selected Category.
 - + Rasa creates Rasa.
 - + Item creates Item.
-Inline creation must not create hidden legacy entities that bypass the Master Category contract.
+Inline creation must not silently create legacy Product, Complement, Flavor, or Level entities as replacements.
 
-## 6. Pedas / Spice UI Contract
+## 7. Pedas / Spice Contract
 
-Pedas is optional Menu presentation.
 Canonical interaction:
+
     [ ] Level Pedas
+
     unchecked
-    → horizontal scale hidden / inactive
-    → no Pedas indicator in preview/customer presentation
+    → horizontal scale hidden/inactive
+    → no Pedas indicator
+
     checked
-    → horizontal scale becomes active
-    → Owner selects a position on the scale
+    → horizontal scale active
+    → Owner selects a position
 
-Rules:
-- Pedas is not a dropdown.
-- The UI must not define business vocabulary such as Level 1 = tidak pedas, Level 2 = pedas, and so on.
-- The horizontal scale position may be stored numerically internally.
-- The checkbox is the authoritative indication that Pedas presentation is enabled.
-- Unchecked means no active Pedas presentation.
-- Existing numeric storage such as 0–4 is an internal scalar only; it must not be presented as named business levels unless a future contract explicitly defines that vocabulary.
+Pedas is not a dropdown.
+The UI must not define business meanings such as Level 1 = not spicy, Level 2 = spicy, etc.
+A numeric storage value may represent the horizontal position internally.
+spice_enabled is the explicit authoritative toggle.
+When disabled, no active Pedas presentation is shown.
 
-## 7. Selling Price
+## 8. Selling Price
 
 Selling price belongs to Menu.
+The same Item may participate in multiple Menus with different selling prices.
+Item stock identity and Menu price are separate authorities.
+Historical transactions must preserve the effective transaction price.
+
+## 9. Menu Media
+
+Menu image is Menu presentation media.
+Do not define the Menu image as the first Item image.
+Do not silently substitute Item media as the canonical Menu-media rule.
+Temporary fallback for legacy preview/migration is technical fallback only.
+New Menu image upload uses the canonical Media Engine.
+
+## 10. Master Category UI Contract
+
+Master Category contains exactly:
+    Category
+    Rasa
     Item
-    → internal atomic identity / optional stock
-    Menu
-    → customer-facing presentation
-    → selling price
 
-Rules:
-- Item does not own canonical Menu selling price.
-- The same Item may participate in multiple Menus with different selling prices.
-- Menu selling price is stored independently from Item stock identity.
-- Historical orders must retain the effective transaction price.
+Category may contain/manage its Sub Category structure.
+The presentation may use tabs, cards, segmented navigation, or another UI pattern, but it must not create additional master concepts.
 
-## 8. Menu Media
+Deletion behavior:
+- Do not show destructive Delete when referential integrity makes deletion invalid.
+- Use Arsipkan/Nonaktifkan when a referenced master record must be preserved.
+- UI wording and backend behavior must agree.
+- A normal referenced record must not present Delete and then fail with an avoidable foreign-key error.
 
-Menu presentation media belongs to the Menu presentation boundary.
-Rules:
-- Menu image must not be defined as the first Item image.
-- Menu image may not be silently replaced by Item media as the canonical business rule.
-- Any fallback used temporarily for migration or preview must be explicitly treated as technical fallback, not Menu identity.
-- New Menu image upload must use the canonical Media Engine.
-- Do not create a second upload path for Menu images.
+## 11. Customer PWA Contract
 
-## 9. Master Category UI
+Customer PWA consumes a resolved Menu View Model.
 
-Master Category is one Owner workspace containing the four independent vocabularies:
-    Master Category
-    ├── Category
-    ├── Judul
-    ├── Rasa
-    └── Item
-
-The UI may use tabs, segmented navigation, cards, or another presentation pattern, but the information architecture must remain exactly these four concepts.
-
-### Delete/archive behavior
-- A master entity that is referenced by other data must not show a destructive Delete action when deletion is invalid.
-- Where referential integrity requires preservation, the UI should expose Arsipkan / Nonaktifkan semantics.
-- The UI label and backend behavior must agree.
-- Do not present Delete and then return a foreign-key failure for a normal referenced record.
-Category, Judul, Rasa, and Item must each have a clear lifecycle operation appropriate to their references.
-
-## 10. Customer PWA Contract
-
-Customer PWA receives a resolved Menu View Model.
-Conceptual customer payload:
     Menu ID
-    Title        ← Judul
-    Subtitle     ← Rasa when configured and customer-visible
+    Title        ← Sub Category
+    Subtitle     ← Rasa when configured
     Category     ← grouping
     Media        ← Menu presentation
     Selling Price
-    Pedas presentation when enabled
+    Pedas        ← only when enabled
     Availability
 
-The Customer PWA must not reconstruct Menu identity by reading arbitrary legacy Product/Item fields.
-The Customer PWA must not depend on menu_type, SINGLE, PACKAGE, package_name, Item SKU, Item stock flag, or raw internal Product/Item names.
-Search uses the resolved Menu View Model.
-Current search scope:
-- Title/Judul is searchable.
+Customer PWA must not reconstruct Menu identity from legacy Product/Item fields.
+Customer PWA must not depend on menu_type, SINGLE, PACKAGE, package_name, Item SKU, Item stock flags, or raw internal Item/Product names.
+Search operates on the resolved Menu View Model:
+- Title/Sub Category is searchable.
 - Rasa/subtitle is searchable when present.
 - Pedas scale is not searchable.
 - Item name is not searchable.
 - SKU is not searchable.
-Results update while typing; no separate submit action is required for basic search.
+Search updates while typing.
 
-## 11. Inventory Contract
+## 12. Inventory Contract
 
-Item is the inventory identity.
+Item is the inventory identity:
+
     Item
-    ├── SKU present
-    │   └── stock-managed
-    └── SKU absent
-        └── non-stock
+    ├── SKU present → stock-managed
+    └── SKU absent  → non-stock
 
 Rules:
-- SKU presence means the Item is stock-managed.
-- SKU absence means the Item is non-stock.
+- SKU presence determines Item stockability.
 - Inventory quantity belongs to Branch Inventory.
-- Creating an Item must not fabricate stock quantity.
-- Assigning a SKU must not fabricate stock quantity.
-- A Menu consumes Item stock according to its Menu Items quantities.
-- For a Menu containing multiple stock-managed Items, all required stock validations must be evaluated atomically before committing a sale.
+- Creating Item or assigning SKU does not fabricate stock quantity.
+- Selling a Menu consumes the required stock-managed Item quantities.
+- All required Item stock validations must be checked atomically before a sale commits.
 - Non-stock Items do not constrain availability through stock quantity.
-Legacy database tables may still use the physical column name product_id during migration. Forward business meaning is Item.
 
-## 12. Branch Adoption
+Legacy physical product_id/product tables may remain during migration; forward semantic meaning is Item.
 
-The customer-facing assortment boundary is Menu.
+## 13. Branch Adoption
+
+Branch assortment is Menu-authoritative:
+
     Master Menu
        ↓
     Branch adopts Menu
@@ -238,35 +219,36 @@ The customer-facing assortment boundary is Menu.
        ↓
     Branch Item inventory
 
-Rules:
-- Branch adoption is Menu-authoritative.
-- Branch does not create a new Master Menu by copying it.
-- Branch adoption does not create a new Item.
-- Item inventory remains Item-authoritative.
-- Branch-local categories/assortment are separate from Master Category.
-- A Branch may make an adopted Menu operationally unavailable without changing the Master Menu lifecycle.
-- Branch-level price override, where supported, belongs to Branch Menu configuration, not Item.
-Menu Cabang is not a Master Category or Master Menu synonym. It is a branch operational/selling surface.
+Branch adoption does not create another Master Menu or another Item.
+Branch operational availability is distinct from Master Menu lifecycle.
+Branch-local categories are separate from Master Category.
+Any supported Branch price override belongs to Branch Menu configuration, not Item.
+Menu Cabang is a branch operational/selling surface, not a Master Catalog area.
 
-## 13. Legacy Compatibility Boundary
+## 14. Legacy Compatibility Boundary
 
-Legacy implementation may contain products, product_id, menu_type, package_name, sub_categories, menu_titles, old Product-centric Catalog routes, SINGLE/PACKAGE endpoints, and old Complement/Kelengkapan and Level master components.
-These are compatibility/migration evidence only unless explicitly adopted into the new contract.
-Forward code must not use legacy fields as a second authority.
-Migration direction:
-    legacy data
-        ↓
-    migration / compatibility input
-        ↓
-    canonical Menu + Master Category + Item model
-Ambiguous legacy data must be marked for review rather than guessed.
+Legacy concepts may remain temporarily as compatibility/migration evidence:
+- products / product_id
+- sub_categories
+- menu_titles
+- menu_type
+- package_name
+- SINGLE/PACKAGE endpoints
+- Complement/Kelengkapan
+- old Level master data
+- old Product-centric Catalog routes.
 
-## 14. API / Service Boundary
+These are not forward business authorities.
+Forward code must not use legacy fields as a second source of truth.
+Ambiguous legacy records must be marked for review rather than guessed.
 
-Forward Menu create/update conceptually contains:
+## 15. Forward API / Service Shape
+
+Conceptual forward Menu create/update:
+
     {
       category_id: ... ,
-      title_id: ... ,
+      sub_category_id: ... ,
       rasa_id: null,
       spice_enabled: false,
       spice_level: 0,
@@ -278,71 +260,71 @@ Forward Menu create/update conceptually contains:
       ]
     }
 
-title_id refers to Master Category → Judul.
-item_id is the forward semantic name even if the physical DB column remains product_id temporarily.
-spice_level is an internal scalar position only.
+sub_category_id belongs to the selected Category.
+item_id is the forward semantic name even when the physical legacy column remains product_id.
+spice_level is only the internal horizontal-scale position.
 spice_enabled is explicit and authoritative.
-No menu_type or package_name field is required by the forward contract.
-The server remains authoritative for brand ownership, reference ownership, lifecycle, composition validity, stock integrity, authorization, persistence, and audit.
+No menu_type or package_name is required by the forward contract.
+Server-side authorization, brand ownership, lifecycle, composition validity, inventory integrity, persistence, and audit remain authoritative.
 
-## 15. Tests and Definition of Done
+## 16. Definition of Done
 
-### UI
-- Catalog shows exactly Master Menu + Master Category.
-- Master Category exposes Category, Judul, Rasa, Item.
-- No fake Master Kategori route is used for the Item/legacy Product editor.
-- No Catalog top-level Menu Cabang node is introduced as a synonym for Master Menu.
-- Menu editor selects Master Judul rather than free-text customer title.
+UI:
+- Catalog shows exactly Master Menu and Master Category.
+- Master Category shows exactly Category, Rasa, Item, with Sub Category under Category.
+- No Produk Master alias is used for Item.
+- No Catalog top-level Menu Cabang node is used as a Master Menu synonym.
+- Menu editor selects Category/Sub Category/Rasa and does not replace identity with free-text customer title.
 - Menu editor supports one-or-many Item composition.
-- Pedas uses checkbox + horizontal scale.
-- Menu media is not derived by business rule from first Item media.
-- Delete/archive semantics match backend referential rules.
+- Pedas is checkbox + horizontal scale.
+- Menu media is a Menu concern.
+- Delete/archive semantics match referential constraints.
 
-### Backend
-- Menu does not require SINGLE/PACKAGE semantics.
+Backend:
 - Menu accepts one-or-many Items.
-- Menu price belongs to Menu.
-- Item SKU/stockability belongs to Item.
-- Menu resolves Item composition for inventory consumption.
+- Menu has no forward SINGLE/PACKAGE subtype requirement.
+- Menu identity uses Category + Sub Category + Rasa.
+- Menu price is Menu-owned.
+- Item SKU/stockability is Item-owned.
+- Inventory consumption resolves from Menu Items.
 - Customer resolver does not expose internal Item identity.
-- Legacy paths remain isolated compatibility-only.
+- Legacy paths are compatibility-only.
 
-### Tests
-- Tests encode this contract rather than obsolete SINGLE/PACKAGE or Complement/Level/legacy Product UI assumptions.
-- Removed files are not referenced by active tests.
-- UI tests assert the exact Catalog information architecture.
-- Contract tests cover one-item and multi-item Menus.
-- Contract tests cover Pedas enabled/disabled behavior.
-- Customer boundary tests assert Item/SKU/stock fields are absent.
+Tests:
+- Tests assert the exact Catalog information architecture.
+- Tests cover one-Item and multi-Item Menus.
+- Tests cover Pedas enabled/disabled behavior.
+- Tests assert internal Item/SKU/stock fields are absent from customer payload.
+- Active tests do not depend on removed/superseded contract files.
 - Full CI must pass on the proposal branch before promotion.
 
-## 16. Explicit Prohibitions
+## 17. Explicit Prohibitions
 
-Do not introduce or restore these as forward business concepts:
-    Produk Master        — not a Catalog synonym
-    Menu Cabang          — not a Master Menu synonym
-    Kelengkapan          — not a Master Category vocabulary
-    Master Flavor        — not the replacement name for Rasa
-    Master Level         — not a Master Category vocabulary
-    Nama Menu free-text  — not a replacement for Master Judul
-    Menu Satuan          — forbidden as a forward business concept
-    Menu Paket           — forbidden as a forward business concept
-    Package Menu         — forbidden as a forward business concept
-    menu_type SINGLE     — forbidden as a forward business rule
-    menu_type PACKAGE    — forbidden as a forward business rule
-    package_name         — forbidden as a forward business rule
-    Product as UI term for Item — forbidden in Owner forward UI
-    Item SKU in PWA      — forbidden
-    Item stock flag in PWA — forbidden
-Legacy storage may keep some of these temporarily, but forward UI and business logic must not depend on them.
+Do not reintroduce as forward concepts:
+    Produk Master
+    Menu Cabang as Master Menu
+    Kelengkapan as a Master Category area
+    Master Flavor
+    Master Level
+    Judul as a separate Master Category area
+    free-text Nama Menu as a replacement for taxonomy identity
+    Menu Satuan
+    Menu Paket
+    Package Menu
+    menu_type SINGLE
+    menu_type PACKAGE
+    package_name
+    Product as the Owner UI term for Item
+    Item SKU in Customer PWA
+    Item stock flag in Customer PWA
 
-## 17. Contract Precedence
+Legacy storage can remain temporarily, but forward UI and business logic must not depend on it.
 
-When code, tests, older proposals, screenshots, or legacy terminology conflict with this document:
-1. This locked contract is the forward Catalog/Menu authority.
-2. More recent explicit business decisions may supersede this document only when explicitly recorded.
-3. Legacy code is not evidence that a legacy rule remains valid.
-4. A passing legacy test does not override this contract.
-5. Any migration ambiguity must be reviewed; never silently guessed.
+## 18. Precedence and Promotion Gate
 
-Promotion gate: No promotion of the new Catalog/Menu implementation to main until UI, backend, Customer PWA, tests, CI, migration/quarantine, and runtime verification all agree with this contract.
+This document is the forward Catalog/Menu authority.
+Legacy code and passing legacy tests do not override this contract.
+Newer explicit business decisions supersede this contract only when explicitly recorded.
+Ambiguity must be reviewed, never silently guessed.
+
+Promotion to main is blocked until UI, backend, Customer PWA, tests, CI, migration/quarantine, and runtime verification all agree with this contract.
