@@ -43,14 +43,11 @@
     if (select.closest('.x-occ-dropdown, .x-branch-dropdown')) return true; // sudah punya dropdown kustom
     if (select.closest('[hidden], [aria-hidden="true"]')) return true;
 
+    // Cek apakah elemen itu sendiri atau wrapper terdekatnya sengaja disembunyikan (misal: topbar hidden select)
     var el = select;
     while (el && el !== document.body) {
       var inline = (el.getAttribute && el.getAttribute('style')) || '';
       if (/opacity:\s*0|pointer-events:\s*none/.test(inline)) return true;
-      if (typeof window.getComputedStyle === 'function') {
-        var cs = window.getComputedStyle(el);
-        if (cs && (cs.display === 'none' || cs.visibility === 'hidden' || cs.opacity === '0')) return true;
-      }
       el = el.parentElement;
     }
     return false;

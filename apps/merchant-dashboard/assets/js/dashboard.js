@@ -3379,19 +3379,29 @@
     }
 
     try {
-      var res = await adminFetch(API_BASE + '/admin/composed/products/' + encodeURIComponent(productId), {
+      // Contract Product (locked) hanya menyediakan LIST canonical:
+      // GET /admin/composed/products. Tidak ada GET by-id di contract composed,
+      // jadi Product diambil dari list lalu dipilih berdasarkan id — bukan
+      // memakai endpoint legacy /admin/products/:id.
+      var res = await adminFetch(API_BASE + '/admin/composed/products?active_only=0', {
         headers: getAuthHeaders()
       });
       var data = await res.json();
       if (requestSeq !== _productEditorLoadSeq) return;
 
-      if (!data.success || !data.product) {
-        showToast('❌ ' + (data.error || 'Product tidak ditemukan.'));
+      var products = (data && Array.isArray(data.products)) ? data.products : [];
+      var product = null;
+      for (var i = 0; i < products.length; i += 1) {
+        if (String(products[i].id) === String(productId)) { product = products[i]; break; }
+      }
+
+      if (!data || !data.success || !product) {
+        showToast('❌ ' + ((data && data.error) || 'Product tidak ditemukan.'));
         navigateTo('catalog/products');
         return;
       }
 
-      populateProductEditorForm(data.product);
+      populateProductEditorForm(product);
     } catch (err) {
       if (requestSeq !== _productEditorLoadSeq) return;
       console.error('[Product Editor Load Error]:', err);
@@ -10878,6 +10888,9 @@ async function loadMenusView() {
     var editor = $('master-menu-editor-view');
     if (list) list.style.display = 'none';
     if (editor) editor.style.display = 'block';
+    if (window.XentraDropdown && typeof window.XentraDropdown.refresh === 'function') {
+      window.XentraDropdown.refresh();
+    }
   }
 
   function ownerMasterMenuResetEditor(type) {
@@ -10957,6 +10970,9 @@ async function loadMenusView() {
     } else if (!allowEmpty && rows.length) {
       select.value = String(rows[0].id);
     }
+    if (window.XentraDropdown && typeof window.XentraDropdown.refresh === 'function') {
+      window.XentraDropdown.refresh();
+    }
   }
 
   function renderOwnerMasterMenuEditorForm() {
@@ -11003,6 +11019,9 @@ async function loadMenusView() {
 
     renderOwnerMasterMenuPackageComponents();
     renderOwnerMasterMenuPreview();
+    if (window.XentraDropdown && typeof window.XentraDropdown.refresh === 'function') {
+      window.XentraDropdown.refresh();
+    }
   }
 
   function renderOwnerMasterMenuPackageComponents() {
@@ -11059,6 +11078,9 @@ async function loadMenusView() {
         renderOwnerMasterMenuPackageComponents();
       });
     });
+    if (window.XentraDropdown && typeof window.XentraDropdown.refresh === 'function') {
+      window.XentraDropdown.refresh();
+    }
   }
 
   function addOwnerMasterMenuPackageComponent() {

@@ -55,7 +55,12 @@ test('Product Editor loader hydrates only atomic Product data', () => {
 
   assert.ok(loader.includes('showProductEditorSection();'));
   assert.ok(loader.includes('resetProductEditorForAdd();'));
-  assert.ok(loader.includes("API_BASE + '/admin/composed/products/'"));
+  // Contract composed hanya punya LIST (GET /admin/composed/products).
+  // Tidak ada GET by-id, jadi loader mengambil Product dari list canonical —
+  // bukan /admin/composed/products/:id (pernah 404) atau legacy /admin/products/:id.
+  assert.ok(loader.includes("API_BASE + '/admin/composed/products?active_only=0'"));
+  assert.ok(!/composed\/products\/'\s*\+\s*encodeURIComponent\(productId\)/.test(loader));
+  assert.ok(!loader.includes("'/admin/products/'"));
   assert.ok(!loader.includes('loadMasterMenuComponents()'));
   assert.ok(!loader.includes('loadMasterMenuComposition('));
   assert.ok(!loader.includes('loadProductOptionsEditor('));
