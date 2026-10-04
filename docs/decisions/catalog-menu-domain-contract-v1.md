@@ -320,6 +320,49 @@ Do not reintroduce as forward concepts:
 
 Legacy storage can remain temporarily, but forward UI and business logic must not depend on it.
 
+## 🔒 KOREKSI — Judul menggantikan Sub Category, Rasa dekoratif
+**Tanggal: 2026-10-05, koreksi dari pemilik contract. Menggantikan §1, §2, §4, §10, §17.**
+
+### Model forward yang benar
+
+    Catalog
+    ├── Master Menu
+    └── Master Category
+        ├── Category   ← pengelompokan saja (bukan parent)
+        ├── Judul      ← master, judul customer
+        ├── Rasa       ← master, opsional/dekoratif
+        └── Item       ← unit atomic/stock internal
+
+### Aturan
+
+1. Master Category berisi tepat empat tab: **Category | Judul | Rasa | Item**.
+2. **Sub Category dihapus** sebagai konsep forward — dari UI, wiring, API, dan database.
+   Perannya digantikan Judul. (Boleh diganti atau dibuat ulang; pilihannya teknis.)
+3. **Judul** adalah master Brand-scoped dengan ON/OFF, edit, dan delete — persis pola Category
+   dan Rasa. Judul **bukan child Category** dan **bukan field bebas**.
+4. **Category hanya pengelompokan**, bukan parent dari Judul. Hubungan Menu ↔ Judul sama
+   dengan hubungan Menu ↔ Rasa (master yang direferensikan Menu).
+5. Saat Category dipilih di editor Menu, **dropdown Judul direkomendasikan berdasarkan
+   Category** — mis. Category "Udang" menampilkan Judul yang berkaitan dengan udang, bukan
+   ayam atau minuman. Bila tidak ada Judul yang cocok, seluruh Judul tetap dapat dipilih
+   supaya Menu tidak pernah buntu.
+6. Memilih/menambah Judul dan Rasa memakai pola **dropdown + tombol `[ + ]`**; `[ + ]` membuka
+   bottom sheet master-inline dan hasilnya langsung menjadi opsi dropdown.
+7. **Rasa opsional** (boleh kosong) dan bersifat dekoratif.
+8. **Judul adalah judul customer.** Bila Rasa diisi, customer melihat Judul di baris atas dan
+   Rasa di baris bawah dengan **satu ukuran font dan satu warna** — bukan subtitle kecil
+   berwarna redup. Contoh: Judul "Ayam Geprek" + Rasa "Sambal Ijo" → terbaca
+   "Ayam Geprek Sambal Ijo".
+9. Anti-duplikat Menu: **(Category + Judul + Rasa)** dalam satu Brand, dengan Rasa kosong
+   diperlakukan sebagai satu nilai tersendiri (NULL-safe).
+10. Judul **wajib** saat Menu disimpan, karena tanpa Judul customer tidak punya judul.
+11. Media Menu tetap milik Menu (bukan gambar Item pertama).
+
+### Cakupan pekerjaan
+
+UI, wiring, API, dan database wajib konsisten dengan koreksi ini. Kode, route, dan test lama
+yang masih bertumpu pada Sub Category atau `menu_titles` legacy tidak menjadi acuan.
+
 ## 18. Precedence and Promotion Gate
 
 This document is the forward Catalog/Menu authority.
