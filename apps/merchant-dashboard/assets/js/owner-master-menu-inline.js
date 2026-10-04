@@ -368,6 +368,10 @@
       button.setAttribute('data-inline-master-action', 'package-product');
       button.textContent = '+ Buat Product';
       button.style.marginTop = '8px';
+      var helper = document.createElement('small');
+      helper.className = 'x-master-inline-dependency-hint';
+      helper.textContent = 'Tidak menemukan Product?';
+      packageAdd.parentNode.appendChild(helper);
       button.addEventListener('click', function() {
         createProductInline({ packageContext: true }).catch(function(err) {
           console.error('[Master Menu Inline]', err);
