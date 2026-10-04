@@ -188,7 +188,12 @@ test('PHASE 1: OWNER DASHBOARD CATALOG IMPLEMENTATION', async (t) => {
       createdProductId = res.body.product.id;
     });
 
-    await t2.test('2.2 Category archive remains safe when product is assigned', async () => {
+    await t2.test('2.2 Category archive remains safe when product and sub-category are assigned', async () => {
+      const fkSubCategoryId = 'phase1_archive_fk_sub_' + Date.now();
+      db.prepare(
+        "INSERT INTO sub_categories (id, brand_id, category_id, name, slug, is_active) VALUES (?, ?, ?, ?, ?, 1)"
+      ).run(fkSubCategoryId, BRAND_ID, createdCategoryId, 'FK Archive Test', 'fk-archive-test-' + Date.now());
+
       const res = await makeRequest(server, {
         method: 'DELETE',
         path: `/api/v1/admin/categories/${createdCategoryId}`,
@@ -205,7 +210,11 @@ test('PHASE 1: OWNER DASHBOARD CATALOG IMPLEMENTATION', async (t) => {
       assert.ok(persisted, 'Archived category must remain in the database');
       assert.strictEqual(Number(persisted.is_active), 0);
 
-      // Restore for the canonical Menu tests that follow.
+      const child = db.prepare('SELECT id, category_id FROM sub_categories WHERE id = ?').get(fkSubCategoryId);
+      assert.ok(child, 'Existing Sub Category relation must remain intact after archive');
+      assert.strictEqual(child.category_id, createdCategoryId);
+
+      // Restore for the canonical Menu tests that follow, then remove only the test fixture.
       const restore = await makeRequest(server, {
         method: 'PUT',
         path: `/api/v1/admin/categories/${createdCategoryId}`,
@@ -214,6 +223,7 @@ test('PHASE 1: OWNER DASHBOARD CATALOG IMPLEMENTATION', async (t) => {
 
       assert.strictEqual(restore.status, 200);
       assert.strictEqual(Number(restore.body.category.is_active), 1);
+      db.prepare('DELETE FROM sub_categories WHERE id = ?').run(fkSubCategoryId);
     });
 
     await t2.test('2.3 GET /admin/products/:id returns detail with branch adoption matrix', async () => {
