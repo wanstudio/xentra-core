@@ -79,6 +79,13 @@ class ComposedProductService {
           "VALUES (?, ?, ?, NULL, ?, ?, ?)",
           [makeId('skuhist'), brandId, id, normalizedSku, actorId, actorRole]
         );
+
+        // SKU is the stockability boundary: make the Product visible in
+        // canonical branch inventory for every currently active branch.
+        repository.ensureSkuProductInventoryForActiveBranches({
+          brandId,
+          productId: id
+        });
       }
 
       repository.db.exec('COMMIT');
