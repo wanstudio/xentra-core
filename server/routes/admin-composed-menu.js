@@ -172,6 +172,8 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
       const menu = service.createSingleMenu({
         brandId: req.brand_id,
         productId: body.product_id,
+        displayName: body.display_name,
+        categoryId: body.category_id,
         subCategoryId: body.sub_category_id,
         rasaId: body.rasa_id,
         levelId: body.level_id,
@@ -191,6 +193,8 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
         brandId: req.brand_id,
         menuId: req.params.id,
         productId: body.product_id,
+        displayName: body.display_name,
+        categoryId: body.category_id,
         subCategoryId: body.sub_category_id,
         rasaId: body.rasa_id,
         levelId: body.level_id,
