@@ -2552,26 +2552,20 @@
       }
 
       var rightControls = '';
-      if (type === 'category') {
-        var isCatActive = row.is_active !== 0 && row.is_active !== null;
-        var toggleSwitch = '' +
-          '<label class="x-toggle' + (isCatActive ? ' x-toggle-on' : '') + '" title="' + (isCatActive ? 'Kategori Aktif (klik untuk nonaktifkan)' : 'Kategori Nonaktif (klik untuk aktifkan)') + '" style="margin:0;">' +
-            '<input type="checkbox" ' + (isCatActive ? 'checked' : '') + ' onchange="toggleCategoryStatus(\'' + esc(String(row.id)) + '\', this)" aria-label="Status Kategori ' + esc(row.name) + '">' +
-            '<span class="x-toggle-slider"></span>' +
-          '</label>';
+      var isRowActive = row.is_active !== 0 && row.is_active !== null;
+      var typeNoun = referenceTypeLabel(type);
+      var toggleSwitch = '' +
+        '<label class="x-toggle' + (isRowActive ? ' x-toggle-on' : '') + '" title="' + (isRowActive ? typeNoun + ' Aktif (klik untuk nonaktifkan)' : typeNoun + ' Nonaktif (klik untuk aktifkan)') + '" style="margin:0;">' +
+          '<input type="checkbox" ' + (isRowActive ? 'checked' : '') + ' onchange="toggleMasterReferenceStatus(\'' + esc(String(type)) + '\', \'' + esc(String(row.id)) + '\', this)" aria-label="Status ' + typeNoun + ' ' + esc(row.name) + '">' +
+          '<span class="x-toggle-slider"></span>' +
+        '</label>';
 
-        var editBtn = '' +
-          '<button type="button" class="x-btn-icon" onclick="openEditMasterReference(\'category\', \'' + esc(String(row.id)) + '\')" aria-label="Edit kategori ' + esc(row.name) + '" title="Edit Kategori" style="width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid #e2e8f0;background:#ffffff;color:#475569;cursor:pointer;transition:all 0.15s ease;">' +
-            '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>' +
-          '</button>';
+      var editBtn = '' +
+        '<button type="button" class="x-btn-icon" onclick="openEditMasterReference(\'' + esc(String(type)) + '\', \'' + esc(String(row.id)) + '\')" aria-label="Edit ' + typeNoun.toLowerCase() + ' ' + esc(row.name) + '" title="Edit ' + typeNoun + '" style="width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid #e2e8f0;background:#ffffff;color:#475569;cursor:pointer;transition:all 0.15s ease;">' +
+          '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>' +
+        '</button>';
 
-        rightControls = toggleSwitch + editBtn;
-      } else {
-        rightControls = referenceStatusBadge(row.is_active !== 0 && row.is_active !== null) +
-          '<button type="button" class="x-action-menu-trigger" aria-label="Aksi ' + referenceTypeLabel(type).toLowerCase() + '" data-master-reference-action="' + type + '" data-reference-id="' + esc(String(row.id)) + '">' +
-            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>' +
-          '</button>';
-      }
+      rightControls = toggleSwitch + editBtn;
 
       return [
         '<div class="x-master-reference-card">',
@@ -2692,37 +2686,53 @@
   }
   window.deleteMasterReference = deleteMasterReference;
 
-  async function toggleCategoryStatus(id, inputEl) {
-    if (!id) return;
+  async function toggleMasterReferenceStatus(type, id, inputEl) {
+    if (!id || !type) return;
+    var noun = referenceTypeLabel(type);
     var prevChecked = inputEl ? !inputEl.checked : null;
     try {
       if (inputEl) inputEl.disabled = true;
-      var res = await adminFetch(API_BASE + '/admin/categories/' + encodeURIComponent(id) + '/toggle', {
+      var endpoint = type === 'category'
+        ? API_BASE + '/admin/categories/' + encodeURIComponent(id) + '/toggle'
+        : API_BASE + '/admin/menu/components/' + encodeURIComponent(type) + '/' + encodeURIComponent(id) + '/toggle';
+
+      var res = await adminFetch(endpoint, {
         method: 'PATCH',
         headers: getAuthHeaders()
       });
       var data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Gagal mengubah status kategori.');
+        throw new Error(data.error || 'Gagal mengubah status ' + noun.toLowerCase() + '.');
       }
 
-      var updatedCategory = data.category;
-      if (updatedCategory) {
-        var categoryRows = state.categories || [];
-        var idx = categoryRows.findIndex(function(c) { return String(c.id) === String(id); });
-        if (idx >= 0) categoryRows[idx] = updatedCategory;
-        state.categories = categoryRows;
+      if (type === 'category') {
+        var updatedCategory = data.category;
+        if (updatedCategory) {
+          var categoryRows = state.categories || [];
+          var idx = categoryRows.findIndex(function(c) { return String(c.id) === String(id); });
+          if (idx >= 0) categoryRows[idx] = updatedCategory;
+          state.categories = categoryRows;
+        } else {
+          var cat = (state.categories || []).find(function(c) { return String(c.id) === String(id); });
+          if (cat) cat.is_active = inputEl.checked ? 1 : 0;
+        }
+        populateProductCategorySelect();
+        renderProductCategoryFilterChips();
+        renderMasterProductsTable();
       } else {
-        var cat = (state.categories || []).find(function(c) { return String(c.id) === String(id); });
-        if (cat) cat.is_active = inputEl.checked ? 1 : 0;
+        var comp = (_masterMenuComponents[type] || []).find(function(c) { return String(c.id) === String(id); });
+        if (comp) {
+          comp.is_active = (data.component && typeof data.component.is_active !== 'undefined')
+            ? data.component.is_active
+            : (inputEl.checked ? 1 : 0);
+        }
+        renderMasterMenuSelectors();
       }
 
-      populateProductCategorySelect();
-      renderProductCategoryFilterChips();
-      renderMasterProductsTable();
-      renderMasterReferenceList('category');
+      renderMasterReferenceList(type);
       renderMasterMenuCustomerPreview();
-      showToast(data.message || 'Status kategori berhasil diubah.', 'success');
+      var activeText = inputEl.checked ? 'diaktifkan' : 'dinonaktifkan';
+      showToast(data.message || (noun + ' berhasil ' + activeText + '.'), 'success');
     } catch (err) {
       if (inputEl && prevChecked !== null) {
         inputEl.checked = prevChecked;
@@ -2734,7 +2744,8 @@
       if (inputEl) inputEl.disabled = false;
     }
   }
-  window.toggleCategoryStatus = toggleCategoryStatus;
+  window.toggleMasterReferenceStatus = toggleMasterReferenceStatus;
+  window.toggleCategoryStatus = function(id, inputEl) { return toggleMasterReferenceStatus('category', id, inputEl); };
 
   // ─────────────────────────────────────────────────────────────────────────
   // 2. MASTER REFERENCE QUICK-ADD (Product Assembly)
