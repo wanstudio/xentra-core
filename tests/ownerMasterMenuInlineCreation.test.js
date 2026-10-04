@@ -40,3 +40,13 @@ test('Package Product quick-create does not depend on dashboard private state', 
   assert.ok(INLINE.includes('data-cm-product'));
   assert.ok(!INLINE.includes("document.getElementById('btn-cm-add-component').click()"));
 });
+
+
+test('Inline creation has contextual mobile UX and dependency guardrails', () => {
+  assert.ok(INLINE.includes('x-master-inline-sheet'));
+  assert.ok(INLINE.includes('x-master-inline-link'));
+  assert.ok(INLINE.includes('x-master-inline-created'));
+  assert.ok(INLINE.includes('refreshSubCategoryDependencyState'));
+  assert.ok(INLINE.includes('action.disabled = disabled'));
+  assert.ok(INLINE.includes('Pilih Kategori terlebih dahulu'));
+  assert.ok(INLINE.includes('Product adalah identitas dasar'));\n});
