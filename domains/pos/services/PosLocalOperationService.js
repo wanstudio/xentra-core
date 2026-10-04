@@ -30,7 +30,6 @@ function buildOfflineStockRequirements(items) {
   const requirements = new Map();
   for (const item of Array.isArray(items) ? items : []) {
     const menuId = item && item.menu_id ? String(item.menu_id).trim() : '';
-    const menuType = menuId ? String(item.menu_type || '').trim().toUpperCase() : null;
     if (menuId) {
       const components = Array.isArray(item.component_snapshot) ? item.component_snapshot : [];
       for (const component of components) {
