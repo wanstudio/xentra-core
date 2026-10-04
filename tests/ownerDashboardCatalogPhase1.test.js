@@ -476,10 +476,10 @@ test('PHASE 1: OWNER DASHBOARD CATALOG IMPLEMENTATION', async (t) => {
       });
       assert.strictEqual(pRes.status, 200);
 
-      // Now category deletion should succeed
+      // Category lifecycle is archive-first; archiving should succeed
       const cRes = await makeRequest(server, {
-        method: 'DELETE',
-        path: `/api/v1/admin/categories/${createdCategoryId}`,
+        method: 'PATCH',
+        path: `/api/v1/admin/categories/${createdCategoryId}/archive`,
         headers: { Authorization: `Bearer ${ownerToken}` }
       });
       assert.strictEqual(cRes.status, 200);
