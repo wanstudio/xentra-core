@@ -42,6 +42,8 @@
     restoreEntry(entry);
     stack = stack.filter(function (item) { return item !== entry; });
 
+    if (typeof entry.onClose === 'function') entry.onClose(entry);
+
     var top = stack[stack.length - 1];
     if (top && top.shell) {
       top.shell.removeAttribute('aria-hidden');
@@ -156,7 +158,8 @@
       content: content,
       anchor: anchor,
       shell: shell,
-      dismissible: options.dismissible
+      dismissible: options.dismissible,
+      onClose: options.onClose
     };
     stack.push(entry);
 
