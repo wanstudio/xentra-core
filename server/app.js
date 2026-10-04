@@ -191,6 +191,10 @@ app.use(express.urlencoded({ extended: true, limit: '30mb' }));
 
 // REST API with Tenant Resolution (Support /api/v1, /api, and root /auth)
 app.use(['/api/v1', '/api', '/auth'], (req, res, next) => {
+  // Allow /auth/broker HTML view to pass through to its designated UI route
+  if (req.baseUrl === '/auth' && (req.path === '/broker' || req.path === '/broker/')) {
+    return next();
+  }
   // If requested at root /auth/..., normalize req.url so apiRoutes matches /auth/...
   if (req.baseUrl === '/auth') {
     req.url = '/auth' + (req.url === '/' ? '' : req.url);

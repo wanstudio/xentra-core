@@ -252,7 +252,7 @@ class PrePaymentVerificationGate {
       if ((hasExplicitExpectedPrice || hasExplicitItemPrice) && expectedPrice !== actualPrice) {
         priceDiffs.push({
           product_id: productId,
-          name: masterProduct.name,
+          name: resolvedMenuProduct.master.name,
           expected_price: expectedPrice,
           actual_price: actualPrice,
           difference: actualPrice - expectedPrice

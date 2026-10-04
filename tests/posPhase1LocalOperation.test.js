@@ -95,6 +95,40 @@ test('POS-P1-04: Terminal authorization fails if terminal is used against a diff
   }, /not authorized for branch/);
 });
 
+test('POS-P1-04B: replaceTerminal deactivates previous device and activates new device (1 Branch = 1 active terminal)', () => {
+  const prevTerminal = posOperationalRepository.findActiveTerminalByBranch('branch_p1_a');
+  assert.ok(prevTerminal);
+
+  const newTerminal = PosLocalOperationService.replaceTerminal({
+    branch_id: 'branch_p1_a',
+    device_name: 'Kasir HP Baru A',
+    device_identifier: 'pos_hw_uuid_branch_a_replacement_99',
+    config_version: 1,
+    replaced_by: 'user_cashier_1'
+  });
+
+  assert.ok(newTerminal);
+  assert.notStrictEqual(newTerminal.id, prevTerminal.id);
+  assert.strictEqual(newTerminal.status, 'active');
+  assert.strictEqual(newTerminal.device_identifier, 'pos_hw_uuid_branch_a_replacement_99');
+
+  // Verify old terminal is deactivated
+  const oldTermCheck = posOperationalRepository.findTerminalById(prevTerminal.id);
+  assert.strictEqual(oldTermCheck.status, 'deactivated');
+
+  // Verify only 1 active terminal exists for branch
+  const activeTerm = posOperationalRepository.findActiveTerminalByBranch('branch_p1_a');
+  assert.strictEqual(activeTerm.id, newTerminal.id);
+
+  // Calling replaceTerminal with same device identifier is idempotent
+  const sameAgain = PosLocalOperationService.replaceTerminal({
+    branch_id: 'branch_p1_a',
+    device_name: 'Kasir HP Baru A',
+    device_identifier: 'pos_hw_uuid_branch_a_replacement_99'
+  });
+  assert.strictEqual(sameAgain.id, newTerminal.id);
+});
+
 // ==============================================================================
 // 2. ATOMIC OFFLINE SALE & LOCAL DURABILITY
 // ==============================================================================
@@ -377,4 +411,107 @@ test('POS-P1-13: Cross-channel inventory conflict is detected and recorded for m
   assert.strictEqual(resolved.status, 'resolved');
   assert.strictEqual(resolved.resolution_decision, 'prioritize_pos');
   assert.strictEqual(resolved.resolved_by, 'mgr_branch_a');
+});
+
+// ==============================================================================
+// 8. CASHIER SELF-DEVICE ENROLLMENT & REPLACEMENT ROUTE BOUNDARY
+// ==============================================================================
+test('POS-P1-14: POST /pos/terminal/replace allows cashier to enroll terminal for own branch but denies other branch', async () => {
+  const http = require('http');
+  const app = require('../server/app');
+
+  // Insert cashier user if needed
+  db.prepare(`
+    INSERT OR IGNORE INTO users (id, brand_id, branch_id, username, email, full_name, role, status)
+    VALUES ('user_cashier_p1_a', 'brand_p1', 'branch_p1_a', 'cashier_p1_a', 'cashier_p1_a@test.com', 'Kasir P1 A', 'cashier', 'active')
+  `).run();
+
+  const tokenOwn = 'xnt_test_cashier_p1_a_' + Date.now();
+  if (global.TokenSessionStore) {
+    global.TokenSessionStore.sessions.set(tokenOwn, {
+      id: 'user_cashier_p1_a',
+      userId: 'user_cashier_p1_a',
+      username: 'cashier_p1_a',
+      role: 'cashier',
+      brand_id: 'brand_p1',
+      brandId: 'brand_p1',
+      branch_id: 'branch_p1_a',
+      branchId: 'branch_p1_a',
+      status: 'active',
+      expiresAt: Date.now() + 3600000
+    });
+  }
+
+  const server = http.createServer(app);
+  await new Promise(resolve => server.listen(0, resolve));
+  const port = server.address().port;
+
+  function doRequest(options, body) {
+    return new Promise((resolve, reject) => {
+      const req = http.request(options, (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          let parsed = {};
+          try { parsed = JSON.parse(data); } catch (_) {}
+          resolve({ status: res.statusCode, body: parsed });
+        });
+      });
+      req.on('error', reject);
+      if (body) req.write(JSON.stringify(body));
+      req.end();
+    });
+  }
+
+  try {
+    // 1. Cashier attempts to enroll device for another branch -> 403 Forbidden
+    const forbiddenRes = await doRequest({
+      hostname: 'localhost',
+      port,
+      path: '/api/v1/pos/terminal/replace',
+      method: 'POST',
+      headers: {
+        'Host': 'xentra.cloud',
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${tokenOwn}`
+      }
+    }, {
+      branch_id: 'branch_p1_b',
+      device_name: 'HP Kasir Hack',
+      device_identifier: 'pos_dev_hack_forbidden'
+    });
+
+    assert.strictEqual(forbiddenRes.status, 403);
+    assert.ok(
+      forbiddenRes.body.error === 'FORBIDDEN_BRANCH_ACCESS' ||
+      (forbiddenRes.body.error && forbiddenRes.body.error.includes('Akses ditolak')) ||
+      (forbiddenRes.body.message && forbiddenRes.body.message.includes('Akses ditolak'))
+    );
+
+    // 2. Cashier enrolls new device for own branch -> 200 OK
+    const successRes = await doRequest({
+      hostname: 'localhost',
+      port,
+      path: '/api/v1/pos/terminal/replace',
+      method: 'POST',
+      headers: {
+        'Host': 'xentra.cloud',
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${tokenOwn}`
+      }
+    }, {
+      branch_id: 'branch_p1_a',
+      device_name: 'HP Kasir Baru Cabang A',
+      device_identifier: 'pos_dev_cashier_self_enroll_01'
+    });
+
+    assert.strictEqual(successRes.status, 200);
+    assert.strictEqual(successRes.body.success, true);
+    assert.ok(successRes.body.terminal);
+    assert.strictEqual(successRes.body.terminal.branch_id, 'branch_p1_a');
+    assert.strictEqual(successRes.body.terminal.device_identifier, 'pos_dev_cashier_self_enroll_01');
+    assert.strictEqual(successRes.body.terminal.status, 'active');
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
 });

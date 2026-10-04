@@ -506,6 +506,7 @@ test('PAYMENT GATEWAY AUDIT & REGRESSION SUITE', async (t) => {
       INSERT OR REPLACE INTO branch_products (branch_id, product_id, price, is_available, stock)
       VALUES (?, '287', 18000, 1, 100)
     `).run(BRANCH_ID);
+    db.prepare('UPDATE products SET price = 18000 WHERE id = ?').run('287');
 
     const OrderPlacementService = require('../domains/commerce/services/OrderPlacementService');
     const placement = await OrderPlacementService.submitOrder({

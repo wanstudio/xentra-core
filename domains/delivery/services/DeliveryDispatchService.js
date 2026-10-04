@@ -132,10 +132,14 @@ class DeliveryDispatchService {
           );
         }
 
+        const isCash = latestOrder.payment_method === 'cash';
         orderRepository.updateDeliveryStatus({
           orderId: order_id,
           status,
-          updatedAt: now
+          updatedAt: now,
+          codCollectionStatus: isCash ? 'collected' : null,
+          codCashCustody: isCash ? 'driver' : null,
+          codCollectedAmount: isCash ? (Number(latestOrder.grand_total) || 0) : 0
         });
 
         OrderStateMachine.transition({
@@ -183,6 +187,44 @@ class DeliveryDispatchService {
 
   static getDelivery(order_id) {
     return orderRepository.findDeliveryByOrderId(order_id);
+  }
+
+  /**
+   * Cashier confirms physical handover of collected COD cash from Driver.
+   * Transfers custody from driver to cashier.
+   */
+  static recordCodHandover({ order_id, cashier_id = null, branch_id = null }) {
+    const order = orderRepository.findById(order_id);
+    if (!order) {
+      throw new Error('[DeliveryDispatchService] Order "' + order_id + '" tidak ditemukan.');
+    }
+    if (order.order_type !== 'delivery') {
+      throw new Error('[DeliveryDispatchService] Order "' + order_id + '" bukan pesanan delivery.');
+    }
+    if (branch_id && order.branch_id !== branch_id) {
+      throw new Error('[DeliveryDispatchService] Pesanan berada di luar kewenangan cabang kasir.');
+    }
+    const delivery = orderRepository.findDeliveryByOrderId(order_id);
+    if (!delivery) {
+      throw new Error('[DeliveryDispatchService] Data delivery untuk pesanan "' + order_id + '" tidak ditemukan.');
+    }
+    if (delivery.status !== DeliveryModel.STATUS.DELIVERED) {
+      throw new Error('[DeliveryDispatchService] Handover kas COD hanya dapat dilakukan setelah delivery berstatus delivered.');
+    }
+    const now = new Date().toISOString();
+    orderRepository.recordDeliveryCodHandover({
+      orderId: order_id,
+      codHandedOverTo: cashier_id || null,
+      updatedAt: now
+    });
+    return {
+      success: true,
+      order_id,
+      cod_collection_status: 'handed_over',
+      cod_cash_custody: 'cashier',
+      cod_handed_over_at: now,
+      cod_handed_over_to: cashier_id || null
+    };
   }
 }
 

@@ -12354,7 +12354,7 @@ async function loadMenusView() {
         btn.addEventListener('click', async function () {
           var id = btn.getAttribute('data-id');
           var host = btn.getAttribute('data-host');
-          if (!confirm('Hapus domain "' + host + '" dari Xentra Registry?')) return;
+          if (!await confirmFeatureAction('delete-platform-domain', 'Hapus Domain', 'Hapus domain "' + host + '" dari Xentra Registry?', 'Hapus')) return;
           try {
             var res = await fetch(API_BASE + '/platform/domains/' + id, {
               method: 'DELETE',

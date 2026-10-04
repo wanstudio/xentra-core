@@ -77,6 +77,69 @@ class PosLocalOperationService {
   }
 
   /**
+   * Replaces / re-enrolls a POS terminal for a branch (e.g. Cashier device replacement or setup).
+   * Atomically deactivates any existing active terminal for the branch and binds the new device,
+   * strictly preserving the invariant: 1 Branch = exactly 1 active POS device.
+   */
+  static replaceTerminal({ branch_id, device_name, device_identifier, config_version = 1, replaced_by = null }) {
+    if (!branch_id || typeof branch_id !== 'string') {
+      throw new Error('[PosLocalOperation] "branch_id" is required and must be a valid string.');
+    }
+    if (!device_name || !device_identifier) {
+      throw new Error('[PosLocalOperation] "device_name" and "device_identifier" are required.');
+    }
+
+    const existingActive = posOperationalRepository.findActiveTerminalByBranch(branch_id);
+    if (existingActive && existingActive.device_identifier === device_identifier) {
+      return existingActive;
+    }
+
+    posOperationalRepository.beginTransaction();
+    let terminalId;
+    let oldTerminalId = null;
+    try {
+      if (existingActive) {
+        oldTerminalId = existingActive.id;
+        posOperationalRepository.deactivateTerminal(existingActive.id);
+      }
+
+      terminalId = `pos_term_${crypto.randomBytes(6).toString('hex')}`;
+      const now = new Date().toISOString();
+
+      posOperationalRepository.insertTerminal({
+        id: terminalId,
+        branchId: branch_id,
+        deviceName: device_name,
+        deviceIdentifier: device_identifier,
+        configVersion: config_version,
+        createdAt: now,
+        updatedAt: now
+      });
+
+      posOperationalRepository.commitTransaction();
+    } catch (err) {
+      try { posOperationalRepository.rollbackTransaction(); } catch (_) {}
+      throw err;
+    }
+
+    events.EventBus.publish({
+      type: 'pos.terminal.replaced',
+      producer: 'pos',
+      payload: {
+        terminal_id: terminalId,
+        previous_terminal_id: oldTerminalId,
+        branch_id,
+        device_name,
+        device_identifier,
+        config_version,
+        replaced_by
+      }
+    }).catch(() => {});
+
+    return posOperationalRepository.findTerminalById(terminalId);
+  }
+
+  /**
    * Retrieves active terminal for a branch.
    */
   static getActiveTerminal(branch_id) {

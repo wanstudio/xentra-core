@@ -762,7 +762,9 @@ function requireAuth(allowedRoles = []) {
         '/auth/cashier-onboarding',
         '/auth/cashier-onboarding/status',
         '/auth/cashier-onboarding/pin',
-        '/auth/cashier-onboarding/identity'
+        '/auth/cashier-onboarding/identity',
+        '/pos/terminal/current',
+        '/pos/terminal/replace'
       ];
       const isCashierExempt = cashierExemptPaths.includes(req.path) ||
         (req.originalUrl && cashierExemptPaths.some(p => req.originalUrl.includes(p)));

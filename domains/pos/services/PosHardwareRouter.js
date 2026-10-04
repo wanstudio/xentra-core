@@ -21,7 +21,10 @@ class PosHardwareRouter {
     lines.push({ text: branch_name, align: 'center', bold: true, size: 'double' });
     lines.push({ text: `No: ${order.order_number || order.id}`, align: 'left' });
     lines.push({ text: `Tgl: ${new Date(order.created_at || Date.now()).toLocaleString('id-ID')}`, align: 'left' });
-    lines.push({ text: `Kanal: ${(order.order_channel || 'POS').toUpperCase()} | Tipe: ${(order.order_type || 'Dine-In').toUpperCase()}`, align: 'left' });
+    const typeLabel = String(order.order_type || '').toLowerCase() === 'pickup'
+      ? 'TAKEAWAY'
+      : (order.order_type || 'Dine-In').toUpperCase();
+    lines.push({ text: `Kanal: ${(order.order_channel || 'POS').toUpperCase()} | Tipe: ${typeLabel}`, align: 'left' });
     if (order.table_number) {
       lines.push({ text: `MEJA : ${order.table_number}`, align: 'left', bold: true });
     }

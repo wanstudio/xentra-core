@@ -45,9 +45,19 @@ class CashSettlementService {
       throw new Error(`[CashSettlementService] Order "${order_id}" tidak ditemukan.`);
     }
 
-    const TERMINAL_ORDER_STATUSES = ['completed', 'cancelled', 'expired', 'rejected', 'timeout', 'fulfillment_exception'];
+    const TERMINAL_ORDER_STATUSES = ['cancelled', 'expired', 'rejected', 'timeout', 'fulfillment_exception'];
     if (TERMINAL_ORDER_STATUSES.includes(order.status)) {
       throw new Error(`[CashSettlementService] Tidak dapat menyelesaikan pembayaran tunai untuk pesanan yang sudah berada pada status terminal "${order.status}".`);
+    }
+
+    if (order.status === 'completed') {
+      // Completed Order Exception (Contract v1.1):
+      // Normal COD state is Delivery = delivered, Order = completed, Payment = pending.
+      // Order completion does not close the payment lifecycle for cash/COD.
+      // Blanket terminal-order guard must not block cash settlement when payment_method is cash.
+      if (order.payment_method !== 'cash') {
+        throw new Error(`[CashSettlementService] Tidak dapat menyelesaikan pembayaran tunai untuk pesanan "${order_id}" yang sudah selesai dan bukan pembayaran tunai/COD.`);
+      }
     }
 
     if (order.status === 'pending') {
@@ -175,6 +185,20 @@ class CashSettlementService {
       });
 
       paymentRepository.markOrderPaidByCash({ orderId: order_id, updatedAt: now });
+
+      // Transfer COD cash custody to cashier upon settlement if order has delivery
+      try {
+        const { OrderRepository } = require('../../../core/data/repositories');
+        const oRepo = new OrderRepository();
+        const del = oRepo.findDeliveryByOrderId(order_id);
+        if (del) {
+          oRepo.recordDeliveryCodHandover({
+            orderId: order_id,
+            codHandedOverTo: cashier_id || null,
+            updatedAt: now
+          });
+        }
+      } catch (_) {}
 
       if (payment_group_id) {
         const checks = posBillRepository.findChecks(order_id);

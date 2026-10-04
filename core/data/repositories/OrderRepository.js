@@ -103,12 +103,42 @@ class OrderRepository {
     `, [deliveryId, orderId, driverName, driverPhone, updatedAt, updatedAt]);
   }
 
-  updateDeliveryStatus({ orderId, status, updatedAt }) {
+  updateDeliveryStatus({
+    orderId,
+    status,
+    updatedAt,
+    codCollectionStatus = null,
+    codCashCustody = null,
+    codCollectedAmount = null
+  }) {
+    if (codCollectionStatus !== null || codCashCustody !== null || codCollectedAmount !== null) {
+      return this.db.execute(`
+        UPDATE order_deliveries
+        SET status = ?,
+            cod_collection_status = COALESCE(?, cod_collection_status),
+            cod_cash_custody = COALESCE(?, cod_cash_custody),
+            cod_collected_amount = COALESCE(?, cod_collected_amount),
+            updated_at = ?
+        WHERE order_id = ?
+      `, [status, codCollectionStatus, codCashCustody, codCollectedAmount, updatedAt, orderId]);
+    }
     return this.db.execute(`
       UPDATE order_deliveries
       SET status = ?, updated_at = ?
       WHERE order_id = ?
     `, [status, updatedAt, orderId]);
+  }
+
+  recordDeliveryCodHandover({ orderId, codHandedOverTo = null, updatedAt }) {
+    return this.db.execute(`
+      UPDATE order_deliveries
+      SET cod_collection_status = 'handed_over',
+          cod_cash_custody = 'cashier',
+          cod_handed_over_at = ?,
+          cod_handed_over_to = ?,
+          updated_at = ?
+      WHERE order_id = ?
+    `, [updatedAt, codHandedOverTo, updatedAt, orderId]);
   }
 
   markDelivered({ orderId, updatedAt }) {

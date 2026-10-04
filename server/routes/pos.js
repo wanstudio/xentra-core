@@ -237,6 +237,35 @@ router.post('/pos/orders/:id/cancel-qris-static', requireAuth(['cashier']), (req
     res.json(ManualQrisSettlementService.cancelStaticQrisPayment({ order_id: req.params.id, cashier_id: cashierId, branch_id: branchId, reason: req.body?.reason || 'QRIS statis dibatalkan oleh kasir.' }));
   } catch (err) { res.status(400).json({ success: false, error: err.message }); }
 });
+router.get('/pos/orders/:id', requireAuth(['cashier', 'branch_manager', 'brand_manager', 'owner']), (req, res) => {
+  try {
+    const branchId = req.user.branch_id || req.user.branchId;
+    const userRole = req.user.role;
+    let sql = 'SELECT * FROM orders WHERE id = ? AND brand_id = ?';
+    const params = [req.params.id, req.brand_id];
+    if (['cashier', 'branch_manager'].includes(userRole) && branchId) {
+      sql += ' AND branch_id = ?';
+      params.push(branchId);
+    }
+    const order = db.prepare(sql).get(...params);
+    if (!order) return res.status(404).json({ success: false, error: 'Pesanan tidak ditemukan.' });
+
+    const items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(order.id);
+    const payment = db.prepare('SELECT * FROM order_payments WHERE order_id = ? LIMIT 1').get(order.id);
+    const delivery = db.prepare('SELECT * FROM order_deliveries WHERE order_id = ? LIMIT 1').get(order.id);
+
+    res.json({
+      success: true,
+      order,
+      items,
+      payment: payment || null,
+      delivery: delivery || null
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.get('/pos/sales', requireAuth(['cashier']), (req, res) => {
   try {
     const branchId = req.user.branch_id || req.user.branchId;
@@ -246,10 +275,18 @@ router.get('/pos/sales', requireAuth(['cashier']), (req, res) => {
     }
 
     const rows = db.prepare(`
-      SELECT o.*, p.payment_status AS payment_status
+      SELECT o.*, p.payment_status AS payment_status,
+             d.status AS delivery_status,
+             d.driver_name, d.driver_phone,
+             d.cod_collection_status, d.cod_cash_custody, d.cod_collected_amount,
+             d.cod_handed_over_at, d.cod_handed_over_to
       FROM orders o
       LEFT JOIN order_payments p ON p.order_id = o.id
-      WHERE o.brand_id = ? AND o.branch_id = ? AND o.order_channel = 'pos_cashier'
+      LEFT JOIN order_deliveries d ON d.order_id = o.id
+      WHERE o.brand_id = ? AND o.branch_id = ? AND (
+        o.order_channel = 'pos_cashier'
+        OR (o.order_type = 'delivery' AND o.payment_method = 'cash')
+      )
       ORDER BY o.created_at DESC
       LIMIT 100
     `).all(req.brand_id, branchId);
@@ -1159,6 +1196,55 @@ router.post('/pos/terminal/register', requireAuth(['owner', 'brand_manager', 'br
       device_name: req.body.device_name,
       device_identifier: req.body.device_identifier,
       config_version: req.body.config_version || 1
+    });
+
+    res.json({ success: true, terminal });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/pos/terminal/replace', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), async (req, res) => {
+  try {
+    const userRole = req.user.role;
+    const userBranchId = req.user.branch_id || req.user.branchId;
+    let targetBranchId = req.body.branch_id || userBranchId;
+
+    if (userRole === 'cashier') {
+      if (!userBranchId) {
+        return res.status(403).json({
+          success: false,
+          error: 'Akses ditolak: Akun kasir belum memiliki cabang terdaftar.'
+        });
+      }
+      if (req.body.branch_id && req.body.branch_id !== userBranchId) {
+        return res.status(403).json({
+          success: false,
+          error: `Akses ditolak: Kasir hanya berwenang menghubungkan terminal untuk cabang sendiri (${userBranchId}).`
+        });
+      }
+      targetBranchId = userBranchId;
+    } else if (userRole === 'branch_manager') {
+      if (userBranchId && req.body.branch_id && req.body.branch_id !== userBranchId) {
+        return res.status(403).json({
+          success: false,
+          error: `Akses ditolak: Anda hanya berwenang mengganti terminal untuk cabang Anda (${userBranchId}).`
+        });
+      }
+      targetBranchId = userBranchId;
+    }
+
+    if (!targetBranchId) {
+      return res.status(400).json({ success: false, error: 'Cabang (branch_id) wajib ditentukan.' });
+    }
+
+    const { PosLocalOperationService } = require('../../domains/pos');
+    const terminal = PosLocalOperationService.replaceTerminal({
+      branch_id: targetBranchId,
+      device_name: req.body.device_name,
+      device_identifier: req.body.device_identifier,
+      config_version: req.body.config_version || 1,
+      replaced_by: req.user.id || req.user.user_id || null
     });
 
     res.json({ success: true, terminal });

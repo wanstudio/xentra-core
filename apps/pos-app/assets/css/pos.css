@@ -291,6 +291,10 @@ button,input,select,textarea{font:inherit;font-family:inherit}.pos-shell{min-hei
 .pos-order-modal-actions{margin-top:12px;display:flex;flex-direction:column;gap:8px}
 .pos-order-modal-btn-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
 .pos-order-modal-btn-row .pos-btn{font-size:12px;font-weight:700;padding:8px 4px;height:36px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center}
+.pos-order-modal-action-row{display:flex;gap:8px;width:100%}
+.pos-order-modal-action-row .pos-order-modal-secondary-btn{flex:1;height:40px;font-size:13px;font-weight:700;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;padding:0 8px}
+.pos-order-modal-action-row .pos-order-modal-secondary-btn:disabled{opacity:.45;cursor:not-allowed}
+#pos-clear-confirm-yes{background:var(--danger);border-color:var(--danger);color:#fff}
 .pos-order-modal-pay-btn{width:100%;padding:12px 16px;font-size:14px;font-weight:800;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:6px;background:#0f172a;color:#ffffff;border:1px solid #0f172a;cursor:pointer;transition:all .15s ease;letter-spacing:-0.01em}
 .pos-order-modal-pay-btn:hover{background:#1e293b}
 .pos-order-modal-pay-btn:active{transform:scale(0.99)}

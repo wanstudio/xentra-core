@@ -1216,6 +1216,11 @@ function initSchema(targetDb) {
       driver_phone TEXT,
       tracking_url TEXT,
       status TEXT NOT NULL DEFAULT 'unassigned',
+      cod_collection_status TEXT DEFAULT 'pending',
+      cod_cash_custody TEXT DEFAULT NULL,
+      cod_collected_amount REAL DEFAULT 0,
+      cod_handed_over_at TEXT DEFAULT NULL,
+      cod_handed_over_to TEXT DEFAULT NULL,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
@@ -2631,6 +2636,13 @@ function bootstrapEssentialTenant(targetDb) {
   try { targetDb.exec("ALTER TABLE order_items ADD COLUMN menu_snapshot TEXT;"); } catch (_) {}
   try { targetDb.exec("ALTER TABLE order_addition_batches ADD COLUMN client_transaction_id TEXT;"); } catch (_) {}
   try { targetDb.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_order_addition_batches_client_tx ON order_addition_batches(order_id, client_transaction_id) WHERE client_transaction_id IS NOT NULL;"); } catch (_) {}
+
+  // COD Cash Custody & Handover: order_deliveries tracking columns
+  try { targetDb.exec("ALTER TABLE order_deliveries ADD COLUMN cod_collection_status TEXT DEFAULT 'pending';"); } catch (_) {}
+  try { targetDb.exec("ALTER TABLE order_deliveries ADD COLUMN cod_cash_custody TEXT DEFAULT NULL;"); } catch (_) {}
+  try { targetDb.exec("ALTER TABLE order_deliveries ADD COLUMN cod_collected_amount REAL DEFAULT 0;"); } catch (_) {}
+  try { targetDb.exec("ALTER TABLE order_deliveries ADD COLUMN cod_handed_over_at TEXT DEFAULT NULL;"); } catch (_) {}
+  try { targetDb.exec("ALTER TABLE order_deliveries ADD COLUMN cod_handed_over_to TEXT DEFAULT NULL;"); } catch (_) {}
 }
 
 /**
