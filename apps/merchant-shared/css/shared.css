@@ -582,7 +582,7 @@ a:focus:not(:focus-visible),
   border: 1px solid var(--border-color, #e2e8f0);
   border-radius: var(--radius-sm, 8px);
   background: transparent;
-  color: var(--text-main, #334155);
+  color: #64748b;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -595,32 +595,32 @@ a:focus:not(:focus-visible),
 
 .x-master-inline-link svg {
   display: block;
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   margin: auto;
   pointer-events: none;
 }
 
 .x-master-inline-link:hover {
-  background: #f1f5f9;
-  border-color: #94a3b8;
-  color: #0f172a;
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #334155;
 }
 
 .x-master-inline-link:active {
   transform: scale(0.95);
-  background: #e2e8f0;
+  background: #f1f5f9;
 }
 
 .x-master-inline-link:focus-visible {
-  outline: 2px solid var(--text-main, #0f172a);
+  outline: 2px solid #94a3b8;
   outline-offset: 2px;
 }
 
 .x-master-inline-link:disabled {
   background: transparent;
-  border-color: #e2e8f0;
-  color: #94a3b8;
+  border-color: #f1f5f9;
+  color: #cbd5e1;
   cursor: not-allowed;
   transform: none;
   opacity: 0.5;

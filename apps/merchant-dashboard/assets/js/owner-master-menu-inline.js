@@ -294,7 +294,7 @@
     button.type = 'button';
     button.className = 'x-master-inline-link';
     button.setAttribute('data-inline-master-action', action);
-    button.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
+    button.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
     button.title = 'Tambah ' + label + ' Baru';
     button.setAttribute('aria-label', 'Tambah ' + label + ' Baru');
     button.addEventListener('click', function() {
