@@ -42,7 +42,7 @@ function buildOfflineStockRequirements(items) {
         const required = menuQty * componentQty;
         const existing = requirements.get(productId);
         if (existing) existing.quantity += required;
-        else requirements.set(productId, { product_id: productId, product_name: component.product_name || productId, quantity: required, menu_type: menuType });
+        else requirements.set(productId, { product_id: productId, product_name: component.product_name || productId, quantity: required });
       }
       continue;
     }
@@ -51,7 +51,7 @@ function buildOfflineStockRequirements(items) {
     if (!productId || !Number.isSafeInteger(quantity) || quantity <= 0) continue;
     const existing = requirements.get(productId);
     if (existing) existing.quantity += quantity;
-    else requirements.set(productId, { product_id: productId, product_name: (item && (item.name || item.product_name)) || productId, quantity, menu_type: null });
+    else requirements.set(productId, { product_id: productId, product_name: (item && (item.name || item.product_name)) || productId, quantity });
   }
   return Array.from(requirements.values());
 }
