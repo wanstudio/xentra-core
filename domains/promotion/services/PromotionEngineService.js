@@ -107,7 +107,6 @@ class PromotionEngineService {
               target_menu_id: evalResult.reward.target_menu_id || resolvedReward.menu_id,
               target_product_id: evalResult.reward.target_product_id || (resolvedReward.source === 'legacy_product' ? resolvedReward.product_id : null),
               menu_id: resolvedReward.menu_id,
-              menu_type: resolvedReward.menu_type,
               product_id: resolvedReward.product_id,
               product_name: resolvedReward.name,
               regular_price: resolvedReward.regular_price,
