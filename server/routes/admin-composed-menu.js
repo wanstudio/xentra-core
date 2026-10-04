@@ -172,7 +172,8 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
         categoryId: body.category_id,
         titleId: body.title_id,
         rasaId: body.rasa_id,
-        levelId: body.level_id,
+        levelId: null,
+        spiceLevel: body.spice_level,
         sellingPrice: body.selling_price,
         status: body.status,
         components: body.components
@@ -187,7 +188,7 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
       const menu = service.updateMenu({
         brandId: req.brand_id, menuId: req.params.id,
         categoryId: body.category_id, titleId: body.title_id, rasaId: body.rasa_id,
-        levelId: body.level_id, sellingPrice: body.selling_price, status: body.status,
+        levelId: null, spiceLevel: body.spice_level, sellingPrice: body.selling_price, status: body.status,
         components: body.components
       });
       res.json({ success: true, menu });
