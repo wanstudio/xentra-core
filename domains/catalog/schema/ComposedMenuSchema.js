@@ -122,10 +122,14 @@ function ensureComposedMenuSchema(db) {
     CREATE TABLE IF NOT EXISTS menus (
       id TEXT PRIMARY KEY,
       brand_id TEXT NOT NULL,
-      category_id TEXT NOT NULL,
-      title_id TEXT NOT NULL,
+      menu_type TEXT DEFAULT 'SINGLE',
+      display_name TEXT,
+      category_id TEXT,
+      title_id TEXT,
+      sub_category_id TEXT,
       rasa_id TEXT,
       level_id TEXT,
+      package_name TEXT,
       selling_price REAL NOT NULL CHECK (selling_price >= 0),
       status TEXT NOT NULL DEFAULT 'DRAFT',
       created_at TEXT DEFAULT (datetime('now')),
@@ -133,6 +137,7 @@ function ensureComposedMenuSchema(db) {
       FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
       FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE RESTRICT,
       FOREIGN KEY (title_id) REFERENCES menu_titles(id) ON DELETE RESTRICT,
+      FOREIGN KEY (sub_category_id) REFERENCES sub_categories(id) ON DELETE RESTRICT,
       FOREIGN KEY (rasa_id) REFERENCES menu_flavors(id) ON DELETE RESTRICT,
       FOREIGN KEY (level_id) REFERENCES menu_levels(id) ON DELETE RESTRICT
     );
