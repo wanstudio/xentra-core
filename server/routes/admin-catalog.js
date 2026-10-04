@@ -144,6 +144,77 @@ router.patch('/admin/categories/:id/archive', requireAuth(['owner', 'brand_manag
   }
 });
 
+router.delete('/admin/categories/:id', requireAuth(['owner', 'brand_manager']), (req, res) => {
+  try {
+    const existing = db.prepare(
+      'SELECT id, name FROM categories WHERE id = ? AND brand_id = ?'
+    ).get(req.params.id, req.brand_id);
+
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Kategori tidak ditemukan.' });
+    }
+
+    // 1. Cek apakah kategori masih digunakan oleh Product Master
+    const productUsage = db.prepare(
+      'SELECT COUNT(*) as count FROM products WHERE category_id = ? AND brand_id = ?'
+    ).get(req.params.id, req.brand_id);
+
+    if (productUsage && productUsage.count > 0) {
+      return res.status(409).json({
+        success: false,
+        error: `Kategori "${existing.name}" tidak dapat dihapus karena masih digunakan oleh ${productUsage.count} Produk. Pindahkan atau hapus produk terlebih dahulu.`
+      });
+    }
+
+    // 2. Cek apakah ada Sub Category atau Menu yang terhubung
+    const subCatUsage = db.prepare(
+      'SELECT COUNT(*) as count FROM sub_categories WHERE category_id = ? AND brand_id = ?'
+    ).get(req.params.id, req.brand_id);
+
+    if (subCatUsage && subCatUsage.count > 0) {
+      return res.status(409).json({
+        success: false,
+        error: `Kategori "${existing.name}" tidak dapat dihapus karena masih memiliki ${subCatUsage.count} Sub Kategori / Menu. Hapus sub kategori terlebih dahulu.`
+      });
+    }
+
+    // 3. Cek apakah ada relasi langsung di menus (jika ada kolom category_id pada cabang/menu)
+    try {
+      const menuUsage = db.prepare(
+        'SELECT COUNT(*) as count FROM menus WHERE category_id = ? AND brand_id = ?'
+      ).get(req.params.id, req.brand_id);
+      if (menuUsage && menuUsage.count > 0) {
+        return res.status(409).json({
+          success: false,
+          error: `Kategori "${existing.name}" tidak dapat dihapus karena masih digunakan oleh ${menuUsage.count} Menu.`
+        });
+      }
+    } catch (_) {
+      // menus table might not have category_id directly if it uses sub_categories
+    }
+
+    // Hapus kategori secara permanen
+    const stmt = db.prepare('DELETE FROM categories WHERE id = ? AND brand_id = ?').run(req.params.id, req.brand_id);
+    if (!stmt || stmt.changes === 0) {
+      return res.status(404).json({ success: false, error: 'Kategori tidak ditemukan atau gagal dihapus.' });
+    }
+
+    res.json({
+      success: true,
+      deleted: true,
+      message: `Kategori "${existing.name}" berhasil dihapus.`
+    });
+  } catch (err) {
+    if (/FOREIGN KEY|constraint/i.test(String(err && err.message))) {
+      return res.status(409).json({
+        success: false,
+        error: 'Kategori tidak dapat dihapus karena masih memiliki data relasi yang terhubung.'
+      });
+    }
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // 13. Admin Products CRUD
 router.get('/admin/products', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {

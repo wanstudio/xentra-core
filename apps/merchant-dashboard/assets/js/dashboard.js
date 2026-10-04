@@ -2565,7 +2565,12 @@
           '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>' +
         '</button>';
 
-      rightControls = toggleSwitch + editBtn;
+      var deleteBtn = '' +
+        '<button type="button" class="x-btn-icon" onclick="deleteMasterReference(\'' + esc(String(type)) + '\', \'' + esc(String(row.id)) + '\')" aria-label="Hapus ' + typeNoun.toLowerCase() + ' ' + esc(row.name) + '" title="Hapus ' + typeNoun + '" style="width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid #fee2e2;background:#ffffff;color:#ef4444;cursor:pointer;transition:all 0.15s ease;">' +
+          '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>' +
+        '</button>';
+
+      rightControls = toggleSwitch + editBtn + deleteBtn;
 
       return [
         '<div class="x-master-reference-card">',
@@ -2632,11 +2637,8 @@
     if (!row) return;
 
     var noun = referenceTypeLabel(type).toLowerCase();
-    var isArchive = type === 'category';
-    var actionLabel = isArchive ? 'Arsipkan' : 'Hapus';
-    var actionMessage = isArchive
-      ? 'Arsipkan ' + noun + ' "' + row.name + '"? Data dan relasinya tetap dipertahankan.'
-      : 'Hapus ' + noun + ' "' + row.name + '"? Tindakan ini tidak dapat dibatalkan.';
+    var actionLabel = 'Hapus';
+    var actionMessage = 'Hapus ' + noun + ' "' + row.name + '"? Data yang sedang digunakan oleh Produk atau Menu tidak dapat dihapus.';
     if (window.XentraPresentation && !await window.XentraPresentation.confirm({
       id: 'delete-master-reference',
       title: actionLabel + ' ' + referenceTypeLabel(type),
@@ -2646,32 +2648,22 @@
     })) return;
 
     try {
-      var endpoint = isArchive ? meta.archiveEndpoint(String(id)) : meta.deleteEndpoint(String(id));
+      var endpoint = meta.deleteEndpoint ? meta.deleteEndpoint(String(id)) : (API_BASE + '/admin/' + type + 's/' + encodeURIComponent(id));
       var res = await adminFetch(endpoint, {
-        method: isArchive ? 'PATCH' : 'DELETE',
+        method: 'DELETE',
         headers: getAuthHeaders()
       });
       var data = await res.json();
 
       if (!res.ok || !data.success) {
-        throw new Error(data.error || (isArchive ? 'Gagal mengarsipkan ' + noun + '.' : 'Gagal menghapus ' + noun + '.'));
+        throw new Error(data.error || ('Gagal menghapus ' + noun + '.'));
       }
 
       if (type === 'category') {
-        var updatedCategory = data.category;
-        if (!updatedCategory) throw new Error('Server tidak mengembalikan kategori hasil arsip.');
-        var categoryRows = state.categories || [];
-        var categoryIndex = categoryRows.findIndex(function(item) { return String(item.id) === String(id); });
-        if (categoryIndex >= 0) categoryRows[categoryIndex] = updatedCategory;
-        else categoryRows.push(updatedCategory);
-        state.categories = categoryRows;
+        state.categories = (state.categories || []).filter(function(item) { return String(item.id) !== String(id); });
         populateProductCategorySelect();
         renderProductCategoryFilterChips();
         renderMasterProductsTable();
-        renderMasterReferenceList(type);
-        renderMasterMenuCustomerPreview();
-        showToast(data.message || 'Kategori diarsipkan.', 'success');
-        return;
       } else {
         _masterMenuComponents[type] = (_masterMenuComponents[type] || []).filter(function(item) { return String(item.id) !== String(id); });
         renderMasterMenuSelectors();
@@ -2679,7 +2671,7 @@
 
       renderMasterReferenceList(type);
       renderMasterMenuCustomerPreview();
-      showToast(referenceTypeLabel(type) + ' dihapus.', 'success');
+      showToast(data.message || (referenceTypeLabel(type) + ' berhasil dihapus.'), 'success');
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -2758,6 +2750,7 @@
       placeholder: 'Contoh: Makanan Berat',
       description: 'Pengelompokan Produk Master / Judul Menu',
       endpoint: function () { return API_BASE + '/admin/categories'; },
+      deleteEndpoint: function (id) { return API_BASE + '/admin/categories/' + encodeURIComponent(id); },
       archiveEndpoint: function (id) { return API_BASE + '/admin/categories/' + encodeURIComponent(id) + '/archive'; },
       payload: function (name) { return { name: name }; }
     },
