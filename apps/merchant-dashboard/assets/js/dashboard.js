@@ -3324,11 +3324,11 @@
   var _productEditorActiveState = 1;
 
   function resetProductEditorForAdd() {
-    $('product-editor-title').textContent = 'Tambah Product Atomic';
+    $('product-editor-title').textContent = 'Tambah Product';
     $('prod-editor-breadcrumb').textContent = 'Tambah Product';
-    $('prod-editor-subtitle').textContent = 'Product adalah unit catalog/stock. Taxonomy, harga jual, dan identitas customer dikelola oleh Menu.';
+    $('prod-editor-subtitle').textContent = 'Product satuan yang digunakan dan dihitung dalam stock, seperti ayam, ikan, bumbu, dan lainnya.';
     if ($('product-editor-mobile-title')) $('product-editor-mobile-title').textContent = 'Tambah Product';
-    if ($('product-editor-mobile-subtitle')) $('product-editor-mobile-subtitle').textContent = 'Buat unit Product atomic; harga dan taxonomy customer dikelola oleh Menu.';
+    if ($('product-editor-mobile-subtitle')) $('product-editor-mobile-subtitle').textContent = 'Product satuan yang digunakan dan dihitung dalam stock, seperti ayam, ikan, bumbu, dan lainnya.';
     $('prod-id').value = '';
     $('prod-name').value = '';
     $('prod-sku').value = '';
