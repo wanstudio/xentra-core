@@ -129,43 +129,6 @@ router.patch('/admin/categories/:id/archive', requireAuth(['owner', 'brand_manag
   }
 });
 
-router.delete('/admin/categories/:id', requireAuth(['owner', 'brand_manager']), (req, res) => {
-  try {
-    const existing = db.prepare(
-      'SELECT id, name, is_active FROM categories WHERE id = ? AND brand_id = ?'
-    ).get(req.params.id, req.brand_id);
-
-    if (!existing) {
-      return res.status(404).json({ success: false, error: 'Kategori tidak ditemukan.' });
-    }
-
-    // Taxonomy lifecycle is archive-first. A Category may be referenced by
-    // Products, Sub Categories, or Menus, so hard deletion is not allowed.
-    const stmt = db.prepare(`
-      UPDATE categories
-      SET is_active = 0
-      WHERE id = ? AND brand_id = ?
-    `).run(req.params.id, req.brand_id);
-
-    if (!stmt || stmt.changes === 0) {
-      return res.status(404).json({ success: false, error: 'Kategori tidak ditemukan atau tidak berubah.' });
-    }
-
-    const category = db.prepare(
-      'SELECT * FROM categories WHERE id = ? AND brand_id = ?'
-    ).get(req.params.id, req.brand_id);
-
-    res.json({
-      success: true,
-      archived: true,
-      message: 'Kategori berhasil diarsipkan.',
-      category
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
 // 13. Admin Products CRUD
 router.get('/admin/products', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
