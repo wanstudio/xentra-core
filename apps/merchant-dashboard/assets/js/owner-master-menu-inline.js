@@ -16,6 +16,7 @@
 
   var API_BASE = (window.XentraShared && window.XentraShared.API_BASE) || '/api/v1';
   var shared = window.XentraShared || {};
+  var createdProducts = [];
 
   function adminFetch(url, options) {
     if (typeof shared.adminFetch === 'function') return shared.adminFetch(url, options);
@@ -183,6 +184,7 @@
     });
 
     var product = data.product;
+    createdProducts.push(product);
     var label = product.name + (product.sku ? ' · SKU ' + product.sku : '');
     addOption(document.getElementById('cm-product'), product.id, label, true);
 
@@ -326,11 +328,22 @@
     row.appendChild(button);
   }
 
+  function syncCreatedProductOptions() {
+    document.querySelectorAll('[data-cm-product]').forEach(function(select) {
+      createdProducts.forEach(function(product) {
+        var id = String(product.id || '');
+        if (!id || Array.from(select.options).some(function(option) { return String(option.value) === id; })) return;
+        addOption(select, id, product.name + (product.sku ? ' · SKU ' + product.sku : ''), false);
+      });
+    });
+  }
+
   function injectQuickCreateControls() {
     addButtonToFormGroup('cm-product', 'product', 'Product', createProductInline);
     addButtonToFormGroup('cm-category', 'category', 'Kategori', createCategoryInline);
     addButtonToFormGroup('cm-sub-category', 'sub-category', 'Sub Category', createSubCategoryInline);
     addButtonToFormGroup('cm-rasa', 'rasa', 'Rasa', createRasaInline);
+    syncCreatedProductOptions();
 
     var packageAdd = document.getElementById('btn-cm-add-component');
     if (packageAdd && !document.querySelector('[data-inline-master-action="package-product"]')) {
@@ -341,10 +354,7 @@
       button.textContent = '+ Buat Product';
       button.style.cssText = 'margin-top:8px;padding:8px 12px;font-size:12px;';
       button.addEventListener('click', function() {
-        createProductInline().then(function() {
-          var add = document.getElementById('btn-cm-add-component');
-          if (add) add.click();
-        }).catch(function(err) {
+        createProductInline().catch(function(err) {
           console.error('[Master Menu Inline]', err);
           toast('❌ ' + (err.message || 'Gagal membuat Product.'));
         });
