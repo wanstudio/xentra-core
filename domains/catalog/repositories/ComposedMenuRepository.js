@@ -31,49 +31,33 @@ class ComposedMenuRepository {
     );
   }
 
-  findSubCategory({ brandId, subCategoryId }) {
+  findTitle({ brandId, titleId }) {
     return this.db.queryOne(
-      "SELECT sc.id, sc.brand_id, sc.category_id, sc.name, sc.slug, sc.sort_order, sc.is_active, " +
-      "c.name AS category_name, c.slug AS category_slug " +
-      "FROM sub_categories sc " +
-      "JOIN categories c ON c.id = sc.category_id AND c.brand_id = sc.brand_id " +
-      "WHERE sc.id = ? AND sc.brand_id = ?",
-      [subCategoryId, brandId]
+      "SELECT id, brand_id, name, slug, sort_order, is_active FROM menu_titles WHERE id = ? AND brand_id = ?",
+      [titleId, brandId]
     );
   }
 
-  findSubCategoryByName({ brandId, name }) {
+  findTitleByName({ brandId, name }) {
     return this.db.queryOne(
-      "SELECT sc.id, sc.brand_id, sc.category_id, sc.name, sc.slug, sc.sort_order, sc.is_active, " +
-      "c.name AS category_name, c.slug AS category_slug " +
-      "FROM sub_categories sc " +
-      "JOIN categories c ON c.id = sc.category_id AND c.brand_id = sc.brand_id " +
-      "WHERE sc.brand_id = ? AND lower(trim(sc.name)) = lower(trim(?)) LIMIT 1",
+      "SELECT id, brand_id, name, slug, sort_order, is_active FROM menu_titles WHERE brand_id = ? AND lower(trim(name)) = lower(trim(?)) LIMIT 1",
       [brandId, name]
     );
   }
 
-  listSubCategories({ brandId, categoryId = null, activeOnly = false }) {
-    const categoryFilter = categoryId == null ? '' : ' AND sc.category_id = ?';
-    const activeFilter = activeOnly ? ' AND sc.is_active = 1 AND c.is_active = 1' : '';
-    const params = categoryId == null ? [brandId] : [brandId, categoryId];
-
+  listTitles({ brandId, activeOnly = false }) {
+    const activeFilter = activeOnly ? ' AND is_active = 1' : '';
     return this.db.queryMany(
-      "SELECT sc.id, sc.brand_id, sc.category_id, sc.name, sc.slug, sc.sort_order, sc.is_active, " +
-      "c.name AS category_name, c.slug AS category_slug " +
-      "FROM sub_categories sc " +
-      "JOIN categories c ON c.id = sc.category_id AND c.brand_id = sc.brand_id " +
-      "WHERE sc.brand_id = ?" + categoryFilter + activeFilter +
-      " ORDER BY sc.sort_order ASC, sc.name ASC, sc.id ASC",
-      params
+      "SELECT id, brand_id, name, slug, sort_order, is_active FROM menu_titles WHERE brand_id = ?" + activeFilter +
+      " ORDER BY sort_order ASC, name ASC, id ASC",
+      [brandId]
     );
   }
 
-  createSubCategory({ id, brandId, categoryId, name, slug, sortOrder }) {
+  createTitle({ id, brandId, name, slug, sortOrder = null }) {
     return this.db.execute(
-      "INSERT INTO sub_categories (id, brand_id, category_id, name, slug, sort_order, is_active) " +
-      "VALUES (?, ?, ?, ?, ?, COALESCE(?, 0), 1)",
-      [id, brandId, categoryId, name, slug, sortOrder]
+      "INSERT INTO menu_titles (id, brand_id, name, slug, sort_order, is_active) VALUES (?, ?, ?, ?, COALESCE(?, 0), 1)",
+      [id, brandId, name, slug, sortOrder]
     );
   }
 
@@ -158,16 +142,12 @@ class ComposedMenuRepository {
 
   findMenu({ brandId, menuId }) {
     return this.db.queryOne(
-      "SELECT m.id, m.brand_id, m.menu_type, m.display_name, m.category_id AS menu_category_id, m.sub_category_id, m.rasa_id, m.level_id, " +
-      "m.package_name, m.selling_price, m.status, m.created_at, m.updated_at, " +
-      "sc.name AS sub_category_name, sc.slug AS sub_category_slug, " +
-      "COALESCE(c_menu.id, c_sub.id) AS category_id, COALESCE(c_menu.name, c_sub.name) AS category_name, COALESCE(c_menu.slug, c_sub.slug) AS category_slug, " +
-      "r.name AS rasa_name, r.slug AS rasa_slug, " +
-      "l.name AS level_name, l.slug AS level_slug, l.sort_order AS level_sort_order " +
+      "SELECT m.id, m.brand_id, m.category_id, m.title_id, m.rasa_id, m.level_id, m.selling_price, m.status, m.created_at, m.updated_at, " +
+      "c.name AS category_name, c.slug AS category_slug, t.name AS title_name, t.slug AS title_slug, " +
+      "r.name AS rasa_name, r.slug AS rasa_slug, l.name AS level_name, l.slug AS level_slug, l.sort_order AS level_sort_order " +
       "FROM menus m " +
-      "LEFT JOIN sub_categories sc ON sc.id = m.sub_category_id AND sc.brand_id = m.brand_id " +
-      "LEFT JOIN categories c_menu ON c_menu.id = m.category_id AND c_menu.brand_id = m.brand_id " +
-      "LEFT JOIN categories c_sub ON c_sub.id = sc.category_id AND c_sub.brand_id = m.brand_id " +
+      "JOIN categories c ON c.id = m.category_id AND c.brand_id = m.brand_id " +
+      "JOIN menu_titles t ON t.id = m.title_id AND t.brand_id = m.brand_id " +
       "LEFT JOIN menu_flavors r ON r.id = m.rasa_id AND r.brand_id = m.brand_id " +
       "LEFT JOIN menu_levels l ON l.id = m.level_id AND l.brand_id = m.brand_id " +
       "WHERE m.id = ? AND m.brand_id = ?",
@@ -175,33 +155,23 @@ class ComposedMenuRepository {
     );
   }
 
-  findSingleMenuByName({ brandId, categoryId, displayName }) {
+  findMenuByIdentity({ brandId, categoryId, titleId, rasaId = null }) {
     return this.db.queryOne(
-      "SELECT id, brand_id, menu_type, display_name, category_id, sub_category_id, rasa_id, level_id, package_name, selling_price, status " +
-      "FROM menus WHERE brand_id = ? AND menu_type = 'SINGLE' AND category_id = ? AND lower(trim(display_name)) = lower(trim(?)) LIMIT 1",
-      [brandId, categoryId, displayName]
+      "SELECT id, brand_id, category_id, title_id, rasa_id, level_id, selling_price, status " +
+      "FROM menus WHERE brand_id = ? AND category_id = ? AND title_id = ? AND COALESCE(rasa_id, '') = COALESCE(?, '') LIMIT 1",
+      [brandId, categoryId, titleId, rasaId]
     );
   }
 
-  findSingleMenuByIdentity({ brandId, subCategoryId, rasaId }) {
-    return this.db.queryOne(
-      "SELECT id, brand_id, menu_type, sub_category_id, rasa_id, level_id, package_name, selling_price, status " +
-      "FROM menus WHERE brand_id = ? AND menu_type = 'SINGLE' AND sub_category_id = ? AND rasa_id = ? LIMIT 1",
-      [brandId, subCategoryId, rasaId]
-    );
-  }
-
-  createMenu({ id, brandId, menuType, displayName = null, categoryId = null, subCategoryId = null, rasaId = null, levelId = null, packageName = null, sellingPrice, status }) {
+  createMenu({ id, brandId, categoryId, titleId, rasaId = null, levelId = null, sellingPrice, status }) {
     return this.db.execute(
-      "INSERT INTO menus " +
-      "(id, brand_id, menu_type, display_name, category_id, sub_category_id, rasa_id, level_id, package_name, selling_price, status) " +
-      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      [id, brandId, menuType, displayName, categoryId, subCategoryId, rasaId, levelId, packageName, sellingPrice, status]
+      "INSERT INTO menus (id, brand_id, category_id, title_id, rasa_id, level_id, selling_price, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      [id, brandId, categoryId, titleId, rasaId, levelId, sellingPrice, status]
     );
   }
 
   updateMenu({ brandId, menuId, fields }) {
-    const allowed = ['display_name', 'category_id', 'sub_category_id', 'rasa_id', 'level_id', 'package_name', 'selling_price', 'status'];
+    const allowed = ['category_id', 'title_id', 'rasa_id', 'level_id', 'selling_price', 'status'];
     const sets = [];
     const params = [];
     for (const key of allowed) {
@@ -244,33 +214,20 @@ class ComposedMenuRepository {
     );
   }
 
-  listMenus({ brandId, menuType = null, status = null }) {
+  listMenus({ brandId, status = null }) {
     const clauses = ['m.brand_id = ?'];
     const params = [brandId];
-    if (menuType) {
-      clauses.push('m.menu_type = ?');
-      params.push(menuType);
-    }
-    if (status) {
-      clauses.push('m.status = ?');
-      params.push(status);
-    }
-
+    if (status) { clauses.push('m.status = ?'); params.push(status); }
     return this.db.queryMany(
-      "SELECT m.id, m.brand_id, m.menu_type, m.display_name, m.category_id AS menu_category_id, m.sub_category_id, m.rasa_id, m.level_id, " +
-      "m.package_name, m.selling_price, m.status, " +
-      "sc.name AS sub_category_name, sc.slug AS sub_category_slug, " +
-      "COALESCE(c_menu.id, c_sub.id) AS category_id, COALESCE(c_menu.name, c_sub.name) AS category_name, COALESCE(c_menu.slug, c_sub.slug) AS category_slug, " +
-      "r.name AS rasa_name, r.slug AS rasa_slug, " +
-      "l.name AS level_name, l.slug AS level_slug, l.sort_order AS level_sort_order " +
-      "FROM menus m " +
-      "LEFT JOIN sub_categories sc ON sc.id = m.sub_category_id AND sc.brand_id = m.brand_id " +
-      "LEFT JOIN categories c_menu ON c_menu.id = m.category_id AND c_menu.brand_id = m.brand_id " +
-      "LEFT JOIN categories c_sub ON c_sub.id = sc.category_id AND c_sub.brand_id = m.brand_id " +
+      "SELECT m.id, m.brand_id, m.category_id, m.title_id, m.rasa_id, m.level_id, m.selling_price, m.status, " +
+      "c.name AS category_name, c.slug AS category_slug, t.name AS title_name, t.slug AS title_slug, " +
+      "r.name AS rasa_name, r.slug AS rasa_slug, l.name AS level_name, l.slug AS level_slug, l.sort_order AS level_sort_order " +
+      "FROM menus m JOIN categories c ON c.id = m.category_id AND c.brand_id = m.brand_id " +
+      "JOIN menu_titles t ON t.id = m.title_id AND t.brand_id = m.brand_id " +
       "LEFT JOIN menu_flavors r ON r.id = m.rasa_id AND r.brand_id = m.brand_id " +
       "LEFT JOIN menu_levels l ON l.id = m.level_id AND l.brand_id = m.brand_id " +
       "WHERE " + clauses.join(' AND ') +
-      " ORDER BY COALESCE(c_menu.name, c_sub.name, '') ASC, COALESCE(sc.sort_order, 999999) ASC, COALESCE(m.display_name, m.package_name, '') ASC, m.id ASC",
+      " ORDER BY c.name ASC, t.name ASC, COALESCE(r.name, '') ASC, m.id ASC",
       params
     );
   }
