@@ -34,10 +34,11 @@ function isOriginalRasa(name) {
 }
 
 function resolveCustomerTitle(menu) {
-  return menu.display_name ||
-    (menu.menu_type === 'PACKAGE'
-      ? (menu.package_name || menu.sub_category_name || 'Paket')
-      : (menu.sub_category_name || 'Menu'));
+  const title = String(menu.title_name || '').trim();
+  const rasa = String(menu.rasa_name || '').trim();
+  if (!title) return 'Menu';
+  if (!rasa || isOriginalRasa(rasa)) return title;
+  return title + ' ' + rasa;
 }
 
 function resolveMenuBase(menu, branchState = null) {
@@ -50,15 +51,14 @@ function resolveMenuBase(menu, branchState = null) {
   return {
     id: menu.id,
     menu_id: menu.id,
-    menu_type: menu.menu_type,
     title: displayNameOverride || resolveCustomerTitle(menu),
     subtitle: menu.rasa_name && !rasaIsOriginal ? menu.rasa_name : null,
     price: Number(menu.selling_price),
     category: menu.category_id
       ? { id: menu.category_id, name: menu.category_name, slug: menu.category_slug }
       : null,
-    sub_category: menu.sub_category_id
-      ? { id: menu.sub_category_id, name: menu.sub_category_name, slug: menu.sub_category_slug }
+    title_master: menu.title_id
+      ? { id: menu.title_id, name: menu.title_name, slug: menu.title_slug }
       : null,
     rasa: menu.rasa_id
       ? { id: menu.rasa_id, name: menu.rasa_name, slug: menu.rasa_slug }
@@ -71,7 +71,7 @@ function resolveMenuBase(menu, branchState = null) {
   };
 }
 
-function calculateInventory(menuItems, inventoryRows, menuType = null, checkStock = true) {
+function calculateInventory(menuItems, inventoryRows, checkStock = true) {
   const inventoryMap = new Map(
     (inventoryRows || []).map(row => [String(row.product_id), row])
   );
@@ -88,15 +88,6 @@ function calculateInventory(menuItems, inventoryRows, menuType = null, checkStoc
 
   const totalUnits = normalizedItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
   if (normalizedItems.some(item => Number(item.quantity) <= 0)) {
-    blocking = blocking || 'MENU_COMPOSITION_INVALID';
-  }
-  if (menuType === 'SINGLE' && (
-    normalizedItems.length !== 1 ||
-    Number(normalizedItems[0] && normalizedItems[0].quantity) !== 1
-  )) {
-    blocking = blocking || 'MENU_COMPOSITION_INVALID';
-  }
-  if (menuType === 'PACKAGE' && totalUnits < 2) {
     blocking = blocking || 'MENU_COMPOSITION_INVALID';
   }
 
@@ -251,7 +242,7 @@ class ComposedMenuResolver {
         ? base.price
         : Number(branchState.price_override);
 
-      const inventoryState = calculateInventory(itemMap.get(String(menu.id)) || [], inventory, menu.menu_type);
+      const inventoryState = calculateInventory(itemMap.get(String(menu.id)) || [], inventory);
 
       const menuStatusValid = String(menu.status).toUpperCase() === 'ACTIVE';
       const categoryMemberships = membershipMap.get(String(menu.id)) || [];
