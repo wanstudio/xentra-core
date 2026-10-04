@@ -2560,17 +2560,12 @@
           '<span class="x-toggle-slider"></span>' +
         '</label>';
 
-      var editBtn = '' +
-        '<button type="button" class="x-btn-icon" onclick="openEditMasterReference(\'' + esc(String(type)) + '\', \'' + esc(String(row.id)) + '\')" aria-label="Edit ' + typeNoun.toLowerCase() + ' ' + esc(row.name) + '" title="Edit ' + typeNoun + '" style="width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid #e2e8f0;background:#ffffff;color:#475569;cursor:pointer;transition:all 0.15s ease;">' +
-          '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>' +
+      var actionMenuBtn = '' +
+        '<button type="button" class="x-action-menu-trigger" aria-label="Aksi ' + typeNoun.toLowerCase() + '" data-master-reference-action="' + esc(String(type)) + '" data-reference-id="' + esc(String(row.id)) + '">' +
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>' +
         '</button>';
 
-      var deleteBtn = '' +
-        '<button type="button" class="x-btn-icon" onclick="deleteMasterReference(\'' + esc(String(type)) + '\', \'' + esc(String(row.id)) + '\')" aria-label="Hapus ' + typeNoun.toLowerCase() + ' ' + esc(row.name) + '" title="Hapus ' + typeNoun + '" style="width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid #fee2e2;background:#ffffff;color:#ef4444;cursor:pointer;transition:all 0.15s ease;">' +
-          '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>' +
-        '</button>';
-
-      rightControls = toggleSwitch + editBtn + deleteBtn;
+      rightControls = toggleSwitch + actionMenuBtn;
 
       return [
         '<div class="x-master-reference-card">',
@@ -3940,7 +3935,7 @@ async function loadMenusView() {
           onClick: function () { openEditMasterReference(type, id); }
         },
         {
-          label: type === 'category' ? 'Arsipkan' : 'Hapus',
+          label: 'Hapus',
           icon: '🗑️',
           destructive: true,
           onClick: function () { deleteMasterReference(type, id); }
