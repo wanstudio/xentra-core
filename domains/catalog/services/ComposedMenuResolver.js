@@ -34,9 +34,10 @@ function isOriginalRasa(name) {
 }
 
 function resolveCustomerTitle(menu) {
-  return menu.menu_type === 'PACKAGE'
-    ? (menu.package_name || menu.sub_category_name || 'Paket')
-    : (menu.sub_category_name || '');
+  return menu.display_name ||
+    (menu.menu_type === 'PACKAGE'
+      ? (menu.package_name || menu.sub_category_name || 'Paket')
+      : (menu.sub_category_name || 'Menu'));
 }
 
 function resolveMenuBase(menu, branchState = null) {
