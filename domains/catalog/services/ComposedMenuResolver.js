@@ -53,6 +53,11 @@ function resolveMenuBase(menu, branchState = null) {
     title: displayNameOverride || resolveCustomerTitle(menu),
     subtitle: menu.rasa_name && !rasaIsOriginal ? menu.rasa_name : null,
     price: Number(menu.selling_price),
+    // Menu media is the sole customer-facing presentation source. Do not
+    // derive this from component Product media; a Package may contain many
+    // Products with unrelated images.
+    image_url: menu.image_url || null,
+    media_id: menu.media_id || null,
     category: menu.category_id
       ? { id: menu.category_id, name: menu.category_name, slug: menu.category_slug }
       : null,
