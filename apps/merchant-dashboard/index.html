@@ -1873,8 +1873,16 @@
                   <select id="cm-rasa" class="x-input"></select>
                 </div>
                 <div class="x-form-group">
-                  <label for="cm-level">Level Pedas</label>
-                  <select id="cm-level" class="x-input"></select>
+                  <label>Pedas</label>
+                  <input type="hidden" id="cm-spice-level" value="0">
+                  <div id="cm-spice-scale" role="radiogroup" aria-label="Tingkat pedas" style="display:flex;align-items:center;gap:10px;padding:10px 0;">
+                    <button type="button" class="cm-spice-dot" data-spice="0" aria-label="Tidak pedas" aria-pressed="true" style="width:24px;height:24px;border-radius:50%;border:2px solid #cbd5e1;background:#fff;padding:0;cursor:pointer;"></button>
+                    <button type="button" class="cm-spice-dot" data-spice="1" aria-label="Pedas 1" aria-pressed="false" style="width:24px;height:24px;border-radius:50%;border:2px solid #cbd5e1;background:#fff;padding:0;cursor:pointer;"></button>
+                    <button type="button" class="cm-spice-dot" data-spice="2" aria-label="Pedas 2" aria-pressed="false" style="width:24px;height:24px;border-radius:50%;border:2px solid #cbd5e1;background:#fff;padding:0;cursor:pointer;"></button>
+                    <button type="button" class="cm-spice-dot" data-spice="3" aria-label="Pedas 3" aria-pressed="false" style="width:24px;height:24px;border-radius:50%;border:2px solid #cbd5e1;background:#fff;padding:0;cursor:pointer;"></button>
+                    <button type="button" class="cm-spice-dot" data-spice="4" aria-label="Pedas 4" aria-pressed="false" style="width:24px;height:24px;border-radius:50%;border:2px solid #cbd5e1;background:#fff;padding:0;cursor:pointer;"></button>
+                  </div>
+                  <small class="text-muted" style="display:block;font-size:11px;">Pilih posisi pada skala. Tidak ada definisi Level 1/2/3/4.</small>
                 </div>
               </div>
 
