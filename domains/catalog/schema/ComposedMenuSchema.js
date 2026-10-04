@@ -102,6 +102,9 @@ function ensureComposedMenuSchema(db) {
       rasa_id TEXT,
       level_id TEXT,
       package_name TEXT,
+      media_id TEXT,
+      image_url TEXT,
+      image TEXT,
       selling_price REAL NOT NULL CHECK (selling_price >= 0),
       status TEXT NOT NULL DEFAULT 'DRAFT',
       created_at TEXT DEFAULT (datetime('now')),
@@ -370,6 +373,11 @@ function ensureComposedMenuSchema(db) {
   // Triggers are used instead of a new unique index because legacy rows may
   // predate this contract and must not make additive schema initialization fail.
   try { db.exec('ALTER TABLE branch_menus ADD COLUMN display_name_override TEXT;'); } catch (_) {}
+  // Menu media is customer-facing presentation authority. Product media must
+  // never be used as an implicit fallback for Menu cards or package imagery.
+  try { db.exec('ALTER TABLE menus ADD COLUMN media_id TEXT;'); } catch (_) {}
+  try { db.exec('ALTER TABLE menus ADD COLUMN image_url TEXT;'); } catch (_) {}
+  try { db.exec('ALTER TABLE menus ADD COLUMN image TEXT;'); } catch (_) {}
 
   db.exec(`
     CREATE TRIGGER IF NOT EXISTS trg_menu_flavors_brand_name_unique_insert
