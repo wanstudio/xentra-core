@@ -1340,7 +1340,7 @@
           menu_subtitle: menu.subtitle || '',
           price: Number(menu.price || 0),
           regular_price: Number(menu.price || 0),
-          product_id: menu.menu_type === 'SINGLE' && first ? first.product_id : null,
+          product_id: first ? first.product_id : null,
           description: first ? (first.description || '') : '',
           image_url: first ? (first.image_url || '') : '',
           component_snapshot: components,
