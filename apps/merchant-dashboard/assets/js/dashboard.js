@@ -2551,17 +2551,6 @@
         description = 'Indikator Customer · satu per Produk Master';
       }
 
-      return [
-        '<div class="x-master-reference-card">',
-          '<div class="x-master-reference-card-main">',
-            '<div class="x-master-reference-icon ' + referenceIconClass(type) + '" aria-hidden="true">',
-              '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">' + referenceIconSvg(type) + '</svg>',
-            '</div>',
-            '<div class="x-master-reference-copy">',
-              '<strong>' + esc(row.name) + '</strong>',
-              '<span>' + esc(description) + '</span>',
-            '</div>',
-          '</div>',
       var rightControls = '';
       if (type === 'category') {
         var isCatActive = row.is_active !== 0 && row.is_active !== null;
