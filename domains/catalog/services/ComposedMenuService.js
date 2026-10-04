@@ -280,7 +280,10 @@ class ComposedMenuService {
     rasaId = null,
     levelId = null,
     sellingPrice,
-    status = 'DRAFT'
+    status = 'DRAFT',
+    mediaId = null,
+    imageUrl = null,
+    image = null
   }) {
     ensureSchema();
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
@@ -330,7 +333,10 @@ class ComposedMenuService {
         levelId: normalizedLevelId,
         packageName: null,
         sellingPrice: price,
-        status: menuStatus
+        status: menuStatus,
+        mediaId,
+        imageUrl,
+        image
       });
 
       repository.replaceMenuItems({
@@ -358,7 +364,10 @@ class ComposedMenuService {
     rasaId = undefined,
     levelId = undefined,
     sellingPrice,
-    status = undefined
+    status = undefined,
+    mediaId = undefined,
+    imageUrl = undefined,
+    image = undefined
   }) {
     ensureSchema();
     const current = repository.findMenu({ brandId, menuId });
@@ -413,7 +422,10 @@ class ComposedMenuService {
           level_id: nextLevelId,
           package_name: null,
           selling_price: nextPrice,
-          status: nextStatus
+          status: nextStatus,
+          ...(mediaId !== undefined ? { media_id: mediaId } : {}),
+          ...(imageUrl !== undefined ? { image_url: imageUrl } : {}),
+          ...(image !== undefined ? { image: image } : {})
         }
       });
       repository.replaceMenuItems({ menuId, items: [{ productId: product.id, quantity: 1 }] });
@@ -435,7 +447,10 @@ class ComposedMenuService {
     rasaId = undefined,
     levelId = undefined,
     components,
-    status = undefined
+    status = undefined,
+    mediaId = undefined,
+    imageUrl = undefined,
+    image = undefined
   }) {
     ensureSchema();
     const current = repository.findMenu({ brandId, menuId });
@@ -511,7 +526,10 @@ class ComposedMenuService {
           level_id: nextLevelId,
           package_name: nextPackageName,
           selling_price: nextPrice,
-          status: nextStatus
+          status: nextStatus,
+          ...(mediaId !== undefined ? { media_id: mediaId } : {}),
+          ...(imageUrl !== undefined ? { image_url: imageUrl } : {}),
+          ...(image !== undefined ? { image: image } : {})
         }
       });
       repository.replaceMenuItems({ menuId, items: normalizedComponents });
@@ -532,7 +550,10 @@ class ComposedMenuService {
     rasaId = null,
     levelId = null,
     components,
-    status = 'DRAFT'
+    status = 'DRAFT',
+    mediaId = null,
+    imageUrl = null,
+    image = null
   }) {
     ensureSchema();
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
@@ -587,7 +608,10 @@ class ComposedMenuService {
         levelId: normalizedLevelId,
         packageName: normalizedPackageName,
         sellingPrice: price,
-        status: menuStatus
+        status: menuStatus,
+        mediaId,
+        imageUrl,
+        image
       });
 
       repository.replaceMenuItems({
