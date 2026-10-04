@@ -8,13 +8,13 @@ const {
 
 function statusForError(message) {
   switch (message) {
-    case 'MENU_SATUAN_ALREADY_EXISTS':
-    case 'SUB_CATEGORY_ALREADY_EXISTS':
+    case 'MENU_ALREADY_EXISTS':
+    case 'TITLE_ALREADY_EXISTS':
+    case 'TITLE_IN_USE':
     case 'RASA_ALREADY_EXISTS':
+    case 'RASA_IN_USE':
     case 'PRODUCT_SKU_ALREADY_EXISTS':
     case 'PRODUCT_SKU_REMOVAL_BLOCKED_STOCK':
-    case 'MENU_TYPE_MISMATCH':
-    case 'RASA_ORIGINAL_PROTECTED':
       return 409;
     case 'MENU_NOT_FOUND':
     case 'MASTER_PRODUCT_NOT_FOUND':
@@ -141,11 +141,9 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
 
   router.get('/admin/menus', requireAuth(ownerRoles), (req, res) => {
     try {
-      const menuType = req.query && req.query.menu_type ? String(req.query.menu_type).trim().toUpperCase() : null;
       const status = req.query && req.query.status ? String(req.query.status).trim().toUpperCase() : null;
       const menus = service.listMenus({
         brandId: req.brand_id,
-        menuType,
         status
       });
       res.json({ success: true, menus });
@@ -166,84 +164,34 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
     }
   });
 
-  router.post('/admin/menus/single', requireAuth(ownerRoles), (req, res) => {
+  router.post('/admin/menus', requireAuth(ownerRoles), (req, res) => {
     try {
       const body = req.body || {};
-      const menu = service.createSingleMenu({
+      const menu = service.createMenu({
         brandId: req.brand_id,
-        productId: body.product_id,
-        displayName: body.display_name,
         categoryId: body.category_id,
-        subCategoryId: body.sub_category_id,
+        titleId: body.title_id,
         rasaId: body.rasa_id,
         levelId: body.level_id,
         sellingPrice: body.selling_price,
-        status: body.status
+        status: body.status,
+        components: body.components
       });
       res.status(201).json({ success: true, menu });
-    } catch (err) {
-      sendError(res, err, 'COMPOSED_SINGLE_MENU_CREATE_FAILED');
-    }
+    } catch (err) { sendError(res, err, 'COMPOSED_MENU_CREATE_FAILED'); }
   });
 
-  router.put('/admin/menus/:id/single', requireAuth(ownerRoles), (req, res) => {
+  router.put('/admin/menus/:id', requireAuth(ownerRoles), (req, res) => {
     try {
       const body = req.body || {};
-      const menu = service.updateSingleMenu({
-        brandId: req.brand_id,
-        menuId: req.params.id,
-        productId: body.product_id,
-        displayName: body.display_name,
-        categoryId: body.category_id,
-        subCategoryId: body.sub_category_id,
-        rasaId: body.rasa_id,
-        levelId: body.level_id,
-        sellingPrice: body.selling_price,
-        status: body.status
+      const menu = service.updateMenu({
+        brandId: req.brand_id, menuId: req.params.id,
+        categoryId: body.category_id, titleId: body.title_id, rasaId: body.rasa_id,
+        levelId: body.level_id, sellingPrice: body.selling_price, status: body.status,
+        components: body.components
       });
       res.json({ success: true, menu });
-    } catch (err) {
-      sendError(res, err, 'COMPOSED_SINGLE_MENU_UPDATE_FAILED');
-    }
-  });
-
-  router.post('/admin/menus/package', requireAuth(ownerRoles), (req, res) => {
-    try {
-      const body = req.body || {};
-      const menu = service.createPackageMenu({
-        brandId: req.brand_id,
-        packageName: body.package_name,
-        sellingPrice: body.selling_price,
-        subCategoryId: body.sub_category_id,
-        rasaId: body.rasa_id,
-        levelId: body.level_id,
-        components: body.components,
-        status: body.status
-      });
-      res.status(201).json({ success: true, menu });
-    } catch (err) {
-      sendError(res, err, 'COMPOSED_PACKAGE_MENU_CREATE_FAILED');
-    }
-  });
-
-  router.put('/admin/menus/:id/package', requireAuth(ownerRoles), (req, res) => {
-    try {
-      const body = req.body || {};
-      const menu = service.updatePackageMenu({
-        brandId: req.brand_id,
-        menuId: req.params.id,
-        packageName: body.package_name,
-        sellingPrice: body.selling_price,
-        subCategoryId: body.sub_category_id,
-        rasaId: body.rasa_id,
-        levelId: body.level_id,
-        components: body.components,
-        status: body.status
-      });
-      res.json({ success: true, menu });
-    } catch (err) {
-      sendError(res, err, 'COMPOSED_PACKAGE_MENU_UPDATE_FAILED');
-    }
+    } catch (err) { sendError(res, err, 'COMPOSED_MENU_UPDATE_FAILED'); }
   });
 
   router.patch('/admin/menus/:id/status', requireAuth(ownerRoles), (req, res) => {
@@ -333,66 +281,32 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
     }
   });
 
-  router.get('/admin/sub-categories', requireAuth(ownerRoles), (req, res) => {
+  router.get('/admin/titles', requireAuth(ownerRoles), (req, res) => {
     try {
-      const categoryId = req.query && req.query.category_id ? req.query.category_id : null;
       const activeOnly = req.query && (req.query.active_only === '1' || req.query.active_only === 'true');
-      res.json({
-        success: true,
-        sub_categories: service.listSubCategories({
-          brandId: req.brand_id,
-          categoryId,
-          activeOnly
-        })
-      });
-    } catch (err) {
-      sendError(res, err, 'SUB_CATEGORY_LIST_FAILED');
-    }
+      res.json({ success: true, titles: service.listTitles({ brandId: req.brand_id, activeOnly }) });
+    } catch (err) { sendError(res, err, 'TITLE_LIST_FAILED'); }
   });
 
-  router.put('/admin/sub-categories/:id', requireAuth(ownerRoles), (req, res) => {
+  router.post('/admin/titles', requireAuth(ownerRoles), (req, res) => {
     try {
-      const body = req.body || {};
-      const result = service.updateSubCategory({
-        brandId: req.brand_id,
-        subCategoryId: req.params.id,
-        name: body.name,
-        categoryId: body.category_id,
-        slug: body.slug,
-        isActive: body.is_active
-      });
-      res.json({ success: true, ...result });
-    } catch (err) {
-      sendError(res, err, 'SUB_CATEGORY_UPDATE_FAILED');
-    }
+      const body=req.body||{};
+      const title=service.createTitle({brandId:req.brand_id,name:body.name,slug:body.slug,sortOrder:body.sort_order});
+      res.status(201).json({success:true,title});
+    } catch(err){sendError(res,err,'TITLE_CREATE_FAILED');}
   });
 
-  router.delete('/admin/sub-categories/:id', requireAuth(ownerRoles), (req, res) => {
-    try {
-      const result = service.deleteSubCategory({
-        brandId: req.brand_id,
-        subCategoryId: req.params.id
-      });
-      res.json({ success: true, ...result });
-    } catch (err) {
-      sendError(res, err, 'SUB_CATEGORY_DELETE_FAILED');
-    }
+  router.put('/admin/titles/:id', requireAuth(ownerRoles), (req,res)=>{
+    try{
+      const body=req.body||{};
+      const title=service.updateTitle({brandId:req.brand_id,titleId:req.params.id,name:body.name,slug:body.slug,sortOrder:body.sort_order,isActive:body.is_active});
+      res.json({success:true,title});
+    }catch(err){sendError(res,err,'TITLE_UPDATE_FAILED');}
   });
 
-  router.post('/admin/sub-categories', requireAuth(ownerRoles), (req, res) => {
-    try {
-      const body = req.body || {};
-      const subCategory = service.createSubCategory({
-        brandId: req.brand_id,
-        categoryId: body.category_id,
-        name: body.name,
-        slug: body.slug,
-        sortOrder: body.sort_order
-      });
-      res.status(201).json({ success: true, sub_category: subCategory });
-    } catch (err) {
-      sendError(res, err, 'SUB_CATEGORY_CREATE_FAILED');
-    }
+  router.delete('/admin/titles/:id', requireAuth(ownerRoles), (req,res)=>{
+    try{res.json({success:true,...service.deleteTitle({brandId:req.brand_id,titleId:req.params.id})});}
+    catch(err){sendError(res,err,'TITLE_DELETE_FAILED');}
   });
 
   router.get('/admin/rasas', requireAuth(ownerRoles), (req, res) => {
