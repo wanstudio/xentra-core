@@ -65,24 +65,32 @@
       var id = options.id || ('master-inline-' + Date.now());
       var fields = options.fields || [];
       var wrap = document.createElement('div');
+      wrap.className = 'x-master-inline-sheet-content';
       wrap.innerHTML =
-        '<div style="display:flex;flex-direction:column;gap:12px;">' +
-          fields.map(function(field, index) {
-            return '<div>' +
-              '<label style="display:block;font-size:12px;font-weight:700;margin-bottom:6px;">' +
-                esc(field.label || field.name) + (field.required === false ? ' <span style="font-weight:400;color:#94a3b8;">(opsional)</span>' : ' <span style="color:#ef4444;">*</span>') +
-              '</label>' +
-              '<input id="' + id + '-field-' + index + '" class="x-input" type="' + esc(field.type || 'text') + '"' +
-                ' value="' + esc(field.value || '') + '"' +
-                ' placeholder="' + esc(field.placeholder || '') + '"' +
-                (field.required === false ? '' : ' required') +
-                (field.inputmode ? ' inputmode="' + esc(field.inputmode) + '"' : '') +
-              '>' +
-            '</div>';
-          }).join('') +
-          '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px;">' +
+        '<div class="x-master-inline-sheet">' +
+          '<div class="x-master-inline-sheet-intro">' +
+            '<strong>' + esc(options.eyebrow || 'Master Data') + '</strong>' +
+            '<p>' + esc(options.description || 'Buat data baru tanpa meninggalkan editor Menu Master.') + '</p>' +
+          '</div>' +
+          '<div class="x-master-inline-sheet-fields">' +
+            fields.map(function(field, index) {
+              return '<div class="x-master-inline-field">' +
+                '<label for="' + id + '-field-' + index + '">' +
+                  esc(field.label || field.name) + (field.required === false ? ' <span class="x-master-inline-optional">Opsional</span>' : ' <span class="x-required-mark">*</span>') +
+                '</label>' +
+                '<input id="' + id + '-field-' + index + '" class="x-input" type="' + esc(field.type || 'text') + '"' +
+                  ' value="' + esc(field.value || '') + '"' +
+                  ' placeholder="' + esc(field.placeholder || '') + '"' +
+                  (field.required === false ? '' : ' required') +
+                  (field.inputmode ? ' inputmode="' + esc(field.inputmode) + '"' : '') +
+                '>' +
+                (field.help ? '<small>' + esc(field.help) + '</small>' : '') +
+              '</div>';
+            }).join('') +
+          '</div>' +
+          '<div class="x-master-inline-sheet-actions">' +
             '<button type="button" class="x-btn-secondary" data-inline-cancel>Batal</button>' +
-            '<button type="button" class="x-btn-primary" data-inline-save>' + esc(options.saveLabel || 'Simpan') + '</button>' +
+            '<button type="button" class="x-btn-primary" data-inline-save>' + esc(options.saveLabel || 'Simpan & Pilih') + '</button>' +
           '</div>' +
         '</div>';
 
@@ -94,10 +102,7 @@
         resolve(result);
       }
 
-      wrap.querySelector('[data-inline-cancel]').addEventListener('click', function() {
-        finish(null);
-      });
-
+      wrap.querySelector('[data-inline-cancel]').addEventListener('click', function() { finish(null); });
       wrap.querySelector('[data-inline-save]').addEventListener('click', function() {
         var values = {};
         var invalid = false;
@@ -111,7 +116,7 @@
           values[field.name] = value;
         });
         if (invalid) {
-          toast('❌ Lengkapi field yang wajib diisi.');
+          toast('Lengkapi field yang wajib diisi.');
           return;
         }
         finish(values);
@@ -121,7 +126,7 @@
         id: id,
         type: 'bottom-sheet',
         title: options.title || 'Tambah',
-        content: wrap.firstElementChild,
+        content: wrap,
         dismissible: true,
         onClose: function() {
           if (!done) {
@@ -166,166 +171,144 @@
     var result = await requestFieldsSheet({
       id: 'master-menu-inline-product',
       title: 'Buat Product Master',
+      eyebrow: 'Product Master',
+      description: 'Product adalah identitas dasar yang dapat dipakai oleh beberapa Menu. Harga dan taxonomy diatur di Menu.',
       saveLabel: 'Simpan & Pilih Product',
       fields: [
         { name: 'name', label: 'Nama Product Internal', placeholder: 'Contoh: Ayam Geprek', required: true },
-        { name: 'sku', label: 'SKU', placeholder: 'Contoh: AYAM-GEP-001', required: false }
+        { name: 'sku', label: 'SKU', placeholder: 'Contoh: AYAM-GEP-001', required: false, help: 'Isi jika Product ini dikelola sebagai item stok.' }
       ]
     });
     if (!result) return;
-
     var data = await requestJson('/admin/composed/products', {
       method: 'POST',
-      body: JSON.stringify({
-        name: result.name,
-        sku: result.sku || null,
-        is_active: true
-      })
+      body: JSON.stringify({ name: result.name, sku: result.sku || null, is_active: true })
     });
-
     var product = data.product;
     createdProducts.push(product);
     var label = product.name + (product.sku ? ' · SKU ' + product.sku : '');
     addOption(document.getElementById('cm-product'), product.id, label, true);
-
-    document.querySelectorAll('[data-cm-product]').forEach(function(select) {
-      if (select.options.length && !Array.from(select.options).some(function(o) { return String(o.value) === String(product.id); })) {
-        addOption(select, product.id, label, false);
-      }
-    });
-
-    toast('✅ Product dibuat dan langsung dipilih di Menu.');
+    syncCreatedProductOptions();
+    showCreatedState('product', 'Product dibuat dan dipilih untuk Menu ini.');
+    toast('Product dibuat dan langsung dipilih di Menu.');
   }
 
   async function createCategoryInline() {
     var result = await requestFieldsSheet({
       id: 'master-menu-inline-category',
       title: 'Buat Kategori',
+      eyebrow: 'Taxonomy',
+      description: 'Kategori adalah parent taxonomy untuk mengelompokkan Sub Category.',
       saveLabel: 'Simpan & Pilih Kategori',
-      fields: [
-        { name: 'name', label: 'Nama Kategori', placeholder: 'Contoh: Makanan', required: true }
-      ]
+      fields: [{ name: 'name', label: 'Nama Kategori', placeholder: 'Contoh: Makanan', required: true }]
     });
     if (!result) return;
-
-    var data = await requestJson('/admin/categories', {
-      method: 'POST',
-      body: JSON.stringify({ name: result.name })
-    });
+    var data = await requestJson('/admin/categories', { method: 'POST', body: JSON.stringify({ name: result.name }) });
     var category = data.category;
     addOption(document.getElementById('cm-category'), category.id, category.name, true);
-    toast('✅ Kategori dibuat dan langsung dipilih.');
+    refreshSubCategoryDependencyState();
+    showCreatedState('category', 'Kategori dibuat dan dipilih.');
+    toast('Kategori dibuat dan langsung dipilih.');
   }
 
   async function createSubCategoryInline() {
     var category = document.getElementById('cm-category');
     var categoryId = category ? String(category.value || '') : '';
     if (!categoryId) {
-      toast('⚠️ Pilih Kategori terlebih dahulu.');
+      refreshSubCategoryDependencyState();
       return;
     }
-
     var result = await requestFieldsSheet({
       id: 'master-menu-inline-sub-category',
       title: 'Buat Sub Category',
+      eyebrow: 'Taxonomy',
+      description: 'Sub Category harus berada di dalam Kategori yang sedang dipilih.',
       saveLabel: 'Simpan & Pilih Sub Category',
-      fields: [
-        { name: 'name', label: 'Nama Sub Category', placeholder: 'Contoh: Ayam Geprek', required: true }
-      ]
+      fields: [{ name: 'name', label: 'Nama Sub Category', placeholder: 'Contoh: Ayam Geprek', required: true }]
     });
     if (!result) return;
-
-    var data = await requestJson('/admin/sub-categories', {
-      method: 'POST',
-      body: JSON.stringify({ category_id: categoryId, name: result.name })
-    });
+    var data = await requestJson('/admin/sub-categories', { method: 'POST', body: JSON.stringify({ category_id: categoryId, name: result.name }) });
     var sub = data.sub_category;
-
     var select = document.getElementById('cm-sub-category');
-    if (select) {
-      addOption(select, sub.id, sub.name, true);
-    }
-
-    toast('✅ Sub Category dibuat dan langsung dipilih.');
+    if (select) addOption(select, sub.id, sub.name, true);
+    showCreatedState('sub-category', 'Sub Category dibuat dan dipilih.');
+    toast('Sub Category dibuat dan langsung dipilih.');
   }
 
   async function createRasaInline() {
     var result = await requestFieldsSheet({
       id: 'master-menu-inline-rasa',
       title: 'Buat Master Rasa',
+      eyebrow: 'Master Data',
+      description: 'Rasa bersifat reusable dan dapat dipakai oleh banyak Menu.',
       saveLabel: 'Simpan & Pilih Rasa',
-      fields: [
-        { name: 'name', label: 'Nama Rasa', placeholder: 'Contoh: Sambal Matah', required: true }
-      ]
+      fields: [{ name: 'name', label: 'Nama Rasa', placeholder: 'Contoh: Sambal Matah', required: true }]
     });
     if (!result) return;
-
-    var data = await requestJson('/admin/rasas', {
-      method: 'POST',
-      body: JSON.stringify({ name: result.name })
-    });
+    var data = await requestJson('/admin/rasas', { method: 'POST', body: JSON.stringify({ name: result.name }) });
     var rasa = data.rasa;
-
     var select = document.getElementById('cm-rasa');
-    if (select) {
-      addOption(select, rasa.id, rasa.name, true);
-    }
-
-    toast('✅ Rasa dibuat dan langsung dipilih.');
+    if (select) addOption(select, rasa.id, rasa.name, true);
+    showCreatedState('rasa', 'Rasa dibuat dan dipilih.');
+    toast('Rasa dibuat dan langsung dipilih.');
   }
 
-  function addButtonAfter(target, config) {
-    if (!target || !target.parentNode) return;
-    if (document.querySelector('[data-inline-master-action="' + config.action + '"]')) return;
-
-    var button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'x-btn-secondary';
-    button.setAttribute('data-inline-master-action', config.action);
-    button.textContent = '+ ' + config.label;
-    button.style.cssText = 'white-space:nowrap;padding:8px 12px;font-size:12px;';
-    button.addEventListener('click', function() {
-      config.handler().catch(function(err) {
-        console.error('[Master Menu Inline]', err);
-        toast('❌ ' + (err.message || 'Gagal membuat data.'));
-      });
-    });
-
-    if (config.wrap) {
-      var wrap = document.createElement('div');
-      wrap.style.cssText = 'display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;';
-      target.parentNode.insertBefore(wrap, target);
-      wrap.appendChild(target);
-      wrap.appendChild(button);
-    } else {
-      target.parentNode.insertBefore(button, target.nextSibling);
-    }
-  }
-
-  function addButtonToFormGroup(selectId, action, label, handler) {
+  function addButtonToFormGroup(selectId, action, label, handler, options) {
     var select = document.getElementById(selectId);
     if (!select) return;
     var group = select.closest('.x-form-group');
     if (!group || group.querySelector('[data-inline-master-action="' + action + '"]')) return;
-
+    options = options || {};
     var row = document.createElement('div');
-    row.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;';
+    row.className = 'x-master-inline-select-row';
     select.parentNode.insertBefore(row, select);
     row.appendChild(select);
-
     var button = document.createElement('button');
     button.type = 'button';
-    button.className = 'x-btn-secondary';
+    button.className = 'x-master-inline-link';
     button.setAttribute('data-inline-master-action', action);
     button.textContent = '+ ' + label;
-    button.style.cssText = 'white-space:nowrap;padding:8px 12px;font-size:12px;';
+    button.setAttribute('aria-label', 'Buat ' + label + ' baru');
     button.addEventListener('click', function() {
       handler().catch(function(err) {
         console.error('[Master Menu Inline]', err);
-        toast('❌ ' + (err.message || 'Gagal membuat data.'));
+        toast(err.message || 'Gagal membuat data.');
       });
     });
     row.appendChild(button);
+    if (options.helper) {
+      var helper = document.createElement('small');
+      helper.className = 'x-master-inline-dependency-hint';
+      helper.setAttribute('data-inline-dependency-hint', action);
+      helper.textContent = options.helper;
+      group.appendChild(helper);
+    }
+  }
+
+  function showCreatedState(action, message) {
+    var trigger = document.querySelector('[data-inline-master-action="' + action + '"]');
+    if (!trigger) return;
+    var formGroup = trigger.closest('.x-form-group');
+    if (!formGroup) return;
+    var old = formGroup.querySelector('.x-master-inline-created');
+    if (old) old.remove();
+    var state = document.createElement('div');
+    state.className = 'x-master-inline-created';
+    state.textContent = '✓ ' + message;
+    formGroup.appendChild(state);
+  }
+
+  function refreshSubCategoryDependencyState() {
+    var category = document.getElementById('cm-category');
+    var sub = document.getElementById('cm-sub-category');
+    var action = document.querySelector('[data-inline-master-action="sub-category"]');
+    var disabled = !(category && category.value);
+    if (sub) sub.disabled = disabled;
+    if (action) {
+      action.disabled = disabled;
+      action.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+      action.title = disabled ? 'Pilih Kategori terlebih dahulu' : 'Buat Sub Category baru';
+    }
   }
 
   function syncCreatedProductOptions() {
@@ -339,24 +322,29 @@
   }
 
   function injectQuickCreateControls() {
-    addButtonToFormGroup('cm-product', 'product', 'Product', createProductInline);
-    addButtonToFormGroup('cm-category', 'category', 'Kategori', createCategoryInline);
-    addButtonToFormGroup('cm-sub-category', 'sub-category', 'Sub Category', createSubCategoryInline);
-    addButtonToFormGroup('cm-rasa', 'rasa', 'Rasa', createRasaInline);
+    addButtonToFormGroup('cm-product', 'product', 'Buat Product', createProductInline, {
+      helper: 'Product adalah identitas dasar; harga dan taxonomy diatur di Menu.'
+    });
+    addButtonToFormGroup('cm-category', 'category', 'Buat Kategori', createCategoryInline);
+    addButtonToFormGroup('cm-sub-category', 'sub-category', 'Buat Sub Category', createSubCategoryInline, {
+      helper: 'Pilih Kategori terlebih dahulu.'
+    });
+    addButtonToFormGroup('cm-rasa', 'rasa', 'Buat Rasa', createRasaInline);
+    refreshSubCategoryDependencyState();
     syncCreatedProductOptions();
 
     var packageAdd = document.getElementById('btn-cm-add-component');
     if (packageAdd && !document.querySelector('[data-inline-master-action="package-product"]')) {
       var button = document.createElement('button');
       button.type = 'button';
-      button.className = 'x-btn-secondary';
+      button.className = 'x-master-inline-link';
       button.setAttribute('data-inline-master-action', 'package-product');
       button.textContent = '+ Buat Product';
-      button.style.cssText = 'margin-top:8px;padding:8px 12px;font-size:12px;';
+      button.style.marginTop = '8px';
       button.addEventListener('click', function() {
         createProductInline().catch(function(err) {
           console.error('[Master Menu Inline]', err);
-          toast('❌ ' + (err.message || 'Gagal membuat Product.'));
+          toast(err.message || 'Gagal membuat Product.');
         });
       });
       packageAdd.parentNode.appendChild(button);
@@ -368,11 +356,24 @@
     if (!form) return;
     injectQuickCreateControls();
 
-    var type = document.getElementById('master-menu-type');
-    var observer = new MutationObserver(function() {
-      injectQuickCreateControls();
-    });
+    var observer;
+    var injecting = false;
+    var scheduled = false;
+    function scheduleInject() {
+      if (injecting || scheduled) return;
+      scheduled = true;
+      setTimeout(function() {
+        scheduled = false;
+        injecting = true;
+        injectQuickCreateControls();
+        injecting = false;
+      }, 0);
+    }
+    observer = new MutationObserver(scheduleInject);
     observer.observe(form, { subtree: true, childList: true });
+    form.addEventListener('change', function(event) {
+      if (event.target && event.target.id === 'cm-category') refreshSubCategoryDependencyState();
+    });
 
     /*
      * Existing dashboard.js initializes the canonical editor and navigation.
