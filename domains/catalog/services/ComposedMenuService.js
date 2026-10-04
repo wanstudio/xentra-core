@@ -150,7 +150,7 @@ class ComposedMenuService {
     return repository.findProductSku({ brandId, productId });
   }
 
-  static listSubCategories({
+  static listTitles({
     brandId, categoryId = null, activeOnly = false
   }) {
     ensureSchema();
