@@ -195,8 +195,8 @@ test('PHASE 1: OWNER DASHBOARD CATALOG IMPLEMENTATION', async (t) => {
       ).run(fkSubCategoryId, BRAND_ID, createdCategoryId, 'FK Archive Test', 'fk-archive-test-' + Date.now());
 
       const res = await makeRequest(server, {
-        method: 'DELETE',
-        path: `/api/v1/admin/categories/${createdCategoryId}`,
+        method: 'PATCH',
+        path: `/api/v1/admin/categories/${createdCategoryId}/archive`,
         headers: { Authorization: `Bearer ${ownerToken}` }
       });
 
