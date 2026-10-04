@@ -136,6 +136,24 @@
         }
       });
 
+      fields.forEach(function(field, index) {
+        if (!field.showWhen) return;
+        var sourceIndex = fields.findIndex(function(candidate) { return candidate.name === field.showWhen.field; });
+        var source = sourceIndex >= 0 ? wrap.querySelector('#' + id + '-field-' + sourceIndex) : null;
+        var target = wrap.querySelector('[data-inline-field-wrap="' + field.name + '"]');
+        if (!source || !target) return;
+        function syncVisibility() {
+          var visible = source.type === 'checkbox' ? source.checked : String(source.value || '') === String(field.showWhen.equals);
+          target.style.display = visible ? '' : 'none';
+          if (!visible) {
+            var input = wrap.querySelector('#' + id + '-field-' + index);
+            if (input) input.value = '';
+          }
+        }
+        source.addEventListener('change', syncVisibility);
+        syncVisibility();
+      });
+
       setTimeout(function() {
         var first = wrap.querySelector('input');
         if (first) {
@@ -175,7 +193,7 @@
       fields: [
         { name: 'name', label: 'Nama Item', placeholder: 'Contoh: Nasi', required: true },
         { name: 'stock_managed', label: 'Kelola di Stock', kind: 'checkbox', checked: false },
-        { name: 'sku', label: 'SKU', placeholder: 'Contoh: NASI-001', required: false }
+        { name: 'sku', label: 'SKU', placeholder: 'Contoh: NASI-001', required: false, showWhen: { field: 'stock_managed', equals: true } }
       ]
     });
     if (!result) return;
