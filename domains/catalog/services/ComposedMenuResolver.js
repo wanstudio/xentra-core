@@ -185,7 +185,7 @@ class ComposedMenuResolver {
     return menus.map(menu => {
       const base = resolveMenuBase(menu);
       const menuItems = itemMap.get(String(menu.id)) || [];
-      const inventoryState = calculateInventory(menuItems, [], menu.menu_type, false);
+      const inventoryState = calculateInventory(menuItems, [], false);
       const available = inventoryState.blocking_reason == null && String(menu.status).toUpperCase() === 'ACTIVE';
       return {
         ...base,
