@@ -10771,6 +10771,10 @@ async function loadMenusView() {
      directly to /admin/menus/* and never uses the legacy customer catalog route.
      ========================================================================= */
 
+  var _ownerMasterMenuImageFile = null;
+  var _ownerMasterMenuCropSpec = null;
+  var _ownerMasterMenuImageRemoved = false;
+
   var _ownerMasterMenuState = {
     menus: [],
     products: [],
@@ -10783,7 +10787,9 @@ async function loadMenusView() {
     editingId: null,
     editingType: 'SINGLE',
     createType: 'SINGLE',
-    packageComponents: []
+    packageComponents: [],
+    imageUrl: null,
+    mediaId: null
   };
 
   function upsertOwnerMasterMenuDependency(type, row, options) {
@@ -10880,6 +10886,11 @@ async function loadMenusView() {
     _ownerMasterMenuState.packageComponents = nextType === 'PACKAGE'
       ? [{ product_id: '', quantity: 1 }, { product_id: '', quantity: 1 }]
       : [];
+    _ownerMasterMenuImageFile = null;
+    _ownerMasterMenuCropSpec = null;
+    _ownerMasterMenuImageRemoved = false;
+    _ownerMasterMenuState.imageUrl = null;
+    _ownerMasterMenuState.mediaId = null;
 
     $('master-menu-id').value = '';
     $('master-menu-type').value = nextType;
@@ -11079,6 +11090,24 @@ async function loadMenusView() {
     }) || null;
   }
 
+  function setOwnerMasterMenuImagePreview(src, hasImage) {
+    var img = $('cm-menu-image-preview');
+    var empty = $('cm-menu-image-empty');
+    var remove = $('btn-cm-menu-image-remove');
+    if (!img || !empty) return;
+    if (hasImage && src) {
+      img.src = src;
+      img.style.display = 'block';
+      empty.style.display = 'none';
+      if (remove) remove.style.display = 'inline-flex';
+    } else {
+      img.removeAttribute('src');
+      img.style.display = 'none';
+      empty.style.display = 'inline-flex';
+      if (remove) remove.style.display = 'none';
+    }
+  }
+
   function renderOwnerMasterMenuPreview() {
     var titleEl = $('cm-preview-title');
     var subtitleEl = $('cm-preview-subtitle');
@@ -11114,18 +11143,14 @@ async function loadMenusView() {
         var qty = Number(item.quantity || 1);
         return product.name + (qty > 1 ? ' × ' + qty : '');
       }).filter(Boolean).join(' · ');
-      var firstProduct = (_ownerMasterMenuState.packageComponents || []).map(function(item) {
-        return ownerMasterMenuFindProduct(item.product_id);
-      }).find(function(product) { return product && (product.image_url || product.image); });
-      image = firstProduct ? (firstProduct.image_url || firstProduct.image || '') : '';
+      image = _ownerMasterMenuState.imageUrl || '';
     } else {
       // Canonical resolver title for SINGLE is Sub Category, never Product name.
       title = sub ? sub.name : 'Pilih Sub Category';
       detail = ownerMasterMenuFindProduct($('cm-product') && $('cm-product').value)
         ? 'Product: ' + ownerMasterMenuFindProduct($('cm-product').value).name
         : '';
-      var singleProduct = ownerMasterMenuFindProduct($('cm-product') && $('cm-product').value);
-      image = singleProduct ? (singleProduct.image_url || singleProduct.image || '') : '';
+      image = _ownerMasterMenuState.imageUrl || '';
     }
 
     titleEl.textContent = title;
@@ -11316,6 +11341,12 @@ async function loadMenusView() {
       $('cm-level').value = menu.level_id ? String(menu.level_id) : '';
       $('cm-price').value = menu.selling_price != null ? menu.selling_price : '';
       $('cm-status').value = String(menu.status || 'DRAFT').toUpperCase();
+      _ownerMasterMenuState.imageUrl = menu.image_url || null;
+      _ownerMasterMenuState.mediaId = menu.media_id || null;
+      _ownerMasterMenuImageFile = null;
+      _ownerMasterMenuCropSpec = null;
+      _ownerMasterMenuImageRemoved = false;
+      setOwnerMasterMenuImagePreview(_ownerMasterMenuState.imageUrl, !!_ownerMasterMenuState.imageUrl);
 
       $('master-menu-editor-title').textContent = type === 'PACKAGE' ? 'Edit Menu Paket' : 'Edit Menu Satuan';
       $('master-menu-editor-breadcrumb').textContent = ownerMasterMenuTitle(menu);
@@ -11334,6 +11365,7 @@ async function loadMenusView() {
       $('cm-level').value = menu.level_id ? String(menu.level_id) : '';
       $('cm-price').value = menu.selling_price != null ? menu.selling_price : '';
       $('cm-status').value = String(menu.status || 'DRAFT').toUpperCase();
+      setOwnerMasterMenuImagePreview(_ownerMasterMenuState.imageUrl, !!_ownerMasterMenuState.imageUrl);
       renderOwnerMasterMenuPackageComponents();
       renderOwnerMasterMenuPreview();
     } catch (err) {
@@ -11410,6 +11442,49 @@ async function loadMenusView() {
       var data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Gagal menyimpan Menu Master.');
 
+      var savedMenuId = data.menu && data.menu.id ? String(data.menu.id) : menuId;
+      if (!savedMenuId) throw new Error('Menu tersimpan tetapi ID Menu tidak kembali dari server.');
+
+      if (_ownerMasterMenuImageRemoved) {
+        var removeMenuImageRes = await adminFetch(API_BASE + '/admin/media/entity/menus/' + encodeURIComponent(savedMenuId) + '/image', {
+          method: 'DELETE',
+          headers: getAuthHeaders()
+        });
+        var removeMenuImageData = {};
+        try { removeMenuImageData = await removeMenuImageRes.json(); } catch (_) {}
+        if (!removeMenuImageRes.ok || !removeMenuImageData.success) {
+          throw new Error(removeMenuImageData.error || 'Gagal menghapus foto Menu.');
+        }
+        _ownerMasterMenuState.imageUrl = null;
+        _ownerMasterMenuState.mediaId = null;
+      }
+
+      if (_ownerMasterMenuImageFile && !_ownerMasterMenuImageRemoved) {
+        var menuImageBase64 = await new Promise(function (resolve, reject) {
+          var reader = new FileReader();
+          reader.onload = function () { resolve(reader.result); };
+          reader.onerror = function () { reject(new Error('Gagal membaca file gambar Menu.')); };
+          reader.readAsDataURL(_ownerMasterMenuImageFile);
+        });
+        var menuImageRes = await adminFetch(API_BASE + '/admin/media/entity/menus/' + encodeURIComponent(savedMenuId) + '/image', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            image_base64: menuImageBase64,
+            mime_type: _ownerMasterMenuImageFile.type,
+            original_filename: _ownerMasterMenuImageFile.name || null,
+            crop_spec: _ownerMasterMenuCropSpec || null
+          })
+        });
+        var menuImageData = {};
+        try { menuImageData = await menuImageRes.json(); } catch (_) {}
+        if (!menuImageRes.ok || !menuImageData.success) {
+          throw new Error(menuImageData.error || 'Gagal mengunggah foto Menu.');
+        }
+        _ownerMasterMenuState.imageUrl = menuImageData.preview_url || (menuImageData.menu && menuImageData.menu.image_url) || null;
+        _ownerMasterMenuState.mediaId = menuImageData.menu && menuImageData.menu.media_id || null;
+      }
+
       showToast(status === 'ACTIVE' ? '✅ Menu Master aktif.' : '✅ Menu Master tersimpan sebagai draft.');
       navigateTo('catalog/master-menus', { history: 'replace' });
     } catch (err) {
@@ -11476,6 +11551,9 @@ async function loadMenusView() {
     var form = $('form-master-menu');
     var saveDraft = $('btn-save-master-menu-draft');
     var addComponent = $('btn-cm-add-component');
+    var menuImagePick = $('btn-cm-menu-image-pick');
+    var menuImageFile = $('cm-menu-image-file');
+    var menuImageRemove = $('btn-cm-menu-image-remove');
 
     if (addSingle) addSingle.addEventListener('click', function() { openNewOwnerMasterMenu('SINGLE'); });
     if (addPackage) addPackage.addEventListener('click', function() { openNewOwnerMasterMenu('PACKAGE'); });
@@ -11509,6 +11587,54 @@ async function loadMenusView() {
     });
 
     if (addComponent) addComponent.addEventListener('click', addOwnerMasterMenuPackageComponent);
+
+    if (menuImagePick && menuImageFile) {
+      menuImagePick.addEventListener('click', function () { menuImageFile.click(); });
+      menuImageFile.addEventListener('change', function () {
+        var file = menuImageFile.files && menuImageFile.files[0];
+        if (!file) return;
+        var allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+        if (allowed.indexOf(file.type) === -1) {
+          showToast('❌ Format gambar tidak didukung. Gunakan JPG, PNG, atau WEBP.');
+          menuImageFile.value = '';
+          return;
+        }
+        if (file.size > 20 * 1024 * 1024) {
+          showToast('❌ Ukuran gambar melebihi batas maksimal 20MB.');
+          menuImageFile.value = '';
+          return;
+        }
+        _ownerMasterMenuImageFile = file;
+        _ownerMasterMenuImageRemoved = false;
+        _ownerMasterMenuCropSpec = null;
+        XentraCropEditor.open({
+          source: file,
+          assetType: 'menu',
+          aspectRatio: 1.0,
+          title: 'Potong & Posisikan Foto Menu (1:1)',
+          onConfirm: function (cropSpec, previewDataUrl) {
+            _ownerMasterMenuCropSpec = cropSpec;
+            setOwnerMasterMenuImagePreview(previewDataUrl || URL.createObjectURL(file), true);
+          },
+          onCancel: function () {
+            _ownerMasterMenuImageFile = null;
+            _ownerMasterMenuCropSpec = null;
+            if (menuImageFile) menuImageFile.value = '';
+          }
+        });
+      });
+    }
+
+    if (menuImageRemove) menuImageRemove.addEventListener('click', function () {
+      _ownerMasterMenuImageFile = null;
+      _ownerMasterMenuCropSpec = null;
+      _ownerMasterMenuImageRemoved = true;
+      if (menuImageFile) menuImageFile.value = '';
+      _ownerMasterMenuState.imageUrl = null;
+      _ownerMasterMenuState.mediaId = null;
+      setOwnerMasterMenuImagePreview('', false);
+      renderOwnerMasterMenuPreview();
+    });
     if (form) form.addEventListener('submit', function(e) {
       e.preventDefault();
       saveOwnerMasterMenu('ACTIVE');
