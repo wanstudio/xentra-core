@@ -11,6 +11,7 @@ const PromotionRepository = require('../../../core/data/repositories/PromotionRe
 const Promotion = require('../domain/Promotion');
 const ConflictResolver = require('../domain/ConflictResolver');
 const InstallIncentiveStrategy = require('../strategies/InstallIncentiveStrategy');
+const PromotionRewardResolver = require('./PromotionRewardResolver');
 
 const promotionRepository = new PromotionRepository();
 
@@ -94,22 +95,38 @@ class PromotionEngineService {
           ...evalResult
         };
 
-        if (evalResult.should_grant_reward && evalResult.reward && evalResult.reward.product_id) {
+        if (evalResult.should_grant_reward && evalResult.reward) {
           try {
-            const catalogProduct = promotionRepository.findRewardCatalogProduct({
-              productId: String(evalResult.reward.product_id),
-              brandId: brand_id
+            const resolvedReward = PromotionRewardResolver.resolveConfiguredReward({
+              brandId: brand_id,
+              branchId: branch_id,
+              reward: evalResult.reward
             });
-            if (catalogProduct) {
-              item.reward.product_name = catalogProduct.name;
-              item.reward.regular_price = Number(catalogProduct.regular_price || catalogProduct.price || 0);
-              item.reward.image_url = catalogProduct.image_url || '';
-            }
-          } catch (_) { /* enrichment must never break eligibility */ }
+            item.reward = {
+              ...evalResult.reward,
+              target_menu_id: evalResult.reward.target_menu_id || resolvedReward.menu_id,
+              target_product_id: evalResult.reward.target_product_id || (resolvedReward.source === 'legacy_product' ? resolvedReward.product_id : null),
+              menu_id: resolvedReward.menu_id,
+              menu_type: resolvedReward.menu_type,
+              product_id: resolvedReward.product_id,
+              product_name: resolvedReward.name,
+              regular_price: resolvedReward.regular_price,
+              image_url: resolvedReward.image_url,
+              menu_snapshot: resolvedReward.menu_snapshot,
+              component_snapshot: resolvedReward.component_snapshot,
+              resolution_source: resolvedReward.source
+            };
+          } catch (err) {
+            // A configured reward that cannot resolve to a sellable Menu at the
+            // requested Branch is not an applicable reward. Keep the discovery
+            // record for diagnostics, but do not let it enter ConflictResolver.
+            item.should_grant_reward = false;
+            item.reward_resolution_error = err.message;
+          }
         }
 
         discoveryList.push(item);
-        if (evalResult.should_grant_reward) eligibleCandidates.push(item);
+        if (item.should_grant_reward) eligibleCandidates.push(item);
       }
     }
 
@@ -175,7 +192,27 @@ class PromotionEngineService {
       const maxLimit = Number(promoRow.max_redemptions_per_customer || 1);
       if (used >= maxLimit) throw new Error(`[PROMO_LIMIT_EXCEEDED_RACE] Batas klaim promo "${promoId}" (${maxLimit}x) telah digunakan oleh pesanan lain milik pelanggan.`);
       let benefitAmount = Number(it.unit_price || 0);
-      if (benefitAmount === 0) { const reward = promotionRepository.findRewardProductPrice(it.product_id); benefitAmount = reward ? Number(reward.v || 0) : 0; }
+      if (benefitAmount === 0) {
+        let snapshotPrice = 0;
+        if (it.menu_snapshot) {
+          try {
+            const snapshot = typeof it.menu_snapshot === 'string' ? JSON.parse(it.menu_snapshot) : it.menu_snapshot;
+            snapshotPrice = Number(snapshot && (snapshot.price || snapshot.selling_price) || 0);
+          } catch (_) {}
+        }
+        if (snapshotPrice > 0) {
+          benefitAmount = snapshotPrice;
+        } else if (it.menu_id) {
+          const rewardMenu = promotionRepository.findRewardMenu({
+            menuId: String(it.menu_id),
+            brandId: order.brand_id
+          });
+          benefitAmount = rewardMenu ? Number(rewardMenu.selling_price || 0) : 0;
+        } else {
+          const reward = promotionRepository.findRewardProductPrice(it.product_id);
+          benefitAmount = reward ? Number(reward.v || 0) : 0;
+        }
+      }
       promotions.push({ promo_id: promoId, benefit_amount: benefitAmount });
     }
     if (promotions.length) {

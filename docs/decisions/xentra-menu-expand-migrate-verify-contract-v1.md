@@ -1,9 +1,13 @@
 # Xentra — Menu Migration Expand / Migrate / Verify / Contract v1
 
-Status: LOCKED — DATA MIGRATION ARCHITECTURE
+Status: SUPERSEDED — HISTORICAL MIGRATION ARCHITECTURE
 Date: 2026-09-30
-Scope: Master Product Menu migration to Master Menu Composition v1
+Superseded by: docs/proposals/xentra-taxonomy-composed-menu-v1.md (LOCKED TARGET CONTRACT, 2026-10-03)
+Scope: Historical migration architecture
 
+## 0. Supersession notice
+
+> This historical migration document predates the current Product → Menu → Inventory target. Its old Product Composition description and migration commands must not be used as the implementation authority. The current migration engine and contract are defined by docs/proposals/xentra-taxonomy-composed-menu-v1.md and the current ComposedMenuMigrationService.
 ## 1. Decision
 Xentra migrates Menu data with a staged Expand → Migrate → Verify → Contract lifecycle.
 During the migration window, legacy data may remain physically present for compatibility/history while Master Menu Composition becomes the only canonical source of truth for new UI, new APIs, and new features.

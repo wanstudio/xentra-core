@@ -207,7 +207,21 @@ class PosOrderService {
       orderRepository.deleteItems(order.id);
       for (const item of verifiedItems) {
         const note = item.promo_id ? ('[PROMO:' + item.promo_id + '] ' + (item.notes || item.note || '')).trim() : (item.notes || item.note || '');
-        orderRepository.insertItem({ id: 'item_' + crypto.randomBytes(6).toString('hex'), orderId: order.id, productId: item.product_id, productName: item.name, unitPrice: item.unit_price, quantity: item.quantity, itemSubtotal: item.subtotal, note, modifiersSnapshot: JSON.stringify(item.modifiers_snapshot || item.options || []) });
+        orderRepository.insertItem({
+          id: 'item_' + crypto.randomBytes(6).toString('hex'),
+          orderId: order.id,
+          productId: item.product_id,
+          productName: item.name,
+          unitPrice: item.unit_price,
+          quantity: item.quantity,
+          itemSubtotal: item.subtotal,
+          note,
+          modifiersSnapshot: JSON.stringify(item.modifiers_snapshot || item.options || []),
+          menuSnapshot: item.menu_snapshot ? JSON.stringify(item.menu_snapshot) : null,
+          menuId: item.menu_id || null,
+          menuType: item.menu_type || null,
+          componentSnapshot: item.component_snapshot ? JSON.stringify(item.component_snapshot) : null
+        });
       }
       orderRepository.updatePendingOrderSnapshot({ orderId: order.id, customerName: customer_name || 'Tamu', customerPhone: customer_phone || '', subtotal, grandTotal, updatedAt: now });
       posOrderRepository.updateHeldSnapshot({ heldOrderId: held_order_id, customerName: customer_name || 'Tamu', customerPhone: customer_phone || '', itemsPayload: JSON.stringify(items), updatedAt: now });

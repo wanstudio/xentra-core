@@ -25,10 +25,21 @@ test.before(() => {
     db.prepare(`INSERT OR REPLACE INTO branches (id, brand_id, name, slug, address_text, latitude, longitude) VALUES (?, ?, 'Cabang A', 'cabang-a', 'Jl. A', -7.25, 112.75)`).run(BRANCH_A, BRAND_ID);
     db.prepare(`INSERT OR REPLACE INTO branches (id, brand_id, name, slug, address_text, latitude, longitude) VALUES (?, ?, 'Cabang B', 'cabang-b', 'Jl. B', -7.26, 112.76)`).run(BRANCH_B, BRAND_ID);
 
-    // Seed test product for OrderPlacementService
-    db.prepare(`INSERT OR REPLACE INTO products (id, brand_id, name, slug, price, is_active) VALUES ('prod_sec_1', ?, 'Menu DineSec 1', 'menu-dinesec-1', 25000, 1)`).run(BRAND_ID);
-    db.prepare(`INSERT OR REPLACE INTO branch_products (branch_id, product_id, price, stock, is_available) VALUES (?, 'prod_sec_1', 25000, 100, 1)`).run(BRANCH_A);
-    db.prepare(`INSERT OR REPLACE INTO branch_products (branch_id, product_id, price, stock, is_available) VALUES (?, 'prod_sec_1', 25000, 100, 1)`).run(BRANCH_B);
+    // Canonical Product/SKU -> Master Menu -> Branch Menu -> Inventory fixture.
+    db.prepare("INSERT OR IGNORE INTO categories (id, brand_id, name, slug, is_active) VALUES ('cat_sec_1', ?, 'Makanan', 'cat-sec-1', 1)").run(BRAND_ID);
+    db.prepare("INSERT OR REPLACE INTO products (id, brand_id, category_id, name, slug, price, is_active) VALUES ('prod_sec_1', ?, 'cat_sec_1', 'Menu DineSec 1', 'menu-dinesec-1', 25000, 1)").run(BRAND_ID);
+    db.prepare("INSERT OR IGNORE INTO menu_flavors (id, brand_id, name, slug, is_active) VALUES ('rasa_sec_original', ?, 'Original', 'rasa-sec-original', 1)").run(BRAND_ID);
+    db.prepare("INSERT OR REPLACE INTO sub_categories (id, brand_id, category_id, name, slug, is_active) VALUES ('sub_sec_1', ?, 'cat_sec_1', 'Menu DineSec 1', 'sub-sec-1', 1)").run(BRAND_ID);
+    db.prepare("INSERT OR REPLACE INTO menus (id, brand_id, menu_type, sub_category_id, rasa_id, selling_price, status) VALUES ('menu_sec_1', ?, 'SINGLE', 'sub_sec_1', 'rasa_sec_original', 25000, 'ACTIVE')").run(BRAND_ID);
+    db.prepare("INSERT OR REPLACE INTO menu_items (menu_id, product_id, quantity, sort_order) VALUES ('menu_sec_1', 'prod_sec_1', 1, 0)").run();
+    db.prepare("INSERT OR IGNORE INTO branch_categories (id, brand_id, branch_id, name, slug, sort_order, is_active) VALUES ('bc_sec_1_a', ?, ?, 'Makanan', 'bc-sec-a', 1, 1)").run(BRAND_ID, BRANCH_A);
+    db.prepare("INSERT OR IGNORE INTO branch_categories (id, brand_id, branch_id, name, slug, sort_order, is_active) VALUES ('bc_sec_1_b', ?, ?, 'Makanan', 'bc-sec-b', 1, 1)").run(BRAND_ID, BRANCH_B);
+    db.prepare("INSERT OR REPLACE INTO branch_menus (branch_id, menu_id, price_override, is_available) VALUES (?, 'menu_sec_1', NULL, 1)").run(BRANCH_A);
+    db.prepare("INSERT OR REPLACE INTO branch_menus (branch_id, menu_id, price_override, is_available) VALUES (?, 'menu_sec_1', NULL, 1)").run(BRANCH_B);
+    db.prepare("INSERT OR REPLACE INTO branch_menu_categories (branch_id, menu_id, branch_category_id) VALUES (?, 'menu_sec_1', 'bc_sec_1_a')").run(BRANCH_A);
+    db.prepare("INSERT OR REPLACE INTO branch_menu_categories (branch_id, menu_id, branch_category_id) VALUES (?, 'menu_sec_1', 'bc_sec_1_b')").run(BRANCH_B);
+    db.prepare("INSERT OR REPLACE INTO branch_product_inventory (branch_id, product_id, stock_qty, low_stock_threshold) VALUES (?, 'prod_sec_1', 100, 10)").run(BRANCH_A);
+    db.prepare("INSERT OR REPLACE INTO branch_product_inventory (branch_id, product_id, stock_qty, low_stock_threshold) VALUES (?, 'prod_sec_1', 100, 10)").run(BRANCH_B);
 
     // Seed tables
     db.prepare(`INSERT OR REPLACE INTO branch_tables (id, branch_id, table_number, label, capacity, is_active) VALUES (?, ?, '1', 'Meja 1', 4, 1)`).run(TABLE_A1, BRANCH_A);
@@ -45,7 +56,7 @@ test.before(() => {
 
 // Helper to create simple items array
 function makeItems() {
-  return [{ product_id: 'prod_sec_1', name: 'Menu DineSec 1', unit_price: 25000, quantity: 1, subtotal: 25000 }];
+  return [{ menu_id: 'menu_sec_1', quantity: 1, expected_price: 25000 }];
 }
 
 // ── Invariant 1: Customer A → session Customer B = reject ──

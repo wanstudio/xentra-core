@@ -46,8 +46,8 @@
       adminFetch(API_BASE + "/dine-in/layout?branch_id=" + encodeURIComponent(branchId), { headers: headers }),
       // 3: Branch Inventory
       adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId) + "/inventory", { headers: headers }),
-      // 4: Branch Products (availability)
-      adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId) + "/products", { headers: headers }),
+      // 4: Branch Menus (availability)
+      adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId) + "/menu", { headers: headers }),
       // 5: Promotions
       adminFetch(API_BASE + "/admin/marketing/promotions", { headers: headers }),
       // 6: Operational Activity Logs
@@ -208,13 +208,14 @@
     if (results[4].status === "fulfilled" && results[4].value && results[4].value.ok) {
       try {
         var pData = await results[4].value.json();
-        if (pData.success && Array.isArray(pData.assignments)) {
-          unavailItems = pData.assignments.filter(function (p) {
-            return p.is_available === 0 || p.is_available === false;
-          });
-        }
+        var menuAssignments = pData.success && Array.isArray(pData.adopted_menus)
+          ? pData.adopted_menus
+          : [];
+        unavailItems = menuAssignments.filter(function (menu) {
+          return menu.is_available === 0 || menu.is_available === false;
+        });
       } catch (e) {
-        console.warn("[BM Hari Ini Products Parse Error]:", e);
+        console.warn("[BM Hari Ini Menu Parse Error]:", e);
       }
     }
     renderHariIniAttention(lowItems, unavailItems);

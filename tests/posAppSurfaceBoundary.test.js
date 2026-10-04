@@ -110,7 +110,7 @@ describe('POS ↔ Merchant App surface boundary', () => {
       '/pos/local/sale',
       '/pos/local/sync-outbox',
       '/dine-in/layout',
-      '/catalog/menu'
+      '/catalog/composed-menu'
     ]) {
       assert.ok(js.includes(endpoint), 'missing POS contract: ' + endpoint);
     }

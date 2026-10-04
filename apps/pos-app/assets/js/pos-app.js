@@ -1367,12 +1367,18 @@
     }
   }
 
+  function menuCartIdentity(item){
+    if (item && item.menu_id) return 'menu:' + String(item.menu_id);
+    return 'product:' + String(item && item.product_id != null ? item.product_id : '');
+  }
+
   function decrementProduct(p, e){
     if(e&&e.stopPropagation)e.stopPropagation();
     try{
+      var targetIdentity = p && p.menu_id ? 'menu:' + String(p.menu_id) : 'product:' + String(p.id);
       var items=composer().getDisplayItems();
       for(var i=items.length-1;i>=0;i--){
-        if(String(items[i].product_id)===String(p.id)){
+        if(menuCartIdentity(items[i])===targetIdentity){
           composer().changeQty(i,-1);
           renderCart();
           return;
@@ -1386,10 +1392,11 @@
   function incrementProduct(p,e){
     if(e&&e.stopPropagation)e.stopPropagation();
     try{
+      var targetIdentity = p && p.menu_id ? 'menu:' + String(p.menu_id) : 'product:' + String(p.id);
       var items=composer().getDisplayItems();
       if(optionGroups(p).length>0){
         for(var i=items.length-1;i>=0;i--){
-          if(String(items[i].product_id)===String(p.id)){
+          if(menuCartIdentity(items[i])===targetIdentity){
             composer().changeQty(i,1);
             renderCart();
             return;
@@ -1441,15 +1448,35 @@
     if (p.is_available === 0 || p.is_available === false) return toast('Menu sedang tidak tersedia.');
     var cleanSelections=Array.isArray(selections)?selections:[];
     var unitPrice=clientOptionPrice(p,cleanSelections);
+    var payload={
+      product_id:p.menu_id ? (p.product_id || null) : p.id,
+      name:p.name || p.product_name || p.title || 'Menu',
+      unit_price:unitPrice,
+      quantity:1,
+      options:cleanSelections,
+      note:note||''
+    };
+
+    if (p.menu_id) {
+      payload.menu_id=p.menu_id;
+      payload.menu_type=p.menu_type || 'SINGLE';
+      payload.component_snapshot=Array.isArray(p.components) ? p.components : (Array.isArray(p.component_snapshot) ? p.component_snapshot : []);
+      payload.menu_snapshot=p.menu_snapshot || {
+        menu_id:p.menu_id,
+        menu_type:p.menu_type || 'SINGLE',
+        title:p.name || p.title || '',
+        subtitle:p.subtitle || null,
+        price:Number(p.price || 0),
+        category:p.category || null,
+        sub_category:p.sub_category || null,
+        rasa:p.rasa || null,
+        level:p.level || null,
+        status:p.status || 'ACTIVE'
+      };
+    }
+
     try{
-      composer().addItem({
-        product_id:p.id,
-        name:p.name || p.product_name || 'Produk',
-        unit_price:unitPrice,
-        quantity:1,
-        options:cleanSelections,
-        note:note||''
-      });
+      composer().addItem(payload);
       renderCart();
     }catch(e){
       showOrderLockedWarning();
@@ -1610,8 +1637,9 @@
         var hasOpts=optionGroups(p).length>0;
 
         var composerCart=composer().getDisplayItems();
+        var targetIdentity = p.menu_id ? 'menu:' + String(p.menu_id) : 'product:' + String(p.id);
         var cartQty=composerCart.reduce(function(acc,item){
-          return String(item.product_id)===String(p.id)?acc+(Number(item.quantity)||0):acc;
+          return menuCartIdentity(item)===targetIdentity?acc+(Number(item.quantity)||0):acc;
         },0);
         var orderLocked=composer().isExisting();
 
@@ -1685,12 +1713,70 @@
     }
   }
 
+  function adaptCanonicalPosCatalog(data){
+    var menus=Array.isArray(data && data.menus)?data.menus:[];
+    var sourceCategories=Array.isArray(data && data.categories)?data.categories:[];
+    var categoryMap={};
+    var categories=[];
+
+    sourceCategories.forEach(function(cat){
+      var c={id:cat.id,name:cat.name||cat.title||'Menu',slug:cat.slug||'',products:[]};
+      categoryMap[String(c.id)]=c;
+      categories.push(c);
+    });
+
+    var products=[];
+    menus.forEach(function(menu){
+      var branchCategories=Array.isArray(menu.branch_categories)?menu.branch_categories:[];
+      var categoryRefs=branchCategories.length
+        ? branchCategories
+        : (menu.category ? [menu.category] : []);
+
+      var primaryCategory=categoryRefs[0] || menu.category || null;
+      var product=Object.assign({},menu,{
+        id:menu.menu_id || menu.id,
+        menu_id:menu.menu_id || menu.id,
+        product_id:menu.menu_type==='SINGLE' && Array.isArray(menu.components) && menu.components[0]
+          ? menu.components[0].product_id
+          : null,
+        name:menu.title || menu.package_name || 'Menu',
+        product_name:menu.title || menu.package_name || 'Menu',
+        subtitle:menu.subtitle || null,
+        price:Number(menu.price || 0),
+        regular_price:Number(menu.price || 0),
+        is_available:menu.is_available !== false,
+        components:Array.isArray(menu.components)?menu.components:[],
+        component_snapshot:Array.isArray(menu.components)?menu.components:[],
+        category_id:primaryCategory ? primaryCategory.id : null,
+        category_ids:categoryRefs.map(function(c){return c.id;}),
+        category:primaryCategory,
+        options_config:{version:1,groups:[]}
+      });
+
+      if(!products.some(function(existing){return String(existing.id)===String(product.id);})){
+        products.push(product);
+      }
+
+      categoryRefs.forEach(function(refCat){
+        var key=String(refCat.id);
+        if(!categoryMap[key]){
+          categoryMap[key]={id:refCat.id,name:refCat.name||'Menu',slug:refCat.slug||'',products:[]};
+          categories.push(categoryMap[key]);
+        }
+        categoryMap[key].products.push(product);
+      });
+    });
+
+    return {categories:categories,products:products};
+  }
+
   async function loadMenu(){
     if(!state.branchId)return;
     try{
-      var data=await request('/catalog/menu?branch_id='+encodeURIComponent(state.branchId),{headers:headers()});
-      var catalogProducts=Array.isArray(data.all_products)?data.all_products:(data.products&&Array.isArray(data.products.items)?data.products.items:[]);
-      state.menu={categories:data.categories||[],products:catalogProducts};
+      // Canonical Menu is the sole forward POS catalog source. A canonical
+      // failure must not silently revive the legacy Product catalog.
+      var data=await request('/catalog/composed-menu?branch_id='+encodeURIComponent(state.branchId),{headers:headers()});
+      state.menu=adaptCanonicalPosCatalog(data);
       savePosMenuCache();
       renderMenu();
       state.coreConnection=true;
@@ -2913,7 +2999,7 @@
         phone:'',
         table_number:table?table.table_number:null
       },
-      items:items.map(function(i){return {product_id:i.product_id,name:i.name,quantity:i.quantity,unit_price:i.unit_price,expected_price:i.unit_price,options:i.options||[],note:i.note||''};}),
+      items:items.map(function(i){return {product_id:i.menu_id ? (i.product_id || null) : i.product_id,name:i.name,quantity:i.quantity,unit_price:i.unit_price,expected_price:i.unit_price,menu_id:i.menu_id||null,menu_type:i.menu_type||null,component_snapshot:Array.isArray(i.component_snapshot)?i.component_snapshot:null,menu_snapshot:i.menu_snapshot||null,options:i.options||[],note:i.note||''};}),
       client_transaction_id:'pos_'+Date.now()+'_'+Math.random().toString(36).slice(2,8)
     };
 
@@ -2982,9 +3068,25 @@
 
     var existing=composer().snapshot();
     var canonicalItems=(data.items||[]).map(function(it){
+      var componentSnapshot=[];
+      try {
+        componentSnapshot = Array.isArray(it.component_snapshot)
+          ? it.component_snapshot
+          : JSON.parse(it.component_snapshot || '[]');
+      } catch (_) { componentSnapshot=[]; }
+      var menuSnapshot=null;
+      try {
+        menuSnapshot = it.menu_snapshot && typeof it.menu_snapshot === 'object'
+          ? it.menu_snapshot
+          : JSON.parse(it.menu_snapshot || 'null');
+      } catch (_) { menuSnapshot=null; }
       return {
-        product_id:it.product_id,
-        name:it.product_name||it.name||'Produk',
+        product_id:it.menu_id ? (it.product_id || null) : it.product_id,
+        menu_id:it.menu_id||null,
+        menu_type:it.menu_type||null,
+        component_snapshot:componentSnapshot,
+        menu_snapshot:menuSnapshot,
+        name:it.product_name||it.name||'Menu',
         unit_price:Number(it.unit_price||0),
         quantity:Number(it.quantity||0),
         note:it.note||'',

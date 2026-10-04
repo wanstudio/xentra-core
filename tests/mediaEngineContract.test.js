@@ -181,11 +181,14 @@ test('MEDIA ENGINE — canonical boundary contract', async (t) => {
       const code = fs.readFileSync(path.join(ROOT, rel), 'utf8');
       const start = code.indexOf('window.openBranchOverrideModal');
       const end = code.indexOf('window.clearBranchProductOverride');
-      assert.ok(start >= 0 && end > start, rel + ' must contain a bounded branch-product override controller');
-      const branchProductController = code.slice(start, end);
-      assert.doesNotMatch(branchProductController, /uploadBranchProductImage/);
-      assert.doesNotMatch(branchProductController, /_bpSelectedFile/);
-      assert.doesNotMatch(branchProductController, /XentraCropEditor\.open/);
+      if (start >= 0 && end > start) {
+        const branchProductController = code.slice(start, end);
+        assert.doesNotMatch(branchProductController, /uploadBranchProductImage/);
+        assert.doesNotMatch(branchProductController, /_bpSelectedFile/);
+        assert.doesNotMatch(branchProductController, /XentraCropEditor\.open/);
+      }
+      assert.doesNotMatch(code, /uploadBranchProductImage/);
+      assert.doesNotMatch(code, /_bpSelectedFile/);
     }
   });
 

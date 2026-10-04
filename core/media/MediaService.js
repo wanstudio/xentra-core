@@ -177,6 +177,25 @@ class MediaService {
   }
 
   /**
+   * Queue a FAILED asset for canonical processing retry.
+   * The asset moves only from FAILED -> PROCESSING; actual image work is
+   * performed by processMedia(), which then transitions PROCESSING -> READY.
+   */
+  async retryFailed({ mediaId, brandId, cropSpec = null }) {
+    const asset = this.getMedia({ mediaId, brandId });
+    if (asset.status !== MediaLifecycle.STATES.FAILED) {
+      const err = new Error(`Aset media tidak dapat di-retry dari status '${asset.status}'.`);
+      err.code = 'MEDIA_RETRY_INVALID_STATE';
+      throw err;
+    }
+
+    MediaLifecycle.assertTransition(asset.status, MediaLifecycle.STATES.PROCESSING);
+    this.mediaRepo.updateStatus(mediaId, brandId, MediaLifecycle.STATES.PROCESSING, { error_message: null });
+    const queued = this.mediaRepo.findById(mediaId, brandId);
+    return this._formatAssetResponse(Object.assign({}, queued, { crop_spec: cropSpec || queued.crop_spec }));
+  }
+
+  /**
    * Attach a READY asset to an entity.
    */
   async attachToEntity({ mediaId, brandId, entityType, entityId, manageTransaction = true }) {
@@ -573,8 +592,11 @@ class MediaService {
 
     // A queued retry may already be in PROCESSING. A direct process call from
     // TEMPORARY/UPLOADED/FAILED must enter PROCESSING exactly once.
+    // Duplicate/re-processing from READY is supported as an idempotent reconciliation path.
     if (asset.status !== MediaLifecycle.STATES.PROCESSING) {
-      MediaLifecycle.assertTransition(asset.status, MediaLifecycle.STATES.PROCESSING);
+      if (asset.status !== MediaLifecycle.STATES.READY) {
+        MediaLifecycle.assertTransition(asset.status, MediaLifecycle.STATES.PROCESSING);
+      }
       this.mediaRepo.updateStatus(mediaId, brandId, MediaLifecycle.STATES.PROCESSING);
     }
 

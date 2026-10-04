@@ -307,14 +307,14 @@ Existing domain ownership, role, scope, and KDS boundaries are not superseded.
 
 ### 🔒 30 September 2026 — Customer Display Name Override
 
-In Merchant Menu, an adopted Master Product may expose one optional **Nama Tampil Customer** action.
+**Status: SUPERSEDED by the 2026-10-03 Product → Menu → Inventory contract.**
 
-- Merchant enters a branch-specific display string only when the branch needs a different customer-facing name.
-- Empty/cleared value is persisted as `NULL` and automatically inherits the live Master presentation.
-- The field is presentation-only and does not change Master Product identity or composition.
-- The same Master Product (`branch_products.product_id`) remains the source of all Master data.
-- The canonical mutation endpoint is `PATCH /admin/branches/:id/menu/:productId/display-name`.
-- The edit interaction uses the shared Bottom Sheet presentation primitive.
+This historical UI addendum must not be used to implement a new Branch display-name override. The current contract cancels the Branch Product Name Override as a forward behavior.
+
+- Customer-facing title comes from the resolved Menu contract.
+- `branch_products.name_override` is migration/history data only.
+- New Merchant UI must not create or call `PATCH /admin/branches/:id/menu/:productId/display-name`.
+- Any future Branch-scoped display override requires a new explicit contract on the adopted Menu boundary, not a Product override.
 
 ---
 

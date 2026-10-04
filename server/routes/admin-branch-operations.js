@@ -1,50 +1,14 @@
 /**
  * XENTRA CORE — ADMIN BRANCH OPERATIONS
  *
- * Branch-scoped product assignments and inventory operations.
- * Catalog adoption/product lifecycle remains in admin-branch-catalog.js.
+ * Branch-scoped inventory operations.
+ * Catalog adoption/product lifecycle, including the quarantined legacy Branch Product
+ * compatibility routes, remains exclusively in admin-branch-catalog.js.
  */
 'use strict';
 
 module.exports = function registerAdminBranchOperationsRoutes(router, deps) {
   const { db, requireAuth, InventoryStockService } = deps;
-
-router.get('/admin/branches/:id/products', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
-  try {
-    if (req.user.role === 'branch_manager') {
-      const assignedBranchId = req.user.branchId || req.user.branch_id;
-      if (assignedBranchId && assignedBranchId !== req.params.id) {
-        return res.status(403).json({
-          success: false,
-          error: 'FORBIDDEN_BRANCH_SCOPE',
-          message: 'Branch Manager hanya memiliki kewenangan pada cabang yang ditugaskan.'
-        });
-      }
-    }
-
-    const branch = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
-    if (!branch) {
-      return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
-    }
-
-    const assignments = db.prepare(`
-      SELECT bp.branch_id, bp.product_id, bp.price, bp.stock, bp.is_available, bp.low_stock_threshold,
-             p.name AS product_name, p.is_active AS is_master_active,
-             c.name AS category_name
-      FROM branch_products bp
-      JOIN products p ON p.id = bp.product_id
-      LEFT JOIN categories c ON c.id = p.category_id
-      WHERE bp.branch_id = ?
-      ORDER BY p.sort_order ASC, p.name ASC
-    `).all(req.params.id);
-
-    res.json({ success: true, branch_id: req.params.id, assignments: assignments || [] });
-  } catch (err) {
-    console.error('[API Error GET /admin/branches/:id/products]:', err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
 
 
 router.get('/admin/branches/:id/inventory', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
@@ -66,12 +30,41 @@ router.get('/admin/branches/:id/inventory', requireAuth(['owner', 'brand_manager
     }
 
     const rows = db.prepare(`
-      SELECT bp.product_id, p.name AS product_name, bp.price, bp.stock, bp.is_available, bp.low_stock_threshold
-      FROM branch_products bp
-      JOIN products p ON p.id = bp.product_id AND p.brand_id = ?
-      WHERE bp.branch_id = ?
-      ORDER BY p.sort_order ASC, p.name ASC
-    `).all(req.brand_id, req.params.id);
+      SELECT
+        p.id AS product_id,
+        p.name AS product_name,
+        p.sku,
+        CASE
+          WHEN p.sku IS NOT NULL AND trim(p.sku) <> ''
+            THEN COALESCE(bpi.stock_qty, 0)
+          ELSE COALESCE(bp.stock, 0)
+        END AS stock,
+        CASE
+          WHEN p.sku IS NOT NULL AND trim(p.sku) <> ''
+            THEN COALESCE(bpi.low_stock_threshold, 5)
+          ELSE COALESCE(bp.low_stock_threshold, 5)
+        END AS low_stock_threshold,
+        CASE
+          WHEN p.sku IS NOT NULL AND trim(p.sku) <> '' THEN 'canonical'
+          WHEN bp.product_id IS NOT NULL THEN 'legacy'
+          ELSE 'none'
+        END AS stock_source,
+        CASE
+          WHEN p.sku IS NOT NULL AND trim(p.sku) <> '' THEN NULL
+          ELSE bp.is_available
+        END AS is_available
+      FROM products p
+      LEFT JOIN branch_product_inventory bpi
+        ON bpi.branch_id = ? AND bpi.product_id = p.id
+      LEFT JOIN branch_products bp
+        ON bp.branch_id = ? AND bp.product_id = p.id
+      WHERE p.brand_id = ?
+        AND (
+          (p.sku IS NOT NULL AND trim(p.sku) <> '')
+          OR bp.product_id IS NOT NULL
+        )
+      ORDER BY p.name ASC, p.id ASC
+    `).all(req.params.id, req.params.id, req.brand_id);
 
     res.json({ success: true, branch_id: req.params.id, inventory: rows || [] });
   } catch (err) {
@@ -136,15 +129,30 @@ router.patch('/admin/branches/:id/inventory/:productId', requireAuth(['owner', '
       });
     }
 
-    // Assignment + brand consistency must already hold (C1 trigger enforces it at the DB too).
-    const assignment = db.prepare(`
-      SELECT bp.branch_id
-      FROM branch_products bp
-      JOIN products p ON p.id = bp.product_id AND p.brand_id = ?
-      WHERE bp.branch_id = ? AND bp.product_id = ?
-    `).get(req.brand_id, req.params.id, req.params.productId);
-    if (!assignment) {
-      return res.status(404).json({ success: false, error: 'Produk tidak dialokasikan ke cabang ini.' });
+    // Forward inventory boundary:
+    // - SKU Product -> canonical branch_product_inventory; no Branch Menu adoption is required
+    //   for stock to exist.
+    // - Product without SKU -> legacy branch_products compatibility path.
+    const product = db.prepare(`
+      SELECT id, brand_id, sku
+      FROM products
+      WHERE id = ? AND brand_id = ?
+    `).get(req.params.productId, req.brand_id);
+    if (!product) {
+      return res.status(404).json({ success: false, error: 'Produk tidak ditemukan pada brand ini.' });
+    }
+
+    const canonicalStock = product.sku != null && String(product.sku).trim() !== '';
+    if (!canonicalStock) {
+      const assignment = db.prepare(`
+        SELECT bp.branch_id
+        FROM branch_products bp
+        JOIN products p ON p.id = bp.product_id AND p.brand_id = ?
+        WHERE bp.branch_id = ? AND bp.product_id = ?
+      `).get(req.brand_id, req.params.id, req.params.productId);
+      if (!assignment) {
+        return res.status(404).json({ success: false, error: 'Produk tidak dialokasikan ke cabang ini.' });
+      }
     }
 
     try {
@@ -160,11 +168,12 @@ router.patch('/admin/branches/:id/inventory/:productId', requireAuth(['owner', '
         notes
       });
 
-      const current = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(req.params.id, req.params.productId);
+      const stock = InventoryStockService.getStock(req.params.id, req.params.productId);
       res.json({
         success: true,
         movement,
-        stock: current ? current.stock : 0
+        stock,
+        stock_source: canonicalStock ? 'canonical' : 'legacy'
       });
     } catch (stockErr) {
       const msg = String(stockErr && stockErr.message || '');

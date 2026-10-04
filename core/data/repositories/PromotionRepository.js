@@ -312,10 +312,10 @@ class PromotionRepository {
       const presStr = typeof rw.presentation_payload === 'object' ? JSON.stringify(rw.presentation_payload) : (rw.presentation_payload || null);
       this.db.execute(`
         INSERT INTO promotion_rewards (
-          id, promotion_id, reward_type, target_product_id, amount_in_cents, max_discount_in_cents, presentation_payload, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+          id, promotion_id, reward_type, target_menu_id, target_product_id, amount_in_cents, max_discount_in_cents, presentation_payload, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
       `, [
-        rewId, promoId, rw.reward_type || 'freebie_product', rw.target_product_id || null,
+        rewId, promoId, rw.reward_type || 'freebie_product', rw.target_menu_id || null, rw.target_product_id || null,
         Number(rw.amount_in_cents || 0), rw.max_discount_in_cents || null, presStr
       ]);
     }
@@ -398,7 +398,11 @@ class PromotionRepository {
           presStr = typeof rw.presentation_payload === 'object' ? JSON.stringify(rw.presentation_payload) : (rw.presentation_payload || null);
         } else {
           // Preserve existing presentation_payload for this reward if it existed
-          const existingRw = (existing.rewards || []).find(r => r.id === rewId || r.target_product_id === rw.target_product_id);
+          const existingRw = (existing.rewards || []).find(r =>
+            r.id === rewId ||
+            (rw.target_menu_id && r.target_menu_id === rw.target_menu_id) ||
+            (rw.target_product_id && r.target_product_id === rw.target_product_id)
+          );
           if (existingRw && existingRw.presentation_payload) {
             presStr = typeof existingRw.presentation_payload === 'object'
               ? JSON.stringify(existingRw.presentation_payload)
@@ -407,10 +411,10 @@ class PromotionRepository {
         }
         this.db.execute(`
           INSERT INTO promotion_rewards (
-            id, promotion_id, reward_type, target_product_id, amount_in_cents, max_discount_in_cents, presentation_payload, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+            id, promotion_id, reward_type, target_menu_id, target_product_id, amount_in_cents, max_discount_in_cents, presentation_payload, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
         `, [
-          rewId, promotionId, rw.reward_type || 'freebie_product', rw.target_product_id || null,
+          rewId, promotionId, rw.reward_type || 'freebie_product', rw.target_menu_id || null, rw.target_product_id || null,
           Number(rw.amount_in_cents || 0), rw.max_discount_in_cents || null, presStr
         ]);
       }
@@ -490,6 +494,16 @@ class PromotionRepository {
       FROM products
       WHERE id = ? AND brand_id = ?
     `, [productId, brandId]);
+  }
+
+  findRewardMenu({ menuId, brandId }) {
+    return this.db.queryOne(`
+      SELECT m.id, m.brand_id, m.menu_type, m.package_name, m.selling_price, m.status,
+             sc.name AS sub_category_name
+      FROM menus m
+      LEFT JOIN sub_categories sc ON sc.id = m.sub_category_id AND sc.brand_id = m.brand_id
+      WHERE m.id = ? AND m.brand_id = ?
+    `, [menuId, brandId]);
   }
 
   recordRedemption({

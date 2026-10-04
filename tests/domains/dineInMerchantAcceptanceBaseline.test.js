@@ -32,11 +32,9 @@ let bmToken;
 
 function makeItems() {
   return [{
-    product_id: 'prod_bline_1',
+    menu_id: 'menu_bline_1',
     quantity: 1,
-    unit_price: 35000,
-    product_name: 'Nasi Goreng Spesial',
-    subtotal: 35000
+    expected_price: 35000
   }];
 }
 
@@ -122,16 +120,17 @@ test.before(async () => {
     `).run(t.id, new Date().toISOString());
   }
 
-  // Seed product
-  db.prepare(`
-    INSERT OR REPLACE INTO products (id, brand_id, name, slug, price, is_active)
-    VALUES ('prod_bline_1', ?, 'Nasi Goreng Spesial', 'nasgor-spesial-bline', 35000, 1)
-  `).run(BRAND_ID);
-
-  db.prepare(`
-    INSERT OR REPLACE INTO branch_products (branch_id, product_id, price, stock, is_available)
-    VALUES (?, 'prod_bline_1', 35000, 100, 1)
-  `).run(BRANCH_ID);
+  // Canonical Product/SKU -> Master Menu -> Branch Menu -> Inventory fixture.
+  db.prepare("INSERT OR IGNORE INTO categories (id, brand_id, name, slug, is_active) VALUES ('cat_bline_1', ?, 'Makanan', 'makanan-bline', 1)").run(BRAND_ID);
+  db.prepare("INSERT OR REPLACE INTO products (id, brand_id, category_id, name, slug, price, is_active, sku) VALUES ('prod_bline_1', ?, 'cat_bline_1', 'Nasi Goreng Spesial', 'nasgor-spesial-bline', 35000, 1, 'BLINE-SKU-001')").run(BRAND_ID);
+  db.prepare("INSERT OR IGNORE INTO menu_flavors (id, brand_id, name, slug, is_active) VALUES ('rasa_bline_original', ?, 'Original', 'rasa-bline-original', 1)").run(BRAND_ID);
+  db.prepare("INSERT OR REPLACE INTO sub_categories (id, brand_id, category_id, name, slug, is_active) VALUES ('sub_bline_1', ?, 'cat_bline_1', 'Nasi Goreng', 'sub-bline-1', 1)").run(BRAND_ID);
+  db.prepare("INSERT OR REPLACE INTO menus (id, brand_id, menu_type, sub_category_id, rasa_id, selling_price, status) VALUES ('menu_bline_1', ?, 'SINGLE', 'sub_bline_1', 'rasa_bline_original', 35000, 'ACTIVE')").run(BRAND_ID);
+  db.prepare("INSERT OR REPLACE INTO menu_items (menu_id, product_id, quantity, sort_order) VALUES ('menu_bline_1', 'prod_bline_1', 1, 0)").run();
+  db.prepare("INSERT OR REPLACE INTO branch_categories (id, brand_id, branch_id, name, slug, sort_order, is_active) VALUES ('bc_bline_1', ?, ?, 'Makanan', 'makanan-bline-branch', 1, 1)").run(BRAND_ID, BRANCH_ID);
+  db.prepare("INSERT OR REPLACE INTO branch_menus (branch_id, menu_id, price_override, is_available) VALUES (?, 'menu_bline_1', NULL, 1)").run(BRANCH_ID);
+  db.prepare("INSERT OR REPLACE INTO branch_menu_categories (branch_id, menu_id, branch_category_id) VALUES (?, 'menu_bline_1', 'bc_bline_1')").run(BRANCH_ID);
+  db.prepare("INSERT OR REPLACE INTO branch_product_inventory (branch_id, product_id, stock_qty, low_stock_threshold) VALUES (?, 'prod_bline_1', 100, 10)").run(BRANCH_ID);
 
   // Seed staff user in DB for authoritative account check in requireAuth
   db.prepare(`
@@ -166,7 +165,7 @@ test('Baseline 1: Customer dine-in multi-table selection is strictly rejected', 
 });
 
 test('Baseline 2: Cash Pending does NOT deduct stock; Table is held; Merchant Accept via HTTP activates Dining Session, marks Table occupied, and deducts stock', async () => {
-  const initialStock = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH_ID, 'prod_bline_1').stock;
+  const initialStock = db.prepare('SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?').get(BRANCH_ID, 'prod_bline_1').stock_qty;
   assert.equal(initialStock, 100);
 
   // Step 1: Customer creates cash order for Table T1
@@ -186,7 +185,7 @@ test('Baseline 2: Cash Pending does NOT deduct stock; Table is held; Merchant Ac
   assert.equal(order.status, 'pending', 'Order must be pending awaiting merchant acceptance');
 
   // Verify: Stock is NOT deducted for pending cash order (P0 fix verification)
-  const stockWhilePending = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH_ID, 'prod_bline_1').stock;
+  const stockWhilePending = db.prepare('SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?').get(BRANCH_ID, 'prod_bline_1').stock_qty;
   assert.equal(stockWhilePending, 100, 'Pending cash order must NOT deduct stock before merchant acceptance');
 
   // Table hold created for payment/acceptance stage
@@ -243,7 +242,7 @@ test('Baseline 2: Cash Pending does NOT deduct stock; Table is held; Merchant Ac
   assert.equal(sessionRow.status, 'active');
 
   // Verify stock is now deducted upon merchant acceptance (100 -> 99)
-  const stockAfterAccept = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH_ID, 'prod_bline_1').stock;
+  const stockAfterAccept = db.prepare('SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?').get(BRANCH_ID, 'prod_bline_1').stock_qty;
   assert.equal(stockAfterAccept, 99, 'Stock must be deducted upon merchant acceptance');
 
   // Verify inventory movement record exists
@@ -274,7 +273,7 @@ test('Baseline 2: Cash Pending does NOT deduct stock; Table is held; Merchant Ac
 
 test('Baseline 3: Merchant Accept via HTTP is atomic: fails if table is already occupied by another customer; order remains pending and stock untouched', async () => {
   const custBPhone = '081299990002';
-  const stockBefore = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH_ID, 'prod_bline_1').stock;
+  const stockBefore = db.prepare('SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?').get(BRANCH_ID, 'prod_bline_1').stock_qty;
 
   // Step 1: Customer B places order for Table T2 (Order pending, hold created)
   const orderRes = await OrderPlacementService.submitOrder({
@@ -335,7 +334,7 @@ test('Baseline 3: Merchant Accept via HTTP is atomic: fails if table is already 
   assert.equal(orderAfterFailedAccept.status, 'pending', 'Order must NOT be confirmed if Dining Session creation fails');
 
   // Invariant check: Stock must NOT be deducted!
-  const stockAfterFailedAccept = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH_ID, 'prod_bline_1').stock;
+  const stockAfterFailedAccept = db.prepare('SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?').get(BRANCH_ID, 'prod_bline_1').stock_qty;
   assert.equal(stockAfterFailedAccept, stockBefore, 'Stock must NOT be deducted if accept fails');
 
   // Cleanup the other session
@@ -345,7 +344,7 @@ test('Baseline 3: Merchant Accept via HTTP is atomic: fails if table is already 
 
 test('Baseline 4: Merchant Reject via HTTP releases table hold back to available; order rejected; stock untouched', async () => {
   const custPhone = '081299990003';
-  const stockBefore = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH_ID, 'prod_bline_1').stock;
+  const stockBefore = db.prepare('SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?').get(BRANCH_ID, 'prod_bline_1').stock_qty;
 
   const orderRes = await OrderPlacementService.submitOrder({
     brand_id: BRAND_ID,
@@ -389,7 +388,7 @@ test('Baseline 4: Merchant Reject via HTTP releases table hold back to available
   assert.equal(t3State.current_session_id, null);
 
   // Verify stock was NOT deducted
-  const stockAfter = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH_ID, 'prod_bline_1').stock;
+  const stockAfter = db.prepare('SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?').get(BRANCH_ID, 'prod_bline_1').stock_qty;
   assert.equal(stockAfter, stockBefore);
 });
 
@@ -485,7 +484,7 @@ test('Baseline 6: Acceptance Timeout releases table hold back to available', asy
 
 test('Baseline 7: Concurrent double-click Accept requests execute atomically without destroying active session', async () => {
   const custPhone = '081299990007';
-  const stockBefore = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH_ID, 'prod_bline_1').stock;
+  const stockBefore = db.prepare('SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?').get(BRANCH_ID, 'prod_bline_1').stock_qty;
 
   // Step 1: Customer creates cash order for Table T5
   const orderRes = await OrderPlacementService.submitOrder({
@@ -548,7 +547,7 @@ test('Baseline 7: Concurrent double-click Accept requests execute atomically wit
   assert.equal(activeSession.status, 'active', 'Active session must NOT be completed by duplicate accept');
 
   // Verify stock was deducted EXACTLY ONCE (stockBefore - 1)
-  const stockAfter = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH_ID, 'prod_bline_1').stock;
+  const stockAfter = db.prepare('SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?').get(BRANCH_ID, 'prod_bline_1').stock_qty;
   assert.equal(stockAfter, stockBefore - 1, 'Stock must be deducted exactly once despite concurrent accept requests');
 
   // Cleanup session

@@ -366,20 +366,20 @@
 
   function findCurrentProductForBanner(productId) {
     var targetId = String(productId || '');
-    var local = products.find(function (product) {
-      return String(product.id) === targetId;
-    });
-    if (local) return local;
 
-    for (var i = 0; i < categories.length; i++) {
-      var items = Array.isArray(categories[i].products) ? categories[i].products : [];
-      var hit = items.find(function (product) {
-        return String(product.id) === targetId;
+    // Banner PRODUCT CTA stores a Product identity for compatibility, while
+    // Customer Home now renders Menu objects. Resolve that Product only through
+    // the canonical Menu component snapshot. Never read Product price/category
+    // here—the canonical Menu remains the customer commercial authority.
+    var matches = products.filter(function (product) {
+      return Array.isArray(product.components) && product.components.some(function (component) {
+        return String(component && component.product_id || '') === targetId;
       });
-      if (hit) return hit;
-    }
+    });
 
-    return null;
+    // A Product can legally participate in multiple Menus. A banner PRODUCT
+    // target must not silently choose one commercial Menu in that case.
+    return matches.length === 1 ? matches[0] : null;
   }
 
   function goToBannerCategory(categoryId) {
@@ -412,28 +412,35 @@
 
     var branchId = currentCustomerBranchId();
     var endpoint = branchId
-      ? '/catalog/menu?branch_id=' + encodeURIComponent(branchId)
-      : '/catalog/menu';
+      ? '/catalog/composed-menu?branch_id=' + encodeURIComponent(branchId)
+      : '/catalog/composed-menu';
 
-    return API.get(endpoint).then(function (data) {
+    return API.get(endpoint).then(function (rawData) {
+      var data = rawData && Array.isArray(rawData.menus)
+        ? adaptCanonicalHomeCatalog(rawData)
+        : rawData;
       var hit = null;
-      var cats = data && Array.isArray(data.categories) ? data.categories : [];
+      var products = data && Array.isArray(data.all_products) ? data.all_products : [];
 
-      cats.some(function (cat) {
-        var items = Array.isArray(cat.products) ? cat.products : [];
-        var found = items.find(function (product) {
-          return String(product.id) === String(productId);
+      // The Banner CONTENT contract historically stores PRODUCT CTA by
+      // Product ID. Resolve that identity only through canonical Menu output.
+      // A Product used by multiple Menus is intentionally ambiguous; never
+      // invent which commercial Menu the banner should open.
+      var targetId = String(productId || '');
+      var componentHits = products.filter(function (product) {
+        return Array.isArray(product.components) && product.components.some(function (component) {
+          return String(component && component.product_id || '') === targetId;
         });
-        if (found) {
-          hit = found;
-          return true;
-        }
-        return false;
       });
 
-      if (hit) {
-        openProductDetail(hit);
+      if (componentHits.length === 1) {
+        openProductDetail(componentHits[0]);
         return true;
+      }
+
+      if (componentHits.length > 1) {
+        UI.toast('Produk Banner terhubung ke lebih dari satu Menu. Buka Menu tersebut dari katalog.');
+        return false;
       }
 
       UI.toast('Produk Banner tidak tersedia di cabang ini.');
@@ -1136,43 +1143,140 @@
     if (branches.length > 1) updateBranchActiveState();
   }
 
+  function adaptCanonicalHomeCatalog(data) {
+    var sourceCategories = Array.isArray(data && data.categories) ? data.categories : [];
+    var sourceMenus = Array.isArray(data && data.menus) ? data.menus : [];
+    var categoryMap = {};
+
+    sourceCategories.forEach(function (cat) {
+      categoryMap[String(cat.id)] = Object.assign({}, cat, { products: [] });
+    });
+
+    var productsByMenu = {};
+    sourceMenus.forEach(function (menu) {
+      var categoryRefs = Array.isArray(menu.branch_categories) && menu.branch_categories.length
+        ? menu.branch_categories
+        : (menu.category ? [menu.category] : []);
+
+      categoryRefs.forEach(function (cat) {
+        var key = String(cat.id);
+        if (!categoryMap[key]) {
+          categoryMap[key] = {
+            id: cat.id,
+            name: cat.name || 'Menu',
+            slug: cat.slug || '',
+            products: []
+          };
+        }
+      });
+
+      var componentSnapshot = Array.isArray(menu.components) ? menu.components : [];
+      var product = Object.assign({}, menu, {
+        id: menu.menu_id || menu.id,
+        menu_id: menu.menu_id || menu.id,
+        menu_type: menu.menu_type || 'SINGLE',
+        product_id: menu.menu_type === 'SINGLE' && componentSnapshot[0]
+          ? componentSnapshot[0].product_id
+          : null,
+        name: menu.title || menu.package_name || 'Menu',
+        menu_title: menu.title || menu.package_name || 'Menu',
+        menu_subtitle: menu.subtitle || '',
+        menu_indicator_level: menu.level && menu.level.value != null ? menu.level.value : null,
+        price: Number(menu.price || 0),
+        regular_price: Number(menu.price || 0),
+        description: componentSnapshot.length === 1 ? (componentSnapshot[0].description || '') : '',
+        image_url: componentSnapshot.length === 1 ? (componentSnapshot[0].image_url || '') : '',
+        components: componentSnapshot,
+        component_snapshot: componentSnapshot,
+        menu_snapshot: {
+          menu_id: menu.menu_id || menu.id,
+          menu_type: menu.menu_type || 'SINGLE',
+          title: menu.title || menu.package_name || 'Menu',
+          subtitle: menu.subtitle || null,
+          price: Number(menu.price || 0),
+          category: menu.category || null,
+          sub_category: menu.sub_category || null,
+          rasa: menu.rasa || null,
+          level: menu.level || null,
+          status: menu.status || 'ACTIVE'
+        }
+      });
+
+      productsByMenu[String(product.id)] = product;
+    });
+
+    Object.keys(productsByMenu).forEach(function (menuId) {
+      var product = productsByMenu[menuId];
+      var categoryRefs = Array.isArray(product.branch_categories) && product.branch_categories.length
+        ? product.branch_categories
+        : (product.category ? [product.category] : []);
+
+      product.category_ids = categoryRefs.map(function (cat) { return cat.id; });
+      product.category_id = categoryRefs.length ? categoryRefs[0].id : null;
+
+      categoryRefs.forEach(function (cat) {
+        var key = String(cat.id);
+        if (!categoryMap[key]) {
+          categoryMap[key] = {
+            id: cat.id,
+            name: cat.name || 'Menu',
+            slug: cat.slug || '',
+            products: []
+          };
+        }
+        categoryMap[key].products.push(product);
+      });
+    });
+
+    return {
+      success: true,
+      categories: Object.keys(categoryMap).map(function (key) { return categoryMap[key]; }),
+      products: Object.keys(productsByMenu).map(function (key) { return productsByMenu[key]; }),
+      all_products: Object.keys(productsByMenu).map(function (key) { return productsByMenu[key]; })
+    };
+  }
+
   function loadCatalog(branchId) {
     var seq = ++catalogLoadSeq;
     catalogBranchId = branchId ? String(branchId) : null;
-    var path = branchId ? '/catalog/menu?branch_id=' + encodeURIComponent(branchId) : '/catalog/menu';
+    var path = branchId
+      ? '/catalog/composed-menu?branch_id=' + encodeURIComponent(branchId)
+      : '/catalog/composed-menu';
 
     perfLog('home_api_catalog_start');
     API.get(path)
-      .then(function (data) {
-        if (seq !== catalogLoadSeq) return; // superseded by a newer catalog load
+      .then(function (rawData) {
+        if (seq !== catalogLoadSeq) return;
         perfLog('home_api_catalog_end');
+
+        var data = rawData && Array.isArray(rawData.menus)
+          ? adaptCanonicalHomeCatalog(rawData)
+          : rawData;
+
         if (data && data.success && data.categories && data.categories.length > 0) {
-          // Only the brand-wide menu (no branch context) is cached; branch menus
-          // are never cached so a cache key can never cross branch identities.
           if (!catalogBranchId) {
             try { localStorage.setItem('xentra_catalog_cache', JSON.stringify(data)); } catch (_) {}
           }
           applyCatalog(data);
           return;
         }
-        // With a branch context, an empty/failed menu must be honest — a branch
-        // whose menu has no data is never filled with brand-wide/static content.
-        if (catalogBranchId) {
-          renderEmptyBranchCatalog();
-        } else if (!categories.length) {
+
+        // A successful empty canonical response is authoritative. Do not invent
+        // legacy products into a genuinely empty canonical branch catalog.
+        if (catalogBranchId || !categories.length) {
           renderEmptyBranchCatalog();
         }
       })
       .catch(function (err) {
-        if (seq !== catalogLoadSeq) return; // superseded by a newer catalog load
+        if (seq !== catalogLoadSeq) return;
         perfLog('home_api_catalog_end', 'error');
-        console.warn('[Home] Load catalog network warn:', err);
-        if (catalogBranchId) {
-          renderEmptyBranchCatalog();
-        } else if (!categories.length) {
-          renderEmptyBranchCatalog();
-        }
-      });
+        console.warn('[Home] Canonical catalog load warn:', err);
+
+        // Canonical Menu resolution is the only forward Customer PWA catalog source.
+        // A canonical failure must remain visible instead of silently reviving the
+        // legacy Product-centric catalog, which could produce a mixed/incorrect cart.
+        if (catalogBranchId || !categories.length) renderEmptyBranchCatalog();
+      }));
   }
 
   // ======================================================================
@@ -1260,22 +1364,13 @@
       return;
     }
 
-    API.get('/products?category=' + encodeURIComponent(categoryId))
-      .then(function (data) {
-        if (seq !== productLoadSeq) return;
-        if (data.success && Array.isArray(data.items) && data.items.length > 0) {
-          products = data.items;
-          if (found) found.products = products;
-        } else {
-          products = [];
-        }
-        renderProducts();
-      })
-      .catch(function () {
-        if (seq !== productLoadSeq) return;
-        products = [];
-        renderProducts();
-      });
+    // Canonical Menu endpoint is the sole forward Customer catalog source.
+    // Missing category payload means an empty category, not a permission to
+    // resurrect the legacy Product catalog.
+    if (seq !== productLoadSeq) return;
+    products = [];
+    if (found) found.products = [];
+    renderProducts();
   }
 
   // Customer presentation contract: Level Pedas is always a four-dot horizontal

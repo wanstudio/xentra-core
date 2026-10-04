@@ -63,20 +63,27 @@ async function createCustomerSession(phone) {
 }
 
 function addTestBranch(id) {
-  db.prepare(`INSERT OR IGNORE INTO products
-    (id, brand_id, name, slug, description, price, is_active)
-    VALUES ('272', 'brand_bangjo', 'Test Product 272', 'test-product-272', 'Test', 35000, 1)`)
-    .run();
-  db.prepare(`INSERT OR REPLACE INTO branches
-    (id, brand_id, name, slug, address_text, latitude, longitude, phone, is_active, is_open_override)
-    VALUES (?, 'brand_bangjo', ?, ?, 'Jl. Test', -7.2912, 112.7154, '081000000001', 1, 1)`)
-    .run(id, 'Branch ' + id, id);
-  db.prepare(`INSERT OR REPLACE INTO branch_delivery_settings
-    (id, branch_id, is_delivery_active, is_pickup_active, max_radius_km, free_delivery_km, price_per_km, min_order_amount)
-    VALUES (?, ?, 1, 1, 25, 5, 3000, 0)`)
-    .run('bds_' + id, id);
-  db.prepare(`INSERT OR REPLACE INTO branch_products (branch_id, product_id, price, stock, is_available)
-    VALUES (?, '272', 35000, 10, 1)`).run(id);
+  const productId = 'customer_auth_product_272';
+  const categoryId = 'customer_auth_category';
+  const menuId = 'customer_auth_menu_272';
+  const subCategoryId = 'customer_auth_sub_272';
+
+  db.prepare("INSERT OR IGNORE INTO categories (id, brand_id, name, slug, is_active) VALUES (?, 'brand_bangjo', 'Makanan Test', 'customer-auth-makanan', 1)").run(categoryId);
+  db.prepare("INSERT OR IGNORE INTO products (id, brand_id, category_id, name, slug, description, price, is_active) VALUES (?, 'brand_bangjo', ?, 'Test Customer Menu', ?, 'Test', 35000, 1)").run(productId, categoryId, 'customer-auth-product-272');
+  db.prepare("INSERT OR REPLACE INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, is_active, is_open_override) VALUES (?, 'brand_bangjo', ?, ?, 'Jl. Test', -7.2912, 112.7154, '081000000001', 1, 1)").run(id, 'Branch ' + id, id);
+  db.prepare("INSERT OR REPLACE INTO branch_delivery_settings (id, branch_id, is_delivery_active, is_pickup_active, max_radius_km, free_delivery_km, price_per_km, min_order_amount) VALUES (?, ?, 1, 1, 25, 5, 3000, 0)").run('bds_' + id, id);
+
+  const rasa = db.prepare("SELECT id FROM menu_flavors WHERE brand_id = 'brand_bangjo' AND lower(trim(name)) = 'original' AND is_active = 1 LIMIT 1").get()
+    || (db.prepare("INSERT INTO menu_flavors (id, brand_id, name, slug, is_active) VALUES ('customer_auth_original', 'brand_bangjo', 'Original', 'customer-auth-original', 1)").run(),
+        db.prepare("SELECT id FROM menu_flavors WHERE id = 'customer_auth_original'").get());
+
+  db.prepare("INSERT OR IGNORE INTO sub_categories (id, brand_id, category_id, name, slug, is_active) VALUES (?, 'brand_bangjo', ?, 'Test Customer Menu', 'customer-auth-makanan', 1)").run(subCategoryId, categoryId);
+  db.prepare("INSERT OR IGNORE INTO menus (id, brand_id, menu_type, sub_category_id, rasa_id, selling_price, status) VALUES (?, 'brand_bangjo', 'SINGLE', ?, ?, 35000, 'ACTIVE')").run(menuId, subCategoryId, rasa.id);
+  db.prepare("INSERT OR IGNORE INTO menu_items (menu_id, product_id, quantity, sort_order) VALUES (?, ?, 1, 0)").run(menuId, productId);
+  db.prepare("INSERT OR IGNORE INTO branch_categories (id, brand_id, branch_id, name, slug, sort_order, is_active) VALUES (?, 'brand_bangjo', ?, 'Makanan', ?, 1, 1)").run('customer_auth_bc_' + id, id, 'customer-auth-makanan-' + id);
+  db.prepare("INSERT OR REPLACE INTO branch_menus (branch_id, menu_id, is_available, price_override) VALUES (?, ?, 1, 35000)").run(id, menuId);
+  db.prepare("INSERT OR REPLACE INTO branch_menu_categories (branch_id, menu_id, branch_category_id) VALUES (?, ?, ?)").run(id, menuId, 'customer_auth_bc_' + id);
+  db.prepare("INSERT OR REPLACE INTO branch_product_inventory (branch_id, product_id, stock_qty, low_stock_threshold) VALUES (?, ?, 10, 5)").run(id, productId);
 }
 
 async function createOrder(phone, branchId) {
@@ -89,7 +96,7 @@ async function createOrder(phone, branchId) {
       payment_method: 'cash',
       customer: { name: 'Test Customer', phone },
       order_type: 'pickup',
-      items: [{ id: '272', quantity: 1 }]
+      items: [{ menu_id: 'customer_auth_menu_272', quantity: 1, expected_price: 35000 }]
     })
   });
   const data = await res.json();
@@ -194,7 +201,7 @@ test('SEC-08: Checkout requires valid customer auth (no unauthenticated checkout
       payment_method: 'cash',
       customer: { name: 'Hacker', phone: '089000000088' },
       order_type: 'pickup',
-      items: [{ id: '272', quantity: 1 }]
+      items: [{ menu_id: 'customer_auth_menu_272', quantity: 1, expected_price: 35000 }]
     })
   });
   assert.strictEqual(res.status, 401);
@@ -215,7 +222,7 @@ test('SEC-09: Checkout with a customer session binds authoritative phone from se
       payment_method: 'cash',
       customer: { name: 'Body Phone', phone: '089999999999' },
       order_type: 'pickup',
-      items: [{ id: '272', quantity: 1 }]
+      items: [{ menu_id: 'customer_auth_menu_272', quantity: 1, expected_price: 35000 }]
     })
   });
   assert.strictEqual(res.status, 201);
@@ -312,7 +319,7 @@ test('OTP-FLOW-04: Complete OTP flow end-to-end: send → verify → use token f
       payment_method: 'cash',
       customer: { name: 'Flow Test', phone },
       order_type: 'pickup',
-      items: [{ id: '272', quantity: 1 }]
+      items: [{ menu_id: 'customer_auth_menu_272', quantity: 1, expected_price: 35000 }]
     })
   });
   assert.strictEqual(orderRes.status, 201);
@@ -402,7 +409,7 @@ test('SEC-13: Unauthenticated /checkout/verify is rejected with 401', async () =
     body: JSON.stringify({
       branch_id: 'branch_sec_13',
       order_type: 'pickup',
-      items: [{ product_id: '272', id: '272', quantity: 1, expected_price: 35000 }]
+      items: [{ menu_id: 'customer_auth_menu_272', quantity: 1, expected_price: 35000 }]
     })
   });
   assert.strictEqual(res.status, 401);
@@ -420,7 +427,7 @@ test('SEC-14: Forged customer token on /checkout/verify is rejected with 401', a
     body: JSON.stringify({
       branch_id: 'branch_sec_14',
       order_type: 'pickup',
-      items: [{ product_id: '272', id: '272', quantity: 1, expected_price: 35000 }]
+      items: [{ menu_id: 'customer_auth_menu_272', quantity: 1, expected_price: 35000 }]
     })
   });
   assert.strictEqual(res.status, 401);
@@ -440,7 +447,7 @@ test('SEC-15: /checkout/verify uses session phone, not body phone', async () => 
       branch_id: 'branch_sec_15',
       order_type: 'pickup',
       customer: { name: 'Body Name', phone: '089999999999' },
-      items: [{ product_id: '272', id: '272', quantity: 1, expected_price: 35000 }]
+      items: [{ menu_id: 'customer_auth_menu_272', quantity: 1, expected_price: 35000 }]
     })
   });
   assert.strictEqual(res.status, 200);
@@ -459,7 +466,7 @@ test('SEC-16: Expired customer token on /checkout/verify is rejected with 401', 
     body: JSON.stringify({
       branch_id: 'branch_sec_16',
       order_type: 'pickup',
-      items: [{ product_id: '272', id: '272', quantity: 1, expected_price: 35000 }]
+      items: [{ menu_id: 'customer_auth_menu_272', quantity: 1, expected_price: 35000 }]
     })
   });
   assert.strictEqual(res.status, 401);
@@ -479,7 +486,7 @@ test('SEC-17: Valid customer session allows /checkout/verify to succeed', async 
       branch_id: 'branch_sec_17',
       order_type: 'pickup',
       customer: { name: 'Verify Customer', phone },
-      items: [{ product_id: '272', id: '272', quantity: 1, expected_price: 35000 }]
+      items: [{ menu_id: 'customer_auth_menu_272', quantity: 1, expected_price: 35000 }]
     })
   });
   assert.strictEqual(res.status, 200);
@@ -511,7 +518,7 @@ test('SEC-18: Customer session persists to SQLite and survives memory cache wipe
       payment_method: 'cash',
       customer: { name: 'Restart Survivor', phone },
       order_type: 'pickup',
-      items: [{ id: '272', quantity: 1 }]
+      items: [{ menu_id: 'customer_auth_menu_272', quantity: 1, expected_price: 35000 }]
     })
   });
   assert.strictEqual(res.status, 201, 'order must succeed with restored session');
@@ -553,7 +560,7 @@ test('SEC-20: Unauthenticated checkout returns CUSTOMER_AUTH_REQUIRED, while inv
       payment_method: 'cash',
       customer: { name: 'No Token', phone: '089000000020' },
       order_type: 'pickup',
-      items: [{ id: '272', quantity: 1 }]
+      items: [{ menu_id: 'customer_auth_menu_272', quantity: 1, expected_price: 35000 }]
     })
   });
   assert.strictEqual(noTokenRes.status, 401);
@@ -569,7 +576,7 @@ test('SEC-20: Unauthenticated checkout returns CUSTOMER_AUTH_REQUIRED, while inv
       payment_method: 'cash',
       customer: { name: 'Invalid Token', phone: '089000000020' },
       order_type: 'pickup',
-      items: [{ id: '272', quantity: 1 }]
+      items: [{ menu_id: 'customer_auth_menu_272', quantity: 1, expected_price: 35000 }]
     })
   });
   assert.strictEqual(invalidTokenRes.status, 401);
@@ -593,7 +600,7 @@ test('SEC-21: Returning customer with existing valid session creates multiple co
       payment_method: 'cash',
       customer: { name: 'Returning Customer', phone },
       order_type: 'pickup',
-      items: [{ id: '272', quantity: 1 }]
+      items: [{ menu_id: 'customer_auth_menu_272', quantity: 1, expected_price: 35000 }]
     })
   });
   assert.strictEqual(res1.status, 201, 'first order succeeds with existing valid session');
@@ -609,7 +616,7 @@ test('SEC-21: Returning customer with existing valid session creates multiple co
       payment_method: 'cash',
       customer: { name: 'Returning Customer', phone },
       order_type: 'pickup',
-      items: [{ id: '272', quantity: 2 }]
+      items: [{ menu_id: 'customer_auth_menu_272', quantity: 2, expected_price: 35000 }]
     })
   });
   assert.strictEqual(res2.status, 201, 'second order also succeeds immediately without re-OTP');
@@ -630,7 +637,7 @@ test('SEC-22: Invalid or expired customer session cannot initiate Midtrans payme
       payment_method: 'midtrans',
       customer: { name: 'Payment Attempter', phone: '089000000022' },
       order_type: 'pickup',
-      items: [{ id: '272', quantity: 1 }]
+      items: [{ menu_id: 'customer_auth_menu_272', quantity: 1, expected_price: 35000 }]
     })
   });
 

@@ -337,9 +337,10 @@
     if (existing) {
       existing.quantity += qty;
     } else {
-      // Promo-line identity is canonical only (flag / promotion_id / synthetic
-      // reward_ id). Price-0 or name "Gratis" heuristics are NOT used, so a
-      // legitimately discounted or free catalog product is never misflagged.
+      // Canonical promo reward identity is promotion_id + menu_id +
+      // is_promo_reward; the synthetic reward_ id remains only a cart-row key.
+      // Legacy Product-only reward lines remain readable during migration.
+      // Price-0 or name "Gratis" heuristics are NOT used.
       var isPromo = Boolean(
         product.is_promo_reward ||
         product.promotion_id ||
@@ -348,11 +349,26 @@
       );
 
       var newItem = {
-        // Keep the cart row id separate from the authoritative catalog product id.
-        // Promo rewards use id=reward_<promo>, while product_id points to the real product.
+        // Cart row identity is the customer-facing Menu identity when present.
+        // Promo rewards keep their synthetic row id; legacy catalog items retain product identity.
         id: product.id,
-        product_id: product.product_id || product.id,
-        name: product.name,
+        // For canonical Menu Paket, product_id is intentionally null because the
+        // sellable identity is the Menu and stock is resolved from component_snapshot.
+        product_id: product.product_id !== undefined
+          ? product.product_id
+          : (product.menu_id ? null : product.id),
+        menu_id: product.menu_id || null,
+        menu_type: product.menu_type || null,
+        component_snapshot: Array.isArray(product.component_snapshot)
+          ? product.component_snapshot
+          : (Array.isArray(product.components) ? product.components : null),
+        menu_snapshot: product.menu_snapshot || null,
+        menu_title: product.menu_title || product.title || null,
+        menu_subtitle: product.menu_subtitle || product.subtitle || null,
+        menu_indicator_level: product.menu_indicator_level != null
+          ? product.menu_indicator_level
+          : (product.level && product.level.value != null ? product.level.value : null),
+        name: product.name || product.title || product.menu_title || '',
         price: Number(product.price),
         regular_price: product.regular_price ? Number(product.regular_price) : null,
         image_url: product.image_url || '',

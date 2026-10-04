@@ -45,7 +45,7 @@ test('reconciliation recognizes an existing canonical structured Product', () =>
     productId: PRODUCT_WITH_COMPOSITION
   });
   assert.equal(result.status, 'migrated');
-  assert.equal(result.schema_version, 2);
+  assert.equal(result.current_schema_version, 2);
 
   const product = db.prepare(
     'SELECT menu_schema_version, menu_migration_status FROM products WHERE id = ?'

@@ -34,7 +34,7 @@ function resolveLevelIndicatorLevel(level) {
   // Backward compatibility for historical default Level rows that predate
   // sort_order population. The customer still receives a structured number;
   // the legacy name itself is never rendered.
-  var match = String(level.name || '').match(/^\s*(\d+)/);
+  var match = String(level.name || '').match(/(\d+)\s*$/);
   if (match) return Math.min(4, Math.max(1, Number(match[1])));
 
   return null;

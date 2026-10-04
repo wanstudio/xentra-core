@@ -207,7 +207,11 @@ class OrderAdditionService {
           itemSubtotal: item.subtotal,
           note: formattedNote,
           modifiersSnapshot: JSON.stringify(item.modifiers_snapshot || item.options || []),
-          additionBatchId: addition.id
+          additionBatchId: addition.id,
+          menuSnapshot: item.menu_snapshot ? JSON.stringify(item.menu_snapshot) : null,
+          menuId: item.menu_id || null,
+          menuType: item.menu_type || null,
+          componentSnapshot: item.component_snapshot ? JSON.stringify(item.component_snapshot) : null
         });
         insertedItems.push({
           id: itemId,
@@ -216,7 +220,10 @@ class OrderAdditionService {
           unit_price: Number(item.unit_price || 0),
           quantity: Number(item.quantity || 0),
           item_subtotal: Number(item.subtotal || 0),
-          note: formattedNote
+          note: formattedNote,
+          menu_id: item.menu_id || null,
+          menu_type: item.menu_type || null,
+          component_snapshot: item.component_snapshot || null
         });
       }
 

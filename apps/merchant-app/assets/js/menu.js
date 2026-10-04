@@ -222,21 +222,25 @@
 
       XentraMerchantBranchCatalog.state.catalogData = data;
       _bmMenuState.categories = data.categories || [];
-      _bmMenuState.availableProducts = data.available_master_products || [];
+      _bmMenuState.availableProducts = data.available_master_menus || data.available_master_products || [];
 
       // The canonical Branch Menu endpoint already contains the complete
       // structured Master composition. Do not merge with the legacy
       // /admin/branches/:id/products assignment response.
-      _bmMenuState.products = (data.adopted_products || []).map(function (product) {
-        var comp = product.menu_composition || product;
-        var categories = Array.isArray(product.categories) ? product.categories : [];
-        return Object.assign({}, product, {
-          product_id: product.product_id || product.id,
-          product_name: product.display_name_override || (product.master && product.master.name ? product.master.name : (product.product_name || product.name || '')),
+      _bmMenuState.products = (data.adopted_menus || data.adopted_products || []).map(function (menu) {
+        var categories = Array.isArray(menu.categories) ? menu.categories : [];
+        var menuId = menu.menu_id || menu.id;
+        var displayName = menu.display_name_override || menu.title || menu.name || 'Menu';
+        return Object.assign({}, menu, {
+          id: menuId,
+          menu_id: menuId,
+          menu_name: displayName,
+          name: displayName,
+          master_name: menu.title || menu.name || 'Menu',
           category_ids: categories.map(function (cat) { return String(cat.id); }),
           categories: categories,
-          menu_composition: comp,
-          is_available: product.is_available !== false && product.availability !== false
+          menu_composition: menu,
+          is_available: menu.is_available !== false && menu.availability !== false
         });
       });
 
@@ -436,7 +440,7 @@
 
     var selectedCategoryId = _bmMenuState.selectedCategoryId;
     var filtered = (_bmMenuState.products || []).filter(function (p) {
-      var name = (p.product_name || p.name || '').toLowerCase();
+      var name = (p.menu_name || p.name || p.title || '').toLowerCase();
       if (_bmMenuState.searchQuery && name.indexOf(_bmMenuState.searchQuery) === -1) return false;
 
       var isAvail = (p.is_available === 1 || p.is_available === true);
@@ -475,7 +479,7 @@
 
       var toggleBtn = '<label class="x-toggle x-menu-availability-toggle' + (isAvail ? ' x-toggle-on' : '') + '" title="' + (isAvail ? 'Tersedia' : 'Tidak tersedia') + '">' +
         '<input type="checkbox" class="x-menu-availability-input" ' + (isAvail ? 'checked' : '') +
-        ' aria-label="Ubah ketersediaan ' + esc(p.product_name || p.name) + '">' +
+        ' aria-label="Ubah ketersediaan ' + esc(p.menu_name || p.name || p.title) + '">' +
         '<span class="x-toggle-slider"></span></label>';
 
       return '<tr class="x-merchant-data-row x-menu-row" data-menu-index="' + index + '">' +
@@ -504,7 +508,7 @@
       var availabilityInput = row.querySelector('.x-menu-availability-input');
       if (availabilityInput) {
         availabilityInput.addEventListener('change', function () {
-          toggleBMProductAvailability(product.product_id, this.checked ? 1 : 0);
+          toggleBMMenuAvailability(product.menu_id, this.checked ? 1 : 0);
         });
       }
 
@@ -519,7 +523,7 @@
               label: 'Ubah Nama Tampil',
               icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16"/><path d="M4 12h10"/><path d="M4 18h7"/></svg>',
               onClick: function () {
-                openBMProductDisplayNameEditor(product);
+                openBMMenuDisplayNameEditor(product);
               }
             },
             {
@@ -527,7 +531,7 @@
               icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 15H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>',
               destructive: true,
               onClick: function () {
-                removeBMBranchProduct(product.product_id, product.product_name || product.name || product.menu_title || 'Menu');
+                removeBMBranchMenu(product.menu_id, product.menu_name || product.name || 'Menu');
               }
             }
           ]);;
@@ -536,16 +540,16 @@
     });
   }
 
-  async function openBMProductDisplayNameEditor(product) {
+  async function openBMMenuDisplayNameEditor(product) {
     var branchId = getBMTargetBranchId();
-    if (!branchId || !product || !product.product_id) return;
+    if (!branchId || !product || !product.menu_id) return;
 
     var currentOverride = product.display_name_override != null
       ? String(product.display_name_override)
       : '';
-    var masterName = product.master && product.master.name
-      ? String(product.master.name)
-      : String(product.name || product.title || 'Produk');
+    var masterName = product.master_name
+      ? String(product.master_name)
+      : String(product.title || product.name || 'Menu');
     var currentDisplay = product.title || masterName;
 
     if (!window.XentraPresentation || typeof window.XentraPresentation.open !== 'function') {
@@ -571,7 +575,7 @@
     var field = wrap.querySelector('#bm-display-name-input');
 
     window.XentraPresentation.open({
-      id: 'merchant-product-display-name',
+      id: 'merchant-menu-display-name',
       type: 'bottom-sheet',
       title: 'Nama Tampil Customer',
       content: content,
@@ -579,8 +583,8 @@
     });
 
     function closeSheet() {
-      if (window.XentraPresentation && window.XentraPresentation.isOpen('merchant-product-display-name')) {
-        window.XentraPresentation.close('merchant-product-display-name');
+      if (window.XentraPresentation && window.XentraPresentation.isOpen('merchant-menu-display-name')) {
+        window.XentraPresentation.close('merchant-menu-display-name');
       }
     }
 
@@ -592,7 +596,7 @@
       saveBtn.textContent = 'Menyimpan...';
 
       try {
-        var res = await window.XentraCatalogClient.updateBranchProductDisplayName(branchId, product.product_id, value || null);
+        var res = await window.XentraCatalogClient.updateBranchMenuDisplayName(branchId, product.menu_id, value || null);
         var data = await res.json();
         if (!res.ok || !data.success) {
           throw new Error(data.error || data.message || 'Gagal menyimpan nama tampil.');
@@ -617,19 +621,15 @@
     return { currentDisplay: currentDisplay };
   }
 
-  async function toggleBMProductAvailability(productId, nextVal) {
+  async function toggleBMMenuAvailability(menuId, nextVal) {
     var branchId = getBMTargetBranchId();
     if (!branchId) return;
 
     try {
-      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/products/' + encodeURIComponent(productId), {
-        method: 'PATCH',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ is_available: nextVal })
-      });
+      var res = await window.XentraCatalogClient.setBranchMenuAvailability(branchId, menuId, nextVal);
       var data = await res.json();
       if (res.ok && data.success) {
-        showToast(nextVal === 1 ? 'Produk berhasil ditandai Tersedia.' : 'Produk ditandai Habis.');
+        showToast(nextVal === 1 ? 'Menu berhasil ditandai Tersedia.' : 'Menu ditandai Tidak Tersedia.');
         loadBMMenu();
       } else {
         showToast('Gagal mengubah ketersediaan: ' + (data.error || 'Terjadi kesalahan'));
@@ -639,25 +639,22 @@
       showToast('Kesalahan jaringan.');
     }
   }
-  window.toggleBMProductAvailability = toggleBMProductAvailability;
+  window.toggleBMMenuAvailability = toggleBMMenuAvailability;
 
-  window.removeBMBranchProduct = async function (productId, productName) {
+  window.removeBMBranchMenu = async function (menuId, menuName) {
     var branchId = getBMTargetBranchId();
     if (!branchId) return;
 
-    if (!confirm('Hapus "' + productName + '" dari katalog cabang ini? Menu tidak akan lagi tampil di halaman pemesanan pelanggan.')) return;
+    if (!confirm('Hapus "' + (menuName || 'menu ini') + '" dari katalog cabang ini? Menu tidak akan lagi tampil di halaman pemesanan pelanggan.')) return;
 
     try {
-      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/products/' + encodeURIComponent(productId), {
-        method: 'DELETE',
-        headers: getAuthHeaders()
-      });
+      var res = await window.XentraCatalogClient.removeBranchMenu(branchId, menuId);
       var data = await res.json();
       if (data.success) {
-        showToast('✅ Produk berhasil dihapus dari cabang.');
+        showToast('✅ Menu berhasil dihapus dari cabang.');
         loadBMMenu();
       } else {
-        showToast('❌ ' + (data.error || 'Gagal menghapus produk.'));
+        showToast('❌ ' + (data.error || 'Gagal menghapus menu.'));
       }
     } catch (err) {
       showToast('❌ Kesalahan jaringan.');
@@ -680,7 +677,7 @@
     if (container) {
       container.innerHTML = '<div style="padding:32px 16px; text-align:center; color:#64748b; font-size:13px;">' +
         '<div style="font-size:24px; margin-bottom:8px;">⏳</div>' +
-        '<div>Memuat katalog produk master...</div>' +
+        '<div>Memuat Master Menu...</div>' +
       '</div>';
     }
     modal.style.display = 'flex';
@@ -698,26 +695,20 @@
       var data = await res.json();
       if (res.ok && data.success) {
         XentraMerchantBranchCatalog.state.catalogData = data;
-        _bmMenuState.availableProducts = data.available_master_products || [];
+        _bmMenuState.availableProducts = data.available_master_menus || data.available_master_products || [];
 
         // Distinguish between already adopted and available master products
-        var unadopted = (data.available_master_products || []).map(function (p) {
+        var unadopted = (data.available_master_menus || data.available_master_products || []).map(function (p) {
           return Object.assign({}, p, { is_adopted: false });
         });
 
-        var adopted = (data.adopted_products || []).map(function (ap) {
-          return {
-            id: ap.product_id,
-            name: ap.name,
-            price: ap.price,
-            master_price: ap.master_price,
-            image_url: ap.image_url,
-            pricing_mode: ap.pricing_mode,
-            min_price: ap.min_price,
-            max_price: ap.max_price,
-            description: ap.description,
+        var adopted = (data.adopted_menus || data.adopted_products || []).map(function (menu) {
+          return Object.assign({}, menu, {
+            id: menu.menu_id || menu.id,
+            menu_id: menu.menu_id || menu.id,
+            name: menu.display_name_override || menu.title || menu.name || 'Menu',
             is_adopted: true
-          };
+          });
         });
 
         // Unadopted first, then adopted marked
@@ -759,7 +750,7 @@
     var q = (_bmMenuState.addCatalogSearchQuery || '').toLowerCase();
     var filtered = all.filter(function (p) {
       if (!q) return true;
-      return (p.name || '').toLowerCase().indexOf(q) !== -1 || (p.description || '').toLowerCase().indexOf(q) !== -1;
+      return (p.name || p.title || '').toLowerCase().indexOf(q) !== -1 || (p.subtitle || '').toLowerCase().indexOf(q) !== -1;
     });
 
     filtered.forEach(function (p) {
@@ -816,7 +807,7 @@
     var count = (_bmMenuState.selectedCatalogProductIds && _bmMenuState.selectedCatalogProductIds.size) || 0;
     var countEl = $('bm-add-catalog-count');
     if (countEl) {
-      countEl.textContent = count + ' produk dipilih';
+      countEl.textContent = count + ' menu dipilih';
     }
     var submitBtn = $('btn-bm-submit-adopt-catalog');
     if (submitBtn) {
@@ -850,7 +841,7 @@
 
     if (!filtered.length) {
       container.innerHTML = '<div style="background:#f8fafc; border:1px dashed #cbd5e1; border-radius:8px; padding:28px; text-align:center; color:#64748b; font-size:13px;">' +
-        (q ? 'Tidak ada produk master yang sesuai dengan pencarian "' + esc(q) + '".' : 'Belum ada produk master yang tersedia untuk brand ini.') +
+        (q ? 'Tidak ada Master Menu yang sesuai dengan pencarian "' + esc(q) + '".' : 'Belum ada Master Menu yang tersedia untuk brand ini.') +
       '</div>';
       updateBMAddCatalogFooter();
       return;
@@ -859,19 +850,19 @@
     var selectedSet = _bmMenuState.selectedCatalogProductIds || new Set();
 
     container.innerHTML = filtered.map(function (p) {
-      var pid = String(p.id);
-      var img = p.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100';
+      var pid = String(p.menu_id || p.id);
+      var img = p.image_url || (p.components && p.components[0] && p.components[0].image_url) || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100';
       var isRange = p.pricing_mode === 'range';
-      var modeBadge = isRange
-        ? '<span class="x-badge x-badge-range" style="font-size:11px;">Range (' + formatMoney(p.min_price) + ' - ' + formatMoney(p.max_price) + ')</span>'
-        : '<span class="x-badge x-badge-lock" style="font-size:11px;">Harga Terkunci</span>';
+      var modeBadge = '<span class="x-badge x-badge-info" style="font-size:11px;">' +
+        (String(p.menu_type || '').toUpperCase() === 'PACKAGE' ? 'Menu Paket' : 'Menu Satuan') +
+        '</span>';
 
       if (p.is_adopted) {
         return '<div class="x-catalog-picker-card is-adopted" id="catalog-pick-card-' + esc(pid) + '">' +
           '<div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0;">' +
             '<img src="' + esc(img) + '" style="width:44px; height:44px; border-radius:6px; object-fit:cover; flex-shrink:0; border:1px solid #e2e8f0;" alt="">' +
             '<div style="min-width:0; flex:1;">' +
-              '<div style="font-weight:700; font-size:13.5px; color:#334155; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + esc(p.name) + '</div>' +
+              '<div style="font-weight:700; font-size:13.5px; color:#334155; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + esc(p.name || p.title || 'Menu') + '</div>' +
               '<div style="display:flex; gap:6px; align-items:center; margin-top:2px; flex-wrap:wrap;">' +
                 '<span style="font-size:12px; font-weight:700; color:#64748b;">' + formatMoney(p.price || p.master_price) + '</span>' +
                 modeBadge +
@@ -915,7 +906,7 @@
 
     var selectedSet = _bmMenuState.selectedCatalogProductIds;
     if (!selectedSet || selectedSet.size === 0) {
-      showToast('⚠️ Pilih minimal 1 produk master untuk diadopsi.');
+      showToast('⚠️ Pilih minimal 1 Master Menu untuk diadopsi.');
       return;
     }
 
@@ -940,16 +931,8 @@
     for (var i = 0; i < pids.length; i++) {
       var pid = pids[i];
       try {
-        var adoptPayload = { product_id: pid };
-        if (targetCatId) {
-          adoptPayload.branch_category_id = targetCatId;
-          adoptPayload.category_ids = [targetCatId];
-        }
-
-        var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/adopt', {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify(adoptPayload)
+        var res = await window.XentraCatalogClient.adoptMenu(branchId, pid, {
+          branch_category_ids: [targetCatId]
         });
         var data = await res.json();
         if (res.ok && data.success) {
@@ -974,7 +957,7 @@
       closeBMAddCatalogModal();
       if (typeof loadBMMenu === 'function') await loadBMMenu();
     } else {
-      showToast('❌ ' + (lastError || 'Gagal mengadopsi produk terpilih.'));
+      showToast('❌ ' + (lastError || 'Gagal mengadopsi menu terpilih.'));
     }
   };
 

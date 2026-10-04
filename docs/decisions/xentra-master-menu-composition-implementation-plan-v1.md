@@ -1,11 +1,11 @@
 # Xentra — Master Menu Composition Implementation Plan v1
 
-**Status:** 🔒 LOCKED — EXECUTION PLAN  
+**Status:** SUPERSEDED — HISTORICAL EXECUTION PLAN  
 **Date:** 2026-09-29  
-**Authority:** `docs/decisions/xentra-master-menu-composition-branch-adoption-contract-v1.md`  
+**Superseded by:** `docs/proposals/xentra-taxonomy-composed-menu-v1.md` (LOCKED TARGET CONTRACT, 2026-10-03)  
 **Legacy boundary:** `docs/decisions/xentra-menu-legacy-quarantine-v1.md`
 
-**Migration lifecycle:** `docs/decisions/xentra-menu-expand-migrate-verify-contract-v1.md`
+> This file describes the pre–Product→Menu→Inventory implementation plan. It remains useful as migration history only. Do not use its Product-centric composition/pricing/category model as current implementation authority. Current work must follow the locked Product → Menu → Inventory proposal and the active Composed Menu migration/service contracts.
 
 ### Migration engine execution boundary — 2026-09-30
 

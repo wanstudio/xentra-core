@@ -20,6 +20,7 @@ const registerPlatformRoutes = require('./platform');
 const registerPlatformDomainRoutes = require('./platform-domains');
 const registerAdminCatalogRoutes = require('./admin-catalog');
 const registerAdminMenuCompositionRoutes = require('./admin-menu-composition');
+const registerAdminComposedMenuRoutes = require('./admin-composed-menu');
 const registerAdminBrandRoutes = require('./admin-brand');
 const registerAdminBranchRoutes = require('./admin-branches');
 const registerAdminOrderRoutes = require('./admin-orders');
@@ -51,7 +52,7 @@ const RouteService = require('../services/RouteService');
 const { PromotionEngineService } = require('../../domains/promotion');
 const { InventoryStockService, InventoryMovementModel } = require('../../domains/inventory');
 const CatalogService = require('../../domains/catalog/services/CatalogService');
-const { PricingPolicyModel, MasterMenuResolver } = require('../../domains/catalog');
+const { PricingPolicyModel, MasterMenuResolver, ComposedMenuResolver, ComposedMenuService } = require('../../domains/catalog');
 const { XentraConnectorClient, XentraConnectorError } = require('../../core/integration/XentraConnectorClient');
 const { BrandRepository: CoreBrandRepo, BranchRepository: CoreBranchRepo, UserRepository: CoreUserRepo } = require('../../core/data/repositories');
 const coreBrandRepo = new CoreBrandRepo();
@@ -496,7 +497,7 @@ registerLegacyCustomerOtpRoutes(router, {
 
 // 5. Menu Catalog & Home
 // Canonical public catalog menu route is isolated in server/routes/catalog.js.
-registerCatalogRoutes(router, { db, CatalogService, MasterMenuResolver, batchResolveCustomerMediaDelivery });
+registerCatalogRoutes(router, { db, CatalogService, MasterMenuResolver, ComposedMenuResolver, batchResolveCustomerMediaDelivery });
 
 // Product/upsell/checkout-session support routes are isolated in server/routes/storefront.js.
 registerStorefrontRoutes(router, { db, crypto, batchResolveCustomerMediaDelivery });
@@ -1017,6 +1018,8 @@ registerAdminBrandRoutes(router, {
 registerAdminCatalogRoutes(router, { db, requireAuth });
 // Master Menu Composition routes use Owner-authoritative structured component data.
 registerAdminMenuCompositionRoutes(router, { requireAuth });
+// New locked Product → Menu → Inventory construction boundary.
+registerAdminComposedMenuRoutes(router, { db, requireAuth });
 
 // Admin branch management routes are isolated in server/routes/admin-branches.js.
 registerAdminBranchRoutes(router, { db, crypto, requireAuth });
@@ -1026,7 +1029,7 @@ registerAdminOrderRoutes(router, { db, requireAuth, AcceptanceTimeoutService });
 
 // Branch catalog adoption, availability, and pricing overrides are isolated in server/routes/admin-branch-catalog.js.
 // Canonical Branch Menu read model — structured Master Menu Composition + Branch Adoption.
-registerAdminBranchMenuRoutes(router, { db, requireAuth, resolver: MasterMenuResolver });
+registerAdminBranchMenuRoutes(router, { db, requireAuth, resolver: ComposedMenuResolver, service: ComposedMenuService });
 registerAdminBranchCatalogRoutes(router, {
   db,
   crypto,

@@ -53,7 +53,7 @@ test('PRES-06: destructive confirmation uses generic Dialog presentation, not fe
   assert.ok(shellJs.includes("type: 'dialog'"));
   assert.ok(shellJs.includes('data-confirm-ok'));
   assert.ok(dashboardJs.includes("id: 'delete-master-reference'"));
-  assert.ok(dashboardJs.includes("id: 'delete-master-product'"));
+  assert.ok(dashboardJs.includes("id: 'archive-master-product'"));
   assert.ok(!dashboardJs.includes("confirm('Hapus ' + noun"));
 });
 
@@ -114,7 +114,7 @@ test('PRES-12: Marketing Banner assignment is Bottom Sheet and preview is Dialog
 test('PRES-14: Merchant Menu display-name editor uses canonical presentation transport', () => {
   assert.ok(merchantMenuJs.includes('XentraPresentation.open({'));
   assert.ok(merchantMenuJs.includes("type: 'bottom-sheet'"));
-  assert.ok(merchantMenuJs.includes('updateBranchProductDisplayName'));
+  assert.ok(merchantMenuJs.includes('updateBranchMenuDisplayName'));
   assert.ok(merchantMenuJs.includes("label: 'Ubah Nama Tampil'"));
 });
 
@@ -123,7 +123,6 @@ test('PRES-13: Owner Dashboard legacy interactive surfaces use canonical present
   assert.ok(dashboardJs.includes("requestTextInputSheet({ title: 'Edit '"));
   assert.ok(dashboardJs.includes("requestTextInputSheet({ title: 'Tambah Master '"));
   assert.ok(branchCatalogJs.includes("openBranchCatalogSheet('modal-adopt-product', 'branch-adopt-product')"));
-  assert.ok(branchCatalogJs.includes("openBranchCatalogSheet('modal-branch-override', 'branch-product-override')"));
   assert.ok(branchCatalogJs.includes("requestBranchTextInput({ title: 'Tambah Kategori Cabang'"));
   assert.ok(dashboardJs.includes("requestTextInputSheet({ title: 'Tambah Kategori Cabang'"));
   assert.ok(dashboardJs.includes("requestTextInputSheet({ title: 'Tolak Pesanan'"));
@@ -146,8 +145,6 @@ test('PRES-15: Owner Dashboard no longer uses native prompt() for feature input'
 test('PRES-16: Owner Dashboard keeps legacy modal markup only as feature content composed by XentraPresentation', () => {
   assert.ok(dashboardHtml.includes('id="modal-master-menu-components"'));
   assert.ok(dashboardHtml.includes('id="modal-adopt-product"'));
-  assert.ok(dashboardHtml.includes('id="modal-branch-override"'));
   assert.ok(dashboardJs.includes("openExistingCardInPresentation('modal-master-menu-components'"));
   assert.ok(branchCatalogJs.includes("openBranchCatalogSheet('modal-adopt-product'"));
-  assert.ok(branchCatalogJs.includes("openBranchCatalogSheet('modal-branch-override'"));
 });

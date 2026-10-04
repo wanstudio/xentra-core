@@ -677,15 +677,9 @@ test('MEDIA SYSTEM M3 — CANONICAL SERVER-SIDE IMAGE PROCESSING PIPELINE', asyn
     const firstRun = await mediaService.processMedia({ mediaId: staged.media_id, brandId: BRAND_A });
     const firstVariantsCount = firstRun.variants.length;
 
-    // Reset status to allow re-run
-    await mediaService.transitionStatus({
-      mediaId: staged.media_id,
-      brandId: BRAND_A,
-      targetStatus: 'failed',
-      errorMessage: 'Force rerun'
-    });
-
-    // Re-run
+    // Re-run through the canonical Media Engine processing path. Published READY
+    // assets cannot be manually rewound through transitionStatus; duplicate
+    // processing itself is the supported idempotent/reconciliation path.
     const secondRun = await mediaService.processMedia({ mediaId: staged.media_id, brandId: BRAND_A });
     assert.equal(secondRun.status, 'ready');
     assert.equal(secondRun.variants.length, firstVariantsCount);

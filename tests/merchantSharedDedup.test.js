@@ -43,6 +43,10 @@ test('MERCHANT SHARED — boundary ownership', async (t) => {
     assert.ok(CATALOG_CLIENT_JS.includes('window.XentraCatalogClient'));
     [
       'getBranchCatalog',
+      'setBranchMenuAvailability',
+      'removeBranchMenu',
+      'updateBranchMenuDisplayName',
+      'adoptMenu',
       'setBranchProductAvailability',
       'removeBranchProduct',
       'uploadBranchProductImage',
@@ -81,9 +85,7 @@ test('MERCHANT SHARED — boundary ownership', async (t) => {
       'renderInlineAdoptedProducts',
       'renderInlineAvailableProducts',
       'openBranchCategoryCreateModal',
-      'openBranchCategoryEditModal',
-      'openBranchOverrideModal',
-      'saveBranchProductOverride'
+      'openBranchCategoryEditModal'
     ].forEach((fn) => {
       assert.match(MERCHANT_CATALOG_UI_JS, new RegExp(fn.replace('$','\\$')));
       assert.doesNotMatch(CATALOG_CLIENT_JS, new RegExp(fn.replace('$','\\$')));

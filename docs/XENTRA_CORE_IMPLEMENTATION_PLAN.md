@@ -640,30 +640,24 @@ Next implementation work should begin with the earliest incomplete dependency in
 
 ---
 
-## Current Execution — Master Menu Composition (2026-09-29)
+## Historical Execution — Master Menu Composition (2026-09-29)
 
-The repository is executing the locked Master Menu Composition migration.
+> **SUPERSEDED 2026-10-03:** this Product-centric execution track is historical. The current locked architecture is `docs/proposals/xentra-taxonomy-composed-menu-v1.md` (Product → Menu → Inventory). The files and lifecycle below may remain as migration evidence only; they are not current implementation authority.
 
-**Forward contract:** `docs/decisions/xentra-master-menu-composition-branch-adoption-contract-v1.md`  
-**Execution plan:** `docs/decisions/xentra-master-menu-composition-implementation-plan-v1.md`  
+**Current authority:** `docs/proposals/xentra-taxonomy-composed-menu-v1.md`  
 **Legacy boundary:** `docs/decisions/xentra-menu-legacy-quarantine-v1.md`
 
-**Migration lifecycle:** `docs/decisions/xentra-menu-expand-migrate-verify-contract-v1.md`
+### Historical migration implementation
 
-### Locked migration implementation
+The previous Product Composition migration introduced lifecycle metadata and reconciliation tooling:
 
-The Menu migration is now a first-class repository capability, not a page-level patch.
+- `products.menu_schema_version` and `products.menu_migration_status` remain legacy physical metadata.
+- `product_menu_migrations` remains historical reconciliation evidence.
+- `ProductMenuMigrationService` remains code-history/test material and has no forward runtime consumer.
+- `tools/migrate-master-menu.js` is now fail-closed with `LEGACY_MASTER_MENU_MIGRATION_DISABLED`; it must not be used on production data.
+- Current canonical commercial Menu state lives in the Product → Menu → Inventory model, including `menus.selling_price`, `menu_items`, `branch_menus`, and `branch_menu_categories`.
 
-- `products.menu_schema_version` and `products.menu_migration_status` track the lightweight current lifecycle state.
-- `product_menu_migrations` stores reconciliation evidence, attempts, errors, timestamps, and the canonical fingerprint.
-- `ProductMenuMigrationService` provides inspection, reconciliation, verification, and brand-wide batch operations.
-- `tools/migrate-master-menu.js` is the explicit operator entry point; ordinary application startup does not run migration.
-- Canonical Product composition saves record schema version 2 / migrated state in the same transaction as the structured relations.
-- Legacy free text is never auto-guessed into Flavor, Complement, or Level.
-
-Migration lifecycle is locked as:
-
-**Expand → Migrate/Backfill → Verify → Switch reads/writes to canonical → Contract**
+The old lifecycle **Expand → Migrate/Backfill → Verify → Switch reads/writes to canonical → Contract** is retained only as historical migration context.
 
 ### Completed
 

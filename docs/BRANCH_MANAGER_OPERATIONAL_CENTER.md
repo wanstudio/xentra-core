@@ -5,6 +5,9 @@
 **Scope:** Branch-scoped daily restaurant operations + Branch adoption/category operations under the Master Menu Composition contract
 
 > **Canonical map:** `docs/CANONICAL_ARCHITECTURE_PRODUCT_LIBRARY_V2.md`. This document defines the Branch Manager surface in detail; it must not redefine terminology, scope, or cross-dashboard authority independently.
+
+> **CURRENT FORWARD MENU CONTRACT (2026-10-03):** The Branch selling unit is **Menu**. Adoption uses `branch_menus`, Branch Category membership uses `branch_menu_categories`, and Product/SKU stock uses `branch_product_inventory`. Historical Branch Product terminology below is non-normative and must not be used to design new APIs/UI.
+
 > **Menu authority lock:** `docs/decisions/branch-manager-menu-configuration-v1.md`.
 > **Master Menu composition lock:** `docs/decisions/xentra-master-menu-composition-branch-adoption-contract-v1.md`.
 > **Legacy Menu quarantine:** `docs/decisions/xentra-menu-legacy-quarantine-v1.md`.
@@ -148,14 +151,14 @@ Core must validate availability at reservation/selection transaction boundaries 
 
 Branch Manager has explicit **branch-scoped Menu Configuration authority** for the authenticated manager's current Branch.
 
-### 8.1 Adopt products from Master Catalog
+### 8.1 Adopt Menus from Master Catalog
 
-Master Catalog remains Owner/Brand authority. Branch Manager may **adopt/select approved Master Products** into the Branch's selling assortment.
+Master Catalog remains Owner/Brand authority. Branch Manager may **adopt/select approved Master Menus** into the Branch's selling assortment.
 
 Adoption means:
 - the product already exists in the Brand Master Catalog;
 - the current Branch chooses to sell that product;
-- the resulting Branch Product is scoped to the current Branch;
+- the resulting Branch Menu is scoped to the current Branch;
 - adoption does not grant any Master Product editing authority.
 
 Branch Manager may not create a new Master Product merely because the Branch needs a menu item.
@@ -172,23 +175,23 @@ Branch Categories are not Master Categories. They are branch-local selling struc
 
 ### 8.3 Category membership
 
-Branch Manager may assign/remove adopted Branch Products to/from one or more Branch Categories.
+Branch Manager may assign/remove adopted Branch Menus to/from one or more Branch Categories.
 
 The relationship is **many-to-many**:
 
 ```text
-Branch Product ↔ Branch Category
+Branch Menu ↔ Branch Category
 ```
 
-The same Branch Product may appear in multiple local categories without duplicating the product.
+The same Branch Menu may appear in multiple local categories without duplicating the product.
 
 ### 8.4 Operational availability
 
-Branch Manager continues to operate Branch Product availability/sold-out state.
+Branch Manager operates Branch Menu availability/sold-out state.
 
-`branch_products.is_available` remains the branch-scoped availability authority. This must not mutate Master Product `is_active`.
+`branch_menus.is_available` is the forward branch selling-availability authority. This must not mutate Master Product `is_active`.
 
-Stock is a separate Inventory concern.
+Product/SKU stock is a separate Inventory concern and is resolved through `branch_product_inventory.stock_qty`.
 
 ### 8.5 Explicit prohibitions
 

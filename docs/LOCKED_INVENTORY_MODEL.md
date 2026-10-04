@@ -1,8 +1,9 @@
 # 🔒 Xentra Inventory Model — Sellable Product Stock vs Procurement / Raw Material Inventory v1
 
-**Status: LOCKED / AUTHORITATIVE**  
-**Decision date:** 2026-09-24  
-**Scope:** Xentra Commerce, Customer PWA, POS/Merchant operations, Branch Product stock, Purchasing, and raw-material inventory.
+**Status: LOCKED / RECONCILED WITH PRODUCT → MENU → INVENTORY CONTRACT**  
+**Original decision:** 2026-09-24  
+**Reconciled:** 2026-10-03  
+**Scope:** Xentra Commerce, Customer PWA, POS/Merchant operations, Branch Product compatibility stock, canonical Product inventory, Purchasing, and raw-material inventory.
 
 ## 1. Core Decision
 
@@ -12,7 +13,7 @@ Xentra has two different inventory concepts with different business purposes:
    - Stock of products/menu items that are already **ready to sell**.
    - Example: Nasi Goreng = 20 portions ready for sale.
    - Used by Customer PWA, Merchant operations, and POS sales.
-   - This is the stock represented by the Branch Product sellable quantity (for example the `branch_products.stock` field).
+   - In the current canonical model this quantity is stored in `branch_product_inventory.stock_qty` per Branch + Product. `branch_products.stock` is legacy compatibility data during migration.
    - It is **one Branch sellable stock pool**, not separate POS/PWA/Dine-in/Delivery/WhatsApp stock pools.
 
 2. **Procurement / Raw Material Inventory**
@@ -158,10 +159,11 @@ Any implementation that treats these as the same quantity or mixes their busines
 
 The existing Inventory Check → Commit → Consume contract remains useful for inventory domains that explicitly need reservation/commitment semantics.
 
-However, it must **not** be read as redefining the `branch_products.stock` field into a raw-material or hidden reservation ledger.
+However, it must **not** be read as redefining the legacy `branch_products.stock` field into a raw-material or hidden reservation ledger. Canonical ready-to-sell Product stock is `branch_product_inventory.stock_qty`.
 
 For the current ready-to-sell product model, order acceptance is the stock-decrease boundary defined above.
 
 **Notion locked decision:** https://app.notion.com/p/3e51ae1e12b181ca8dc3dde84ecf9585?pvs=204
 
-**Git source of this lock:** https://github.com/wanstudio/xentra-core
+**Current implementation authority:** `docs/proposals/xentra-taxonomy-composed-menu-v1.md`  
+**Git source of this inventory lock:** https://github.com/wanstudio/xentra-core

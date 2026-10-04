@@ -280,8 +280,8 @@ describe('PWA Home Boot Regression', () => {
 
     // When a branch context exists, catalog request must include branch_id
     assert.ok(
-      home.includes("'/catalog/menu?branch_id='") || home.includes('"/catalog/menu?branch_id="'),
-      'home.js must request /catalog/menu?branch_id= when branch context is set'
+      home.includes("'/catalog/composed-menu?branch_id='") || home.includes('"/catalog/composed-menu?branch_id="'),
+      'home.js must request /catalog/composed-menu?branch_id= when branch context is set'
     );
 
     // Must NOT silently fall back to brand-wide catalog when branch context exists

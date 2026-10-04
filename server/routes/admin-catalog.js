@@ -19,10 +19,11 @@ router.get('/admin/categories', requireAuth(['owner', 'brand_manager']), (req, r
 router.post('/admin/categories', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const { name, image } = req.body;
-    if (!name) return res.status(400).json({ success: false, error: 'Nama kategori wajib diisi.' });
+    const normalizedName = typeof name === 'string' ? name.trim() : '';
+    if (!normalizedName) return res.status(400).json({ success: false, error: 'Nama kategori wajib diisi.' });
 
     const id = 'cat_' + Date.now();
-    const slug = normalizedName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const slug = normalizedName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
     
     db.prepare(`
       INSERT INTO categories (id, brand_id, name, slug, sort_order)
@@ -181,16 +182,15 @@ router.get('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req,
 
 router.post('/admin/products', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
-    const { name, category_id, price, regular_price, description, image, pricing_mode, min_price, max_price } = req.body;
+    const { name, category_id, price, regular_price, description, image, pricing_mode, min_price, max_price, sku } = req.body;
     const normalizedName = typeof name === 'string' ? name.trim() : '';
-    if (!normalizedName || price === undefined || price === null || price === '') {
-      return res.status(400).json({ success: false, error: 'Nama Produk dan harga menu wajib diisi.' });
-    }
-    if (!category_id) {
-      return res.status(400).json({ success: false, error: 'Kategori produk wajib dipilih.' });
+    if (!normalizedName) {
+      return res.status(400).json({ success: false, error: 'Nama Produk wajib diisi.' });
     }
 
-    // P1 TENANT CATEGORY INTEGRITY GUARD (FINDING 02)
+    // Product is the atomic inventory entity in the v1 proposal.
+    // category_id/price/pricing fields remain optional compatibility fields while
+    // legacy consumers migrate to canonical Menu ownership.
     if (category_id) {
       const validCategory = db.prepare('SELECT id FROM categories WHERE id = ? AND brand_id = ?').get(category_id, req.brand_id);
       if (!validCategory) {
@@ -201,12 +201,17 @@ router.post('/admin/products', requireAuth(['owner', 'brand_manager']), (req, re
       }
     }
 
+    const compatibilityPrice = price !== undefined && price !== null && price !== '' ? Number(price) : 0;
+    const compatibilityRegularPrice = regular_price !== undefined && regular_price !== null && regular_price !== ''
+      ? Number(regular_price)
+      : compatibilityPrice;
+
     const id = 'prod_' + Date.now();
     const slug = normalizedName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
     db.prepare(`
-      INSERT INTO products (id, brand_id, category_id, name, slug, description, price, regular_price, pricing_mode, min_price, max_price, is_active, sort_order)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM products WHERE brand_id = ?))
+      INSERT INTO products (id, brand_id, category_id, name, slug, description, price, regular_price, pricing_mode, min_price, max_price, is_active, sort_order, sku)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM products WHERE brand_id = ?), ?)
     `).run(
       id,
       req.brand_id,
@@ -214,12 +219,13 @@ router.post('/admin/products', requireAuth(['owner', 'brand_manager']), (req, re
       normalizedName,
       slug,
       description !== undefined ? description : '',
-      Number(price),
-      regular_price ? Number(regular_price) : Number(price),
+      compatibilityPrice,
+      compatibilityRegularPrice,
       pricing_mode || 'lock',
       min_price !== undefined ? Number(min_price) : null,
       max_price !== undefined ? Number(max_price) : null,
-      req.brand_id
+      req.brand_id,
+      sku !== undefined && sku !== null ? (String(sku).trim() || null) : null
     );
 
     res.status(201).json({
@@ -228,21 +234,25 @@ router.post('/admin/products', requireAuth(['owner', 'brand_manager']), (req, re
         id,
         name: normalizedName,
         category_id,
-        price: Number(price),
-        regular_price: regular_price ? Number(regular_price) : Number(price),
+        price: compatibilityPrice,
+        regular_price: compatibilityRegularPrice,
+        sku: sku !== undefined && sku !== null ? (String(sku).trim() || null) : null,
         description: description !== undefined ? description : '',
         image: image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400',
         is_active: 1
       }
     });
   } catch (err) {
+    if (err && (err.code === 'SQLITE_CONSTRAINT_UNIQUE' || String(err.message || '').toLowerCase().includes('unique constraint failed: products.brand_id, products.sku'))) {
+      return res.status(400).json({ success: false, error: 'PRODUCT_SKU_ALREADY_EXISTS' });
+    }
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
 router.put('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
-    const { name, category_id, price, regular_price, description, image, is_active, pricing_mode, min_price, max_price } = req.body;
+    const { name, category_id, price, regular_price, description, image, is_active, pricing_mode, min_price, max_price, sku } = req.body;
     if (name !== undefined && (typeof name !== 'string' || !name.trim())) {
       return res.status(400).json({ success: false, error: 'Nama Produk tidak boleh kosong.' });
     }
@@ -273,7 +283,7 @@ router.put('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req,
       'SELECT id FROM products WHERE id = ? AND brand_id = ?'
     ).get(req.params.id, req.brand_id);
     if (!existing) {
-      return res.status(404).json({ success: false, error: 'Menu produk tidak ditemukan.' });
+      return res.status(404).json({ success: false, error: 'Product tidak ditemukan.' });
     }
 
     db.prepare(`
@@ -287,6 +297,7 @@ router.put('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req,
           max_price = COALESCE(?, max_price),
           description = COALESCE(?, description),
           is_active = COALESCE(?, is_active),
+          sku = CASE WHEN ? IS NULL THEN sku WHEN ? = '__NULL__' THEN NULL ELSE ? END,
           updated_at = datetime('now')
       WHERE id = ? AND brand_id = ?
     `).run(
@@ -299,6 +310,9 @@ router.put('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req,
       max_price !== undefined ? max_price : null,
       description !== undefined ? description : null,
       normIsActive !== null ? normIsActive : null,
+      sku === undefined ? null : String(sku),
+      sku === undefined ? null : (sku === null ? '__NULL__' : (String(sku).trim() ? String(sku).trim() : '__NULL__')),
+      sku === undefined ? null : (sku === null ? null : (String(sku).trim() ? String(sku).trim() : null)),
       req.params.id,
       req.brand_id
     );
@@ -307,8 +321,11 @@ router.put('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req,
       'SELECT * FROM products WHERE id = ? AND brand_id = ?'
     ).get(req.params.id, req.brand_id);
 
-    res.json({ success: true, message: 'Menu produk berhasil diperbarui.', product });
+    res.json({ success: true, message: 'Product berhasil diperbarui.', product });
   } catch (err) {
+    if (err && (err.code === 'SQLITE_CONSTRAINT_UNIQUE' || String(err.message || '').toLowerCase().includes('unique constraint failed: products.brand_id, products.sku'))) {
+      return res.status(400).json({ success: false, error: 'PRODUCT_SKU_ALREADY_EXISTS' });
+    }
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -316,7 +333,7 @@ router.put('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req,
 router.get('/admin/products/:id/options', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const product = db.prepare('SELECT id, name, options_config FROM products WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
-    if (!product) return res.status(404).json({ success: false, error: 'Menu produk tidak ditemukan.' });
+    if (!product) return res.status(404).json({ success: false, error: 'Product tidak ditemukan.' });
     const ProductOptionsModel = require('../../domains/catalog/models/ProductOptionsModel');
     res.json({ success: true, product_id: product.id, product_name: product.name, options_config: ProductOptionsModel.normalizeConfig(product.options_config) });
   } catch (err) {
@@ -327,7 +344,7 @@ router.get('/admin/products/:id/options', requireAuth(['owner', 'brand_manager']
 router.put('/admin/products/:id/options', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const product = db.prepare('SELECT id, name FROM products WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
-    if (!product) return res.status(404).json({ success: false, error: 'Menu produk tidak ditemukan.' });
+    if (!product) return res.status(404).json({ success: false, error: 'Product tidak ditemukan.' });
 
     const ProductOptionsModel = require('../../domains/catalog/models/ProductOptionsModel');
     const config = ProductOptionsModel.validateConfig(req.body && req.body.options_config);
@@ -364,7 +381,7 @@ router.patch('/admin/products/:id/toggle', requireAuth(['owner', 'brand_manager'
     `).run(req.params.id, req.brand_id);
 
     if (!stmt || stmt.changes === 0) {
-      return res.status(404).json({ success: false, error: 'Menu produk tidak ditemukan atau tidak berubah.' });
+      return res.status(404).json({ success: false, error: 'Product tidak ditemukan atau tidak berubah.' });
     }
 
     res.json({ success: true, message: 'Status ketersediaan menu berhasil diubah.' });
@@ -377,9 +394,9 @@ router.delete('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (r
   try {
     const stmt = db.prepare('DELETE FROM products WHERE id = ? AND brand_id = ?').run(req.params.id, req.brand_id);
     if (!stmt || stmt.changes === 0) {
-      return res.status(404).json({ success: false, error: 'Menu produk tidak ditemukan.' });
+      return res.status(404).json({ success: false, error: 'Product tidak ditemukan.' });
     }
-    res.json({ success: true, message: 'Menu berhasil dihapus.' });
+    res.json({ success: true, message: 'Product berhasil dihapus.' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

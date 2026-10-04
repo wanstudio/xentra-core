@@ -14,6 +14,7 @@ const SHARED_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/shared.j
 const CATALOG_CLIENT_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/catalog-client.js');
 const BRANCH_CATALOG_JS_PATH = path.join(__dirname, '../apps/merchant-app/assets/js/branch-catalog-ui.js');
 const OWNER_BRANCH_CATALOG_JS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/js/branch-catalog-ui.js');
+const OWNER_NAVIGATION_JS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/js/owner-navigation.js');
 
 test('CLIENT OWNER DASHBOARD — Marketing / Promotion Workspace Visibility & Lifecycle', async (t) => {
   const html = fs.readFileSync(HTML_PATH, 'utf8');
@@ -25,6 +26,7 @@ test('CLIENT OWNER DASHBOARD — Marketing / Promotion Workspace Visibility & Li
   function evalApp(win) {
     win.eval(sharedJs);
     win.eval(ownerCatalogJs);
+    win.eval(fs.readFileSync(OWNER_NAVIGATION_JS_PATH, 'utf8'));
     win.eval(js);
   }
 
@@ -65,7 +67,7 @@ test('CLIENT OWNER DASHBOARD — Marketing / Promotion Workspace Visibility & Li
                 capability_type: 'install_incentive',
                 stacking_policy: 'exclusive',
                 is_active: 1,
-                rewards: [{ reward_type: 'freebie_product', target_product_name: 'Es Teh Manis' }],
+                rewards: [{ reward_type: 'freebie_product', target_menu_id: 'menu-es-teh', target_menu_title: 'Es Teh Manis' }],
                 scopes: [{ branch_id: 'branch-1', is_active: 1 }],
                 redemptions_count: 5
               }
@@ -74,15 +76,15 @@ test('CLIENT OWNER DASHBOARD — Marketing / Promotion Workspace Visibility & Li
           text: async () => '{}'
         };
       }
-      if (u.includes('/admin/catalog/products')) {
+      if (u.includes('/admin/menus')) {
         return {
           ok: true,
           status: 200,
           json: async () => ({
             success: true,
-            products: [
-              { id: 'prod-1', name: 'Ayam Goreng', price: 25000 },
-              { id: 'prod-2', name: 'Es Teh Manis', price: 5000 }
+            menus: [
+              { id: 'menu-ayam', menu_type: 'SINGLE', sub_category_name: 'Ayam Goreng', selling_price: 25000, status: 'ACTIVE' },
+              { id: 'menu-es-teh', menu_type: 'SINGLE', sub_category_name: 'Es Teh Manis', selling_price: 5000, status: 'ACTIVE' }
             ]
           }),
           text: async () => '{}'
@@ -167,7 +169,10 @@ test('CLIENT OWNER DASHBOARD — Marketing / Promotion Workspace Visibility & Li
     createBtn.click();
     await new Promise(res => setTimeout(res, 50));
 
-    assert.strictEqual(modal.style.display, 'flex', 'Modal must open with display: flex');
+    const editorPage = win.document.getElementById('marketing-promotion-editor-view');
+    assert.ok(editorPage, 'Marketing promotion editor page must exist');
+    assert.notStrictEqual(editorPage.style.display, 'none', 'Promotion editor page must be visible');
+    assert.notStrictEqual(modal.style.display, 'flex', 'Legacy modal backdrop must remain closed after editor is promoted to a focused page');
     const modalTitle = win.document.getElementById('modal-mkt-promo-title');
     assert.strictEqual(modalTitle.textContent, 'Buat Program Promosi Baru');
 
@@ -181,7 +186,7 @@ test('CLIENT OWNER DASHBOARD — Marketing / Promotion Workspace Visibility & Li
     assert.ok(win.document.getElementById('mkt-promo-status'), 'Status select must exist');
     assert.ok(win.document.getElementById('mkt-promo-start-at'), 'Start date input must exist');
     assert.ok(win.document.getElementById('mkt-promo-end-at'), 'End date input must exist');
-    assert.ok(win.document.getElementById('mkt-promo-target-product'), 'Target product select must exist');
+    assert.ok(win.document.getElementById('mkt-promo-target-menu'), 'Target Menu select must exist');
     assert.ok(win.document.getElementById('mkt-promo-branches-list'), 'Branches list container must exist');
     assert.ok(win.document.getElementById('btn-mkt-submit-promo'), 'Submit button must exist');
   });

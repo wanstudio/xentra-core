@@ -202,13 +202,16 @@ class OrderRepository {
     note,
     modifiersSnapshot = null,
     additionBatchId = null,
-    menuSnapshot = null
+    menuSnapshot = null,
+    menuId = null,
+    menuType = null,
+    componentSnapshot = null
   }) {
     return this.db.execute(`
       INSERT INTO order_items (
         id, order_id, product_id, product_name, unit_price, quantity, item_subtotal, note,
-        modifiers_snapshot, addition_batch_id, menu_snapshot
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        modifiers_snapshot, addition_batch_id, menu_snapshot, menu_id, menu_type, component_snapshot
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       id,
       orderId,
@@ -220,7 +223,10 @@ class OrderRepository {
       note,
       modifiersSnapshot,
       additionBatchId || null,
-      menuSnapshot
+      menuSnapshot,
+      menuId || null,
+      menuType || null,
+      componentSnapshot || null
     ]);
   }
 

@@ -1,9 +1,9 @@
 /**
- * Xentra Commerce — Branch/Product Eligibility Service (C3 / Phase D)
+ * Xentra Commerce — Branch/Menu Eligibility Service (canonical + legacy compatibility)
  *
  * Canonical, deterministic decision layer answering:
  *
- *   "Can this Branch currently satisfy a requested product / cart requirement?"
+ *   "Can this Branch currently satisfy a requested Menu / cart requirement?"
  *
  * It consumes authoritative operational facts only and NEVER decides:
  *   - which branch to select (nearest / best / cheapest)      -> later Matching
@@ -11,19 +11,21 @@
  *   - stock mutation / reservation                            -> Inventory (C2)
  *   - split fulfillment (Core v1 = 1 cart -> 1 fulfillment branch)
  *
- * Facts consumed (all read server-side, never from the client):
- *   branches.is_active / is_open_override           (B1 branch operational state)
- *   products.is_active + brand scope                (C1 product master)
- *   branch_products row = assignment                (C1 product <-> branch)
- *   branch_products.is_available                    (C1 operational availability flag)
- *   branch_products.stock                           (C2 branch inventory)
- *   branch_delivery_settings.is_delivery_active /
- *       is_pickup_active                            (B1 fulfillment capability)
+ * Facts consumed:
+ *   Canonical Menu path:
+ *     menus / menu_items                         (commercial Menu + composition)
+ *     branch_menus                               (Branch Menu adoption/availability)
+ *     branch_product_inventory                   (Product stock by Branch)
+ *   Legacy Product compatibility path:
+ *     products / branch_products                 (temporary migration compatibility)
+ *   Fulfillment capability:
+ *     branch_delivery_settings.is_delivery_active /
+ *       is_pickup_active
  *
  * One canonical source of eligibility logic. Consumers must not re-implement
  * these rules:
  *   - BranchMatcher (server/services/BranchMatcher.js) narrows delivery
- *     candidates through evaluateCart().
+ *     candidates through evaluateCart(); canonical carts are evaluated by Menu.
  *   - PrePaymentVerificationGate keeps its own STRONGER final checks executed
  *     at the exact Pay/commit moment (assignment, active, availability, stock,
  *     pricing, promotion). Those checks operate on the same facts with the
@@ -49,6 +51,7 @@
  * leaked across tenant boundaries.
  */
 const { EligibilityRepository } = require('../../../core/data/repositories');
+const { verifyComposedCheckout } = require('./ComposedMenuCheckoutService');
 
 const eligibilityRepository = new EligibilityRepository();
 
@@ -68,7 +71,9 @@ class EligibilityService {
     PRODUCT_UNAVAILABLE: 'PRODUCT_UNAVAILABLE',
     INSUFFICIENT_STOCK: 'INSUFFICIENT_STOCK',
     INVALID_QUANTITY: 'INVALID_QUANTITY',
-    INVALID_CART: 'INVALID_CART'
+    INVALID_CART: 'INVALID_CART',
+    MENU_NOT_FOUND: 'MENU_NOT_FOUND',
+    MENU_UNAVAILABLE: 'MENU_UNAVAILABLE'
   };
 
   static _resolveBranch({ brand_id, branch_id, order_type }) {
@@ -159,6 +164,49 @@ class EligibilityService {
     return { eligible: true, reasons: [], branch_id, brand_id, product_id, quantity: qty };
   }
 
+  static evaluateMenu({ brand_id, branch_id, menu_id, quantity = 1, order_type = null }) {
+    const branchGate = EligibilityService._resolveBranch({ brand_id, branch_id, order_type });
+    if (!branchGate.ok) {
+      return {
+        eligible: false,
+        reasons: [branchGate.reason],
+        branch_id,
+        brand_id,
+        menu_id,
+        quantity
+      };
+    }
+
+    const verification = verifyComposedCheckout({
+      brandId: brand_id,
+      branchId: branch_id,
+      items: [{
+        menu_id,
+        quantity: Number(quantity)
+      }]
+    });
+
+    let reasons = [];
+    if (!verification.is_valid) {
+      if (verification.status === 'OUT_OF_STOCK') {
+        reasons = [EligibilityService.REASONS.INSUFFICIENT_STOCK];
+      } else if (verification.status === 'MENU_UNAVAILABLE') {
+        reasons = [EligibilityService.REASONS.MENU_UNAVAILABLE];
+      } else {
+        reasons = [EligibilityService.REASONS.MENU_NOT_FOUND];
+      }
+    }
+
+    return {
+      eligible: Boolean(verification.is_valid),
+      reasons,
+      branch_id,
+      brand_id,
+      menu_id,
+      quantity: Number(quantity)
+    };
+  }
+
   static evaluateCart({ brand_id, branch_id, items, order_type = null }) {
     if (!Array.isArray(items) || items.length === 0) {
       return { eligible: false, reasons: [EligibilityService.REASONS.INVALID_CART], branch_id: branch_id || null, brand_id: brand_id || null, items: [] };
@@ -173,9 +221,77 @@ class EligibilityService {
         branch_id,
         brand_id,
         items: items.map((item) => ({
-          product_id: item.product_id != null ? item.product_id : item.id,
-          quantity: item.quantity != null ? Number(item.quantity) : Number(item.qty != null ? item.qty : 1),
+          menu_id: item && item.menu_id ? String(item.menu_id) : null,
+          product_id: item && (item.product_id != null ? item.product_id : item.id),
+          quantity: item && item.quantity != null ? Number(item.quantity) : Number(item && item.qty != null ? item.qty : 1),
           eligible: false,
+          reasons
+        }))
+      };
+    }
+
+    const nonRewardItems = items.filter((item) => {
+      if (!item) return false;
+      const pid = String(item.product_id || item.id || '');
+      return !item.is_promo_reward && !item.promo_id && !item.promotion_id && !pid.startsWith('reward_');
+    });
+    const canonicalItems = nonRewardItems.filter(item => item && item.menu_id);
+    const legacyItems = nonRewardItems.filter(item => !item || !item.menu_id);
+
+    if (canonicalItems.length > 0) {
+      if (legacyItems.length > 0) {
+        return {
+          eligible: false,
+          reasons: [EligibilityService.REASONS.INVALID_CART],
+          branch_id,
+          brand_id,
+          items: nonRewardItems.map(item => ({
+            menu_id: item && item.menu_id ? String(item.menu_id) : null,
+            product_id: item && (item.product_id != null ? item.product_id : item.id),
+            quantity: item && item.quantity != null ? Number(item.quantity) : 1,
+            eligible: false,
+            reasons: [EligibilityService.REASONS.INVALID_CART]
+          }))
+        };
+      }
+
+      const canonicalVerification = verifyComposedCheckout({
+        brandId: brand_id,
+        branchId: branch_id,
+        items: canonicalItems.map(item => {
+          const clone = { ...item };
+          // Branch matching tests fulfillment capability/availability/stock.
+          // Client expected price is intentionally not a branch eligibility gate.
+          delete clone.expected_price;
+          return clone;
+        })
+      });
+
+      let reasons = [];
+      if (!canonicalVerification.is_valid) {
+        if (canonicalVerification.status === 'OUT_OF_STOCK') {
+          reasons = [EligibilityService.REASONS.INSUFFICIENT_STOCK];
+        } else if (canonicalVerification.status === 'MENU_UNAVAILABLE') {
+          reasons = [EligibilityService.REASONS.MENU_UNAVAILABLE];
+        } else if (verification.status === 'PRICE_CHANGED') {
+          // Should be unreachable after stripping client prices above, but keep
+          // the mapping explicit so a future verifier change cannot mislabel a
+          // price-only result as a missing Menu.
+          reasons = [];
+        } else {
+          reasons = [EligibilityService.REASONS.MENU_NOT_FOUND];
+        }
+      }
+
+      return {
+        eligible: Boolean(canonicalVerification.is_valid),
+        reasons,
+        branch_id,
+        brand_id,
+        items: canonicalItems.map(item => ({
+          menu_id: item.menu_id,
+          quantity: item.quantity != null ? Number(item.quantity) : Number(item.qty != null ? item.qty : 1),
+          eligible: Boolean(canonicalVerification.is_valid),
           reasons
         }))
       };
