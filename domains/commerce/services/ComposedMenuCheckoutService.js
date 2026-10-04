@@ -219,10 +219,7 @@ function verifyComposedCheckout({ brandId, branchId, items }) {
 
     return {
       menu_id: entry.menu.menu_id,
-      menu_type: entry.menu.menu_type,
-      product_id: String(entry.menu.menu_type || '').toUpperCase() === 'SINGLE'
-        ? (componentSnapshot[0] ? componentSnapshot[0].product_id : null)
-        : null,
+      product_id: componentSnapshot[0] ? componentSnapshot[0].product_id : null,
       name: entry.menu.title,
       unit_price: Number(entry.menu.price),
       quantity: entry.quantity,
