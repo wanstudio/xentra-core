@@ -174,6 +174,7 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
         rasaId: body.rasa_id,
         levelId: null,
         spiceLevel: body.spice_level,
+      spiceEnabled: body.spice_enabled === true,
         sellingPrice: body.selling_price,
         status: body.status,
         components: body.components
