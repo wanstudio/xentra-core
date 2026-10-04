@@ -86,8 +86,8 @@ async function editMenu(id){
   var t=$('master-menu-editor-title');if(t)t.textContent='Edit Menu';var mt=$('master-menu-editor-mobile-title');if(mt)mt.textContent='Edit Menu';showEditor();
  }catch(e){toast('❌ '+e.message)}
 }
-function showEditor(){var a=$('master-menu-editor-view'),b=$('master-menu-list-view');if(a)a.style.display='';if(b)b.style.display='none'}
-function showList(){var a=$('master-menu-editor-view'),b=$('master-menu-list-view');if(a)a.style.display='none';if(b)b.style.display='';resetEditor()}
+function showEditor(){var a=$('master-menu-editor-view'),b=$('master-menu-list');if(a)a.style.display='';if(b)b.style.display='none'}
+function showList(){var a=$('master-menu-editor-view'),b=$('master-menu-list');if(a)a.style.display='none';if(b)b.style.display='';resetEditor()}
 function bind(){
  if($('btn-add-master-menu'))$('btn-add-master-menu').addEventListener('click',function(){resetEditor();showEditor()});
  if($('btn-cm-add-component'))$('btn-cm-add-component').addEventListener('click',function(){state.components.push({product_id:'',quantity:1});renderComponents()});
