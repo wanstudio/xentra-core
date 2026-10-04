@@ -41,6 +41,9 @@ function ensureComposedMenuSchema(db) {
   if (!hasColumn(db, 'menus', 'category_id')) {
     try { db.exec('ALTER TABLE menus ADD COLUMN category_id TEXT;'); } catch (_) {}
   }
+  if (!hasColumn(db, 'menus', 'spice_level')) {
+    try { db.exec('ALTER TABLE menus ADD COLUMN spice_level INTEGER NOT NULL DEFAULT 0 CHECK (spice_level BETWEEN 0 AND 4);'); } catch (_) {}
+  }
 
   db.exec(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_products_brand_sku_normalized
@@ -129,6 +132,7 @@ function ensureComposedMenuSchema(db) {
       sub_category_id TEXT,
       rasa_id TEXT,
       level_id TEXT,
+      spice_level INTEGER NOT NULL DEFAULT 0 CHECK (spice_level BETWEEN 0 AND 4),
       package_name TEXT,
       selling_price REAL NOT NULL CHECK (selling_price >= 0),
       status TEXT NOT NULL DEFAULT 'DRAFT',
