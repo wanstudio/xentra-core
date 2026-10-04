@@ -8471,6 +8471,10 @@ input[type="file"].x-input,
   background:#fff7ed;
   color:#ea580c;
 }
+.x-master-reference-icon-complement{
+  background:#eff6ff;
+  color:#2563eb;
+}
 .x-master-reference-copy{
   min-width:0;
   display:flex;
@@ -9535,6 +9539,28 @@ body:not(.x-merchant-app) .x-owner-mobile-page-sub {
 
 .x-master-menu-card-header > div {
   min-width: 0;
+  flex: 1 1 auto;
+}
+
+/* Thumbnail foto Menu. Menu memiliki fotonya sendiri; kosong = placeholder netral,
+   bukan foto salah satu Product (docs/decisions/xentra-menu-presentation-media-v1.md). */
+.x-master-menu-card-thumb {
+  flex: 0 0 auto;
+  display: block;
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: #f1f5f9;
+  border: 1px solid #e5e7eb;
+}
+
+.x-master-menu-card-thumb-empty {
+  background-color: #f8fafc;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23cbd5e1' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='16' rx='3'/%3E%3Ccircle cx='8.5' cy='9.5' r='1.6'/%3E%3Cpath d='m21 16-5-5-9 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 24px 24px;
 }
 
 .x-master-menu-card-header h4 {
