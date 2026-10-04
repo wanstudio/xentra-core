@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="/merchant-shared/fonts/plus-jakarta-sans.css?v=1.0.0">
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.4">
   <link rel="stylesheet" href="/merchant-shared/css/presentation-shells.css?v=1.0.3">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.37">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.38">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#ffffff">
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
@@ -1840,6 +1840,25 @@
               <div style="margin-bottom:16px;">
                 <h3 id="master-menu-editor-title" style="margin:0;font-size:20px;">Tambah Menu Satuan</h3>
                 <p class="text-muted" style="margin:5px 0 0;font-size:13px;">Field berikut langsung menulis ke entitas Menu. Jangan gunakan nama Product sebagai judul customer.</p>
+              </div>
+
+              <div class="x-form-group">
+                <label for="btn-cm-image-pick">Foto Menu</label>
+                <div class="x-image-upload-control">
+                  <div class="x-image-upload-preview-box" id="cm-image-preview-box" style="width:84px;height:84px;">
+                    <img id="cm-image-preview" alt="Foto Menu" style="display:none;width:100%;height:100%;object-fit:cover;">
+                    <div id="cm-image-empty" class="x-image-upload-empty" style="font-size:24px;">🍽️</div>
+                  </div>
+                  <div class="x-image-upload-info">
+                    <div class="x-image-upload-actions">
+                      <button type="button" id="btn-cm-image-pick" class="x-btn-secondary" style="font-size:12px;padding:6px 12px;">📁 Pilih Foto</button>
+                      <button type="button" id="btn-cm-image-remove" class="x-btn-secondary" style="font-size:12px;padding:6px 12px;color:#ef4444;display:none;">Hapus Foto</button>
+                    </div>
+                    <input type="file" id="cm-image-file" accept="image/jpeg,image/png,image/webp" style="display:none;">
+                    <input type="hidden" id="cm-image-removed" value="0">
+                    <div class="x-image-specs-text">Foto customer-facing milik Menu ini (Satuan maupun Paket) — bukan foto Product. JPG, PNG, atau WebP · Maks. 20 MB · Rasio 1:1 · Xentra akan crop, resize, dan kompresi otomatis.</div>
+                  </div>
+                </div>
               </div>
 
               <div id="master-menu-single-fields">
@@ -5078,7 +5097,7 @@
   <script src="/merchant-dashboard/assets/js/owner-bottom-nav.js?v=1.0.0"></script>
   <script src="/merchant-shared/js/presentation-shells.js?v=1.0.2"></script>
   <script src="/merchant-dashboard/assets/js/owner-navigation.js?v=1.0.0"></script>
-  <script src="/dashboard/assets/js/dashboard.js?v=3.0.62"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=3.0.64"></script>
   <script src="/merchant-dashboard/assets/js/owner-master-menu-inline.js?v=1.0.2"></script>
 </body>
 </html>  

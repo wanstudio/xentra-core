@@ -88,7 +88,13 @@ router.patch('/admin/categories/:id/toggle', requireAuth(['owner', 'brand_manage
       return res.status(404).json({ success: false, error: 'Kategori tidak ditemukan atau tidak berubah.' });
     }
 
-    res.json({ success: true, message: 'Status ketersediaan kategori berhasil diubah.' });
+    const category = db.prepare('SELECT * FROM categories WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
+    const activeText = category && category.is_active === 1 ? 'diaktifkan' : 'dinonaktifkan';
+    res.json({
+      success: true,
+      message: `Kategori "${category ? category.name : ''}" berhasil ${activeText}.`,
+      category
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

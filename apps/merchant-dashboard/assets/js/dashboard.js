@@ -2562,11 +2562,41 @@
               '<span>' + esc(description) + '</span>',
             '</div>',
           '</div>',
-          '<div class="x-master-reference-card-right">',
-            referenceStatusBadge(row.is_active !== 0 && row.is_active !== null),
-            '<button type="button" class="x-action-menu-trigger" aria-label="Aksi ' + referenceTypeLabel(type).toLowerCase() + '" data-master-reference-action="' + type + '" data-reference-id="' + esc(String(row.id)) + '">',
-              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>',
-            '</button>',
+      var rightControls = '';
+      if (type === 'category') {
+        var isCatActive = row.is_active !== 0 && row.is_active !== null;
+        var toggleSwitch = '' +
+          '<label class="x-toggle' + (isCatActive ? ' x-toggle-on' : '') + '" title="' + (isCatActive ? 'Kategori Aktif (klik untuk nonaktifkan)' : 'Kategori Nonaktif (klik untuk aktifkan)') + '" style="margin:0;">' +
+            '<input type="checkbox" ' + (isCatActive ? 'checked' : '') + ' onchange="toggleCategoryStatus(\'' + esc(String(row.id)) + '\', this)" aria-label="Status Kategori ' + esc(row.name) + '">' +
+            '<span class="x-toggle-slider"></span>' +
+          '</label>';
+
+        var editBtn = '' +
+          '<button type="button" class="x-btn-icon" onclick="openEditMasterReference(\'category\', \'' + esc(String(row.id)) + '\')" aria-label="Edit kategori ' + esc(row.name) + '" title="Edit Kategori" style="width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid #e2e8f0;background:#ffffff;color:#475569;cursor:pointer;transition:all 0.15s ease;">' +
+            '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>' +
+          '</button>';
+
+        rightControls = toggleSwitch + editBtn;
+      } else {
+        rightControls = referenceStatusBadge(row.is_active !== 0 && row.is_active !== null) +
+          '<button type="button" class="x-action-menu-trigger" aria-label="Aksi ' + referenceTypeLabel(type).toLowerCase() + '" data-master-reference-action="' + type + '" data-reference-id="' + esc(String(row.id)) + '">' +
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>' +
+          '</button>';
+      }
+
+      return [
+        '<div class="x-master-reference-card">',
+          '<div class="x-master-reference-card-main">',
+            '<div class="x-master-reference-icon ' + referenceIconClass(type) + '" aria-hidden="true">',
+              '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">' + referenceIconSvg(type) + '</svg>',
+            '</div>',
+            '<div class="x-master-reference-copy">',
+              '<strong>' + esc(row.name) + '</strong>',
+              '<span>' + esc(description) + '</span>',
+            '</div>',
+          '</div>',
+          '<div class="x-master-reference-card-right" style="display:flex;align-items:center;gap:10px;">',
+            rightControls,
           '</div>',
         '</div>'
       ].join('');
@@ -2672,6 +2702,50 @@
     }
   }
   window.deleteMasterReference = deleteMasterReference;
+
+  async function toggleCategoryStatus(id, inputEl) {
+    if (!id) return;
+    var prevChecked = inputEl ? !inputEl.checked : null;
+    try {
+      if (inputEl) inputEl.disabled = true;
+      var res = await adminFetch(API_BASE + '/admin/categories/' + encodeURIComponent(id) + '/toggle', {
+        method: 'PATCH',
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Gagal mengubah status kategori.');
+      }
+
+      var updatedCategory = data.category;
+      if (updatedCategory) {
+        var categoryRows = state.categories || [];
+        var idx = categoryRows.findIndex(function(c) { return String(c.id) === String(id); });
+        if (idx >= 0) categoryRows[idx] = updatedCategory;
+        state.categories = categoryRows;
+      } else {
+        var cat = (state.categories || []).find(function(c) { return String(c.id) === String(id); });
+        if (cat) cat.is_active = inputEl.checked ? 1 : 0;
+      }
+
+      populateProductCategorySelect();
+      renderProductCategoryFilterChips();
+      renderMasterProductsTable();
+      renderMasterReferenceList('category');
+      renderMasterMenuCustomerPreview();
+      showToast(data.message || 'Status kategori berhasil diubah.', 'success');
+    } catch (err) {
+      if (inputEl && prevChecked !== null) {
+        inputEl.checked = prevChecked;
+        var parentLabel = inputEl.closest ? inputEl.closest('.x-toggle') : null;
+        if (parentLabel) parentLabel.classList.toggle('x-toggle-on', prevChecked);
+      }
+      showToast(err.message, 'error');
+    } finally {
+      if (inputEl) inputEl.disabled = false;
+    }
+  }
+  window.toggleCategoryStatus = toggleCategoryStatus;
 
   // ─────────────────────────────────────────────────────────────────────────
   // 2. MASTER REFERENCE QUICK-ADD (Product Assembly)
@@ -10961,6 +11035,7 @@ async function loadMenusView() {
       ? 'Susun nama paket, Product penyusun, taxonomy, dan harga Menu.'
       : 'Pilih Product penyusun, Sub Category, Rasa, taxonomy, dan harga Menu.';
 
+    resetOwnerMasterMenuImageState('');
     renderOwnerMasterMenuEditorForm();
   }
 
@@ -11149,6 +11224,47 @@ async function loadMenusView() {
     }) || null;
   }
 
+  // Menu Presentation Media state — scoped to the Master Menu editor.
+  // The Menu owns its customer-facing photo (docs/decisions/xentra-menu-presentation-media-v1.md).
+  // The file stays in memory until the Menu save pipeline uploads it.
+  var _masterMenuImageFile = null;
+  var _masterMenuCropSpec = null;
+  var _masterMenuImageRemoved = false;
+  var _masterMenuImagePreviewSrc = '';
+
+  function setOwnerMasterMenuImagePreview(src, hasImage) {
+    var previewImg = $('cm-image-preview');
+    var emptyBox = $('cm-image-empty');
+    var btnRemove = $('btn-cm-image-remove');
+    var btnPick = $('btn-cm-image-pick');
+    if (!previewImg || !emptyBox) return;
+    if (hasImage && src) {
+      previewImg.src = src;
+      previewImg.style.display = 'block';
+      emptyBox.style.display = 'none';
+      if (btnRemove) btnRemove.style.display = 'inline-block';
+      if (btnPick) btnPick.textContent = '\ud83d\udcc1 Ganti Foto';
+    } else {
+      previewImg.removeAttribute('src');
+      previewImg.style.display = 'none';
+      emptyBox.style.display = 'flex';
+      if (btnRemove) btnRemove.style.display = 'none';
+      if (btnPick) btnPick.textContent = '\ud83d\udcc1 Pilih Foto';
+    }
+  }
+
+  function resetOwnerMasterMenuImageState(existingSrc) {
+    _masterMenuImageFile = null;
+    _masterMenuCropSpec = null;
+    _masterMenuImageRemoved = false;
+    _masterMenuImagePreviewSrc = existingSrc || '';
+    var fileInput = $('cm-image-file');
+    if (fileInput) fileInput.value = '';
+    var removedFlag = $('cm-image-removed');
+    if (removedFlag) removedFlag.value = '0';
+    setOwnerMasterMenuImagePreview(_masterMenuImagePreviewSrc, !!_masterMenuImagePreviewSrc);
+  }
+
   function renderOwnerMasterMenuPreview() {
     var titleEl = $('cm-preview-title');
     var subtitleEl = $('cm-preview-subtitle');
@@ -11184,19 +11300,17 @@ async function loadMenusView() {
         var qty = Number(item.quantity || 1);
         return product.name + (qty > 1 ? ' × ' + qty : '');
       }).filter(Boolean).join(' · ');
-      var firstProduct = (_ownerMasterMenuState.packageComponents || []).map(function(item) {
-        return ownerMasterMenuFindProduct(item.product_id);
-      }).find(function(product) { return product && (product.image_url || product.image); });
-      image = firstProduct ? (firstProduct.image_url || firstProduct.image || '') : '';
     } else {
       // Canonical resolver title for SINGLE is Sub Category, never Product name.
       title = sub ? sub.name : 'Pilih Sub Category';
       detail = ownerMasterMenuFindProduct($('cm-product') && $('cm-product').value)
-        ? 'Product: ' + ownerMasterMenuFindProduct($('cm-product').value).name
+        ? 'Product: ' + ownerMasterMenuFindProduct($('cm-product') && $('cm-product').value).name
         : '';
-      var singleProduct = ownerMasterMenuFindProduct($('cm-product') && $('cm-product').value);
-      image = singleProduct ? (singleProduct.image_url || singleProduct.image || '') : '';
     }
+
+    // Foto preview = foto Menu itu sendiri (Satuan maupun Paket), bukan foto salah satu Product.
+    // Kosong berarti placeholder netral; Product foto hanya tampil di daftar komposisi.
+    image = _masterMenuImagePreviewSrc || '';
 
     titleEl.textContent = title;
     subtitleEl.textContent = rasaLabel;
@@ -11317,8 +11431,14 @@ async function loadMenusView() {
       var typeLabel = type === 'PACKAGE' ? 'Paket' : 'Satuan';
       var statusClass = status === 'ACTIVE' ? 'x-badge-success' : (status === 'ARCHIVED' ? 'x-badge-warning' : 'x-badge-info');
       var taxonomy = [menu.category_name, menu.sub_category_name].filter(Boolean).join(' › ');
+      // Thumbnail foto Menu (bukan foto Product), supaya Owner langsung melihat mana yang belum ada foto.
+      var thumb = menu.image_url || menu.image || '';
+      var thumbHtml = thumb
+        ? '<img class="x-master-menu-card-thumb" src="' + esc(thumb) + '" alt="' + esc(title) + '" loading="lazy" decoding="async">'
+        : '<span class="x-master-menu-card-thumb x-master-menu-card-thumb-empty" aria-hidden="true"></span>';
       return '<article class="x-master-menu-card">' +
         '<div class="x-master-menu-card-header">' +
+          thumbHtml +
           '<div>' +
             '<span class="x-badge x-badge-info">' + typeLabel + '</span>' +
             '<h4>' + esc(title) + '</h4>' +
@@ -11404,6 +11524,8 @@ async function loadMenusView() {
       $('cm-level').value = menu.level_id ? String(menu.level_id) : '';
       $('cm-price').value = menu.selling_price != null ? menu.selling_price : '';
       $('cm-status').value = String(menu.status || 'DRAFT').toUpperCase();
+      // Foto Menu milik Menu ini, bukan foto komponen Product.
+      resetOwnerMasterMenuImageState(menu.image_url || menu.preview_url || menu.image || '');
       renderOwnerMasterMenuPackageComponents();
       renderOwnerMasterMenuPreview();
     } catch (err) {
@@ -11480,6 +11602,63 @@ async function loadMenusView() {
       var data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Gagal menyimpan Menu Master.');
 
+      // Foto Menu diproses SETELAH Menu tersimpan, memakai canonical Media Engine
+      // (docs/decisions/xentra-menu-presentation-media-v1.md).
+      var savedMenuId = (data.menu && data.menu.id) || menuId;
+      if (!savedMenuId) {
+        showToast('❌ Menu tersimpan tetapi ID Menu tidak kembali dari server.');
+        return;
+      }
+
+      if (_masterMenuImageRemoved) {
+        var removeRes = await adminFetch(API_BASE + '/admin/media/entity/menus/' + encodeURIComponent(savedMenuId) + '/image', {
+          method: 'DELETE',
+          headers: getAuthHeaders()
+        });
+        var removeData = {};
+        try {
+          removeData = await removeRes.json();
+        } catch (_) {
+          removeData = { success: false, error: 'Gagal membaca respons penghapusan foto Menu (HTTP ' + removeRes.status + ').' };
+        }
+        if (!removeRes.ok || !removeData.success) {
+          showToast('❌ ' + (removeData.error || removeData.message || 'Gagal menghapus foto Menu.'));
+          return;
+        }
+      }
+
+      if (_masterMenuImageFile && !_masterMenuImageRemoved) {
+        var menuImageBase64 = await new Promise(function(resolve, reject) {
+          var menuImgReader = new FileReader();
+          menuImgReader.onload = function() { resolve(menuImgReader.result); };
+          menuImgReader.onerror = function() { reject(new Error('Gagal membaca file gambar.')); };
+          menuImgReader.readAsDataURL(_masterMenuImageFile);
+        });
+
+        var menuImagePayload = {
+          image_base64: menuImageBase64,
+          mime_type: _masterMenuImageFile.type,
+          original_filename: _masterMenuImageFile.name || null
+        };
+        if (_masterMenuCropSpec) menuImagePayload.crop_spec = _masterMenuCropSpec;
+
+        var menuImageRes = await adminFetch(API_BASE + '/admin/media/entity/menus/' + encodeURIComponent(savedMenuId) + '/image', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify(menuImagePayload)
+        });
+        var menuImageData = {};
+        try {
+          menuImageData = await menuImageRes.json();
+        } catch (_) {
+          menuImageData = { success: false, error: 'Upload foto Menu gagal (HTTP ' + menuImageRes.status + ').' };
+        }
+        if (!menuImageRes.ok || !menuImageData.success) {
+          showToast('❌ ' + (menuImageData.error || menuImageData.message || 'Menu tersimpan, tetapi foto Menu gagal diunggah.'));
+          return;
+        }
+      }
+
       showToast(status === 'ACTIVE' ? '✅ Menu Master aktif.' : '✅ Menu Master tersimpan sebagai draft.');
       navigateTo('catalog/master-menus', { history: 'replace' });
     } catch (err) {
@@ -11546,6 +11725,68 @@ async function loadMenusView() {
     var form = $('form-master-menu');
     var saveDraft = $('btn-save-master-menu-draft');
     var addComponent = $('btn-cm-add-component');
+
+    // Foto Menu — pick → shared crop editor (1:1) → canonical entity media pipeline.
+    // Menu owns its customer-facing photo, independent from Product photos.
+    var menuImagePick = $('btn-cm-image-pick');
+    var menuImageFile = $('cm-image-file');
+    var menuImageRemove = $('btn-cm-image-remove');
+    if (menuImagePick && menuImageFile) {
+      menuImagePick.addEventListener('click', function() { menuImageFile.click(); });
+      menuImageFile.addEventListener('change', function() {
+        var file = menuImageFile.files && menuImageFile.files[0];
+        if (!file) { _masterMenuImageFile = null; _masterMenuCropSpec = null; return; }
+        _masterMenuImageRemoved = false;
+        _masterMenuCropSpec = null;
+
+        var allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+        if (allowed.indexOf(file.type) === -1) {
+          showToast('❌ Format gambar tidak didukung. Gunakan JPG, PNG, atau WEBP.');
+          menuImageFile.value = '';
+          return;
+        }
+        if (file.size > 20 * 1024 * 1024) {
+          showToast('❌ Ukuran gambar melebihi batas maksimal 20MB.');
+          menuImageFile.value = '';
+          return;
+        }
+
+        _masterMenuImageFile = file;
+
+        XentraCropEditor.open({
+          source: file,
+          assetType: 'menu',
+          aspectRatio: 1.0,
+          title: 'Potong & Posisikan Foto Menu (1:1)',
+          onConfirm: function (cropSpec, previewDataUrl) {
+            _masterMenuCropSpec = cropSpec;
+            _masterMenuImagePreviewSrc = previewDataUrl || URL.createObjectURL(file);
+            setOwnerMasterMenuImagePreview(_masterMenuImagePreviewSrc, true);
+            renderOwnerMasterMenuPreview();
+            showToast('✓ Potongan foto Menu disesuaikan.');
+          },
+          onCancel: function () {
+            _masterMenuImageFile = null;
+            _masterMenuCropSpec = null;
+            if (menuImageFile) menuImageFile.value = '';
+          }
+        });
+      });
+    }
+
+    if (menuImageRemove) {
+      menuImageRemove.addEventListener('click', function() {
+        _masterMenuImageFile = null;
+        _masterMenuCropSpec = null;
+        _masterMenuImageRemoved = true;
+        _masterMenuImagePreviewSrc = '';
+        if (menuImageFile) menuImageFile.value = '';
+        var removedFlag = $('cm-image-removed');
+        if (removedFlag) removedFlag.value = '1';
+        setOwnerMasterMenuImagePreview('', false);
+        renderOwnerMasterMenuPreview();
+      });
+    }
 
     if (addSingle) addSingle.addEventListener('click', function() { openNewOwnerMasterMenu('SINGLE'); });
     if (addPackage) addPackage.addEventListener('click', function() { openNewOwnerMasterMenu('PACKAGE'); });
