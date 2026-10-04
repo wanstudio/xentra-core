@@ -242,31 +242,6 @@
     toast('✅ Kategori dibuat dan langsung dipilih.');
   }
 
-  async function createTitleInline() {
-        var result = await requestFieldsSheet({
-      id: 'master-menu-inline-title',
-      title: 'Buat Judul',
-      saveLabel: 'Simpan & Pilih Judul',
-      fields: [
-        { name: 'name', label: 'Nama Judul', placeholder: 'Contoh: Udang Sambalado', required: true }
-      ]
-    });
-    if (!result) return;
-
-    var data = await requestJson('/admin/titles', {
-      method: 'POST',
-      body: JSON.stringify({ name: result.name })
-    });
-    var title = data.title;
-
-    var select = document.getElementById('cm-sub-category');
-    if (select) {
-      addOption(select, title.id, title.name, true);
-    }
-
-    toast('✅ Judul dibuat dan langsung dipilih.');
-  }
-
   async function createRasaInline() {
     var result = await requestFieldsSheet({
       id: 'master-menu-inline-rasa',
@@ -359,7 +334,6 @@
   function injectQuickCreateControls() {
     addButtonToFormGroup('cm-product', 'item', 'Item', createItemInline);
     addButtonToFormGroup('cm-category', 'category', 'Kategori', createCategoryInline);
-    addButtonToFormGroup('cm-sub-category', 'title', 'Judul', createTitleInline);
     addButtonToFormGroup('cm-rasa', 'rasa', 'Rasa', createRasaInline);
     syncCreatedProductOptions();
 
@@ -413,7 +387,6 @@
     init: enhanceMasterMenuEditor,
     createItem: createItemInline,
     createCategory: createCategoryInline,
-    createTitle: createTitleInline,
     createRasa: createRasaInline
   };
 
