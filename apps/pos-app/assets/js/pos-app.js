@@ -1965,10 +1965,34 @@
     }
   }
 
+  // Perangkat yang belum punya binding lokal (storage bersih / origin atau
+  // domain baru) bisa meminta konteks terminalnya ke server. Server hanya
+  // menjawab kalau brand di domain ini punya TEPAT SATU terminal aktif; kalau
+  // tidak, perangkat tetap harus diaktivasi lewat akun manager.
+  async function resolveTerminalContextFromServer(){
+    if(!navigator.onLine) return false;
+    try{
+      var d=await requestWithTimeout('/pos/terminal/resolve',{},2500);
+      if(!d || !d.success || !d.terminal || !d.terminal.id || !d.terminal.branch_id) return false;
+      state.terminalId=d.terminal.id;
+      state.branchId=d.terminal.branch_id;
+      try{
+        localStorage.setItem('xentra_pos_terminal_id',String(state.terminalId));
+        localStorage.setItem('xentra_pos_branch_id',String(state.branchId));
+      }catch(_){}
+      return true;
+    }catch(_){ return false; }
+  }
+
   async function ensureSession(){
     var setupRequested=isTerminalSetupRequested();
     if(!token()){
       var hasTerminalContext=!!(state.terminalId && (state.branchId || localStorage.getItem('xentra_pos_branch_id')));
+      if(!hasTerminalContext && !setupRequested){
+        // Kasir tidak perlu aktivasi manager kalau terminalnya sudah terdaftar dan
+        // cabangnya tidak ambigu.
+        hasTerminalContext=await resolveTerminalContextFromServer();
+      }
       await openPinUnlockGate(!navigator.onLine, !hasTerminalContext || setupRequested);
       return !!token() || !!state.user;
     }

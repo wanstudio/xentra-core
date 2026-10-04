@@ -1027,6 +1027,56 @@ router.post('/pos/offline-sync/batch', requireAuth(['owner', 'brand_manager', 'b
 });
 
 
+// Mengembalikan konteks terminal untuk perangkat yang belum punya binding lokal
+// (localStorage bersih, browser/PWA baru, atau origin/domain baru) supaya kasir
+// bisa memakai PIN tanpa aktivasi manager.
+//
+// Tanpa sesi, jadi sengaja dibatasi ketat:
+//   - tenant tetap dari domain (req.brand_id hasil tenantResolver; host tak
+//     terdaftar sudah gagal closed sebelum sampai ke sini);
+//   - hanya menjawab kalau brand ini punya TEPAT SATU terminal aktif, sehingga
+//     cabangnya tidak ambigu. Kalau nol atau lebih dari satu, klien tetap harus
+//     lewat alur aktivasi manager (pilih cabang);
+//   - tidak mengembalikan data pengguna apa pun; PIN kasir tetap satu-satunya
+//     kredensial, dengan rate-limit dan lockout yang sudah berlaku.
+router.get('/pos/terminal/resolve', (req, res) => {
+  try {
+    if (!req.brand_id) {
+      return res.status(400).json({ success: false, error: 'Brand tidak terdeteksi dari domain ini.' });
+    }
+
+    // LIMIT 2 cukup untuk membedakan "tepat satu" dari "lebih dari satu".
+    const terminals = db.prepare(`
+      SELECT t.id, t.branch_id, b.name AS branch_name
+      FROM pos_terminals t
+      JOIN branches b ON b.id = t.branch_id
+      WHERE b.brand_id = ? AND t.status = 'active' AND b.is_active = 1
+      ORDER BY t.created_at ASC
+      LIMIT 2
+    `).all(req.brand_id);
+
+    if (terminals.length === 0) {
+      return res.json({ success: true, terminal: null, reason: 'NO_ACTIVE_TERMINAL' });
+    }
+    if (terminals.length > 1) {
+      return res.json({ success: true, terminal: null, reason: 'MULTIPLE_ACTIVE_TERMINALS' });
+    }
+
+    const terminal = terminals[0];
+    res.json({
+      success: true,
+      reason: 'SINGLE_ACTIVE_TERMINAL',
+      terminal: {
+        id: terminal.id,
+        branch_id: terminal.branch_id,
+        branch_name: terminal.branch_name || ''
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Gagal menyelesaikan konteks terminal.' });
+  }
+});
+
 // Terminal binding is readable by Cashier for normal POS boot and by
 // Manager/Owner for the explicit first-time terminal activation flow.
 // Registration remains a Manager/Owner administrative capability.
