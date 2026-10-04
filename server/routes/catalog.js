@@ -27,9 +27,32 @@ router.get('/catalog/composed-menu', (req, res) => {
       if (branch.is_active === 0) return res.status(400).json({ success: false, error: 'BRANCH_INACTIVE' });
     }
 
-    const menus = branchId
+    const resolvedMenus = branchId
       ? ComposedMenuResolver.resolveBranchMenu({ brandId, branchId, includeUnavailable })
       : ComposedMenuResolver.resolveMasterMenu({ brandId });
+
+    // Menu presentation media is owned by the Menu. Canonical READY derivatives take precedence;
+    // the Menu's own legacy image_url is the only fallback — never a component Product image
+    // (docs/decisions/xentra-menu-presentation-media-v1.md).
+    const menuMediaMap = batchResolveCustomerMediaDelivery({
+      mediaIds: resolvedMenus.map(menu => menu.media_id).filter(Boolean),
+      brandId,
+      assetType: 'square'
+    });
+
+    const menus = resolvedMenus.map((menu) => {
+      const resolved = menu.media_id ? menuMediaMap.get(menu.media_id) : null;
+      const legacyImg = menu.image_url || menu.image || '';
+      const previewUrl = resolved ? resolved.preview_url : (legacyImg || null);
+      return {
+        ...menu,
+        preview_url: previewUrl,
+        image_url: previewUrl || legacyImg || '',
+        image: previewUrl || legacyImg || '',
+        media_id: resolved ? resolved.media_id : (menu.media_id || null),
+        srcset_variants: resolved ? resolved.srcset_variants : []
+      };
+    });
 
     const categoriesMap = new Map();
     for (const menu of menus) {

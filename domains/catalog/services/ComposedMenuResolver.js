@@ -64,6 +64,13 @@ function resolveMenuBase(menu, branchState = null) {
       : null,
     level: level,
     status: menu.status,
+    // Menu presentation media (customer-facing). Owned by the Menu — never derived from a
+    // component Product image (docs/decisions/xentra-menu-presentation-media-v1.md).
+    // Delivery enrichment (preview_url/srcset_variants) is attached by the read route;
+    // when empty the client shows a neutral placeholder.
+    media_id: menu.media_id || null,
+    image_url: menu.image_url || null,
+    image: menu.image || null,
     ...(branchState ? {
       display_name_override: displayNameOverride
     } : {})

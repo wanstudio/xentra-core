@@ -4,6 +4,9 @@
  * Release identity: content hash of this file.
  * Canonical white status bar / theme-color (#ffffff).
  * Release 2026-09-30c: Rasa uses the same title color as Kategori.
+ * Release 2026-10-04a: Menu presentation media (foto Menu milik Menu) + fix parser
+ *   error di pages/home.js. Cache bubble WAJIB di-bump agar shell lama terbuang
+ *   dan perbaikan/JS baru benar-benar sampai ke klien.
  * When this file changes (new commit), the hash changes → new cache → old purged.
  * No hardcoded version strings. No external endpoints. No manual edits.
  *

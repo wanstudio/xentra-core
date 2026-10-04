@@ -1185,7 +1185,13 @@
         price: Number(menu.price || 0),
         regular_price: Number(menu.price || 0),
         description: componentSnapshot.length === 1 ? (componentSnapshot[0].description || '') : '',
-        image_url: componentSnapshot.length === 1 ? (componentSnapshot[0].image_url || '') : '',
+        // Foto customer-facing adalah milik Menu (Satuan maupun Paket), bukan komponen Product.
+        // Kosong berarti placeholder netral — bukan foto salah satu Product.
+        image_url: menu.image_url || menu.image || '',
+        image: menu.image || menu.image_url || '',
+        preview_url: menu.preview_url || null,
+        media_id: menu.media_id || null,
+        srcset_variants: Array.isArray(menu.srcset_variants) ? menu.srcset_variants : [],
         components: componentSnapshot,
         component_snapshot: componentSnapshot,
         menu_snapshot: {
@@ -1276,7 +1282,7 @@
         // A canonical failure must remain visible instead of silently reviving the
         // legacy Product-centric catalog, which could produce a mixed/incorrect cart.
         if (catalogBranchId || !categories.length) renderEmptyBranchCatalog();
-      }));
+      });
   }
 
   // ======================================================================
@@ -1467,6 +1473,10 @@
           imgHtml = '<img class="x-product-image" src="' + UI.escape(image) + '"' +
             ' alt="' + UI.escape(product.name) + '" width="105" height="105" loading="lazy" decoding="async">';
         }
+      }
+      // Menu belum punya foto sendiri → placeholder netral. Bukan foto salah satu Product.
+      if (!imgHtml) {
+        imgHtml = '<span class="x-product-image x-product-image-empty" role="img" aria-label="Belum ada foto"></span>';
       }
 
       html +=

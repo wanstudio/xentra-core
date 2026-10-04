@@ -147,7 +147,7 @@ class ImageProcessor {
    *
    * @param {Object} options
    * @param {Buffer} options.sourceBuffer - Raw source image binary
-   * @param {string} options.assetType - 'product' | 'category' | 'logo' | 'avatar' | 'pwa_icon' | 'promotion' | 'banner' | 'general'
+   * @param {string} options.assetType - 'product' | 'menu' | 'category' | 'logo' | 'avatar' | 'pwa_icon' | 'promotion' | 'banner' | 'general'
    * @param {Object|CropSpec} [options.cropSpec] - M2 crop intent
    * @returns {Promise<{
    *   cropSpec: CropSpec,

@@ -42,6 +42,17 @@ const IMAGE_RULES = {
     label: 'Foto Menu / Produk',
     specsText: 'JPG, PNG, atau WebP · Maks. 20 MB · Rasio 1:1'
   },
+  menu: {
+    maxBytes: 20 * 1024 * 1024, // 20MB — Menu Presentation Media v1 (same policy as Product)
+    maxWidth: 4096,
+    maxHeight: 4096,
+    maxMegaPixels: 20,
+    allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+    targetRatio: 1.0,
+    ratioTolerance: 0.15,
+    label: 'Foto Menu',
+    specsText: 'JPG, PNG, atau WebP · Maks. 20 MB · Rasio 1:1'
+  },
   category: {
     maxBytes: 15 * 1024 * 1024, // 15MB (M0 locked policy)
     maxWidth: 4096,
@@ -222,7 +233,7 @@ function inspectImageBuffer(buf) {
 }
 
 /**
- * Validates an upload payload for a specific asset type (logo, product, category, banner, avatar, pwa_icon, promotion, general).
+ * Validates an upload payload for a specific asset type (logo, product, menu, category, banner, avatar, pwa_icon, promotion, general).
  * Returns { valid: true, buffer, info } or { valid: false, error, code }.
  */
 function validateImageUpload({ imageBase64, mimeType, declaredFilename, assetType = 'general', enforceAspectRatio = false }) {

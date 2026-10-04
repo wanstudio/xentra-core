@@ -160,6 +160,7 @@ class ComposedMenuRepository {
     return this.db.queryOne(
       "SELECT m.id, m.brand_id, m.menu_type, m.sub_category_id, m.rasa_id, m.level_id, " +
       "m.package_name, m.selling_price, m.status, m.created_at, m.updated_at, " +
+      "m.media_id, m.image_url, m.image, " +
       "sc.name AS sub_category_name, sc.slug AS sub_category_slug, " +
       "c.id AS category_id, c.name AS category_name, c.slug AS category_slug, " +
       "r.name AS rasa_name, r.slug AS rasa_slug, " +
@@ -250,6 +251,7 @@ class ComposedMenuRepository {
     return this.db.queryMany(
       "SELECT m.id, m.brand_id, m.menu_type, m.sub_category_id, m.rasa_id, m.level_id, " +
       "m.package_name, m.selling_price, m.status, " +
+      "m.media_id, m.image_url, m.image, " +
       "sc.name AS sub_category_name, sc.slug AS sub_category_slug, " +
       "c.id AS category_id, c.name AS category_name, c.slug AS category_slug, " +
       "r.name AS rasa_name, r.slug AS rasa_slug, " +

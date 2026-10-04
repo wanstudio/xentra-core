@@ -51,6 +51,7 @@ UI preflight is a user-experience guardrail only. Server-side validation remains
 | Merchant/Owner PWA icon | 10 MB | 1:1 WebP derivatives |
 | POS PWA icon | 10 MB | 1:1 WebP derivatives |
 | Promotion icon | 10 MB | 1:1 WebP derivatives |
+| Menu (Satuan & Paket) | 20 MB | 1:1 WebP derivatives |
 
 The 20 MP safety ceiling remains authoritative. Supported input formats remain JPEG, PNG, and WebP. HEIC/HEIF remains unsupported until actual runtime decode/process capability is proven. Arbitrary SVG uploads remain disabled.
 
@@ -130,7 +131,7 @@ Brand-owned media binding is transactionally paired with the owning Brand refere
 Media Engine entity attachment is type-safe and lifecycle-safe:
 
 - A media asset may only attach to an approved entity type whose slot matches the asset semantic `asset_type`.
-- Canonical slot mappings include `logo`, `product`, `category`, `banner`, `avatar`, `pwa_icon`, and `promotion`.
+- Canonical slot mappings include `logo`, `product`, `category`, `banner`, `avatar`, `pwa_icon`, `promotion`, and `menu`.
 - Generic media attach/replace HTTP mutations are manager-only compatibility boundaries; branch roles use slot-specific adapters instead.
 - `READY` is a published state, not an upload shortcut. Direct lifecycle mutation to `READY` is forbidden; `MediaService.processMedia()` is the normal publication path after ImageProcessor completion.
 - The historical `/admin/media/:id/ready` endpoint is retained only as a compatibility alias and delegates to the canonical processing pipeline.
@@ -141,7 +142,7 @@ Generic Brand/Profile settings are not media mutation APIs.
 
 These endpoints may update ordinary profile/configuration fields, but they must not accept image URL fields as a shortcut for media upload/replacement.
 
-Logo, PWA icon, banner, product, and category image changes use their dedicated Media System mutation boundary.
+Logo, PWA icon, banner, product, category, and menu image changes use their dedicated Media System mutation boundary.
 
 ## 8. Garbage collection / references
 

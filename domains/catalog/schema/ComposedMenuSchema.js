@@ -371,6 +371,36 @@ function ensureComposedMenuSchema(db) {
   // predate this contract and must not make additive schema initialization fail.
   try { db.exec('ALTER TABLE branch_menus ADD COLUMN display_name_override TEXT;'); } catch (_) {}
 
+  // Menu presentation media (customer-facing) — LOCKED by
+  // docs/decisions/xentra-menu-presentation-media-v1.md. Menu Satuan and Menu Paket own their
+  // customer-facing image; a component Product image is never used as a fallback.
+  // Idempotent — safe on existing databases.
+  try { db.exec('ALTER TABLE menus ADD COLUMN media_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL;'); } catch (_) {}
+  try { db.exec('ALTER TABLE menus ADD COLUMN image_url TEXT;'); } catch (_) {}
+  try { db.exec('ALTER TABLE menus ADD COLUMN image TEXT;'); } catch (_) {}
+  try { db.exec('CREATE INDEX IF NOT EXISTS idx_menus_media_id ON menus(media_id) WHERE media_id IS NOT NULL;'); } catch (_) {}
+
+  // Migration evidence for the explicit one-time backfill of legacy Menu presentation media.
+  // Runtime fallback is not a migration mechanism, so every copy is recorded here.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS menu_media_migrations (
+      menu_id TEXT PRIMARY KEY,
+      brand_id TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'component_product',
+      source_product_id TEXT,
+      media_id TEXT,
+      status TEXT NOT NULL
+        CHECK (status IN ('COPIED', 'SKIPPED_PACKAGE', 'SKIPPED_NO_SOURCE', 'SKIPPED_ALREADY_SET', 'FAILED')),
+      notes TEXT,
+      ran_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (menu_id) REFERENCES menus(id) ON DELETE CASCADE,
+      FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_menu_media_migrations_brand_status
+      ON menu_media_migrations(brand_id, status);
+  `);
+
   db.exec(`
     CREATE TRIGGER IF NOT EXISTS trg_menu_flavors_brand_name_unique_insert
     BEFORE INSERT ON menu_flavors

@@ -139,6 +139,21 @@ class MediaReferenceResolver {
       references.push({ type: 'product', id: p.id, field: p.media_id === mediaId ? 'media_id' : 'image_url' });
     }
 
+    // 3b. Check Menus table (canonical Menu presentation media — Menu owns its own
+    // customer-facing image, never derived from a component Product).
+    try {
+      let menuSql = 'SELECT id, brand_id, media_id, image_url, image FROM menus WHERE (media_id = ? OR image_url LIKE ? OR image LIKE ?)';
+      const menuParams = [mediaId, mediaIdPattern, mediaIdPattern];
+      if (brandId) {
+        menuSql += ' AND brand_id = ?';
+        menuParams.push(brandId);
+      }
+      const menus = this.db.queryMany(menuSql, menuParams);
+      for (const m of menus) {
+        references.push({ type: 'menu', id: m.id, field: m.media_id === mediaId ? 'media_id' : 'image_url' });
+      }
+    } catch (_) {}
+
     // 4. Check Categories table (canonical media_id or image_url/image)
     let catSql = 'SELECT id, brand_id, media_id, image_url, image FROM categories WHERE (media_id = ? OR image_url LIKE ? OR image LIKE ?)';
     const catParams = [mediaId, mediaIdPattern, mediaIdPattern];

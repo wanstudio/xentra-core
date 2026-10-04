@@ -246,6 +246,7 @@
       var ratioMap  = {
         logo:     1.0,
         product:  1.0,
+        menu:     1.0,
         category: 1.0,
         avatar:   1.0,
         banner:   350 / 180, // ~1.944

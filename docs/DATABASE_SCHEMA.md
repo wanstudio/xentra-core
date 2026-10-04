@@ -16,7 +16,8 @@ products
   = atomic reusable Product + optional SKU
 
 menus
-  = customer-facing Menu Satuan / Menu Paket + selling price + taxonomy
+  = customer-facing Menu Satuan / Menu Paket + selling price + taxonomy + presentation media
+    (`media_id` canonical, `image_url`/`image` delivery-compatible; owned by Menu, never derived from Product)
 
 menu_items
   = fixed Product composition
@@ -409,6 +410,9 @@ products
 These relations remain physical compatibility data for migration/reconciliation only. They are
 **not** the canonical customer-facing Menu composition. The canonical composition is
 `menus → menu_items → products`, with Menu taxonomy stored on `menus` and its Master references.
+Customer-facing Menu presentation media also belongs to `menus` (`media_id` + `image_url`/`image`);
+component Product images describe composition contents only and are never used as a Menu image fallback
+(see `docs/decisions/xentra-menu-presentation-media-v1.md`).
 The same-Brand relationship is enforced at database level. Existing product `category_id` is retained
 for legacy Product context and migration mapping.
 

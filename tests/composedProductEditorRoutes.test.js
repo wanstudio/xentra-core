@@ -9,7 +9,7 @@
  * Test ini benar-benar memanggil route-nya (express + DB), bukan string search:
  *   CPR-01..03  create -> edit mempertahankan identitas Product yang sama
  *   CPR-04      archive/nonaktifkan lalu aktifkan kembali
- *   CPR-05      contract guard: GET by-id memang tidak ada (404 ENDPOINT_NOT_FOUND)
+ *   CPR-05      canonical product detail by-id (id asing ≠ Product baru)
  *   CPR-06..07  id asing / brand lain tidak menulis apa pun
  *   CPR-08      editor memakai LIST canonical, bukan by-id / legacy
  */
@@ -185,11 +185,21 @@ test('CPR-04: archive (nonaktif) lalu aktifkan kembali lewat PATCH status', asyn
 
 // ── CPR-05: contract guard ──
 
-test('CPR-05: GET by-id memang tidak ada di contract (404 ENDPOINT_NOT_FOUND)', async () => {
-  const { status, body } = await call('GET', '/admin/composed/products/prod_apa_saja');
-  assert.strictEqual(status, 404);
-  assert.strictEqual(body.error, 'ENDPOINT_NOT_FOUND',
-    'GET by-id bukan bagian contract; editor tidak boleh bergantung padanya');
+test('CPR-05: GET by-id tersedia dan menolak id asing sebagai Product tidak ditemukan', async () => {
+  // Contract diperbarui: server kini menyediakan canonical master product detail
+  // (GET /admin/composed/products/:id). Editor tetap TIDAK bergantung padanya (CPR-08).
+  const created = await call('POST', '/admin/composed/products', { name: 'Produk Detail CPR' });
+  const productId = created.body.product.id;
+
+  const found = await call('GET', '/admin/composed/products/' + encodeURIComponent(productId));
+  assert.strictEqual(found.status, 200);
+  assert.strictEqual(found.body.success, true);
+  assert.strictEqual(found.body.product.id, productId);
+
+  const missing = await call('GET', '/admin/composed/products/prod_apa_saja');
+  assert.strictEqual(missing.status, 404);
+  assert.strictEqual(missing.body.error, 'MASTER_PRODUCT_NOT_FOUND',
+    'id asing tidak pernah menjadi Product baru');
 });
 
 // ── CPR-06..07: tidak menulis untuk id asing / brand lain ──

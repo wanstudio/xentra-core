@@ -1371,7 +1371,12 @@
           regular_price: Number(menu.price || 0),
           product_id: menu.menu_type === 'SINGLE' && first ? first.product_id : null,
           description: first ? (first.description || '') : '',
-          image_url: first ? (first.image_url || '') : '',
+          // Foto customer-facing milik Menu (Satuan maupun Paket), bukan komponen Product.
+          image_url: menu.image_url || menu.image || '',
+          image: menu.image || menu.image_url || '',
+          preview_url: menu.preview_url || null,
+          media_id: menu.media_id || null,
+          srcset_variants: Array.isArray(menu.srcset_variants) ? menu.srcset_variants : [],
           component_snapshot: components,
           components: components,
           menu_snapshot: menu.menu_snapshot || {

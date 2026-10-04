@@ -113,6 +113,7 @@ Customer / Merchant / POS delivery
 - UI upload instructions must mirror the authoritative asset limits and state that crop/resize/compression are automatic where applicable.
 - Legacy compatibility routes may remain temporarily, but their binary handling must still delegate to the canonical Media Engine. A route that bypasses the engine is not an allowed compatibility path.
 - Branch Product photo override is quarantined: new branch photo writes/mutations are rejected, catalog resolution always uses the Master Product photo, and legacy `image_override` data is not treated as the active customer photo.
+- Menu presentation media (Satuan and Paket) is owned by the Menu, not by its component Products. A customer-facing Menu image must never be derived at runtime from a component Product image; when a Menu has no media, a neutral placeholder is used. See `xentra-menu-presentation-media-v1.md`.
 
 ### Current canonical slot mapping
 
@@ -126,6 +127,7 @@ Customer / Merchant / POS delivery
 | Merchant/Owner PWA icon | 10 MB | 1:1 WebP derivatives |
 | POS PWA icon | 10 MB | 1:1 WebP derivatives |
 | Promotion icon | 10 MB | 1:1 WebP derivatives |
+| Menu (Satuan & Paket) | 20 MB | 1:1 WebP derivatives |
 
 Merchant-facing instruction is intentionally: **upload the normal original photo; Xentra handles crop, resize, compression, and optimized delivery automatically.**
 
@@ -141,6 +143,7 @@ The canonical Media Engine also locks the consumer/attachment contract, not only
 - `brand_pos_pwa_icon` → `pwa_icon`
 - `product` → `product`
 - `category` / `branch_category` → `category`
+- `menu` → `menu`
 - `brand_banner` / `banner_content_revision` → `banner`
 - A media asset cannot be attached through a generic endpoint when its `asset_type` does not match the target slot.
 - Direct transition to `READY` is not a publish mechanism. Media becomes `READY` only through the processing pipeline; the historical READY endpoint delegates to that pipeline.

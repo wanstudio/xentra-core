@@ -653,3 +653,28 @@ For Master Menu resolution, Category nodes use the actual Master Category record
 Existing Branch Customer Display Name Override remains the narrow Branch-scoped exception: a non-empty `branch_products.name_override` replaces the Customer title for that Branch; clearing it restores the live Master Product Name. The existing subtitle-suppression behavior for an active override remains unchanged.
 
 **Source of truth:** `docs/decisions/xentra-product-name-category-display-boundary-v1.md`.
+
+---
+
+## 🔒 SUPERSEDING DECISION — Menu Presentation Media v1
+**Decision date: 4 October 2026**
+
+The Customer presentation mapping for **media** is revised, per the contract gate above (Customer presentation mapping).
+
+```
+Menu (Satuan & Paket) → presentation media        (customer-facing, owned by Menu)
+component Product     → composition contents only (never a Menu image fallback)
+```
+
+A Menu owns its customer-facing image on `menus` (`media_id` canonical, `image_url`/`image` delivery-compatible),
+attached through the canonical Media Engine slot `menu` (1:1, 20 MB). A customer-facing Menu image must never be
+derived at runtime from a component Product image — including Menu Paket, where picking one of several component
+Product images is semantically invalid. When a Menu has no media, a neutral placeholder is used.
+
+Component Product thumbnails remain allowed inside a composition listing, because they describe the contents of the
+Menu rather than its presentation.
+
+Migration of existing Menus is explicit and one-time (backfill Menu Satuan from its single component Product,
+recorded as migration evidence; Menu Paket is never auto-copied), never a runtime fallback.
+
+**Source of truth:** `docs/decisions/xentra-menu-presentation-media-v1.md`.

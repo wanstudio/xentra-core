@@ -986,7 +986,7 @@ These are engineering decisions that can be solved during implementation/reconci
 - exact Product SKU generation format/prefix remains an engineering convention, provided generated SKUs are deterministic/unique within Brand and auditable;
 - exact physical migration mechanics for existing SQLite tables;
 - exact inventory SKU-history table versus snapshot representation;
-- exact media binding for Menu Paket;
+- exact media binding for Menu Paket; **resolved** — Menu Satuan and Menu Paket own their customer-facing presentation media on `menus` (`media_id` + `image_url`/`image`) via the canonical Media Engine slot `menu` (1:1, 20 MB); no runtime fallback to component Product images. See `docs/decisions/xentra-menu-presentation-media-v1.md`;
 - final endpoint naming/versioning;
 - exact Branch Menu repository and API shape; **resolved** — canonical repository/service/resolver and `/admin/branches/:id/menu` boundary are implemented;
 - legacy Product Options adapter shape;

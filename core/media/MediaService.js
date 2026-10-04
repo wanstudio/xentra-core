@@ -26,6 +26,7 @@ const ENTITY_MEDIA_ASSET_TYPES = Object.freeze({
   brand_merchant_pwa_icon: ['pwa_icon'],
   brand_pos_pwa_icon: ['pwa_icon'],
   product: ['product'],
+  menu: ['menu'],
   category: ['category'],
   branch_category: ['category'],
   brand_banner: ['banner'],
