@@ -3533,11 +3533,12 @@ async function loadMenusView() {
       // Fetch adoption summary for each branch
       var summaries = await Promise.all(branches.map(async function (b) {
         try {
-          var cRes = await adminFetch(API_BASE + '/admin/branches/' + b.id + '/catalog', { headers: getAuthHeaders() });
+          var cRes = await adminFetch(API_BASE + '/admin/branches/' + b.id + '/menu', { headers: getAuthHeaders() });
           var cData = await cRes.json();
+          var adoptedList = cData.adopted_menus || cData.adopted_products || [];
           return {
             branch: b,
-            adoptedCount: (cData.adopted_products || []).length,
+            adoptedCount: adoptedList.length,
             categoryCount: (cData.categories || []).length
           };
         } catch (_) {
@@ -3593,7 +3594,7 @@ async function loadMenusView() {
     if (catsEl) catsEl.innerHTML = '<span class="text-muted" style="font-size:13px;">Memuat kategori...</span>';
 
     try {
-      var res = await adminFetch(API_BASE + '/admin/branches/' + branchId + '/catalog', {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + branchId + '/menu', {
         headers: getAuthHeaders()
       });
       var data = await res.json();
@@ -3605,8 +3606,8 @@ async function loadMenusView() {
       XentraOwnerBranchCatalog.state.catalogData = data;
 
       var categories = data.categories || [];
-      var adopted = data.adopted_products || [];
-      var available = data.available_master_products || [];
+      var adopted = data.adopted_menus || data.adopted_products || [];
+      var available = data.available_master_menus || data.available_master_products || [];
 
       if ($('menus-branch-cat-count')) $('menus-branch-cat-count').textContent = categories.length;
       if ($('menus-branch-active-count')) $('menus-branch-active-count').textContent = adopted.length;
@@ -3728,6 +3729,7 @@ async function loadMenusView() {
 
     // FORWARD MENU: card may show Master Menu Composition as read-only; no Branch content overrides.
     container.innerHTML = filtered.map(function (p) {
+      var menuId = p.menu_id || p.id;
       var img = p.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100';
       var isAvailable = p.is_available === 1 || p.is_available === true;
       var catName = (p.category_names && p.category_names.length)
@@ -3737,29 +3739,27 @@ async function loadMenusView() {
         ? '<span class="x-badge x-badge-range">Range (' + formatMoney(p.min_price) + ' - ' + formatMoney(p.max_price) + ')</span>'
         : '<span class="x-badge x-badge-lock">Harga Terkunci</span>';
 
-
-
       var availabilityToggle = '' +
         '<label class="x-toggle' + (isAvailable ? ' x-toggle-on' : '') + '" title="' + (isAvailable ? 'Menu tersedia' : 'Menu habis') + '">' +
-          '<input type="checkbox" ' + (isAvailable ? 'checked' : '') + ' onchange="toggleBranchProductAvailability(\'' + p.product_id + '\', this.checked ? 1 : 0)" aria-label="Ubah ketersediaan menu cabang">' +
+          '<input type="checkbox" ' + (isAvailable ? 'checked' : '') + ' onchange="toggleBranchMenuAvailability(\'' + esc(menuId) + '\', this.checked ? 1 : 0)" aria-label="Ubah ketersediaan menu cabang">' +
           '<span class="x-toggle-slider"></span>' +
         '</label>';
 
       return [
         '<div class="x-product-card-simple">',
-          '<img src="' + esc(img) + '" class="x-product-card-thumb" alt="' + esc(p.name) + '">',
+          '<img src="' + esc(img) + '" class="x-product-card-thumb" alt="' + esc(p.name || p.title) + '">',
           '<div class="x-product-card-content">',
-            '<h5>' + esc(p.name) + '</h5>',
+            '<h5>' + esc(p.name || p.title) + '</h5>',
             '<div style="display:flex;gap:4px;flex-wrap:wrap;margin:4px 0;">',
               '<span class="x-badge x-badge-info" style="font-size:10px;">' + esc(catName) + '</span>',
               modeBadge,
             '</div>',
-            '<div class="x-product-card-price">Jual: ' + formatMoney(p.price) + ' <small class="text-muted" style="font-weight:normal;">(Owner: ' + formatMoney(p.master_price) + ')</small></div>',
+            '<div class="x-product-card-price">Jual: ' + formatMoney(p.price) + ' <small class="text-muted" style="font-weight:normal;">(Owner: ' + formatMoney(p.master_price || p.selling_price || p.price) + ')</small></div>',
             '<div class="x-product-card-actions">',
               '<div>' + availabilityToggle + '</div>',
               '<div class="x-item-actions">',
-                '<button type="button" class="x-action-menu-trigger" aria-label="Aksi menu cabang ' + esc(p.name) + '" onclick="XentraActionMenu.open(this, [' +
-                  '{ label: \'Hapus dari Cabang\', icon: \'🗑️\', destructive: true, onClick: function() { removeBranchProduct(\'' + p.product_id + '\', \'' + esc(p.name) + '\'); } }' +
+                '<button type="button" class="x-action-menu-trigger" aria-label="Aksi menu cabang ' + esc(p.name || p.title) + '" onclick="XentraActionMenu.open(this, [' +
+                  '{ label: \'Hapus dari Cabang\', icon: \'🗑️\', destructive: true, onClick: function() { removeBranchMenu(\'' + esc(menuId) + '\', \'' + esc(p.name || p.title) + '\'); } }' +
                 '])">',
                   '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>',
                 '</button>',
@@ -3776,11 +3776,12 @@ async function loadMenusView() {
     if (!container) return;
 
     if (!available.length) {
-      container.innerHTML = '<div style="grid-column:1/-1;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:24px;text-align:center;color:#64748b;font-size:13px;">Semua produk dari katalog Master telah diadopsi oleh cabang ini.</div>';
+      container.innerHTML = '<div style="grid-column:1/-1;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:24px;text-align:center;color:#64748b;font-size:13px;">Semua Master Menu telah diadopsi oleh cabang ini.</div>';
       return;
     }
 
     container.innerHTML = available.map(function (p) {
+      var menuId = p.menu_id || p.id;
       var img = p.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100';
       var isRange = p.pricing_mode === 'range';
       var modeBadge = isRange
@@ -3789,13 +3790,13 @@ async function loadMenusView() {
 
       return [
         '<div class="x-product-card-simple" style="background:#f8fafc;">',
-          '<img src="' + img + '" class="x-product-card-thumb" alt="' + esc(p.name) + '">',
+          '<img src="' + img + '" class="x-product-card-thumb" alt="' + esc(p.name || p.title) + '">',
           '<div class="x-product-card-content">',
-            '<h5>' + esc(p.name) + '</h5>',
+            '<h5>' + esc(p.name || p.title) + '</h5>',
             '<div style="margin:4px 0;">' + modeBadge + '</div>',
-            '<div class="x-product-card-price">Harga Dasar Master: ' + formatMoney(p.price) + '</div>',
+            '<div class="x-product-card-price">Harga Dasar Master: ' + formatMoney(p.selling_price || p.price) + '</div>',
             '<div class="x-product-card-actions">',
-              '<button type="button" class="x-btn-primary" style="padding:6px 12px;font-size:12px;" onclick="openAdoptModal(\'' + p.id + '\')">＋ Adopsi ke Cabang</button>',
+              '<button type="button" class="x-btn-primary" style="padding:6px 12px;font-size:12px;" onclick="openAdoptModal(\'' + esc(menuId) + '\')">＋ Adopsi ke Cabang</button>',
             '</div>',
           '</div>',
         '</div>'
