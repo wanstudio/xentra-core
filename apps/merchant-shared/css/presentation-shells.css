@@ -105,6 +105,15 @@
   padding-right: var(--x-sheet-gutter, 20px);
 }
 
+/* Konten master-inline (quick-create Product/Menu/Category/Sub Category/Rasa dan
+   sheet input lain) memakai gutter sheet yang sama dengan header/footer. Tanpa
+   ini isinya menempel ke sisi sheet, dan action bar sticky-nya (yang memakai
+   margin -16px untuk melebar penuh) justru keluar dari sheet di mobile. */
+.x-presentation-surface > :not(.x-modal-card) > .x-master-inline-sheet-content {
+  padding-left: var(--x-sheet-gutter, 20px);
+  padding-right: var(--x-sheet-gutter, 20px);
+}
+
 /* Blok judul header dibiarkan menyusut supaya judul panjang tidak meluber. */
 .x-presentation-surface > :not(.x-modal-card) > .x-modal-header > div {
   min-width: 0;

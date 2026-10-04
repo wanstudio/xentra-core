@@ -27,17 +27,28 @@
   function requestBranchTextInput(options) {
     options = options || {};
     return new Promise(function(resolve) {
+      // Isi sheet memakai pola reusable .x-master-inline-*; tidak ada CSS inline
+      // yang ditulis JavaScript.
       var wrap = document.createElement('div');
+      wrap.className = 'x-master-inline-sheet-content';
       wrap.innerHTML =
-        '<div style="padding:4px 0;">' +
-          '<label style="display:block;font-size:12px;font-weight:700;margin-bottom:7px;">' + esc(options.label || 'Nama') + '</label>' +
-          '<input id="x-branch-text-input" class="x-input" type="text" value="' + esc(options.value || '') + '" autocomplete="off">' +
-          '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;">' +
+        '<div class="x-master-inline-sheet">' +
+          '<div class="x-master-inline-sheet-intro">' +
+            '<strong>' + esc(options.title || 'Input') + '</strong>' +
+            (options.description ? '<p>' + esc(options.description) + '</p>' : '') +
+          '</div>' +
+          '<div class="x-master-inline-sheet-fields">' +
+            '<div class="x-master-inline-field">' +
+              '<label for="x-branch-text-input">' + esc(options.label || 'Nama') + '</label>' +
+              '<input id="x-branch-text-input" class="x-input" type="text" value="' + esc(options.value || '') + '" autocomplete="off">' +
+              (options.help ? '<small>' + esc(options.help) + '</small>' : '') +
+            '</div>' +
+          '</div>' +
+          '<div class="x-master-inline-sheet-actions">' +
             '<button type="button" class="x-btn-secondary" data-action="cancel">Batal</button>' +
             '<button type="button" class="x-btn-primary" data-action="save">Simpan</button>' +
           '</div>' +
         '</div>';
-      var content = wrap.firstElementChild;
       var field = wrap.querySelector('#x-branch-text-input');
       var done = false;
       function finish(value) {
@@ -53,7 +64,7 @@
           id: 'branch-category-input',
           type: 'bottom-sheet',
           title: options.title || 'Input',
-          content: content,
+          content: wrap,
           dismissible: true,
           onClose: function () { if (!done) { done = true; resolve(null); } }
         });

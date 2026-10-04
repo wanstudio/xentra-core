@@ -557,28 +557,35 @@
       return;
     }
 
+    // Isi sheet memakai pola reusable .x-master-inline-*; tidak ada CSS inline
+    // yang ditulis JavaScript.
     var wrap = document.createElement('div');
+    wrap.className = 'x-master-inline-sheet-content';
     wrap.innerHTML =
-      '<div style="padding:4px 0;">' +
-        '<div style="font-size:12px;color:#64748b;margin-bottom:6px;">Nama Master</div>' +
-        '<div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:14px;">' + esc(masterName) + '</div>' +
-        '<label for="bm-display-name-input" style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:7px;">Nama yang tampil ke customer</label>' +
-        '<input id="bm-display-name-input" class="x-input" type="text" value="' + esc(currentOverride) + '" maxlength="100" autocomplete="off">' +
-        '<div style="font-size:11px;color:#64748b;margin-top:7px;">Kosongkan untuk otomatis mengikuti nama Master.</div>' +
-        '<div style="font-size:11px;color:#94a3b8;margin-top:4px;">Saat override diisi, nama ini menggantikan judul Customer untuk cabang ini saja.</div>' +
-        '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">' +
+      '<div class="x-master-inline-sheet">' +
+        '<div class="x-master-inline-sheet-intro">' +
+          '<strong>Nama Tampil Customer</strong>' +
+          '<p>Master: ' + esc(masterName) + '</p>' +
+        '</div>' +
+        '<div class="x-master-inline-sheet-fields">' +
+          '<div class="x-master-inline-field">' +
+            '<label for="bm-display-name-input">Nama yang tampil ke customer</label>' +
+            '<input id="bm-display-name-input" class="x-input" type="text" value="' + esc(currentOverride) + '" maxlength="100" autocomplete="off">' +
+            '<small>Kosongkan untuk otomatis mengikuti nama Master. Saat override diisi, nama ini menggantikan judul Customer untuk cabang ini saja.</small>' +
+          '</div>' +
+        '</div>' +
+        '<div class="x-master-inline-sheet-actions">' +
           '<button type="button" class="x-btn-secondary" data-action="cancel">Batal</button>' +
           '<button type="button" class="x-btn-primary" data-action="save">Simpan</button>' +
         '</div>' +
       '</div>';
-    var content = wrap.firstElementChild;
     var field = wrap.querySelector('#bm-display-name-input');
 
     window.XentraPresentation.open({
       id: 'merchant-menu-display-name',
       type: 'bottom-sheet',
       title: 'Nama Tampil Customer',
-      content: content,
+      content: wrap,
       dismissible: true
     });
 
