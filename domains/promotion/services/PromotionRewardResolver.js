@@ -38,15 +38,6 @@ function assertCanonicalMenu(menu) {
   if (components.some(component => component.product_is_active === false || component.product_is_active === 0)) {
     throw new Error('REWARD_MENU_COMPONENT_UNAVAILABLE');
   }
-  if (menu.menu_type === 'SINGLE' && (
-    components.length !== 1 || Number(components[0].quantity) !== 1
-  )) {
-    throw new Error('REWARD_MENU_COMPOSITION_INVALID');
-  }
-  if (menu.menu_type === 'PACKAGE') {
-    const totalUnits = components.reduce((sum, component) => sum + Number(component.quantity || 0), 0);
-    if (totalUnits < 2) throw new Error('REWARD_MENU_COMPOSITION_INVALID');
-  }
 }
 
 class PromotionRewardResolver {
@@ -110,7 +101,6 @@ class PromotionRewardResolver {
     return {
       source: 'menu',
       menu_id: menu.menu_id || menu.id,
-      menu_type: menu.menu_type,
       // order_items.product_id is still NOT NULL for compatibility. For a package,
       // store the first component only as a compatibility pointer; it is never the
       // commercial package identity and must never drive package stock deduction.
@@ -122,12 +112,10 @@ class PromotionRewardResolver {
         schema_version: 'xentra-menu-reward-v1',
         captured_at: new Date().toISOString(),
         menu_id: menu.menu_id || menu.id,
-        menu_type: menu.menu_type,
         title: menu.title || '',
         subtitle: menu.subtitle || null,
         price: Number(menu.price || 0),
         category: menu.category || null,
-        sub_category: menu.sub_category || null,
         rasa: menu.rasa || null,
         level: menu.level || null
       },
@@ -147,7 +135,6 @@ class PromotionRewardResolver {
       return {
         source: 'legacy_product',
         menu_id: null,
-        menu_type: null,
         product_id: String(productId),
         name: product.name || 'Hadiah Promo',
         image_url: product.image_url || '',
