@@ -88,7 +88,6 @@ module.exports = function registerAdminMarketingPromotionRoutes(router, deps) {
             target_menu_title: rewardTarget && rewardTarget.menu_snapshot
               ? rewardTarget.menu_snapshot.title
               : (rewardTarget && rewardTarget.name) || null,
-            target_menu_type: rewardTarget ? rewardTarget.menu_type : null,
             presentation: pres,
             presentation_delivery: delivery
           };
