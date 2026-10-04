@@ -204,6 +204,12 @@ class ComposedProductService {
     });
   }
 
+  static findProduct({ brandId, productId }) {
+    ensureSchema();
+    if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
+    return repository.findProduct({ brandId, productId });
+  }
+
   static listProducts({ brandId, activeOnly = true, query = null }) {
     ensureSchema();
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
