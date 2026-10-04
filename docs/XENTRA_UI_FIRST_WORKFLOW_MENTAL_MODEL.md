@@ -270,7 +270,14 @@ The change is the **order in which we solve the problem**:
 
 > **First make the experience make sense. Then make the system support it.**
 
-## 13. Final Rule
+## 13. Canonical Notion Decision
+
+Notion source of truth / working decision:
+https://app.notion.com/p/3ef1ae1e12b18171b95bc8bbc301440e
+
+Git remains the repository source of truth for the file itself. The Notion page preserves the product/process decision in the Xentra documentation workspace.
+
+## 14. Final Rule
 
 > **For user-facing work: UI → UX behavior → UX contract → backend contract → backend → wiring → tests.**
 
