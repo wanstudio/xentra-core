@@ -163,10 +163,10 @@ class ComposedMenuRepository {
     );
   }
 
-  createMenu({ id, brandId, categoryId, titleId, rasaId = null, levelId = null, sellingPrice, status }) {
+  createMenu({ id, brandId, categoryId, titleId, rasaId = null, levelId = null, sellingPrice, status, displayName = null }) {
     return this.db.execute(
-      "INSERT INTO menus (id, brand_id, category_id, title_id, rasa_id, level_id, selling_price, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-      [id, brandId, categoryId, titleId, rasaId, levelId, sellingPrice, status]
+      "INSERT INTO menus (id, brand_id, menu_type, display_name, category_id, title_id, sub_category_id, rasa_id, level_id, package_name, selling_price, status) VALUES (?, ?, 'SINGLE', ?, ?, ?, NULL, ?, ?, NULL, ?, ?)",
+      [id, brandId, displayName, categoryId, titleId, rasaId, levelId, sellingPrice, status]
     );
   }
 
