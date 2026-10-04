@@ -160,7 +160,10 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
         rasaId: body.rasa_id,
         levelId: body.level_id,
         sellingPrice: body.selling_price,
-        status: body.status
+        status: body.status,
+        mediaId: body.media_id,
+        imageUrl: body.image_url,
+        image: body.image
       });
       res.status(201).json({ success: true, menu });
     } catch (err) {
@@ -179,7 +182,10 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
         rasaId: body.rasa_id,
         levelId: body.level_id,
         sellingPrice: body.selling_price,
-        status: body.status
+        status: body.status,
+        mediaId: body.media_id,
+        imageUrl: body.image_url,
+        image: body.image
       });
       res.json({ success: true, menu });
     } catch (err) {
@@ -198,7 +204,10 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
         rasaId: body.rasa_id,
         levelId: body.level_id,
         components: body.components,
-        status: body.status
+        status: body.status,
+        mediaId: body.media_id,
+        imageUrl: body.image_url,
+        image: body.image
       });
       res.status(201).json({ success: true, menu });
     } catch (err) {
@@ -218,7 +227,10 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
         rasaId: body.rasa_id,
         levelId: body.level_id,
         components: body.components,
-        status: body.status
+        status: body.status,
+        mediaId: body.media_id,
+        imageUrl: body.image_url,
+        image: body.image
       });
       res.json({ success: true, menu });
     } catch (err) {
