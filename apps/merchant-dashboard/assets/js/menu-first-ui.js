@@ -86,7 +86,7 @@ async function save(status){
  if(!titleId)return toast('❌ Judul wajib dipilih.');
  if(!components.length)return toast('❌ Minimal satu Item wajib dimasukkan.');
  if(components.some(function(x){return !Number.isSafeInteger(x.quantity)||x.quantity<1}))return toast('❌ Quantity Item tidak valid.');
- var body={category_id:categoryId,title_id:titleId,rasa_id:$('cm-rasa').value||null,spice_level:$('cm-spice-enabled').checked?Number($('cm-spice-level').value||0):null,selling_price:Number($('cm-price').value||0),status:status,components:components};
+ var body={category_id:categoryId,title_id:titleId,rasa_id:$('cm-rasa').value||null,spice_level:Number($('cm-spice-level').value||0),spice_enabled:$('cm-spice-enabled').checked,selling_price:Number($('cm-price').value||0),status:status,components:components};
  try{
    var d=await api(state.editingId?('/admin/menus/'+encodeURIComponent(state.editingId)):('/admin/menus'),{method:state.editingId?'PUT':'POST',body:JSON.stringify(body)});
    toast('✓ Menu tersimpan');state.editingId=(d.menu||{}).id||state.editingId;await loadMenus();showList();
@@ -104,7 +104,7 @@ function renderList(){
 async function editMenu(id){
  try{
   var d=await api('/admin/menus/'+encodeURIComponent(id));var m=d.menu||{};state.editingId=id;
-  $('cm-category').value=m.category_id||'';$('cm-sub-category').value=m.title_id||'';$('cm-rasa').value=m.rasa_id||'';setSpiceEnabled(m.spice_level!==null&&m.spice_level!==undefined,m.spice_level);$('cm-price').value=m.selling_price||0;$('cm-status').value=m.status||'DRAFT';
+  $('cm-category').value=m.category_id||'';$('cm-sub-category').value=m.title_id||'';$('cm-rasa').value=m.rasa_id||'';setSpiceEnabled(Boolean(m.spice_enabled),m.spice_level);$('cm-price').value=m.selling_price||0;$('cm-status').value=m.status||'DRAFT';
   state.components=(m.components||[]).map(function(x){return{product_id:x.product_id,quantity:Number(x.quantity||1)}});if(!state.components.length)state.components=[{product_id:'',quantity:1}];renderComponents();
   var t=$('master-menu-editor-title');if(t)t.textContent='Edit Menu';var mt=$('master-menu-editor-mobile-title');if(mt)mt.textContent='Edit Menu';showEditor();
  }catch(e){toast('❌ '+e.message)}
