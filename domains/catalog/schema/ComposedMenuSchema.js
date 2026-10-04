@@ -35,8 +35,8 @@ function ensureComposedMenuSchema(db) {
     db.exec('ALTER TABLE products ADD COLUMN sku TEXT;');
   }
 
-  if (!hasColumn(db, 'menus', 'display_name')) {
-    try { db.exec('ALTER TABLE menus ADD COLUMN display_name TEXT;'); } catch (_) {}
+  if (!hasColumn(db, 'menus', 'title_id')) {
+    try { db.exec('ALTER TABLE menus ADD COLUMN title_id TEXT;'); } catch (_) {}
   }
   if (!hasColumn(db, 'menus', 'category_id')) {
     try { db.exec('ALTER TABLE menus ADD COLUMN category_id TEXT;'); } catch (_) {}
@@ -101,97 +101,75 @@ function ensureComposedMenuSchema(db) {
       SELECT RAISE(ABORT, 'SUB_CATEGORY_CROSS_BRAND');
     END;
 
+    CREATE TABLE IF NOT EXISTS menu_titles (
+      id TEXT PRIMARY KEY,
+      brand_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_menu_titles_brand_name_normalized
+      ON menu_titles(brand_id, lower(trim(name)));
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_menu_titles_brand_slug
+      ON menu_titles(brand_id, slug);
+
     CREATE TABLE IF NOT EXISTS menus (
       id TEXT PRIMARY KEY,
       brand_id TEXT NOT NULL,
-      menu_type TEXT NOT NULL CHECK (menu_type IN ('SINGLE', 'PACKAGE')),
-      display_name TEXT,
-      category_id TEXT,
-      sub_category_id TEXT,
+      category_id TEXT NOT NULL,
+      title_id TEXT NOT NULL,
       rasa_id TEXT,
       level_id TEXT,
-      package_name TEXT,
       selling_price REAL NOT NULL CHECK (selling_price >= 0),
       status TEXT NOT NULL DEFAULT 'DRAFT',
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
       FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE RESTRICT,
-      FOREIGN KEY (sub_category_id) REFERENCES sub_categories(id) ON DELETE RESTRICT,
+      FOREIGN KEY (title_id) REFERENCES menu_titles(id) ON DELETE RESTRICT,
       FOREIGN KEY (rasa_id) REFERENCES menu_flavors(id) ON DELETE RESTRICT,
-      FOREIGN KEY (level_id) REFERENCES menu_levels(id) ON DELETE RESTRICT,
-      CHECK (
-        (menu_type = 'SINGLE'
-          AND display_name IS NOT NULL
-          AND trim(display_name) <> ''
-          AND category_id IS NOT NULL
-          AND package_name IS NULL)
-        OR
-        (menu_type = 'PACKAGE'
-          AND package_name IS NOT NULL
-          AND trim(package_name) <> '')
-      )
+      FOREIGN KEY (level_id) REFERENCES menu_levels(id) ON DELETE RESTRICT
     );
 
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_menus_single_identity
-      ON menus(brand_id, sub_category_id, rasa_id)
-      WHERE menu_type = 'SINGLE' AND sub_category_id IS NOT NULL AND rasa_id IS NOT NULL;
-
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_menus_single_display_name_category
-      ON menus(brand_id, category_id, lower(trim(display_name)))
-      WHERE menu_type = 'SINGLE' AND category_id IS NOT NULL AND display_name IS NOT NULL AND trim(display_name) <> '';
-
-    CREATE INDEX IF NOT EXISTS idx_menus_brand_type_status
-      ON menus(brand_id, menu_type, status);
-
-    CREATE INDEX IF NOT EXISTS idx_menus_brand_sub_category
-      ON menus(brand_id, sub_category_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_menus_identity
+      ON menus(brand_id, category_id, title_id, COALESCE(rasa_id, ''));
 
     CREATE INDEX IF NOT EXISTS idx_menus_brand_category
       ON menus(brand_id, category_id);
+
+    CREATE INDEX IF NOT EXISTS idx_menus_brand_title
+      ON menus(brand_id, title_id);
 
     CREATE TRIGGER IF NOT EXISTS trg_menus_brand_consistency_insert
     BEFORE INSERT ON menus
     FOR EACH ROW
     WHEN
-      (NEW.category_id IS NOT NULL AND
-       ((SELECT brand_id FROM categories WHERE id = NEW.category_id) IS NULL OR
-        (SELECT brand_id FROM categories WHERE id = NEW.category_id) <> NEW.brand_id))
-      OR
-      (NEW.sub_category_id IS NOT NULL AND
-       ((SELECT brand_id FROM sub_categories WHERE id = NEW.sub_category_id) IS NULL OR
-        (SELECT brand_id FROM sub_categories WHERE id = NEW.sub_category_id) <> NEW.brand_id))
-      OR
-      (NEW.rasa_id IS NOT NULL AND
-       ((SELECT brand_id FROM menu_flavors WHERE id = NEW.rasa_id) IS NULL OR
-        (SELECT brand_id FROM menu_flavors WHERE id = NEW.rasa_id) <> NEW.brand_id))
-      OR
-      (NEW.level_id IS NOT NULL AND
-       ((SELECT brand_id FROM menu_levels WHERE id = NEW.level_id) IS NULL OR
-        (SELECT brand_id FROM menu_levels WHERE id = NEW.level_id) <> NEW.brand_id))
+      (SELECT brand_id FROM categories WHERE id = NEW.category_id) IS NULL
+      OR (SELECT brand_id FROM categories WHERE id = NEW.category_id) <> NEW.brand_id
+      OR (SELECT brand_id FROM menu_titles WHERE id = NEW.title_id) IS NULL
+      OR (SELECT brand_id FROM menu_titles WHERE id = NEW.title_id) <> NEW.brand_id
+      OR (NEW.rasa_id IS NOT NULL AND ((SELECT brand_id FROM menu_flavors WHERE id = NEW.rasa_id) IS NULL OR (SELECT brand_id FROM menu_flavors WHERE id = NEW.rasa_id) <> NEW.brand_id))
+      OR (NEW.level_id IS NOT NULL AND ((SELECT brand_id FROM menu_levels WHERE id = NEW.level_id) IS NULL OR (SELECT brand_id FROM menu_levels WHERE id = NEW.level_id) <> NEW.brand_id))
     BEGIN
       SELECT RAISE(ABORT, 'MENU_CROSS_BRAND');
     END;
 
     CREATE TRIGGER IF NOT EXISTS trg_menus_brand_consistency_update
-    BEFORE UPDATE OF brand_id, sub_category_id, rasa_id, level_id ON menus
+    BEFORE UPDATE OF brand_id, category_id, title_id, rasa_id, level_id ON menus
     FOR EACH ROW
     WHEN
-      (NEW.category_id IS NOT NULL AND
-       ((SELECT brand_id FROM categories WHERE id = NEW.category_id) IS NULL OR
-        (SELECT brand_id FROM categories WHERE id = NEW.category_id) <> NEW.brand_id))
-      OR
-      (NEW.sub_category_id IS NOT NULL AND
-       ((SELECT brand_id FROM sub_categories WHERE id = NEW.sub_category_id) IS NULL OR
-        (SELECT brand_id FROM sub_categories WHERE id = NEW.sub_category_id) <> NEW.brand_id))
-      OR
-      (NEW.rasa_id IS NOT NULL AND
-       ((SELECT brand_id FROM menu_flavors WHERE id = NEW.rasa_id) IS NULL OR
-        (SELECT brand_id FROM menu_flavors WHERE id = NEW.rasa_id) <> NEW.brand_id))
-      OR
-      (NEW.level_id IS NOT NULL AND
-       ((SELECT brand_id FROM menu_levels WHERE id = NEW.level_id) IS NULL OR
-        (SELECT brand_id FROM menu_levels WHERE id = NEW.level_id) <> NEW.brand_id))
+      (SELECT brand_id FROM categories WHERE id = NEW.category_id) IS NULL
+      OR (SELECT brand_id FROM categories WHERE id = NEW.category_id) <> NEW.brand_id
+      OR (SELECT brand_id FROM menu_titles WHERE id = NEW.title_id) IS NULL
+      OR (SELECT brand_id FROM menu_titles WHERE id = NEW.title_id) <> NEW.brand_id
+      OR (NEW.rasa_id IS NOT NULL AND ((SELECT brand_id FROM menu_flavors WHERE id = NEW.rasa_id) IS NULL OR (SELECT brand_id FROM menu_flavors WHERE id = NEW.rasa_id) <> NEW.brand_id))
+      OR (NEW.level_id IS NOT NULL AND ((SELECT brand_id FROM menu_levels WHERE id = NEW.level_id) IS NULL OR (SELECT brand_id FROM menu_levels WHERE id = NEW.level_id) <> NEW.brand_id))
     BEGIN
       SELECT RAISE(ABORT, 'MENU_CROSS_BRAND');
     END;
