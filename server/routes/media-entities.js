@@ -287,6 +287,86 @@ router.delete('/admin/media/entity/products/:productId/image',
   }
 );
 
+// ---- Master Menu Image (canonical customer-facing presentation) ----
+
+router.post('/admin/media/entity/menus/:menuId/image',
+  requireAuth(['owner', 'brand_manager']),
+  async (req, res) => {
+    try {
+      const menu = db.prepare('SELECT id, media_id FROM menus WHERE id = ? AND brand_id = ?')
+        .get(req.params.menuId, req.brand_id);
+      if (!menu) return res.status(404).json({ success: false, error: 'Menu tidak ditemukan.', code: 'MENU_NOT_FOUND' });
+
+      const { image_base64, mime_type, original_filename, crop_spec } = req.body || {};
+      if (!image_base64) {
+        return res.status(400).json({ success: false, error: 'Data gambar Menu wajib diunggah.', code: 'MISSING_IMAGE_DATA' });
+      }
+
+      const oldMediaId = menu.media_id || null;
+      const asset = await runEntityMediaPipeline({
+        brandId: req.brand_id,
+        tenantId: req.brand ? req.brand.organization_id : null,
+        userId: req.user ? req.user.id : null,
+        imageBase64: image_base64,
+        mimeType: mime_type,
+        originalFilename: original_filename,
+        assetType: 'menu',
+        cropSpec: crop_spec || null
+      });
+
+      await mediaService.attachToEntity({
+        mediaId: asset.media_id,
+        brandId: req.brand_id,
+        entityType: 'menu',
+        entityId: String(req.params.menuId)
+      });
+
+      if (oldMediaId && oldMediaId !== asset.media_id) {
+        await mediaService.unlinkMedia({ mediaId: oldMediaId, brandId: req.brand_id }).catch(() => {});
+      }
+
+      const previewUrl = resolvePreviewUrl(asset, 320);
+      db.prepare("UPDATE menus SET media_id = ?, image_url = ?, image = ?, updated_at = datetime('now') WHERE id = ? AND brand_id = ?")
+        .run(asset.media_id, previewUrl || asset.url, previewUrl || asset.url, req.params.menuId, req.brand_id);
+
+      res.status(201).json({
+        success: true,
+        message: 'Gambar Menu berhasil diproses dan dikaitkan.',
+        asset,
+        preview_url: previewUrl,
+        menu: { id: req.params.menuId, media_id: asset.media_id, image_url: previewUrl || asset.url }
+      });
+    } catch (err) {
+      const statusCode = err.code === 'UNAUTHORIZED_TENANT' ? 403 : (err.code === 'MENU_NOT_FOUND' ? 404 : 400);
+      console.error('[M5 POST /admin/media/entity/menus/:menuId/image]:', err.message);
+      res.status(statusCode).json({ success: false, error: err.message, code: err.code || 'MENU_IMAGE_UPLOAD_ERROR' });
+    }
+  }
+);
+
+router.delete('/admin/media/entity/menus/:menuId/image',
+  requireAuth(['owner', 'brand_manager']),
+  async (req, res) => {
+    try {
+      const menu = db.prepare('SELECT id, media_id FROM menus WHERE id = ? AND brand_id = ?')
+        .get(req.params.menuId, req.brand_id);
+      if (!menu) return res.status(404).json({ success: false, error: 'Menu tidak ditemukan.', code: 'MENU_NOT_FOUND' });
+
+      if (menu.media_id) {
+        await mediaService.unlinkMedia({ mediaId: menu.media_id, brandId: req.brand_id }).catch(() => {});
+      }
+      db.prepare("UPDATE menus SET media_id = NULL, image_url = NULL, image = NULL, updated_at = datetime('now') WHERE id = ? AND brand_id = ?")
+        .run(req.params.menuId, req.brand_id);
+
+      res.json({ success: true, menu: { id: req.params.menuId, media_id: null, image_url: null, image: null } });
+    } catch (err) {
+      const statusCode = err.code === 'UNAUTHORIZED_TENANT' ? 403 : 400;
+      console.error('[M5 DELETE /admin/media/entity/menus/:menuId/image]:', err.message);
+      res.status(statusCode).json({ success: false, error: err.message, code: err.code || 'MENU_IMAGE_DELETE_ERROR' });
+    }
+  }
+);
+
 // ---- Master Category Image (M5 canonical) ----
 
 /**
