@@ -1,7 +1,7 @@
 /*
  * XENTRA — OWNER MASTER MENU
  * Locked Menu Domain v2
- * Category + Judul + optional Rasa + Product composition.
+ * Category + Judul + optional Rasa + Item composition.
  */
 (function(){'use strict';
 var S=window.XentraShared||{},API_BASE=S.API_BASE||'/api/v1';
@@ -11,26 +11,49 @@ function fetcher(url,opt){return typeof S.adminFetch==='function'?S.adminFetch(u
 function headers(){return typeof S.getAuthHeaders==='function'?S.getAuthHeaders({'Content-Type':'application/json'}):{'Content-Type':'application/json'}}
 async function api(path,opt){var r=await fetcher(API_BASE+path,Object.assign({headers:headers()},opt||{}));var d=await r.json();if(!r.ok||!d.success)throw new Error(d.error||d.message||'Request gagal');return d}
 function toast(m){if(S.showToast)S.showToast(m);else if(window.showToast)window.showToast(m)}
-var state={categories:[],titles:[],rasas:[],levels:[],products:[],menus:[],components:[],editingId:null};
+var state={categories:[],titles:[],rasas:[],levels:[],products:[],menus:[],recommendationMenus:[],components:[],editingId:null};
 
 function optionRows(rows,selected,placeholder){var h='<option value="">'+esc(placeholder||'Pilih')+'</option>';(rows||[]).forEach(function(r){h+='<option value="'+esc(r.id)+'"'+(String(r.id)===String(selected||'')?' selected':'')+'>'+esc(r.name)+'</option>'});return h}
 async function loadMasters(){
  var rs=await Promise.all([
    api('/admin/categories?active_only=1'),api('/admin/titles?active_only=1'),api('/admin/rasas?active_only=1'),
-   api('/admin/levels?active_only=1'),api('/admin/composed/products?active_only=1')
+   api('/admin/levels?active_only=1'),api('/admin/composed/products?active_only=1'),api('/admin/menus')
  ]);
  state.categories=rs[0].categories||[];state.titles=rs[1].titles||[];state.rasas=rs[2].rasas||[];state.levels=rs[3].levels||[];state.products=rs[4].products||[];
+ state.recommendationMenus=rs[5].menus||[];
  renderMasterSelects();
+}
+function recommendedTitleIds(categoryId){
+ var seen={},ids=[];if(!categoryId)return ids;
+ state.recommendationMenus.forEach(function(m){
+   if(String(m.category_id||'')!==String(categoryId))return;
+   var id=String(m.title_id||'');if(id&&!seen[id]){seen[id]=1;ids.push(id);}
+ });
+ return ids;
+}
+function renderTitleOptions(selected,categoryId){
+ var recommended=recommendedTitleIds(categoryId),recSet={};recommended.forEach(function(id){recSet[id]=1;});
+ var rows=state.titles.filter(function(t){return !categoryId||recSet[String(t.id)];});
+ var html='<option value="">Pilih Judul</option>';
+ if(recommended.length){
+   html+='<option value="" disabled>— Rekomendasi untuk kategori ini —</option>';
+   recommended.forEach(function(id){var t=state.titles.find(function(x){return String(x.id)===id;});if(t)html+='<option value="'+esc(t.id)+'"'+(String(t.id)===String(selected||'')?' selected':'')+'>'+esc(t.name)+'</option>';});
+   var others=state.titles.filter(function(t){return !recSet[String(t.id)];});
+   if(others.length){html+='<option value="" disabled>— Judul lainnya —</option>';others.forEach(function(t){html+='<option value="'+esc(t.id)+'"'+(String(t.id)===String(selected||'')?' selected':'')+'>'+esc(t.name)+'</option>';});}
+ } else {
+   state.titles.forEach(function(t){html+='<option value="'+esc(t.id)+'"'+(String(t.id)===String(selected||'')?' selected':'')+'>'+esc(t.name)+'</option>';});
+ }
+ return html;
 }
 function renderMasterSelects(){
  var c=$('cm-category'),t=$('cm-sub-category'),r=$('cm-rasa'),l=$('cm-level');
  if(c)c.innerHTML=optionRows(state.categories,c.value,'Pilih Kategori');
- if(t)t.innerHTML=optionRows(state.titles,t.value,'Pilih Judul');
+ if(t)t.innerHTML=renderTitleOptions(t.value,c&&c.value);
  if(r)r.innerHTML=optionRows(state.rasas,r.value,'Tidak ada rasa');
  if(l)l.innerHTML=optionRows(state.levels,l.value,'Tidak ada level');
  renderComponents();
 }
-function productOptions(selected){return optionRows(state.products,selected,'Pilih Product')}
+function productOptions(selected){return optionRows(state.products,selected,'Pilih Item')}
 function renderComponents(){
  var wrap=$('cm-package-components');if(!wrap)return;
  if(!state.components.length)state.components=[{product_id:'',quantity:1}];
@@ -61,8 +84,8 @@ async function save(status){
  var components=readComponents();
  if(!categoryId)return toast('❌ Kategori wajib dipilih.');
  if(!titleId)return toast('❌ Judul wajib dipilih.');
- if(!components.length)return toast('❌ Minimal satu Product wajib dimasukkan.');
- if(components.some(function(x){return !Number.isSafeInteger(x.quantity)||x.quantity<1}))return toast('❌ Quantity Product tidak valid.');
+ if(!components.length)return toast('❌ Minimal satu Item wajib dimasukkan.');
+ if(components.some(function(x){return !Number.isSafeInteger(x.quantity)||x.quantity<1}))return toast('❌ Quantity Item tidak valid.');
  var body={category_id:categoryId,title_id:titleId,rasa_id:$('cm-rasa').value||null,level_id:$('cm-level').value||null,selling_price:Number($('cm-price').value||0),status:status,components:components};
  try{
    var d=await api(state.editingId?('/admin/menus/'+encodeURIComponent(state.editingId)):('/admin/menus'),{method:state.editingId?'PUT':'POST',body:JSON.stringify(body)});
@@ -70,7 +93,7 @@ async function save(status){
  }catch(e){toast('❌ '+e.message)}
 }
 async function loadMenus(){
- var d=await api('/admin/menus?status=ACTIVE');state.menus=d.menus||[];renderList();
+ var d=await api('/admin/menus?status=ACTIVE');state.menus=(d.menus||[]).filter(function(m){return String(m.status||'').toUpperCase()==='ACTIVE';});state.recommendationMenus=d.menus||state.recommendationMenus;renderList();
 }
 function renderList(){
  var wrap=$('master-menu-list');if(!wrap)return;
@@ -95,7 +118,8 @@ function bind(){
  if($('btn-save-master-menu-active'))$('btn-save-master-menu-active').addEventListener('click',function(){save('ACTIVE')});
  if($('btn-cancel-master-menu'))$('btn-cancel-master-menu').addEventListener('click',showList);
  if($('btn-master-menu-editor-back'))$('btn-master-menu-editor-back').addEventListener('click',showList);
- ['cm-category','cm-sub-category','cm-rasa','cm-level','cm-price'].forEach(function(id){if($(id))$(id).addEventListener('change',updatePreview);});
+ ['cm-category','cm-rasa','cm-level','cm-price'].forEach(function(id){if($(id))$(id).addEventListener('change',function(){if(id==='cm-category'){var t=$('cm-sub-category');var selected=t?t.value:'';if(t)t.innerHTML=renderTitleOptions(selected,$('cm-category').value);}updatePreview();});});
+ if($('cm-sub-category'))$('cm-sub-category').addEventListener('change',updatePreview);
  loadMasters().then(loadMenus).catch(function(e){console.error(e);toast('❌ Gagal memuat Master Menu')});
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
