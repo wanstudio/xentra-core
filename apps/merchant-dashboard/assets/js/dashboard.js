@@ -3833,7 +3833,7 @@ async function loadMenusView() {
           onClick: function () { openEditMasterReference(type, id); }
         },
         {
-          label: 'Hapus',
+          label: type === 'category' ? 'Arsipkan' : 'Hapus',
           icon: '🗑️',
           destructive: true,
           onClick: function () { deleteMasterReference(type, id); }
