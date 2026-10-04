@@ -2590,9 +2590,9 @@
     var noun = referenceTypeLabel(type).toLowerCase();
     if (window.XentraPresentation && !await window.XentraPresentation.confirm({
       id: 'delete-master-reference',
-      title: 'Hapus ' + referenceTypeLabel(type),
-      message: 'Hapus ' + noun + ' "' + row.name + '"? Tindakan ini tidak dapat dibatalkan.',
-      okLabel: 'Hapus',
+      title: 'Arsipkan ' + referenceTypeLabel(type),
+      message: 'Arsipkan ' + noun + ' "' + row.name + '"? Data dan relasinya tetap dipertahankan.',
+      okLabel: 'Arsipkan',
       cancelLabel: 'Batal'
     })) return;
 
@@ -2608,10 +2608,20 @@
       }
 
       if (type === 'category') {
-        state.categories = (state.categories || []).filter(function(item) { return String(item.id) !== String(id); });
+        var updatedCategory = data.category;
+        if (!updatedCategory) throw new Error('Server tidak mengembalikan kategori hasil arsip.');
+        var categoryRows = state.categories || [];
+        var categoryIndex = categoryRows.findIndex(function(item) { return String(item.id) === String(id); });
+        if (categoryIndex >= 0) categoryRows[categoryIndex] = updatedCategory;
+        else categoryRows.push(updatedCategory);
+        state.categories = categoryRows;
         populateProductCategorySelect();
         renderProductCategoryFilterChips();
         renderMasterProductsTable();
+        renderMasterReferenceList(type);
+        renderMasterMenuCustomerPreview();
+        showToast('✅ Kategori diarsipkan.');
+        return;
       } else {
         _masterMenuComponents[type] = (_masterMenuComponents[type] || []).filter(function(item) { return String(item.id) !== String(id); });
         renderMasterMenuSelectors();
