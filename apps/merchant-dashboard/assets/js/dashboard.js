@@ -11614,7 +11614,9 @@ async function loadMenusView() {
           title: 'Potong & Posisikan Foto Menu (1:1)',
           onConfirm: function (cropSpec, previewDataUrl) {
             _ownerMasterMenuCropSpec = cropSpec;
-            setOwnerMasterMenuImagePreview(previewDataUrl || URL.createObjectURL(file), true);
+            _ownerMasterMenuState.imageUrl = previewDataUrl || URL.createObjectURL(file);
+            setOwnerMasterMenuImagePreview(_ownerMasterMenuState.imageUrl, true);
+            renderOwnerMasterMenuPreview();
           },
           onCancel: function () {
             _ownerMasterMenuImageFile = null;
