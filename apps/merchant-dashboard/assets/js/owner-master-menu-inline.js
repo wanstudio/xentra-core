@@ -5,7 +5,7 @@
    * XENTRA OWNER — MASTER MENU INLINE DEPENDENCY CREATION
    *
    * UX boundary:
-   * - Product, Category, Sub Category and Rasa remain separate Master entities.
+   * - Item, Category, Judul and Rasa remain separate Master entities.
    * - Owner can create a missing dependency without leaving Menu Master.
    * - Creation immediately selects the newly-created entity in the current Menu draft.
    * - No legacy Product commercial fields are introduced.
@@ -16,7 +16,7 @@
 
   var API_BASE = (window.XentraShared && window.XentraShared.API_BASE) || '/api/v1';
   var shared = window.XentraShared || {};
-  var createdProducts = [];
+  var createdItems = [];
 
   function adminFetch(url, options) {
     if (typeof shared.adminFetch === 'function') return shared.adminFetch(url, options);
@@ -68,16 +68,21 @@
       wrap.innerHTML =
         '<div style="display:flex;flex-direction:column;gap:12px;">' +
           fields.map(function(field, index) {
-            return '<div>' +
-              '<label style="display:block;font-size:12px;font-weight:700;margin-bottom:6px;">' +
-                esc(field.label || field.name) + (field.required === false ? ' <span style="font-weight:400;color:#94a3b8;">(opsional)</span>' : ' <span style="color:#ef4444;">*</span>') +
-              '</label>' +
-              '<input id="' + id + '-field-' + index + '" class="x-input" type="' + esc(field.type || 'text') + '"' +
-                ' value="' + esc(field.value || '') + '"' +
-                ' placeholder="' + esc(field.placeholder || '') + '"' +
-                (field.required === false ? '' : ' required') +
-                (field.inputmode ? ' inputmode="' + esc(field.inputmode) + '"' : '') +
-              '>' +
+            return '<div data-inline-field-wrap="' + esc(field.name) + '">' +
+              (field.kind === 'checkbox' ?
+                '<label class="x-checkbox-label" style="display:flex;align-items:center;gap:8px;">' +
+                  '<input id="' + id + '-field-' + index + '" type="checkbox"' + (field.checked ? ' checked' : '') + '>' +
+                  '<span>' + esc(field.label || field.name) + '</span>' +
+                '</label>' :
+                '<label style="display:block;font-size:12px;font-weight:700;margin-bottom:6px;">' +
+                  esc(field.label || field.name) + (field.required === false ? ' <span style="font-weight:400;color:#94a3b8;">(opsional)</span>' : ' <span style="color:#ef4444;">*</span>') +
+                '</label>' +
+                '<input id="' + id + '-field-' + index + '" class="x-input" type="' + esc(field.type || 'text') + '"' +
+                  ' value="' + esc(field.value || '') + '"' +
+                  ' placeholder="' + esc(field.placeholder || '') + '"' +
+                  (field.required === false ? '' : ' required') +
+                  (field.inputmode ? ' inputmode="' + esc(field.inputmode) + '"' : '') +
+                '>') +
             '</div>';
           }).join('') +
           '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px;">' +
@@ -103,8 +108,8 @@
         var invalid = false;
         fields.forEach(function(field, index) {
           var el = wrap.querySelector('#' + id + '-field-' + index);
-          var value = el ? String(el.value || '').trim() : '';
-          if (field.required !== false && !value) {
+          var value = field.kind === 'checkbox' ? !!(el && el.checked) : (el ? String(el.value || '').trim() : '');
+          if (field.kind !== 'checkbox' && field.required !== false && !value) {
             invalid = true;
             if (el) el.focus();
           }
@@ -162,39 +167,41 @@
     select.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
-  async function createProductInline() {
+  async function createItemInline() {
     var result = await requestFieldsSheet({
-      id: 'master-menu-inline-product',
-      title: 'Buat Product Master',
-      saveLabel: 'Simpan & Pilih Product',
+      id: 'master-menu-inline-item',
+      title: 'Buat Item',
+      saveLabel: 'Simpan & Pilih Item',
       fields: [
-        { name: 'name', label: 'Nama Product Internal', placeholder: 'Contoh: Ayam Geprek', required: true },
-        { name: 'sku', label: 'SKU', placeholder: 'Contoh: AYAM-GEP-001', required: false }
+        { name: 'name', label: 'Nama Item', placeholder: 'Contoh: Nasi', required: true },
+        { name: 'stock_managed', label: 'Kelola di Stock', kind: 'checkbox', checked: false },
+        { name: 'sku', label: 'SKU', placeholder: 'Contoh: NASI-001', required: false }
       ]
     });
     if (!result) return;
+    if (result.stock_managed && !result.sku) {
+      toast('❌ SKU wajib diisi jika Kelola di Stock dicentang.');
+      return;
+    }
 
     var data = await requestJson('/admin/composed/products', {
       method: 'POST',
       body: JSON.stringify({
         name: result.name,
-        sku: result.sku || null,
+        sku: result.stock_managed ? result.sku : null,
         is_active: true
       })
     });
 
-    var product = data.product;
-    createdProducts.push(product);
-    var label = product.name + (product.sku ? ' · SKU ' + product.sku : '');
-    addOption(document.getElementById('cm-product'), product.id, label, true);
-
-    document.querySelectorAll('[data-cm-product]').forEach(function(select) {
-      if (select.options.length && !Array.from(select.options).some(function(o) { return String(o.value) === String(product.id); })) {
-        addOption(select, product.id, label, false);
+    var item = data.product;
+    createdItems.push(item);
+    var label = item.name + (item.sku ? ' · SKU ' + item.sku : '');
+    document.querySelectorAll('[data-cm-product], .cm-component-product').forEach(function(select) {
+      if (select.options.length && !Array.from(select.options).some(function(o) { return String(o.value) === String(item.id); })) {
+        addOption(select, item.id, label, false);
       }
     });
-
-    toast('✅ Product dibuat dan langsung dipilih di Menu.');
+    toast('✅ Item dibuat dan tersedia di komposisi Menu.');
   }
 
   async function createCategoryInline() {
@@ -217,36 +224,29 @@
     toast('✅ Kategori dibuat dan langsung dipilih.');
   }
 
-  async function createSubCategoryInline() {
-    var category = document.getElementById('cm-category');
-    var categoryId = category ? String(category.value || '') : '';
-    if (!categoryId) {
-      toast('⚠️ Pilih Kategori terlebih dahulu.');
-      return;
-    }
-
-    var result = await requestFieldsSheet({
-      id: 'master-menu-inline-sub-category',
-      title: 'Buat Sub Category',
-      saveLabel: 'Simpan & Pilih Sub Category',
+  async function createTitleInline() {
+        var result = await requestFieldsSheet({
+      id: 'master-menu-inline-title',
+      title: 'Buat Judul',
+      saveLabel: 'Simpan & Pilih Judul',
       fields: [
-        { name: 'name', label: 'Nama Sub Category', placeholder: 'Contoh: Ayam Geprek', required: true }
+        { name: 'name', label: 'Nama Judul', placeholder: 'Contoh: Udang Sambalado', required: true }
       ]
     });
     if (!result) return;
 
-    var data = await requestJson('/admin/sub-categories', {
+    var data = await requestJson('/admin/titles', {
       method: 'POST',
-      body: JSON.stringify({ category_id: categoryId, name: result.name })
+      body: JSON.stringify({ name: result.name })
     });
-    var sub = data.sub_category;
+    var title = data.title;
 
     var select = document.getElementById('cm-sub-category');
     if (select) {
-      addOption(select, sub.id, sub.name, true);
+      addOption(select, title.id, title.name, true);
     }
 
-    toast('✅ Sub Category dibuat dan langsung dipilih.');
+    toast('✅ Judul dibuat dan langsung dipilih.');
   }
 
   async function createRasaInline() {
@@ -330,18 +330,18 @@
 
   function syncCreatedProductOptions() {
     document.querySelectorAll('[data-cm-product]').forEach(function(select) {
-      createdProducts.forEach(function(product) {
-        var id = String(product.id || '');
+      createdItems.forEach(function(item) {
+        var id = String(item.id || '');
         if (!id || Array.from(select.options).some(function(option) { return String(option.value) === id; })) return;
-        addOption(select, id, product.name + (product.sku ? ' · SKU ' + product.sku : ''), false);
+        addOption(select, id, item.name + (item.sku ? ' · SKU ' + item.sku : ''), false);
       });
     });
   }
 
   function injectQuickCreateControls() {
-    addButtonToFormGroup('cm-product', 'product', 'Product', createProductInline);
+    addButtonToFormGroup('cm-product', 'item', 'Item', createItemInline);
     addButtonToFormGroup('cm-category', 'category', 'Kategori', createCategoryInline);
-    addButtonToFormGroup('cm-sub-category', 'sub-category', 'Sub Category', createSubCategoryInline);
+    addButtonToFormGroup('cm-sub-category', 'title', 'Judul', createTitleInline);
     addButtonToFormGroup('cm-rasa', 'rasa', 'Rasa', createRasaInline);
     syncCreatedProductOptions();
 
@@ -351,12 +351,12 @@
       button.type = 'button';
       button.className = 'x-btn-secondary';
       button.setAttribute('data-inline-master-action', 'package-product');
-      button.textContent = '+ Buat Product';
+      button.textContent = '+ Buat Item';
       button.style.cssText = 'margin-top:8px;padding:8px 12px;font-size:12px;';
       button.addEventListener('click', function() {
-        createProductInline().catch(function(err) {
+        createItemInline().catch(function(err) {
           console.error('[Master Menu Inline]', err);
-          toast('❌ ' + (err.message || 'Gagal membuat Product.'));
+          toast('❌ ' + (err.message || 'Gagal membuat Item.'));
         });
       });
       packageAdd.parentNode.appendChild(button);
@@ -368,8 +368,7 @@
     if (!form) return;
     injectQuickCreateControls();
 
-    var type = document.getElementById('master-menu-type');
-    var observer = new MutationObserver(function() {
+        var observer = new MutationObserver(function() {
       injectQuickCreateControls();
     });
     observer.observe(form, { subtree: true, childList: true });
@@ -377,7 +376,7 @@
     /*
      * Existing dashboard.js initializes the canonical editor and navigation.
      * This layer only adds dependency creation affordances; it never replaces
-     * the save flow or changes Menu/Product ownership.
+     * the save flow or changes Menu/Item ownership.
      */
   }
 
@@ -394,9 +393,9 @@
 
   window.XentraOwnerMasterMenuInline = {
     init: enhanceMasterMenuEditor,
-    createProduct: createProductInline,
+    createItem: createItemInline,
     createCategory: createCategoryInline,
-    createSubCategory: createSubCategoryInline,
+    createTitle: createTitleInline,
     createRasa: createRasaInline
   };
 
