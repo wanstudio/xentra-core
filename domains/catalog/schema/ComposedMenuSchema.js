@@ -35,6 +35,13 @@ function ensureComposedMenuSchema(db) {
     db.exec('ALTER TABLE products ADD COLUMN sku TEXT;');
   }
 
+  if (!hasColumn(db, 'menus', 'display_name')) {
+    try { db.exec('ALTER TABLE menus ADD COLUMN display_name TEXT;'); } catch (_) {}
+  }
+  if (!hasColumn(db, 'menus', 'category_id')) {
+    try { db.exec('ALTER TABLE menus ADD COLUMN category_id TEXT;'); } catch (_) {}
+  }
+
   db.exec(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_products_brand_sku_normalized
       ON products(brand_id, lower(trim(sku)))
@@ -98,6 +105,8 @@ function ensureComposedMenuSchema(db) {
       id TEXT PRIMARY KEY,
       brand_id TEXT NOT NULL,
       menu_type TEXT NOT NULL CHECK (menu_type IN ('SINGLE', 'PACKAGE')),
+      display_name TEXT,
+      category_id TEXT,
       sub_category_id TEXT,
       rasa_id TEXT,
       level_id TEXT,
@@ -107,13 +116,15 @@ function ensureComposedMenuSchema(db) {
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
+      FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE RESTRICT,
       FOREIGN KEY (sub_category_id) REFERENCES sub_categories(id) ON DELETE RESTRICT,
       FOREIGN KEY (rasa_id) REFERENCES menu_flavors(id) ON DELETE RESTRICT,
       FOREIGN KEY (level_id) REFERENCES menu_levels(id) ON DELETE RESTRICT,
       CHECK (
         (menu_type = 'SINGLE'
-          AND sub_category_id IS NOT NULL
-          AND rasa_id IS NOT NULL
+          AND display_name IS NOT NULL
+          AND trim(display_name) <> ''
+          AND category_id IS NOT NULL
           AND package_name IS NULL)
         OR
         (menu_type = 'PACKAGE'
@@ -124,7 +135,11 @@ function ensureComposedMenuSchema(db) {
 
     CREATE UNIQUE INDEX IF NOT EXISTS idx_menus_single_identity
       ON menus(brand_id, sub_category_id, rasa_id)
-      WHERE menu_type = 'SINGLE';
+      WHERE menu_type = 'SINGLE' AND sub_category_id IS NOT NULL AND rasa_id IS NOT NULL;
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_menus_single_display_name_category
+      ON menus(brand_id, category_id, lower(trim(display_name)))
+      WHERE menu_type = 'SINGLE' AND category_id IS NOT NULL AND display_name IS NOT NULL AND trim(display_name) <> '';
 
     CREATE INDEX IF NOT EXISTS idx_menus_brand_type_status
       ON menus(brand_id, menu_type, status);
@@ -132,10 +147,17 @@ function ensureComposedMenuSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_menus_brand_sub_category
       ON menus(brand_id, sub_category_id);
 
+    CREATE INDEX IF NOT EXISTS idx_menus_brand_category
+      ON menus(brand_id, category_id);
+
     CREATE TRIGGER IF NOT EXISTS trg_menus_brand_consistency_insert
     BEFORE INSERT ON menus
     FOR EACH ROW
     WHEN
+      (NEW.category_id IS NOT NULL AND
+       ((SELECT brand_id FROM categories WHERE id = NEW.category_id) IS NULL OR
+        (SELECT brand_id FROM categories WHERE id = NEW.category_id) <> NEW.brand_id))
+      OR
       (NEW.sub_category_id IS NOT NULL AND
        ((SELECT brand_id FROM sub_categories WHERE id = NEW.sub_category_id) IS NULL OR
         (SELECT brand_id FROM sub_categories WHERE id = NEW.sub_category_id) <> NEW.brand_id))
@@ -155,6 +177,10 @@ function ensureComposedMenuSchema(db) {
     BEFORE UPDATE OF brand_id, sub_category_id, rasa_id, level_id ON menus
     FOR EACH ROW
     WHEN
+      (NEW.category_id IS NOT NULL AND
+       ((SELECT brand_id FROM categories WHERE id = NEW.category_id) IS NULL OR
+        (SELECT brand_id FROM categories WHERE id = NEW.category_id) <> NEW.brand_id))
+      OR
       (NEW.sub_category_id IS NOT NULL AND
        ((SELECT brand_id FROM sub_categories WHERE id = NEW.sub_category_id) IS NULL OR
         (SELECT brand_id FROM sub_categories WHERE id = NEW.sub_category_id) <> NEW.brand_id))
