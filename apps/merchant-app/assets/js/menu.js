@@ -853,9 +853,7 @@
       var pid = String(p.menu_id || p.id);
       var img = p.image_url || (p.components && p.components[0] && p.components[0].image_url) || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100';
       var isRange = p.pricing_mode === 'range';
-      var modeBadge = '<span class="x-badge x-badge-info" style="font-size:11px;">' +
-        (String(p.menu_type || '').toUpperCase() === 'PACKAGE' ? 'Menu Paket' : 'Menu Satuan') +
-        '</span>';
+      var modeBadge = '';
 
       if (p.is_adopted) {
         return '<div class="x-catalog-picker-card is-adopted" id="catalog-pick-card-' + esc(pid) + '">' +
