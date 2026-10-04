@@ -1827,7 +1827,7 @@
               </button>
               <span id="master-menu-editor-mobile-title">Tambah Menu</span>
             </h3>
-            <p class="x-owner-mobile-page-sub" id="master-menu-editor-mobile-subtitle">Menu adalah identitas komersial customer; Product hanya menjadi unit komposisi.</p>
+            <p class="x-owner-mobile-page-sub" id="master-menu-editor-mobile-subtitle">Menu adalah identitas komersial customer; Item hanya menjadi komponen internal.</p>
           </div>
 
           <div class="x-product-editor-breadcrumb-row x-owner-child-legacy-nav" style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
@@ -1840,8 +1840,7 @@
 
           <form id="form-master-menu" class="x-form" style="max-width:920px;margin:0 auto;">
             <input type="hidden" id="master-menu-id" value="">
-            <input type="hidden" id="master-menu-type" value="SINGLE">
-
+            
             <div class="x-card" style="margin-bottom:14px;">
               <div style="margin-bottom:16px;">
                 <h3 id="master-menu-editor-title" style="margin:0;font-size:20px;">Tambah Menu</h3>
@@ -1849,17 +1848,17 @@
               </div>
 
               <div class="x-form-group">
-                <label>Komposisi Product <span class="x-required-mark">*</span></label>
+                <label>Komposisi Item <span class="x-required-mark">*</span></label>
                 <div id="cm-package-components" class="x-composed-menu-components"></div>
-                <button type="button" class="x-btn-secondary" id="btn-cm-add-component" style="margin-top:8px;">+ Tambah Product</button>
-                <small class="text-muted" style="display:block;margin-top:5px;font-size:11px;">Product di sini adalah komponen inventory Menu. Satu Menu boleh memiliki satu atau banyak Product.</small>
+                <button type="button" class="x-btn-secondary" id="btn-cm-add-component" style="margin-top:8px;">+ Tambah Item</button>
+                <small class="text-muted" style="display:block;margin-top:5px;font-size:11px;">Item di sini adalah komponen internal Menu. Nama Item dan SKU tidak ditampilkan di Customer PWA.</small>
               </div>
 
                 <div class="x-form-group">
                   <label>Komposisi Product <span class="x-required-mark">*</span></label>
                   <div id="cm-package-components" class="x-composed-menu-components"></div>
                   <button type="button" class="x-btn-secondary" id="btn-cm-add-component" style="margin-top:8px;">+ Tambah Product</button>
-                  <small class="text-muted" style="display:block;margin-top:5px;font-size:11px;">Minimal 2 unit total. Satu Product tidak boleh muncul dua kali dalam paket.</small>
+                  <small class="text-muted" style="display:block;margin-top:5px;font-size:11px;">Satu Item tidak boleh muncul dua kali dalam satu Menu; gunakan quantity untuk jumlah unit.</small>
                 </div>
               </div>
 
@@ -1867,7 +1866,7 @@
                 <div class="x-form-group">
                   <label for="cm-category">Kategori</label>
                   <select id="cm-category" class="x-input"></select>
-                  <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Kategori adalah parent taxonomy; Judul adalah nama dasar Menu; Rasa bersifat opsional.</small>
+                  <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Kategori adalah pengelompokan; Judul dan Rasa adalah master terpisah. Judul direkomendasikan berdasarkan Menu yang sudah memakai kategori ini.</small>
                 </div>
                 <div class="x-form-group">
                   <label for="cm-sub-category">Judul <span class="x-required-mark">*</span></label>
@@ -1890,7 +1889,7 @@
                 <div class="x-form-group">
                   <label for="cm-price">Harga Jual Menu (Rp) <span class="x-required-mark">*</span></label>
                   <input type="number" id="cm-price" class="x-input" min="0" step="1" inputmode="numeric" required placeholder="28000">
-                  <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Harga komersial berada di Menu, bukan di Product Master.</small>
+                  <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Harga komersial berada di Menu, bukan di Item Master.</small>
                 </div>
                 <div class="x-form-group">
                   <label for="cm-status">Status</label>
