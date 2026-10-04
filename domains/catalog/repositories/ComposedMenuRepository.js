@@ -419,6 +419,22 @@ class ComposedMenuRepository {
     );
   }
 
+  ensureSkuProductInventoryForActiveBranches({ brandId, productId, lowStockThreshold = 5 }) {
+    const product = this.db.queryOne(
+      "SELECT id, sku FROM products WHERE id = ? AND brand_id = ?",
+      [productId, brandId]
+    );
+    if (!product || product.sku == null || String(product.sku).trim() === '') return { changes: 0 };
+
+    return this.db.execute(
+      "INSERT OR IGNORE INTO branch_product_inventory " +
+      "(branch_id, product_id, stock_qty, low_stock_threshold) " +
+      "SELECT id, ?, 0, ? FROM branches " +
+      "WHERE brand_id = ? AND is_active = 1",
+      [productId, lowStockThreshold, brandId]
+    );
+  }
+
   begin() {
     this.db.exec('BEGIN IMMEDIATE');
   }
