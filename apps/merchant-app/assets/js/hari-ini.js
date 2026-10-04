@@ -46,8 +46,8 @@
       adminFetch(API_BASE + "/dine-in/layout?branch_id=" + encodeURIComponent(branchId), { headers: headers }),
       // 3: Branch Inventory
       adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId) + "/inventory", { headers: headers }),
-      // 4: Branch Products (availability)
-      adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId) + "/products", { headers: headers }),
+      // 4: Branch Menus (availability)
+      adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId) + "/menu", { headers: headers }),
       // 5: Promotions
       adminFetch(API_BASE + "/admin/marketing/promotions", { headers: headers }),
       // 6: Operational Activity Logs
@@ -220,10 +220,10 @@
     }
     renderHariIniAttention(lowItems, unavailItems);
 
-    // 6. Process Active Approved Promotions
-    if (results[6].status === "fulfilled" && results[6].value && results[6].value.ok) {
+    // 5. Process Active Approved Promotions
+    if (results[5].status === "fulfilled" && results[5].value && results[5].value.ok) {
       try {
-        var promoData = await results[6].value.json();
+        var promoData = await results[5].value.json();
         if (promoData.success && Array.isArray(promoData.promotions)) {
           var activePromos = promoData.promotions.filter(function (p) {
             var active = (p.is_active === 1 || p.is_active === true || p.status === "active");
@@ -238,10 +238,10 @@
       }
     }
 
-    // 7. Process Authoritative Recent Branch Operational Activity Logs
-    if (results[7].status === "fulfilled" && results[7].value && results[7].value.ok) {
+    // 6. Process Authoritative Recent Branch Operational Activity Logs
+    if (results[6].status === "fulfilled" && results[6].value && results[6].value.ok) {
       try {
-        var logsData = await results[7].value.json();
+        var logsData = await results[6].value.json();
         if (logsData.success && Array.isArray(logsData.logs)) {
           renderHariIniRecentActivity(logsData.logs);
         }

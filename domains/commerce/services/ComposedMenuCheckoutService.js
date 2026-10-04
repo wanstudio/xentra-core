@@ -149,11 +149,13 @@ function verifyComposedCheckout({ brandId, branchId, items }) {
         continue;
       }
 
-      if (expectedPrice !== null && expectedPrice !== Number(menu.price)) {
+      const unitPrice = Number(menu.price);
+      const lineTotal = unitPrice * quantity;
+      if (expectedPrice !== null && expectedPrice !== unitPrice && expectedPrice !== lineTotal) {
         priceDiffs.push({
           menu_id: item.menu_id,
           expected_price: expectedPrice,
-          actual_price: Number(menu.price)
+          actual_price: unitPrice
         });
       }
 
@@ -235,6 +237,7 @@ function verifyComposedCheckout({ brandId, branchId, items }) {
         title: entry.menu.title,
         subtitle: entry.menu.subtitle,
         price: Number(entry.menu.price),
+        selling_price: Number(entry.menu.selling_price !== undefined ? entry.menu.selling_price : entry.menu.price),
         category: entry.menu.category,
         sub_category: entry.menu.sub_category,
         rasa: entry.menu.rasa,

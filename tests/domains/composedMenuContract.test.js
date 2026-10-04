@@ -245,7 +245,7 @@ test('Rasa master uniqueness is normalized within one Brand', () => {
 });
 
 test('Branch Menu adoption is separate from Product Inventory and package availability is component-driven', () => {
-  const menus = db.prepare("SELECT id FROM menus WHERE brand_id = ? AND menu_type = 'PACKAGE' LIMIT 1").get(BRAND);
+  const menus = db.prepare("SELECT id FROM menus WHERE brand_id = ? AND package_name = 'Paket Ayam x2 CMV1' LIMIT 1").get(BRAND);
   ComposedMenuService.adoptMenuToBranch({
     brandId: BRAND,
     branchId: BRANCH,
@@ -270,7 +270,7 @@ test('Branch Menu adoption is separate from Product Inventory and package availa
   assert.equal(resolved[0].inventory.available_quantity, 2);
 
   db.prepare(
-    "UPDATE branch_product_inventory SET stock_qty = 3, updated_at = datetime('now') WHERE branch_id = ? AND product_id = ?"
+    "UPDATE branch_product_inventory SET stock_qty = 1, updated_at = datetime('now') WHERE branch_id = ? AND product_id = ?"
   ).run(BRANCH, PRODUCT_A);
 
   const stockout = ComposedMenuResolver.resolveBranchMenu({
@@ -400,11 +400,13 @@ test.after(() => {
   db.prepare('DELETE FROM branch_menu_categories WHERE branch_id = ? AND menu_id IN (SELECT id FROM menus WHERE brand_id = ?)').run(BRANCH, BRAND);
   db.prepare('DELETE FROM branch_menus WHERE branch_id = ?').run(BRANCH);
   db.prepare('DELETE FROM branch_product_inventory WHERE branch_id = ?').run(BRANCH);
+  db.prepare('DELETE FROM branch_products WHERE branch_id = ?').run(BRANCH);
   db.prepare('DELETE FROM menu_items WHERE menu_id IN (SELECT id FROM menus WHERE brand_id = ?)').run(BRAND);
   db.prepare('DELETE FROM menus WHERE brand_id = ?').run(BRAND);
   db.prepare('DELETE FROM sub_categories WHERE brand_id = ? AND id = ?').run(BRAND, SUBCATEGORY);
   db.prepare('DELETE FROM sub_categories WHERE brand_id = ? AND name = ?').run(BRAND, 'Ayam Bakar CMV1');
   db.prepare('DELETE FROM menu_flavors WHERE brand_id = ? AND id IN (?, ?)').run(BRAND, 'cmv1_hidden_category_rasa', db.prepare("SELECT id FROM menu_flavors WHERE brand_id = ? AND lower(trim(name)) = 'original' LIMIT 1").get(BRAND)?.id || '');
+  db.prepare('DELETE FROM product_sku_history WHERE brand_id = ?').run(BRAND);
   db.prepare('DELETE FROM products WHERE id IN (?, ?)').run(PRODUCT_A, PRODUCT_B);
   db.prepare('DELETE FROM branch_categories WHERE id = ?').run(BRANCH_CATEGORY);
   db.prepare('DELETE FROM branches WHERE id = ?').run(BRANCH);

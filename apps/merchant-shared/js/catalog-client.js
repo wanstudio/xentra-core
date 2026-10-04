@@ -68,8 +68,9 @@
     });
   }
 
-  // Legacy Product transport aliases. Forward Merchant Menu code must use the
-  // Menu methods above; these remain readable for compatibility migration only.
+  // Legacy Product transport aliases.
+  // Forward Merchant Menu code must use the Menu methods above;
+  // these remain readable for compatibility migration only.
   function updateBranchProductDisplayName(branchId, productId, name) {
     return updateBranchMenuDisplayName(branchId, productId, name);
   }

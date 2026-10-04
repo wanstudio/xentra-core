@@ -277,6 +277,17 @@ class ComposedMenuResolver {
           name: row.branch_category_name,
           slug: row.branch_category_slug
         })),
+        components: (itemMap.get(String(menu.id)) || []).map(item => ({
+          product_id: item.product_id,
+          product_name: item.product_name,
+          product_slug: item.product_slug || null,
+          sku: item.sku || null,
+          quantity: Number(item.quantity),
+          description: item.product_description || '',
+          image_url: item.product_image_url || item.product_image || '',
+          media_id: item.product_media_id || null,
+          product_is_active: item.product_is_active !== 0
+        })),
         inventory: inventoryState
       };
 

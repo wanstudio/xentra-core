@@ -679,7 +679,7 @@
 
     var metaKey = (isMasterMenuEditor || route === 'catalog/master-menus')
       ? 'catalog/master-menus'
-      : ((isProductDetail || isProductEditor) ? 'catalog/products' : (isBranchEditor ? 'branches' : (isBranchDetail ? 'branches' : (isOrderDetail ? 'orders' : (isCustomerDetail ? 'customers/:id' : (isTeamRoute ? ('team/' + teamSubtab) : (isReportsRoute ? 'reports' : (isFinanceRoute ? ('finance/' + financeSubtab) : (isMarketingRoute ? ('marketing/' + marketingSubtab) : (isSettingsRoute ? ('settings/' + settingsSubtab) : route)))))))))));
+      : ((isProductDetail || isProductEditor) ? 'catalog/products' : (isBranchEditor ? 'branches' : (isBranchDetail ? 'branches' : (isOrderDetail ? 'orders' : (isCustomerDetail ? 'customers/:id' : (isTeamRoute ? ('team/' + teamSubtab) : (isReportsRoute ? 'reports' : (isFinanceRoute ? ('finance/' + financeSubtab) : (isMarketingRoute ? ('marketing/' + marketingSubtab) : (isSettingsRoute ? ('settings/' + settingsSubtab) : route))))))))));
     if (isMarketingEditor) metaKey = 'marketing/' + marketingSubtab;
     var meta = metaDict[metaKey] || metaDict[route] || metaDict['overview'];
     var tabId = meta.tab;
@@ -756,7 +756,7 @@
       ? (masterMenuEditorId ? 'Edit Menu Master' : 'Tambah Menu Master')
       : (isProductEditor
         ? (productEditorId ? 'Edit Produk Master' : 'Tambah Produk Master')
-        : (isBranchEditor ? (branchEditorId ? 'Edit Cabang' : 'Tambah Cabang') : (isProductDetail ? 'Product Detail' : (isBranchDetail ? 'Branch Detail' : (isOrderDetail ? 'Order Detail' : (isCustomerDetail ? 'Customer Detail' : (isReportsRoute ? 'Reports' : meta.title))))));
+        : (isBranchEditor ? (branchEditorId ? 'Edit Cabang' : 'Tambah Cabang') : (isProductDetail ? 'Product Detail' : (isBranchDetail ? 'Branch Detail' : (isOrderDetail ? 'Order Detail' : (isCustomerDetail ? 'Customer Detail' : (isReportsRoute ? 'Reports' : meta.title)))))));
     if (subEl) subEl.textContent = isMasterMenuEditor
       ? 'Susun Menu Satuan atau Menu Paket pada katalog komersial brand'
       : (isProductEditor
@@ -2182,7 +2182,7 @@
       var isActive = prod.is_active !== 0;
       var toggleSwitch = '' +
         '<label class="x-toggle' + (isActive ? ' x-toggle-on' : '') + '" title="' + (isActive ? 'Product aktif' : 'Product nonaktif') + '">' +
-          '<input type="checkbox" ' + (isActive ? 'checked' : '') + ' onchange="toggleStock(\\'' + esc(prod.id) + '\\', this.checked ? 1 : 0)" aria-label="Status Product ' + esc(prod.name) + '">' +
+          '<input type="checkbox" ' + (isActive ? 'checked' : '') + ' onchange="toggleStock(\'' + esc(prod.id) + '\', this.checked ? 1 : 0)" aria-label="Status Product ' + esc(prod.name) + '">' +
           '<span class="x-toggle-slider"></span>' +
         '</label>';
 
@@ -2198,10 +2198,10 @@
           '<td class="text-right" style="white-space:nowrap;">',
             '<div class="x-item-actions">',
               '<button type="button" class="x-action-menu-trigger" aria-label="Aksi Product ' + esc(prod.name) + '" onclick="XentraActionMenu.open(this, [' +
-                '{ label: \\'Lihat Detail\\', icon: \\'🔍\\', onClick: function() { navigateTo(\\'catalog/products/' + encodeURIComponent(prod.id) + '\\'); } },' +
-                '{ label: \\'Edit Product\\', icon: \\'✏️\\', onClick: function() { openEditProduct(\\'' + esc(prod.id) + '\\'); } },' +
+                '{ label: \'Lihat Detail\', icon: \'🔍\', onClick: function() { navigateTo(\'catalog/products/' + encodeURIComponent(prod.id) + '\'); } },' +
+                '{ label: \'Edit Product\', icon: \'✏️\', onClick: function() { openEditProduct(\'' + esc(prod.id) + '\'); } },' +
                 '{ divider: true },' +
-                '{ label: \\'Arsipkan Product\\', icon: \\'🗑️\\', destructive: true, onClick: function() { deleteProduct(\\'' + esc(prod.id) + '\\'); } }' +
+                '{ label: \'Arsipkan Product\', icon: \'🗑️\', destructive: true, onClick: function() { deleteProduct(\'' + esc(prod.id) + '\'); } }' +
               '])">',
                 '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>',
               '</button>',
@@ -4219,6 +4219,8 @@ async function loadMenusView() {
         }
       });
     }
+  }
+
   /* =========================================================================
      MODUL 3: CABANG & PENGATURAN ONGKIR CONTROLLER
      ========================================================================= */
@@ -11019,6 +11021,8 @@ async function loadMenusView() {
     var sub = ownerMasterMenuSelectedSubCategory();
     var rasa = ownerMasterMenuSelectedRasa();
     var rasaLabel = rasa ? ownerMasterMenuRasaLabel(rasa.name) : '';
+    var levelName = '';
+    var levelPosition = 0;
     var selectedLevel = ownerMasterMenuSelectedLevel();
     if (selectedLevel) {
       levelName = String(selectedLevel.name || '');
@@ -11029,8 +11033,6 @@ async function loadMenusView() {
     var detail = '';
     var image = '';
     var title = '';
-    var levelName = '';
-    var levelPosition = 0;
 
     if (type === 'PACKAGE') {
       title = String(($('cm-package-name') && $('cm-package-name').value) || '').trim() || 'Nama Menu Paket';
@@ -11070,6 +11072,20 @@ async function loadMenusView() {
         imageEl.alt = '';
         imageEl.style.display = 'none';
         emptyEl.style.display = 'inline-flex';
+      }
+    }
+
+    if (indicatorEl) {
+      if (levelPosition > 0) {
+        var indicatorHtml = '<span class="x-master-customer-preview-spice-label">Pedas</span>' +
+          '<span class="x-master-customer-preview-spice-dots" aria-label="Level Pedas ' + levelPosition + ' dari 4">';
+        for (var levelIndex = 1; levelIndex <= 4; levelIndex += 1) {
+          indicatorHtml += '<span class="x-master-customer-preview-spice-dot' + (levelIndex <= levelPosition ? ' is-filled' : '') + '" aria-hidden="true"></span>';
+        }
+        indicatorHtml += '</span>';
+        indicatorEl.innerHTML = indicatorHtml;
+      } else {
+        indicatorEl.innerHTML = '';
       }
     }
   }

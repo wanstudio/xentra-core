@@ -442,9 +442,9 @@ test('Owner Dashboard Mobile Navigation', async t => {
     controller.initialize();
     controller.navigate('catalog/products');
     controller.navigate('catalog/products/new');
-    assert.deepEqual(controller.getSnapshot().stack, ['business', 'catalog/products', 'catalog/products/new']);
+    assert.deepEqual(Array.from(controller.getSnapshot().stack), ['business', 'catalog/products', 'catalog/products/new']);
     controller.back();
-    assert.deepEqual(controller.getSnapshot().stack, ['business', 'catalog/products']);
+    assert.deepEqual(Array.from(controller.getSnapshot().stack), ['business', 'catalog/products']);
   });
 
   await t.test('OWNER-MOB-14B: child Back behavior is centralized in one router helper', () => {

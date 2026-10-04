@@ -1857,6 +1857,10 @@ function csAddBranch(id, { is_active = 1, is_open_override = 1, delivery = 1, pi
   if (assign272) {
     db.prepare(`INSERT OR REPLACE INTO branch_products (branch_id, product_id, price, stock, is_available)
       VALUES (?, '272', 35000, 10, 1)`).run(id);
+    db.prepare(`INSERT OR REPLACE INTO branch_product_inventory (branch_id, product_id, stock_qty, low_stock_threshold)
+      VALUES (?, '272', 10, 5)`).run(id);
+    db.prepare(`INSERT OR IGNORE INTO branch_menus (branch_id, menu_id, is_available, price_override)
+      VALUES (?, 'demo_bangjo_menu_272', 1, 35000)`).run(id);
   }
 }
 
@@ -2413,8 +2417,8 @@ test('R5 ACCEPT: own-branch branch_manager accepts a pending order → confirmed
     headers: bm.headers,
     body: JSON.stringify({ decision: 'accept', note: 'Siap diproses' })
   });
-  assert.strictEqual(res.status, 200);
   const data = await res.json();
+  assert.strictEqual(res.status, 200);
   assert.strictEqual(data.success, true);
   assert.strictEqual(data.decision, 'accept');
   assert.strictEqual(data.new_status, 'confirmed', 'ACCEPTED = confirmed (locked operational acceptance state)');

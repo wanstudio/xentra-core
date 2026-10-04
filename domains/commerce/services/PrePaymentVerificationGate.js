@@ -186,13 +186,32 @@ class PrePaymentVerificationGate {
           cart_items: nonRewardItems
         });
 
-        const eligiblePromo = (evalResult.applied || []).find(p =>
+        let eligiblePromo = (evalResult.applied || []).find(p =>
           !promoId || p.promo_id === promoId || p.id === promoId
         ) || (evalResult.discovery || []).find(p =>
           (!promoId || p.promo_id === promoId || p.id === promoId) && p.should_grant_reward
         );
 
+        const rewardErrorMessages = {
+          BRANCH_MENU_NOT_ADOPTED: 'Menu hadiah belum diadopsi di cabang yang akan memenuhi pesananmu.',
+          BRANCH_MENU_UNAVAILABLE: 'Menu hadiah sedang dinonaktifkan di cabang yang akan memenuhi pesananmu.',
+          REWARD_BRANCH_CATEGORY_UNAVAILABLE: 'Kategori cabang untuk menu hadiah sedang tidak tersedia.',
+          REWARD_OUT_OF_STOCK: 'Maaf, menu hadiah sedang habis di cabang yang akan memenuhi pesananmu.',
+          REWARD_MENU_COMPONENT_UNAVAILABLE: 'Komponen menu hadiah sedang tidak tersedia.',
+          REWARD_MENU_INACTIVE: 'Menu hadiah saat ini tidak aktif.',
+          REWARD_PRODUCT_NOT_FOUND: 'Produk hadiah legacy tidak ditemukan.',
+          BRANCH_REWARD_PRODUCT_NOT_AVAILABLE: 'Produk hadiah legacy tidak tersedia di cabang ini.',
+          BRANCH_REWARD_PRODUCT_UNAVAILABLE: 'Produk hadiah legacy sedang dinonaktifkan di cabang ini.'
+        };
+
         if (!eligiblePromo) {
+          const failedDiscoveryPromo = (evalResult.discovery || []).find(p =>
+            (!promoId || p.promo_id === promoId || p.id === promoId) && p.reward_resolution_error
+          );
+          if (failedDiscoveryPromo && failedDiscoveryPromo.reward_resolution_error) {
+            errors.push(rewardErrorMessages[failedDiscoveryPromo.reward_resolution_error] || 'Menu hadiah promo tidak dapat diselesaikan secara aman.');
+            continue;
+          }
           errors.push('Klaim hadiah promo tidak valid atau syarat promo belum terpenuhi.');
           continue;
         }
@@ -208,18 +227,7 @@ class PrePaymentVerificationGate {
             reward: rewardSpec
           });
         } catch (err) {
-          const rewardMessage = {
-            BRANCH_MENU_NOT_ADOPTED: 'Menu hadiah belum diadopsi di cabang yang akan memenuhi pesananmu.',
-            BRANCH_MENU_UNAVAILABLE: 'Menu hadiah sedang dinonaktifkan di cabang yang akan memenuhi pesananmu.',
-            REWARD_BRANCH_CATEGORY_UNAVAILABLE: 'Kategori cabang untuk menu hadiah sedang tidak tersedia.',
-            REWARD_OUT_OF_STOCK: 'Maaf, menu hadiah sedang habis di cabang yang akan memenuhi pesananmu.',
-            REWARD_MENU_COMPONENT_UNAVAILABLE: 'Komponen menu hadiah sedang tidak tersedia.',
-            REWARD_MENU_INACTIVE: 'Menu hadiah saat ini tidak aktif.',
-            REWARD_PRODUCT_NOT_FOUND: 'Produk hadiah legacy tidak ditemukan.',
-            BRANCH_REWARD_PRODUCT_NOT_AVAILABLE: 'Produk hadiah legacy tidak tersedia di cabang ini.',
-            BRANCH_REWARD_PRODUCT_UNAVAILABLE: 'Produk hadiah legacy sedang dinonaktifkan di cabang ini.'
-          }[err.message] || 'Menu hadiah promo tidak dapat diselesaikan secara aman.';
-          errors.push(rewardMessage);
+          errors.push(rewardErrorMessages[err.message] || 'Menu hadiah promo tidak dapat diselesaikan secara aman.');
           continue;
         }
 

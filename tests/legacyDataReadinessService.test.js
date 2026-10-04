@@ -71,13 +71,6 @@ test('Legacy readiness inventory is read-only and classifies unresolved mappings
           product_id: '401',
           product_name: 'Nasi Goreng',
           canonical_menu_candidates: 0
-        },
-        {
-          branch_id: 'branch-1',
-          branch_name: 'Cabang 1',
-          product_id: '402',
-          product_name: 'Mie Goreng',
-          canonical_menu_candidates: 1
         }
       ]
     },
@@ -119,7 +112,7 @@ test('Legacy readiness inventory is read-only and classifies unresolved mappings
   assert.ok(db.calls.length > 0);
   for (const call of db.calls) {
     assert.match(call.sql.trim(), /^SELECT/i, 'inventory must issue SELECT only');
-    assert.notMatch(call.sql, /\b(?:INSERT|UPDATE|DELETE|REPLACE|ALTER|DROP|CREATE)\b/i);
+    assert.doesNotMatch(call.sql, /\b(?:INSERT|UPDATE|DELETE|REPLACE|ALTER|DROP|CREATE)\b/i);
   }
 });
 

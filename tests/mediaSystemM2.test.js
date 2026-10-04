@@ -324,6 +324,8 @@ test('MEDIA SYSTEM M2 — CROP / IMAGE EDITOR UI & DOMAIN SUITE', async (t) => {
     win.eval(fs.readFileSync(CROP_EDITOR_JS_PATH, 'utf8'));
     win.eval(fs.readFileSync(CATALOG_CLIENT_JS_PATH, 'utf8'));
     win.eval(fs.readFileSync(BRANCH_CATALOG_JS_PATH, 'utf8'));
+    win.eval(fs.readFileSync(path.join(__dirname, '../apps/merchant-shared/js/presentation-shells.js'), 'utf8'));
+    win.eval(fs.readFileSync(path.join(__dirname, '../apps/merchant-dashboard/assets/js/owner-navigation.js'), 'utf8'));
     const js = fs.readFileSync(JS_PATH, 'utf8');
     win.eval(js);
 

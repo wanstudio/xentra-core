@@ -744,7 +744,7 @@ class ComposedMenuService {
   }
 
   static setBranchMenuDisplayName({
-    brandId, branchId, menuId, name
+    brandId, branchId, menuId, name, displayName: aliasDisplayName
   }) {
     ensureSchema();
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
@@ -758,7 +758,8 @@ class ComposedMenuService {
     );
     if (!branch) throw new Error('BRANCH_NOT_FOUND');
 
-    const displayName = name == null ? null : String(name).trim() || null;
+    const rawName = name !== undefined ? name : aliasDisplayName;
+    const displayName = rawName == null ? null : String(rawName).trim() || null;
     if (displayName && displayName.length > 100) throw new Error('DISPLAY_NAME_TOO_LONG');
 
     repository.setBranchMenuDisplayName({

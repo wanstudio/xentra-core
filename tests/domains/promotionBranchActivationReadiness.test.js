@@ -67,11 +67,13 @@ describe('Promotion Branch Activation ↔ Reward Catalog Readiness', () => {
     db.prepare('INSERT INTO branches (id, brand_id, name, slug, address_text, is_active, latitude, longitude) VALUES (?, ?, ?, ?, ?, 1, -5.36, 105.26)')
       .run(branchB, brandId, 'Branch Readiness B', 'branch-readiness-b', 'Jl. Test B');
 
-    // 3. Seed master products
-    db.prepare('INSERT INTO products (id, brand_id, name, slug, price, is_active) VALUES (?, ?, ?, ?, ?, 1)')
-      .run(masterFood, brandId, 'Nasi Uduk Spesial', 'nasi-uduk-spesial', 20000);
-    db.prepare('INSERT INTO products (id, brand_id, name, slug, price, is_active) VALUES (?, ?, ?, ?, ?, 1)')
-      .run(masterReward, brandId, 'Es Teh Melati Hadiah', 'es-teh-melati-hadiah', 5000);
+    // 3. Seed category and master products
+    db.prepare('INSERT OR IGNORE INTO categories (id, brand_id, name, slug, is_active) VALUES (?, ?, ?, ?, 1)')
+      .run('cat_readiness_test', brandId, 'Readiness Foods', 'readiness-foods');
+    db.prepare('INSERT INTO products (id, brand_id, category_id, name, slug, price, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)')
+      .run(masterFood, brandId, 'cat_readiness_test', 'Nasi Uduk Spesial', 'nasi-uduk-spesial', 20000);
+    db.prepare('INSERT INTO products (id, brand_id, category_id, name, slug, price, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)')
+      .run(masterReward, brandId, 'cat_readiness_test', 'Es Teh Melati Hadiah', 'es-teh-melati-hadiah', 5000);
 
     const rasaRow = db.prepare("SELECT id FROM menu_flavors WHERE brand_id = ? AND lower(trim(name)) = 'original' AND is_active = 1 LIMIT 1").get(brandId)
       || (db.prepare("INSERT INTO menu_flavors (id, brand_id, name, slug, is_active) VALUES ('readiness_original_rasa', ?, 'Original', 'readiness-original', 1)").run(brandId), db.prepare("SELECT id FROM menu_flavors WHERE id = 'readiness_original_rasa'").get());
@@ -80,6 +82,8 @@ describe('Promotion Branch Activation ↔ Reward Catalog Readiness', () => {
     db.prepare("INSERT OR REPLACE INTO menus (id, brand_id, menu_type, sub_category_id, rasa_id, selling_price, status) VALUES (?, ?, 'SINGLE', 'sub_readiness_food', ?, 20000, 'ACTIVE')").run(foodMenu, brandId, rasaRow.id);
     db.prepare("INSERT OR REPLACE INTO menus (id, brand_id, menu_type, sub_category_id, rasa_id, selling_price, status) VALUES (?, ?, 'SINGLE', 'sub_readiness_reward', ?, 5000, 'ACTIVE')").run(rewardMenu, brandId, rasaRow.id);
     db.prepare("INSERT OR REPLACE INTO menu_items (menu_id, product_id, quantity, sort_order) VALUES (?, ?, 1, 0), (?, ?, 1, 0)").run(foodMenu, masterFood, rewardMenu, masterReward);
+    db.prepare("UPDATE products SET sku = ? WHERE id = ?").run('SKU-' + masterFood, masterFood);
+    db.prepare("UPDATE products SET sku = ? WHERE id = ?").run('SKU-' + masterReward, masterReward);
     db.prepare("INSERT OR REPLACE INTO branch_categories (id, brand_id, branch_id, name, slug, sort_order, is_active) VALUES ('bc_readiness_A', ?, ?, 'Makanan', 'bc-readiness-A', 1, 1), ('bc_readiness_B', ?, ?, 'Makanan', 'bc-readiness-B', 1, 1)").run(brandId, branchA, brandId, branchB);
     // 4. Branch A has both food and reward available (is_available = 1)
     db.prepare('INSERT INTO branch_products (branch_id, product_id, price, stock, is_available) VALUES (?, ?, ?, ?, 1)')
@@ -180,7 +184,7 @@ describe('Promotion Branch Activation ↔ Reward Catalog Readiness', () => {
 
   test('ACT-03: Activating at Branch B fails validation when reward exists but is_available = 0', () => {
     // Add reward to Branch B but set is_available = 0
-    db.prepare('UPDATE branch_menus SET is_available = 0 WHERE branch_id = ? AND menu_id = ?').run(branchB, rewardMenu);
+    db.prepare('INSERT OR REPLACE INTO branch_menus (branch_id, menu_id, is_available) VALUES (?, ?, 0)').run(branchB, rewardMenu);
 
     const rewards = repo.findRewards(promoTestId);
     const targetMid = rewards[0].target_menu_id;
@@ -188,9 +192,9 @@ describe('Promotion Branch Activation ↔ Reward Catalog Readiness', () => {
     assert.ok(bm);
     assert.strictEqual(Number(bm.is_available), 0);
 
-    const menu = db.prepare('SELECT id, title FROM menus WHERE id = ?').get(targetMid);
+    const menu = db.prepare('SELECT id, package_name FROM menus WHERE id = ?').get(targetMid);
     assert.ok(menu);
-    const expectedError = `Promo belum dapat diaktifkan karena Menu hadiah '${menu.title || targetMid}' sedang dinonaktifkan di cabang ini.`;
+    const expectedError = `Promo belum dapat diaktifkan karena Menu hadiah '${menu.package_name || targetMid}' sedang dinonaktifkan di cabang ini.`;
     assert.ok(expectedError.includes('sedang dinonaktifkan di cabang ini'));
   });
 

@@ -16,7 +16,7 @@ const contract = fs.readFileSync(path.join(ROOT, 'docs/proposals/xentra-taxonomy
 
 test('Product contract separates atomic Product ownership from commercial Menu ownership', () => {
   const start = ownerHtml.indexOf('<section id="tab-catalog-products"');
-  const end = ownerHtml.indexOf('<!-- TAB: CATALOG / MENUS', start);
+  const end = ownerHtml.indexOf('<!-- TAB: CATALOG / MASTER MENUS', start);
   const section = ownerHtml.slice(start, end);
 
   assert.ok(section.includes('id="prod-name"'));
@@ -62,7 +62,7 @@ test('Product Editor loader hydrates only atomic Product data', () => {
 });
 
 test('Product list displays atomic identity fields instead of commercial pricing', () => {
-  const sectionStart = ownerJs.indexOf('function renderMasterProductsTable()');
+  const sectionStart = ownerJs.indexOf('function getFilteredMasterProducts()');
   const sectionEnd = ownerJs.indexOf('// PRODUCT DETAIL VIEW', sectionStart);
   const renderer = ownerJs.slice(sectionStart, sectionEnd);
 
@@ -90,8 +90,8 @@ test('Product API accepts atomic creation without commercial category/price', ()
 });
 
 test('Product API preserves legacy fields only as compatibility fields', () => {
-  assert.ok(contract.includes('legacy products.price/category'));
-  assert.ok(contract.includes('new Menu code does not use them'));
+  assert.ok(contract.includes('selling price/category'));
+  assert.ok(contract.includes('Product does **not** own the canonical selling price'));
   assert.ok(composedMenuResolver.includes('selling_price'));
   assert.ok(!composedMenuResolver.includes('product.price'));
   assert.ok(composedMenuRoute.includes("router.post('/admin/menus/single'"));
@@ -118,8 +118,8 @@ test('Customer-facing taxonomy and price stay in canonical Menu workspace', () =
   assert.ok(controller.includes('rasa_id: rasaId'));
   assert.ok(controller.includes('level_id: levelId'));
   assert.ok(controller.includes('selling_price: price'));
-  assert.ok(controller.includes('package_name: packageName'));
-  assert.ok(controller.includes('components: components'));
+  assert.ok(controller.includes('payload.package_name = packageName'));
+  assert.ok(controller.includes('payload.components = components'));
 });
 
 test('Canonical Menu resolver owns Customer title/subtitle semantics', () => {

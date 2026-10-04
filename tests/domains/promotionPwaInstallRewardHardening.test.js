@@ -75,10 +75,12 @@ describe('PWA Install Reward Flow Hardening', () => {
       .run(branchB, brandId, 'Gading Branch', 'gading-branch', 'Jl. Gading No. 2');
 
     // 2. Seed Master Catalog Products
-    db.prepare('INSERT INTO products (id, brand_id, name, slug, price, is_active) VALUES (?, ?, ?, ?, ?, 1)')
-      .run(foodProductId, brandId, 'Nasi Ayam Penyet', 'nasi-ayam-penyet-hard', 25000);
-    db.prepare('INSERT INTO products (id, brand_id, name, slug, price, regular_price, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)')
-      .run(rewardProductId, brandId, 'Es Teh Segar', 'es-teh-segar-hard', 5000, 5000);
+    db.prepare('INSERT OR IGNORE INTO categories (id, brand_id, name, slug, is_active) VALUES (?, ?, ?, ?, 1)')
+      .run('cat_pwa_hard', brandId, 'PWA Hard Foods', 'pwa-hard-foods');
+    db.prepare('INSERT INTO products (id, brand_id, category_id, name, slug, price, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)')
+      .run(foodProductId, brandId, 'cat_pwa_hard', 'Nasi Ayam Penyet', 'nasi-ayam-penyet-hard', 25000);
+    db.prepare('INSERT INTO products (id, brand_id, category_id, name, slug, price, regular_price, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, 1)')
+      .run(rewardProductId, brandId, 'cat_pwa_hard', 'Es Teh Segar', 'es-teh-segar-hard', 5000, 5000);
 
     const rasa = db.prepare("SELECT id FROM menu_flavors WHERE brand_id = ? AND lower(trim(name)) = 'original' AND is_active = 1 LIMIT 1").get(brandId)
       || (db.prepare("INSERT INTO menu_flavors (id, brand_id, name, slug, is_active) VALUES ('pwa_hard_original', ?, 'Original', 'pwa-hard-original', 1)").run(brandId), db.prepare("SELECT id FROM menu_flavors WHERE id = 'pwa_hard_original'").get());

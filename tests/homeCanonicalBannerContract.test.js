@@ -11,7 +11,7 @@ const HOME = fs.readFileSync(
 );
 
 test('Customer Home banner product CTA uses canonical composed catalog transport', () => {
-  const start = HOME.indexOf('function goToBannerProduct(productId)');
+  const start = HOME.indexOf('function findCurrentProductForBanner(productId)');
   const end = HOME.indexOf('function goToBannerPromotion(', start);
   assert.ok(start >= 0 && end > start, 'Banner product helper must exist');
 

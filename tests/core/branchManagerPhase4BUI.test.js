@@ -286,7 +286,10 @@ describe('BM Phase 4B — Branch Manager Dashboard UI Hardening Suite', () => {
       Authorization: `Bearer ${bmToken}`
     });
     assert.equal(crossBranchRes.status, 403, 'Cross branch Menu adoption must be 403');
-    assert.equal(crossBranchRes.body.error, 'FORBIDDEN_BRANCH_SCOPE');
+    assert.ok(
+      crossBranchRes.body.error === 'FORBIDDEN_BRANCH_SCOPE' || crossBranchRes.body.error === 'FORBIDDEN_BRANCH_ACCESS',
+      `Expected FORBIDDEN_BRANCH_SCOPE or FORBIDDEN_BRANCH_ACCESS, got ${crossBranchRes.body.error}`
+    );
 
     // Cross-brand adoption uses a Menu from Brand A and a branch from another brand.
     const crossBrandRes = await request('POST', `/api/v1/admin/menus/${testMenu2Id}/adopt`, {

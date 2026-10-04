@@ -74,16 +74,20 @@ async function mockFetch(path, options = {}) {
 function ensureCanonicalFixture({ brandId, branchId, productId, menuId, categoryId, subCategoryId, price, categoryName }) {
   db.prepare("INSERT OR IGNORE INTO categories (id, brand_id, name, slug, is_active) VALUES (?, ?, ?, ?, 1)")
     .run(categoryId, brandId, categoryName || 'Makanan', categoryId + '-slug');
-  db.prepare("INSERT OR REPLACE INTO products (id, brand_id, category_id, name, slug, description, price, is_active) VALUES (?, ?, ?, ?, ?, 'Desc', ?, 1)")
+  db.prepare("INSERT OR IGNORE INTO products (id, brand_id, category_id, name, slug, description, price, is_active) VALUES (?, ?, ?, ?, ?, 'Desc', ?, 1)")
     .run(productId, brandId, categoryId, 'CSA Product ' + productId, productId + '-slug', price);
   const rasaId = 'csa_rasa_' + brandId;
-  db.prepare("INSERT OR IGNORE INTO menu_flavors (id, brand_id, name, slug, is_active) VALUES (?, ?, 'Original', ?, 1)")
-    .run(rasaId, brandId, 'original-' + brandId);
-  db.prepare("INSERT OR REPLACE INTO sub_categories (id, brand_id, category_id, name, slug, is_active) VALUES (?, ?, ?, ?, ?, 1)")
+  const existingRasa = db.prepare("SELECT id FROM menu_flavors WHERE brand_id = ? AND lower(trim(name)) = 'original' AND is_active = 1 LIMIT 1").get(brandId);
+  const finalRasaId = existingRasa ? existingRasa.id : rasaId;
+  if (!existingRasa) {
+    db.prepare("INSERT INTO menu_flavors (id, brand_id, name, slug, is_active) VALUES (?, ?, 'Original', ?, 1)")
+      .run(rasaId, brandId, 'original-' + brandId);
+  }
+  db.prepare("INSERT OR IGNORE INTO sub_categories (id, brand_id, category_id, name, slug, is_active) VALUES (?, ?, ?, ?, ?, 1)")
     .run(subCategoryId, brandId, categoryId, 'CSA Menu', subCategoryId + '-slug');
-  db.prepare("INSERT OR REPLACE INTO menus (id, brand_id, menu_type, sub_category_id, rasa_id, selling_price, status) VALUES (?, ?, 'SINGLE', ?, ?, ?, 'ACTIVE')")
-    .run(menuId, brandId, subCategoryId, rasaId, price);
-  db.prepare("INSERT OR REPLACE INTO menu_items (menu_id, product_id, quantity, sort_order) VALUES (?, ?, 1, 0)")
+  db.prepare("INSERT OR IGNORE INTO menus (id, brand_id, menu_type, sub_category_id, rasa_id, selling_price, status) VALUES (?, ?, 'SINGLE', ?, ?, ?, 'ACTIVE')")
+    .run(menuId, brandId, subCategoryId, finalRasaId, price);
+  db.prepare("INSERT OR IGNORE INTO menu_items (menu_id, product_id, quantity, sort_order) VALUES (?, ?, 1, 0)")
     .run(menuId, productId);
   db.prepare("INSERT OR REPLACE INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, is_active, is_open_override) VALUES (?, ?, ?, ?, ?, -7.2, 112.7, '0811111111', 1, 1)")
     .run(branchId, brandId, 'CSA Branch ' + branchId, branchId + '-slug', 'Jl. Test');

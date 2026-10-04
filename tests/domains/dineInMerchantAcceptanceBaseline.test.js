@@ -122,7 +122,7 @@ test.before(async () => {
 
   // Canonical Product/SKU -> Master Menu -> Branch Menu -> Inventory fixture.
   db.prepare("INSERT OR IGNORE INTO categories (id, brand_id, name, slug, is_active) VALUES ('cat_bline_1', ?, 'Makanan', 'makanan-bline', 1)").run(BRAND_ID);
-  db.prepare("INSERT OR REPLACE INTO products (id, brand_id, category_id, name, slug, price, is_active) VALUES ('prod_bline_1', ?, 'cat_bline_1', 'Nasi Goreng Spesial', 'nasgor-spesial-bline', 35000, 1)").run(BRAND_ID);
+  db.prepare("INSERT OR REPLACE INTO products (id, brand_id, category_id, name, slug, price, is_active, sku) VALUES ('prod_bline_1', ?, 'cat_bline_1', 'Nasi Goreng Spesial', 'nasgor-spesial-bline', 35000, 1, 'BLINE-SKU-001')").run(BRAND_ID);
   db.prepare("INSERT OR IGNORE INTO menu_flavors (id, brand_id, name, slug, is_active) VALUES ('rasa_bline_original', ?, 'Original', 'rasa-bline-original', 1)").run(BRAND_ID);
   db.prepare("INSERT OR REPLACE INTO sub_categories (id, brand_id, category_id, name, slug, is_active) VALUES ('sub_bline_1', ?, 'cat_bline_1', 'Nasi Goreng', 'sub-bline-1', 1)").run(BRAND_ID);
   db.prepare("INSERT OR REPLACE INTO menus (id, brand_id, menu_type, sub_category_id, rasa_id, selling_price, status) VALUES ('menu_bline_1', ?, 'SINGLE', 'sub_bline_1', 'rasa_bline_original', 35000, 'ACTIVE')").run(BRAND_ID);

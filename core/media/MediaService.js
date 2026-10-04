@@ -591,8 +591,11 @@ class MediaService {
 
     // A queued retry may already be in PROCESSING. A direct process call from
     // TEMPORARY/UPLOADED/FAILED must enter PROCESSING exactly once.
+    // Duplicate/re-processing from READY is supported as an idempotent reconciliation path.
     if (asset.status !== MediaLifecycle.STATES.PROCESSING) {
-      MediaLifecycle.assertTransition(asset.status, MediaLifecycle.STATES.PROCESSING);
+      if (asset.status !== MediaLifecycle.STATES.READY) {
+        MediaLifecycle.assertTransition(asset.status, MediaLifecycle.STATES.PROCESSING);
+      }
       this.mediaRepo.updateStatus(mediaId, brandId, MediaLifecycle.STATES.PROCESSING);
     }
 

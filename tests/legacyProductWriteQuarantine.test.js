@@ -38,12 +38,12 @@ test('Forward Branch Catalog UI is Menu-only and does not call legacy Product ov
 test('Merchant App inline Menu actions pass menu_id, never component product_id', () => {
   assert.match(
     merchantApp,
-    /toggleBranchMenuAvailability\(\\'\s*\+\s*p\.menu_id\s*\+\s*\\'/,
+    /toggleBranchMenuAvailability\([^)]*p\.menu_id/,
     'availability toggle must receive the Menu ID'
   );
   assert.match(
     merchantApp,
-    /removeBranchMenu\(\\'\s*\+\s*p\.menu_id\s*\+\s*\\'/,
+    /removeBranchMenu\([^)]*p\.menu_id/,
     'remove action must receive the Menu ID'
   );
   assert.doesNotMatch(

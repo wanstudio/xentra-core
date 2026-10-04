@@ -62,7 +62,7 @@ test.before(async () => {
 
   db.prepare(
     "INSERT OR IGNORE INTO menu_complements (id, brand_id, name, slug, is_active) VALUES (?, ?, 'Nasi CMM', 'nasi-cmm', 1)"
-  ).run(COMPLEMENT);
+  ).run(COMPLEMENT, BRAND);
   db.prepare(
     "DELETE FROM product_complements WHERE product_id IN (?, ?, ?, ?)"
   ).run(PRODUCT_SIMPLE, PRODUCT_STOCK, PRODUCT_COMPLEMENT, PRODUCT_DUPLICATE);

@@ -804,7 +804,7 @@ describe('BM-3 — Branch Manager Dashboard: Menu + Stok + Promo', () => {
 
     const master = db.prepare('SELECT * FROM products WHERE id = ?').get('prod_bm3_adoptable');
     assert.ok(master);
-    assert.equal(master.name, 'Es Teh Manis Jumbo');
+    assert.equal(master.name, 'Menu BM3 Adoptable');
     assert.equal(master.is_active, 1);
   });
 

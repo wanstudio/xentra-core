@@ -2541,6 +2541,9 @@ function initSchema(targetDb) {
       targetDb.prepare(
         'UPDATE branch_products SET branch_category_id = ? WHERE branch_id = ? AND product_id = ? AND branch_category_id IS NULL'
       ).run(branchCat.id, row.branch_id, row.product_id);
+      targetDb.prepare(
+        'INSERT OR IGNORE INTO branch_product_categories (branch_id, product_id, branch_category_id) VALUES (?, ?, ?)'
+      ).run(row.branch_id, row.product_id, branchCat.id);
     }
 
     // Step 4: Legacy pricing compatibility shadow only.

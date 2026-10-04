@@ -128,14 +128,14 @@ function addTestBranch(branchId) {
   const subCategoryId = 'customer_google_sub_272';
   const menuId = 'customer_google_menu_272';
   db.prepare("INSERT OR IGNORE INTO categories (id, brand_id, name, slug, is_active) VALUES (?, 'brand_bangjo', 'Makanan Google Test', 'customer-google-makanan', 1)").run(categoryId);
-  db.prepare("INSERT OR REPLACE INTO products (id, brand_id, category_id, name, slug, description, price, is_active) VALUES (?, 'brand_bangjo', ?, 'Test Customer Google Menu', ?, 'Test', 35000, 1)").run(productId, categoryId, 'customer-google-product-272');
+  db.prepare("INSERT OR IGNORE INTO products (id, brand_id, category_id, name, slug, description, price, is_active) VALUES (?, 'brand_bangjo', ?, 'Test Customer Google Menu', ?, 'Test', 35000, 1)").run(productId, categoryId, 'customer-google-product-272');
   db.prepare("INSERT OR REPLACE INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, is_active, is_open_override) VALUES (?, 'brand_bangjo', ?, ?, 'Jl. Test', -7.2912, 112.7154, '081000000001', 1, 1)").run(branchId, 'Branch ' + branchId, branchId);
   db.prepare("INSERT OR REPLACE INTO branch_delivery_settings (id, branch_id, is_delivery_active, is_pickup_active, max_radius_km, free_delivery_km, price_per_km, min_order_amount) VALUES (?, ?, 1, 1, 25, 5, 3000, 0)").run('bds_' + branchId, branchId);
   const rasa = db.prepare("SELECT id FROM menu_flavors WHERE brand_id = 'brand_bangjo' AND lower(trim(name)) = 'original' AND is_active = 1 LIMIT 1").get()
     || (db.prepare("INSERT INTO menu_flavors (id, brand_id, name, slug, is_active) VALUES ('customer_google_original', 'brand_bangjo', 'Original', 'customer-google-original', 1)").run(), db.prepare("SELECT id FROM menu_flavors WHERE id = 'customer_google_original'").get());
-  db.prepare("INSERT OR REPLACE INTO sub_categories (id, brand_id, category_id, name, slug, is_active) VALUES (?, 'brand_bangjo', ?, 'Test Customer Google Menu', 'customer-google-makanan', 1)").run(subCategoryId, categoryId);
-  db.prepare("INSERT OR REPLACE INTO menus (id, brand_id, menu_type, sub_category_id, rasa_id, selling_price, status) VALUES (?, 'brand_bangjo', 'SINGLE', ?, ?, 35000, 'ACTIVE')").run(menuId, subCategoryId, rasa.id);
-  db.prepare("INSERT OR REPLACE INTO menu_items (menu_id, product_id, quantity, sort_order) VALUES (?, ?, 1, 0)").run(menuId, productId);
+  db.prepare("INSERT OR IGNORE INTO sub_categories (id, brand_id, category_id, name, slug, is_active) VALUES (?, 'brand_bangjo', ?, 'Test Customer Google Menu', 'customer-google-makanan', 1)").run(subCategoryId, categoryId);
+  db.prepare("INSERT OR IGNORE INTO menus (id, brand_id, menu_type, sub_category_id, rasa_id, selling_price, status) VALUES (?, 'brand_bangjo', 'SINGLE', ?, ?, 35000, 'ACTIVE')").run(menuId, subCategoryId, rasa.id);
+  db.prepare("INSERT OR IGNORE INTO menu_items (menu_id, product_id, quantity, sort_order) VALUES (?, ?, 1, 0)").run(menuId, productId);
   db.prepare("INSERT OR IGNORE INTO branch_categories (id, brand_id, branch_id, name, slug, sort_order, is_active) VALUES (?, 'brand_bangjo', ?, 'Makanan', ?, 1, 1)").run('customer_google_bc_' + branchId, branchId, 'customer-google-makanan-' + branchId);
   db.prepare("INSERT OR REPLACE INTO branch_menus (branch_id, menu_id, is_available, price_override) VALUES (?, ?, 1, 35000)").run(branchId, menuId);
   db.prepare("INSERT OR REPLACE INTO branch_menu_categories (branch_id, menu_id, branch_category_id) VALUES (?, ?, ?)").run(branchId, menuId, 'customer_google_bc_' + branchId);

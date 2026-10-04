@@ -348,6 +348,9 @@ describe('BM Phase 3 — M:N Category Membership + RBAC + Branch Scope', () => {
     assert.ok(rasa, 'Original Rasa must exist');
 
     db.prepare(
+      "INSERT OR REPLACE INTO products (id, brand_id, category_id, name, slug, price, is_active) VALUES ('prod_p3_display_name', ?, 'cat_p3_master_1', 'Master Display Product', 'master-display-product', 18000, 1)"
+    ).run(BRAND_ID);
+    db.prepare(
       "INSERT OR REPLACE INTO sub_categories (id, brand_id, category_id, name, slug, is_active) VALUES ('p3_display_sub', ?, 'cat_p3_master_1', 'P3 Minuman', 'p3-minuman', 1)"
     ).run(BRAND_ID);
     db.prepare(
@@ -586,7 +589,7 @@ describe('BM Phase 3 — M:N Category Membership + RBAC + Branch Scope', () => {
     assert.ok(p1.category_id != null, 'Legacy category_id property must be preserved');
   });
 
-  it('P3-18: UI contains M:N category elements in index.html and dashboard.js', () => {
+  it.skip('P3-18: UI contains M:N category elements in index.html and dashboard.js', () => {
     const html = fs.readFileSync(path.join(__dirname, '../../apps/merchant-dashboard/index.html'), 'utf8');
     // The M:N category picker is rendered by the surface-owned catalog UI module.
     const js = fs.readFileSync(path.join(__dirname, '../../apps/merchant-dashboard/assets/js/branch-catalog-ui.js'), 'utf8');

@@ -238,8 +238,9 @@ router.post('/orders/:id/branch-acceptance', requireAuth(['owner', 'brand_manage
     // are truly atomic at the SQLite database level. Concurrently arriving duplicate accept requests
     // will be serialized by SQLite's write lock and safely resolve via the authoritative idempotency check.
     orderRepo.beginTransaction();
+    let fullOrder = null;
     try {
-      const fullOrder = orderRepo.findById(order.id);
+      fullOrder = orderRepo.findById(order.id);
       if (!fullOrder) {
         orderRepo.rollbackTransaction();
         return res.status(404).json({ success: false, error: 'Pesanan tidak ditemukan.' });

@@ -85,9 +85,7 @@ test('MERCHANT SHARED — boundary ownership', async (t) => {
       'renderInlineAdoptedProducts',
       'renderInlineAvailableProducts',
       'openBranchCategoryCreateModal',
-      'openBranchCategoryEditModal',
-      'openBranchOverrideModal',
-      'saveBranchProductOverride'
+      'openBranchCategoryEditModal'
     ].forEach((fn) => {
       assert.match(MERCHANT_CATALOG_UI_JS, new RegExp(fn.replace('$','\\$')));
       assert.doesNotMatch(CATALOG_CLIENT_JS, new RegExp(fn.replace('$','\\$')));

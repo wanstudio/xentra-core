@@ -110,7 +110,7 @@ class BrandRepository {
     return this.db.queryOne('SELECT * FROM brands WHERE id = ? LIMIT 1', [brandId]);
   }
 
-  updateBrandProfile(brandId, { name, tagline, primary_color, merchant_pwa_name, pos_pwa_name }) {
+  updateBrandProfile(brandId, { name, tagline, primary_color, merchant_pwa_name, pos_pwa_name, banners }) {
     if (name !== undefined && (typeof name !== 'string' || !name.trim())) {
       throw new Error('Nama brand harus berupa teks yang valid.');
     }
@@ -129,6 +129,19 @@ class BrandRepository {
         throw new Error('Format warna tema (hex) tidak valid. Gunakan format #RRGGBB.');
       }
       normalizedPrimaryColor = cleanHex.toUpperCase();
+    }
+
+    if (banners !== undefined && banners !== null) {
+      if (typeof banners === 'string') {
+        try {
+          const parsed = JSON.parse(banners);
+          if (!Array.isArray(parsed)) throw new Error();
+        } catch (_) {
+          throw new Error('Format banners JSON tidak valid, harus berupa JSON array.');
+        }
+      } else if (!Array.isArray(banners)) {
+        throw new Error('Format banners tidak valid, harus berupa array atau JSON string.');
+      }
     }
 
     // Media references are intentionally excluded. Logo, PWA icons, and banners

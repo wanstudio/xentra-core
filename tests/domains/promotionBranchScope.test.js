@@ -76,13 +76,15 @@ describe('Promotion Phase 1 — Campaign <-> Branch Scope Domain Audit & Impleme
     db.prepare('INSERT INTO branches (id, brand_id, name, slug, address_text, is_active, latitude, longitude) VALUES (?, ?, ?, ?, ?, 1, -6.20, 106.80)')
       .run(branchForeign, otherBrandId, 'Foreign Branch', 'foreign-branch', 'Jl. Sudirman No. 10');
 
-    // 3. Seed Master Products
-    db.prepare('INSERT INTO products (id, brand_id, name, slug, price, is_active) VALUES (?, ?, ?, ?, ?, 1)')
-      .run(foodProdA, brandId, 'Nasi Ayam Penyet', 'nasi-ayam-penyet', 25000);
-    db.prepare('INSERT INTO products (id, brand_id, name, slug, price, is_active) VALUES (?, ?, ?, ?, ?, 1)')
-      .run(rewardProdA, brandId, 'Es Teh Promo', 'es-teh-promo', 5000);
-    db.prepare('INSERT INTO products (id, brand_id, name, slug, price, is_active) VALUES (?, ?, ?, ?, ?, 1)')
-      .run(rewardProdB, brandId, 'Puding Coklat Promo', 'puding-promo', 8000);
+    // 3. Seed Category & Master Products
+    db.prepare('INSERT OR IGNORE INTO categories (id, brand_id, name, slug, is_active) VALUES (?, ?, ?, ?, 1)')
+      .run('cat_scope_promo', brandId, 'Promo Foods', 'promo-foods');
+    db.prepare('INSERT INTO products (id, brand_id, category_id, name, slug, price, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)')
+      .run(foodProdA, brandId, 'cat_scope_promo', 'Nasi Ayam Penyet', 'nasi-ayam-penyet', 25000);
+    db.prepare('INSERT INTO products (id, brand_id, category_id, name, slug, price, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)')
+      .run(rewardProdA, brandId, 'cat_scope_promo', 'Es Teh Promo', 'es-teh-promo', 5000);
+    db.prepare('INSERT INTO products (id, brand_id, category_id, name, slug, price, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)')
+      .run(rewardProdB, brandId, 'cat_scope_promo', 'Puding Coklat Promo', 'puding-promo', 8000);
 
     const rasa = db.prepare("SELECT id FROM menu_flavors WHERE brand_id = ? AND lower(trim(name)) = 'original' AND is_active = 1 LIMIT 1").get(brandId)
       || (db.prepare("INSERT INTO menu_flavors (id, brand_id, name, slug, is_active) VALUES ('scope_original_rasa', ?, 'Original', 'scope-original', 1)").run(brandId), db.prepare("SELECT id FROM menu_flavors WHERE id = 'scope_original_rasa'").get());
