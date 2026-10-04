@@ -56,6 +56,13 @@ function normalizeSpiceLevel(value) {
   return level;
 }
 
+function normalizeSpiceLevel(value) {
+  if (value === undefined || value === null || value === '') return 0;
+  const level = Number(value);
+  if (!Number.isInteger(level) || level < 0 || level > 4) throw new Error('MENU_SPICE_LEVEL_INVALID');
+  return level;
+}
+
 function normalizeLevelId(value) {
   if (value === undefined || value === null || value === '') return null;
   return String(value).trim() || null;
