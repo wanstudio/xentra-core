@@ -190,7 +190,8 @@
     });
     var product = data.product;
     createdProducts.push(product);
-    var label = product.name + (product.sku ? ' · SKU ' + product.sku : '');
+    // Label dropdown komposisi = nama Product saja; SKU tetap identity internal.
+    var label = product.name;
     var menuApi = window.XentraOwnerMasterMenu;
     if (packageContext && menuApi && typeof menuApi.addPackageProduct === 'function') {
       menuApi.addPackageProduct(product);
@@ -352,7 +353,7 @@
       createdProducts.forEach(function(product) {
         var id = String(product.id || '');
         if (!id || Array.from(select.options).some(function(option) { return String(option.value) === id; })) return;
-        addOption(select, id, product.name + (product.sku ? ' · SKU ' + product.sku : ''), false);
+        addOption(select, id, product.name, false);
       });
     });
   }

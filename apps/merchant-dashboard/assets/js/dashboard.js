@@ -10977,9 +10977,9 @@ async function loadMenusView() {
     if (single) single.style.display = _ownerMasterMenuState.editingType === 'SINGLE' ? 'block' : 'none';
     if (pkg) pkg.style.display = _ownerMasterMenuState.editingType === 'PACKAGE' ? 'block' : 'none';
 
-    ownerMasterMenuPopulateSelect('cm-product', _ownerMasterMenuState.products, 'id', function(row) {
-      return row.name + (row.sku ? ' · SKU ' + row.sku : '');
-    });
+    // Dropdown komposisi menampilkan NAMA Product saja. SKU tetap identity
+    // internal (value opsi = id Product) dan tidak ditampilkan ke pengguna.
+    ownerMasterMenuPopulateSelect('cm-product', _ownerMasterMenuState.products, 'id');
     ownerMasterMenuPopulateSelect('cm-category', _ownerMasterMenuState.categories, 'id');
     renderOwnerMasterMenuSubCategories();
     ownerMasterMenuPopulateSelect('cm-rasa', _ownerMasterMenuState.rasas, 'id', function(row) {
