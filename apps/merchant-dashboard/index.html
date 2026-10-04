@@ -1907,6 +1907,24 @@
                 </div>
               </div>
 
+              <div class="x-form-group">
+                <label>Foto Menu</label>
+                <div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;">
+                  <div id="cm-menu-image-preview-wrap" style="width:112px;height:112px;border-radius:12px;overflow:hidden;border:1px solid var(--border-color,#e2e8f0);background:#f8fafc;display:flex;align-items:center;justify-content:center;">
+                    <img id="cm-menu-image-preview" alt="Preview Foto Menu" style="display:none;width:100%;height:100%;object-fit:cover;">
+                    <span id="cm-menu-image-empty" style="font-size:28px;">🍲</span>
+                  </div>
+                  <div style="flex:1;min-width:220px;">
+                    <input type="file" id="cm-menu-image-file" accept="image/jpeg,image/jpg,image/png,image/webp" style="display:none;">
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                      <button type="button" class="x-btn-secondary" id="btn-cm-menu-image-pick">Pilih Foto</button>
+                      <button type="button" class="x-btn-secondary" id="btn-cm-menu-image-remove" style="display:none;">Hapus Foto</button>
+                    </div>
+                    <small class="text-muted" style="display:block;margin-top:5px;font-size:11px;">Foto ini milik Menu dan menjadi gambar customer. Product hanya menjadi komponen stok; gambar Product tidak dijadikan fallback.</small>
+                  </div>
+                </div>
+              </div>
+
               <div class="x-form-row">
                 <div class="x-form-group">
                   <label for="cm-price">Harga Jual Menu (Rp) <span class="x-required-mark">*</span></label>
