@@ -195,17 +195,33 @@
      ========================================================================= */
 
   /**
-   * Shows a transient toast notification.
+   * Shows a transient toast notification with design variant support.
    * @param {string} message - Toast text (HTML-escaped internally).
-   * @param {string} [type]  - Reserved for future type variants (unused).
+   * @param {string} [type]  - Variant: 'success' | 'error' | 'warning' | 'info' (auto-detected if omitted).
    */
   function showToast(message, type) {
     var container = $('x-toast-container');
     if (!container) return;
 
+    var text = String(message || '').trim();
+    var resolvedType = type;
+    if (!resolvedType) {
+      if (/^[❌🚫⚠️]/.test(text) || text.indexOf('❌') !== -1 || text.indexOf('Gagal') !== -1 || text.indexOf('gagal') !== -1 || text.indexOf('Error') !== -1 || text.indexOf('tidak') !== -1) {
+        resolvedType = (text.indexOf('⚠️') !== -1) ? 'warning' : 'error';
+      } else if (/^[✅✓]/.test(text) || text.indexOf('✅') !== -1 || text.indexOf('berhasil') !== -1 || text.indexOf('Berhasil') !== -1) {
+        resolvedType = 'success';
+      }
+    }
+
+    // Clean leading emoji if already present so it doesn't duplicate icon
+    var cleanText = text.replace(/^[✅✓❌⚡⚠️\s]+/, '');
+    var icon = resolvedType === 'error' ? '❌'
+      : (resolvedType === 'success' ? '✅'
+      : (resolvedType === 'warning' ? '⚠️' : '⚡'));
+
     var toast = document.createElement('div');
-    toast.className = 'x-toast';
-    toast.innerHTML = '<span>⚡</span> <span>' + esc(message) + '</span>';
+    toast.className = 'x-toast' + (resolvedType ? ' x-toast-' + resolvedType : '');
+    toast.innerHTML = '<span>' + icon + '</span> <span>' + esc(cleanText || text) + '</span>';
     container.appendChild(toast);
 
     setTimeout(function () {

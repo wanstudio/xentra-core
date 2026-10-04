@@ -84,6 +84,36 @@ a:focus:not(:focus-visible),
   align-items: center;
   gap: 10px;
   animation: xSharedSlideInRight 0.25s ease;
+  border: 1px solid transparent;
+}
+
+.x-toast.x-toast-error,
+.x-toast.x-toast-danger {
+  background: #fff1f2;
+  color: #9f1239;
+  border-color: #fecdd3;
+  box-shadow: 0 4px 14px rgba(225, 29, 72, 0.12);
+}
+
+.x-toast.x-toast-success {
+  background: #f0fdf4;
+  color: #166534;
+  border-color: #bbf7d0;
+  box-shadow: 0 4px 14px rgba(22, 101, 52, 0.1);
+}
+
+.x-toast.x-toast-warning {
+  background: #fffbeb;
+  color: #92400e;
+  border-color: #fde68a;
+  box-shadow: 0 4px 14px rgba(180, 83, 9, 0.1);
+}
+
+.x-toast.x-toast-info {
+  background: #f0f9ff;
+  color: #075985;
+  border-color: #bae6fd;
+  box-shadow: 0 4px 14px rgba(14, 116, 144, 0.1);
 }
 
 @keyframes xSharedSlideInRight {

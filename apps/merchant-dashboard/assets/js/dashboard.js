@@ -186,12 +186,31 @@
   }
 
   function showToast(message, type) {
+    if (window.XentraShared && typeof window.XentraShared.showToast === 'function') {
+      window.XentraShared.showToast(message, type);
+      return;
+    }
     var container = $('x-toast-container');
     if (!container) return;
 
+    var text = String(message || '').trim();
+    var resolvedType = type;
+    if (!resolvedType) {
+      if (/^[❌🚫⚠️]/.test(text) || text.indexOf('❌') !== -1 || text.indexOf('Gagal') !== -1 || text.indexOf('gagal') !== -1 || text.indexOf('Error') !== -1 || text.indexOf('tidak') !== -1) {
+        resolvedType = (text.indexOf('⚠️') !== -1) ? 'warning' : 'error';
+      } else if (/^[✅✓]/.test(text) || text.indexOf('✅') !== -1 || text.indexOf('berhasil') !== -1 || text.indexOf('Berhasil') !== -1) {
+        resolvedType = 'success';
+      }
+    }
+
+    var cleanText = text.replace(/^[✅✓❌⚡⚠️\s]+/, '');
+    var icon = resolvedType === 'error' ? '❌'
+      : (resolvedType === 'success' ? '✅'
+      : (resolvedType === 'warning' ? '⚠️' : '⚡'));
+
     var toast = document.createElement('div');
-    toast.className = 'x-toast';
-    toast.innerHTML = '<span>⚡</span> <span>' + esc(message) + '</span>';
+    toast.className = 'x-toast' + (resolvedType ? ' x-toast-' + resolvedType : '');
+    toast.innerHTML = '<span>' + icon + '</span> <span>' + esc(cleanText || text) + '</span>';
     container.appendChild(toast);
 
     setTimeout(function () {
@@ -203,6 +222,7 @@
       }, 300);
     }, 3500);
   }
+  window.showToast = showToast;
 
 
   window.toggleStockChecked = function (id, checked) {
@@ -2637,7 +2657,7 @@
         renderMasterProductsTable();
         renderMasterReferenceList(type);
         renderMasterMenuCustomerPreview();
-        showToast('✅ Kategori diarsipkan.');
+        showToast('Kategori diarsipkan.', 'success');
         return;
       } else {
         _masterMenuComponents[type] = (_masterMenuComponents[type] || []).filter(function(item) { return String(item.id) !== String(id); });
@@ -2646,9 +2666,9 @@
 
       renderMasterReferenceList(type);
       renderMasterMenuCustomerPreview();
-      showToast('✅ ' + referenceTypeLabel(type) + ' dihapus.');
+      showToast(referenceTypeLabel(type) + ' dihapus.', 'success');
     } catch (err) {
-      showToast('❌ ' + err.message);
+      showToast(err.message, 'error');
     }
   }
   window.deleteMasterReference = deleteMasterReference;
