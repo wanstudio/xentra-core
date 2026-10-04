@@ -1174,10 +1174,7 @@
       var product = Object.assign({}, menu, {
         id: menu.menu_id || menu.id,
         menu_id: menu.menu_id || menu.id,
-        menu_type: menu.menu_type || 'SINGLE',
-        product_id: menu.menu_type === 'SINGLE' && componentSnapshot[0]
-          ? componentSnapshot[0].product_id
-          : null,
+        product_id: componentSnapshot[0] ? componentSnapshot[0].product_id : null,
         name: menu.title || menu.package_name || 'Menu',
         menu_title: menu.title || menu.package_name || 'Menu',
         menu_subtitle: menu.subtitle || '',
