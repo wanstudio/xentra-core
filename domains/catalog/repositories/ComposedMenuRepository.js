@@ -182,17 +182,17 @@ class ComposedMenuRepository {
     );
   }
 
-  createMenu({ id, brandId, menuType, subCategoryId = null, rasaId = null, levelId = null, packageName = null, sellingPrice, status }) {
+  createMenu({ id, brandId, menuType, subCategoryId = null, rasaId = null, levelId = null, packageName = null, sellingPrice, status, mediaId = null, imageUrl = null, image = null }) {
     return this.db.execute(
       "INSERT INTO menus " +
       "(id, brand_id, menu_type, sub_category_id, rasa_id, level_id, package_name, selling_price, status) " +
       "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      [id, brandId, menuType, subCategoryId, rasaId, levelId, packageName, sellingPrice, status]
+      [id, brandId, menuType, subCategoryId, rasaId, levelId, packageName, sellingPrice, status, mediaId, imageUrl, image]
     );
   }
 
   updateMenu({ brandId, menuId, fields }) {
-    const allowed = ['sub_category_id', 'rasa_id', 'level_id', 'package_name', 'selling_price', 'status'];
+    const allowed = ['sub_category_id', 'rasa_id', 'level_id', 'package_name', 'selling_price', 'status', 'media_id', 'image_url', 'image'];
     const sets = [];
     const params = [];
     for (const key of allowed) {
