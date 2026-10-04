@@ -252,7 +252,6 @@ class PrePaymentVerificationGate {
         verifiedItems.push({
           product_id: resolvedReward.product_id,
           menu_id: resolvedReward.menu_id,
-          menu_type: resolvedReward.menu_type,
           menu_snapshot: resolvedReward.menu_snapshot,
           component_snapshot: resolvedReward.component_snapshot,
           promo_id: authoritativePromoId,
