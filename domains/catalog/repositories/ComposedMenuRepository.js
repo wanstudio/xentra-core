@@ -142,7 +142,7 @@ class ComposedMenuRepository {
 
   findMenu({ brandId, menuId }) {
     return this.db.queryOne(
-      "SELECT m.id, m.brand_id, m.category_id, m.title_id, m.rasa_id, m.level_id, m.spice_level AS spice_level, m.selling_price, m.status, m.created_at, m.updated_at, " +
+      "SELECT m.id, m.brand_id, m.category_id, m.title_id, m.rasa_id, m.level_id, m.spice_level AS spice_level, spice_enabled AS spice_enabled, m.spice_enabled AS spice_enabled, m.selling_price, m.status, m.created_at, m.updated_at, " +
       "c.name AS category_name, c.slug AS category_slug, t.name AS title_name, t.slug AS title_slug, " +
       "r.name AS rasa_name, r.slug AS rasa_slug, l.name AS level_name, l.slug AS level_slug, l.sort_order AS level_sort_order " +
       "FROM menus m " +
@@ -163,15 +163,15 @@ class ComposedMenuRepository {
     );
   }
 
-  createMenu({ id, brandId, categoryId, titleId, rasaId = null, levelId = null, spiceLevel = null, sellingPrice, status, displayName = null }) {
+  createMenu({ id, brandId, categoryId, titleId, rasaId = null, levelId = null, spiceLevel = 0, spiceEnabled = false, sellingPrice, status, displayName = null }) {
     return this.db.execute(
-      "INSERT INTO menus (id, brand_id, menu_type, display_name, category_id, title_id, sub_category_id, rasa_id, level_id, spice_level, package_name, selling_price, status) VALUES (?, ?, 'SINGLE', ?, ?, ?, NULL, ?, ?, ?, NULL, ?, ?)",
-      [id, brandId, displayName, categoryId, titleId, rasaId, levelId, spiceLevel, sellingPrice, status]
+      "INSERT INTO menus (id, brand_id, menu_type, display_name, category_id, title_id, sub_category_id, rasa_id, level_id, spice_level, spice_enabled, package_name, selling_price, status) VALUES (?, ?, 'SINGLE', ?, ?, ?, NULL, ?, ?, ?, NULL, ?, ?)",
+      [id, brandId, displayName, categoryId, titleId, rasaId, levelId, spiceLevel, spiceEnabled ? 1 : 0, sellingPrice, status]
     );
   }
 
   updateMenu({ brandId, menuId, fields }) {
-    const allowed = ['category_id', 'title_id', 'rasa_id', 'level_id', 'spice_level', 'selling_price', 'status'];
+    const allowed = ['category_id', 'title_id', 'rasa_id', 'level_id', 'spice_level', 'spice_enabled', 'selling_price', 'status'];
     const sets = [];
     const params = [];
     for (const key of allowed) {
