@@ -2599,30 +2599,46 @@
     if (!row) return;
 
     var noun = referenceTypeLabel(type).toLowerCase();
+    var isArchive = type === 'category';
+    var actionLabel = isArchive ? 'Arsipkan' : 'Hapus';
+    var actionMessage = isArchive
+      ? 'Arsipkan ' + noun + ' "' + row.name + '"? Data dan relasinya tetap dipertahankan.'
+      : 'Hapus ' + noun + ' "' + row.name + '"? Tindakan ini tidak dapat dibatalkan.';
     if (window.XentraPresentation && !await window.XentraPresentation.confirm({
       id: 'delete-master-reference',
-      title: 'Hapus ' + referenceTypeLabel(type),
-      message: 'Hapus ' + noun + ' "' + row.name + '"? Tindakan ini tidak dapat dibatalkan.',
-      okLabel: 'Hapus',
+      title: actionLabel + ' ' + referenceTypeLabel(type),
+      message: actionMessage,
+      okLabel: actionLabel,
       cancelLabel: 'Batal'
     })) return;
 
     try {
-      var res = await adminFetch(meta.deleteEndpoint(String(id)), {
-        method: 'DELETE',
+      var endpoint = isArchive ? meta.archiveEndpoint(String(id)) : meta.deleteEndpoint(String(id));
+      var res = await adminFetch(endpoint, {
+        method: isArchive ? 'PATCH' : 'DELETE',
         headers: getAuthHeaders()
       });
       var data = await res.json();
 
       if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Gagal menghapus ' + noun + '.');
+        throw new Error(data.error || (isArchive ? 'Gagal mengarsipkan ' + noun + '.' : 'Gagal menghapus ' + noun + '.'));
       }
 
       if (type === 'category') {
-        state.categories = (state.categories || []).filter(function(item) { return String(item.id) !== String(id); });
+        var updatedCategory = data.category;
+        if (!updatedCategory) throw new Error('Server tidak mengembalikan kategori hasil arsip.');
+        var categoryRows = state.categories || [];
+        var categoryIndex = categoryRows.findIndex(function(item) { return String(item.id) === String(id); });
+        if (categoryIndex >= 0) categoryRows[categoryIndex] = updatedCategory;
+        else categoryRows.push(updatedCategory);
+        state.categories = categoryRows;
         populateProductCategorySelect();
         renderProductCategoryFilterChips();
         renderMasterProductsTable();
+        renderMasterReferenceList(type);
+        renderMasterMenuCustomerPreview();
+        showToast('✅ Kategori diarsipkan.');
+        return;
       } else {
         _masterMenuComponents[type] = (_masterMenuComponents[type] || []).filter(function(item) { return String(item.id) !== String(id); });
         renderMasterMenuSelectors();
@@ -2648,7 +2664,7 @@
       placeholder: 'Contoh: Makanan Berat',
       description: 'Pengelompokan Produk Master / Judul Menu',
       endpoint: function () { return API_BASE + '/admin/categories'; },
-      deleteEndpoint: function (id) { return API_BASE + '/admin/categories/' + encodeURIComponent(id); },
+      archiveEndpoint: function (id) { return API_BASE + '/admin/categories/' + encodeURIComponent(id) + '/archive'; },
       payload: function (name) { return { name: name }; }
     },
     flavor: {
@@ -3837,7 +3853,7 @@ async function loadMenusView() {
           onClick: function () { openEditMasterReference(type, id); }
         },
         {
-          label: 'Hapus',
+          label: type === 'category' ? 'Arsipkan' : 'Hapus',
           icon: '🗑️',
           destructive: true,
           onClick: function () { deleteMasterReference(type, id); }

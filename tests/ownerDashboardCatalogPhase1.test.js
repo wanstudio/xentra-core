@@ -188,16 +188,42 @@ test('PHASE 1: OWNER DASHBOARD CATALOG IMPLEMENTATION', async (t) => {
       createdProductId = res.body.product.id;
     });
 
-    await t2.test('2.2 Category deletion is protected when product is assigned', async () => {
+    await t2.test('2.2 Category archive remains safe when product and sub-category are assigned', async () => {
+      const fkSubCategoryId = 'phase1_archive_fk_sub_' + Date.now();
+      db.prepare(
+        "INSERT INTO sub_categories (id, brand_id, category_id, name, slug, is_active) VALUES (?, ?, ?, ?, ?, 1)"
+      ).run(fkSubCategoryId, BRAND_ID, createdCategoryId, 'FK Archive Test', 'fk-archive-test-' + Date.now());
+
       const res = await makeRequest(server, {
-        method: 'DELETE',
-        path: `/api/v1/admin/categories/${createdCategoryId}`,
+        method: 'PATCH',
+        path: `/api/v1/admin/categories/${createdCategoryId}/archive`,
         headers: { Authorization: `Bearer ${ownerToken}` }
       });
 
-      assert.strictEqual(res.status, 400, 'Must reject category deletion with active products');
-      assert.strictEqual(res.body.success, false);
-      assert.ok(res.body.error.includes('tidak dapat dihapus'));
+      assert.strictEqual(res.status, 200, 'Category archive must not fail on foreign-key references');
+      assert.strictEqual(res.body.success, true);
+      assert.strictEqual(res.body.archived, true);
+      assert.ok(res.body.category, 'Archive response must return the category');
+      assert.strictEqual(Number(res.body.category.is_active), 0);
+
+      const persisted = db.prepare('SELECT is_active FROM categories WHERE id = ? AND brand_id = ?').get(createdCategoryId, BRAND_ID);
+      assert.ok(persisted, 'Archived category must remain in the database');
+      assert.strictEqual(Number(persisted.is_active), 0);
+
+      const child = db.prepare('SELECT id, category_id FROM sub_categories WHERE id = ?').get(fkSubCategoryId);
+      assert.ok(child, 'Existing Sub Category relation must remain intact after archive');
+      assert.strictEqual(child.category_id, createdCategoryId);
+
+      // Restore for the canonical Menu tests that follow, then remove only the test fixture.
+      const restore = await makeRequest(server, {
+        method: 'PUT',
+        path: `/api/v1/admin/categories/${createdCategoryId}`,
+        headers: { Authorization: `Bearer ${ownerToken}` }
+      }, { is_active: true });
+
+      assert.strictEqual(restore.status, 200);
+      assert.strictEqual(Number(restore.body.category.is_active), 1);
+      db.prepare('DELETE FROM sub_categories WHERE id = ?').run(fkSubCategoryId);
     });
 
     await t2.test('2.3 GET /admin/products/:id returns detail with branch adoption matrix', async () => {

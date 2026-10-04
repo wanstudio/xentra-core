@@ -363,7 +363,7 @@ test('Master Category and Flavor edit/delete endpoints are wired', () => {
   const route = fs.readFileSync(path.join(ROOT, 'server/routes/admin-catalog.js'), 'utf8');
   const compositionRoute = fs.readFileSync(path.join(ROOT, 'server/routes/admin-menu-composition.js'), 'utf8');
   assert.ok(route.includes("router.put('/admin/categories/:id'"));
-  assert.ok(route.includes("router.delete('/admin/categories/:id'"));
+  assert.ok(route.includes("router.patch('/admin/categories/:id/archive'"));
   assert.ok(compositionRoute.includes("router.put('/admin/menu/components/:type/:id'"));
   assert.ok(compositionRoute.includes("router.delete('/admin/menu/components/:type/:id'"));
   assert.ok(JS.includes("deleteEndpoint: function (id) { return API_BASE + '/admin/menu/components/flavor/'"));

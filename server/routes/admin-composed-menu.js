@@ -67,6 +67,22 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
     }
   });
 
+  router.get('/admin/composed/products/:id', requireAuth(ownerRoles), (req, res) => {
+    try {
+      const product = productService.findProduct
+        ? productService.findProduct({ brandId: req.brand_id, productId: req.params.id })
+        : null;
+
+      if (!product) {
+        return res.status(404).json({ success: false, error: 'MASTER_PRODUCT_NOT_FOUND' });
+      }
+
+      res.json({ success: true, product });
+    } catch (err) {
+      sendError(res, err, 'COMPOSED_PRODUCT_READ_FAILED');
+    }
+  });
+
   router.post('/admin/composed/products', requireAuth(ownerRoles), (req, res) => {
     try {
       const body = req.body || {};

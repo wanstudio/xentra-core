@@ -514,8 +514,8 @@ describe('BM Phase 3 — M:N Category Membership + RBAC + Branch Scope', () => {
     });
     assert.equal(createCat.status, 403);
 
-    // DELETE /admin/categories/:id -> 403
-    const delCat = await request('DELETE', '/api/v1/admin/categories/cat_p3_master_1', null, {
+    // PATCH /admin/categories/:id/archive -> 403
+    const delCat = await request('PATCH', '/api/v1/admin/categories/cat_p3_master_1/archive', null, {
       Authorization: `Bearer ${token}`
     });
     assert.equal(delCat.status, 403);
