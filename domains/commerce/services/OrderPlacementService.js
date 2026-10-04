@@ -372,7 +372,6 @@ class OrderPlacementService {
           modifiersSnapshot: JSON.stringify(item.modifiers_snapshot || item.options || []),
           menuSnapshot: item.menu_snapshot ? JSON.stringify(item.menu_snapshot) : null,
           menuId: item.menu_id || null,
-          menuType: item.menu_type || null,
           componentSnapshot: item.component_snapshot ? JSON.stringify(item.component_snapshot) : null
         });
 
