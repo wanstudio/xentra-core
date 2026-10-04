@@ -2657,7 +2657,7 @@
         renderMasterProductsTable();
         renderMasterReferenceList(type);
         renderMasterMenuCustomerPreview();
-        showToast('Kategori diarsipkan.', 'success');
+        showToast(data.message || 'Kategori diarsipkan.', 'success');
         return;
       } else {
         _masterMenuComponents[type] = (_masterMenuComponents[type] || []).filter(function(item) { return String(item.id) !== String(id); });

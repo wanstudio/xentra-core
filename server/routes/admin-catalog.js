@@ -104,15 +104,24 @@ router.patch('/admin/categories/:id/archive', requireAuth(['owner', 'brand_manag
       return res.status(404).json({ success: false, error: 'Kategori tidak ditemukan.' });
     }
 
-    const stmt = db.prepare(`
+    if (existing.is_active === 0) {
+      const category = db.prepare(
+        'SELECT * FROM categories WHERE id = ? AND brand_id = ?'
+      ).get(req.params.id, req.brand_id);
+
+      return res.json({
+        success: true,
+        archived: true,
+        message: `Kategori "${existing.name}" sudah berstatus nonaktif (diarsipkan).`,
+        category
+      });
+    }
+
+    db.prepare(`
       UPDATE categories
       SET is_active = 0
       WHERE id = ? AND brand_id = ?
     `).run(req.params.id, req.brand_id);
-
-    if (!stmt || stmt.changes === 0) {
-      return res.status(404).json({ success: false, error: 'Kategori tidak ditemukan atau tidak berubah.' });
-    }
 
     const category = db.prepare(
       'SELECT * FROM categories WHERE id = ? AND brand_id = ?'
@@ -121,7 +130,7 @@ router.patch('/admin/categories/:id/archive', requireAuth(['owner', 'brand_manag
     res.json({
       success: true,
       archived: true,
-      message: 'Kategori berhasil diarsipkan.',
+      message: `Kategori "${category ? category.name : existing.name}" berhasil diarsipkan.`,
       category
     });
   } catch (err) {
