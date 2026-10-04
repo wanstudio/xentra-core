@@ -167,15 +167,19 @@
     select.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
-  async function createProductInline() {
+  async function createProductInline(options) {
+    options = options || {};
+    var packageContext = options.packageContext === true;
     var result = await requestFieldsSheet({
       id: 'master-menu-inline-product',
-      title: 'Buat Product Master',
-      eyebrow: 'Product Master',
-      description: 'Product adalah identitas dasar yang dapat dipakai oleh beberapa Menu. Harga dan taxonomy diatur di Menu.',
-      saveLabel: 'Simpan & Pilih Product',
+      title: packageContext ? 'Buat Product untuk Paket' : 'Buat Product',
+      eyebrow: 'Product',
+      description: packageContext
+        ? 'Product baru akan langsung ditambahkan sebagai komponen pertama yang belum ada di Menu Paket ini.'
+        : 'Product adalah identitas dasar yang dapat dipakai oleh beberapa Menu. Harga dan taxonomy diatur di Menu.',
+      saveLabel: packageContext ? 'Simpan & Tambahkan ke Paket' : 'Simpan & Pilih Product',
       fields: [
-        { name: 'name', label: 'Nama Product Internal', placeholder: 'Contoh: Ayam Geprek', required: true },
+        { name: 'name', label: 'Nama Product', placeholder: 'Contoh: Ayam Geprek', required: true },
         { name: 'sku', label: 'SKU', placeholder: 'Contoh: AYAM-GEP-001', required: false, help: 'Isi jika Product ini dikelola sebagai item stok.' }
       ]
     });
@@ -187,10 +191,21 @@
     var product = data.product;
     createdProducts.push(product);
     var label = product.name + (product.sku ? ' · SKU ' + product.sku : '');
-    addOption(document.getElementById('cm-product'), product.id, label, true);
+    var menuApi = window.XentraOwnerMasterMenu;
+    if (packageContext && menuApi && typeof menuApi.addPackageProduct === 'function') {
+      menuApi.addPackageProduct(product);
+      syncCreatedProductOptions();
+      showCreatedState('package-product', 'Product dibuat dan langsung ditambahkan ke paket.');
+      return product;
+    }
+    if (menuApi && typeof menuApi.upsertDependency === 'function') {
+      menuApi.upsertDependency('product', product, { selectId: 'cm-product' });
+    } else {
+      addOption(document.getElementById('cm-product'), product.id, label, true);
+    }
     syncCreatedProductOptions();
     showCreatedState('product', 'Product dibuat dan dipilih untuk Menu ini.');
-    toast('Product dibuat dan langsung dipilih di Menu.');
+    return product;
   }
 
   async function createCategoryInline() {
@@ -205,10 +220,14 @@
     if (!result) return;
     var data = await requestJson('/admin/categories', { method: 'POST', body: JSON.stringify({ name: result.name }) });
     var category = data.category;
-    addOption(document.getElementById('cm-category'), category.id, category.name, true);
+    var menuApi = window.XentraOwnerMasterMenu;
+    if (menuApi && typeof menuApi.upsertDependency === 'function') {
+      menuApi.upsertDependency('category', category, { selectId: 'cm-category' });
+    } else {
+      addOption(document.getElementById('cm-category'), category.id, category.name, true);
+    }
     refreshSubCategoryDependencyState();
     showCreatedState('category', 'Kategori dibuat dan dipilih.');
-    toast('Kategori dibuat dan langsung dipilih.');
   }
 
   async function createSubCategoryInline() {
@@ -230,9 +249,13 @@
     var data = await requestJson('/admin/sub-categories', { method: 'POST', body: JSON.stringify({ category_id: categoryId, name: result.name }) });
     var sub = data.sub_category;
     var select = document.getElementById('cm-sub-category');
-    if (select) addOption(select, sub.id, sub.name, true);
+    var menuApi = window.XentraOwnerMasterMenu;
+    if (menuApi && typeof menuApi.upsertDependency === 'function') {
+      menuApi.upsertDependency('sub-category', sub, { selectId: 'cm-sub-category' });
+    } else if (select) {
+      addOption(select, sub.id, sub.name, true);
+    }
     showCreatedState('sub-category', 'Sub Category dibuat dan dipilih.');
-    toast('Sub Category dibuat dan langsung dipilih.');
   }
 
   async function createRasaInline() {
@@ -248,9 +271,13 @@
     var data = await requestJson('/admin/rasas', { method: 'POST', body: JSON.stringify({ name: result.name }) });
     var rasa = data.rasa;
     var select = document.getElementById('cm-rasa');
-    if (select) addOption(select, rasa.id, rasa.name, true);
+    var menuApi = window.XentraOwnerMasterMenu;
+    if (menuApi && typeof menuApi.upsertDependency === 'function') {
+      menuApi.upsertDependency('rasa', rasa, { selectId: 'cm-rasa' });
+    } else if (select) {
+      addOption(select, rasa.id, rasa.name, true);
+    }
     showCreatedState('rasa', 'Rasa dibuat dan dipilih.');
-    toast('Rasa dibuat dan langsung dipilih.');
   }
 
   function addButtonToFormGroup(selectId, action, label, handler, options) {
@@ -342,7 +369,7 @@
       button.textContent = '+ Buat Product';
       button.style.marginTop = '8px';
       button.addEventListener('click', function() {
-        createProductInline().catch(function(err) {
+        createProductInline({ packageContext: true }).catch(function(err) {
           console.error('[Master Menu Inline]', err);
           toast(err.message || 'Gagal membuat Product.');
         });
