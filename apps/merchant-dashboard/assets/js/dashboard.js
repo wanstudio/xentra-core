@@ -10786,6 +10786,58 @@ async function loadMenusView() {
     packageComponents: []
   };
 
+  function upsertOwnerMasterMenuDependency(type, row, options) {
+    options = options || {};
+    if (!row || !row.id) return false;
+
+    var listMap = {
+      product: 'products',
+      category: 'categories',
+      'sub-category': 'subCategories',
+      rasa: 'rasas'
+    };
+    var listName = listMap[type];
+    if (!listName || !Array.isArray(_ownerMasterMenuState[listName])) return false;
+
+    var list = _ownerMasterMenuState[listName];
+    var index = list.findIndex(function(item) { return String(item.id) === String(row.id); });
+    if (index >= 0) list[index] = Object.assign({}, list[index], row);
+    else list.push(row);
+
+    if (type === 'sub-category') {
+      renderOwnerMasterMenuSubCategories();
+    } else {
+      renderOwnerMasterMenuEditorForm();
+    }
+
+    var selectId = options.selectId;
+    var select = selectId ? $(selectId) : null;
+    if (select) select.value = String(row.id);
+
+    if (type === 'category') renderOwnerMasterMenuSubCategories();
+    renderOwnerMasterMenuPreview();
+    return true;
+  }
+
+  function addOwnerMasterMenuPackageProduct(product) {
+    if (!product || !product.id) return false;
+    var productId = String(product.id);
+    var exists = (_ownerMasterMenuState.packageComponents || []).some(function(item) {
+      return String(item.product_id || '') === productId;
+    });
+    if (exists) return false;
+
+    var products = _ownerMasterMenuState.products || [];
+    var index = products.findIndex(function(item) { return String(item.id) === productId; });
+    if (index >= 0) products[index] = Object.assign({}, products[index], product);
+    else products.push(product);
+
+    _ownerMasterMenuState.packageComponents.push({ product_id: productId, quantity: 1 });
+    renderOwnerMasterMenuPackageComponents();
+    renderOwnerMasterMenuPreview();
+    return true;
+  }
+
   function ownerMasterMenuStatusLabel(status) {
     var value = String(status || '').toUpperCase();
     if (value === 'ACTIVE') return 'Aktif';
@@ -11386,6 +11438,11 @@ async function loadMenusView() {
     _ownerMasterMenuState.createType = type === 'PACKAGE' ? 'PACKAGE' : 'SINGLE';
     navigateTo('catalog/master-menus/new');
   }
+
+  window.XentraOwnerMasterMenu = {
+    upsertDependency: upsertOwnerMasterMenuDependency,
+    addPackageProduct: addOwnerMasterMenuPackageProduct
+  };
 
   window.createMenuFromProduct = function(productId) {
     if (!productId) return;

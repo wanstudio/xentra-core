@@ -133,6 +133,16 @@ class ComposedMenuService {
         "VALUES (?, ?, ?, ?, ?, ?, ?)",
         [makeId('skuhist'), brandId, productId, previousSku, normalized, actorId, actorRole]
       );
+
+      if (normalized) {
+        // Adding SKU later must have the same stockability semantics as
+        // creating a Product with SKU from the start.
+        repository.ensureSkuProductInventoryForActiveBranches({
+          brandId,
+          productId
+        });
+      }
+
       repository.commit();
     } catch (err) {
       try { repository.rollback(); } catch (_) {}
