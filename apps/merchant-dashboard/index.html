@@ -1667,6 +1667,7 @@
               </div>
             </div>
             <div style="display:flex;flex-direction:column;gap:8px;justify-content:center;">
+              <button type="button" class="x-btn-primary" id="btn-create-menu-from-detail" style="white-space:nowrap;">🍽️ + Buat Menu Satuan</button>
               <button type="button" class="x-btn-secondary" id="btn-edit-from-detail">✏️ Edit Product</button>
             </div>
           </div>
@@ -1705,7 +1706,7 @@
         <button type="button" class="x-title-back-btn x-owner-mobile-page-back" id="btn-product-editor-mobile-back" aria-label="Kembali" onclick="goBackFromChildPage()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
         <span id="product-editor-mobile-title">Tambah Produk</span>
       </h3>
-      <p class="x-owner-mobile-page-sub" id="product-editor-mobile-subtitle">Susun identitas, harga, foto, dan komposisi Master Menu.</p>
+      <p class="x-owner-mobile-page-sub" id="product-editor-mobile-subtitle">Kelola Product atomic, SKU, media, dan status inventory.</p>
     </div>
     <div class="x-product-editor-breadcrumb-row x-owner-child-legacy-nav" style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
       <button type="button" class="x-btn-secondary" id="btn-back-from-product-editor" style="padding:6px 12px;font-size:13px;">
@@ -3486,7 +3487,7 @@
               </div>
               <div class="x-hub-info">
                 <h3>Kategori</h3>
-                <p>Kelola kategori master untuk mengelompokkan Produk Master</p>
+                <p>Kelola taksonomi Menu pelanggan (Kategori, Sub Kategori, &amp; Rasa)</p>
               </div>
               <div class="x-hub-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
             </div>
@@ -3497,7 +3498,18 @@
               </div>
               <div class="x-hub-info">
                 <h3>Produk Master</h3>
-                <p>Kelola produk, varian, dan foto master brand</p>
+                <p>Kelola Product atomic, SKU, media, dan status inventory</p>
+              </div>
+              <div class="x-hub-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
+            </div>
+
+            <div class="x-hub-card" onclick="navigateTo('catalog/master-menus')">
+              <div class="x-hub-icon bg-blue">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+              </div>
+              <div class="x-hub-info">
+                <h3>Menu Master</h3>
+                <p>Susun Menu Satuan &amp; Menu Paket yang dijual ke pelanggan</p>
               </div>
               <div class="x-hub-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
             </div>

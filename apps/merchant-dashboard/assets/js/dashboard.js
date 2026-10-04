@@ -225,10 +225,10 @@
   var CLIENT_ROUTE_META = {
     'overview':           { title: 'Overview',    sub: 'Ringkasan bisnis dan aktivitas terkini', tab: 'overview' },
     'orders':             { title: 'Orders',       sub: 'Antrean pesanan realtime dan status dapur', tab: 'orders' },
-    'catalog':            { title: 'Catalog',      sub: 'Kelola produk master, kategori, dan menu cabang', tab: 'catalog-products' },
-    'catalog/products':   { title: 'Products',     sub: 'Kelola daftar produk master brand', tab: 'catalog-products' },
-    'catalog/categories': { title: 'Kategori',     sub: 'Kelola kategori master untuk Produk Master', tab: 'catalog-categories' },
-    'catalog/master-menus': { title: 'Menu Master', sub: 'Susun menu komersial brand untuk diadopsi cabang', tab: 'catalog-master-menus' },
+    'catalog':            { title: 'Catalog',      sub: 'Kelola taksonomi, produk master, menu komersial, dan menu cabang', tab: 'catalog-products' },
+    'catalog/products':   { title: 'Produk Master', sub: 'Kelola Product atomic, SKU, media, dan status inventory', tab: 'catalog-products' },
+    'catalog/categories': { title: 'Kategori',     sub: 'Kelola taksonomi Menu pelanggan (Kategori, Sub Kategori, & Rasa)', tab: 'catalog-categories' },
+    'catalog/master-menus': { title: 'Menu Master', sub: 'Susun Menu Satuan & Menu Paket yang dijual ke pelanggan', tab: 'catalog-master-menus' },
     
     'catalog/menus':      { title: 'Menu Cabang',  sub: 'Atur assortment dan kategori jual per cabang', tab: 'catalog-menus' },
     'branches':           { title: 'Branches',     sub: 'Atur lokasi cabang, radius, dan formula ongkir', tab: 'branches' },
@@ -760,7 +760,7 @@
     if (subEl) subEl.textContent = isMasterMenuEditor
       ? 'Susun Menu Satuan atau Menu Paket pada katalog komersial brand'
       : (isProductEditor
-        ? 'Susun identitas, harga, foto, dan komposisi Master Menu'
+        ? 'Kelola Product atomic, SKU, media, dan status inventory'
         : (isBranchEditor ? 'Kelola identitas, lokasi, kontak, dan aturan operasional cabang' : (isProductDetail ? 'Detail produk master dan status adopsi di cabang' : (isBranchDetail ? 'Detail informasi, operasional, menu, dan tim cabang' : (isOrderDetail ? 'Detail transaksi, rincian biaya, dan status pesanan' : (isCustomerDetail ? 'Profil pelanggan, riwayat pesanan, dan loyalitas' : (isReportsRoute ? 'Laporan penjualan, analitik bisnis, dan kinerja cabang' : meta.sub)))))));
 
     // 6. Sync Owner bottom nav active module (no-op on desktop, hidden by CSS)
@@ -2199,6 +2199,7 @@
             '<div class="x-item-actions">',
               '<button type="button" class="x-action-menu-trigger" aria-label="Aksi Product ' + esc(prod.name) + '" onclick="XentraActionMenu.open(this, [' +
                 '{ label: \'Lihat Detail\', icon: \'🔍\', onClick: function() { navigateTo(\'catalog/products/' + encodeURIComponent(prod.id) + '\'); } },' +
+                '{ label: \'+ Buat Menu Satuan\', icon: \'🍽️\', onClick: function() { window.createMenuFromProduct(\'' + esc(prod.id) + '\'); } },' +
                 '{ label: \'Edit Product\', icon: \'✏️\', onClick: function() { openEditProduct(\'' + esc(prod.id) + '\'); } },' +
                 '{ divider: true },' +
                 '{ label: \'Arsipkan Product\', icon: \'🗑️\', destructive: true, onClick: function() { deleteProduct(\'' + esc(prod.id) + '\'); } }' +
@@ -4010,6 +4011,24 @@ async function loadMenusView() {
     if (btnBack) {
       btnBack.addEventListener('click', function () {
         goBackFromChildPage();
+      });
+    }
+
+    var btnCreateMenuFromDetail = $('btn-create-menu-from-detail');
+    if (btnCreateMenuFromDetail) {
+      btnCreateMenuFromDetail.addEventListener('click', function () {
+        if (_catalogState.activeDetailProductId) {
+          window.createMenuFromProduct(_catalogState.activeDetailProductId);
+        }
+      });
+    }
+
+    var btnEditFromDetail = $('btn-edit-from-detail');
+    if (btnEditFromDetail) {
+      btnEditFromDetail.addEventListener('click', function () {
+        if (_catalogState.activeDetailProductId) {
+          navigateTo('catalog/products/' + encodeURIComponent(_catalogState.activeDetailProductId) + '/edit');
+        }
       });
     }
 
@@ -11205,6 +11224,11 @@ async function loadMenusView() {
       ownerMasterMenuResetEditor(_ownerMasterMenuState.createType);
       try {
         await loadOwnerMasterMenuReferences();
+        if (_ownerMasterMenuState.preselectedProductId) {
+          var preId = String(_ownerMasterMenuState.preselectedProductId);
+          $('cm-product').value = preId;
+          _ownerMasterMenuState.preselectedProductId = null;
+        }
         renderOwnerMasterMenuEditorForm();
       } catch (err) {
         console.error('[Owner Master Menu References Error]:', err);
@@ -11362,6 +11386,12 @@ async function loadMenusView() {
     navigateTo('catalog/master-menus/new');
   }
 
+  window.createMenuFromProduct = function(productId) {
+    if (!productId) return;
+    _ownerMasterMenuState.preselectedProductId = productId;
+    _ownerMasterMenuState.createType = 'SINGLE';
+    navigateTo('catalog/master-menus/new');
+  };
   window.openAddMasterMenuSingle = function() {
     openNewOwnerMasterMenu('SINGLE');
   };
