@@ -1668,7 +1668,7 @@
               </div>
             </div>
             <div style="display:flex;flex-direction:column;gap:8px;justify-content:center;">
-              <button type="button" class="x-btn-primary" id="btn-create-menu-from-detail" style="white-space:nowrap;">🍽️ + Buat Menu Satuan</button>
+              <button type="button" class="x-btn-primary" id="btn-create-menu-from-detail" style="white-space:nowrap;">🍽️ + Buat Menu</button>
               <button type="button" class="x-btn-secondary" id="btn-edit-from-detail">✏️ Edit Product</button>
             </div>
           </div>
@@ -1802,8 +1802,7 @@
               <p class="x-master-products-sub x-owner-mobile-page-sub">Susun menu komersial brand yang kemudian diadopsi oleh cabang.</p>
             </div>
             <div class="x-header-buttons" id="master-menu-add-actions">
-              <button type="button" class="x-btn-secondary" id="btn-add-master-menu-single">+ Menu Satuan</button>
-              <button type="button" class="x-btn-primary" id="btn-add-master-menu-package">+ Menu Paket</button>
+              <button type="button" class="x-btn-primary" id="btn-add-master-menu">+ Buat Menu</button>
             </div>
           </div>
 
@@ -1811,11 +1810,6 @@
             <div style="flex:1;min-width:220px;position:relative;">
               <input type="search" id="master-menu-search" class="x-input" placeholder="Cari menu..." autocomplete="off" style="padding-left:36px;">
               <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            </div>
-            <div class="x-master-menu-filter-tabs" id="master-menu-type-filter" role="tablist" aria-label="Filter tipe menu">
-              <button type="button" class="x-subnav-tab active" data-menu-filter="all" role="tab" aria-selected="true">Semua</button>
-              <button type="button" class="x-subnav-tab" data-menu-filter="SINGLE" role="tab" aria-selected="false">Satuan</button>
-              <button type="button" class="x-subnav-tab" data-menu-filter="PACKAGE" role="tab" aria-selected="false">Paket</button>
             </div>
           </div>
 
@@ -1850,24 +1844,16 @@
 
             <div class="x-card" style="margin-bottom:14px;">
               <div style="margin-bottom:16px;">
-                <h3 id="master-menu-editor-title" style="margin:0;font-size:20px;">Tambah Menu Satuan</h3>
+                <h3 id="master-menu-editor-title" style="margin:0;font-size:20px;">Tambah Menu</h3>
                 <p class="text-muted" style="margin:5px 0 0;font-size:13px;">Field berikut langsung menulis ke entitas Menu. Jangan gunakan nama Product sebagai judul customer.</p>
               </div>
 
-              <div id="master-menu-single-fields">
-                <div class="x-form-group">
-                  <label for="cm-product">Product Komposisi <span class="x-required-mark">*</span></label>
-                  <select id="cm-product" class="x-input" required></select>
-                  <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Pilih tepat satu Product Master sebagai unit stok Menu Satuan.</small>
-                </div>
+              <div class="x-form-group">
+                <label>Komposisi Product <span class="x-required-mark">*</span></label>
+                <div id="cm-package-components" class="x-composed-menu-components"></div>
+                <button type="button" class="x-btn-secondary" id="btn-cm-add-component" style="margin-top:8px;">+ Tambah Product</button>
+                <small class="text-muted" style="display:block;margin-top:5px;font-size:11px;">Product di sini adalah komponen inventory Menu. Satu Menu boleh memiliki satu atau banyak Product.</small>
               </div>
-
-              <div id="master-menu-package-fields" style="display:none;">
-                <div class="x-form-group">
-                  <label for="cm-package-name">Nama Menu Paket <span class="x-required-mark">*</span></label>
-                  <input type="text" id="cm-package-name" class="x-input" maxlength="255" autocomplete="off" placeholder="Contoh: Paket Hemat Ayam + Nasi">
-                  <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Nama ini adalah judul customer untuk Menu Paket.</small>
-                </div>
 
                 <div class="x-form-group">
                   <label>Komposisi Product <span class="x-required-mark">*</span></label>
@@ -1881,17 +1867,17 @@
                 <div class="x-form-group">
                   <label for="cm-category">Kategori</label>
                   <select id="cm-category" class="x-input"></select>
-                  <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Kategori adalah parent taxonomy; identitas Menu Satuan memakai Sub Category + Rasa.</small>
+                  <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Kategori adalah parent taxonomy; Judul adalah nama dasar Menu; Rasa bersifat opsional.</small>
                 </div>
                 <div class="x-form-group">
-                  <label for="cm-sub-category">Sub Category <span id="cm-sub-required" class="x-required-mark">*</span></label>
+                  <label for="cm-sub-category">Judul <span class="x-required-mark">*</span></label>
                   <select id="cm-sub-category" class="x-input"></select>
                 </div>
               </div>
 
               <div class="x-form-row">
                 <div class="x-form-group">
-                  <label for="cm-rasa">Rasa <span id="cm-rasa-help" class="text-muted">(Menu Satuan default Original)</span></label>
+                  <label for="cm-rasa">Rasa <span class="text-muted">(opsional)</span></label>
                   <select id="cm-rasa" class="x-input"></select>
                 </div>
                 <div class="x-form-group">
