@@ -1,0 +1,51 @@
+/* XENTRA — Menu-first Owner UI (presentation-only) */
+.x-menu-first-basics{display:grid;grid-template-columns:minmax(0,1fr) 152px;gap:18px;align-items:start;margin:0 0 18px}
+.x-menu-first-fields{display:flex;flex-direction:column;gap:14px}
+.x-menu-first-field{min-width:0}
+.x-menu-first-field label,.x-menu-first-label{display:block;margin:0 0 7px;font-size:13px;line-height:1.35;font-weight:750;color:#111827}
+.x-menu-first-field small{display:block;margin-top:5px;font-size:11px;line-height:1.45;color:#64748b}
+.x-menu-first-name{min-height:48px;font-size:15px!important;font-weight:600}
+.x-menu-first-image{position:relative;width:152px;min-width:152px}
+.x-menu-first-image-preview{width:152px;height:152px;overflow:hidden;border:1px dashed #cbd5e1;border-radius:14px;background:#f8fafc;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.x-menu-first-image-preview img{width:100%;height:100%;object-fit:cover}
+.x-menu-first-image-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:14px;text-align:center;color:#64748b}
+.x-menu-first-image-empty-icon{font-size:27px;line-height:1}
+.x-menu-first-image-empty span:last-child{font-size:11px;line-height:1.4}
+.x-menu-first-image-actions{display:flex;gap:6px;margin-top:7px}
+.x-menu-first-image-actions button{flex:1 1 0;min-height:34px;padding:6px 8px;font-size:11px}
+.x-menu-first-image-input{display:none!important}
+.x-menu-first-type{display:inline-flex;width:100%;gap:6px;padding:4px;border:1px solid #e5e7eb;border-radius:12px;background:#f8fafc}
+.x-menu-first-type button{flex:1 1 0;min-height:40px;border:0;border-radius:9px;background:transparent;color:#64748b;font:inherit;font-size:12px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.x-menu-first-type button.is-active{background:#111827;color:#fff}
+.x-menu-first-advanced{margin-top:16px;border:1px solid #e5e7eb;border-radius:12px;background:#fff;overflow:hidden}
+.x-menu-first-advanced>summary{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:48px;padding:0 14px;cursor:pointer;list-style:none;font-size:13px;font-weight:750;color:#111827}
+.x-menu-first-advanced>summary::-webkit-details-marker{display:none}
+.x-menu-first-advanced>summary::after{content:'⌄';font-size:16px;color:#64748b;transition:transform .15s ease}
+.x-menu-first-advanced[open]>summary::after{transform:rotate(180deg)}
+.x-menu-first-advanced-body{padding:0 14px 14px;border-top:1px solid #f1f5f9}
+.x-menu-first-advanced-note{margin:12px 0 14px;padding:10px 12px;border-radius:10px;background:#f8fafc;font-size:11px;line-height:1.5;color:#64748b}
+.x-menu-first-basic-meta{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.x-menu-first-hidden-technical{display:none!important}
+.x-menu-first-package-panel{margin-top:14px;padding-top:14px;border-top:1px solid #f1f5f9}
+.x-menu-first-save-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:16px}
+.x-menu-first-save-row .x-btn-primary{min-width:180px;min-height:48px;font-size:14px;font-weight:800}
+.x-menu-first-save-row .x-btn-secondary{min-height:44px}
+.x-menu-first-inline-hint{margin-top:7px;font-size:11px;line-height:1.45;color:#64748b}
+#tab-catalog-master-menus .x-menu-first-toolbar{margin:14px 0 16px}
+#tab-catalog-master-menus .x-menu-first-toolbar .x-input{min-height:44px}
+#tab-catalog-master-menus .x-menu-first-add{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border:0;border-radius:10px;background:#111827;color:#fff;font:inherit;font-size:13px;font-weight:800;cursor:pointer}
+#tab-catalog-master-menus .x-menu-first-add:active{transform:scale(.98)}
+#nav-catalog-sub .x-nav-sub-item.x-menu-first-primary-route{font-weight:800}
+@media (max-width:680px){
+  .x-menu-first-basics{grid-template-columns:1fr}
+  .x-menu-first-image{width:100%;min-width:0}
+  .x-menu-first-image-preview{width:112px;height:112px}
+  .x-menu-first-basic-meta{grid-template-columns:1fr}
+  .x-menu-first-save-row{position:sticky;bottom:0;z-index:5;margin-left:-14px;margin-right:-14px;padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px));background:rgba(255,255,255,.96);border-top:1px solid #e5e7eb;backdrop-filter:blur(10px)}
+  #tab-catalog-master-menus .x-menu-first-add{width:100%;justify-content:center}
+}
+@media (max-width:420px){
+  .x-menu-first-image-preview{width:96px;height:96px}
+  .x-menu-first-type button{min-height:42px}
+  .x-menu-first-field label,.x-menu-first-label{font-size:12px}
+}
