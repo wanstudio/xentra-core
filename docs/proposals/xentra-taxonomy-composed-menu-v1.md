@@ -1,3 +1,9 @@
+# SUPERSEDED — 2026-10-05
+
+The Menu contract in this document is superseded by docs/proposals/xentra-menu-domain-v2.md. The forward contract no longer has Menu Satuan/Menu Paket or menu_type SINGLE/PACKAGE. Use the v2 contract for all new implementation. This document remains only as historical migration evidence.
+
+---
+
 # Xentra — Taxonomy, Product & Composed Menu Contract v1
 
 **Status:** LOCKED TARGET CONTRACT — IMPLEMENTATION ISOLATED ON PROPOSAL BRANCH
