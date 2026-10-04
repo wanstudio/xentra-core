@@ -215,12 +215,12 @@
 
     setTimeout(function () {
       toast.style.opacity = '0';
-      toast.style.transform = 'translateY(10px)';
-      toast.style.transition = 'all 0.3s ease';
+      toast.style.transform = 'scale(0.92)';
+      toast.style.transition = 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)';
       setTimeout(function () {
         if (toast.parentNode) toast.parentNode.removeChild(toast);
-      }, 300);
-    }, 3500);
+      }, 250);
+    }, 3000);
   }
   window.showToast = showToast;
 

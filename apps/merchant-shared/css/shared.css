@@ -61,81 +61,87 @@ a:focus:not(:focus-visible),
    Used by showToast() in shared.js. Sits above every modal (z-index 13000).
    ========================================================================== */
 
-/* Toast Container — sits above every modal layer */
+/* Toast Container — sits above every modal layer (z-index 13000), centered on screen */
 .x-toast-container {
   position: fixed;
-  bottom: 24px;
-  right: 24px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   z-index: 13000;
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 10px;
+  pointer-events: none;
+  max-width: calc(100vw - 32px);
+  width: max-content;
 }
 
 .x-toast {
   background: #0f172a;
   color: #ffffff;
-  padding: 12px 20px;
-  border-radius: var(--radius-sm);
+  padding: 14px 22px;
+  border-radius: 18px;
   font-size: 14px;
-  font-weight: 600;
-  box-shadow: var(--shadow-lg);
-  display: flex;
+  font-weight: 700;
+  line-height: 1.45;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.04);
+  display: inline-flex;
   align-items: center;
   gap: 10px;
-  animation: xSharedSlideInRight 0.25s ease;
+  text-align: center;
+  box-sizing: border-box;
+  animation: xSharedToastPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   border: 1px solid transparent;
+  pointer-events: auto;
 }
 
 .x-toast.x-toast-error,
 .x-toast.x-toast-danger {
-  background: #fff1f2;
-  color: #9f1239;
-  border-color: #fecdd3;
-  box-shadow: 0 4px 14px rgba(225, 29, 72, 0.12);
+  background: #fff0f2;
+  color: #991b1b;
+  border-color: #ffd4d8;
+  box-shadow: 0 12px 32px rgba(225, 29, 72, 0.18), 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .x-toast.x-toast-success {
   background: #f0fdf4;
   color: #166534;
   border-color: #bbf7d0;
-  box-shadow: 0 4px 14px rgba(22, 101, 52, 0.1);
+  box-shadow: 0 12px 32px rgba(22, 101, 52, 0.15), 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .x-toast.x-toast-warning {
   background: #fffbeb;
   color: #92400e;
   border-color: #fde68a;
-  box-shadow: 0 4px 14px rgba(180, 83, 9, 0.1);
+  box-shadow: 0 12px 32px rgba(180, 83, 9, 0.15), 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .x-toast.x-toast-info {
   background: #f0f9ff;
   color: #075985;
   border-color: #bae6fd;
-  box-shadow: 0 4px 14px rgba(14, 116, 144, 0.1);
+  box-shadow: 0 12px 32px rgba(14, 116, 144, 0.15), 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
-@keyframes xSharedSlideInRight {
-  from { opacity: 0; transform: translateX(30px); }
-  to   { opacity: 1; transform: translateX(0); }
+@keyframes xSharedToastPopIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
 }
 
 @media (max-width: 768px) {
   .x-toast-container {
-    left: 16px !important;
-    right: 16px !important;
-    bottom: 16px !important;
-    max-width: calc(100vw - 32px) !important;
-    box-sizing: border-box !important;
+    max-width: calc(100vw - 32px);
+    width: max-content;
   }
 
   .x-toast {
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-    word-break: break-word !important;
-    padding: 10px 14px !important;
-    font-size: 13px !important;
+    max-width: 100%;
+    word-break: break-word;
+    padding: 12px 18px;
+    font-size: 13.5px;
+    border-radius: 16px;
   }
 }
 
