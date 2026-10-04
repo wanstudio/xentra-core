@@ -567,8 +567,10 @@ a:focus:not(:focus-visible),
   gap: 8px;
 }
 
-.x-master-inline-select-row .x-input {
-  flex: 1;
+.x-master-inline-select-row .x-input,
+.x-master-inline-select-row .x-occ-dropdown,
+.x-master-inline-select-row .x-owner-select-dropdown {
+  flex: 1 1 auto;
   min-width: 0;
 }
 

@@ -5426,11 +5426,14 @@ async function loadMenusView() {
       };
       occLabel.textContent = presetLabels[preset] || 'Pilih periode';
     }
-    document.querySelectorAll('.x-occ-dropdown-item').forEach(function (btn) {
-      var isActive = btn.dataset.value === preset;
-      btn.classList.toggle('active', isActive);
-      btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
-    });
+    var occPeriodMenu = $('occ-period-menu');
+    if (occPeriodMenu) {
+      occPeriodMenu.querySelectorAll('.x-occ-dropdown-item').forEach(function (btn) {
+        var isActive = btn.dataset.value === preset;
+        btn.classList.toggle('active', isActive);
+        btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      });
+    }
 
     if (!skipReload) {
       loadOverview();
@@ -5735,18 +5738,20 @@ async function loadMenusView() {
       });
     }
 
-    document.querySelectorAll('.x-occ-dropdown-item').forEach(function (btn) {
-      btn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        var val = this.dataset.value;
-        toggleOccDropdown(false);
-        if (occSelect) {
-          occSelect.value = val;
-        }
-        setOccCustomOpen(false);
-        setOverviewPeriodPreset(val);
+    if (occDropdown) {
+      occDropdown.querySelectorAll('.x-occ-dropdown-item').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var val = this.dataset.value;
+          toggleOccDropdown(false);
+          if (occSelect) {
+            occSelect.value = val;
+          }
+          setOccCustomOpen(false);
+          setOverviewPeriodPreset(val);
+        });
       });
-    });
+    }
 
     document.addEventListener('click', function (e) {
       if (occDropdown && occDropdown.classList.contains('open') && !occDropdown.contains(e.target)) {
@@ -5832,10 +5837,13 @@ async function loadMenusView() {
       if (occLabel) {
         occLabel.textContent = 'Kustom';
       }
-      document.querySelectorAll('.x-occ-dropdown-item').forEach(function (btn) {
-        btn.classList.remove('active');
-        btn.setAttribute('aria-selected', 'false');
-      });
+      var occPeriodMenu = $('occ-period-menu');
+      if (occPeriodMenu) {
+        occPeriodMenu.querySelectorAll('.x-occ-dropdown-item').forEach(function (btn) {
+          btn.classList.remove('active');
+          btn.setAttribute('aria-selected', 'false');
+        });
+      }
       if (inputStart) inputStart.value = sVal;
       if (inputEnd) inputEnd.value = eVal;
       setOccCustomOpen(false);

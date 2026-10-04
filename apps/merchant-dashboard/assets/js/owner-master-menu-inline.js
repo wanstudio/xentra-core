@@ -286,9 +286,17 @@
     var group = select.closest('.x-form-group');
     if (!group || group.querySelector('[data-inline-master-action="' + action + '"]')) return;
     options = options || {};
+
+    // Jika select sudah di-enhance oleh XentraDropdown, elemen host-nya berada tepat sebelum select.
+    var host = (select.previousElementSibling && select.previousElementSibling.classList.contains('x-owner-select-dropdown'))
+      ? select.previousElementSibling
+      : null;
+
     var row = document.createElement('div');
     row.className = 'x-master-inline-select-row';
-    select.parentNode.insertBefore(row, select);
+    var insertTarget = host || select;
+    insertTarget.parentNode.insertBefore(row, insertTarget);
+    if (host) row.appendChild(host);
     row.appendChild(select);
     var button = document.createElement('button');
     button.type = 'button';
