@@ -294,8 +294,9 @@
     button.type = 'button';
     button.className = 'x-master-inline-link';
     button.setAttribute('data-inline-master-action', action);
-    button.textContent = '+ ' + label;
-    button.setAttribute('aria-label', 'Buat ' + label + ' baru');
+    button.textContent = '+';
+    button.title = 'Tambah ' + label + ' Baru';
+    button.setAttribute('aria-label', 'Tambah ' + label + ' Baru');
     button.addEventListener('click', function() {
       handler().catch(function(err) {
         console.error('[Master Menu Inline]', err);
