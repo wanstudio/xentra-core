@@ -157,7 +157,7 @@ test('Atomic Product Editor exposes only Product-owned controls', () => {
   assert.ok(section.includes('id="prod-name"'));
   assert.ok(section.includes('id="prod-sku"'));
   assert.ok(section.includes('id="prod-desc"'));
-  assert.ok(section.includes('id="prod-is-active"'));
+  assert.ok(!section.includes('id="prod-is-active"'), 'Product Editor does not own active toggle; managed from list');
 
   for (const legacyField of [
     'id="prod-category"',
@@ -177,7 +177,7 @@ test('Atomic Product Editor exposes only Product-owned controls', () => {
 
   assert.ok(JS.includes('Canonical Product Editor submit: Product owns only atomic identity'));
   assert.ok(JS.includes('sku: sku || null'));
-  assert.ok(JS.includes("is_active: $('prod-is-active').checked ? 1 : 0"));
+  assert.ok(JS.includes("is_active: id ? _productEditorActiveState : 1"));
 });
 
 test('Product Editor does not own Master Menu references', () => {
@@ -271,7 +271,7 @@ test('Master Product uses a dedicated atomic Product editor', () => {
   assert.ok(HTML.includes('id="form-product"'));
   assert.ok(HTML.includes('id="prod-name"'));
   assert.ok(HTML.includes('id="prod-sku"'));
-  assert.ok(HTML.includes('id="prod-is-active"'));
+  assert.ok(!HTML.includes('id="prod-is-active"'));
   assert.ok(JS.includes("route === 'catalog/products/new'"));
   assert.ok(JS.includes("/^catalog\\/products\\/[^/]+\\/edit$/"));
   assert.ok(JS.includes('function showProductEditorSection()'));
@@ -447,7 +447,7 @@ test('Master Product editor stays inside Catalog Products tab and remains atomic
   const form = HTML.slice(editorStart, editorEnd);
   assert.ok(form.includes('id="prod-name"'));
   assert.ok(form.includes('id="prod-sku"'));
-  assert.ok(form.includes('id="prod-is-active"'));
+  assert.ok(!form.includes('id="prod-is-active"'));
   assert.ok(!form.includes('branch_category_id'));
   assert.ok(!form.includes('id="prod-price"'));
   assert.ok(!form.includes('id="prod-category"'));

@@ -22,7 +22,8 @@ test('Product contract separates atomic Product ownership from commercial Menu o
   assert.ok(section.includes('id="prod-name"'));
   assert.ok(section.includes('id="prod-sku"'));
   assert.ok(section.includes('id="prod-desc"'));
-  assert.ok(section.includes('id="prod-is-active"'));
+  // Status Product dikelola dari Product List, bukan dari Product Editor
+  assert.ok(!section.includes('id="prod-is-active"'), 'prod-is-active tidak boleh ada di Product Editor');
 
   for (const forbidden of [
     'id="prod-category"',
@@ -42,7 +43,7 @@ test('Product contract separates atomic Product ownership from commercial Menu o
   }
 
   assert.ok(ownerJs.includes("sku: sku || null"));
-  assert.ok(ownerJs.includes("is_active: $('prod-is-active').checked ? 1 : 0"));
+  assert.ok(ownerJs.includes("is_active: id ? _productEditorActiveState : 1"));
   assert.ok(ownerJs.includes("API_BASE + '/admin/composed/products'"));
   assert.ok(!ownerJs.includes("saveMasterMenuComposition(savedId)"));
 });

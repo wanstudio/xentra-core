@@ -3321,14 +3321,7 @@
   }
 
   var _productEditorLoadSeq = 0;
-
-  function toggleRangeFields() {
-    var ppm = $('prod-pricing-mode');
-    var prf = $('prod-range-fields');
-    if (!ppm || !prf) return;
-    var isRange = ppm.value === 'range';
-    prf.style.display = isRange ? 'flex' : 'none';
-  }
+  var _productEditorActiveState = 1;
 
   function resetProductEditorForAdd() {
     $('product-editor-title').textContent = 'Tambah Product Atomic';
@@ -3340,7 +3333,7 @@
     $('prod-name').value = '';
     $('prod-sku').value = '';
     $('prod-desc').value = '';
-    $('prod-is-active').checked = true;
+    _productEditorActiveState = 1;
     _productImageFile = null;
     _productCropSpec = null;
     _productImageRemoved = false;
@@ -3359,7 +3352,7 @@
     $('prod-name').value = prod.name || '';
     $('prod-sku').value = prod.sku || '';
     $('prod-desc').value = prod.description || '';
-    $('prod-is-active').checked = prod.is_active !== 0;
+    _productEditorActiveState = (prod.is_active !== undefined && prod.is_active !== null) ? (prod.is_active !== 0 ? 1 : 0) : 1;
     _productImageFile = null;
     _productCropSpec = null;
     _productImageRemoved = false;
@@ -4161,7 +4154,7 @@ async function loadMenusView() {
           name: $('prod-name').value.trim(),
           sku: sku || null,
           description: $('prod-desc').value,
-          is_active: $('prod-is-active').checked ? 1 : 0
+          is_active: id ? _productEditorActiveState : 1
         };
 
         if (!payload.name) {
