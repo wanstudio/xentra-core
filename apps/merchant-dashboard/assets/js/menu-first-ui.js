@@ -1,43 +1,103 @@
 /*
- * XENTRA — MENU-FIRST OWNER UI
- * 2026-10-05
- * Presentation-first layer. No server/domain contract changes.
+ * XENTRA — OWNER MASTER MENU
+ * Locked Menu Domain v2
+ * Category + Judul + optional Rasa + Product composition.
  */
 (function(){'use strict';
 var S=window.XentraShared||{},API_BASE=S.API_BASE||'/api/v1';
-var form=null,firstCard=null,visibleNameInput=null,imageInput=null,imagePreview=null,imageEmpty=null,imageRemove=null,typeButtons=[],isPackage=false,imageFile=null,imageRemoved=false,submittingBridge=false,editorHydrationInFlight=null,lastEditorMenuId=null;
-
 function $(id){return document.getElementById(id)}
-function toast(message){if(typeof window.showToast==='function')window.showToast(message);else if(S&&typeof S.showToast==='function')S.showToast(message)}
-function adminFetch(url,options){return typeof S.adminFetch==='function'?S.adminFetch(url,options||{}):fetch(url,options||{})}
-function authHeaders(extra){if(typeof S.getAuthHeaders==='function')return S.getAuthHeaders(extra||{});var h=Object.assign({'Content-Type':'application/json'},extra||{}),t=localStorage.getItem('xentra_merchant_token');if(t)h.Authorization='Bearer '+t;return h}
-async function requestJson(path,options){var o=Object.assign({},options||{});o.headers=o.headers||authHeaders();var r=await adminFetch(API_BASE+path,o),d=await r.json();if(!r.ok||!d.success)throw new Error(d.error||d.message||'Gagal memproses permintaan.');return d}
-function setSelectValue(id,value){var e=$(id);if(!e)return;e.value=value==null?'':String(value);e.dispatchEvent(new Event('change',{bubbles:true}))}
-async function ensureOriginalRasa(){var l=await requestJson('/admin/rasas?active_only=1',{method:'GET',headers:authHeaders()}),rows=Array.isArray(l.rasas)?l.rasas:[],o=rows.find(function(r){return String(r.name||'').trim().toLowerCase()==='original'});if(o)return o;var c=await requestJson('/admin/rasas',{method:'POST',headers:authHeaders(),body:JSON.stringify({name:'Original'})});return c.rasa}
-async function ensureHiddenSubCategory(categoryId,menuName){if(!categoryId||!menuName)return null;var l=await requestJson('/admin/sub-categories?category_id='+encodeURIComponent(categoryId)+'&active_only=1',{method:'GET',headers:authHeaders()}),rows=Array.isArray(l.sub_categories)?l.sub_categories:[],same=rows.find(function(r){return String(r.name||'').trim().toLowerCase()===String(menuName).trim().toLowerCase()});if(same)return same;var c=await requestJson('/admin/sub-categories',{method:'POST',headers:authHeaders(),body:JSON.stringify({category_id:categoryId,name:menuName})});return c.sub_category}
-async function ensureBackingProduct(menuName,existingProductId){if(existingProductId)return{id:String(existingProductId),created:false};var c=await requestJson('/admin/composed/products',{method:'POST',headers:authHeaders(),body:JSON.stringify({name:menuName,sku:null,is_active:true})});return{id:String(c.product.id),created:true}}
-function fileToDataUrl(file){return new Promise(function(resolve,reject){var r=new FileReader();r.onload=function(){resolve(r.result)};r.onerror=function(){reject(new Error('Gagal membaca foto.'))};r.readAsDataURL(file)})}
-async function uploadProductImage(productId){if(!productId||!imageFile)return;var u=await fileToDataUrl(imageFile),b=String(u||'').split(',')[1]||'';if(!b)throw new Error('Foto tidak dapat diproses.');await requestJson('/admin/media/entity/products/'+encodeURIComponent(productId)+'/image',{method:'POST',headers:authHeaders(),body:JSON.stringify({image_base64:b,mime_type:imageFile.type||'image/jpeg',original_filename:imageFile.name||null})})}
-async function deleteProductImage(productId){if(!productId||!imageRemoved)return;var r=await adminFetch(API_BASE+'/admin/media/entity/products/'+encodeURIComponent(productId)+'/image',{method:'DELETE',headers:authHeaders()}),d=await r.json();if(!r.ok||!d.success)throw new Error(d.error||d.message||'Gagal menghapus foto.')}
-function getMenuId(){var e=$('master-menu-id');return e&&e.value?String(e.value):''}
-function getProductId(){var e=$('cm-product');return e&&e.value?String(e.value):''}
-function syncNameIntoLegacyFields(){var n=visibleNameInput?String(visibleNameInput.value||'').trim():'';var p=$('cm-package-name');if(p)p.value=n}
-function renderImagePreview(src){if(!imagePreview||!imageEmpty)return;if(src){imagePreview.src=src;imagePreview.style.display='block';imageEmpty.style.display='none'}else{imagePreview.removeAttribute('src');imagePreview.style.display='none';imageEmpty.style.display=''}}
-function clearNewEditorState(){if(visibleNameInput)visibleNameInput.value='';if($('cm-price'))$('cm-price').value='';if($('cm-category'))$('cm-category').value='';if($('cm-sub-category'))$('cm-sub-category').value='';if($('cm-rasa'))$('cm-rasa').value='';if($('cm-level'))$('cm-level').value='';if($('cm-status'))$('cm-status').value='ACTIVE';if(imageInput)imageInput.value='';imageFile=null;imageRemoved=false;renderImagePreview('');if(imageRemove)imageRemove.style.display='none';setEditorType('SINGLE')}
-function setImageFile(file){imageFile=file||null;imageRemoved=false;if(!file){renderImagePreview('');return}renderImagePreview(URL.createObjectURL(file))}
-function setEditorType(type){type=String(type||'SINGLE').toUpperCase()==='PACKAGE'?'PACKAGE':'SINGLE';isPackage=type==='PACKAGE';var ht=$('master-menu-type');if(ht){ht.value=type;ht.dispatchEvent(new Event('change',{bubbles:true}))}typeButtons.forEach(function(b){var a=String(b.getAttribute('data-menu-first-type')||'')===type;b.classList.toggle('is-active',a);b.setAttribute('aria-pressed',a?'true':'false')});var sf=$('master-menu-single-fields'),pf=$('master-menu-package-fields');if(sf)sf.style.display='none';if(pf)pf.style.display=isPackage?'':'none';var t=$('master-menu-editor-title'),mt=$('master-menu-editor-mobile-title');if(t)t.textContent=isPackage?'Tambah Paket':'Tambah Menu';if(mt&&!getMenuId())mt.textContent=isPackage?'Tambah Paket':'Tambah Menu';var s=$('x-menu-first-save');if(s)s.textContent=isPackage?'Simpan Paket':'Simpan Menu';var ib=imagePreview&&imagePreview.closest('.x-menu-first-image');if(ib)ib.style.display=isPackage?'none':''}
-async function hydrateEditorFromMenu(menuId){if(!menuId||editorHydrationInFlight===menuId)return;editorHydrationInFlight=menuId;try{var d=await requestJson('/admin/menus/'+encodeURIComponent(menuId),{method:'GET',headers:authHeaders()}),m=d.menu||{},title=m.title||m.package_name||m.name||'';if(visibleNameInput)visibleNameInput.value=title;if($('cm-price')&&m.selling_price!=null)$('cm-price').value=Number(m.selling_price);if(m.category&&m.category.id)setSelectValue('cm-category',m.category.id);else if(m.category_id)setSelectValue('cm-category',m.category_id);if(m.sub_category_id)setSelectValue('cm-sub-category',m.sub_category_id);if(m.rasa_id)setSelectValue('cm-rasa',m.rasa_id);if(m.level_id)setSelectValue('cm-level',m.level_id);if(m.status&&$('cm-status'))$('cm-status').value=m.status;var c=Array.isArray(m.components)&&m.components.length?m.components[0]:null;if(c&&c.product_id)setSelectValue('cm-product',c.product_id);setEditorType(m.menu_type||'SINGLE');var img=(c&&(c.image_url||c.image))||m.image_url||'';renderImagePreview(img);if(imageRemove)imageRemove.style.display=img?'':'none'}catch(e){console.error('[Xentra Menu First] hydrate error:',e);toast('❌ Gagal memuat detail menu.')}finally{editorHydrationInFlight=null}}
-function getState(){return{menuId:getMenuId(),type:isPackage?'PACKAGE':'SINGLE',name:visibleNameInput?String(visibleNameInput.value||'').trim():'',categoryId:$('cm-category')?String($('cm-category').value||''):'',price:$('cm-price')?Number($('cm-price').value||0):0,status:$('cm-status')?String($('cm-status').value||'ACTIVE'):'ACTIVE',productId:getProductId()}}
-async function prepareAndSubmitOriginalForm(){var s=getState();if(!s.name){toast('❌ Nama menu wajib diisi.');if(visibleNameInput)visibleNameInput.focus();return}if(!s.categoryId){toast('❌ Pilih kategori menu terlebih dahulu.');var c=$('cm-category');if(c)c.focus();return}if(!Number.isFinite(s.price)||s.price<0){toast('❌ Harga menu tidak valid.');var p=$('cm-price');if(p)p.focus();return}var save=$('x-menu-first-save');if(save){save.disabled=true;save.textContent='Menyimpan...'}if(form)form.setAttribute('aria-busy','true');try{var product={id:s.productId,created:false};if(!isPackage){product=await ensureBackingProduct(s.name,s.productId);setSelectValue('cm-product',product.id);if(imageFile)await uploadProductImage(product.id);else if(imageRemoved&&!product.created)await deleteProductImage(product.id)}var sub=await ensureHiddenSubCategory(s.categoryId,s.name);if(!sub)throw new Error('SUB_CATEGORY_REQUIRED');setSelectValue('cm-sub-category',sub.id);var rasa=await ensureOriginalRasa();setSelectValue('cm-rasa',rasa.id);if($('cm-status'))$('cm-status').value='ACTIVE';syncNameIntoLegacyFields();submittingBridge=true;form.requestSubmit()}catch(e){console.error('[Xentra Menu First] save bridge error:',e);toast('❌ '+(e.message||'Gagal menyiapkan menu.'));if(save){save.disabled=false;save.textContent=isPackage?'Simpan Paket':'Simpan Menu'}if(form)form.setAttribute('aria-busy','false')}}
-function installSubmitBridge(){if(!form||form.__xMenuFirstSubmitBridge)return;form.__xMenuFirstSubmitBridge=true;form.addEventListener('submit',function(e){if(submittingBridge){submittingBridge=false;return}e.preventDefault();e.stopImmediatePropagation();prepareAndSubmitOriginalForm()},true)}
-function moveFieldToSlot(fieldId,slotId,labelText,helperText){var f=$(fieldId),slot=$(slotId);if(!f||!slot)return;var g=f.closest('.x-form-group');if(!g)return;var l=g.querySelector('label'),h=g.querySelector('small');if(l)l.textContent=labelText;if(h&&helperText)h.textContent=helperText;slot.appendChild(g)}
-function hideTechnicalGroup(fieldId){var f=$(fieldId);if(!f)return;var host=f.closest('.x-form-group')||f;host.classList.add('x-menu-first-hidden-technical')}
-function buildEditorUI(){form=$('form-master-menu');if(!form)return;firstCard=form.querySelector('.x-card');if(!firstCard||$('x-menu-first-name'))return;var intro=firstCard.querySelector('div[style*="margin-bottom:16px"]');if(intro){var p=intro.querySelector('p');if(p)p.textContent='Tambahkan menu yang ingin dijual pelanggan. Pengaturan lanjutan tersedia saat diperlukan.'}var basics=document.createElement('div');basics.className='x-menu-first-basics';basics.innerHTML='<div class="x-menu-first-fields"><div class="x-menu-first-field"><label for="x-menu-first-name">Nama Menu <span class="x-required-mark">*</span></label><input type="text" id="x-menu-first-name" class="x-input x-menu-first-name" maxlength="255" autocomplete="off" placeholder="Contoh: Es Teh Manis"></div><div class="x-menu-first-basic-meta"><div class="x-menu-first-field" id="x-menu-first-category-slot"></div><div class="x-menu-first-field" id="x-menu-first-price-slot"></div></div><div class="x-menu-first-field"><div class="x-menu-first-type" role="group" aria-label="Jenis menu"><button type="button" data-menu-first-type="SINGLE" class="is-active" aria-pressed="true">Menu biasa</button><button type="button" data-menu-first-type="PACKAGE" aria-pressed="false">Paket</button></div><div class="x-menu-first-inline-hint">Menu biasa untuk satu item. Pilih Paket hanya saat memang menjual gabungan beberapa menu atau item.</div></div></div><div class="x-menu-first-image"><div class="x-menu-first-label">Foto Menu <span style="font-weight:500;color:#94a3b8;">(opsional)</span></div><div class="x-menu-first-image-preview" id="x-menu-first-image-preview" role="button" tabindex="0" aria-label="Pilih foto menu"><img id="x-menu-first-image" alt="Preview foto menu" style="display:none;"><div class="x-menu-first-image-empty" id="x-menu-first-image-empty"><span class="x-menu-first-image-empty-icon">🍲</span><span>Tambah foto</span></div></div><div class="x-menu-first-image-actions"><button type="button" class="x-btn-secondary" id="x-menu-first-image-pick">Pilih</button><button type="button" class="x-btn-secondary" id="x-menu-first-image-remove" style="display:none;">Hapus</button></div><input type="file" id="x-menu-first-image-file" class="x-menu-first-image-input" accept="image/jpeg,image/png,image/webp"><div class="x-menu-first-inline-hint">1:1 · JPG, PNG, WebP. Xentra memproses foto otomatis.</div></div>';firstCard.insertBefore(basics,firstCard.firstChild.nextSibling||firstCard.firstChild);visibleNameInput=$('x-menu-first-name');imageInput=$('x-menu-first-image-file');imagePreview=$('x-menu-first-image');imageEmpty=$('x-menu-first-image-empty');imageRemove=$('x-menu-first-image-remove');typeButtons=Array.prototype.slice.call(firstCard.querySelectorAll('[data-menu-first-type]'));moveFieldToSlot('cm-category','x-menu-first-category-slot','Kategori','Pilih kategori agar pelanggan mudah menemukan menu ini.');moveFieldToSlot('cm-price','x-menu-first-price-slot','Harga Jual (Rp)','Harga yang dibayar pelanggan.');hideTechnicalGroup('master-menu-single-fields');hideTechnicalGroup('cm-sub-category');hideTechnicalGroup('cm-status');var rg=$('cm-rasa')&&$('cm-rasa').closest('.x-form-group'),lg=$('cm-level')&&$('cm-level').closest('.x-form-group'),row=rg&&rg.closest('.x-form-row'),adv=document.createElement('details');adv.className='x-menu-first-advanced';adv.innerHTML='<summary>Pengaturan tambahan <span style="font-size:11px;color:#94a3b8;font-weight:500;">opsional</span></summary>';var body=document.createElement('div');body.className='x-menu-first-advanced-body';body.innerHTML='<div class="x-menu-first-advanced-note">Menu sederhana seperti Es Teh Manis tidak perlu mengatur Rasa atau Level.</div>';var grid=document.createElement('div');grid.className='x-menu-first-basic-meta';if(rg){var rl=rg.querySelector('label');if(rl)rl.textContent='Rasa';grid.appendChild(rg)}if(lg){var ll=lg.querySelector('label');if(ll)ll.textContent='Level Pedas';grid.appendChild(lg)}body.appendChild(grid);adv.appendChild(body);firstCard.appendChild(adv);if(row)row.classList.add('x-menu-first-hidden-technical');var ph=$('master-menu-package-fields');if(ph)ph.classList.add('x-menu-first-package-panel');var actions=form.querySelector('.x-form-actions');if(actions){actions.classList.add('x-menu-first-save-row');var submit=$('btn-save-master-menu-active')||actions.querySelector('button[type="submit"]');if(submit){submit.id='x-menu-first-save';submit.textContent='Simpan Menu'}var draft=$('btn-save-master-menu-draft');if(draft)draft.classList.add('x-menu-first-hidden-technical')}installSubmitBridge();visibleNameInput.addEventListener('input',syncNameIntoLegacyFields);typeButtons.forEach(function(b){b.addEventListener('click',function(){setEditorType(b.getAttribute('data-menu-first-type'))})});if(imageInput)imageInput.addEventListener('change',function(){var f=imageInput.files&&imageInput.files[0];if(!f)return;if(!/^image\\/(jpeg|png|webp)$/i.test(f.type)){toast('❌ Gunakan JPG, PNG, atau WebP.');imageInput.value='';return}if(f.size>20*1024*1024){toast('❌ Foto maksimal 20 MB.');imageInput.value='';return}setImageFile(f);if(imageRemove)imageRemove.style.display=''});var pick=$('x-menu-first-image-pick'),box=$('x-menu-first-image-preview');if(pick)pick.addEventListener('click',function(){if(imageInput)imageInput.click()});if(box)box.addEventListener('click',function(){if(imageInput)imageInput.click()});if(box)box.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();if(imageInput)imageInput.click()}});if(imageRemove)imageRemove.addEventListener('click',function(){imageFile=null;imageRemoved=true;if(imageInput)imageInput.value='';renderImagePreview('');imageRemove.style.display='none'});setEditorType('SINGLE')}
-function buildListUI(){var section=$('tab-catalog-master-menus');if(!section)return;var title=section.querySelector('#master-menu-list-view .x-master-products-title');if(title){var t=Array.prototype.slice.call(title.childNodes).find(function(n){return n.nodeType===3&&String(n.textContent||'').trim()});if(t)t.textContent=' Menu'}var sub=section.querySelector('#master-menu-list-view .x-master-products-sub');if(sub)sub.textContent='Menu yang dijual ke pelanggan. Tambah satu menu dulu; pengaturan lanjutan tersedia saat diperlukan.';var old=$('master-menu-add-actions');if(old){old.style.display='none';var header=old.parentNode;if(header&&!header.querySelector('#x-menu-first-add')){var add=document.createElement('button');add.type='button';add.id='x-menu-first-add';add.className='x-menu-first-add';add.textContent='+ Tambah Menu';add.addEventListener('click',function(){var legacy=$('btn-add-master-menu-single');if(legacy)legacy.click()});header.appendChild(add)}}var search=section.querySelector('#master-menu-search');if(search){var tb=search.closest('.x-master-menu-toolbar');if(tb)tb.classList.add('x-menu-first-toolbar')}var cards=section.querySelectorAll('.x-master-menu-card h4');cards.forEach(function(h){h.textContent=h.textContent.replace(/^Menu Master\\b/i,'Menu')});var hub=document.querySelector('.x-hub-card[onclick*="catalog/master-menus"]');if(hub){var hh=hub.querySelector('h3'),p=hub.querySelector('p');if(hh)hh.textContent='Menu';if(p)p.textContent='Kelola menu yang dijual ke pelanggan.'}}
-function normalizeCatalogNavigation(){var parent=$('nav-catalog-parent'),sub=$('nav-catalog-sub');if(!parent||!sub)return;var parentSpan=parent.querySelector(':scope > span');if(parentSpan)parentSpan.textContent='Menu';var menu=sub.querySelector('[data-route="catalog/master-menus"]'),branch=sub.querySelector('[data-route="catalog/menus"]'),categories=sub.querySelector('[data-route="catalog/categories"]'),products=sub.querySelector('[data-route="catalog/products"]');if(menu){var ms=menu.querySelector('span');if(ms)ms.textContent='Menu';menu.classList.add('x-menu-first-primary-route');sub.appendChild(menu)}if(branch){var bs=branch.querySelector('span');if(bs)bs.textContent='Menu Cabang';sub.appendChild(branch)}if(categories){var cs=categories.querySelector('span');if(cs)cs.textContent='Kategori';sub.appendChild(categories)}if(products){var ps=products.querySelector('span');if(ps)ps.textContent='Produk & Stok';sub.appendChild(products)}}
-function syncEditorRoute(){var view=$('master-menu-editor-view');if(!view||view.style.display==='none')return;var id=getMenuId();if(id){if(lastEditorMenuId!==id){lastEditorMenuId=id;imageFile=null;imageRemoved=false;if(imageInput)imageInput.value='';hydrateEditorFromMenu(id)}return}if(lastEditorMenuId!==''){lastEditorMenuId='';clearNewEditorState()}}
-function observeEditor(){var view=$('master-menu-editor-view');if(!view)return;new MutationObserver(syncEditorRoute).observe(view,{attributes:true,attributeFilter:['style']})}
-function init(){buildListUI();buildEditorUI();normalizeCatalogNavigation();observeEditor();syncEditorRoute();document.documentElement.setAttribute('data-xentra-menu-first-ui','1')}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
-window.XentraMenuFirstUI={init:init,setType:setEditorType,getState:getState};
+function esc(v){return S.esc?S.esc(v):String(v==null?'':v).replace(/[&<>"]/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]})}
+function fetcher(url,opt){return typeof S.adminFetch==='function'?S.adminFetch(url,opt||{}):fetch(url,opt||{})}
+function headers(){return typeof S.getAuthHeaders==='function'?S.getAuthHeaders({'Content-Type':'application/json'}):{'Content-Type':'application/json'}}
+async function api(path,opt){var r=await fetcher(API_BASE+path,Object.assign({headers:headers()},opt||{}));var d=await r.json();if(!r.ok||!d.success)throw new Error(d.error||d.message||'Request gagal');return d}
+function toast(m){if(S.showToast)S.showToast(m);else if(window.showToast)window.showToast(m)}
+var state={categories:[],titles:[],rasas:[],levels:[],products:[],menus:[],components:[],editingId:null};
+
+function optionRows(rows,selected,placeholder){var h='<option value="">'+esc(placeholder||'Pilih')+'</option>';(rows||[]).forEach(function(r){h+='<option value="'+esc(r.id)+'"'+(String(r.id)===String(selected||'')?' selected':'')+'>'+esc(r.name)+'</option>'});return h}
+async function loadMasters(){
+ var rs=await Promise.all([
+   api('/admin/categories?active_only=1'),api('/admin/titles?active_only=1'),api('/admin/rasas?active_only=1'),
+   api('/admin/levels?active_only=1'),api('/admin/composed/products?active_only=1')
+ ]);
+ state.categories=rs[0].categories||[];state.titles=rs[1].titles||[];state.rasas=rs[2].rasas||[];state.levels=rs[3].levels||[];state.products=rs[4].products||[];
+ renderMasterSelects();
+}
+function renderMasterSelects(){
+ var c=$('cm-category'),t=$('cm-sub-category'),r=$('cm-rasa'),l=$('cm-level');
+ if(c)c.innerHTML=optionRows(state.categories,c.value,'Pilih Kategori');
+ if(t)t.innerHTML=optionRows(state.titles,t.value,'Pilih Judul');
+ if(r)r.innerHTML=optionRows(state.rasas,r.value,'Tidak ada rasa');
+ if(l)l.innerHTML=optionRows(state.levels,l.value,'Tidak ada level');
+ renderComponents();
+}
+function productOptions(selected){return optionRows(state.products,selected,'Pilih Product')}
+function renderComponents(){
+ var wrap=$('cm-package-components');if(!wrap)return;
+ if(!state.components.length)state.components=[{product_id:'',quantity:1}];
+ wrap.innerHTML='';
+ state.components.forEach(function(x,i){
+   var row=document.createElement('div');row.className='x-composed-menu-component-row';row.style.cssText='display:flex;gap:8px;align-items:center;margin-bottom:8px';
+   row.innerHTML='<select class="x-input cm-component-product" data-i="'+i+'">'+productOptions(x.product_id)+'</select><input class="x-input cm-component-qty" data-i="'+i+'" type="number" min="1" step="1" value="'+esc(x.quantity||1)+'" style="max-width:90px"><button type="button" class="x-btn-secondary cm-component-remove" data-i="'+i+'">Hapus</button>';
+   wrap.appendChild(row);
+ });
+ Array.prototype.forEach.call(wrap.querySelectorAll('.cm-component-product'),function(e){e.addEventListener('change',function(){state.components[Number(e.dataset.i)].product_id=e.value;updatePreview()})});
+ Array.prototype.forEach.call(wrap.querySelectorAll('.cm-component-qty'),function(e){e.addEventListener('input',function(){state.components[Number(e.dataset.i)].quantity=Number(e.value||1);})});
+ Array.prototype.forEach.call(wrap.querySelectorAll('.cm-component-remove'),function(e){e.addEventListener('click',function(){if(state.components.length<=1)return;state.components.splice(Number(e.dataset.i),1);renderComponents()})});
+ updatePreview();
+}
+function resetEditor(){state.editingId=null;state.components=[{product_id:'',quantity:1}];['cm-category','cm-sub-category','cm-rasa','cm-level'].forEach(function(id){if($(id))$(id).value=''});if($('cm-price'))$('cm-price').value='';if($('cm-status'))$('cm-status').value='DRAFT';renderComponents();updatePreview();var t=$('master-menu-editor-title');if(t)t.textContent='Tambah Menu';var mt=$('master-menu-editor-mobile-title');if(mt)mt.textContent='Tambah Menu'}
+function readComponents(){return state.components.filter(function(x){return x.product_id}).map(function(x){return{product_id:String(x.product_id),quantity:Number(x.quantity||1)}})}
+function updatePreview(){
+ var c=$('cm-category'),t=$('cm-sub-category'),r=$('cm-rasa'),p=$('cm-price');
+ var cn=c&&c.selectedOptions[0]?c.selectedOptions[0].textContent:'',tn=t&&t.selectedOptions[0]?t.selectedOptions[0].textContent:'',rn=r&&r.value&&r.selectedOptions[0]?r.selectedOptions[0].textContent:'';
+ var title=tn+(rn?' '+rn:'');
+ if($('cm-preview-title'))$('cm-preview-title').textContent=title||'Pilih kategori dan judul';
+ if($('cm-preview-subtitle'))$('cm-preview-subtitle').textContent=rn||'';
+ if($('cm-preview-detail'))$('cm-preview-detail').textContent=cn?('Kategori: '+cn):'';
+ if($('cm-preview-price'))$('cm-preview-price').textContent='Rp'+Number(p&&p.value||0).toLocaleString('id-ID');
+}
+async function save(status){
+ var categoryId=$('cm-category')&&$('cm-category').value,titleId=$('cm-sub-category')&&$('cm-sub-category').value;
+ var components=readComponents();
+ if(!categoryId)return toast('❌ Kategori wajib dipilih.');
+ if(!titleId)return toast('❌ Judul wajib dipilih.');
+ if(!components.length)return toast('❌ Minimal satu Product wajib dimasukkan.');
+ if(components.some(function(x){return !Number.isSafeInteger(x.quantity)||x.quantity<1}))return toast('❌ Quantity Product tidak valid.');
+ var body={category_id:categoryId,title_id:titleId,rasa_id:$('cm-rasa').value||null,level_id:$('cm-level').value||null,selling_price:Number($('cm-price').value||0),status:status,components:components};
+ try{
+   var d=await api(state.editingId?('/admin/menus/'+encodeURIComponent(state.editingId)):('/admin/menus'),{method:state.editingId?'PUT':'POST',body:JSON.stringify(body)});
+   toast('✓ Menu tersimpan');state.editingId=(d.menu||{}).id||state.editingId;await loadMenus();showList();
+ }catch(e){toast('❌ '+e.message)}
+}
+async function loadMenus(){
+ var d=await api('/admin/menus?status=ACTIVE');state.menus=d.menus||[];renderList();
+}
+function renderList(){
+ var wrap=$('master-menu-list');if(!wrap)return;
+ if(!state.menus.length){wrap.innerHTML='<div class="x-empty-state text-center py-6 text-muted">Belum ada Menu Master.</div>';return}
+ wrap.innerHTML=state.menus.map(function(m){var title=(m.title_name||'Menu')+(m.rasa_name?' '+m.rasa_name:'');return '<button type="button" class="x-master-menu-card" data-menu-id="'+esc(m.id)+'"><strong>'+esc(title)+'</strong><span>'+esc(m.category_name||'')+'</span><span>Rp'+Number(m.selling_price||0).toLocaleString('id-ID')+'</span></button>'}).join('');
+ Array.prototype.forEach.call(wrap.querySelectorAll('[data-menu-id]'),function(e){e.addEventListener('click',function(){editMenu(e.dataset.menuId)})});
+}
+async function editMenu(id){
+ try{
+  var d=await api('/admin/menus/'+encodeURIComponent(id));var m=d.menu||{};state.editingId=id;
+  $('cm-category').value=m.category_id||'';$('cm-sub-category').value=m.title_id||'';$('cm-rasa').value=m.rasa_id||'';$('cm-level').value=m.level_id||'';$('cm-price').value=m.selling_price||0;$('cm-status').value=m.status||'DRAFT';
+  state.components=(m.components||[]).map(function(x){return{product_id:x.product_id,quantity:Number(x.quantity||1)}});if(!state.components.length)state.components=[{product_id:'',quantity:1}];renderComponents();
+  var t=$('master-menu-editor-title');if(t)t.textContent='Edit Menu';var mt=$('master-menu-editor-mobile-title');if(mt)mt.textContent='Edit Menu';showEditor();
+ }catch(e){toast('❌ '+e.message)}
+}
+function showEditor(){var a=$('master-menu-editor-view'),b=$('master-menu-list-view');if(a)a.style.display='';if(b)b.style.display='none'}
+function showList(){var a=$('master-menu-editor-view'),b=$('master-menu-list-view');if(a)a.style.display='none';if(b)b.style.display='';resetEditor()}
+function bind(){
+ if($('btn-add-master-menu'))$('btn-add-master-menu').addEventListener('click',function(){resetEditor();showEditor()});
+ if($('btn-cm-add-component'))$('btn-cm-add-component').addEventListener('click',function(){state.components.push({product_id:'',quantity:1});renderComponents()});
+ if($('btn-save-master-menu-draft'))$('btn-save-master-menu-draft').addEventListener('click',function(){save('DRAFT')});
+ if($('btn-save-master-menu-active'))$('btn-save-master-menu-active').addEventListener('click',function(){save('ACTIVE')});
+ if($('btn-cancel-master-menu'))$('btn-cancel-master-menu').addEventListener('click',showList);
+ if($('btn-master-menu-editor-back'))$('btn-master-menu-editor-back').addEventListener('click',showList);
+ ['cm-category','cm-sub-category','cm-rasa','cm-level','cm-price'].forEach(function(id){if($(id))$(id).addEventListener('change',updatePreview);});
+ loadMasters().then(loadMenus).catch(function(e){console.error(e);toast('❌ Gagal memuat Master Menu')});
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
+window.XentraMenuFirstUI={reload:function(){return Promise.all([loadMasters(),loadMenus()])}};
 })();
