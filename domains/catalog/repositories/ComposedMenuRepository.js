@@ -142,7 +142,7 @@ class ComposedMenuRepository {
 
   findMenu({ brandId, menuId }) {
     return this.db.queryOne(
-      "SELECT m.id, m.brand_id, m.category_id, m.title_id, m.rasa_id, m.level_id, m.selling_price, m.status, m.created_at, m.updated_at, " +
+      "SELECT m.id, m.brand_id, m.category_id, m.title_id, m.rasa_id, m.level_id, COALESCE(m.spice_level, 0) AS spice_level, m.selling_price, m.status, m.created_at, m.updated_at, " +
       "c.name AS category_name, c.slug AS category_slug, t.name AS title_name, t.slug AS title_slug, " +
       "r.name AS rasa_name, r.slug AS rasa_slug, l.name AS level_name, l.slug AS level_slug, l.sort_order AS level_sort_order " +
       "FROM menus m " +
@@ -157,21 +157,21 @@ class ComposedMenuRepository {
 
   findMenuByIdentity({ brandId, categoryId, titleId, rasaId = null }) {
     return this.db.queryOne(
-      "SELECT id, brand_id, category_id, title_id, rasa_id, level_id, selling_price, status " +
+      "SELECT id, brand_id, category_id, title_id, rasa_id, level_id, COALESCE(spice_level, 0) AS spice_level, selling_price, status " +
       "FROM menus WHERE brand_id = ? AND category_id = ? AND title_id = ? AND COALESCE(rasa_id, '') = COALESCE(?, '') LIMIT 1",
       [brandId, categoryId, titleId, rasaId]
     );
   }
 
-  createMenu({ id, brandId, categoryId, titleId, rasaId = null, levelId = null, sellingPrice, status, displayName = null }) {
+  createMenu({ id, brandId, categoryId, titleId, rasaId = null, levelId = null, spiceLevel = 0, sellingPrice, status, displayName = null }) {
     return this.db.execute(
-      "INSERT INTO menus (id, brand_id, menu_type, display_name, category_id, title_id, sub_category_id, rasa_id, level_id, package_name, selling_price, status) VALUES (?, ?, 'SINGLE', ?, ?, ?, NULL, ?, ?, NULL, ?, ?)",
-      [id, brandId, displayName, categoryId, titleId, rasaId, levelId, sellingPrice, status]
+      "INSERT INTO menus (id, brand_id, menu_type, display_name, category_id, title_id, sub_category_id, rasa_id, level_id, spice_level, package_name, selling_price, status) VALUES (?, ?, 'SINGLE', ?, ?, ?, NULL, ?, ?, ?, NULL, ?, ?)",
+      [id, brandId, displayName, categoryId, titleId, rasaId, levelId, spiceLevel, sellingPrice, status]
     );
   }
 
   updateMenu({ brandId, menuId, fields }) {
-    const allowed = ['category_id', 'title_id', 'rasa_id', 'level_id', 'selling_price', 'status'];
+    const allowed = ['category_id', 'title_id', 'rasa_id', 'level_id', 'spice_level', 'selling_price', 'status'];
     const sets = [];
     const params = [];
     for (const key of allowed) {
