@@ -1321,7 +1321,6 @@
 
     if (p.menu_id) {
       payload.menu_id=p.menu_id;
-      payload.menu_type=p.menu_type || 'SINGLE';
       payload.component_snapshot=Array.isArray(p.components) ? p.components : (Array.isArray(p.component_snapshot) ? p.component_snapshot : []);
       payload.menu_snapshot=p.menu_snapshot || {
         menu_id:p.menu_id,
