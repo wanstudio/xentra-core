@@ -2546,11 +2546,11 @@
     list.innerHTML = rows.map(function(item) {
       var sku = item.sku == null ? '' : String(item.sku).trim();
       var hasSku = !!sku;
+      var isActive = item.is_active !== 0 && item.is_active !== null;
       var id = esc(String(item.id));
 
       return [
-        '<div class="x-master-item-card">',
-          '<div class="x-master-reference-card">',
+        '<div class="x-master-reference-card">',
             '<div class="x-master-reference-card-main">',
               '<div class="x-master-reference-icon x-master-reference-icon-category" aria-hidden="true">',
                 '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 7h16"></path><path d="M4 12h16"></path><path d="M4 17h10"></path></svg>',
@@ -2561,8 +2561,8 @@
               '</div>',
             '</div>',
             '<div class="x-master-reference-card-right" style="display:flex;align-items:center;gap:10px;">',
-              '<label class="x-toggle' + (hasSku ? ' x-toggle-on' : '') + '" title="Kelola stok (pakai SKU)" style="margin:0;">',
-                '<input type="checkbox" ' + (hasSku ? 'checked' : '') + ' onchange="toggleMasterItemStock(\'' + id + '\', this)" aria-label="Kelola stok (pakai SKU) untuk ' + esc(item.name) + '">',
+              '<label class="x-toggle' + (isActive ? ' x-toggle-on' : '') + '" title="' + (isActive ? 'Item aktif (klik untuk nonaktifkan)' : 'Item nonaktif (klik untuk aktifkan)') + '" style="margin:0;">',
+                '<input type="checkbox" ' + (isActive ? 'checked' : '') + ' onchange="toggleMasterItemActive(\'' + id + '\', this)" aria-label="Status item ' + esc(item.name) + '">',
                 '<span class="x-toggle-slider"></span>',
               '</label>',
               '<button type="button" class="x-action-menu-trigger" aria-label="Aksi Item ' + esc(item.name) + '" onclick="XentraActionMenu.open(this, [' +
@@ -2574,64 +2574,30 @@
               '</button>',
             '</div>',
           '</div>',
-          '<div class="x-master-item-sku" id="master-item-sku-' + id + '"' + (hasSku ? '' : ' hidden') + '>',
-            '<label for="master-item-sku-input-' + id + '">SKU ' + esc(item.name) + '</label>',
-            '<input type="text" class="x-input" id="master-item-sku-input-' + id + '" value="' + esc(sku) + '" placeholder="Contoh: AYM-001" maxlength="60" autocomplete="off">',
-            '<button type="button" class="x-btn-primary" onclick="saveMasterItemSku(\'' + id + '\', true)">Simpan SKU</button>',
-          '</div>',
-        '</div>'
+       '</div>'
       ].join('');
     }).join('');
   }
 
-  window.toggleMasterItemStock = function(productId, inputEl) {
-    var row = document.getElementById('master-item-sku-' + productId);
-    if (inputEl && inputEl.checked) {
-      if (row) {
-        row.hidden = false;
-        var field = row.querySelector('.x-input');
-        if (field) {
-          field.focus();
-          field.select();
-        }
-      }
-      return;
-    }
-    // Mematikan pengelolaan stok = mengosongkan SKU. Server menolaknya selama
-    // masih ada stok positif di cabang mana pun.
-    saveMasterItemSku(productId, false);
-  };
-
-  window.saveMasterItemSku = async function(productId, fromInput) {
-    var field = document.getElementById('master-item-sku-input-' + productId);
-    var sku = fromInput && field ? String(field.value || '').trim() : '';
-
+  // Toggle kartu Item = aktif/nonaktif item (bukan pengelolaan stok). Dipakai untuk
+  // menghentikan sementara item yang tidak boleh dijual, dan bisa dinyalakan kembali.
+  window.toggleMasterItemActive = async function(productId, inputEl) {
+    var nextActive = inputEl && inputEl.checked ? 1 : 0;
     try {
-      var res = await adminFetch(API_BASE + '/admin/products/' + encodeURIComponent(productId) + '/sku', {
-        method: 'PUT',
+      var res = await adminFetch(API_BASE + '/admin/composed/products/' + encodeURIComponent(productId) + '/status', {
+        method: 'PATCH',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ sku: sku })
+        body: JSON.stringify({ is_active: nextActive })
       });
       var data = await res.json();
-
-      if (!res.ok || !data.success) {
-        var code = data.error || '';
-        var message = data.message || code;
-        if (code === 'PRODUCT_SKU_REMOVAL_BLOCKED_STOCK' || code === 'PRODUCT_SKU_UPDATE_FAILED') {
-          message = 'Stok item ini masih ada di cabang. Stok harus nol dulu sebelum pengelolaan stok dimatikan.';
-        }
-        throw new Error(message || 'Gagal menyimpan SKU.');
-      }
+      if (!res.ok || !data.success) throw new Error(data.message || data.error || 'Gagal mengubah status item.');
 
       var rows = state.products || [];
-      var index = rows.findIndex(function(item) { return String(item.id) === String(productId); });
-      if (index >= 0) {
-        rows[index] = Object.assign({}, rows[index], { sku: data.product && data.product.sku ? data.product.sku : null });
-        state.products = rows;
-      }
+      var index = rows.findIndex(function (item) { return String(item.id) === String(productId); });
+      if (index >= 0) { rows[index] = Object.assign({}, rows[index], { is_active: nextActive }); state.products = rows; }
 
       renderMasterItemsList();
-      showToast('✅ SKU disimpan.');
+      showToast('✅ Item ' + (nextActive ? 'diaktifkan' : 'dinonaktifkan') + '.');
     } catch (err) {
       renderMasterItemsList();
       showToast('❌ ' + err.message);

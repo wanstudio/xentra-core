@@ -8406,39 +8406,9 @@ input[type="file"].x-input,
   margin-top: 0;
 }
 
-/* Tab Item: satu kartu = satu item, memakai komponen kartu yang sama dengan tab
-   master (ikon + nama + status + toggle + menu aksi). Baris SKU tampil sebagai
-   blok terpisah di bawah kartu saat pengelolaan stok diaktifkan. */
-.x-master-item-card{
-  display: grid;
-  gap: 8px;
-}
-.x-master-item-sku{
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding: 10px 12px;
-  border: 1px dashed var(--border-color);
-  border-radius: var(--radius-sm);
-  background: var(--bg-main);
-}
-.x-master-item-sku label{
-  flex: 1 1 100%;
-  margin: 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-.x-master-item-sku .x-input{
-  flex: 1 1 170px;
-  margin: 0;
-}
-.x-master-item-sku .x-btn-primary{
-  flex: 0 0 auto;
-  padding: 9px 14px;
-  font-size: 12px;
-}
+/* Tab Item memakai komponen kartu yang sama dengan tab master (ikon + nama +
+   status + toggle aktif/nonaktif + menu aksi). Pengelolaan SKU ada di halaman
+   edit item, jadi tidak ada baris SKU di sini. */
 .x-master-reference-toolbar{
   display:flex;
   align-items:center;
