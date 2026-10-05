@@ -2688,7 +2688,7 @@
               '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">' + referenceIconSvg(type) + '</svg>',
             '</div>',
             '<div class="x-master-reference-copy">',
-              '<strong>' + esc(row.name) + '</strong>',
+              '<strong>' + esc(row.name) + '</strong>' + (isRowActive ? '' : ' ' + referenceStatusBadge(false)),
               '<span>' + esc(description) + '</span>',
             '</div>',
           '</div>',
