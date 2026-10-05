@@ -357,6 +357,14 @@ Legacy storage can remain temporarily, but forward UI and business logic must no
    diperlakukan sebagai satu nilai tersendiri (NULL-safe).
 10. Judul **wajib** saat Menu disimpan, karena tanpa Judul customer tidak punya judul.
 11. Media Menu tetap milik Menu (bukan gambar Item pertama).
+12. **Validasi bergantung status** (hanya Category + Judul yang selalu wajib):
+    - **DRAFT** — wajib: Category + Judul. Harga, Item, Rasa, Pedas, dan Media boleh kosong.
+      Menu boleh disusun bertahap.
+    - **ACTIVE** — wajib: Category + Judul + **harga** + **minimal 1 Item**. Alasannya Menu
+      ACTIVE tampil di customer PWA dan harus bisa dibeli; Menu tanpa harga/Item tidak boleh
+      dipublikasikan.
+    - Transisi DRAFT → ACTIVE wajib melewati validasi ACTIVE di server (bukan hanya di UI).
+    - Semua field non-wajib lain (Rasa, Pedas, Media) tetap boleh kosong di status apa pun.
 
 ### Cakupan pekerjaan
 
