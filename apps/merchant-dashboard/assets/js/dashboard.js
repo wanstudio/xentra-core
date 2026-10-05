@@ -2401,6 +2401,7 @@
       category: $('master-reference-category-panel'),
       flavor: $('master-reference-flavor-panel'),
       complement: $('master-reference-complement-panel'),
+      title: $('master-reference-title-panel'),
     };
     Object.keys(panels).forEach(function(key) {
       if (panels[key]) panels[key].hidden = _masterReferenceTab !== key;
@@ -2423,6 +2424,7 @@
       category: $('master-categories-page-list'),
       flavor: $('master-flavors-page-list'),
       complement: $('master-complements-page-list'),
+      title: $('master-titles-page-list'),
     };
     var requestSeq = ++_masterReferenceLoadSeq;
 
@@ -2445,6 +2447,20 @@
         if (requestSeq !== _masterReferenceLoadSeq) return;
         console.error('[Master Category Load Error]:', err);
         if (listEls.category) listEls.category.innerHTML = '<div class="x-empty-state text-center py-8 text-muted">Gagal memuat kategori. Coba lagi.</div>';
+      });
+
+    var titlePromise = adminFetch(API_BASE + '/admin/menu-titles', { headers: headers })
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (requestSeq !== _masterReferenceLoadSeq) return;
+        if (!data.success) throw new Error(data.error || 'Gagal memuat judul.');
+        _masterMenuComponents.title = data.titles || [];
+        renderMasterReferenceList('title');
+      })
+      .catch(function(err) {
+        if (requestSeq !== _masterReferenceLoadSeq) return;
+        console.error('[Master Judul Load Error]:', err);
+        if (listEls.title) listEls.title.innerHTML = '<div class="x-empty-state text-center py-8 text-muted">Gagal memuat judul. Coba lagi.</div>';
       });
 
     var componentPromises = ['flavor', 'complement', 'level'].map(function(type) {
@@ -2479,7 +2495,7 @@
         });
     });
 
-    await Promise.allSettled([categoryPromise].concat(componentPromises));
+    await Promise.allSettled([categoryPromise, titlePromise].concat(componentPromises));
 
     if (requestSeq === _masterReferenceLoadSeq) {
       populateProductCategorySelect();
@@ -2500,11 +2516,12 @@
   }
 
   function referenceTypeLabel(type) {
+    if (type === 'title') return 'Judul';
     return type === 'category' ? 'Kategori' : type === 'flavor' ? 'Rasa' : type === 'complement' ? 'Kelengkapan' : 'Level';
   }
 
   function referenceIconClass(type) {
-    return type === 'category'
+    return (type === 'category' || type === 'title')
       ? 'x-master-reference-icon-category'
       : type === 'flavor'
         ? 'x-master-reference-icon-flavor'
@@ -2514,6 +2531,7 @@
   }
 
   function referenceIconSvg(type) {
+    if (type === 'title') return '<path d="M4 6h16"></path><path d="M4 12h16"></path><path d="M4 18h9"></path>';
     if (type === 'category') return '<rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect>';
     if (type === 'flavor') return '<path d="M5 12h14"></path><path d="M12 5v14"></path><circle cx="12" cy="12" r="9"></circle>';
     if (type === 'complement') return '<path d="M4 7h16"></path><path d="M6 7v12"></path><path d="M18 7v12"></path><path d="M3 19h18"></path><path d="M9 7V4h6v3"></path>';
@@ -2525,6 +2543,7 @@
       category: 'master-categories-page-list',
       flavor: 'master-flavors-page-list',
       complement: 'master-complements-page-list',
+      title: 'master-titles-page-list',
       level: 'master-levels-page-list'
     };
     var list = $(listMap[type]);
@@ -2543,6 +2562,8 @@
           return String(product.category_id) === String(row.id);
         }).length;
         description = productCount + ' Produk Master';
+      } else if (type === 'title') {
+        description = 'Judul Menu di Customer PWA · wajib dipilih tiap Menu';
       } else if (type === 'flavor') {
         description = 'Dipakai sebagai pilihan Rasa pada Produk Master';
       } else if (type === 'complement') {
@@ -2679,11 +2700,18 @@
     var prevChecked = inputEl ? !inputEl.checked : null;
     try {
       if (inputEl) inputEl.disabled = true;
+      var isTitle = type === 'title';
       var endpoint = type === 'category'
         ? API_BASE + '/admin/categories/' + encodeURIComponent(id) + '/toggle'
-        : API_BASE + '/admin/menu/components/' + encodeURIComponent(type) + '/' + encodeURIComponent(id) + '/toggle';
+        : isTitle
+          ? API_BASE + '/admin/menu-titles/' + encodeURIComponent(id)
+          : API_BASE + '/admin/menu/components/' + encodeURIComponent(type) + '/' + encodeURIComponent(id) + '/toggle';
 
-      var res = await adminFetch(endpoint, {
+      var res = await adminFetch(endpoint, isTitle ? {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ is_active: inputEl && inputEl.checked ? 1 : 0 })
+      } : {
         method: 'PATCH',
         headers: getAuthHeaders()
       });
@@ -2747,6 +2775,15 @@
       endpoint: function () { return API_BASE + '/admin/categories'; },
       deleteEndpoint: function (id) { return API_BASE + '/admin/categories/' + encodeURIComponent(id); },
       archiveEndpoint: function (id) { return API_BASE + '/admin/categories/' + encodeURIComponent(id) + '/archive'; },
+      payload: function (name) { return { name: name }; }
+    },
+    title: {
+      title: 'Tambah Judul',
+      label: 'Nama Judul',
+      placeholder: 'Contoh: Ayam Geprek',
+      description: 'Judul Menu di Customer PWA; wajib dipilih tiap Menu',
+      endpoint: function () { return API_BASE + '/admin/menu-titles'; },
+      deleteEndpoint: function (id) { return API_BASE + '/admin/menu-titles/' + encodeURIComponent(id); },
       payload: function (name) { return { name: name }; }
     },
     flavor: {
@@ -2844,7 +2881,7 @@
         throw new Error(data.error || 'Gagal menyimpan data master.');
       }
 
-      var row = type === 'category' ? data.category : data.component;
+      var row = type === 'category' ? data.category : (type === 'title' ? data.title : data.component);
       if (!row) throw new Error('Server tidak mengembalikan hasil simpan.');
 
       var rows = referenceRows(type);
@@ -3974,6 +4011,14 @@ async function loadMenusView() {
       btnAddFlavorPage.dataset.bound = 'true';
       btnAddFlavorPage.addEventListener('click', function() {
         openMasterReferenceQuickAdd('flavor');
+      });
+    }
+
+    var btnAddTitlePage = $('btn-add-master-title-page');
+    if (btnAddTitlePage && !btnAddTitlePage.dataset.bound) {
+      btnAddTitlePage.dataset.bound = 'true';
+      btnAddTitlePage.addEventListener('click', function() {
+        openMasterReferenceQuickAdd('title');
       });
     }
 

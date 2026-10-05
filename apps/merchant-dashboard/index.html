@@ -1534,11 +1534,12 @@
               <button type="button" class="x-title-back-btn x-owner-mobile-page-back" id="btn-master-category-back" aria-label="Kembali" onclick="goBackFromCategory()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
               <span>Kategori</span>
             </h3>
-            <p class="x-owner-mobile-page-sub">Kelola Master Kategori, Rasa, dan Kelengkapan</p>
+            <p class="x-owner-mobile-page-sub">Kelola Master Kategori, Judul, Rasa, dan Item</p>
           </div>
 
           <div class="x-subnav-tabs x-master-reference-tabs" id="master-reference-tabs" role="tablist" aria-label="Master kategori menu">
             <button type="button" class="x-subnav-tab active" data-master-reference-tab="category" role="tab" aria-selected="true">Kategori</button>
+            <button type="button" class="x-subnav-tab" data-master-reference-tab="title" role="tab" aria-selected="false">Judul</button>
             <button type="button" class="x-subnav-tab" data-master-reference-tab="flavor" role="tab" aria-selected="false">Rasa</button>
             <button type="button" class="x-subnav-tab" data-master-reference-tab="complement" role="tab" aria-selected="false">Kelengkapan</button>
           </div>
@@ -1553,6 +1554,19 @@
             </div>
             <div id="master-categories-page-list" class="x-master-reference-card-list">
               <div class="x-empty-state text-center py-6 text-muted">Memuat kategori...</div>
+            </div>
+          </div>
+
+          <div id="master-reference-title-panel" class="x-master-reference-panel" role="tabpanel" hidden>
+            <div class="x-master-reference-toolbar">
+              <div>
+                <strong>Judul</strong>
+                <span class="text-muted">Judul Menu di Customer PWA · wajib dipilih tiap Menu</span>
+              </div>
+              <button type="button" class="x-btn-primary x-master-add-round" id="btn-add-master-title-page" aria-label="Tambah Judul"><svg class="x-master-add-round-icon" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>
+            </div>
+            <div id="master-titles-page-list" class="x-master-reference-card-list">
+              <div class="x-empty-state text-center py-6 text-muted">Memuat judul...</div>
             </div>
           </div>
 
@@ -5097,7 +5111,7 @@
   <script src="/merchant-dashboard/assets/js/owner-bottom-nav.js?v=1.0.0"></script>
   <script src="/merchant-shared/js/presentation-shells.js?v=1.0.2"></script>
   <script src="/merchant-dashboard/assets/js/owner-navigation.js?v=1.0.0"></script>
-  <script src="/dashboard/assets/js/dashboard.js?v=3.0.69"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=3.0.70"></script>
   <script src="/merchant-dashboard/assets/js/owner-master-menu-inline.js?v=1.0.2"></script>
 </body>
 </html>  
