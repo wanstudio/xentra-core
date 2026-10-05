@@ -114,6 +114,27 @@ test('JUDUL-UI-02b: setMasterReferenceTab mengizinkan tipe title (kalau tidak, k
   assert.ok(allowed.includes('category'), 'daftar allowed tetap memuat category');
 });
 
+test('JUDUL-UI-02c: bingkai card panel master reference berbasis kelas, bukan daftar ID', () => {
+  // Regresi: aturan bingkai card dulu menuliskan ID panel satu per satu
+  // (#master-reference-category-panel, #master-reference-flavor-panel), sehingga
+  // panel baru (Judul, Kelengkapan) dirender tanpa bingkai card.
+  const css = fs.readFileSync(
+    path.join(__dirname, '..', 'apps', 'merchant-shared', 'css', 'dashboard.css'),
+    'utf8'
+  );
+
+  const rule = css.match(/\.x-master-reference-panel\{([^}]*)\}/);
+  assert.ok(rule, 'aturan .x-master-reference-panel harus ada (bingkai card satu kesatuan dengan tab)');
+  assert.match(rule[1], /background:\s*var\(--bg-card\)/, 'panel harus memakai latar kartu');
+  assert.match(rule[1], /border:\s*1px solid var\(--border-color\)/, 'panel harus berbingkai');
+  assert.match(rule[1], /border-radius:\s*var\(--radius-md\)/, 'panel harus bersudut membulat');
+
+  assert.ok(
+    !/#master-reference-(category|flavor|title|complement)-panel\s*[,{]/.test(css),
+    'panel tidak boleh dibingkai lewat daftar ID — panel baru akan terlewat lagi'
+  );
+});
+
 // ── Bentuk API yang dibaca UI ───────────────────────────────────────────────
 
 test('JUDUL-UI-03: GET /admin/menu-titles mengembalikan bentuk yang dibaca dashboard', async () => {

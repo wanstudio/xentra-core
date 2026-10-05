@@ -8397,8 +8397,7 @@ input[type="file"].x-input,
   margin-top: 14px;
   margin-bottom: 12px;   /* jeda antara bagian atas dan bawah */
 }
-#master-reference-category-panel,
-#master-reference-flavor-panel{
+.x-master-reference-panel{
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
