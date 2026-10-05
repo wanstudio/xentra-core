@@ -257,7 +257,7 @@
     'overview':           { title: 'Overview',    sub: 'Ringkasan bisnis dan aktivitas terkini', tab: 'overview' },
     'orders':             { title: 'Orders',       sub: 'Antrean pesanan realtime dan status dapur', tab: 'orders' },
     'catalog':            { title: 'Catalog',      sub: 'Kelola taksonomi, produk master, menu komersial, dan menu cabang', tab: 'catalog-products' },
-    'catalog/products':   { title: 'Produk Master', sub: 'Kelola Product atomic, SKU, media, dan status inventory', tab: 'catalog-products' },
+    'catalog/products':   { title: 'Item', sub: 'Kelola item: nama, SKU, media, dan status stok', tab: 'catalog-products' },
     'catalog/categories': { title: 'Kategori',     sub: 'Kelola taksonomi Menu pelanggan (Kategori, Sub Kategori, & Rasa)', tab: 'catalog-categories' },
     'catalog/master-menus': { title: 'Menu Master', sub: 'Susun Menu Satuan & Menu Paket yang dijual ke pelanggan', tab: 'catalog-master-menus' },
     
@@ -786,12 +786,12 @@
     if (titleEl) titleEl.textContent = isMasterMenuEditor
       ? (masterMenuEditorId ? 'Edit Menu Master' : 'Tambah Menu Master')
       : (isProductEditor
-        ? (productEditorId ? 'Edit Produk Master' : 'Tambah Produk Master')
+        ? (productEditorId ? 'Edit Item' : 'Tambah Item')
         : (isBranchEditor ? (branchEditorId ? 'Edit Cabang' : 'Tambah Cabang') : (isProductDetail ? 'Product Detail' : (isBranchDetail ? 'Branch Detail' : (isOrderDetail ? 'Order Detail' : (isCustomerDetail ? 'Customer Detail' : (isReportsRoute ? 'Reports' : meta.title)))))));
     if (subEl) subEl.textContent = isMasterMenuEditor
       ? 'Susun Menu Satuan atau Menu Paket pada katalog komersial brand'
       : (isProductEditor
-        ? 'Kelola Product atomic, SKU, media, dan status inventory'
+        ? 'Kelola item: nama, SKU, media, dan status stok'
         : (isBranchEditor ? 'Kelola identitas, lokasi, kontak, dan aturan operasional cabang' : (isProductDetail ? 'Detail produk master dan status adopsi di cabang' : (isBranchDetail ? 'Detail informasi, operasional, menu, dan tim cabang' : (isOrderDetail ? 'Detail transaksi, rincian biaya, dan status pesanan' : (isCustomerDetail ? 'Profil pelanggan, riwayat pesanan, dan loyalitas' : (isReportsRoute ? 'Laporan penjualan, analitik bisnis, dan kinerja cabang' : meta.sub)))))));
 
     // 6. Sync Owner bottom nav active module (no-op on desktop, hidden by CSS)
@@ -2204,7 +2204,7 @@
     var filtered = getFilteredMasterProducts();
 
     if (!filtered.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-muted">Belum ada Product yang cocok dengan pencarian.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-muted">Belum ada Item yang cocok dengan pencarian.</td></tr>';
       return;
     }
 
@@ -2212,8 +2212,8 @@
       var img = prod.image || prod.image_url || '';
       var isActive = prod.is_active !== 0;
       var toggleSwitch = '' +
-        '<label class="x-toggle' + (isActive ? ' x-toggle-on' : '') + '" title="' + (isActive ? 'Product aktif' : 'Product nonaktif') + '">' +
-          '<input type="checkbox" ' + (isActive ? 'checked' : '') + ' onchange="toggleStock(\'' + esc(prod.id) + '\', this.checked ? 1 : 0)" aria-label="Status Product ' + esc(prod.name) + '">' +
+        '<label class="x-toggle' + (isActive ? ' x-toggle-on' : '') + '" title="' + (isActive ? 'Item aktif' : 'Item nonaktif') + '">' +
+          '<input type="checkbox" ' + (isActive ? 'checked' : '') + ' onchange="toggleStock(\'' + esc(prod.id) + '\', this.checked ? 1 : 0)" aria-label="Status Item ' + esc(prod.name) + '">' +
           '<span class="x-toggle-slider"></span>' +
         '</label>';
 
@@ -2228,12 +2228,12 @@
           '<td>' + toggleSwitch + '</td>',
           '<td class="text-right" style="white-space:nowrap;">',
             '<div class="x-item-actions">',
-              '<button type="button" class="x-action-menu-trigger" aria-label="Aksi Product ' + esc(prod.name) + '" onclick="XentraActionMenu.open(this, [' +
+              '<button type="button" class="x-action-menu-trigger" aria-label="Aksi Item ' + esc(prod.name) + '" onclick="XentraActionMenu.open(this, [' +
                 '{ label: \'Lihat Detail\', icon: \'🔍\', onClick: function() { navigateTo(\'catalog/products/' + encodeURIComponent(prod.id) + '\'); } },' +
                 '{ label: \'+ Buat Menu Satuan\', icon: \'🍽️\', onClick: function() { window.createMenuFromProduct(\'' + esc(prod.id) + '\'); } },' +
-                '{ label: \'Edit Product\', icon: \'✏️\', onClick: function() { openEditProduct(\'' + esc(prod.id) + '\'); } },' +
+                '{ label: \'Edit Item\', icon: \'✏️\', onClick: function() { openEditProduct(\'' + esc(prod.id) + '\'); } },' +
                 '{ divider: true },' +
-                '{ label: \'Arsipkan Product\', icon: \'🗑️\', destructive: true, onClick: function() { deleteProduct(\'' + esc(prod.id) + '\'); } }' +
+                '{ label: \'Arsipkan Item\', icon: \'🗑️\', destructive: true, onClick: function() { deleteProduct(\'' + esc(prod.id) + '\'); } }' +
               '])">',
                 '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>',
               '</button>',
@@ -2263,7 +2263,7 @@
       var res = await adminFetch(API_BASE + '/admin/products/' + productId, { headers: getAuthHeaders() });
       var data = await res.json();
       if (!data.success || !data.product) {
-        showToast('❌ ' + (data.error || 'Produk tidak ditemukan.'));
+        showToast('❌ ' + (data.error || 'Item tidak ditemukan.'));
         navigateTo('catalog/products');
         return;
       }
@@ -2274,7 +2274,7 @@
       // Product detail is intentionally atomic. Do not render legacy
       // Product price/category as customer/commercial identity.
       if ($('prod-detail-breadcrumb')) $('prod-detail-breadcrumb').textContent = prod.name;
-      if ($('product-detail-mobile-title')) $('product-detail-mobile-title').textContent = 'Detail Product · ' + (prod.name || 'Product');
+      if ($('product-detail-mobile-title')) $('product-detail-mobile-title').textContent = 'Detail Item · ' + (prod.name || 'Product');
       if ($('prod-detail-name')) $('prod-detail-name').textContent = prod.name || 'Product';
       if ($('prod-detail-desc')) $('prod-detail-desc').textContent = prod.description || 'Tidak ada deskripsi.';
       if ($('prod-detail-sku')) $('prod-detail-sku').textContent = prod.sku || 'Belum ada SKU';
@@ -2679,15 +2679,15 @@
         var productCount = (state.products || []).filter(function(product) {
           return String(product.category_id) === String(row.id);
         }).length;
-        description = productCount + ' Produk Master';
+        description = productCount + ' Item';
       } else if (type === 'title') {
         description = 'Judul Menu di Customer PWA · wajib dipilih tiap Menu';
       } else if (type === 'flavor') {
-        description = 'Dipakai sebagai pilihan Rasa pada Produk Master';
+        description = 'Dipakai sebagai pilihan Rasa pada Item';
       } else if (type === 'complement') {
         description = 'Detail Customer · bisa dipilih lebih dari satu';
       } else {
-        description = 'Indikator Customer · satu per Produk Master';
+        description = 'Indikator Customer · satu per Item';
       }
 
       var rightControls = '';
@@ -2889,7 +2889,7 @@
       title: 'Tambah Kategori',
       label: 'Nama Kategori',
       placeholder: 'Contoh: Makanan Berat',
-      description: 'Pengelompokan Produk Master / Judul Menu',
+      description: 'Pengelompokan Item / Judul Menu',
       endpoint: function () { return API_BASE + '/admin/categories'; },
       deleteEndpoint: function (id) { return API_BASE + '/admin/categories/' + encodeURIComponent(id); },
       archiveEndpoint: function (id) { return API_BASE + '/admin/categories/' + encodeURIComponent(id) + '/archive'; },
@@ -2917,7 +2917,7 @@
       title: 'Tambah Kelengkapan',
       label: 'Nama Kelengkapan',
       placeholder: 'Contoh: Nasi',
-      description: 'Detail Customer; dapat dipilih lebih dari satu pada Produk Master',
+      description: 'Detail Customer; dapat dipilih lebih dari satu pada Item',
       endpoint: function () { return API_BASE + '/admin/menu/components/complement'; },
       deleteEndpoint: function (id) { return API_BASE + '/admin/menu/components/complement/' + encodeURIComponent(id); },
       payload: function (name) { return { name: name }; }
@@ -2926,7 +2926,7 @@
       title: 'Tambah Level',
       label: 'Nama Level',
       placeholder: 'Contoh: 1 — Tidak Pedas',
-      description: 'Indikator Customer; satu Level dipilih pada Produk Master',
+      description: 'Indikator Customer; satu Level dipilih pada Item',
       endpoint: function () { return API_BASE + '/admin/menu/components/level'; },
       deleteEndpoint: function (id) { return API_BASE + '/admin/menu/components/level/' + encodeURIComponent(id); },
       payload: function (name) { return { name: name }; }
@@ -3503,11 +3503,11 @@
     var titleEl = modal.querySelector('.x-modal-header h3');
     var subtitleEl = modal.querySelector('.x-modal-header p');
     var labels = {
-      flavor: { title: 'Master Rasa', sub: 'Pilihan rasa yang tersedia untuk Produk Master' },
-      complement: { title: 'Master Kelengkapan', sub: 'Pilihan kelengkapan yang tersedia untuk Produk Master' },
-      level: { title: 'Master Level', sub: 'Pilihan level yang tersedia untuk Produk Master' }
+      flavor: { title: 'Master Rasa', sub: 'Pilihan rasa yang tersedia untuk Item' },
+      complement: { title: 'Master Kelengkapan', sub: 'Pilihan kelengkapan yang tersedia untuk Item' },
+      level: { title: 'Master Level', sub: 'Pilihan level yang tersedia untuk Item' }
     };
-    var meta = labels[_masterMenuComponentType] || { title: 'Master Menu', sub: 'Data pilihan yang dipakai untuk menyusun Produk Master' };
+    var meta = labels[_masterMenuComponentType] || { title: 'Master Menu', sub: 'Data pilihan yang dipakai untuk menyusun Item' };
     if (titleEl) titleEl.textContent = meta.title;
     if (subtitleEl) subtitleEl.textContent = meta.sub;
 
@@ -3588,11 +3588,11 @@
   var _productEditorActiveState = 1;
 
   function resetProductEditorForAdd() {
-    $('product-editor-title').textContent = 'Tambah Product';
-    $('prod-editor-breadcrumb').textContent = 'Tambah Product';
-    $('prod-editor-subtitle').textContent = 'Product satuan yang digunakan dan dihitung dalam stock, seperti ayam, ikan, bumbu, dan lainnya.';
-    if ($('product-editor-mobile-title')) $('product-editor-mobile-title').textContent = 'Tambah Product';
-    if ($('product-editor-mobile-subtitle')) $('product-editor-mobile-subtitle').textContent = 'Product satuan yang digunakan dan dihitung dalam stock, seperti ayam, ikan, bumbu, dan lainnya.';
+    $('product-editor-title').textContent = 'Tambah Item';
+    $('prod-editor-breadcrumb').textContent = 'Tambah Item';
+    $('prod-editor-subtitle').textContent = 'Item satuan yang dipakai dan dihitung dalam stok — seperti ayam, ikan, bumbu, dan lainnya.';
+    if ($('product-editor-mobile-title')) $('product-editor-mobile-title').textContent = 'Tambah Item';
+    if ($('product-editor-mobile-subtitle')) $('product-editor-mobile-subtitle').textContent = 'Item satuan yang dipakai dan dihitung dalam stok — seperti ayam, ikan, bumbu, dan lainnya.';
     $('prod-id').value = '';
     $('prod-name').value = '';
     $('prod-sku').value = '';
@@ -3607,11 +3607,11 @@
   }
 
   function populateProductEditorForm(prod) {
-    $('product-editor-title').textContent = 'Edit Product: ' + prod.name;
+    $('product-editor-title').textContent = 'Edit Item: ' + prod.name;
     $('prod-editor-breadcrumb').textContent = prod.name;
-    $('prod-editor-subtitle').textContent = 'Perbarui data atomic Product. Menu tetap dikelola di workspace Menu Master.';
-    if ($('product-editor-mobile-title')) $('product-editor-mobile-title').textContent = 'Edit Product';
-    if ($('product-editor-mobile-subtitle')) $('product-editor-mobile-subtitle').textContent = 'Perbarui Product tanpa mengubah identitas komersial Menu.';
+    $('prod-editor-subtitle').textContent = 'Perbarui data item. Menu tetap dikelola di workspace Master Menu.';
+    if ($('product-editor-mobile-title')) $('product-editor-mobile-title').textContent = 'Edit Item';
+    if ($('product-editor-mobile-subtitle')) $('product-editor-mobile-subtitle').textContent = 'Perbarui item tanpa mengubah identitas komersial Menu.';
     $('prod-id').value = prod.id;
     $('prod-name').value = prod.name || '';
     $('prod-sku').value = prod.sku || '';
@@ -3706,7 +3706,7 @@
   window.deleteProduct = async function (id) {
     if (window.XentraPresentation && !await window.XentraPresentation.confirm({
       id: 'archive-master-product',
-      title: 'Arsipkan Product Master',
+      title: 'Arsipkan Item',
       message: 'Product akan dinonaktifkan dan tetap mempertahankan identitasnya untuk Menu, histori, dan inventory.',
       okLabel: 'Arsipkan',
       cancelLabel: 'Batal'
@@ -3722,7 +3722,7 @@
         showToast('❌ ' + (data.error || data.message || 'Gagal mengarsipkan Product.'));
         return;
       }
-      showToast('Product Master diarsipkan.');
+      showToast('Item diarsipkan.');
       if (_catalogState.activeDetailProductId === id) {
         navigateTo('catalog/products');
       } else {
@@ -4140,7 +4140,7 @@ async function loadMenusView() {
       });
     }
 
-    // Tab Item menambah item lewat alur tambah-item yang sudah ada (Produk Master),
+    // Tab Item menambah item lewat alur tambah-item yang sudah ada (Item),
     // bukan alur master reference — item bukan master teks bebas.
     var btnAddItemPage = $('btn-add-master-item-page');
     if (btnAddItemPage && !btnAddItemPage.dataset.bound) {
@@ -4168,7 +4168,7 @@ async function loadMenusView() {
       openMasterReferenceQuickAdd('flavor');
     });
 
-    // Product Master only exposes Add for reference values. Delegate the
+    // Item only exposes Add for reference values. Delegate the
     // complement + action so the empty-state fallback and rerendered button
     // always invoke the same create-only flow.
     var complementEditor = $('prod-complements-editor');
@@ -5608,7 +5608,7 @@ async function loadMenusView() {
       if (!topProducts || topProducts.length === 0) {
         topProdContainer.innerHTML = '<div class="x-empty-state"><div class="x-empty-state-icon">🍔</div>Belum ada produk yang terjual pada periode ini.</div>';
       } else {
-        var prodHtml = '<table class="x-data-table"><thead><tr><th>Produk</th><th>Kategori</th><th>Terjual</th><th>Total</th></tr></thead><tbody>';
+        var prodHtml = '<table class="x-data-table"><thead><tr><th>Item</th><th>Kategori</th><th>Terjual</th><th>Total</th></tr></thead><tbody>';
         topProducts.forEach(function (p) {
           prodHtml += '<tr>' +
             '<td><strong>' + escapeHtml(p.product_name) + '</strong></td>' +
@@ -6589,7 +6589,7 @@ async function loadMenusView() {
       return;
     }
 
-    var html = '<table class="x-data-table"><thead><tr><th>Produk</th><th>Kategori</th><th>Total Terjual</th><th>Total Omzet</th></tr></thead><tbody>';
+    var html = '<table class="x-data-table"><thead><tr><th>Item</th><th>Kategori</th><th>Total Terjual</th><th>Total Omzet</th></tr></thead><tbody>';
     topProducts.forEach(function (p) {
       html += '<tr><td><strong>' + escapeHtml(p.product_name) + '</strong></td><td><span class="x-badge">' + escapeHtml(p.category_name || 'Uncategorized') + '</span></td><td>' + (p.total_units_sold || 0) + ' item</td><td><strong>' + formatMoney(p.total_gross_sales || 0) + '</strong></td></tr>';
     });
@@ -11535,7 +11535,7 @@ async function loadMenusView() {
     var rasaData = results[3] || {};
     var levelData = results[4] || {};
 
-    if (!productData.success) throw new Error(productData.error || 'Produk Master gagal dimuat.');
+    if (!productData.success) throw new Error(productData.error || 'Item gagal dimuat.');
     if (!categoryData.success) throw new Error(categoryData.error || 'Kategori gagal dimuat.');
     if (!subCategoryData.success) throw new Error(subCategoryData.error || 'Sub Category gagal dimuat.');
     if (!rasaData.success) throw new Error(rasaData.error || 'Rasa gagal dimuat.');
