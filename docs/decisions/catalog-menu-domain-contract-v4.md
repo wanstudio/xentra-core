@@ -108,6 +108,7 @@ Menu owns:
 - required Judul
 - optional Rasa
 - Harga
+- Modal
 - Media
 - Menu Items
 - lifecycle/status
@@ -492,6 +493,7 @@ Category  → required
 Judul     → required
 Rasa      → optional / NULL
 Harga     → Menu selling price
+Modal     → Menu cost
 Media     → Menu media
 Menu Items
 Status
