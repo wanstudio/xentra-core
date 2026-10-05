@@ -104,6 +104,16 @@ test('JUDUL-UI-02: dashboard.js menyambungkan tipe title di semua titik master r
   assert.match(DASHBOARD_JS, /data\.titles \|\| \[\]/, 'daftar Judul dibaca dari respons API');
 });
 
+test('JUDUL-UI-02b: setMasterReferenceTab mengizinkan tipe title (kalau tidak, klik tab Judul dipaksa balik ke Kategori)', () => {
+  // Regresi: daftar `allowed` sempat tidak memuat 'title', sehingga tab Judul
+  // tampil (markup statis) tetapi panelnya tidak pernah ditampilkan.
+  const allowedLine = DASHBOARD_JS.match(/var allowed = \[([^\]]*'category'[^\]]*)\];/);
+  assert.ok(allowedLine, 'daftar allowed harus ada');
+  const allowed = allowedLine[1].split(',').map((s) => s.trim().replace(/^'|'$/g, ''));
+  assert.ok(allowed.includes('title'), "daftar allowed wajib memuat 'title'");
+  assert.ok(allowed.includes('category'), 'daftar allowed tetap memuat category');
+});
+
 // ── Bentuk API yang dibaca UI ───────────────────────────────────────────────
 
 test('JUDUL-UI-03: GET /admin/menu-titles mengembalikan bentuk yang dibaca dashboard', async () => {

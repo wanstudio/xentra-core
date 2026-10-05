@@ -2394,7 +2394,7 @@
   }
 
   function setMasterReferenceTab(type) {
-    var allowed = ['category', 'flavor', 'complement'];
+    var allowed = ['category', 'title', 'flavor', 'complement'];
     _masterReferenceTab = allowed.indexOf(type) !== -1 ? type : 'category';
 
     var panels = {
