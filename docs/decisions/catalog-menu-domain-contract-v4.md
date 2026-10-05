@@ -115,42 +115,51 @@ Menu owns:
 
 ---
 
-## 3. Menu Identity
+## 3. Menu Creation and Menu ID
 
-The forward contract does NOT define Menu identity as a composite formula such as:
+There is only one forward Menu entity.
 
-~~~text
-Category + Judul + Rasa
-~~~
-
-or:
+The Owner creates a Menu by filling the Menu fields and Menu Items:
 
 ~~~text
-Category + Rasa
+Category  → required
+Judul     → required
+Rasa      → optional / NULL
+Harga
+Modal
+Media
+Menu Items → Product × quantity
 ~~~
 
-The Menu is its own entity with a stable Menu ID.
+When the Menu is saved, Core creates/persists its own Menu ID (id_menu).
 
-Category, Judul, and Rasa are attributes/relationships of that Menu:
+Example:
 
 ~~~text
-Menu
-├── Category  required
-├── Judul     required
-└── Rasa      nullable
+Create Menu
+    ↓
+save
+    ↓
+MENU-001
 ~~~
 
-Do not introduce a uniqueness rule based on concatenating Category, Judul, and Rasa unless a separate business decision explicitly requires it.
+id_menu identifies the created Menu entity.
+
+Category, Judul, and Rasa are data attached to the Menu. This contract does not define a composite Menu ID generated from taxonomy values.
+
+Do not introduce a separate identity for Menu Satuan, Menu Paket, or any other Menu subtype.
 
 ---
 
-## 4. No SINGLE / PACKAGE Menu Type
+## 4. No Menu Satuan / Menu Paket
 
 There is exactly one forward Menu entity.
 
-Do not create a forward Menu type named:
+The Menu creation domain does not define:
 
 ~~~text
+Menu Satuan
+Menu Paket
 SINGLE
 PACKAGE
 SINGLE_MENU
@@ -158,7 +167,7 @@ PACKAGE_MENU
 MENU_TYPE
 ~~~
 
-The number of Products in Menu Items does not determine Menu type.
+The number of Products in Menu Items does not create a different Menu entity or subtype.
 
 ~~~text
 1 Product  → Menu
@@ -166,37 +175,94 @@ The number of Products in Menu Items does not determine Menu type.
 20 Products → Menu
 ~~~
 
-All remain the same Menu entity.
+All are simply Menus with different Menu Items.
 
 ---
 
-## 5. “Paket” Is Not a Menu Domain Type
+## 5. “Paket” Has Two Different Meanings
 
-The word Paket may appear inside a Menu Judul.
+The boundary is **not the word “Paket”**.
 
-Canonical example:
+### 5.1 Paket as a permanent catalog Menu
+
+When the merchant wants a combination to exist as its own sellable catalog item, it is simply a Menu.
+
+Example:
 
 ~~~text
-Judul
-Paket Hemat Ayam Tulang Lunak Sambal Ijo + Es Teh
+Paket Hemat Ayam Tulang Lunak + Es Teh
+Rp25.000
 ~~~
 
-This remains an ordinary Menu.
+If the customer can see it as one catalog item, open it as one item, add it to Cart as one item, and the Menu has its own price/media, then it is a normal Menu.
 
-It does not create a Package Menu entity and does not create a PACKAGE Menu Type.
-
-Bundling, discount, and promotional rules belong to the Promo domain.
-
-Promo is separate from Menu.
+It is not:
 
 ~~~text
-Menu
-→ sellable entity
+Menu Paket
+PACKAGE
+menu_type = PACKAGE
+~~~
+
+Example:
+
+~~~text
+menus
+id         = MENU-00125
+category   = AYAM
+judul      = "Paket Hemat Ayam Tulang Lunak Sambal Ijo + Es Teh"
+rasa       = NULL
+harga      = 25000
+~~~
+
+with:
+
+~~~text
+menu_items
+
+MENU-00125 → AYAM-TL       ×1
+MENU-00125 → NASI          ×1
+MENU-00125 → LALAPAN       ×1
+MENU-00125 → SAMBAL-IJO    ×1
+MENU-00125 → ES-TEH-MANIS  ×1
+~~~
+
+This remains one ordinary Menu.
+
+### 5.2 Paket as a promotional mechanism
+
+When existing Menus are offered together under a promotional rule, no new Menu is required.
+
+Example:
+
+~~~text
+Menu A = Ayam Tulang Lunak
+Rp20.000
+
+Menu B = Es Teh Manis
+Rp5.000
+~~~
+
+Promo may define:
+
+~~~text
+Beli Menu A + Menu B
+→ Rp22.000
+~~~
+
+This is a Promo rule against existing Menus.
+
+Do not create a third Menu solely to represent this promotional combination.
+
+The Promo domain is outside this Menu-creation contract. This contract defines only the boundary:
+
+~~~text
+Catalog Menu
+→ creates sellable Menus
 
 Promo
-→ bundling / discount / promotional rules
+→ applies promotional / bundling rules to existing Menus
 ~~~
-
 ---
 
 ## 6. Product
@@ -504,7 +570,7 @@ Rasa      → optional / NULL
 Harga     → Menu selling price
 Modal     → Menu cost
 Media     → Menu media
-Menu Items
+Menu Items → Product × quantity
 Status
 ~~~
 
@@ -517,9 +583,9 @@ Package Name as structural type
 Product count as Menu type
 ~~~
 
-Judul is the required Menu name.
+Judul is the required Menu name and customer-facing base name.
 
-The Judul selector may use the current Category as deterministic UI context to filter/order choices, but that context must not become a stored Judul → Category ownership relation.
+The Judul selector may use the current Category as deterministic UI context to filter/order available Judul choices. This is UI selection context only; it does not make Category the owner of Judul and does not require a `category_id` on Judul.
 
 ---
 
@@ -702,7 +768,9 @@ Assert:
 Assert:
 
 - Promo is separate from Menu;
-- Paket in Judul does not create a Package Menu type.
+- a permanent catalog item named with “Paket” is an ordinary Menu;
+- a promotional bundle over existing Menus does not require a new Menu;
+- Paket does not create a Package Menu type.
 
 ### Lifecycle
 
@@ -716,8 +784,8 @@ Assert:
 ## 21. Explicit Prohibitions
 
 ~~~text
-❌ Menu identity = Category + Judul + Rasa
-❌ Menu identity = Category + Rasa
+❌ Composite Menu identity = Category + Judul + Rasa
+❌ Composite Menu identity = Category + Rasa
 ❌ Sub Category as a separate forward concept
 ❌ Judul as a child/owner-owned child of Category
 ❌ Judul.category_id as a required ownership relation
@@ -727,6 +795,7 @@ Assert:
 ❌ Package Name as structural Menu semantics
 ❌ Product count determining Menu type
 ❌ “Paket” becoming a separate Menu domain entity
+❌ Creating a new Menu solely to represent a Promo bundle of existing Menus
 ❌ Product becoming the customer-facing commercial Menu identity
 ❌ Menu media being defined as the first Product image
 ❌ Menu editor directly inventing Inventory stock
@@ -736,7 +805,28 @@ Assert:
 
 ---
 
-## 22. Governance
+## 22. Package Boundary
+
+The Menu domain determines whether something is a catalog Menu by **commercial existence**, not by naming.
+
+~~~text
+Permanent catalog item
+→ Menu
+→ has id_menu
+→ own Judul/Harga/Modal/Media
+→ own Menu Items
+→ can be shown and purchased as one catalog item
+
+Promotional combination of existing Menus
+→ Promo
+→ no new Menu required
+~~~
+
+The word “Paket” may appear in Judul in either case. The word itself does not determine the domain.
+
+---
+
+## 23. Governance
 
 Before changing Catalog/Menu code, implementation must identify:
 
@@ -763,7 +853,7 @@ STOP
 
 ---
 
-## 23. Status
+## 24. Status
 
 **v4 = reconstructed contract from the confirmed core model.**
 
@@ -784,6 +874,7 @@ CATEGORY
        ├── Judul        required
        ├── Rasa         nullable
        ├── Harga
+       ├── Modal
        ├── Media
        └── Menu Items
             ├── Product × qty
@@ -794,13 +885,16 @@ CATEGORY
 Critical rules:
 
 - Menu is one sellable entity.
+- Saving a Menu produces its stable id_menu.
 - Category is required.
 - Judul is required.
 - Rasa is nullable.
 - Product is the composition/inventory unit.
 - Menu Items connect Menu to Product with quantity.
-- Product count does not determine Menu type.
-- Paket is not a Menu domain type.
-- Promo owns bundling/discount/promotional rules.
-- There is no canonical composite identity formula Category + Judul + Rasa.
+- Product count does not create a Menu type.
+- There is no Menu Satuan or Menu Paket domain in Menu creation.
+- “Paket” in a Menu Judul does not create a Menu subtype.
+- A permanent catalog combination is still a normal Menu.
+- A promotional bundle is a Promo rule over existing Menus; this contract does not create a separate Menu for it.
+- Promo is outside this Menu-creation contract.
 
