@@ -566,6 +566,15 @@
   window.goBackFromCategory = window.goBackFromChildPage;
   window.goBackFromCatalogChild = window.goBackFromChildPage;
 
+  // Editor item dibuka dari konteks Master Category, jadi kembalinya harus
+  // deterministik ke sana dengan tab Item aktif — bukan menuruni history stack
+  // (yang bisa mendarat di daftar Produk atau halaman lain).
+  window.setMasterReferenceTab = setMasterReferenceTab;
+  window.goBackFromItemEditor = function () {
+    setMasterReferenceTab('item');
+    navigateTo('catalog/categories', { history: 'replace' });
+  };
+
   // Render Platform Navigation in Sidebar
   function renderPlatformNavigation() {
     var nav = $('x-dash-nav');
@@ -4113,6 +4122,25 @@ async function loadMenusView() {
       btnAddItemPage.dataset.bound = 'true';
       btnAddItemPage.addEventListener('click', function() {
         if (typeof window.openAddProduct === 'function') window.openAddProduct();
+      });
+    }
+
+    // Tombol kembali di editor item (header mobile + breadcrumb "Kembali ke Daftar
+    // Produk") diarahkan ke Master Category tab Item, bukan history stack.
+    var itemEditorView = $('product-editor-view');
+    if (itemEditorView) {
+      itemEditorView.querySelectorAll('button').forEach(function (btn) {
+        var isBackControl = btn.classList.contains('x-title-back-btn') ||
+          /Kembali ke Daftar Produk/.test(btn.textContent || '');
+        if (!isBackControl || btn.dataset.itemBackBound) return;
+        btn.dataset.itemBackBound = 'true';
+        if (!btn.classList.contains('x-title-back-btn')) btn.textContent = '← Kembali ke Item';
+        // Buang handler inline lama (history stack) supaya tidak jalan dua kali.
+        btn.removeAttribute('onclick');
+        btn.addEventListener('click', function (event) {
+          event.preventDefault();
+          if (typeof window.goBackFromItemEditor === 'function') window.goBackFromItemEditor();
+        });
       });
     }
 

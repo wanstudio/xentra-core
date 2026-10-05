@@ -174,6 +174,15 @@ test('ITEM-03: tab Item punya tombol + (alur tambah item kanonik) dan gaya kartu
   assert.ok(!DASHBOARD_JS.includes('x-master-item-sku'), 'tidak ada sisa markup baris SKU di tab Item');
 });
 
+test('ITEM-04: tombol kembali di editor item mendarat di Master Category tab Item', () => {
+  assert.match(DASHBOARD_JS, /window\.goBackFromItemEditor\s*=/, 'harus ada handler kembali khusus editor item');
+  assert.match(DASHBOARD_JS, /window\.setMasterReferenceTab = setMasterReferenceTab;/, 'tab master reference harus bisa di-set dari luar');
+  assert.match(DASHBOARD_JS, /setMasterReferenceTab\('item'\);\s*\n\s*navigateTo\('catalog\/categories'/, 'kembali ke Master Category dengan tab Item aktif');
+  assert.match(DASHBOARD_JS, /goBackFromItemEditor\(\)/, 'tombol back editor harus memakai handler itu');
+  assert.match(DASHBOARD_JS, /btn\.removeAttribute\('onclick'\)/, 'handler inline lama (history stack) harus dibuang agar tidak jalan dua kali');
+  assert.ok(DASHBOARD_JS.includes("itemEditorView.querySelectorAll('button')"), 'binding diarahkan ke tombol di dalam view editor item');
+});
+
 // ── Bentuk API yang dibaca UI ───────────────────────────────────────────────
 
 test('JUDUL-UI-03: GET /admin/menu-titles mengembalikan bentuk yang dibaca dashboard', async () => {
