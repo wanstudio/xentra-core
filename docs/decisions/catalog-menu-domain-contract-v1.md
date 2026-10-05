@@ -366,6 +366,19 @@ Legacy storage can remain temporarily, but forward UI and business logic must no
     - Transisi DRAFT → ACTIVE wajib melewati validasi ACTIVE di server (bukan hanya di UI).
     - Semua field non-wajib lain (Rasa, Pedas, Media) tetap boleh kosong di status apa pun.
 
+13. **Kontrol stok ada di domain Item, bukan domain Stok** (menguatkan §12):
+    - Tab Item: kolom SKU berupa checkbox **"Kelola stok (pakai SKU)"**.
+      Dicentang → textbox SKU muncul dan wajib diisi. Tidak dicentang → textbox tersembunyi dan
+      SKU dikosongkan, Item menjadi non-stock.
+    - SKU ada → Item stock-managed dan ikut inventaris cabang; SKU kosong → non-stock dan tidak
+      membatasi ketersediaan Menu.
+    - Angka dan pergerakan stok tetap milik domain Stok/Cabang (`branch_product_inventory`).
+      Pola ini sama dengan praktik umum (Shopify "Track quantity", Square/Lightspeed/Toast
+      "Track inventory"): kebijakan di Item, kuantitas per lokasi/cabang.
+    - **Guard**: toggle tidak boleh dimatikan selama masih ada stok > 0 di cabang mana pun.
+      Stok harus dinolkan/dihabiskan lebih dulu. Server menolak (bukan hanya UI) dan UI
+      menjelaskan alasannya, supaya tidak ada state "ada stok tapi Item tidak dihitung".
+
 ### Cakupan pekerjaan
 
 UI, wiring, API, dan database wajib konsisten dengan koreksi ini. Kode, route, dan test lama
