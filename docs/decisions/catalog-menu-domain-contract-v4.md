@@ -68,13 +68,19 @@ A Menu cannot exist in the forward model without a Category.
 
 ### 2.2 Judul
 
-Judul is required.
+Judul is required on Menu.
 
-Judul is the Menu's base name and customer-facing identity/presentation.
+Judul is a standalone Master Judul record under Master Category.
 
-A Menu must have a Judul.
+Judul is the Menu's base/customer-facing name.
 
-Judul is the forward replacement for the former Sub Category concept. No separate Sub Category concept is introduced beside Judul.
+A Menu must reference a Judul.
+
+Judul is **not a child of Category** and Category does not own Judul.
+
+There is no `category_id` ownership relation on Judul.
+
+The former Sub Category concept is replaced by Judul; do not recreate a separate Sub Category entity.
 
 ### 2.3 Rasa
 
@@ -383,9 +389,23 @@ Category master data used for primary Menu grouping.
 
 ### 12.2 Judul
 
-Judul master data used as the required Menu base/customer-facing name.
+Judul is independent Master data used as the required Menu base/customer-facing name.
 
-Judul replaces the former Sub Category concept.
+Judul is not a child of Category.
+
+Category is only contextual when selecting Judul in the Menu editor:
+
+```text
+Category
+→ context for filtering / ordering available Judul choices
+→ not owner of Judul
+```
+
+The **+ Judul** action creates a Master Judul.
+
+It does not create a child of the selected Category.
+
+A Judul record does not require a `category_id` field.
 
 ### 12.3 Rasa
 
@@ -432,6 +452,8 @@ Product count as Menu type
 ~~~
 
 Judul is the required Menu name.
+
+The Judul selector may use the current Category as deterministic UI context to filter/order choices, but that context must not become a stored Judul → Category ownership relation.
 
 ---
 
@@ -628,6 +650,8 @@ Assert:
 ❌ Menu identity = Category + Judul + Rasa
 ❌ Menu identity = Category + Rasa
 ❌ Sub Category as a separate forward concept
+❌ Judul as a child/owner-owned child of Category
+❌ Judul.category_id as a required ownership relation
 ❌ SINGLE Menu type
 ❌ PACKAGE Menu type
 ❌ Menu Type selector
@@ -673,6 +697,14 @@ STOP
 ## 22. Status
 
 **v4 = reconstructed contract from the confirmed core model.**
+
+This revision explicitly locks the following clarified points:
+- Judul is independent Master data, not a Category child.
+- Category is only contextual for deterministic Judul selection/filtering/ordering.
+- + Judul creates a Master Judul, not a Category child.
+- Judul does not require `category_id`.
+- Pedas is an optional Menu attribute controlled by a checkbox and a horizontal 0..4 five-position scale.
+- Pedas is not a dropdown and does not use a Master Level catalog.
 
 The canonical core is:
 
