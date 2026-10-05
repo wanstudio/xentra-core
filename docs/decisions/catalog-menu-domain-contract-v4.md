@@ -372,13 +372,7 @@ The selected position is visually active, for example:
 [●] [●] [●] [○]
 ~~~
 
-Stored position:
-
-~~~text
-1..4
-~~~
-
-The selected value represents one of four visual positions on the scale. The positions are not named Master Levels and must not be assigned invented business meanings.
+The selected value represents one of the four visual positions on the scale. The exact internal encoding of the selected position is an implementation detail; it is not a named Master Level and must not be assigned invented business meanings.
 
 The Pedas control is **not a dropdown**.
 
@@ -760,8 +754,8 @@ This revision explicitly locks the following clarified points:
 - Category is only contextual for deterministic Judul selection/filtering/ordering.
 - + Judul creates a Master Judul, not a Category child.
 - Judul does not require `category_id`.
-- Pedas is an optional Menu attribute controlled by a checkbox and a horizontal 0..4 five-position scale.
-- Pedas is not a dropdown and does not use a Master Level catalog.
+- Pedas is an optional Menu attribute controlled by a checkbox and a four-position horizontal selector.
+- Pedas is not a dropdown, uses four visual positions, and does not use a Master Level catalog.
 
 The canonical core is:
 
