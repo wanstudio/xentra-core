@@ -337,7 +337,64 @@ New image upload continues to use the canonical Xentra Media Engine.
 
 ---
 
-## 11. Inventory Boundary
+## 11. Pedas
+
+Pedas is an optional attribute of Menu.
+
+Default state:
+
+~~~text
+☐ Level Pedas
+~~~
+
+When the checkbox is unchecked:
+
+~~~text
+spice_enabled = false
+spice_level = NULL
+scale hidden/disabled
+~~~
+
+When the checkbox is checked:
+
+~~~text
+☑ Level Pedas
+
+○ ─ ○ ─ ○ ─ ○ ─ ○
+~~~
+
+The scale is horizontal and has five positions.
+
+The selected position is visually active, for example:
+
+~~~text
+○ ─ ○ ─ 🔴 ─ ○ ─ ○
+~~~
+
+Stored position:
+
+~~~text
+0..4
+~~~
+
+Position 0 is the leftmost / not-spicy end of the scale.
+
+The remaining positions represent increasing position/intensity on the same scale. They are not named Master Levels and must not be assigned invented business meanings.
+
+The Pedas control is **not a dropdown**.
+
+There is no Master Level Pedas domain.
+
+When Pedas is disabled again:
+
+~~~text
+spice_enabled = false
+spice_level = NULL
+~~~
+
+---
+
+## 12. Inventory Boundary
 
 Product is the unit that participates in inventory/composition.
 
@@ -371,7 +428,7 @@ Menu editing must not directly invent or mutate stock quantity.
 
 ---
 
-## 12. Master Category Areas
+## 13. Master Category Areas
 
 Master Category contains four peer areas:
 
@@ -426,7 +483,7 @@ Do not create a second commercial identity merely because the Catalog UI area is
 
 ---
 
-## 13. Master Menu Editor
+## 14. Master Menu Editor
 
 The Owner Master Menu editor represents one Menu.
 
@@ -457,7 +514,7 @@ The Judul selector may use the current Category as deterministic UI context to f
 
 ---
 
-## 14. Customer Presentation
+## 15. Customer Presentation
 
 Customer sees the Menu as the commercial entity.
 
@@ -482,7 +539,7 @@ Customer does not need internal Product/SKU composition to identify the Menu.
 
 ---
 
-## 15. Menu vs Product Boundary
+## 16. Menu vs Product Boundary
 
 The mandatory distinction is:
 
@@ -505,7 +562,7 @@ Multiple Products do not create a Package Menu type.
 
 ---
 
-## 16. Lifecycle / Referential Integrity
+## 17. Lifecycle / Referential Integrity
 
 For master data that is already referenced:
 
@@ -520,7 +577,7 @@ Archive preserves the existing reference.
 
 ---
 
-## 17. Legacy Boundary
+## 18. Legacy Boundary
 
 Legacy implementation may still contain concepts such as:
 
@@ -556,7 +613,7 @@ Legacy physical fields may remain during migration, but they are not permission 
 
 ---
 
-## 18. Migration Rules
+## 19. Migration Rules
 
 Migration must:
 
@@ -573,7 +630,7 @@ Ambiguous legacy mappings must become explicit review cases.
 
 ---
 
-## 19. Required Test Contract
+## 20. Required Test Contract
 
 ### Catalog IA
 
@@ -644,7 +701,7 @@ Assert:
 
 ---
 
-## 20. Explicit Prohibitions
+## 21. Explicit Prohibitions
 
 ~~~text
 ❌ Menu identity = Category + Judul + Rasa
@@ -667,7 +724,7 @@ Assert:
 
 ---
 
-## 21. Governance
+## 22. Governance
 
 Before changing Catalog/Menu code, implementation must identify:
 
@@ -694,7 +751,7 @@ STOP
 
 ---
 
-## 22. Status
+## 23. Status
 
 **v4 = reconstructed contract from the confirmed core model.**
 
