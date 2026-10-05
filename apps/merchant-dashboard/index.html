@@ -90,7 +90,7 @@
             <span>Kategori</span>
           </button>
           <button type="button" class="x-nav-sub-item" data-route="catalog/products" data-tab="catalog-products">
-            <span>Item</span>
+            <span>Produk Master</span>
           </button>
           <button type="button" class="x-nav-sub-item" data-route="catalog/master-menus" data-tab="catalog-master-menus">
             <span>Menu Master</span>
@@ -331,10 +331,10 @@
             </div>
           </div>
 
-          <!-- 5. Item Terlaris -->
+          <!-- 5. Produk Terlaris -->
           <div class="x-occ-card" id="occ-products-section">
             <div class="x-occ-card-header">
-              <h3 class="x-occ-card-title">Item Terlaris</h3>
+              <h3 class="x-occ-card-title">Produk Terlaris</h3>
               <a href="#catalog/products" class="x-occ-card-link" id="occ-products-link"><span>Lihat semua</span><svg class="x-occ-link-chevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></a>
             </div>
             <div class="x-occ-card-body" id="occ-products-content" aria-live="polite">
@@ -465,7 +465,7 @@
             </div>
           </div>
 
-          <!-- Two Column Grid: Sales Performance & Top Items -->
+          <!-- Two Column Grid: Sales Performance & Top Products -->
           <div class="x-overview-grid">
             <!-- Sales Performance (Channel & Fulfillment Breakdown) -->
             <div class="x-card-panel">
@@ -478,11 +478,11 @@
               </div>
             </div>
 
-            <!-- Top Items -->
+            <!-- Top Products -->
             <div class="x-card-panel">
               <div class="x-panel-header">
-                <h3>🏆 Top Items</h3>
-                <p>Item dengan unit terjual terbanyak pada periode ini</p>
+                <h3>🏆 Top Products</h3>
+                <p>Produk dengan unit terjual terbanyak pada periode ini</p>
               </div>
               <div class="mt-4" id="overview-top-products-container">
                 <div class="x-empty-state">Memuat data produk terlaris...</div>
@@ -680,7 +680,7 @@
                   <span class="x-mock-pill">Camilan</span>
                 </div>
 
-                <!-- Mockup Item Card -->
+                <!-- Mockup Product Card -->
                 <div class="x-mock-product">
                   <div class="x-mock-prod-info">
                     <h4>Ayam Bakar Madu</h4>
@@ -748,7 +748,7 @@
         <div id="panel-owner-catalog" class="x-card-panel">
           <div class="x-panel-header-flex">
             <div>
-              <h3>🍔 Manajemen Menu & Item</h3>
+              <h3>🍔 Manajemen Menu & Produk</h3>
               <p>Kelola daftar hidangan, harga, foto, dan ketersediaan stok</p>
             </div>
             <div class="x-header-buttons">
@@ -762,7 +762,7 @@
             <button type="button" class="x-cat-filter-btn active" data-cat="all">Semua Kategori</button>
           </div>
 
-          <!-- Items Table -->
+          <!-- Products Table -->
           <div class="x-table-responsive mt-4">
             <table class="x-table">
               <thead>
@@ -815,7 +815,7 @@
             </div>
           </div>
 
-          <!-- Section: Active (Adopted) Items — filterable by category -->
+          <!-- Section: Active (Adopted) Products — filterable by category -->
           <div class="x-card-panel" style="margin-bottom:16px;">
             <div class="x-catalog-section-title">
               <h4>✅ Menu Aktif Cabang (<span id="branch-inline-active-count">0</span>)</h4>
@@ -1027,7 +1027,7 @@
                 <table class="x-table">
                   <thead>
                     <tr>
-                      <th>Item</th>
+                      <th>Produk</th>
                       <th>Kategori Cabang</th>
                       <th>Harga Jual Cabang</th>
                       <th>Status Stok</th>
@@ -1253,7 +1253,7 @@
                 </thead>
                 <tbody>
                   <tr>
-                    <td><strong>Master Item & Kategori</strong></td>
+                    <td><strong>Master Produk & Kategori</strong></td>
                     <td>✅ Full</td>
                     <td>✅ Full</td>
                     <td>👁️ Baca Saja</td>
@@ -1440,7 +1440,7 @@
               <table class="x-table">
                 <thead>
                   <tr>
-                    <th>Item</th>
+                    <th>Produk</th>
                     <th>Harga Satuan</th>
                     <th>Jumlah</th>
                     <th>Catatan</th>
@@ -1460,7 +1460,7 @@
             <div class="x-card-panel" style="padding:16px;border:1px solid var(--border-color);border-radius:8px;">
               <h4 style="margin:0 0 12px 0;">Rincian Biaya</h4>
               <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;">
-                <div style="display:flex;justify-content:space-between;"><span class="text-muted">Subtotal Item</span><span id="order-calc-subtotal">Rp 0</span></div>
+                <div style="display:flex;justify-content:space-between;"><span class="text-muted">Subtotal Produk</span><span id="order-calc-subtotal">Rp 0</span></div>
                 <div style="display:flex;justify-content:space-between;"><span class="text-muted">Ongkos Kirim</span><span id="order-calc-delivery">Rp 0</span></div>
                 <div style="display:flex;justify-content:space-between;"><span class="text-muted">Diskon</span><span id="order-calc-discount">Rp 0</span></div>
                 <div style="display:flex;justify-content:space-between;border-top:1px solid #e2e8f0;padding-top:8px;font-weight:700;font-size:15px;"><span>Grand Total</span><span id="order-calc-grandtotal">Rp 0</span></div>
@@ -1525,7 +1525,7 @@
         </div>
       </section>
 
-      <!-- TAB: CATALOG / PRODUCTS (Master Items) -->
+      <!-- TAB: CATALOG / PRODUCTS (Master Products) -->
             <!-- TAB: CATALOG / CATEGORIES -->
       <section id="tab-catalog-categories" class="x-tab-content" data-tab="catalog-categories">
         <div class="x-card-panel x-owner-child-page-shell x-master-reference-page">
@@ -1600,7 +1600,7 @@
       </section>
 
       <section id="tab-catalog-products" class="x-tab-content" data-tab="catalog-products">
-        <!-- 1. Item List View -->
+        <!-- 1. Product List View -->
         <div id="product-list-view" class="x-card-panel x-owner-child-page-shell">
           <!-- Kartu ini hanya memuat judul, deskripsi, dan CTA. Pencarian, kategori,
                dan daftar produknya berada di luar kartu, langsung di panelnya. -->
@@ -1611,12 +1611,12 @@
                   <button type="button" class="x-title-back-btn x-owner-mobile-page-back" id="btn-master-products-back" aria-label="Kembali" onclick="goBackFromMasterProducts()">
                     <svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
                   </button>
-                  <span>Item</span>
+                  <span>Produk Master</span>
                 </h3>
                 <p class="x-owner-mobile-page-sub">Cabang mengadopsi produk dari katalog ini</p>
               </div>
               <div class="x-header-buttons">
-                <button type="button" class="x-btn-primary" id="btn-add-product-main">+ Tambah Item Baru</button>
+                <button type="button" class="x-btn-primary" id="btn-add-product-main">+ Tambah Produk Baru</button>
               </div>
             </div>
           </div>
@@ -1624,55 +1624,55 @@
           <!-- Search -->
           <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap;align-items:center;">
             <div style="flex:1;min-width:220px;position:relative;">
-              <input type="search" id="prod-search-input" class="x-input" placeholder="Cari nama Item / SKU..." autocomplete="off" style="padding-left:36px;">
+              <input type="search" id="prod-search-input" class="x-input" placeholder="Cari nama Product / SKU..." autocomplete="off" style="padding-left:36px;">
               <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
             </div>
           </div>
 
-          <!-- Items Table -->
+          <!-- Products Table -->
           <div class="x-table-responsive mt-4">
             <table class="x-table" id="master-products-table">
               <thead>
                 <tr>
                   <th>Foto</th>
-                  <th>Item</th>
+                  <th>Product</th>
                   <th>SKU</th>
                   <th>Status</th>
                   <th class="text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody id="master-products-table-body">
-                <tr><td colspan="5" class="text-center py-6">Memuat daftar item...</td></tr>
+                <tr><td colspan="5" class="text-center py-6">Memuat daftar Product...</td></tr>
               </tbody>
             </table>
           </div>
         </div>
 
-        <!-- 2. Item Detail View -->
+        <!-- 2. Product Detail View -->
         <div id="product-detail-view" class="x-card-panel x-owner-child-page-shell" style="display:none;">
           <div class="x-owner-child-mobile-header">
             <h3 class="x-owner-mobile-page-title">
               <button type="button" class="x-title-back-btn x-owner-mobile-page-back" aria-label="Kembali" onclick="goBackFromChildPage()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
-              <span id="product-detail-mobile-title">Detail Item</span>
+              <span id="product-detail-mobile-title">Detail Produk</span>
             </h3>
-            <p class="x-owner-mobile-page-sub">Informasi item dan status adopsi di setiap cabang.</p>
+            <p class="x-owner-mobile-page-sub">Informasi produk master dan status adopsi di setiap cabang.</p>
           </div>
           <div class="x-owner-child-legacy-nav" style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
             <button type="button" class="x-btn-secondary" id="btn-back-to-products" style="padding:6px 12px;font-size:13px;">
-              <svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg> Kembali ke Daftar Item
+              <svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg> Kembali ke Daftar Produk
             </button>
             <span class="text-muted" style="font-size:13px;">/</span>
-            <span id="prod-detail-breadcrumb" style="font-weight:600;font-size:14px;">Detail Item</span>
+            <span id="prod-detail-breadcrumb" style="font-weight:600;font-size:14px;">Detail Produk</span>
           </div>
 
           <div class="x-product-detail-card" style="display:flex;gap:24px;background:#f8fafc;border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:20px;flex-wrap:wrap;">
             <img id="prod-detail-img" src="" alt="" style="width:120px;height:120px;border-radius:10px;object-fit:cover;background:#e2e8f0;flex-shrink:0;">
             <div style="flex:1;min-width:240px;">
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                <h3 id="prod-detail-name" style="margin:0;font-size:20px;">Nama Item</h3>
+                <h3 id="prod-detail-name" style="margin:0;font-size:20px;">Nama Product</h3>
                 <span id="prod-detail-status-badge" class="x-badge x-badge-success">Aktif</span>
               </div>
-              <p id="prod-detail-desc" class="text-muted" style="margin:8px 0;font-size:13px;line-height:1.5;">Deskripsi Item</p>
+              <p id="prod-detail-desc" class="text-muted" style="margin:8px 0;font-size:13px;line-height:1.5;">Deskripsi Product</p>
               <div style="display:flex;gap:20px;margin-top:12px;flex-wrap:wrap;">
                 <div>
                   <span class="text-muted" style="font-size:11px;display:block;">SKU</span>
@@ -1680,7 +1680,7 @@
                 </div>
                 <div>
                   <span class="text-muted" style="font-size:11px;display:block;">ROLE</span>
-                  <strong style="font-size:14px;">Unit stok</strong>
+                  <strong style="font-size:14px;">Atomic Product</strong>
                 </div>
               </div>
               <div class="x-product-legacy-boundary-note" style="margin-top:14px;">
@@ -1690,7 +1690,7 @@
             </div>
             <div style="display:flex;flex-direction:column;gap:8px;justify-content:center;">
               <button type="button" class="x-btn-primary" id="btn-create-menu-from-detail" style="white-space:nowrap;">🍽️ + Buat Menu Satuan</button>
-              <button type="button" class="x-btn-secondary" id="btn-edit-from-detail">✏️ Edit Item</button>
+              <button type="button" class="x-btn-secondary" id="btn-edit-from-detail">✏️ Edit Product</button>
             </div>
           </div>
 
@@ -1699,7 +1699,7 @@
             <div class="x-panel-header-flex">
               <div>
                 <h4>📍 Status Adopsi di Cabang</h4>
-                <p class="text-muted" style="font-size:13px;">Compatibility view lama untuk adopsi Item. Penjualan canonical sekarang mengadopsi Menu Master ke cabang.</p>
+                <p class="text-muted" style="font-size:13px;">Compatibility view lama untuk adopsi Product. Penjualan canonical sekarang mengadopsi Menu Master ke cabang.</p>
               </div>
             </div>
             <div class="x-table-responsive mt-3">
@@ -1726,18 +1726,18 @@
     <div class="x-owner-child-mobile-header" id="product-editor-mobile-header">
       <h3 class="x-owner-mobile-page-title">
         <button type="button" class="x-title-back-btn x-owner-mobile-page-back" id="btn-product-editor-mobile-back" aria-label="Kembali" onclick="goBackFromChildPage()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
-        <span id="product-editor-mobile-title">Tambah Item</span>
-        <span id="product-editor-title" style="display:none;" aria-hidden="true">Tambah Item</span>
+        <span id="product-editor-mobile-title">Tambah Product</span>
+        <span id="product-editor-title" style="display:none;" aria-hidden="true">Tambah Product</span>
       </h3>
-      <p class="x-owner-mobile-page-sub" id="product-editor-mobile-subtitle">Item satuan yang dipakai dan dihitung dalam stok — seperti ayam, ikan, bumbu, dan lainnya.</p>
-      <span id="prod-editor-subtitle" style="display:none;" aria-hidden="true">Item satuan yang dipakai dan dihitung dalam stok — seperti ayam, ikan, bumbu, dan lainnya.</span>
+      <p class="x-owner-mobile-page-sub" id="product-editor-mobile-subtitle">Product satuan yang digunakan dan dihitung dalam stock, seperti ayam, ikan, bumbu, dan lainnya.</p>
+      <span id="prod-editor-subtitle" style="display:none;" aria-hidden="true">Product satuan yang digunakan dan dihitung dalam stock, seperti ayam, ikan, bumbu, dan lainnya.</span>
     </div>
     <div class="x-product-editor-breadcrumb-row x-owner-child-legacy-nav" style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
       <button type="button" class="x-btn-secondary" id="btn-back-from-product-editor" style="padding:6px 12px;font-size:13px;">
-        <svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg> Kembali ke Daftar Item
+        <svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg> Kembali ke Daftar Produk
       </button>
       <span class="text-muted" style="font-size:13px;">/</span>
-      <span id="prod-editor-breadcrumb" style="font-weight:600;font-size:14px;">Tambah Item</span>
+      <span id="prod-editor-breadcrumb" style="font-weight:600;font-size:14px;">Tambah Product</span>
     </div>
 
     <form id="form-product" class="x-form x-product-editor-form" style="max-width:920px;margin:0 auto;">
@@ -1745,10 +1745,10 @@
 
       <div class="x-card x-product-editor-main-card">
         <div class="x-form-group">
-          <label>Foto Item</label>
+          <label>Foto Product</label>
           <div class="x-image-upload-control">
             <div class="x-image-upload-preview-box" id="prod-image-preview-box" style="width:84px;height:84px;">
-              <img id="prod-image-preview" alt="Foto Item" style="display:none;width:100%;height:100%;object-fit:cover;">
+              <img id="prod-image-preview" alt="Foto Product" style="display:none;width:100%;height:100%;object-fit:cover;">
               <div id="prod-image-empty" class="x-image-upload-empty" style="font-size:24px;">🍲</div>
             </div>
             <div class="x-image-upload-info">
@@ -1764,26 +1764,26 @@
         </div>
 
         <div class="x-form-group">
-          <label for="prod-name">Nama Item <span class="x-required-mark" aria-hidden="true">*</span></label>
+          <label for="prod-name">Nama Product <span class="x-required-mark" aria-hidden="true">*</span></label>
           <input type="text" id="prod-name" class="x-input" required maxlength="160" autocomplete="off" placeholder="Contoh: Fillet Ayam Crispy">
-          <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Nama internal Item. Nama ini bukan judul customer Menu.</small>
+          <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Nama internal/atomic Product. Nama ini bukan judul customer Menu.</small>
         </div>
 
         <div class="x-form-group">
           <label for="prod-sku">SKU</label>
           <input type="text" id="prod-sku" class="x-input" maxlength="120" autocomplete="off" placeholder="Contoh: AYAM-FLT-001">
-          <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Opsional. SKU unik dalam Brand; Item dengan SKU menjadi item stok.</small>
+          <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Opsional. SKU unik dalam Brand; Product dengan SKU menjadi stock-managed.</small>
         </div>
 
         <div class="x-form-group">
-          <label for="prod-desc">Deskripsi Internal Item</label>
-          <textarea id="prod-desc" class="x-input" rows="3" placeholder="Catatan internal tentang Item / unit stok..."></textarea>
+          <label for="prod-desc">Deskripsi Internal Product</label>
+          <textarea id="prod-desc" class="x-input" rows="3" placeholder="Catatan internal tentang Product / unit stok..."></textarea>
         </div>
       </div>
 
       <div class="x-product-editor-actions">
         <button type="button" class="x-btn-secondary" id="btn-cancel-product-editor">Batal</button>
-        <button type="submit" class="x-btn-primary" id="btn-save-product-editor">Simpan Item</button>
+        <button type="submit" class="x-btn-primary" id="btn-save-product-editor">Simpan Product</button>
       </div>
     </form>
 
@@ -1835,7 +1835,7 @@
               </button>
               <span id="master-menu-editor-mobile-title">Tambah Menu</span>
             </h3>
-            <p class="x-owner-mobile-page-sub" id="master-menu-editor-mobile-subtitle">Menu adalah identitas komersial customer; Item hanya menjadi unit komposisi.</p>
+            <p class="x-owner-mobile-page-sub" id="master-menu-editor-mobile-subtitle">Menu adalah identitas komersial customer; Product hanya menjadi unit komposisi.</p>
           </div>
 
           <div class="x-product-editor-breadcrumb-row x-owner-child-legacy-nav" style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
@@ -1853,7 +1853,7 @@
             <div class="x-card" style="margin-bottom:14px;">
               <div style="margin-bottom:16px;">
                 <h3 id="master-menu-editor-title" style="margin:0;font-size:20px;">Tambah Menu Satuan</h3>
-                <p class="text-muted" style="margin:5px 0 0;font-size:13px;">Field berikut langsung menulis ke entitas Menu. Jangan gunakan nama Item sebagai judul customer.</p>
+                <p class="text-muted" style="margin:5px 0 0;font-size:13px;">Field berikut langsung menulis ke entitas Menu. Jangan gunakan nama Product sebagai judul customer.</p>
               </div>
 
               <div class="x-form-group">
@@ -1870,16 +1870,16 @@
                     </div>
                     <input type="file" id="cm-image-file" accept="image/jpeg,image/png,image/webp" style="display:none;">
                     <input type="hidden" id="cm-image-removed" value="0">
-                    <div class="x-image-specs-text">Foto customer-facing milik Menu ini (Satuan maupun Paket) — bukan foto Item. JPG, PNG, atau WebP · Maks. 20 MB · Rasio 1:1 · Xentra akan crop, resize, dan kompresi otomatis.</div>
+                    <div class="x-image-specs-text">Foto customer-facing milik Menu ini (Satuan maupun Paket) — bukan foto Product. JPG, PNG, atau WebP · Maks. 20 MB · Rasio 1:1 · Xentra akan crop, resize, dan kompresi otomatis.</div>
                   </div>
                 </div>
               </div>
 
               <div id="master-menu-single-fields">
                 <div class="x-form-group">
-                  <label for="cm-product">Item Komposisi <span class="x-required-mark">*</span></label>
+                  <label for="cm-product">Product Komposisi <span class="x-required-mark">*</span></label>
                   <select id="cm-product" class="x-input" required></select>
-                  <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Pilih tepat satu Item Master sebagai unit stok Menu Satuan.</small>
+                  <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Pilih tepat satu Product Master sebagai unit stok Menu Satuan.</small>
                 </div>
               </div>
 
@@ -1891,10 +1891,10 @@
                 </div>
 
                 <div class="x-form-group">
-                  <label>Komposisi Item <span class="x-required-mark">*</span></label>
+                  <label>Komposisi Product <span class="x-required-mark">*</span></label>
                   <div id="cm-package-components" class="x-composed-menu-components"></div>
-                  <button type="button" class="x-btn-secondary" id="btn-cm-add-component" style="margin-top:8px;">+ Tambah Item</button>
-                  <small class="text-muted" style="display:block;margin-top:5px;font-size:11px;">Minimal 2 unit total. Satu Item tidak boleh muncul dua kali dalam paket.</small>
+                  <button type="button" class="x-btn-secondary" id="btn-cm-add-component" style="margin-top:8px;">+ Tambah Product</button>
+                  <small class="text-muted" style="display:block;margin-top:5px;font-size:11px;">Minimal 2 unit total. Satu Product tidak boleh muncul dua kali dalam paket.</small>
                 </div>
               </div>
 
@@ -1925,7 +1925,7 @@
                 <div class="x-form-group">
                   <label for="cm-price">Harga Jual Menu (Rp) <span class="x-required-mark">*</span></label>
                   <input type="number" id="cm-price" class="x-input" min="0" step="1" inputmode="numeric" required placeholder="28000">
-                  <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Harga komersial berada di Menu, bukan di Item Master.</small>
+                  <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Harga komersial berada di Menu, bukan di Product Master.</small>
                 </div>
                 <div class="x-form-group">
                   <label for="cm-status">Status</label>
@@ -2191,9 +2191,9 @@
             </div>
           </div>
 
-          <!-- Two columns: Top Items & Order History -->
+          <!-- Two columns: Top Products & Order History -->
           <div class="x-overview-grid">
-            <!-- Top Ordered Items -->
+            <!-- Top Ordered Products -->
             <div class="x-card-panel">
               <div class="x-panel-header">
                 <h3>🍔 Menu Favorit</h3>
@@ -2256,12 +2256,12 @@
           <p class="x-owner-mobile-page-sub">Penjualan, produk, pelanggan, cabang, dan operasi</p>
         </div>
 
-        <!-- Sub-Navigation for Reports: Overview, Sales, Orders, Items, Customers, Branches, Operations -->
+        <!-- Sub-Navigation for Reports: Overview, Sales, Orders, Products, Customers, Branches, Operations -->
         <div class="x-subnav-tabs" id="reports-subnav">
           <button type="button" class="x-subnav-tab active" data-report="overview">Overview</button>
           <button type="button" class="x-subnav-tab" data-report="sales">Sales</button>
           <button type="button" class="x-subnav-tab" data-report="orders">Orders</button>
-          <button type="button" class="x-subnav-tab" data-report="products">Items</button>
+          <button type="button" class="x-subnav-tab" data-report="products">Products</button>
           <button type="button" class="x-subnav-tab" data-report="customers">Customers</button>
           <button type="button" class="x-subnav-tab" data-report="branches">Branches</button>
           <button type="button" class="x-subnav-tab" data-report="operations">Operations</button>
@@ -3270,7 +3270,7 @@
                     <div style="display:flex;align-items:center;gap:10px;padding:12px;background:#f8fafc;border-radius:var(--radius-sm);border:1px solid #e2e8f0;">
                       <input id="set-payment-is-production" type="checkbox" style="width:18px;height:18px;cursor:pointer;">
                       <div>
-                        <label for="set-payment-is-production" style="font-size:13px;font-weight:700;color:#1e293b;cursor:pointer;display:block;">Itemion Mode</label>
+                        <label for="set-payment-is-production" style="font-size:13px;font-weight:700;color:#1e293b;cursor:pointer;display:block;">Production Mode</label>
                         <div style="font-size:11px;color:#64748b;">Centang untuk transaksi uang riil. Matikan untuk Sandbox simulasi.</div>
                       </div>
                     </div>
@@ -3310,7 +3310,7 @@
                     <div style="display:flex;align-items:center;gap:10px;padding:12px;background:#f8fafc;border-radius:var(--radius-sm);border:1px solid #e2e8f0;">
                       <input id="set-payment-doku-is-production" type="checkbox" style="width:18px;height:18px;cursor:pointer;">
                       <div>
-                        <label for="set-payment-doku-is-production" style="font-size:13px;font-weight:700;color:#1e293b;cursor:pointer;display:block;">Itemion Mode</label>
+                        <label for="set-payment-doku-is-production" style="font-size:13px;font-weight:700;color:#1e293b;cursor:pointer;display:block;">Production Mode</label>
                         <div style="font-size:11px;color:#64748b;">Centang untuk transaksi uang riil. Matikan untuk Sandbox simulasi.</div>
                       </div>
                     </div>
@@ -3538,8 +3538,8 @@
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>
               </div>
               <div class="x-hub-info">
-                <h3>Item</h3>
-                <p>Kelola item: nama, SKU, media, dan status stok</p>
+                <h3>Produk Master</h3>
+                <p>Kelola Product atomic, SKU, media, dan status inventory</p>
               </div>
               <div class="x-hub-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
             </div>
@@ -4011,7 +4011,7 @@
       <div>
         <h3 id="master-reference-quick-add-title">Tambah Kategori</h3>
         <p id="master-reference-quick-add-subtitle" class="text-muted" style="font-size:12px;margin:3px 0 0;">
-          Tambahkan pilihan master tanpa meninggalkan Item.
+          Tambahkan pilihan master tanpa meninggalkan Produk Master.
         </p>
       </div>
       <button type="button" class="x-modal-close" id="btn-close-master-reference-quick-add" aria-label="Tutup">✕</button>
@@ -4263,7 +4263,7 @@
   <!-- TOAST NOTIFICATION CONTAINER -->
   <div id="x-toast-container" class="x-toast-container"></div>
 
-  <!-- LEGACY QUARANTINED: Branch Item Override compatibility modal.
+  <!-- LEGACY QUARANTINED: Branch Product Override compatibility modal.
        No active forward Menu workflow should expose this editor. -->
   <!-- MODAL: BRANCH PRODUCT EDIT (name, description, price, category) -->
   <div id="modal-branch-override" class="x-modal-backdrop" style="display:none; z-index: 1200;">
@@ -4287,7 +4287,7 @@
             </div>
             <div class="x-file-upload-info">
               <input type="file" id="override-img-file" class="x-input" accept="image/png,image/jpeg,image/webp" disabled>
-              <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Foto Menu Cabang legacy dinonaktifkan. Foto ditentukan oleh Master Item Owner.</small>
+              <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Foto Menu Cabang legacy dinonaktifkan. Foto ditentukan oleh Master Product Owner.</small>
             </div>
           </div>
           <div style="font-size:11px;color:#64748b;margin-top:6px;">Status: <span id="override-img-status" style="font-weight:700;"></span></div>
@@ -4390,7 +4390,7 @@
                 <select id="mkt-banner-cta-type" class="x-input">
                   <option value="NONE">Tanpa CTA</option>
                   <option value="PROMOTION">Promotion</option>
-                  <option value="PRODUCT">Item</option>
+                  <option value="PRODUCT">Product</option>
                   <option value="CATEGORY">Category</option>
                   <option value="URL">URL</option>
                 </select>
@@ -4404,9 +4404,9 @@
               </div>
 
               <div id="mkt-banner-cta-product-wrap" class="x-form-group" style="display:none;">
-                <label for="mkt-banner-cta-product">Item</label>
+                <label for="mkt-banner-cta-product">Product</label>
                 <select id="mkt-banner-cta-product" class="x-input">
-                  <option value="">Pilih Item</option>
+                  <option value="">Pilih Product</option>
                 </select>
               </div>
 
@@ -4737,12 +4737,12 @@
               <input type="hidden" id="mkt-promo-reward-type" value="freebie_product">
             </div>
 
-            <!-- Freebie Item Details Box -->
+            <!-- Freebie Product Details Box -->
             <div id="mkt-promo-benefit-freebie-box" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px;">
               <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 14px;">
                 <div>
                   <label for="mkt-promo-target-menu" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Menu yang Diberikan <span style="color:#ef4444;">*</span></label>
-                  <select id="mkt-promo-target-menu" class="x-input" required style="width: 100%; font-size: 13px;" onchange="onPromotionItemSelected()">
+                  <select id="mkt-promo-target-menu" class="x-input" required style="width: 100%; font-size: 13px;" onchange="onPromotionProductSelected()">
                     <option value="">-- Pilih Menu dari Menu Master --</option>
                   </select>
                   <div id="mkt-promo-target-menu-retry-container" style="display:none; margin-top: 4px;">
@@ -4758,7 +4758,7 @@
                 </div>
               </div>
 
-              <!-- Item Price Summary Callout -->
+              <!-- Product Price Summary Callout -->
               <div id="mkt-promo-menu-summary" style="margin-top: 12px; padding: 10px 12px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; display: flex; align-items: center; justify-content: space-between; font-size: 12px;">
                 <div>
                   <span class="text-muted">Harga normal Menu: </span>
@@ -5111,7 +5111,7 @@
   <script src="/merchant-dashboard/assets/js/owner-bottom-nav.js?v=1.0.0"></script>
   <script src="/merchant-shared/js/presentation-shells.js?v=1.0.2"></script>
   <script src="/merchant-dashboard/assets/js/owner-navigation.js?v=1.0.0"></script>
-  <script src="/dashboard/assets/js/dashboard.js?v=3.0.76"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=3.0.77"></script>
   <script src="/merchant-dashboard/assets/js/owner-master-menu-inline.js?v=1.0.2"></script>
 </body>
 </html>  
