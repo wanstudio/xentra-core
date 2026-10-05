@@ -156,6 +156,22 @@ test('ITEM-02: tab Item punya ceklis "Kelola stok (pakai SKU)" + input SKU', () 
   assert.match(DASHBOARD_JS, /if \(type === 'item'\) return 'Item';/, 'label tipe Item');
 });
 
+test('ITEM-03: tab Item punya tombol + (alur tambah item kanonik) dan gaya kartunya', () => {
+  assert.match(INDEX_HTML, /id="btn-add-master-item-page"/, 'tombol + Item harus ada di toolbar');
+  assert.match(DASHBOARD_JS, /btn-add-master-item-page/, 'tombol + Item harus di-wire');
+  assert.match(DASHBOARD_JS, /window\.openAddProduct\(\)/, 'memakai alur tambah item yang sudah ada');
+
+  // Tanpa gaya ini label ceklis terpotong dan baris SKU tampil berantakan.
+  const css = fs.readFileSync(
+    path.join(__dirname, '..', 'apps', 'merchant-shared', 'css', 'dashboard.css'),
+    'utf8'
+  );
+  for (const sel of ['.x-master-item-card{', '.x-master-item-stock-label{', '.x-master-item-sku{']) {
+    assert.ok(css.includes(sel), 'aturan ' + sel + ' harus ada di dashboard.css');
+  }
+  assert.ok(!/class="x-form-group x-master-item-sku/.test(DASHBOARD_JS), 'baris SKU tidak boleh memakai x-form-group (bentrok gaya)');
+});
+
 // ── Bentuk API yang dibaca UI ───────────────────────────────────────────────
 
 test('JUDUL-UI-03: GET /admin/menu-titles mengembalikan bentuk yang dibaca dashboard', async () => {

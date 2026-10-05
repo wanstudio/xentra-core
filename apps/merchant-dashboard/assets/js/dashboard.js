@@ -2567,7 +2567,7 @@
               '</label>',
             '</div>',
           '</div>',
-          '<div class="x-form-group x-master-item-sku" id="master-item-sku-' + id + '"' + (hasSku ? '' : ' hidden') + '>',
+          '<div class="x-master-item-sku" id="master-item-sku-' + id + '"' + (hasSku ? '' : ' hidden') + '>',
             '<label for="master-item-sku-input-' + id + '">SKU ' + esc(item.name) + '</label>',
             '<input type="text" class="x-input" id="master-item-sku-input-' + id + '" value="' + esc(sku) + '" placeholder="Contoh: AYM-001" maxlength="60" autocomplete="off">',
             '<button type="button" class="x-btn-primary" onclick="saveMasterItemSku(\'' + id + '\', true)">Simpan SKU</button>',
@@ -4130,6 +4130,16 @@ async function loadMenusView() {
       btnAddTitlePage.dataset.bound = 'true';
       btnAddTitlePage.addEventListener('click', function() {
         openMasterReferenceQuickAdd('title');
+      });
+    }
+
+    // Tab Item menambah item lewat alur tambah-item yang sudah ada (Produk Master),
+    // bukan alur master reference — item bukan master teks bebas.
+    var btnAddItemPage = $('btn-add-master-item-page');
+    if (btnAddItemPage && !btnAddItemPage.dataset.bound) {
+      btnAddItemPage.dataset.bound = 'true';
+      btnAddItemPage.addEventListener('click', function() {
+        if (typeof window.openAddProduct === 'function') window.openAddProduct();
       });
     }
 

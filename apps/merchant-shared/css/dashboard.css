@@ -8405,6 +8405,64 @@ input[type="file"].x-input,
   padding: 12px;
   margin-top: 0;
 }
+
+/* Tab Item: satu kartu = satu item. Ceklis "Kelola stok (pakai SKU)" diberi
+   barisnya sendiri supaya labelnya tidak terpotong di layar sempit, dan baris
+   SKU tampil sebagai blok terpisah di bawah kartunya. */
+.x-master-item-card{
+  display: grid;
+  gap: 8px;
+}
+.x-master-item-card .x-master-reference-card{
+  flex-wrap: wrap;
+}
+.x-master-item-card .x-master-reference-card-right{
+  flex: 1 1 100%;
+  justify-content: flex-start;
+  padding-left: 44px;
+}
+.x-master-item-stock-label{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.x-master-item-stock-label input[type="checkbox"]{
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #0f172a;
+  cursor: pointer;
+}
+.x-master-item-sku{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-main);
+}
+.x-master-item-sku label{
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.x-master-item-sku .x-input{
+  flex: 1 1 170px;
+  margin: 0;
+}
+.x-master-item-sku .x-btn-primary{
+  flex: 0 0 auto;
+  padding: 9px 14px;
+  font-size: 12px;
+}
 .x-master-reference-toolbar{
   display:flex;
   align-items:center;
