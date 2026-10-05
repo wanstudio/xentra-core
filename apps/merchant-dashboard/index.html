@@ -1672,7 +1672,7 @@
                 <h3 id="prod-detail-name" style="margin:0;font-size:20px;">Nama Product</h3>
                 <span id="prod-detail-status-badge" class="x-badge x-badge-success">Aktif</span>
               </div>
-              <p id="prod-detail-desc" class="text-muted" style="margin:8px 0;font-size:13px;line-height:1.5;">Deskripsi Product</p>
+              <p id="prod-detail-desc" class="text-muted" style="margin:8px 0;font-size:13px;line-height:1.5;">Deskripsi Item</p>
               <div style="display:flex;gap:20px;margin-top:12px;flex-wrap:wrap;">
                 <div>
                   <span class="text-muted" style="font-size:11px;display:block;">SKU</span>
@@ -1726,18 +1726,18 @@
     <div class="x-owner-child-mobile-header" id="product-editor-mobile-header">
       <h3 class="x-owner-mobile-page-title">
         <button type="button" class="x-title-back-btn x-owner-mobile-page-back" id="btn-product-editor-mobile-back" aria-label="Kembali" onclick="goBackFromChildPage()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
-        <span id="product-editor-mobile-title">Tambah Product</span>
-        <span id="product-editor-title" style="display:none;" aria-hidden="true">Tambah Product</span>
+        <span id="product-editor-mobile-title">Tambah Item</span>
+        <span id="product-editor-title" style="display:none;" aria-hidden="true">Tambah Item</span>
       </h3>
-      <p class="x-owner-mobile-page-sub" id="product-editor-mobile-subtitle">Product satuan yang digunakan dan dihitung dalam stock, seperti ayam, ikan, bumbu, dan lainnya.</p>
-      <span id="prod-editor-subtitle" style="display:none;" aria-hidden="true">Product satuan yang digunakan dan dihitung dalam stock, seperti ayam, ikan, bumbu, dan lainnya.</span>
+      <p class="x-owner-mobile-page-sub" id="product-editor-mobile-subtitle">Item satuan yang dipakai dan dihitung dalam stok — seperti ayam, ikan, bumbu, dan lainnya.</p>
+      <span id="prod-editor-subtitle" style="display:none;" aria-hidden="true">Item satuan yang dipakai dan dihitung dalam stok — seperti ayam, ikan, bumbu, dan lainnya.</span>
     </div>
     <div class="x-product-editor-breadcrumb-row x-owner-child-legacy-nav" style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
       <button type="button" class="x-btn-secondary" id="btn-back-from-product-editor" style="padding:6px 12px;font-size:13px;">
         <svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg> Kembali ke Daftar Produk
       </button>
       <span class="text-muted" style="font-size:13px;">/</span>
-      <span id="prod-editor-breadcrumb" style="font-weight:600;font-size:14px;">Tambah Product</span>
+      <span id="prod-editor-breadcrumb" style="font-weight:600;font-size:14px;">Tambah Item</span>
     </div>
 
     <form id="form-product" class="x-form x-product-editor-form" style="max-width:920px;margin:0 auto;">
@@ -1745,7 +1745,7 @@
 
       <div class="x-card x-product-editor-main-card">
         <div class="x-form-group">
-          <label>Foto Product</label>
+          <label>Foto Item</label>
           <div class="x-image-upload-control">
             <div class="x-image-upload-preview-box" id="prod-image-preview-box" style="width:84px;height:84px;">
               <img id="prod-image-preview" alt="Foto Product" style="display:none;width:100%;height:100%;object-fit:cover;">
@@ -1764,15 +1764,15 @@
         </div>
 
         <div class="x-form-group">
-          <label for="prod-name">Nama Product <span class="x-required-mark" aria-hidden="true">*</span></label>
+          <label for="prod-name">Nama Item <span class="x-required-mark" aria-hidden="true">*</span></label>
           <input type="text" id="prod-name" class="x-input" required maxlength="160" autocomplete="off" placeholder="Contoh: Fillet Ayam Crispy">
-          <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Nama internal/atomic Product. Nama ini bukan judul customer Menu.</small>
+          <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Nama internal Item. Nama ini bukan judul customer Menu.</small>
         </div>
 
         <div class="x-form-group">
           <label for="prod-sku">SKU</label>
           <input type="text" id="prod-sku" class="x-input" maxlength="120" autocomplete="off" placeholder="Contoh: AYAM-FLT-001">
-          <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Opsional. SKU unik dalam Brand; Product dengan SKU menjadi stock-managed.</small>
+          <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Opsional. SKU unik dalam Brand; Item dengan SKU menjadi item stok.</small>
         </div>
 
         <div class="x-form-group">
@@ -5111,7 +5111,7 @@
   <script src="/merchant-dashboard/assets/js/owner-bottom-nav.js?v=1.0.0"></script>
   <script src="/merchant-shared/js/presentation-shells.js?v=1.0.2"></script>
   <script src="/merchant-dashboard/assets/js/owner-navigation.js?v=1.0.0"></script>
-  <script src="/dashboard/assets/js/dashboard.js?v=3.0.78"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=3.0.79"></script>
   <script src="/merchant-dashboard/assets/js/owner-master-menu-inline.js?v=1.0.2"></script>
 </body>
 </html>  

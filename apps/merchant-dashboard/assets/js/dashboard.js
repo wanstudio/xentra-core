@@ -786,7 +786,7 @@
     if (titleEl) titleEl.textContent = isMasterMenuEditor
       ? (masterMenuEditorId ? 'Edit Menu Master' : 'Tambah Menu Master')
       : (isProductEditor
-        ? (productEditorId ? 'Edit Produk Master' : 'Tambah Produk Master')
+        ? (productEditorId ? 'Edit Item' : 'Tambah Item')
         : (isBranchEditor ? (branchEditorId ? 'Edit Cabang' : 'Tambah Cabang') : (isProductDetail ? 'Product Detail' : (isBranchDetail ? 'Branch Detail' : (isOrderDetail ? 'Order Detail' : (isCustomerDetail ? 'Customer Detail' : (isReportsRoute ? 'Reports' : meta.title)))))));
     if (subEl) subEl.textContent = isMasterMenuEditor
       ? 'Susun Menu Satuan atau Menu Paket pada katalog komersial brand'
@@ -3554,10 +3554,10 @@
   var _productEditorActiveState = 1;
 
   function resetProductEditorForAdd() {
-    $('product-editor-title').textContent = 'Tambah Product';
-    $('prod-editor-breadcrumb').textContent = 'Tambah Product';
+    $('product-editor-title').textContent = 'Tambah Item';
+    $('prod-editor-breadcrumb').textContent = 'Tambah Item';
     $('prod-editor-subtitle').textContent = 'Product satuan yang digunakan dan dihitung dalam stock, seperti ayam, ikan, bumbu, dan lainnya.';
-    if ($('product-editor-mobile-title')) $('product-editor-mobile-title').textContent = 'Tambah Product';
+    if ($('product-editor-mobile-title')) $('product-editor-mobile-title').textContent = 'Tambah Item';
     if ($('product-editor-mobile-subtitle')) $('product-editor-mobile-subtitle').textContent = 'Product satuan yang digunakan dan dihitung dalam stock, seperti ayam, ikan, bumbu, dan lainnya.';
     $('prod-id').value = '';
     $('prod-name').value = '';
@@ -3573,11 +3573,11 @@
   }
 
   function populateProductEditorForm(prod) {
-    $('product-editor-title').textContent = 'Edit Product: ' + prod.name;
+    $('product-editor-title').textContent = 'Edit Item: ' + prod.name;
     $('prod-editor-breadcrumb').textContent = prod.name;
-    $('prod-editor-subtitle').textContent = 'Perbarui data atomic Product. Menu tetap dikelola di workspace Menu Master.';
-    if ($('product-editor-mobile-title')) $('product-editor-mobile-title').textContent = 'Edit Product';
-    if ($('product-editor-mobile-subtitle')) $('product-editor-mobile-subtitle').textContent = 'Perbarui Product tanpa mengubah identitas komersial Menu.';
+    $('prod-editor-subtitle').textContent = 'Perbarui data item. Menu tetap dikelola di workspace Master Menu.';
+    if ($('product-editor-mobile-title')) $('product-editor-mobile-title').textContent = 'Edit Item';
+    if ($('product-editor-mobile-subtitle')) $('product-editor-mobile-subtitle').textContent = 'Perbarui item tanpa mengubah identitas komersial Menu.';
     $('prod-id').value = prod.id;
     $('prod-name').value = prod.name || '';
     $('prod-sku').value = prod.sku || '';
