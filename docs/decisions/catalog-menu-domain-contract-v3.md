@@ -520,7 +520,7 @@ Menu media
 Status
 ```
 
-Judul is a Master Category area and is used by the Master Menu as the Menu title/identity reference.
+Judul is a Master Category area and is the Menu title/identity reference.
 
 ### 14.1 Composition editor
 
@@ -853,7 +853,7 @@ The following consumers must be audited before the new Menu model is considered 
 ```text
 Owner Master Menu UI
 Owner Master Category UI
-Category / Judul UI
+Category UI
 Judul UI
 Rasa UI
 Item UI
@@ -964,7 +964,7 @@ Catalog
     └── Item
 ```
 
-- Judul replaces the former Judul concept.
+- Judul replaces the former Sub Category concept.
 - Judul exists as a first-class Master Category area.
 - Master Menu is a separate top-level Catalog area.
 - Master Menu is the commercial Menu authority.
@@ -1012,13 +1012,13 @@ The following are prohibited unless superseded by a newer explicit business deci
 
 ## 29. Open Contract Gaps
 
-The following remain open only where the conversation has not established a detailed implementation rule:
+The following are implementation details, not alternate business semantics:
 
-1. Exact Judul table/column naming where existing storage does not already provide a suitable forward representation.
-2. Exact create/edit API shape for Judul beyond the business role defined here.
-3. Additional Judul UI behavior not required to satisfy the Catalog IA and Menu identity.
+1. Exact physical table/column names for Judul.
+2. Exact API request/response shape for Judul.
+3. UI interaction details that do not change the locked business meaning.
 
-These gaps must be resolved before implementation invents additional behavior.
+These details must follow the business model in this contract and must not create a separate Sub Category concept.
 
 ---
 
@@ -1036,7 +1036,7 @@ Is the code legacy or forward?
 Does the change alter Menu identity?
 Does the change alter Item/SKU inventory semantics?
 Does the change alter Customer presentation?
-Does Judul become involved?
+Does the change alter Category ↔ Judul ↔ Rasa Menu identity?
 Is there an existing contract that already answers the question?
 ```
 
