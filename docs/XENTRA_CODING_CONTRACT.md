@@ -203,7 +203,55 @@ After coding:
 - update durable documentation when contracts or architecture change;
 - commit the completed implementation.
 
-## 8. Prompt Contract
+
+## 8. UI-First Workflow for User-Facing Work
+
+For any user-facing feature or workflow change, coding agents MUST follow the locked sequence in `docs/XENTRA_UI_FIRST_WORKFLOW_MENTAL_MODEL.md`:
+
+```
+User task / business goal
+        ↓
+Reference / benchmark research
+        ↓
+User flow + IA
+        ↓
+UI screens + states
+        ↓
+UX behavior
+        ↓
+UX contract / acceptance criteria
+        ↓
+Minimum backend contract
+        ↓
+Backend implementation
+        ↓
+Wiring / integration
+        ↓
+Tests + runtime verification
+```
+
+The backend model is an implementation constraint, not the default UX.
+
+### Mandatory rules
+
+- UI/UX MUST be made coherent before deep backend expansion for user-facing work.
+- Mature products may be used as interaction benchmarks; do not copy their UI blindly.
+- The basic merchant path MUST not require knowledge of backend entities such as Product, SKU, Composition, resolver, or migration mechanics.
+- Complex capabilities MUST use progressive disclosure and appear only when needed.
+- The **Es Teh Manis test** applies to menu/product entry: a normal merchant must be able to create a simple sellable menu without manually constructing a chain of technical entities.
+- If the current backend cannot cleanly support the approved UI, report the gap and adapt the backend. Do not degrade the UI solely to avoid backend work.
+- Backend audit/refactoring MUST NOT become an open-ended substitute for unresolved UX/product decisions.
+- Pure infrastructure, integrity, security, migration, and other non-user-facing work may proceed backend-first when no new UX is being designed.
+
+### Stop condition
+
+When a user-facing flow has no approved/coherent UI/UX yet:
+
+> **STOP BACKEND EXPANSION. DESIGN THE FLOW FIRST.**
+
+This rule controls implementation sequencing. It does not weaken any existing domain, security, financial, inventory, authorization, state, consistency, or audit invariants.
+
+## 9. Prompt Contract
 
 Every coding task prompt should identify, where applicable:
 
@@ -232,7 +280,7 @@ Verification:
 
 A task is not complete merely because code compiles or a happy-path test passes. Completion requires contractual correctness and coherent runtime behavior.
 
-## 9. Specification-First Principle
+## 10. Specification-First Principle
 
 The approved specification is the bridge between business decisions and implementation.
 
@@ -250,7 +298,7 @@ Xentra-Core implementation
 
 The coding agent should not be required to reconstruct business intent from unrelated implementation details.
 
-## 10. Final Rule
+## 11. Final Rule
 
 > **Implement the approved Xentra-Core contract. Do not invent the contract while coding.**
 
