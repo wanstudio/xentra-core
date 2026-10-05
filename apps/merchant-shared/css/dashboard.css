@@ -8634,7 +8634,7 @@ input[type="file"].x-input,
     align-items: center;
     gap: 6px;
     margin-bottom: 14px;
-    padding: 2px 0 6px;
+    padding: 10px 12px;
     border-bottom: 0;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
