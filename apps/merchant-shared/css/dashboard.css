@@ -8650,9 +8650,10 @@ input[type="file"].x-input,
     line-height: 40px;
   }
   body:not(.x-merchant-app) .x-subnav-tab.active {
-    border-color: #111827;
-    background: #111827;
-    color: #fff;
+    border-color: var(--primary-color);
+    background: var(--primary-color);
+    color: var(--primary-text);
+    font-weight: 700;
   }
 
   /* Orders: dense 9-column desktop table becomes one order card per row. */
