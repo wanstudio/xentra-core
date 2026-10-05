@@ -194,17 +194,19 @@ Promo
 
 ## 6. Product
 
-Product is the unit used by Menu composition and inventory.
+Product is the unit referenced by Menu Items.
 
-A Product may be:
+A Product may have:
 
 ~~~text
 SKU
 or
-non-SKU
+no SKU
 ~~~
 
-Product is not the commercial Menu itself.
+Product participates in Menu composition and inventory.
+
+A Product is referenced by Menu through Menu Items.
 
 ~~~text
 Menu
