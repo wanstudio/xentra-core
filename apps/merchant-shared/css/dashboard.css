@@ -8631,6 +8631,7 @@ input[type="file"].x-input,
   /* Secondary navigation is a horizontally scrollable mobile control, never a
      compressed desktop row. */
   body:not(.x-merchant-app) .x-subnav-tabs {
+    align-items: center;
     gap: 6px;
     margin-bottom: 14px;
     padding: 2px 0 6px;
@@ -8640,20 +8641,22 @@ input[type="file"].x-input,
   }
   body:not(.x-merchant-app) .x-subnav-tabs::-webkit-scrollbar { display:none; }
   body:not(.x-merchant-app) .x-subnav-tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     flex: 0 0 auto;
-    min-height: 40px;
+    min-height: 32px;
     padding: 0 14px;
     border: 1px solid #e5e7eb;
     border-radius: 999px;
     background: #fff;
     font-size: 12px;
-    line-height: 40px;
+    line-height: 1;
   }
   body:not(.x-merchant-app) .x-subnav-tab.active {
-    border-color: var(--primary-color);
-    background: var(--primary-color);
-    color: var(--primary-text);
-    font-weight: 700;
+    border-color: #111827;
+    background: #111827;
+    color: #fff;
   }
 
   /* Orders: dense 9-column desktop table becomes one order card per row. */
