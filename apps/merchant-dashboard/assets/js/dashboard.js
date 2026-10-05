@@ -2561,10 +2561,17 @@
               '</div>',
             '</div>',
             '<div class="x-master-reference-card-right" style="display:flex;align-items:center;gap:10px;">',
-              '<label class="x-master-item-stock-label">',
-                '<input type="checkbox" ' + (hasSku ? 'checked' : '') + ' onchange="toggleMasterItemStock(\'' + id + '\', this)">',
-                '<span>Kelola stok (pakai SKU)</span>',
+              '<label class="x-toggle' + (hasSku ? ' x-toggle-on' : '') + '" title="Kelola stok (pakai SKU)" style="margin:0;">',
+                '<input type="checkbox" ' + (hasSku ? 'checked' : '') + ' onchange="toggleMasterItemStock(\'' + id + '\', this)" aria-label="Kelola stok (pakai SKU) untuk ' + esc(item.name) + '">',
+                '<span class="x-toggle-slider"></span>',
               '</label>',
+              '<button type="button" class="x-action-menu-trigger" aria-label="Aksi Item ' + esc(item.name) + '" onclick="XentraActionMenu.open(this, [' +
+                '{ label: \'Edit\', icon: \'✏️\', onClick: function() { openEditProduct(\'' + id + '\'); } },' +
+                '{ divider: true },' +
+                '{ label: \'Arsipkan\', icon: \'🗑️\', destructive: true, onClick: function() { deleteProduct(\'' + id + '\'); } }' +
+              '])">',
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>',
+              '</button>',
             '</div>',
           '</div>',
           '<div class="x-master-item-sku" id="master-item-sku-' + id + '"' + (hasSku ? '' : ' hidden') + '>',

@@ -145,15 +145,21 @@ test('ITEM-01: deret tab Master Category = Kategori | Judul | Rasa | Item (tanpa
   assert.match(INDEX_HTML, /id="master-items-page-list"/, 'list Item harus ada');
 });
 
-test('ITEM-02: tab Item punya ceklis "Kelola stok (pakai SKU)" + input SKU', () => {
+test('ITEM-02: kartu Item seragam dengan tab lain — toggle, bukan ceklis, + menu aksi', () => {
   assert.match(DASHBOARD_JS, /function renderMasterItemsList\(\)/, 'daftar Item punya renderer sendiri');
-  assert.match(DASHBOARD_JS, /Kelola stok \(pakai SKU\)/, 'ceklis pengelolaan stok harus ada');
+  assert.match(DASHBOARD_JS, /title="Kelola stok \(pakai SKU\)"/, 'toggle harus menjelaskan dirinya (Kelola stok pakai SKU)');
+  assert.match(DASHBOARD_JS, /class="x-toggle' \+ \(hasSku/, 'kartu Item memakai komponen toggle kanonik');
+  assert.match(DASHBOARD_JS, /x-action-menu-trigger/, 'kartu Item harus punya menu aksi seperti tab lain');
+  assert.match(DASHBOARD_JS, /XentraActionMenu\.open\(this, \[/, 'menu aksi memakai XentraActionMenu kanonik');
+  assert.match(DASHBOARD_JS, /label: \\'Edit\\'/, 'menu aksi punya Edit');
+  assert.match(DASHBOARD_JS, /label: \\'Arsipkan\\'/, 'menu aksi punya Arsipkan');
   assert.match(DASHBOARD_JS, /id="master-item-sku-input-/, 'input SKU harus dirender');
-  assert.match(DASHBOARD_JS, /window\.toggleMasterItemStock\s*=/, 'ceklis harus ter-wire');
+  assert.match(DASHBOARD_JS, /window\.toggleMasterItemStock\s*=/, 'toggle harus ter-wire');
   assert.match(DASHBOARD_JS, /window\.saveMasterItemSku\s*=/, 'penyimpanan SKU harus ter-wire');
   assert.match(DASHBOARD_JS, /\/admin\/products\/' \+ encodeURIComponent\(productId\) \+ '\/sku'/, 'memakai endpoint SKU canonical');
   assert.match(DASHBOARD_JS, /Stok harus nol dulu/, 'pesan guard stok harus dijelaskan ke merchant');
   assert.match(DASHBOARD_JS, /if \(type === 'item'\) return 'Item';/, 'label tipe Item');
+  assert.ok(!DASHBOARD_JS.includes('x-master-item-stock-label'), 'ceklis berlabel sudah diganti toggle');
 });
 
 test('ITEM-03: tab Item punya tombol + (alur tambah item kanonik) dan gaya kartunya', () => {
@@ -166,7 +172,7 @@ test('ITEM-03: tab Item punya tombol + (alur tambah item kanonik) dan gaya kartu
     path.join(__dirname, '..', 'apps', 'merchant-shared', 'css', 'dashboard.css'),
     'utf8'
   );
-  for (const sel of ['.x-master-item-card{', '.x-master-item-stock-label{', '.x-master-item-sku{']) {
+  for (const sel of ['.x-master-item-card{', '.x-master-item-sku{']) {
     assert.ok(css.includes(sel), 'aturan ' + sel + ' harus ada di dashboard.css');
   }
   assert.ok(!/class="x-form-group x-master-item-sku/.test(DASHBOARD_JS), 'baris SKU tidak boleh memakai x-form-group (bentrok gaya)');
