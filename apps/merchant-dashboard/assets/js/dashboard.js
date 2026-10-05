@@ -2746,8 +2746,10 @@
     if (!row) return;
 
     var noun = referenceTypeLabel(type).toLowerCase();
-    var actionLabel = 'Hapus';
-    var actionMessage = 'Hapus ' + noun + ' "' + row.name + '"? Data yang sedang digunakan oleh Produk atau Menu tidak dapat dihapus.';
+    var actionLabel = 'Hapus permanen';
+    var actionMessage = 'Hapus permanen ' + noun + ' "' + row.name + '"? ' +
+      'Tindakan ini TIDAK dapat dibatalkan. ' +
+      noun.charAt(0).toUpperCase() + noun.slice(1) + ' yang masih dipakai Produk atau Menu akan ditolak — matikan toggle untuk menonaktifkannya.';
     if (window.XentraPresentation && !await window.XentraPresentation.confirm({
       id: 'delete-master-reference',
       title: actionLabel + ' ' + referenceTypeLabel(type),
@@ -2765,6 +2767,14 @@
       var data = await res.json();
 
       if (!res.ok || !data.success) {
+        var code = data.error || '';
+        if (code === 'TITLE_IN_USE_BY_MENUS') {
+          var used = (data.details && data.details.used_by_menu_count) || (data.message || '').match(/\d+/);
+          throw new Error('Judul ini masih dipakai ' + (used || 'beberapa') + ' Menu, jadi tidak dihapus. Matikan toggle untuk menonaktifkannya.');
+        }
+        if (code === 'PRODUCT_MENU_USAGE_BLOCKED') {
+          throw new Error('Data ini masih dipakai Produk atau Menu, jadi tidak dihapus. Matikan toggle untuk menonaktifkannya.');
+        }
         throw new Error(data.error || ('Gagal menghapus ' + noun + '.'));
       }
 

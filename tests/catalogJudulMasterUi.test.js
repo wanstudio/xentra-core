@@ -255,26 +255,32 @@ test('JUDUL-UI-05: rename lewat PUT name, dan nama kembar ditolak', async () => 
 
 // ── Delete vs Arsip ────────────────────────────────────────────────────────
 
-test('JUDUL-UI-06: DELETE = arsip (baris tetap ada, is_active=0, lapor used_by_menu_count)', async () => {
+test('JUDUL-UI-06: DELETE = hapus permanen bila tidak dipakai Menu (dengan guard pemakaian)', async () => {
   const auth = await loginOwner();
   const created = await (await mockFetch('/api/v1/admin/menu-titles', {
-    method: 'POST', headers: auth, body: JSON.stringify({ name: uniqueName('Judul Arsip') })
+    method: 'POST', headers: auth, body: JSON.stringify({ name: uniqueName('Judul Hapus') })
   })).json();
 
-  const archived = await (await mockFetch('/api/v1/admin/menu-titles/' + created.title.id, {
+  const deleted = await (await mockFetch('/api/v1/admin/menu-titles/' + created.title.id, {
     method: 'DELETE', headers: auth
   })).json();
 
-  assert.strictEqual(archived.success, true);
-  assert.strictEqual(archived.archived, true);
-  assert.strictEqual(typeof archived.used_by_menu_count, 'number', 'UI perlu tahu berapa Menu yang memakainya');
-  assert.strictEqual(archived.used_by_menu_count, 0);
+  assert.strictEqual(deleted.success, true);
+  assert.strictEqual(deleted.deleted, true, 'DELETE harus menghapus permanen, bukan mengarsip');
+  assert.strictEqual(deleted.used_by_menu_count, 0);
 
   const all = await (await mockFetch('/api/v1/admin/menu-titles', { headers: auth })).json();
-  const row = all.titles.find((t) => t.id === created.title.id);
-  assert.ok(row, 'arsip bukan hapus paksa: baris tetap ada agar referensi Menu tidak putus');
-  assert.strictEqual(Number(row.is_active), 0);
+  assert.ok(!all.titles.some((t) => t.id === created.title.id), 'baris harus benar-benar hilang dari daftar');
+
+  // Guard: Judul yang masih dipakai Menu ditolak, bukan dihapus paksa.
+  assert.match(
+    fs.readFileSync(path.join(__dirname, '..', 'domains', 'catalog', 'services', 'ComposedMenuService.js'), 'utf8'),
+    /TITLE_IN_USE_BY_MENUS/,
+    'service harus menolak hapus saat Judul masih dipakai Menu'
+  );
 });
+
+
 
 test('JUDUL-UI-07: tombol [+ ] di editor Menu cukup mengirim nama (idempotent, tanpa judul kembar)', async () => {
   const auth = await loginOwner();

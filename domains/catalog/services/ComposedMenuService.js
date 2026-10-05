@@ -982,8 +982,9 @@ class ComposedMenuService {
   }
 
   /**
-   * Arsipkan Judul. Judul yang masih dipakai Menu TIDAK dihapus paksa: ia hanya
-   * dinonaktifkan supaya riwayat dan referensi tetap utuh (aturan Delete vs Arsip).
+   * Hapus Judul. Permanen bila tidak ada Menu yang memakainya (FK-consistent).
+   * Selama masih dipakai, penghapusan ditolak supaya referensi Menu tidak putus —
+   * merchant diarahkan memakai toggle aktif/nonaktif.
    */
   static deleteMenuTitle({ brandId, titleId }) {
     ensureSchema();
@@ -993,19 +994,16 @@ class ComposedMenuService {
     if (!current) throw new Error('TITLE_NOT_FOUND');
 
     const usedBy = ComposedMenuService.countMenusUsingTitle({ brandId, titleId });
+    if (usedBy > 0) {
+      const err = new Error('TITLE_IN_USE_BY_MENUS');
+      err.status = 409;
+      err.details = { used_by_menu_count: usedBy };
+      throw err;
+    }
 
-    repository.db.execute(
-      "UPDATE menu_titles SET is_active = 0, updated_at = datetime('now') WHERE id = ? AND brand_id = ?",
-      [titleId, brandId]
-    );
+    repository.db.execute('DELETE FROM menu_titles WHERE id = ? AND brand_id = ?', [titleId, brandId]);
 
-    return {
-      id: titleId,
-      status: 'ARCHIVED',
-      archived: true,
-      used_by_menu_count: usedBy,
-      title: ComposedMenuService.findMenuTitle({ brandId, titleId })
-    };
+    return { id: titleId, status: 'DELETED', deleted: true, used_by_menu_count: 0, title: current };
   }
 
   static updateRasa({
