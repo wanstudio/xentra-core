@@ -135,6 +135,27 @@ test('JUDUL-UI-02c: bingkai card panel master reference berbasis kelas, bukan da
   );
 });
 
+// ── Tab Item (menggantikan Kelengkapan) ────────────────────────────────────
+
+test('ITEM-01: deret tab Master Category = Kategori | Judul | Rasa | Item (tanpa Kelengkapan)', () => {
+  const tabs = [...INDEX_HTML.matchAll(/data-master-reference-tab="([a-z]+)"/g)].map((m) => m[1]);
+  assert.deepStrictEqual(tabs, ['category', 'title', 'flavor', 'item'], 'urutan & isi tab harus sesuai contract v1');
+  assert.ok(!INDEX_HTML.includes('data-master-reference-tab="complement"'), 'Kelengkapan tidak boleh tampil lagi');
+  assert.match(INDEX_HTML, /id="master-reference-item-panel"/, 'panel Item harus ada');
+  assert.match(INDEX_HTML, /id="master-items-page-list"/, 'list Item harus ada');
+});
+
+test('ITEM-02: tab Item punya ceklis "Kelola stok (pakai SKU)" + input SKU', () => {
+  assert.match(DASHBOARD_JS, /function renderMasterItemsList\(\)/, 'daftar Item punya renderer sendiri');
+  assert.match(DASHBOARD_JS, /Kelola stok \(pakai SKU\)/, 'ceklis pengelolaan stok harus ada');
+  assert.match(DASHBOARD_JS, /id="master-item-sku-input-/, 'input SKU harus dirender');
+  assert.match(DASHBOARD_JS, /window\.toggleMasterItemStock\s*=/, 'ceklis harus ter-wire');
+  assert.match(DASHBOARD_JS, /window\.saveMasterItemSku\s*=/, 'penyimpanan SKU harus ter-wire');
+  assert.match(DASHBOARD_JS, /\/admin\/products\/' \+ encodeURIComponent\(productId\) \+ '\/sku'/, 'memakai endpoint SKU canonical');
+  assert.match(DASHBOARD_JS, /Stok harus nol dulu/, 'pesan guard stok harus dijelaskan ke merchant');
+  assert.match(DASHBOARD_JS, /if \(type === 'item'\) return 'Item';/, 'label tipe Item');
+});
+
 // ── Bentuk API yang dibaca UI ───────────────────────────────────────────────
 
 test('JUDUL-UI-03: GET /admin/menu-titles mengembalikan bentuk yang dibaca dashboard', async () => {

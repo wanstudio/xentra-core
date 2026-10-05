@@ -2394,7 +2394,7 @@
   }
 
   function setMasterReferenceTab(type) {
-    var allowed = ['category', 'title', 'flavor', 'complement'];
+    var allowed = ['category', 'title', 'flavor', 'item'];
     _masterReferenceTab = allowed.indexOf(type) !== -1 ? type : 'category';
 
     var panels = {
@@ -2402,6 +2402,7 @@
       flavor: $('master-reference-flavor-panel'),
       complement: $('master-reference-complement-panel'),
       title: $('master-reference-title-panel'),
+      item: $('master-reference-item-panel'),
     };
     Object.keys(panels).forEach(function(key) {
       if (panels[key]) panels[key].hidden = _masterReferenceTab !== key;
@@ -2416,7 +2417,12 @@
       });
     }
 
-    renderMasterReferenceList(_masterReferenceTab);
+    if (_masterReferenceTab === 'item') {
+      renderMasterItemsList();
+      if (!(state.products || []).length) loadMasterProducts().then(renderMasterItemsList);
+    } else {
+      renderMasterReferenceList(_masterReferenceTab);
+    }
   }
 
   async function loadMasterCategoriesPage() {
@@ -2517,8 +2523,113 @@
 
   function referenceTypeLabel(type) {
     if (type === 'title') return 'Judul';
+    if (type === 'item') return 'Item';
     return type === 'category' ? 'Kategori' : type === 'flavor' ? 'Rasa' : type === 'complement' ? 'Kelengkapan' : 'Level';
   }
+
+  // ── Tab Item: unit internal + pengelolaan stok berbasis SKU ────────────────
+  // Item memakai satu komponen kartu yang sama dengan tab lain (x-master-reference-card).
+  // SKU adalah identitas stok: checkbox "Kelola stok (pakai SKU)" membuka input SKU,
+  // dan mematikannya = mengosongkan SKU — operasi yang dijaga server
+  // (PRODUCT_SKU_REMOVAL_BLOCKED_STOCK: stok harus nol dulu di semua cabang).
+
+  function renderMasterItemsList() {
+    var list = $('master-items-page-list');
+    if (!list) return;
+
+    var rows = state.products || [];
+    if (!rows.length) {
+      list.innerHTML = '<div class="x-empty-state text-center py-6 text-muted">Belum ada item.</div>';
+      return;
+    }
+
+    list.innerHTML = rows.map(function(item) {
+      var sku = item.sku == null ? '' : String(item.sku).trim();
+      var hasSku = !!sku;
+      var id = esc(String(item.id));
+
+      return [
+        '<div class="x-master-item-card">',
+          '<div class="x-master-reference-card">',
+            '<div class="x-master-reference-card-main">',
+              '<div class="x-master-reference-icon x-master-reference-icon-category" aria-hidden="true">',
+                '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 7h16"></path><path d="M4 12h16"></path><path d="M4 17h10"></path></svg>',
+              '</div>',
+              '<div class="x-master-reference-copy">',
+                '<strong>' + esc(item.name) + '</strong>',
+                '<span>' + (hasSku ? 'Item stok · SKU ' + esc(sku) : 'Item non-stok · belum pakai SKU') + '</span>',
+              '</div>',
+            '</div>',
+            '<div class="x-master-reference-card-right" style="display:flex;align-items:center;gap:10px;">',
+              '<label class="x-master-item-stock-label">',
+                '<input type="checkbox" ' + (hasSku ? 'checked' : '') + ' onchange="toggleMasterItemStock(\'' + id + '\', this)">',
+                '<span>Kelola stok (pakai SKU)</span>',
+              '</label>',
+            '</div>',
+          '</div>',
+          '<div class="x-form-group x-master-item-sku" id="master-item-sku-' + id + '"' + (hasSku ? '' : ' hidden') + '>',
+            '<label for="master-item-sku-input-' + id + '">SKU ' + esc(item.name) + '</label>',
+            '<input type="text" class="x-input" id="master-item-sku-input-' + id + '" value="' + esc(sku) + '" placeholder="Contoh: AYM-001" maxlength="60" autocomplete="off">',
+            '<button type="button" class="x-btn-primary" onclick="saveMasterItemSku(\'' + id + '\', true)">Simpan SKU</button>',
+          '</div>',
+        '</div>'
+      ].join('');
+    }).join('');
+  }
+
+  window.toggleMasterItemStock = function(productId, inputEl) {
+    var row = document.getElementById('master-item-sku-' + productId);
+    if (inputEl && inputEl.checked) {
+      if (row) {
+        row.hidden = false;
+        var field = row.querySelector('.x-input');
+        if (field) {
+          field.focus();
+          field.select();
+        }
+      }
+      return;
+    }
+    // Mematikan pengelolaan stok = mengosongkan SKU. Server menolaknya selama
+    // masih ada stok positif di cabang mana pun.
+    saveMasterItemSku(productId, false);
+  };
+
+  window.saveMasterItemSku = async function(productId, fromInput) {
+    var field = document.getElementById('master-item-sku-input-' + productId);
+    var sku = fromInput && field ? String(field.value || '').trim() : '';
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/products/' + encodeURIComponent(productId) + '/sku', {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ sku: sku })
+      });
+      var data = await res.json();
+
+      if (!res.ok || !data.success) {
+        var code = data.error || '';
+        var message = data.message || code;
+        if (code === 'PRODUCT_SKU_REMOVAL_BLOCKED_STOCK' || code === 'PRODUCT_SKU_UPDATE_FAILED') {
+          message = 'Stok item ini masih ada di cabang. Stok harus nol dulu sebelum pengelolaan stok dimatikan.';
+        }
+        throw new Error(message || 'Gagal menyimpan SKU.');
+      }
+
+      var rows = state.products || [];
+      var index = rows.findIndex(function(item) { return String(item.id) === String(productId); });
+      if (index >= 0) {
+        rows[index] = Object.assign({}, rows[index], { sku: data.product && data.product.sku ? data.product.sku : null });
+        state.products = rows;
+      }
+
+      renderMasterItemsList();
+      showToast('✅ SKU disimpan.');
+    } catch (err) {
+      renderMasterItemsList();
+      showToast('❌ ' + err.message);
+    }
+  };
 
   function referenceIconClass(type) {
     return (type === 'category' || type === 'title')
