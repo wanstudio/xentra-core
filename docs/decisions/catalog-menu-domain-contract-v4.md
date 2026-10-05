@@ -306,18 +306,33 @@ There is no identity formula Category + Judul + Rasa.
 
 ---
 
-## 9. Menu Price
+## 9. Menu Price and Modal
 
-Harga belongs to Menu.
+Harga and Modal are both Menu fields.
 
 ~~~text
 Menu
-└── Harga
+├── Harga
+└── Modal
 ~~~
 
-Customer-facing selling price is the Menu price.
+**Harga** is the customer-facing selling price.
 
-Product composition does not define the Menu's commercial price.
+**Modal** is the Menu's modal/cost value.
+
+They are independent Menu fields.
+
+Product composition does not define either field automatically.
+
+The Master Menu editor must therefore expose both:
+
+~~~text
+harga
+[ Rp 25.000 ]
+
+modal
+[ Rp 15.000 ]
+~~~
 
 ---
 
@@ -522,6 +537,9 @@ Harga
 Media
 availability
 ~~~
+
+Modal is an internal Menu value and is not a required Customer presentation field.
+
 
 Customer-facing Menu identity is Judul.
 
@@ -756,6 +774,7 @@ This revision explicitly locks the following clarified points:
 - Judul does not require `category_id`.
 - Pedas is an optional Menu attribute controlled by a checkbox and a four-position horizontal selector.
 - Pedas is not a dropdown, uses four visual positions, and does not use a Master Level catalog.
+- Menu contains both Harga and Modal as separate fields.
 
 The canonical core is:
 
