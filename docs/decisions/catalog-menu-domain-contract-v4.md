@@ -360,26 +360,24 @@ When the checkbox is checked:
 ~~~text
 ☑ Level Pedas
 
-○ ─ ○ ─ ○ ─ ○ ─ ○
+[●] [●] [●] [○]
 ~~~
 
-The scale is horizontal and has five positions.
+The control is horizontal and has four positions.
 
 The selected position is visually active, for example:
 
 ~~~text
-○ ─ ○ ─ 🔴 ─ ○ ─ ○
+[●] [●] [●] [○]
 ~~~
 
 Stored position:
 
 ~~~text
-0..4
+1..4
 ~~~
 
-Position 0 is the leftmost / not-spicy end of the scale.
-
-The remaining positions represent increasing position/intensity on the same scale. They are not named Master Levels and must not be assigned invented business meanings.
+The selected value represents one of four visual positions on the scale. The positions are not named Master Levels and must not be assigned invented business meanings.
 
 The Pedas control is **not a dropdown**.
 
