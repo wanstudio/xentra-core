@@ -435,6 +435,67 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
     }
   });
 
+  // ── Judul (menu_titles) — master judul customer ────────────────────────────
+  // Contract v1: Sub Category dipensiunkan; Judul menggantikannya sebagai judul customer.
+  // Pola endpoint sengaja sama dengan /admin/rasas supaya editor Menu dan tab
+  // Master Category memakai satu pola yang sudah ada.
+
+  router.get('/admin/menu-titles', requireAuth(ownerRoles), (req, res) => {
+    try {
+      const activeOnly = req.query && (req.query.active_only === '1' || req.query.active_only === 'true');
+      res.json({
+        success: true,
+        titles: service.listMenuTitles({ brandId: req.brand_id, activeOnly })
+      });
+    } catch (err) {
+      sendError(res, err, 'TITLE_LIST_FAILED');
+    }
+  });
+
+  router.post('/admin/menu-titles', requireAuth(ownerRoles), (req, res) => {
+    try {
+      const body = req.body || {};
+      const title = service.createMenuTitle({
+        brandId: req.brand_id,
+        name: body.name,
+        slug: body.slug,
+        sortOrder: body.sort_order
+      });
+      res.status(201).json({ success: true, title });
+    } catch (err) {
+      sendError(res, err, 'TITLE_CREATE_FAILED');
+    }
+  });
+
+  router.put('/admin/menu-titles/:id', requireAuth(ownerRoles), (req, res) => {
+    try {
+      const body = req.body || {};
+      const title = service.updateMenuTitle({
+        brandId: req.brand_id,
+        titleId: req.params.id,
+        name: body.name,
+        slug: body.slug,
+        sortOrder: body.sort_order,
+        isActive: body.is_active
+      });
+      res.json({ success: true, title });
+    } catch (err) {
+      sendError(res, err, 'TITLE_UPDATE_FAILED');
+    }
+  });
+
+  router.delete('/admin/menu-titles/:id', requireAuth(ownerRoles), (req, res) => {
+    try {
+      const result = service.deleteMenuTitle({
+        brandId: req.brand_id,
+        titleId: req.params.id
+      });
+      res.json({ success: true, ...result });
+    } catch (err) {
+      sendError(res, err, 'TITLE_DELETE_FAILED');
+    }
+  });
+
   router.post('/admin/rasas', requireAuth(ownerRoles), (req, res) => {
     try {
       const body = req.body || {};

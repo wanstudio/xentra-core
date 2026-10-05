@@ -880,6 +880,134 @@ class ComposedMenuService {
     };
   }
 
+  // ── Judul (menu_titles) — master judul customer ────────────────────────────
+  // Bentuk dan perlakuan sama seperti Rasa: Brand-scoped, bisa ON/OFF, diarsipkan
+  // (bukan dihapus paksa), dan direferensikan Menu. Contract v1: Sub Category
+  // dipensiunkan, Judul menggantikannya sebagai judul customer.
+
+  static listMenuTitles({ brandId, activeOnly = false }) {
+    ensureSchema();
+    if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
+    return repository.db.queryMany(
+      'SELECT id, brand_id, name, slug, sort_order, is_active, created_at, updated_at ' +
+      'FROM menu_titles WHERE brand_id = ?' + (activeOnly ? ' AND is_active = 1' : '') +
+      ' ORDER BY sort_order ASC, name ASC',
+      [brandId]
+    );
+  }
+
+  static findMenuTitle({ brandId, titleId }) {
+    ensureSchema();
+    if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
+    return repository.db.queryOne(
+      'SELECT id, brand_id, name, slug, sort_order, is_active FROM menu_titles WHERE id = ? AND brand_id = ?',
+      [titleId, brandId]
+    );
+  }
+
+  static findMenuTitleByName({ brandId, name }) {
+    ensureSchema();
+    if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
+    return repository.db.queryOne(
+      'SELECT id, brand_id, name, slug, sort_order, is_active FROM menu_titles ' +
+      'WHERE brand_id = ? AND lower(trim(name)) = lower(trim(?)) LIMIT 1',
+      [brandId, String(name == null ? '' : name)]
+    );
+  }
+
+  static createMenuTitle({ brandId, name, slug = null, sortOrder = 0 }) {
+    ensureSchema();
+    if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
+    const normalizedTitle = normalizeName(name, 'TITLE_NAME_REQUIRED');
+
+    const existing = ComposedMenuService.findMenuTitleByName({ brandId, name: normalizedTitle });
+    if (existing) {
+      // Dipakai juga oleh pemilih [+] di editor Menu: nama yang sudah ada cukup dikembalikan.
+      return existing;
+    }
+
+    const id = makeId('title');
+    const nextSlug = slugify(slug || normalizedTitle);
+    if (!nextSlug) throw new Error('TITLE_SLUG_REQUIRED');
+
+    repository.db.execute(
+      'INSERT INTO menu_titles (id, brand_id, name, slug, sort_order, is_active) VALUES (?, ?, ?, ?, ?, 1)',
+      [id, brandId, normalizedTitle, nextSlug, Number.isFinite(Number(sortOrder)) ? Number(sortOrder) : 0]
+    );
+
+    return ComposedMenuService.findMenuTitle({ brandId, titleId: id });
+  }
+
+  static updateMenuTitle({
+    brandId,
+    titleId,
+    name = undefined,
+    slug = undefined,
+    sortOrder = undefined,
+    isActive = undefined
+  }) {
+    ensureSchema();
+    if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
+
+    const current = ComposedMenuService.findMenuTitle({ brandId, titleId });
+    if (!current) throw new Error('TITLE_NOT_FOUND');
+
+    const nextName = name === undefined ? current.name : normalizeName(name, 'TITLE_NAME_REQUIRED');
+    const duplicate = ComposedMenuService.findMenuTitleByName({ brandId, name: nextName });
+    if (duplicate && String(duplicate.id) !== String(titleId)) throw new Error('TITLE_ALREADY_EXISTS');
+
+    const nextSlug = slug === undefined ? current.slug : slugify(slug || nextName);
+    if (!nextSlug) throw new Error('TITLE_SLUG_REQUIRED');
+
+    const nextSortOrder = sortOrder === undefined ? Number(current.sort_order || 0) : (
+      Number.isFinite(Number(sortOrder)) ? Number(sortOrder) : 0
+    );
+    const nextIsActive = isActive === undefined ? Number(current.is_active) : (Boolean(isActive) ? 1 : 0);
+
+    repository.db.execute(
+      "UPDATE menu_titles SET name = ?, slug = ?, sort_order = ?, is_active = ?, updated_at = datetime('now') WHERE id = ? AND brand_id = ?",
+      [nextName, nextSlug, nextSortOrder, nextIsActive, titleId, brandId]
+    );
+
+    return ComposedMenuService.findMenuTitle({ brandId, titleId });
+  }
+
+  static countMenusUsingTitle({ brandId, titleId }) {
+    ensureSchema();
+    const row = repository.db.queryOne(
+      'SELECT COUNT(*) AS total FROM menus WHERE brand_id = ? AND title_id = ?',
+      [brandId, titleId]
+    );
+    return Number(row && row.total || 0);
+  }
+
+  /**
+   * Arsipkan Judul. Judul yang masih dipakai Menu TIDAK dihapus paksa: ia hanya
+   * dinonaktifkan supaya riwayat dan referensi tetap utuh (aturan Delete vs Arsip).
+   */
+  static deleteMenuTitle({ brandId, titleId }) {
+    ensureSchema();
+    if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
+
+    const current = ComposedMenuService.findMenuTitle({ brandId, titleId });
+    if (!current) throw new Error('TITLE_NOT_FOUND');
+
+    const usedBy = ComposedMenuService.countMenusUsingTitle({ brandId, titleId });
+
+    repository.db.execute(
+      "UPDATE menu_titles SET is_active = 0, updated_at = datetime('now') WHERE id = ? AND brand_id = ?",
+      [titleId, brandId]
+    );
+
+    return {
+      id: titleId,
+      status: 'ARCHIVED',
+      archived: true,
+      used_by_menu_count: usedBy,
+      title: ComposedMenuService.findMenuTitle({ brandId, titleId })
+    };
+  }
+
   static updateRasa({
     brandId,
     rasaId,
