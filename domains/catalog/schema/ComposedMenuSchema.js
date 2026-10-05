@@ -19,6 +19,85 @@ function normalizeName(value) {
   return String(value == null ? '' : value).trim();
 }
 
+function slugify(value) {
+  return normalizeName(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'judul';
+}
+
+/**
+ * Migrasi satu kali: **Sub Category → Judul**.
+ *
+ * Sub Category dipensiunkan sebagai konsep forward; Judul menggantikannya sebagai judul
+ * customer. Supaya judul yang sudah tampil di storefront tidak berubah, setiap Sub Category
+ * yang dipakai Menu dibuatkan Judul dengan nama yang sama, lalu Menu diarahkan ke
+ * `title_id` + `category_id` (Category tetap sebagai pengelompokan).
+ *
+ * Idempotent: hanya memproses Menu yang `title_id`-nya masih kosong.
+ */
+function migrateSubCategoriesToTitles(db) {
+  const query = (sql) => {
+    if (db && typeof db.prepare === 'function') return db.prepare(sql).all();
+    if (db && typeof db.queryMany === 'function') return db.queryMany(sql);
+    return [];
+  };
+  const run = (sql, params) => {
+    if (db && typeof db.prepare === 'function') return db.prepare(sql).run(...params);
+    if (db && typeof db.queryMany === 'function') return db.queryMany(sql, params);
+    return null;
+  };
+
+  let rows = [];
+  try {
+    rows = query(`
+      SELECT m.id AS menu_id, m.brand_id, sc.id AS sub_id, sc.name AS sub_name, sc.category_id AS category_id
+      FROM menus m
+      JOIN sub_categories sc ON sc.id = m.sub_category_id AND sc.brand_id = m.brand_id
+      WHERE m.sub_category_id IS NOT NULL AND (m.title_id IS NULL OR m.title_id = '')
+    `);
+  } catch (_) {
+    return; // Tabel legacy tidak ada pada database yang sudah bersih.
+  }
+  if (!Array.isArray(rows) || rows.length === 0) return;
+
+  const titleIdByName = new Map();
+  for (const row of rows) {
+    const brandId = String(row.brand_id || '');
+    const name = normalizeName(row.sub_name);
+    if (!brandId || !name) continue;
+    const key = brandId + '\u0000' + name.toLowerCase();
+
+    try {
+      if (!titleIdByName.has(key)) {
+        const existing = query(
+          "SELECT id FROM menu_titles WHERE brand_id = '" + brandId.replace(/'/g, "''") +
+          "' AND lower(name) = lower('" + name.replace(/'/g, "''") + "') LIMIT 1"
+        );
+        if (Array.isArray(existing) && existing.length) {
+          titleIdByName.set(key, String(existing[0].id));
+        } else {
+          const id = 'title_' + slugify(name) + '_' + String(row.sub_id || '').replace(/[^a-zA-Z0-9]/g, '').slice(-8);
+          run(
+            'INSERT OR IGNORE INTO menu_titles (id, brand_id, name, slug, sort_order, is_active) VALUES (?, ?, ?, ?, 0, 1)',
+            [id, brandId, name, slugify(name)]
+          );
+          titleIdByName.set(key, id);
+        }
+      }
+
+      const titleId = titleIdByName.get(key);
+      run(
+        'UPDATE menus SET title_id = ?, category_id = COALESCE(category_id, ?), updated_at = datetime(\'now\') WHERE id = ?',
+        [titleId, row.category_id || null, row.menu_id]
+      );
+    } catch (err) {
+      console.error('[ComposedMenuSchema] migrasi Sub Category → Judul tertunda untuk Menu ' + row.menu_id + ':', err.message);
+    }
+  }
+}
+
 function tableDefinition(db, table) {
   let rows = [];
   if (db && typeof db.prepare === 'function') {
@@ -474,15 +553,41 @@ function ensureComposedMenuSchema(db) {
   try { db.exec('ALTER TABLE menus ADD COLUMN spice_enabled INTEGER NOT NULL DEFAULT 0;'); } catch (_) {}
   try { db.exec('ALTER TABLE menus ADD COLUMN spice_level INTEGER NOT NULL DEFAULT 0;'); } catch (_) {}
 
-  // Contract v1 identity — satu Menu per (Brand, Sub Category, Rasa) dengan proteksi
-  // duplikat NULL-safe (rasa opsional). Data legacy bisa saja sudah melanggar aturan
-  // forward ini: jangan menebak, tandai untuk review dan jangan gagalkan boot.
+  // Judul = master judul customer (Brand-scoped), bentuknya sama seperti Rasa.
+  // Sub Category dipensiunkan sebagai konsep forward; perannya digantikan Judul.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS menu_titles (
+      id TEXT PRIMARY KEY,
+      brand_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL,
+      sort_order INTEGER DEFAULT 0,
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_menu_titles_brand_slug
+      ON menu_titles(brand_id, slug);
+  `);
+
+  // Menu kini mereferensikan Category (pengelompokan) dan Judul (judul customer).
+  try { db.exec('ALTER TABLE menus ADD COLUMN category_id TEXT;'); } catch (_) {}
+  try { db.exec('ALTER TABLE menus ADD COLUMN title_id TEXT;'); } catch (_) {}
+
+  // Contract v1 identity — satu Menu per (Brand, Judul, Rasa) dengan proteksi duplikat
+  // NULL-safe (rasa opsional). Data legacy bisa saja sudah melanggar aturan forward ini:
+  // jangan menebak, tandai untuk review dan jangan gagalkan boot.
   try {
-    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_menus_identity_v1 ON menus(brand_id, sub_category_id, COALESCE(rasa_id, ''));");
+    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_menus_identity_v1 ON menus(brand_id, title_id, COALESCE(rasa_id, ''));");
     try { db.exec('DROP INDEX IF EXISTS idx_menus_single_identity;'); } catch (_) {}
   } catch (err) {
     console.error('[ComposedMenuSchema] idx_menus_identity_v1 tertunda — data Menu legacy perlu review:', err.message);
   }
+
+  // Migrasi data: Sub Category → Judul (judul customer tidak berubah).
+  migrateSubCategoriesToTitles(db);
 
   // Migration evidence for the explicit one-time backfill of legacy Menu presentation media.
   // Runtime fallback is not a migration mechanism, so every copy is recorded here.
