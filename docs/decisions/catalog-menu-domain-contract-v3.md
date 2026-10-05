@@ -2,7 +2,7 @@
 
 **Status:** PROPOSED — RECONCILIATION DRAFT  
 **Decision date:** 2026-10-05  
-**Scope:** Catalog, Master Menu, Master Category, Category/Sub Category, Judul, Rasa, Item/SKU, Branch adoption, Customer Menu resolution, Inventory boundary, migration
+**Scope:** Catalog, Master Menu, Master Category, Category, Judul, Rasa, Item/SKU, Branch adoption, Customer Menu resolution, Inventory boundary, migration
 
 > This document is a **new contract**, created from the latest confirmed decisions in the Xentra conversation. It does not edit or reinterpret the previous contract.
 >
@@ -45,19 +45,6 @@ Item
 
 These are peers under Master Category in the Catalog IA.
 
-### 1.3 Sub Category
-
-`Sub Category` belongs to the `Category` structure.
-
-It is not another top-level Catalog area and is not a fifth Master Category area.
-
-Conceptually:
-
-```text
-Master Category
-└── Category
-    └── Sub Category[]
-```
 
 ### 1.4 No additional Catalog top-level area
 
@@ -146,30 +133,17 @@ It is not a separate master identity and it is not another Master Category area.
 
 ---
 
-## 4. Category and Sub Category
+## 4. Category
 
 ### 4.1 Category
 
 Category is brand-owned master classification.
 
-### 4.2 Sub Category
-
-Sub Category is nested under Category.
-
-Rules:
-
-1. Every Sub Category belongs to one Category.
-2. A Menu may reference a Sub Category.
-3. Category is resolved through the Sub Category relationship where that relationship exists.
-4. Sub Category must not become a detached duplicate of Category.
-5. Owner/Brand owns Master Category and Sub Category mutations.
-6. Branch operations must not mutate Master Category/Sub Category definitions.
-
 ### 4.3 Category deletion
 
 Referential integrity is part of the domain contract.
 
-Where a Category or Sub Category is referenced, the normal forward lifecycle is:
+Where a Category is referenced, the normal forward lifecycle is:
 
 ```text
 Referenced
@@ -198,26 +172,25 @@ Master Category
 
 The following is locked by this contract:
 
-- Judul exists as a Master Category area.
+- Judul exists as a first-class Master Category area.
+- Judul is the forward replacement for the former Judul concept.
 - Judul must not be removed from the forward Catalog IA.
-- Judul must not be silently renamed into another Master Category area.
-- Implementation must not assume Judul is legacy-only.
+- Implementation must not recreate a separate Judul concept alongside Judul.
 
-### 5.2 What is intentionally not invented here
+### 5.2 Judul role
 
-The latest confirmed requirement establishes the existence and placement of the Judul area, but it does not provide enough authoritative detail in this contract to define:
+Judul replaces the former Judul concept in the forward model.
 
-- Judul's exact database schema;
-- Judul's exact relation to Category;
-- Judul's exact relation to Sub Category;
-- Judul's exact relation to Rasa;
-- whether Judul is required or optional for a Menu;
-- whether Judul is directly customer-facing;
-- whether a Judul record is selected, generated, or composed by the Master Menu editor.
+Therefore:
 
-Those details are an **Open Contract Gap** until explicitly decided.
+```text
+Category
+└── Judul
+```
 
-An implementation worker must **not invent those rules**.
+Judul is a first-class master reference used by Menu identity.
+
+An implementation worker must not introduce a separate Judul entity or field beside Judul.
 
 ---
 
@@ -255,18 +228,18 @@ This rule must not be implemented by duplicating Rasa into free-text Menu data.
 The established Menu identity is:
 
 ```text
-Category + Sub Category + Rasa
+Category + Judul + Rasa
 ```
 
 Operationally, storage may use:
 
 ```text
-Sub Category reference
+Category reference
++
+Judul reference
 +
 optional Rasa reference
 ```
-
-because Sub Category resolves its parent Category.
 
 ### 7.1 Identity invariants
 
@@ -276,18 +249,6 @@ because Sub Category resolves its parent Category.
 4. Rasa may be optional where the forward model permits a Menu without Rasa.
 5. Do not create a second Menu identity based on legacy Product IDs.
 
-### 7.2 Judul and Menu identity
-
-Judul is part of the Master Category IA, but this document does not redefine the established Menu identity to include Judul.
-
-Until an explicit decision changes the Menu identity contract:
-
-```text
-Menu identity
-= Category + Sub Category + Rasa
-```
-
-Any requirement to make Judul part of identity must be treated as a new business decision.
 
 ---
 
@@ -550,7 +511,7 @@ The confirmed forward editor concepts are:
 
 ```text
 Category
-Sub Category
+Judul
 Rasa
 Pedas configuration
 Item composition
@@ -606,11 +567,9 @@ Master Category
 [ Item ]
 ```
 
-Category itself may contain its own nested Sub Category management.
+Category and Judul are separate master areas under Master Category.
 
-Rasa and Item are peer master areas.
-
-Judul is also a peer master area.
+Rasa and Item are also peer master areas.
 
 The UI must not collapse these into one generic "Product" editor.
 
@@ -807,7 +766,7 @@ Unreferenced master
 Examples:
 
 ```text
-Category referenced by Sub Category/Menu
+Category referenced by Menu
 → Archive
 
 Rasa referenced by Menu
@@ -882,7 +841,7 @@ Rules:
 
 1. Preserve existing valid data.
 2. Do not silently merge ambiguous identities.
-3. Do not silently fabricate Judul semantics.
+3. Do not silently fabricate additional Judul semantics.
 4. Do not infer new Menu subtype semantics from old `menu_type`.
 5. Preserve historical order evidence.
 6. Treat ambiguous legacy rows as review cases.
@@ -898,7 +857,7 @@ The following consumers must be audited before the new Menu model is considered 
 ```text
 Owner Master Menu UI
 Owner Master Category UI
-Category/Sub Category UI
+Category / Judul UI
 Judul UI
 Rasa UI
 Item UI
@@ -928,7 +887,7 @@ Tests must assert:
 
 - Catalog has exactly two top-level areas: Master Menu and Master Category;
 - Master Category has exactly four areas: Category, Judul, Rasa, Item;
-- Sub Category belongs inside Category;
+- Judul replaces the former Judul concept and is a peer Master Category area;
 - Judul is not removed from Master Category;
 - Menu Cabang is not a top-level Catalog node;
 - Product Master is not a competing forward commercial Menu surface.
@@ -937,7 +896,7 @@ Tests must assert:
 
 Tests must assert:
 
-- Menu identity follows Category + Sub Category + Rasa under the current contract;
+- Menu identity follows Category + Judul + Rasa under the current contract;
 - duplicate active identity is rejected;
 - Menu identity is not based on legacy Product ID;
 - Judul does not silently change the Menu identity until explicitly contracted.
@@ -1009,11 +968,11 @@ Catalog
     └── Item
 ```
 
-- Sub Category is inside Category.
+- Judul replaces the former Judul concept.
 - Judul exists as a first-class Master Category area.
 - Master Menu is a separate top-level Catalog area.
 - Master Menu is the commercial Menu authority.
-- Menu identity is Category + Sub Category + Rasa under the current confirmed model.
+- Menu identity is Category + Judul + Rasa under the current confirmed model.
 - A Menu can contain one or more Items.
 - Item is the atomic reusable forward concept.
 - SKU presence determines stockability.
@@ -1060,10 +1019,8 @@ The following are prohibited unless superseded by a newer explicit business deci
 The following are intentionally not invented in v3:
 
 1. Exact Judul entity/schema and its fields.
-2. Exact Judul relationship to Category/Sub Category/Rasa/Menu.
-3. Exact Customer-facing role of Judul.
-4. Exact rules for creating/selecting/reusing Judul.
-5. Any change that would make Judul part of Menu identity.
+2. Exact relationship between Judul, Category, Rasa, and Menu beyond the identity rule stated below.
+3. Exact additional Judul UI behavior not already defined by the Catalog IA.
 
 These gaps must be resolved by explicit business decision before implementation depends on them.
 
@@ -1100,6 +1057,8 @@ STOP
 ## 31. Status and supersession
 
 **v3 is the new reconciliation draft.**
+
+**Critical correction in v3:** the former `Sub Category` concept is replaced by `Judul`; `Judul` is not an extra field alongside Sub Category.
 
 It supersedes the previous `catalog-menu-domain-contract-v2.md` for forward Catalog/Menu work because v2 omitted the confirmed `Judul` area.
 
