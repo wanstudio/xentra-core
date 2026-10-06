@@ -255,9 +255,14 @@ class WorkforceService {
     }
 
     // Validate new role
-    const allowedRoles = ['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen'];
+    const allowedRoles = ['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen', 'driver'];
     if (!allowedRoles.includes(newRole)) {
       throw { status: 400, code: 'INVALID_ROLE', message: `Role must be one of: ${allowedRoles.join(', ')}` };
+    }
+
+    // Driver is always branch-scoped. Do not create a Driver identity without a branch.
+    if (newRole === 'driver' && !target.branch_id) {
+      throw { status: 400, code: 'DRIVER_BRANCH_REQUIRED', message: 'Role Driver harus ditugaskan ke cabang tertentu.' };
     }
 
     // Prevent demoting the last owner
