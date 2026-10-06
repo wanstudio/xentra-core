@@ -121,6 +121,9 @@ async function tenantResolver(req, res, next) {
     req.brand = brand;
     req.brand_id = brand.id;
     req.organization_id = brand.organization_id;
+    // Surface is authoritative registry data when available. Legacy brand-only
+    // domains remain supported but do not manufacture a surface from hostname.
+    req.surface_type = brand.surface_type || null;
 
     next();
   } catch (err) {
