@@ -85,7 +85,7 @@ router.post('/admin/users', requireAuth(['owner', 'brand_manager', 'branch_manag
     if (actor.actor_role === 'owner') {
       allowedRoles = ['brand_manager', 'branch_manager', 'cashier', 'kitchen', 'driver'];
     } else if (actor.actor_role === 'brand_manager') {
-      allowedRoles = ['branch_manager', 'cashier', 'kitchen', 'driver'];
+      allowedRoles = ['branch_manager', 'cashier', 'kitchen'];
     } else if (actor.actor_role === 'branch_manager') {
       allowedRoles = ['cashier'];
       targetBranchId = actor.actor_branch_id; // Force to own branch
