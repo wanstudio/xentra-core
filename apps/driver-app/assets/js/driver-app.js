@@ -254,12 +254,13 @@
 
       if (requestId !== mapState.routeRequestId || state.page !== 'map') return;
 
+      var shouldFitRoute = !mapState.lastRoutedPosition;
       drawRoute(route.geometry);
       setRouteStats(route.distance, route.duration);
       mapState.lastRouteAt = Date.now();
       mapState.lastRoutedPosition = { latitude: lat, longitude: lng };
       clearRouteStatus('');
-      fitDriverRoute();
+      if (shouldFitRoute) fitDriverRoute();
     } catch (err) {
       if (requestId !== mapState.routeRequestId) return;
       clearRouteStatus('Rute gagal dihitung. Gunakan navigasi eksternal.');
