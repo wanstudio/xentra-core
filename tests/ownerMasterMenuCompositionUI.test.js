@@ -195,18 +195,25 @@ test('Product Editor does not own Master Menu references', () => {
     assert.ok(!section.includes('id="' + legacyControl + '"'));
   }
 
-  assert.ok(JS.includes("API_BASE + '/admin/menus/single'"));
-  assert.ok(JS.includes("API_BASE + '/admin/menus/package'"));
+  // Contract v4 uses unified API_BASE + '/admin/menus'
+  assert.ok(JS.includes("API_BASE + '/admin/menus'"));
   assert.ok(!JS.includes("saveMasterMenuComposition(savedId)"));
 });
 
 test('Master Menu references are managed by the canonical Menu workspace', () => {
-  assert.ok(HTML.includes('id="cm-sub-category"'));
+  assert.ok(HTML.includes('id="cm-title"'));
+  assert.ok(HTML.includes('id="btn-quick-add-title"'));
   assert.ok(HTML.includes('id="cm-rasa"'));
-  assert.ok(HTML.includes('id="cm-level"'));
-  assert.ok(JS.includes("API_BASE + '/admin/sub-categories'"));
+  assert.ok(HTML.includes('id="btn-quick-add-rasa"'));
+  assert.ok(HTML.includes('id="cm-spice-toggle"'));
+  assert.ok(!HTML.includes('id="cm-sub-category"'));
+  assert.ok(!HTML.includes('id="cm-level"'));
+  assert.ok(/id="cm-price"[^>]*data-input-type="currency"/.test(HTML));
+  assert.ok(/id="cm-cost"[^>]*data-input-type="currency"/.test(HTML));
+  assert.ok(JS.includes("API_BASE + '/admin/menu-titles'"));
   assert.ok(JS.includes("API_BASE + '/admin/rasas'"));
-  assert.ok(JS.includes("API_BASE + '/admin/menu/components/level'"));
+  assert.ok(!JS.includes("API_BASE + '/admin/sub-categories'"));
+  assert.ok(!JS.includes('sub_category_id: subCategoryId'));
 });
 
 test('Product Editor does not own POS commercial options', () => {
@@ -257,12 +264,10 @@ test('Product Editor no longer renders Customer Menu preview', () => {
 });
 
 test('Owner Menu composition saves through canonical Menu endpoints', () => {
-  assert.ok(JS.includes("API_BASE + '/admin/menus/single'"));
-  assert.ok(JS.includes("API_BASE + '/admin/menus/package'"));
-  assert.ok(JS.includes("API_BASE + '/admin/menus/' + encodeURIComponent(menuId) + '/single'"));
-  assert.ok(JS.includes("API_BASE + '/admin/menus/' + encodeURIComponent(menuId) + '/package'"));
-  assert.ok(JS.includes('product_id: productId'));
-  assert.ok(JS.includes('payload.components = components'));
+  assert.ok(JS.includes("API_BASE + '/admin/menus'"));
+  assert.ok(JS.includes("API_BASE + '/admin/menus/' + encodeURIComponent(menuId)"));
+  assert.ok(JS.includes('product_id: pId'));
+  assert.ok(JS.includes('items: validItems'));
   assert.ok(!JS.includes("API_BASE + '/admin/products/' + encodeURIComponent(productId) + '/composition'"));
 });
 
@@ -454,7 +459,9 @@ test('Master Product editor stays inside Catalog Products tab and remains atomic
 });
 
 test('Level Pedas lives in the canonical Menu Master editor', () => {
-  assert.ok(HTML.includes('id="cm-level"'));
+  assert.ok(HTML.includes('id="cm-spice-toggle"'));
+  assert.ok(HTML.includes('id="cm-spice-dots-row"'));
+  assert.ok(!HTML.includes('id="cm-level"'));
   assert.ok(HTML.includes('id="cm-preview-indicator"'));
   assert.ok(JS.includes('ownerMasterMenuSelectedLevel()'));
   assert.ok(JS.includes('x-master-customer-preview-spice-dot'));

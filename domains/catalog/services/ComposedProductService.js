@@ -47,6 +47,8 @@ class ComposedProductService {
     brandId,
     name,
     sku = null,
+    costPrice = null,
+    cost_price = null,
     description = '',
     imageUrl = null,
     image = null,
@@ -59,6 +61,9 @@ class ComposedProductService {
 
     const normalizedName = normalizeName(name);
     const normalizedSku = normalizeSku(sku);
+    const normalizedCostPrice = costPrice !== null && costPrice !== undefined
+      ? Number(costPrice) || 0
+      : (cost_price !== null && cost_price !== undefined ? Number(cost_price) || 0 : 0);
     const id = makeId('prd');
     const baseSlug = slugify(normalizedName) || id;
     const slug = baseSlug + '-' + id.slice(-8);
@@ -67,9 +72,9 @@ class ComposedProductService {
     try {
       repository.db.execute(
         "INSERT INTO products " +
-        "(id, brand_id, category_id, name, slug, description, price, regular_price, image_url, image, is_active, sku) " +
-        "VALUES (?, ?, NULL, ?, ?, ?, 0, NULL, ?, ?, ?, ?)",
-        [id, brandId, normalizedName, slug, description == null ? '' : String(description), imageUrl, image, normalizeBoolean(isActive) ? 1 : 0, normalizedSku]
+        "(id, brand_id, category_id, name, slug, description, price, regular_price, image_url, image, is_active, sku, cost_price) " +
+        "VALUES (?, ?, NULL, ?, ?, ?, 0, NULL, ?, ?, ?, ?, ?)",
+        [id, brandId, normalizedName, slug, description == null ? '' : String(description), imageUrl, image, normalizeBoolean(isActive) ? 1 : 0, normalizedSku, normalizedCostPrice]
       );
 
       if (normalizedSku) {
@@ -105,6 +110,8 @@ class ComposedProductService {
     productId,
     name,
     description,
+    costPrice,
+    cost_price,
     imageUrl,
     image,
     isActive,
@@ -134,6 +141,9 @@ class ComposedProductService {
 
     const normalizedName = name === undefined ? null : normalizeName(name);
     const nextDescription = description === undefined ? null : (description == null ? '' : String(description));
+    const nextCostPrice = (costPrice !== undefined || cost_price !== undefined)
+      ? Number(costPrice !== undefined ? costPrice : cost_price) || 0
+      : null;
     const nextImageUrl = imageUrl === undefined ? null : imageUrl;
     const nextImage = image === undefined ? null : image;
     const nextActive = isActive === undefined ? null : (normalizeBoolean(isActive) ? 1 : 0);
@@ -150,6 +160,12 @@ class ComposedProductService {
         repository.db.execute(
           "UPDATE products SET description = ?, updated_at = datetime('now') WHERE id = ? AND brand_id = ?",
           [nextDescription, productId, brandId]
+        );
+      }
+      if (nextCostPrice !== null) {
+        repository.db.execute(
+          "UPDATE products SET cost_price = ?, updated_at = datetime('now') WHERE id = ? AND brand_id = ?",
+          [nextCostPrice, productId, brandId]
         );
       }
       if (imageUrl !== undefined || image !== undefined) {

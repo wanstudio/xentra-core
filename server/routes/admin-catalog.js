@@ -18,21 +18,22 @@ router.get('/admin/categories', requireAuth(['owner', 'brand_manager']), (req, r
 
 router.post('/admin/categories', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
-    const { name, image } = req.body;
+    const { name, image, description } = req.body;
     const normalizedName = typeof name === 'string' ? name.trim() : '';
     if (!normalizedName) return res.status(400).json({ success: false, error: 'Nama kategori wajib diisi.' });
 
     const id = 'cat_' + Date.now();
     const slug = normalizedName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    const cleanDesc = description !== undefined ? (typeof description === 'string' ? description.trim() : null) : null;
     
     db.prepare(`
-      INSERT INTO categories (id, brand_id, name, slug, sort_order)
-      VALUES (?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM categories WHERE brand_id = ?))
-    `).run(id, req.brand_id, name, slug, req.brand_id);
+      INSERT INTO categories (id, brand_id, name, slug, description, sort_order)
+      VALUES (?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM categories WHERE brand_id = ?))
+    `).run(id, req.brand_id, name, slug, cleanDesc, req.brand_id);
 
     res.status(201).json({
       success: true,
-      category: { id, name, slug, image: image || '/assets/icons/delivery.png' }
+      category: { id, name, slug, description: cleanDesc, image: image || '/assets/icons/delivery.png' }
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -41,7 +42,7 @@ router.post('/admin/categories', requireAuth(['owner', 'brand_manager']), (req, 
 
 router.put('/admin/categories/:id', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
-    const { name, image, sort_order, is_active } = req.body;
+    const { name, image, description, sort_order, is_active } = req.body;
     let normIsActive = null;
     if (is_active !== undefined && is_active !== null) {
       if (is_active === true || is_active === 1 || is_active === '1' || is_active === 'true') {
@@ -50,14 +51,18 @@ router.put('/admin/categories/:id', requireAuth(['owner', 'brand_manager']), (re
         normIsActive = 0;
       }
     }
+    const cleanDesc = description !== undefined ? (typeof description === 'string' ? description.trim() : null) : undefined;
     db.prepare(`
       UPDATE categories 
       SET name = COALESCE(?, name),
+          description = CASE WHEN ? = 1 THEN ? ELSE description END,
           sort_order = COALESCE(?, sort_order),
           is_active = COALESCE(?, is_active)
       WHERE id = ? AND brand_id = ?
     `).run(
       name !== undefined ? name : null,
+      description !== undefined ? 1 : 0,
+      cleanDesc !== undefined ? cleanDesc : null,
       sort_order !== undefined ? sort_order : null,
       normIsActive !== null ? normIsActive : null,
       req.params.id,
@@ -154,31 +159,7 @@ router.delete('/admin/categories/:id', requireAuth(['owner', 'brand_manager']), 
       return res.status(404).json({ success: false, error: 'Kategori tidak ditemukan.' });
     }
 
-    // 1. Cek apakah kategori masih digunakan oleh Product Master
-    const productUsage = db.prepare(
-      'SELECT COUNT(*) as count FROM products WHERE category_id = ? AND brand_id = ?'
-    ).get(req.params.id, req.brand_id);
-
-    if (productUsage && productUsage.count > 0) {
-      return res.status(409).json({
-        success: false,
-        error: `Kategori "${existing.name}" tidak dapat dihapus karena masih digunakan oleh ${productUsage.count} Produk. Pindahkan atau hapus produk terlebih dahulu.`
-      });
-    }
-
-    // 2. Cek apakah ada Sub Category atau Menu yang terhubung
-    const subCatUsage = db.prepare(
-      'SELECT COUNT(*) as count FROM sub_categories WHERE category_id = ? AND brand_id = ?'
-    ).get(req.params.id, req.brand_id);
-
-    if (subCatUsage && subCatUsage.count > 0) {
-      return res.status(409).json({
-        success: false,
-        error: `Kategori "${existing.name}" tidak dapat dihapus karena masih memiliki ${subCatUsage.count} Sub Kategori / Menu. Hapus sub kategori terlebih dahulu.`
-      });
-    }
-
-    // 3. Cek apakah ada relasi langsung di menus (jika ada kolom category_id pada cabang/menu)
+    // 1. Cek apakah ada Menu Master aktif yang menggunakan kategori ini secara langsung
     try {
       const menuUsage = db.prepare(
         'SELECT COUNT(*) as count FROM menus WHERE category_id = ? AND brand_id = ?'
@@ -190,8 +171,47 @@ router.delete('/admin/categories/:id', requireAuth(['owner', 'brand_manager']), 
         });
       }
     } catch (_) {
-      // menus table might not have category_id directly if it uses sub_categories
+      // menus table might not have category_id directly in some schema variations
     }
+
+    // 2. Cek apakah ada Sub Kategori yang masih terikat pada Menu
+    const subCatInMenuUsage = db.prepare(
+      `SELECT COUNT(*) as count FROM sub_categories sc
+       WHERE sc.category_id = ? AND sc.brand_id = ?
+         AND sc.id IN (SELECT sub_category_id FROM menus WHERE sub_category_id IS NOT NULL)`
+    ).get(req.params.id, req.brand_id);
+
+    if (subCatInMenuUsage && subCatInMenuUsage.count > 0) {
+      return res.status(409).json({
+        success: false,
+        error: `Kategori "${existing.name}" tidak dapat dihapus karena masih memiliki ${subCatInMenuUsage.count} Menu yang terhubung melalui sub kategori.`
+      });
+    }
+
+    // 3. Cek apakah kategori masih digunakan oleh Product Master aktif yang dipakai di Menu / inventory
+    const activeProductUsage = db.prepare(
+      `SELECT COUNT(*) as count FROM products p
+       WHERE p.category_id = ? AND p.brand_id = ?
+         AND (p.is_active = 1 OR p.id IN (SELECT product_id FROM menu_items))`
+    ).get(req.params.id, req.brand_id);
+
+    if (activeProductUsage && activeProductUsage.count > 0) {
+      return res.status(409).json({
+        success: false,
+        error: `Kategori "${existing.name}" tidak dapat dihapus karena masih digunakan oleh ${activeProductUsage.count} Produk aktif. Pindahkan atau hapus produk terlebih dahulu.`
+      });
+    }
+
+    // Lepaskan referensi category_id pada produk dummy / non-aktif yang tidak dipakai di menu mana pun
+    db.prepare(
+      `UPDATE products SET category_id = NULL
+       WHERE category_id = ? AND brand_id = ?
+         AND (is_active = 0 OR is_active IS NULL)
+         AND id NOT IN (SELECT product_id FROM menu_items)`
+    ).run(req.params.id, req.brand_id);
+
+    // Hapus sub_categories orphan milik kategori ini agar tidak melanggar foreign key constraint
+    db.prepare('DELETE FROM sub_categories WHERE category_id = ? AND brand_id = ?').run(req.params.id, req.brand_id);
 
     // Hapus kategori secara permanen
     const stmt = db.prepare('DELETE FROM categories WHERE id = ? AND brand_id = ?').run(req.params.id, req.brand_id);

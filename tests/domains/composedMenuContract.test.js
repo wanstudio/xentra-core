@@ -88,6 +88,77 @@ test('Duplicate Menu Satuan identity is blocked by Sub Category + Rasa', () => {
   );
 });
 
+test('Menu Modal is an independent field: explicit on create, defaults to 0, updatable, rejects negative', () => {
+  const modalSub = ComposedMenuService.createSubCategory({
+    brandId: BRAND,
+    categoryId: CATEGORY,
+    name: 'Modal Sub CMV1'
+  });
+  const modalProduct = 'cmv1_test_modal_product';
+  db.prepare(
+    "INSERT OR IGNORE INTO products (id, brand_id, category_id, name, slug, price, is_active) VALUES (?, ?, ?, 'Modal Product CMV1', 'modal-product-cmv1', 0, 1)"
+  ).run(modalProduct, BRAND, CATEGORY);
+
+  const created = ComposedMenuService.createSingleMenu({
+    brandId: BRAND,
+    productId: modalProduct,
+    subCategoryId: modalSub.id,
+    sellingPrice: 28000,
+    costPrice: 15000,
+    status: 'ACTIVE'
+  });
+  assert.equal(Number(created.cost_price), 15000);
+  assert.equal(Number(created.selling_price), 28000);
+
+  const defaultSub = ComposedMenuService.createSubCategory({
+    brandId: BRAND,
+    categoryId: CATEGORY,
+    name: 'Default Modal Sub CMV1'
+  });
+  const defaultProduct = 'cmv1_test_default_modal_product';
+  db.prepare(
+    "INSERT OR IGNORE INTO products (id, brand_id, category_id, name, slug, price, is_active) VALUES (?, ?, ?, 'Default Modal Product CMV1', 'default-modal-product-cmv1', 0, 1)"
+  ).run(defaultProduct, BRAND, CATEGORY);
+  const noCost = ComposedMenuService.createSingleMenu({
+    brandId: BRAND,
+    productId: defaultProduct,
+    subCategoryId: defaultSub.id,
+    sellingPrice: 12000,
+    status: 'ACTIVE'
+  });
+  assert.equal(Number(noCost.cost_price), 0);
+
+  const updated = ComposedMenuService.updateSingleMenu({
+    brandId: BRAND,
+    menuId: created.id,
+    costPrice: 17000
+  });
+  assert.equal(Number(updated.cost_price), 17000);
+  assert.equal(Number(updated.selling_price), 28000);
+
+  assert.throws(
+    () => ComposedMenuService.updateSingleMenu({
+      brandId: BRAND,
+      menuId: created.id,
+      costPrice: -1
+    }),
+    /MENU_PRICE_INVALID/
+  );
+});
+
+test('Package Menu carries an independent Modal field', () => {
+  const pkg = ComposedMenuService.createPackageMenu({
+    brandId: BRAND,
+    packageName: 'Modal Package CMV1',
+    sellingPrice: 45000,
+    costPrice: 30000,
+    components: [{ product_id: PRODUCT_A, quantity: 1 }, { product_id: PRODUCT_B, quantity: 1 }],
+    status: 'DRAFT'
+  });
+  assert.equal(Number(pkg.cost_price), 30000);
+  assert.equal(Number(pkg.selling_price), 45000);
+});
+
 test('Draft Package may reference an inactive Product, but ACTIVE Package may not', () => {
   const inactiveProduct = 'cmv1_test_inactive_package_product';
   db.prepare(
@@ -405,9 +476,11 @@ test.after(() => {
   db.prepare('DELETE FROM menus WHERE brand_id = ?').run(BRAND);
   db.prepare('DELETE FROM sub_categories WHERE brand_id = ? AND id = ?').run(BRAND, SUBCATEGORY);
   db.prepare('DELETE FROM sub_categories WHERE brand_id = ? AND name = ?').run(BRAND, 'Ayam Bakar CMV1');
+  db.prepare('DELETE FROM sub_categories WHERE brand_id = ? AND name IN (?, ?)').run(BRAND, 'Modal Sub CMV1', 'Default Modal Sub CMV1');
   db.prepare('DELETE FROM menu_flavors WHERE brand_id = ? AND id IN (?, ?)').run(BRAND, 'cmv1_hidden_category_rasa', db.prepare("SELECT id FROM menu_flavors WHERE brand_id = ? AND lower(trim(name)) = 'original' LIMIT 1").get(BRAND)?.id || '');
   db.prepare('DELETE FROM product_sku_history WHERE brand_id = ?').run(BRAND);
   db.prepare('DELETE FROM products WHERE id IN (?, ?)').run(PRODUCT_A, PRODUCT_B);
+  db.prepare('DELETE FROM products WHERE id IN (?, ?)').run('cmv1_test_modal_product', 'cmv1_test_default_modal_product');
   db.prepare('DELETE FROM branch_categories WHERE id = ?').run(BRANCH_CATEGORY);
   db.prepare('DELETE FROM branches WHERE id = ?').run(BRANCH);
   db.prepare('DELETE FROM categories WHERE id IN (?, ?)').run(CATEGORY, CATEGORY_OTHER);

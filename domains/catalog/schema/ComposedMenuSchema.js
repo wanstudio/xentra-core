@@ -135,12 +135,14 @@ function tableColumns(db, table) {
 function migrateLegacyMenuShape(db) {
   const sql = tableDefinition(db, 'menus');
   if (!sql) return;
-  const legacyShape = /menu_type\s+TEXT\s+NOT\s+NULL/i.test(sql) || /menu_type\s+IN\s*\(/i.test(sql);
+  const legacyShape = /menu_type\s+TEXT\s+NOT\s+NULL/i.test(sql) ||
+                      /menu_type\s+IN\s*\(/i.test(sql) ||
+                      /spice_level\s+INTEGER\s+NOT\s+NULL/i.test(sql);
   if (!legacyShape) return;
 
   const copyable = [
-    'id', 'brand_id', 'sub_category_id', 'rasa_id', 'menu_type', 'package_name', 'level_id',
-    'selling_price', 'spice_enabled', 'spice_level', 'status', 'created_at', 'updated_at',
+    'id', 'brand_id', 'category_id', 'title_id', 'sub_category_id', 'rasa_id', 'menu_type', 'package_name', 'level_id',
+    'selling_price', 'cost_price', 'spice_enabled', 'spice_level', 'status', 'created_at', 'updated_at',
     'media_id', 'image_url', 'image'
   ];
   const existing = tableColumns(db, 'menus');
@@ -157,14 +159,17 @@ function migrateLegacyMenuShape(db) {
       CREATE TABLE menus__contract_v1 (
         id TEXT PRIMARY KEY,
         brand_id TEXT NOT NULL,
+        category_id TEXT,
+        title_id TEXT,
         sub_category_id TEXT,
         rasa_id TEXT,
         menu_type TEXT,
         package_name TEXT,
         level_id TEXT,
         selling_price REAL NOT NULL CHECK (selling_price >= 0),
+        cost_price REAL NOT NULL DEFAULT 0 CHECK (cost_price >= 0),
         spice_enabled INTEGER NOT NULL DEFAULT 0,
-        spice_level INTEGER NOT NULL DEFAULT 0,
+        spice_level INTEGER,
         status TEXT NOT NULL DEFAULT 'DRAFT',
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now')),
@@ -281,14 +286,17 @@ function ensureComposedMenuSchema(db) {
     CREATE TABLE IF NOT EXISTS menus (
       id TEXT PRIMARY KEY,
       brand_id TEXT NOT NULL,
+      category_id TEXT,
+      title_id TEXT,
       sub_category_id TEXT,
       rasa_id TEXT,
       menu_type TEXT,
       package_name TEXT,
       level_id TEXT,
       selling_price REAL NOT NULL CHECK (selling_price >= 0),
+      cost_price REAL NOT NULL DEFAULT 0 CHECK (cost_price >= 0),
       spice_enabled INTEGER NOT NULL DEFAULT 0,
-      spice_level INTEGER NOT NULL DEFAULT 0,
+      spice_level INTEGER,
       status TEXT NOT NULL DEFAULT 'DRAFT',
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
@@ -552,6 +560,8 @@ function ensureComposedMenuSchema(db) {
   try { db.exec('CREATE INDEX IF NOT EXISTS idx_menus_media_id ON menus(media_id) WHERE media_id IS NOT NULL;'); } catch (_) {}
   try { db.exec('ALTER TABLE menus ADD COLUMN spice_enabled INTEGER NOT NULL DEFAULT 0;'); } catch (_) {}
   try { db.exec('ALTER TABLE menus ADD COLUMN spice_level INTEGER NOT NULL DEFAULT 0;'); } catch (_) {}
+  try { db.exec('ALTER TABLE menus ADD COLUMN cost_price REAL NOT NULL DEFAULT 0;'); } catch (_) {}
+  try { db.exec('ALTER TABLE products ADD COLUMN cost_price REAL DEFAULT 0;'); } catch (_) {}
 
   // Judul = master judul customer (Brand-scoped), bentuknya sama seperti Rasa.
   // Sub Category dipensiunkan sebagai konsep forward; perannya digantikan Judul.
@@ -576,15 +586,11 @@ function ensureComposedMenuSchema(db) {
   try { db.exec('ALTER TABLE menus ADD COLUMN category_id TEXT;'); } catch (_) {}
   try { db.exec('ALTER TABLE menus ADD COLUMN title_id TEXT;'); } catch (_) {}
 
-  // Contract v1 identity — satu Menu per (Brand, Judul, Rasa) dengan proteksi duplikat
-  // NULL-safe (rasa opsional). Data legacy bisa saja sudah melanggar aturan forward ini:
-  // jangan menebak, tandai untuk review dan jangan gagalkan boot.
-  try {
-    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_menus_identity_v1 ON menus(brand_id, title_id, COALESCE(rasa_id, ''));");
-    try { db.exec('DROP INDEX IF EXISTS idx_menus_single_identity;'); } catch (_) {}
-  } catch (err) {
-    console.error('[ComposedMenuSchema] idx_menus_identity_v1 tertunda — data Menu legacy perlu review:', err.message);
-  }
+  // Contract v4 (§3, §8, §21):
+  // Menu adalah entitas dengan ID stabil sendiri (MENU-001). Tidak ada formula identitas
+  // komposit Category + Judul + Rasa atau pembatasan duplikat komposit.
+  try { db.exec('DROP INDEX IF EXISTS idx_menus_identity_v1;'); } catch (_) {}
+  try { db.exec('DROP INDEX IF EXISTS idx_menus_single_identity;'); } catch (_) {}
 
   // Migrasi data: Sub Category → Judul (judul customer tidak berubah).
   migrateSubCategoriesToTitles(db);

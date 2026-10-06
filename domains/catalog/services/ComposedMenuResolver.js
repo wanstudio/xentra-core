@@ -34,6 +34,7 @@ function isOriginalRasa(name) {
 }
 
 function resolveCustomerTitle(menu) {
+  if (menu.title_name) return menu.title_name;
   return menu.menu_type === 'PACKAGE'
     ? (menu.package_name || menu.sub_category_name || 'Paket')
     : (menu.sub_category_name || '');
@@ -53,6 +54,18 @@ function resolveMenuBase(menu, branchState = null) {
     title: displayNameOverride || resolveCustomerTitle(menu),
     subtitle: menu.rasa_name && !rasaIsOriginal ? menu.rasa_name : null,
     price: Number(menu.selling_price),
+    selling_price: Number(menu.selling_price),
+    cost_price: Number(menu.cost_price || 0),
+    spice_enabled: Number(menu.spice_enabled) === 1,
+    spice_level: menu.spice_level != null ? Number(menu.spice_level) : null,
+    category_id: menu.category_id || null,
+    title_id: menu.title_id || null,
+    rasa_id: menu.rasa_id || null,
+    sub_category_id: menu.sub_category_id || null,
+    package_name: menu.package_name || null,
+    title_ref: menu.title_id
+      ? { id: menu.title_id, name: menu.title_name, slug: menu.title_slug }
+      : null,
     category: menu.category_id
       ? { id: menu.category_id, name: menu.category_name, slug: menu.category_slug }
       : null,
@@ -64,10 +77,6 @@ function resolveMenuBase(menu, branchState = null) {
       : null,
     level: level,
     status: menu.status,
-    // Menu presentation media (customer-facing). Owned by the Menu — never derived from a
-    // component Product image (docs/decisions/xentra-menu-presentation-media-v1.md).
-    // Delivery enrichment (preview_url/srcset_variants) is attached by the read route;
-    // when empty the client shows a neutral placeholder.
     media_id: menu.media_id || null,
     image_url: menu.image_url || null,
     image: menu.image || null,

@@ -937,6 +937,7 @@ function initSchema(targetDb) {
       brand_id TEXT NOT NULL,
       name TEXT NOT NULL,
       slug TEXT NOT NULL,
+      description TEXT,
       image_url TEXT,
       image TEXT,
       sort_order INTEGER DEFAULT 0,
@@ -2299,6 +2300,7 @@ function initSchema(targetDb) {
   try { targetDb.exec('ALTER TABLE brands ADD COLUMN pos_pwa_name TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE products ADD COLUMN media_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE categories ADD COLUMN media_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE categories ADD COLUMN description TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE branch_categories ADD COLUMN media_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE branch_products ADD COLUMN image_media_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL;'); } catch (e) {}
   try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_products_media_id ON products(media_id) WHERE media_id IS NOT NULL;'); } catch (e) {}

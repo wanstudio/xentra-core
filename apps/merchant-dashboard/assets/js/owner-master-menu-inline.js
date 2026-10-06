@@ -5,7 +5,7 @@
    * XENTRA OWNER — MASTER MENU INLINE DEPENDENCY CREATION
    *
    * UX boundary:
-   * - Product, Category, Sub Category and Rasa remain separate Master entities.
+   * - Product, Category, Judul and Rasa remain separate Master entities.
    * - Owner can create a missing dependency without leaving Menu Master.
    * - Creation immediately selects the newly-created entity in the current Menu draft.
    * - No legacy Product commercial fields are introduced.
@@ -214,7 +214,7 @@
       id: 'master-menu-inline-category',
       title: 'Buat Kategori',
       eyebrow: 'Taxonomy',
-      description: 'Kategori adalah parent taxonomy untuk mengelompokkan Sub Category.',
+      description: 'Kategori adalah parent taxonomy untuk mengelompokkan Menu.',
       saveLabel: 'Simpan & Pilih Kategori',
       fields: [{ name: 'name', label: 'Nama Kategori', placeholder: 'Contoh: Makanan', required: true }]
     });
@@ -227,36 +227,7 @@
     } else {
       addOption(document.getElementById('cm-category'), category.id, category.name, true);
     }
-    refreshSubCategoryDependencyState();
     showCreatedState('category', 'Kategori dibuat dan dipilih.');
-  }
-
-  async function createSubCategoryInline() {
-    var category = document.getElementById('cm-category');
-    var categoryId = category ? String(category.value || '') : '';
-    if (!categoryId) {
-      refreshSubCategoryDependencyState();
-      return;
-    }
-    var result = await requestFieldsSheet({
-      id: 'master-menu-inline-sub-category',
-      title: 'Buat Sub Category',
-      eyebrow: 'Taxonomy',
-      description: 'Sub Category harus berada di dalam Kategori yang sedang dipilih.',
-      saveLabel: 'Simpan & Pilih Sub Category',
-      fields: [{ name: 'name', label: 'Nama Sub Category', placeholder: 'Contoh: Ayam Geprek', required: true }]
-    });
-    if (!result) return;
-    var data = await requestJson('/admin/sub-categories', { method: 'POST', body: JSON.stringify({ category_id: categoryId, name: result.name }) });
-    var sub = data.sub_category;
-    var select = document.getElementById('cm-sub-category');
-    var menuApi = window.XentraOwnerMasterMenu;
-    if (menuApi && typeof menuApi.upsertDependency === 'function') {
-      menuApi.upsertDependency('sub-category', sub, { selectId: 'cm-sub-category' });
-    } else if (select) {
-      addOption(select, sub.id, sub.name, true);
-    }
-    showCreatedState('sub-category', 'Sub Category dibuat dan dipilih.');
   }
 
   async function createRasaInline() {
@@ -335,19 +306,6 @@
     formGroup.appendChild(state);
   }
 
-  function refreshSubCategoryDependencyState() {
-    var category = document.getElementById('cm-category');
-    var sub = document.getElementById('cm-sub-category');
-    var action = document.querySelector('[data-inline-master-action="sub-category"]');
-    var disabled = !(category && category.value);
-    if (sub) sub.disabled = disabled;
-    if (action) {
-      action.disabled = disabled;
-      action.setAttribute('aria-disabled', disabled ? 'true' : 'false');
-      action.title = disabled ? 'Pilih Kategori terlebih dahulu' : 'Buat Sub Category baru';
-    }
-  }
-
   function syncCreatedProductOptions() {
     document.querySelectorAll('[data-cm-product]').forEach(function(select) {
       createdProducts.forEach(function(product) {
@@ -363,11 +321,6 @@
       helper: 'Product adalah identitas dasar; harga dan taxonomy diatur di Menu.'
     });
     addButtonToFormGroup('cm-category', 'category', 'Buat Kategori', createCategoryInline);
-    addButtonToFormGroup('cm-sub-category', 'sub-category', 'Buat Sub Category', createSubCategoryInline, {
-      helper: 'Pilih Kategori terlebih dahulu.'
-    });
-    addButtonToFormGroup('cm-rasa', 'rasa', 'Buat Rasa', createRasaInline);
-    refreshSubCategoryDependencyState();
     syncCreatedProductOptions();
 
     var packageAdd = document.getElementById('btn-cm-add-component');
@@ -412,9 +365,6 @@
     }
     observer = new MutationObserver(scheduleInject);
     observer.observe(form, { subtree: true, childList: true });
-    form.addEventListener('change', function(event) {
-      if (event.target && event.target.id === 'cm-category') refreshSubCategoryDependencyState();
-    });
 
     /*
      * Existing dashboard.js initializes the canonical editor and navigation.
@@ -438,7 +388,6 @@
     init: enhanceMasterMenuEditor,
     createProduct: createProductInline,
     createCategory: createCategoryInline,
-    createSubCategory: createSubCategoryInline,
     createRasa: createRasaInline
   };
 

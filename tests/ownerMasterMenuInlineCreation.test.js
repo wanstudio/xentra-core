@@ -13,15 +13,13 @@ test('Owner Master Menu exposes inline dependency creation without leaving the e
   assert.ok(HTML.includes('/merchant-dashboard/assets/js/owner-master-menu-inline.js'));
   assert.ok(INLINE.includes("'/admin/composed/products'"));
   assert.ok(INLINE.includes("'/admin/categories'"));
-  assert.ok(INLINE.includes("'/admin/sub-categories'"));
   assert.ok(INLINE.includes("'/admin/rasas'"));
   assert.ok(INLINE.includes('createProductInline'));
   assert.ok(INLINE.includes('createCategoryInline'));
-  assert.ok(INLINE.includes('createSubCategoryInline'));
+  assert.ok(!INLINE.includes('createSubCategoryInline'));
   assert.ok(INLINE.includes('createRasaInline'));
   assert.ok(INLINE.includes('Simpan & Pilih Product'));
   assert.ok(INLINE.includes('Simpan & Pilih Kategori'));
-  assert.ok(INLINE.includes('Simpan & Pilih Sub Category'));
   assert.ok(INLINE.includes('Simpan & Pilih Rasa'));
 });
 
@@ -31,7 +29,7 @@ test('Inline creation keeps canonical domain boundaries', () => {
   assert.ok(!INLINE.includes('selling_price'));
   assert.ok(!INLINE.includes('price:'));
   assert.ok(!INLINE.includes('category_id: result.category'));
-  assert.ok(INLINE.includes('category_id: categoryId'));
+  assert.ok(!INLINE.includes('sub-category'));
 });
 
 test('Package Product quick-create does not depend on dashboard private state', () => {
@@ -46,9 +44,6 @@ test('Inline creation has contextual mobile UX and dependency guardrails', () =>
   assert.ok(INLINE.includes('x-master-inline-sheet'));
   assert.ok(INLINE.includes('x-master-inline-link'));
   assert.ok(INLINE.includes('x-master-inline-created'));
-  assert.ok(INLINE.includes('refreshSubCategoryDependencyState'));
-  assert.ok(INLINE.includes('action.disabled = disabled'));
-  assert.ok(INLINE.includes('Pilih Kategori terlebih dahulu'));
   assert.ok(INLINE.includes('Product adalah identitas dasar'));
   assert.ok(INLINE.includes('Simpan & Tambahkan ke Paket'));
   assert.ok(INLINE.includes('packageContext'));

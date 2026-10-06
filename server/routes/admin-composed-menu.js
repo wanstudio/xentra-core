@@ -90,6 +90,7 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
         brandId: req.brand_id,
         name: body.name,
         sku: body.sku,
+        costPrice: body.cost_price,
         description: body.description,
         imageUrl: body.image_url,
         image: body.image,
@@ -111,6 +112,7 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
         productId: req.params.id,
         name: body.name,
         sku: body.sku,
+        costPrice: body.cost_price,
         description: body.description,
         imageUrl: body.image_url,
         image: body.image,
@@ -166,6 +168,58 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
     }
   });
 
+  // Canonical Menu endpoints (Contract v4 §3, §14):
+  // POST /admin/menus - Create canonical Menu (Category, Judul, Rasa, Harga, Modal, Items)
+  router.post('/admin/menus', requireAuth(ownerRoles), (req, res) => {
+    try {
+      const body = req.body || {};
+      const items = Array.isArray(body.items) ? body.items : (
+        body.components || (body.product_id ? [{ product_id: body.product_id, quantity: 1 }] : [])
+      );
+      const menu = service.createMenu({
+        brandId: req.brand_id,
+        categoryId: body.category_id,
+        titleId: body.title_id,
+        rasaId: body.rasa_id,
+        spiceEnabled: body.spice_enabled,
+        spiceLevel: body.spice_level,
+        sellingPrice: body.selling_price,
+        costPrice: body.cost_price,
+        items,
+        status: body.status
+      });
+      res.status(201).json({ success: true, menu });
+    } catch (err) {
+      sendError(res, err, 'COMPOSED_MENU_CREATE_FAILED');
+    }
+  });
+
+  // PUT /admin/menus/:id - Update canonical Menu
+  router.put('/admin/menus/:id', requireAuth(ownerRoles), (req, res) => {
+    try {
+      const body = req.body || {};
+      const items = Array.isArray(body.items) ? body.items : (
+        body.components || (body.product_id ? [{ product_id: body.product_id, quantity: 1 }] : undefined)
+      );
+      const menu = service.updateMenu({
+        brandId: req.brand_id,
+        menuId: req.params.id,
+        categoryId: body.category_id,
+        titleId: body.title_id,
+        rasaId: body.rasa_id,
+        spiceEnabled: body.spice_enabled,
+        spiceLevel: body.spice_level,
+        sellingPrice: body.selling_price,
+        costPrice: body.cost_price,
+        items,
+        status: body.status
+      });
+      res.json({ success: true, menu });
+    } catch (err) {
+      sendError(res, err, 'COMPOSED_MENU_UPDATE_FAILED');
+    }
+  });
+
   router.post('/admin/menus/single', requireAuth(ownerRoles), (req, res) => {
     try {
       const body = req.body || {};
@@ -176,6 +230,7 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
         rasaId: body.rasa_id,
         levelId: body.level_id,
         sellingPrice: body.selling_price,
+        costPrice: body.cost_price,
         status: body.status
       });
       res.status(201).json({ success: true, menu });
@@ -195,6 +250,7 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
         rasaId: body.rasa_id,
         levelId: body.level_id,
         sellingPrice: body.selling_price,
+        costPrice: body.cost_price,
         status: body.status
       });
       res.json({ success: true, menu });
@@ -210,6 +266,7 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
         brandId: req.brand_id,
         packageName: body.package_name,
         sellingPrice: body.selling_price,
+        costPrice: body.cost_price,
         subCategoryId: body.sub_category_id,
         rasaId: body.rasa_id,
         levelId: body.level_id,
@@ -230,6 +287,7 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
         menuId: req.params.id,
         packageName: body.package_name,
         sellingPrice: body.selling_price,
+        costPrice: body.cost_price,
         subCategoryId: body.sub_category_id,
         rasaId: body.rasa_id,
         levelId: body.level_id,
@@ -252,6 +310,18 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
       res.json({ success: true, menu });
     } catch (err) {
       sendError(res, err, 'COMPOSED_MENU_STATUS_UPDATE_FAILED');
+    }
+  });
+
+  router.delete('/admin/menus/:id', requireAuth(ownerRoles), (req, res) => {
+    try {
+      const result = service.deleteMenu({
+        brandId: req.brand_id,
+        menuId: req.params.id
+      });
+      res.json({ success: true, ...result });
+    } catch (err) {
+      sendError(res, err, 'COMPOSED_MENU_DELETE_FAILED');
     }
   });
 

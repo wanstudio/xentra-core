@@ -75,8 +75,11 @@
     Array.prototype.forEach.call(select.options, function (option) {
       var isCurrent = String(option.value) === String(select.value) && select.selectedIndex >= 0
         && select.options[select.selectedIndex] === option;
-      html += '<button type="button" class="x-occ-dropdown-item' + (isCurrent ? ' active' : '') + '"' +
+      var isDisabled = Boolean(option.disabled) || option.getAttribute('data-inactive') === '1';
+      var extraClasses = (isCurrent ? ' active' : '') + (isDisabled ? ' is-disabled' : '');
+      html += '<button type="button" class="x-occ-dropdown-item' + extraClasses + '"' +
         ' role="option" data-value="' + escapeAttr(option.value) + '"' +
+        (isDisabled ? ' disabled aria-disabled="true"' : '') +
         ' aria-selected="' + (isCurrent ? 'true' : 'false') + '">' +
         '<span>' + escapeHtml(option.textContent || '') + '</span>' + checkSvg() +
         '</button>';
@@ -86,6 +89,7 @@
       item.onclick = function (event) {
         event.preventDefault();
         event.stopPropagation();
+        if (item.disabled || item.getAttribute('aria-disabled') === 'true') return;
         pick(record, item.dataset.value);
       };
     });

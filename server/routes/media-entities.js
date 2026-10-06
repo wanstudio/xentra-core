@@ -470,6 +470,49 @@ router.post('/admin/media/entity/categories/:categoryId/image',
   }
 );
 
+/**
+ * DELETE /admin/media/entity/categories/:categoryId/image
+ * Remove the Category media reference. Legacy image_url/image columns are cleared too.
+ */
+router.delete('/admin/media/entity/categories/:categoryId/image',
+  requireAuth(['owner', 'brand_manager']),
+  async (req, res) => {
+    try {
+      const category = db.prepare('SELECT id, media_id FROM categories WHERE id = ? AND brand_id = ?')
+        .get(req.params.categoryId, req.brand_id);
+      if (!category) {
+        return res.status(404).json({ success: false, error: 'Kategori tidak ditemukan.', code: 'CATEGORY_NOT_FOUND' });
+      }
+
+      if (category.media_id) {
+        await mediaService.unlinkMedia({
+          mediaId: category.media_id,
+          brandId: req.brand_id
+        });
+      }
+
+      db.prepare(
+        "UPDATE categories SET media_id = NULL, image_url = NULL, image = NULL WHERE id = ? AND brand_id = ?"
+      ).run(req.params.categoryId, req.brand_id);
+
+      res.json({
+        success: true,
+        message: 'Foto kategori berhasil dihapus.',
+        category: {
+          id: req.params.categoryId,
+          media_id: null,
+          image_url: null,
+          image: null
+        }
+      });
+    } catch (err) {
+      const statusCode = err.code === 'UNAUTHORIZED_TENANT' ? 403 : 400;
+      console.error('[M5 DELETE /admin/media/entity/categories/:categoryId/image]:', err.message);
+      res.status(statusCode).json({ success: false, error: err.message, code: err.code || 'CATEGORY_IMAGE_DELETE_ERROR' });
+    }
+  }
+);
+
 // ---- Promo Banner (M5 canonical) ----
 
 /**

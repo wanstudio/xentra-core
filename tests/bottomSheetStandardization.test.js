@@ -16,7 +16,7 @@
  *   BS-STD-05      wiring Merchant App memuat shell canonical
  *   BS-STD-06      gutter konten master-inline + kesesuaian dengan action bar sticky
  *   BS-STD-07      tidak ada CSS sheet feature-specific
- *   BS-STD-08      quick-create Product/Category/Sub Category/Rasa = satu builder
+ *   BS-STD-08      quick-create Product/Category/Rasa = satu builder
  *   BS-STD-09      legacy .x-bottom-sheet* tetap ada dan terpisah dari shell canonical
  */
 'use strict';
@@ -212,13 +212,13 @@ test('BS-STD-07: tidak ada kelas CSS bottom sheet feature-specific', () => {
 
 // ── BS-STD-08: quick-create = satu builder ──
 
-test('BS-STD-08: quick-create Product/Category/Sub Category/Rasa memakai satu builder shared', () => {
+test('BS-STD-08: quick-create Product/Category/Rasa memakai satu builder shared', () => {
   const src = read(MENU_INLINE_JS);
 
   assert.equal((src.match(/'<div class="x-master-inline-sheet">'/g) || []).length, 1,
     'hanya ada satu template sheet master-inline di file quick-create');
 
-  ['createProductInline', 'createCategoryInline', 'createSubCategoryInline', 'createRasaInline']
+  ['createProductInline', 'createCategoryInline', 'createRasaInline']
     .forEach((fn) => {
       const block = extractFunction(src, 'function ' + fn + '(');
       assert.ok(block.includes('requestFieldsSheet('), fn + ' harus memakai builder shared');

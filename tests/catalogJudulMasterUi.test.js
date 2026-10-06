@@ -145,15 +145,12 @@ test('ITEM-01: deret tab Master Category = Kategori | Judul | Rasa | Item (tanpa
   assert.match(INDEX_HTML, /id="master-items-page-list"/, 'list Item harus ada');
 });
 
-test('ITEM-02: kartu Item seragam dengan tab lain — toggle, bukan ceklis, + menu aksi', () => {
+test('ITEM-02: kartu Item memakai toggle aktif/nonaktif dan kartu clickable ke editor', () => {
   assert.match(DASHBOARD_JS, /function renderMasterItemsList\(\)/, 'daftar Item punya renderer sendiri');
   assert.match(DASHBOARD_JS, /class="x-toggle' \+ \(isActive/, 'kartu Item memakai toggle kanonik');
   assert.match(DASHBOARD_JS, /window\.toggleMasterItemActive\s*=/, 'toggle mengaktifkan/menonaktifkan item');
   assert.match(DASHBOARD_JS, /admin\/composed\/products\/' \+ encodeURIComponent\(productId\) \+ '\/status'/, 'memakai endpoint status produk');
-  assert.match(DASHBOARD_JS, /x-action-menu-trigger/, 'kartu Item harus punya menu aksi seperti tab lain');
-  assert.match(DASHBOARD_JS, /XentraActionMenu\.open\(this, \[/, 'menu aksi memakai XentraActionMenu kanonik');
-  assert.match(DASHBOARD_JS, /label: \\'Edit\\'/, 'menu aksi punya Edit');
-  assert.match(DASHBOARD_JS, /label: \\'Arsipkan\\'/, 'menu aksi punya Arsipkan');
+  assert.match(DASHBOARD_JS, /openEditProduct\(/, 'kartu Item membuka editor');
   assert.ok(!DASHBOARD_JS.includes('saveMasterItemSku'), 'editor SKU tidak lagi di tab Item (sudah ada di halaman edit item)');
   assert.ok(!DASHBOARD_JS.includes('master-item-sku-input-'), 'baris input SKU dihapus dari tab Item');
   assert.match(DASHBOARD_JS, /if \(type === 'item'\) return 'Item';/, 'label tipe Item');
