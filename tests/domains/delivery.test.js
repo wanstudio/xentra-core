@@ -131,6 +131,7 @@ test('Delivery 3 — Branch Driver Provider: assigns internal driver and advance
   const assignResult = DeliveryDispatchService.assign({
     order_id: orderId,
     provider_type: DeliveryModel.PROVIDER_TYPES.BRANCH_DRIVER,
+    driver_id: 'driver_1',
     driver_name: 'Budi Kurir',
     driver_phone: '081299998888',
     assigned_by: 'manager_1'
@@ -144,7 +145,16 @@ test('Delivery 3 — Branch Driver Provider: assigns internal driver and advance
   const delRecord = DeliveryDispatchService.getDelivery(orderId);
   assert.ok(delRecord);
   assert.strictEqual(delRecord.status, 'assigned');
-  assert.strictEqual(delRecord.driver_name, 'Budi Kurir');
+  assert.strictEqual(delRecord.driver_id, 'driver_1');
+  assert.strictEqual(delRecord.driver_assignment_status, 'pending');
+
+  assert.throws(
+    () => DeliveryDispatchService.acceptAssignment({
+      order_id: orderId,
+      actor_id: 'driver_other'
+    }),
+    /tidak berwenang/
+  );
 
   // Verify Event
   assert.ok(assignedEvent);
