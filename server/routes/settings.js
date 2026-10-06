@@ -730,7 +730,7 @@ router.get('/admin/settings/security', requireAuth(['owner', 'brand_manager', 'b
         auth_mode: 'jwt_bearer_token',
         session_ttl_hours: 24,
         rbac_model: 'User -> Role -> Scope',
-        roles_supported: ['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen'],
+        roles_supported: ['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen', 'driver'],
         current_user: {
           id: req.user.id || req.user.userId,
           username: req.user.username,
