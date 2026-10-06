@@ -153,6 +153,7 @@ if (!dbInstance) {
       try {
         initSchema(db);
         initComposedMenuSchema(db);
+        ensureDeliveryLifecycleSchema(db);
         if (DB_PATH !== ':memory:') {
           saveSqlJsToDisk(true);
         }
@@ -2956,6 +2957,30 @@ function seedInstallPromotion(targetDb, brandId) {
   } catch (_) {}
 }
 
+function ensureDeliveryLifecycleSchema(targetDb) {
+  // Additive, idempotent migration for databases created before the Driver/COD
+  // lifecycle fields were introduced. Fresh schemas already contain these columns.
+  const statements = [
+    "ALTER TABLE order_deliveries ADD COLUMN driver_id TEXT",
+    "ALTER TABLE order_deliveries ADD COLUMN driver_assignment_status TEXT NOT NULL DEFAULT 'pending'",
+    "ALTER TABLE order_deliveries ADD COLUMN driver_assignment_responded_at TEXT",
+    "ALTER TABLE order_deliveries ADD COLUMN driver_assignment_responded_by TEXT",
+    "ALTER TABLE order_deliveries ADD COLUMN driver_assignment_rejection_reason TEXT",
+    "ALTER TABLE order_deliveries ADD COLUMN cod_collection_status TEXT NOT NULL DEFAULT 'pending'",
+    "ALTER TABLE order_deliveries ADD COLUMN cod_cash_custody TEXT DEFAULT NULL",
+    "ALTER TABLE order_deliveries ADD COLUMN cod_collected_amount REAL NOT NULL DEFAULT 0",
+    "ALTER TABLE order_deliveries ADD COLUMN cod_amount_tendered REAL NOT NULL DEFAULT 0",
+    "ALTER TABLE order_deliveries ADD COLUMN cod_change_given REAL NOT NULL DEFAULT 0",
+    "ALTER TABLE order_deliveries ADD COLUMN cod_handed_over_at TEXT DEFAULT NULL",
+    "ALTER TABLE order_deliveries ADD COLUMN cod_handed_over_to TEXT DEFAULT NULL"
+  ];
+  for (const sql of statements) {
+    try { targetDb.exec(sql); } catch (_) {}
+  }
+  try { targetDb.exec("CREATE INDEX IF NOT EXISTS idx_order_deliveries_driver ON order_deliveries(driver_id, status)"); } catch (_) {}
+  try { targetDb.exec("CREATE INDEX IF NOT EXISTS idx_order_deliveries_cod_custody ON order_deliveries(cod_cash_custody, cod_collection_status)"); } catch (_) {}
+}
+
 // Backwards compatibility for tests explicitly calling db.seedData(db)
 function seedData(targetDb, explicitBrandId) {
   bootstrapEssentialTenant(targetDb);
@@ -2973,6 +2998,7 @@ if (dbInstance) {
   try {
     initSchema(db);
     initComposedMenuSchema(db);
+    ensureDeliveryLifecycleSchema(db);
   } catch (schemaErr) {
     if (process.env.NODE_ENV === 'production') {
       console.error('[Database Fatal Error] Failed to initialize schema in production:', schemaErr);
