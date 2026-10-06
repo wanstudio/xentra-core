@@ -44,6 +44,7 @@ const registerPublicBrandRoutes = require('./public-brand');
 const registerStorefrontRoutes = require('./storefront');
 const registerCatalogRoutes = require('./catalog');
 const registerPosRoutes = require('./pos');
+const registerDriverRoutes = require('./driver');
 const registerMerchantAuthRoutes = require('./merchant-auth');
 const OrderStateMachine = require('../services/OrderStateMachine');
 const AcceptanceTimeoutService = require('../services/AcceptanceTimeoutService');
@@ -733,7 +734,7 @@ function requireAuth(allowedRoles = []) {
 
     // P1 BRANCH SCOPE BOUNDARY ENFORCEMENT (FINDING-01 & NEW-05)
     // Branch-level roles (branch_manager, cashier, kitchen) MUST be assigned to a branch and cannot access outside it
-    const branchScopedRoles = ['branch_manager', 'cashier', 'kitchen'];
+    const branchScopedRoles = ['branch_manager', 'cashier', 'kitchen', 'driver'];
     if (branchScopedRoles.includes(session.role) && !isInvitationAcceptRoute) {
       if (!session.branchId) {
         return res.status(403).json({
@@ -776,6 +777,8 @@ registerCheckoutRoutes(router, {
 });
 
 // Business onboarding and tenant claim routes are isolated in server/routes/onboarding.js.
+registerDriverRoutes(router, { db, requireAuth, DeliveryDispatchService });
+
 registerOnboardingRoutes(router, {
   db,
   crypto,
