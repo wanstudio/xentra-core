@@ -79,6 +79,9 @@ class DeliveryDispatchService {
   static acceptAssignment({ order_id, actor_id }) {
     const order = orderRepository.findById(order_id);
     if (!order) throw new Error('[DeliveryDispatchService] Order "' + order_id + '" tidak ditemukan.');
+    if (order.status !== 'ready') {
+      throw new Error('[DeliveryDispatchService] Driver assignment hanya dapat diterima/ditolak saat pesanan masih berstatus ready.');
+    }
     const delivery = orderRepository.findDeliveryByOrderId(order_id);
     if (!delivery || delivery.status !== DeliveryModel.STATUS.ASSIGNED) {
       throw new Error('[DeliveryDispatchService] Delivery job tidak sedang menunggu penerimaan Driver.');
@@ -109,6 +112,9 @@ class DeliveryDispatchService {
   static rejectAssignment({ order_id, actor_id, reason = '' }) {
     const order = orderRepository.findById(order_id);
     if (!order) throw new Error('[DeliveryDispatchService] Order "' + order_id + '" tidak ditemukan.');
+    if (order.status !== 'ready') {
+      throw new Error('[DeliveryDispatchService] Driver assignment hanya dapat diterima/ditolak saat pesanan masih berstatus ready.');
+    }
     const delivery = orderRepository.findDeliveryByOrderId(order_id);
     if (!delivery || delivery.status !== DeliveryModel.STATUS.ASSIGNED) {
       throw new Error('[DeliveryDispatchService] Delivery job tidak sedang menunggu penerimaan Driver.');
