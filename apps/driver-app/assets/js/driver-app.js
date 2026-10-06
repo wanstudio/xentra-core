@@ -744,21 +744,71 @@
   function renderProfile() {
     if (!state.driver) return shell('Profil', loadingBody('Memuat profil…'), 'profile');
 
-    var body = '<h1 class="screen-title">Profil</h1><div class="screen-subtitle">Identitas dan pengaturan operasional.</div>' +
-      '<div class="card"><div class="profile-head"><div class="avatar">' + icon('user') + '</div><div><div class="profile-name">' + escapeHTML(state.driver.full_name || state.driver.username || 'Driver') + '</div><div class="profile-role">Driver • ' + escapeHTML(state.driver.branch_name || 'Cabang') + '</div></div></div></div>' +
-      '<div class="profile-list">' +
-        profileItem(icon('check'), 'Status', 'Tersedia', 'availability') +
-        profileItem(icon('truck'), 'Kendaraan', 'Belum dikonfigurasi') +
-        profileItem(icon('map'), 'Aplikasi Navigasi', 'Google Maps', 'navigate') +
-        profileItem(icon('info'), 'Tentang Xentra') +
-        profileItem(icon('logout'), 'Keluar Akun', '', 'logout') +
+    var driverName = state.driver.full_name || state.driver.username || 'Driver';
+    var branchName = state.driver.branch_name || 'Cabang Xentra';
+    var phone = state.driver.phone || 'Nomor telepon belum diatur';
+    var totalDelivered = state.history ? state.history.length : 0;
+
+    var body =
+      '<div class="profile-header-card">' +
+        '<div class="profile-avatar-wrap">' +
+          '<div class="profile-avatar">' +
+            icon('user') +
+          '</div>' +
+          '<span class="profile-status-indicator" title="Driver Aktif"></span>' +
+        '</div>' +
+        '<div class="profile-main-info">' +
+          '<h2 class="profile-name">' + escapeHTML(driverName) + '</h2>' +
+          '<div class="profile-badge-row">' +
+            '<span class="pill blue">Mitra Driver</span>' +
+            '<span class="pill green">Aktif</span>' +
+          '</div>' +
+          '<div class="profile-branch-text">' +
+            icon('pin') + ' <span>' + escapeHTML(branchName) + '</span>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="profile-kpi-grid">' +
+        '<div class="profile-kpi-card">' +
+          '<div class="profile-kpi-val">' + totalDelivered + '</div>' +
+          '<div class="profile-kpi-label">Pesanan Selesai</div>' +
+        '</div>' +
+        '<div class="profile-kpi-card">' +
+          '<div class="profile-kpi-val">100%</div>' +
+          '<div class="profile-kpi-label">Keberhasilan</div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="profile-group-title">Operasional & Pengiriman</div>' +
+      '<div class="profile-list-card">' +
+        profileItem(icon('check'), 'Status Kerja', 'Siap Menerima Pesanan', 'availability') +
+        profileItem(icon('truck'), 'Kendaraan', 'Motor • Standar Operasional') +
+        profileItem(icon('map'), 'Navigasi Pilihan', 'Google Maps / Waze', 'navigate') +
+      '</div>' +
+
+      '<div class="profile-group-title">Akun & Bantuan</div>' +
+      '<div class="profile-list-card">' +
+        profileItem(icon('phone'), 'Kontak Telepon', escapeHTML(phone)) +
+        profileItem(icon('info'), 'Versi Sistem', 'Xentra Driver v1.2') +
+        profileItem(icon('logout'), 'Keluar dari Akun', '', 'logout', true) +
       '</div>';
 
     shell('Profil', body, 'profile');
   }
 
-  function profileItem(i, label, value, action) {
-    return '<button class="profile-item" data-action="' + (action || '') + '"><span class="left">' + i + '</span><span class="body"><span class="label">' + escapeHTML(label) + '</span>' + (value ? '<span class="value">' + escapeHTML(value) + '</span>' : '') + '</span><span class="chevron">›</span></button>';
+  function profileItem(ico, label, value, action, isDestructive) {
+    var cls = 'profile-list-item' + (isDestructive ? ' destructive' : '');
+    return '<button type="button" class="' + cls + '" data-action="' + (action || '') + '">' +
+      '<span class="item-icon-box">' + ico + '</span>' +
+      '<span class="item-text-box">' +
+        '<span class="item-label">' + escapeHTML(label) + '</span>' +
+        (value ? '<span class="item-sub">' + escapeHTML(value) + '</span>' : '') +
+      '</span>' +
+      '<span class="item-chevron">' +
+        (isDestructive ? '' : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>') +
+      '</span>' +
+    '</button>';
   }
 
   function toast(message) {
