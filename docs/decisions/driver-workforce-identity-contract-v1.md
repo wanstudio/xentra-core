@@ -1,7 +1,8 @@
 # Xentra — Driver Workforce Identity Contract v1
 
-**Status:** IMPLEMENTATION BASELINE — MVP  
-**Date:** 2026-10-06
+**Status:** LOCKED — MVP BUSINESS / ARCHITECTURE BASELINE  
+**Date:** 2026-10-06  
+**Revision:** v1.1
 
 ## Purpose
 
@@ -74,9 +75,15 @@ The Driver PWA uses a dedicated client-side token/user storage key:
 - xentra_driver_token
 - xentra_driver_user
 
-The Driver surface is available at /driver/.
+The Driver PWA is a **dedicated tenant/client domain surface**.
 
-A dedicated driver subdomain is not required for the MVP path implementation. Supporting that subdomain remains compatible with the server routing boundary.
+For Bangjo, the canonical Driver access domain is:
+
+**https://driver.mybangjo.com/**
+
+The Driver surface MUST be served from the dedicated Driver domain, not from the Customer PWA path `/driver/` on `app.mybangjo.com`.
+
+The domain is a tenant/client entry point and MUST resolve tenant/brand context through the authoritative Domain Registry.
 
 ## Landing
 
@@ -88,7 +95,36 @@ Invitation acceptance also resolves Driver users to:
 
 /driver/
 
-Cross-domain handoff for Driver uses the tenant login surface with a Driver target, then continues to /driver/.
+Cross-domain handoff for Driver may originate from the Xentra login/control-plane flow, but the authenticated Driver runtime MUST continue on the dedicated Driver domain.
+
+The Customer domain `app.mybangjo.com` MUST NOT become the canonical Driver application URL.
+
+## Domain architecture rule
+
+Driver is a first-class application surface in the tenant domain architecture.
+
+The canonical Bangjo client surfaces are:
+
+| Surface | Canonical Bangjo domain |
+|---|---|
+| Customer PWA | `app.mybangjo.com` |
+| Merchant / Owner | `m.mybangjo.com` |
+| POS | `pos.mybangjo.com` |
+| Driver | `driver.mybangjo.com` |
+
+`driver.mybangjo.com` is a runtime/domain mapping decision, not a frontend hostname guess. The authoritative mapping belongs to `tenant_domains`.
+
+For future tenants, the Driver domain may use another tenant-specific hostname, but the same `surface_type = driver` contract applies.
+
+## Infrastructure requirement
+
+The dedicated Driver hostname MUST be provisioned through the normal domain lifecycle:
+
+`Xentra Control Plane → Domain Registry → DNS/SSL/provisioning → Runtime → tenant resolution`
+
+The existence of `driver.mybangjo.com` on VPS/infrastructure is compatible with this architecture, but the runtime must not rely on a client-specific hostname special case as the final source of tenant identity.
+
+The Domain Registry and tenant resolver MUST recognize the Driver surface as `surface_type = driver`.
 
 ## Relationship to locked Driver UX
 
@@ -97,4 +133,6 @@ The Driver PWA remains governed by:
 - docs/decisions/driver-cod-happy-path-validation-v1.md
 - docs/decisions/driver-pwa-ux-ia-contract-v1.md
 
-This document only defines the identity/RBAC prerequisite needed to implement those UX contracts safely.
+This document defines the Driver identity and canonical access surface needed to implement those UX contracts safely.
+
+**Locked conclusion:** For Bangjo MVP, Driver is accessed through **https://driver.mybangjo.com/**. `/driver/` remains the internal application route/surface path, but it is not the canonical public Driver URL on the Customer domain.
