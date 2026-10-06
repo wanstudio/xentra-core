@@ -340,7 +340,8 @@ function registerDriverRoutes(router, deps = {}) {
         DeliveryModel.STATUS.PICKED_UP
       );
 
-      const tasks = rows.map(row => shapeTask(getTask(row.order_id, driverId, req.brand_id))).filter(Boolean);
+      const branchId = req.user.branchId || req.user.branch_id;
+      const tasks = rows.map(row => shapeTask(getTask(row.order_id, driverId, req.brand_id, branchId))).filter(Boolean);
       res.json({
         success: true,
         tasks,

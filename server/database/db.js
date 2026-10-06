@@ -1229,13 +1229,19 @@ function initSchema(targetDb) {
       free_km_applied REAL,
       rate_per_km_applied REAL,
       delivery_fee_calculated REAL,
+      driver_id TEXT REFERENCES users(id) ON DELETE SET NULL,
       driver_name TEXT,
       driver_phone TEXT,
+      driver_assignment_status TEXT DEFAULT 'pending',
+      driver_assignment_responded_at TEXT,
+      driver_assignment_rejection_reason TEXT,
       tracking_url TEXT,
       status TEXT NOT NULL DEFAULT 'unassigned',
       cod_collection_status TEXT DEFAULT 'pending',
       cod_cash_custody TEXT DEFAULT NULL,
       cod_collected_amount REAL DEFAULT 0,
+      cod_amount_tendered REAL DEFAULT NULL,
+      cod_change_given REAL DEFAULT NULL,
       cod_handed_over_at TEXT DEFAULT NULL,
       cod_handed_over_to TEXT DEFAULT NULL,
       created_at TEXT DEFAULT (datetime('now')),
@@ -2773,8 +2779,17 @@ function bootstrapEssentialTenant(targetDb) {
   try { targetDb.exec("ALTER TABLE order_deliveries ADD COLUMN cod_collection_status TEXT DEFAULT 'pending';"); } catch (_) {}
   try { targetDb.exec("ALTER TABLE order_deliveries ADD COLUMN cod_cash_custody TEXT DEFAULT NULL;"); } catch (_) {}
   try { targetDb.exec("ALTER TABLE order_deliveries ADD COLUMN cod_collected_amount REAL DEFAULT 0;"); } catch (_) {}
+  try { targetDb.exec("ALTER TABLE order_deliveries ADD COLUMN cod_amount_tendered REAL DEFAULT NULL;"); } catch (_) {}
+  try { targetDb.exec("ALTER TABLE order_deliveries ADD COLUMN cod_change_given REAL DEFAULT NULL;"); } catch (_) {}
   try { targetDb.exec("ALTER TABLE order_deliveries ADD COLUMN cod_handed_over_at TEXT DEFAULT NULL;"); } catch (_) {}
   try { targetDb.exec("ALTER TABLE order_deliveries ADD COLUMN cod_handed_over_to TEXT DEFAULT NULL;"); } catch (_) {}
+
+  // Driver Assignment & Workforce tracking on order_deliveries
+  try { targetDb.exec("ALTER TABLE order_deliveries ADD COLUMN driver_id TEXT REFERENCES users(id) ON DELETE SET NULL;"); } catch (_) {}
+  try { targetDb.exec("ALTER TABLE order_deliveries ADD COLUMN driver_assignment_status TEXT DEFAULT 'pending';"); } catch (_) {}
+  try { targetDb.exec("ALTER TABLE order_deliveries ADD COLUMN driver_assignment_responded_at TEXT;"); } catch (_) {}
+  try { targetDb.exec("ALTER TABLE order_deliveries ADD COLUMN driver_assignment_rejection_reason TEXT;"); } catch (_) {}
+  try { targetDb.exec("CREATE INDEX IF NOT EXISTS idx_order_deliveries_driver_id ON order_deliveries(driver_id);"); } catch (_) {}
 }
 
 /**

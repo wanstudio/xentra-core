@@ -82,25 +82,52 @@ class OrderRepository {
     return this.db.queryOne('SELECT * FROM order_deliveries WHERE order_id = ?', [orderId]);
   }
 
-  insertOrUpdateDeliveryAssignment({ orderId, driverName, driverPhone, updatedAt }) {
+  insertOrUpdateDeliveryAssignment({ orderId, driverId = null, driverName, driverPhone, updatedAt }) {
     const existing = this.findDeliveryByOrderId(orderId);
     if (existing) {
       return this.db.execute(`
         UPDATE order_deliveries
-        SET driver_name = ?,
+        SET driver_id = ?,
+            driver_name = ?,
             driver_phone = ?,
+            driver_assignment_status = 'pending',
+            driver_assignment_responded_at = NULL,
+            driver_assignment_rejection_reason = NULL,
             status = 'assigned',
             updated_at = ?
         WHERE order_id = ?
-      `, [driverName, driverPhone, updatedAt, orderId]);
+      `, [driverId, driverName, driverPhone, updatedAt, orderId]);
     }
 
     const deliveryId = `del_${Date.now()}`;
     return this.db.execute(`
       INSERT INTO order_deliveries (
-        id, order_id, driver_name, driver_phone, status, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, 'assigned', ?, ?)
-    `, [deliveryId, orderId, driverName, driverPhone, updatedAt, updatedAt]);
+        id, order_id, driver_id, driver_name, driver_phone, driver_assignment_status, status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, 'pending', 'assigned', ?, ?)
+    `, [deliveryId, orderId, driverId, driverName, driverPhone, updatedAt, updatedAt]);
+  }
+
+  respondToDriverAssignment({ orderId, response, respondedBy = null, rejectionReason = null, updatedAt }) {
+    if (response === 'rejected') {
+      return this.db.execute(`
+        UPDATE order_deliveries
+        SET driver_assignment_status = 'rejected',
+            driver_assignment_responded_at = ?,
+            driver_assignment_rejection_reason = ?,
+            driver_id = NULL,
+            status = 'unassigned',
+            updated_at = ?
+        WHERE order_id = ?
+      `, [updatedAt, rejectionReason, updatedAt, orderId]);
+    }
+
+    return this.db.execute(`
+      UPDATE order_deliveries
+      SET driver_assignment_status = 'accepted',
+          driver_assignment_responded_at = ?,
+          updated_at = ?
+      WHERE order_id = ?
+    `, [updatedAt, updatedAt, orderId]);
   }
 
   updateDeliveryStatus({
