@@ -5,7 +5,8 @@ const {
   PaymentRepository,
   DiningTableRepository,
   PosShiftRepository,
-  PosBillRepository
+  PosBillRepository,
+  OrderRepository
 } = require('../../../core/data/repositories');
 const { events } = require('../../../core');
 const PaymentModel = require('../models/PaymentModel');
@@ -14,6 +15,7 @@ const paymentRepository = new PaymentRepository();
 const diningTableRepository = new DiningTableRepository();
 const posShiftRepository = new PosShiftRepository();
 const posBillRepository = new PosBillRepository();
+const orderRepository = new OrderRepository();
 
 class CashSettlementService {
   /**
@@ -45,7 +47,7 @@ class CashSettlementService {
       throw new Error(`[CashSettlementService] Order "${order_id}" tidak ditemukan.`);
     }
 
-    const TERMINAL_ORDER_STATUSES = ['completed', 'cancelled', 'expired', 'rejected', 'timeout', 'fulfillment_exception'];
+    const TERMINAL_ORDER_STATUSES = ['cancelled', 'expired', 'rejected', 'timeout', 'fulfillment_exception'];
     if (TERMINAL_ORDER_STATUSES.includes(order.status)) {
       throw new Error(`[CashSettlementService] Tidak dapat menyelesaikan pembayaran tunai untuk pesanan yang sudah berada pada status terminal "${order.status}".`);
     }
@@ -58,6 +60,26 @@ class CashSettlementService {
 
     if (order.payment_method && order.payment_method !== 'cash') {
       throw new Error(`[CashSettlementService Payment Method Conflict]: Pesanan "${order_id}" menggunakan metode pembayaran online "${order.payment_method}". Tidak dapat diselesaikan melalui pelunasan tunai (Cash).`);
+    }
+
+    // Delivery COD has a separate physical-cash lifecycle. Settlement is only
+    // legal after the cash has been collected by the Driver and physically
+    // handed over/confirmed by the Cashier. Normal POS cash sales have no
+    // delivery record and therefore do not pass through this gate.
+    const deliveryRecord = orderRepository.findDeliveryByOrderId(order_id);
+    if (deliveryRecord) {
+      if (deliveryRecord.status !== 'delivered') {
+        throw new Error('[COD_SETTLEMENT_NOT_READY]: Delivery COD belum selesai diantar.');
+      }
+      if (deliveryRecord.cod_collection_status !== 'handed_over' ||
+          deliveryRecord.cod_cash_custody !== 'cashier') {
+        throw new Error('[COD_HANDOVER_REQUIRED]: COD cash harus sudah diserahkan dan dikonfirmasi Cashier sebelum payment settlement.');
+      }
+      const expectedCod = Number(order.grand_total);
+      const collectedCod = Number(deliveryRecord.cod_collected_amount);
+      if (collectedCod !== expectedCod) {
+        throw new Error('[COD_CASH_VARIANCE_REQUIRES_EXCEPTION_FLOW]: Nominal COD yang dibawa ke Cashier tidak sama dengan tagihan.');
+      }
     }
 
     const expectedAmount = Number(order.grand_total);
