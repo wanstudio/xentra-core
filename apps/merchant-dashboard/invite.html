@@ -406,6 +406,7 @@
           'branch_manager': 'Branch Manager',
           'cashier': 'Kasir',
           'kitchen': 'Dapur',
+          'driver': 'Driver',
           'owner': 'Owner'
         };
         return map[role] || role;
@@ -414,13 +415,16 @@
       function invitationLanding(role) {
         // Keep invitation UX aligned with the same role-based landing contract
         // used by normal authentication and cross-domain handoff.
+        if (role === 'driver') return '/driver/';
         return role === 'cashier' ? '/pos/' : '/dashboard/';
       }
 
       function invitationActionLabel(role) {
-        return role === 'cashier'
-          ? 'Terima Undangan & Masuk POS'
-          : 'Terima Undangan & Masuk Dashboard';
+        return role === 'driver'
+          ? 'Terima Undangan & Masuk Driver'
+          : (role === 'cashier'
+            ? 'Terima Undangan & Masuk POS'
+            : 'Terima Undangan & Masuk Dashboard');
       }
 
       async function validateToken() {
