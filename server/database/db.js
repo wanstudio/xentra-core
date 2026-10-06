@@ -2576,10 +2576,40 @@ function initSchema(targetDb) {
   // Authoritative separation: Schema initialization only provisions essential tenant structure
   // (organization, brand, initial merchant owner if absent).
   // Demo fixtures (demo branches, demo products, demo promotions) are NEVER automatically seeded on startup.
+  ensureTenantDomainRegistrySchema(targetDb);
   bootstrapEssentialTenant(targetDb);
 }
 
+function ensureTenantDomainRegistrySchema(targetDb) {
+  // Authoritative tenant/client domain registry for runtime hostname resolution.
+  targetDb.exec(`
+    CREATE TABLE IF NOT EXISTS tenant_domains (
+      id TEXT PRIMARY KEY,
+      hostname TEXT UNIQUE NOT NULL,
+      organization_id TEXT NOT NULL,
+      brand_id TEXT NOT NULL,
+      surface_type TEXT NOT NULL CHECK (surface_type IN ('customer', 'merchant', 'pos', 'driver')),
+      is_primary INTEGER NOT NULL DEFAULT 0,
+      verification_status TEXT NOT NULL DEFAULT 'pending',
+      verification_method TEXT DEFAULT 'dns_txt',
+      verification_token TEXT,
+      provisioning_status TEXT NOT NULL DEFAULT 'pending',
+      tls_status TEXT NOT NULL DEFAULT 'pending',
+      status TEXT NOT NULL DEFAULT 'active',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+      FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_tenant_domains_org_id ON tenant_domains(organization_id);
+    CREATE INDEX IF NOT EXISTS idx_tenant_domains_brand_id ON tenant_domains(brand_id);
+    CREATE INDEX IF NOT EXISTS idx_tenant_domains_active ON tenant_domains(hostname, status, verification_status);
+  `);
+}
+
 function bootstrapEssentialTenant(targetDb) {
+  ensureTenantDomainRegistrySchema(targetDb);
+
   let brand = null;
   try {
     brand = targetDb.prepare('SELECT id, organization_id FROM brands LIMIT 1').get();
@@ -2623,6 +2653,30 @@ function bootstrapEssentialTenant(targetDb) {
       WHERE id = ? AND (custom_domain IS NULL OR custom_domain = 'xentra.cloud' OR custom_domain = '')
     `).run(brandId);
   } catch (e) {}
+
+  // Seed the canonical Bangjo application domains into the authoritative registry.
+  // INSERT OR IGNORE preserves existing domain ownership/provisioning state.
+  try {
+    const domainRows = [
+      ['td_bangjo_customer', 'app.mybangjo.com', 'customer', 1],
+      ['td_bangjo_merchant', 'm.mybangjo.com', 'merchant', 0],
+      ['td_bangjo_pos', 'pos.mybangjo.com', 'pos', 0],
+      ['td_bangjo_driver', 'driver.mybangjo.com', 'driver', 0]
+    ];
+    const stmt = targetDb.prepare(`
+      INSERT OR IGNORE INTO tenant_domains (
+        id, hostname, organization_id, brand_id, surface_type, is_primary,
+        verification_status, verification_method, verification_token,
+        provisioning_status, tls_status, status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, 'verified', 'dns_txt', 'challenge_bangjo_auto',
+        'provisioned', 'active', 'active', datetime('now'), datetime('now'))
+    `);
+    for (const [id, hostname, surfaceType, isPrimary] of domainRows) {
+      stmt.run(id, hostname, orgId, brandId, surfaceType, isPrimary);
+    }
+  } catch (domainErr) {
+    console.warn('[DomainRegistry] Canonical Bangjo domain seed skipped:', domainErr.message);
+  }
 
   // In test environment only: seed default test merchant owner if users table is empty
   // so existing in-memory test suites have their standard fixture.
