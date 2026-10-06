@@ -5,6 +5,23 @@
   var TOKEN_KEY = 'xentra_driver_token';
   var USER_KEY = 'xentra_driver_user';
 
+  var MAPBOX_VERSION = '3.4.0';
+  var MAPBOX_TOKEN = (window.XentraConfig && window.XentraConfig.mapboxToken) ||
+    'pk.eyJ1IjoiaWtod2FucyIsImEiOiJjbXQ5c2cwMzYwOW15MnpxdXdpeWU3am45In0.YcX49DH0uXP70aBxVDC-TA';
+
+  var mapState = {
+    map: null,
+    driverMarker: null,
+    destinationMarker: null,
+    watchId: null,
+    currentPosition: null,
+    lastRouteAt: 0,
+    lastRoutedPosition: null,
+    routeRequestId: 0,
+    initId: 0
+  };
+
+
   var state = {
     page: 'tasks',
     driver: null,
@@ -83,6 +100,323 @@
     }
 
     return data || {};
+  }
+
+
+  function loadMapboxGL() {
+    return new Promise(function (resolve, reject) {
+      if (window.mapboxgl && typeof window.mapboxgl.Map === 'function') {
+        resolve();
+        return;
+      }
+
+      var css = document.getElementById('xentra-driver-mapbox-css');
+      if (!css) {
+        css = document.createElement('link');
+        css.id = 'xentra-driver-mapbox-css';
+        css.rel = 'stylesheet';
+        css.href = 'https://api.mapbox.com/mapbox-gl-js/v' + MAPBOX_VERSION + '/mapbox-gl.css';
+        document.head.appendChild(css);
+      }
+
+      var script = document.getElementById('xentra-driver-mapbox-js');
+      if (script) {
+        if (script.dataset.loaded === '1' || (window.mapboxgl && typeof window.mapboxgl.Map === 'function')) {
+          resolve();
+          return;
+        }
+        script.addEventListener('load', function () { resolve(); }, { once: true });
+        script.addEventListener('error', function () { reject(new Error('Library Mapbox GL tidak dapat dimuat')); }, { once: true });
+        return;
+      }
+
+      script = document.createElement('script');
+      script.id = 'xentra-driver-mapbox-js';
+      script.src = 'https://api.mapbox.com/mapbox-gl-js/v' + MAPBOX_VERSION + '/mapbox-gl.js';
+      script.onload = function () {
+        script.dataset.loaded = '1';
+        resolve();
+      };
+      script.onerror = function () {
+        reject(new Error('Library Mapbox GL tidak dapat dimuat'));
+      };
+      document.head.appendChild(script);
+    });
+  }
+
+  function setMapStatus(message, type) {
+    var el = document.getElementById('driver-gps-status');
+    if (!el) return;
+    el.textContent = message || '';
+    el.className = 'map-status ' + (type || '');
+  }
+
+  function setRouteStats(distanceMeters, durationSeconds) {
+    var distanceEl = document.getElementById('driver-route-distance');
+    var etaEl = document.getElementById('driver-route-eta');
+    if (distanceEl) {
+      distanceEl.textContent = Number.isFinite(Number(distanceMeters)) ?
+        (Number(distanceMeters) / 1000).toFixed(1) + ' km' : '—';
+    }
+    if (etaEl) {
+      etaEl.textContent = Number.isFinite(Number(durationSeconds)) ?
+        Math.max(1, Math.round(Number(durationSeconds) / 60)) + ' menit' : '—';
+    }
+  }
+
+  function clearRouteStatus(message) {
+    var el = document.getElementById('driver-route-status');
+    if (el) el.textContent = message || '';
+  }
+
+  function updateMapError(message) {
+    var el = document.getElementById('driver-map-error');
+    if (!el) return;
+    el.textContent = message || '';
+    el.hidden = !message;
+  }
+
+  function destinationCoordinates(task) {
+    var destination = task && task.destination || {};
+    var lat = Number(destination.latitude);
+    var lng = Number(destination.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return { latitude: lat, longitude: lng };
+  }
+
+  function samePoint(a, b) {
+    if (!a || !b) return false;
+    return Math.abs(Number(a.latitude) - Number(b.latitude)) < 0.00025 &&
+      Math.abs(Number(a.longitude) - Number(b.longitude)) < 0.00025;
+  }
+
+  function fitDriverRoute() {
+    if (!mapState.map || !mapState.currentPosition) return;
+    var task = selectedTask();
+    var dest = destinationCoordinates(task);
+    if (!dest) return;
+
+    var bounds = new window.mapboxgl.LngLatBounds();
+    bounds.extend([Number(mapState.currentPosition.longitude), Number(mapState.currentPosition.latitude)]);
+    bounds.extend([dest.longitude, dest.latitude]);
+    mapState.map.fitBounds(bounds, { padding: { top: 95, bottom: 110, left: 35, right: 35 }, maxZoom: 16.5, duration: 650 });
+  }
+
+  function drawRoute(routeGeometry) {
+    if (!mapState.map || !routeGeometry) return;
+    var source = mapState.map.getSource('driver-route');
+    var feature = { type: 'Feature', properties: {}, geometry: routeGeometry };
+
+    if (source) {
+      source.setData({ type: 'FeatureCollection', features: [feature] });
+      return;
+    }
+
+    mapState.map.addSource('driver-route', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [feature] }
+    });
+    mapState.map.addLayer({
+      id: 'driver-route-line',
+      type: 'line',
+      source: 'driver-route',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': '#1463ff', 'line-width': 6, 'line-opacity': 0.88 }
+    });
+  }
+
+  async function fetchDriverRoute(position, task) {
+    var dest = destinationCoordinates(task);
+    if (!dest) {
+      clearRouteStatus('Koordinat tujuan belum tersedia.');
+      setRouteStats(null, null);
+      return;
+    }
+
+    var lat = Number(position && position.latitude);
+    var lng = Number(position && position.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+    var requestId = ++mapState.routeRequestId;
+    clearRouteStatus('Menghitung rute…');
+
+    var url = 'https://router.project-osrm.org/route/v1/driving/' +
+      encodeURIComponent(lng) + ',' + encodeURIComponent(lat) + ';' +
+      encodeURIComponent(dest.longitude) + ',' + encodeURIComponent(dest.latitude) +
+      '?overview=full&geometries=geojson&steps=true';
+
+    try {
+      var response = await fetch(url, { method: 'GET', headers: { Accept: 'application/json' } });
+      if (!response.ok) throw new Error('OSRM HTTP ' + response.status);
+      var data = await response.json();
+      var route = data && data.code === 'Ok' && data.routes && data.routes[0];
+      if (!route || !route.geometry) throw new Error('Rute tidak tersedia');
+
+      if (requestId !== mapState.routeRequestId || state.page !== 'map') return;
+
+      drawRoute(route.geometry);
+      setRouteStats(route.distance, route.duration);
+      mapState.lastRouteAt = Date.now();
+      mapState.lastRoutedPosition = { latitude: lat, longitude: lng };
+      clearRouteStatus('');
+      fitDriverRoute();
+    } catch (err) {
+      if (requestId !== mapState.routeRequestId) return;
+      clearRouteStatus('Rute gagal dihitung. Gunakan navigasi eksternal.');
+      updateMapError('Rute peta tidak tersedia saat ini.');
+      setRouteStats(null, null);
+    }
+  }
+
+  function maybeRefreshDriverRoute(position, task, force) {
+    var now = Date.now();
+    var enoughTime = now - mapState.lastRouteAt >= 15000;
+    var moved = !mapState.lastRoutedPosition || !samePoint(position, mapState.lastRoutedPosition);
+    if (force || (enoughTime && moved)) {
+      fetchDriverRoute(position, task);
+    }
+  }
+
+  function applyDriverPosition(position, task) {
+    if (state.page !== 'map') return;
+
+    mapState.currentPosition = {
+      latitude: Number(position.coords.latitude),
+      longitude: Number(position.coords.longitude),
+      accuracy: Number(position.coords.accuracy || 0)
+    };
+
+    if (!Number.isFinite(mapState.currentPosition.latitude) ||
+        !Number.isFinite(mapState.currentPosition.longitude)) {
+      setMapStatus('Lokasi GPS tidak valid', 'error');
+      return;
+    }
+
+    setMapStatus(
+      mapState.currentPosition.accuracy > 100
+        ? 'GPS kurang akurat'
+        : 'Lokasi GPS aktif',
+      mapState.currentPosition.accuracy > 100 ? 'warning' : 'success'
+    );
+
+    if (mapState.map && mapState.driverMarker) {
+      mapState.driverMarker.setLngLat([
+        mapState.currentPosition.longitude,
+        mapState.currentPosition.latitude
+      ]);
+    }
+
+    if (mapState.map && mapState.destinationMarker) {
+      if (!mapState.lastRoutedPosition) fitDriverRoute();
+    }
+
+    maybeRefreshDriverRoute(mapState.currentPosition, task, !mapState.lastRoutedPosition);
+  }
+
+  function startDriverGeolocation(task) {
+    if (!navigator.geolocation) {
+      setMapStatus('GPS tidak didukung perangkat ini', 'error');
+      updateMapError('Perangkat tidak menyediakan GPS browser.');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      function (position) { applyDriverPosition(position, task); },
+      function (error) {
+        var message = error && error.code === 1
+          ? 'Izin lokasi ditolak'
+          : error && error.code === 3
+            ? 'GPS terlalu lama merespons'
+            : 'Lokasi GPS belum tersedia';
+        setMapStatus(message, 'error');
+        updateMapError('Aktifkan izin lokasi agar rute dari posisi Anda dapat dihitung.');
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 10000 }
+    );
+
+    mapState.watchId = navigator.geolocation.watchPosition(
+      function (position) { applyDriverPosition(position, task); },
+      function (error) {
+        if (mapState.currentPosition) {
+          setMapStatus('GPS berhenti memperbarui', 'warning');
+          return;
+        }
+        var message = error && error.code === 1
+          ? 'Izin lokasi ditolak'
+          : 'Lokasi GPS tidak tersedia';
+        setMapStatus(message, 'error');
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
+    );
+  }
+
+  function cleanupDriverMap() {
+    if (mapState.watchId != null && navigator.geolocation) {
+      try { navigator.geolocation.clearWatch(mapState.watchId); } catch (_) {}
+    }
+    mapState.watchId = null;
+    mapState.routeRequestId += 1;
+    if (mapState.map) {
+      try { mapState.map.remove(); } catch (_) {}
+    }
+    mapState.map = null;
+    mapState.driverMarker = null;
+    mapState.destinationMarker = null;
+    mapState.currentPosition = null;
+    mapState.lastRouteAt = 0;
+    mapState.lastRoutedPosition = null;
+  }
+
+  async function initializeDriverMap(task) {
+    var initId = ++mapState.initId;
+    var container = document.getElementById('driver-map');
+    var dest = destinationCoordinates(task);
+    if (!container) return;
+
+    if (!dest) {
+      setMapStatus('Koordinat tujuan belum tersedia', 'error');
+      updateMapError('Pengantaran tidak dapat menampilkan rute karena koordinat tujuan belum tersedia.');
+      return;
+    }
+
+    setMapStatus('Memuat peta…', '');
+    updateMapError('');
+
+    try {
+      await loadMapboxGL();
+      if (initId !== mapState.initId || state.page !== 'map') return;
+
+      window.mapboxgl.accessToken = MAPBOX_TOKEN;
+      mapState.map = new window.mapboxgl.Map({
+        container: container,
+        style: 'mapbox://styles/mapbox/streets-v12',
+        center: [dest.longitude, dest.latitude],
+        zoom: 14,
+        attributionControl: true,
+        cooperativeGestures: true
+      });
+
+      mapState.destinationMarker = new window.mapboxgl.Marker({ color: '#e5484d' })
+        .setLngLat([dest.longitude, dest.latitude])
+        .addTo(mapState.map);
+
+      mapState.map.on('load', function () {
+        if (state.page !== 'map' || initId !== mapState.initId) return;
+        setMapStatus('Mencari lokasi GPS…', '');
+        startDriverGeolocation(task);
+        if (mapState.currentPosition) {
+          fitDriverRoute();
+          maybeRefreshDriverRoute(mapState.currentPosition, task, true);
+        }
+      });
+
+      mapState.map.on('error', function () {
+        updateMapError('Peta gagal dimuat. Gunakan navigasi eksternal.');
+      });
+    } catch (err) {
+      setMapStatus('Peta tidak dapat dimuat', 'error');
+      updateMapError('Peta Xentra gagal dimuat. Anda masih dapat membuka navigasi eksternal.');
+    }
   }
 
   function icon(name) {
@@ -290,13 +624,38 @@
 
     var c = task.customer || {};
     var d = task.destination || {};
-    var body = '<div class="hero-map"><div class="map-grid"></div><div class="nav-banner"><div class="nav-turn">Tujuan Pengantaran</div><div class="nav-road">' + escapeHTML(d.address || 'Alamat tujuan') + '</div></div><div class="route"></div><div class="map-pin a">A</div><div class="map-pin b">B</div><div class="map-controls"><button class="map-control">➤</button><button class="map-control">⌾</button></div></div>' +
-      '<div class="map-sheet"><div class="route-stats"><div class="route-stat"><strong>' + escapeHTML(task.duration_seconds ? Math.round(Number(task.duration_seconds) / 60) + ' menit' : '—') + '</strong><span>ETA</span></div><div class="route-stat"><strong>' + escapeHTML(task.distance_meters ? (Number(task.distance_meters) / 1000).toFixed(1) + ' km' : '—') + '</strong><span>jarak</span></div></div>' +
-      '<div class="customer-row" style="margin-top:0"><span class="pin" style="background:#fff0f0;color:var(--red)">●</span><div style="flex:1"><div class="customer-name">' + escapeHTML(c.name || 'Pelanggan') + '</div><div class="address">' + escapeHTML(d.address || 'Alamat tujuan belum tersedia') + '</div></div><button class="icon-btn" data-action="call" aria-label="Telepon pelanggan">☎</button></div>' +
-      '<button class="secondary-btn" data-action="navigate" style="margin-top:13px">⌖ Buka Navigasi</button>' +
-      '<div class="sticky-action"><button class="primary-btn green" data-action="complete-delivery">Selesaikan Pengantaran ' + icon('arrow') + '</button></div></div>';
+    var body =
+      '<div class="hero-map">' +
+        '<div id="driver-map" class="driver-map" aria-label="Peta pengantaran"></div>' +
+        '<div class="nav-banner">' +
+          '<div class="nav-turn">Tujuan Pengantaran</div>' +
+          '<div class="nav-road">' + escapeHTML(d.address || 'Alamat tujuan') + '</div>' +
+          '<div id="driver-gps-status" class="map-status">Mencari lokasi GPS…</div>' +
+        '</div>' +
+        '<div id="driver-map-error" class="map-error" hidden></div>' +
+        '<div class="map-controls">' +
+          '<button class="map-control" data-action="recenter-map" aria-label="Pusatkan peta">➤</button>' +
+          '<button class="map-control" data-action="refresh-map" aria-label="Segarkan rute">↻</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="map-sheet">' +
+        '<div class="route-stats">' +
+          '<div class="route-stat"><strong id="driver-route-eta">—</strong><span>ETA</span></div>' +
+          '<div class="route-stat"><strong id="driver-route-distance">—</strong><span>jarak</span></div>' +
+        '</div>' +
+        '<div id="driver-route-status" class="route-status"></div>' +
+        '<div class="customer-row" style="margin-top:0">' +
+          '<span class="pin" style="background:#fff0f0;color:var(--red)">●</span>' +
+          '<div style="flex:1"><div class="customer-name">' + escapeHTML(c.name || 'Pelanggan') + '</div>' +
+          '<div class="address">' + escapeHTML(d.address || 'Alamat tujuan belum tersedia') + '</div></div>' +
+          '<button class="icon-btn" data-action="call" aria-label="Telepon pelanggan">☎</button>' +
+        '</div>' +
+        '<button class="secondary-btn" data-action="navigate" style="margin-top:13px">⌖ Buka Navigasi</button>' +
+        '<div class="sticky-action"><button class="primary-btn green" data-action="complete-delivery">Selesaikan Pengantaran ' + icon('arrow') + '</button></div>' +
+      '</div>';
 
     shell('Sedang Mengantar', body, 'tasks', {hideNav:true});
+    initializeDriverMap(task);
   }
 
   function renderCod() {
@@ -589,6 +948,7 @@
   }
 
   function render() {
+    cleanupDriverMap();
     if (state.page === 'tasks') return renderTasks();
     if (state.page === 'new-task') return renderNewTask();
     if (state.page === 'delivery-detail') return renderDetail();
@@ -692,6 +1052,25 @@
       var phone = selected && selected.customer && selected.customer.phone;
       if (!phone) return toast('Nomor pelanggan tidak tersedia');
       window.location.href = 'tel:' + phone;
+      return;
+    }
+
+    if (action === 'recenter-map') {
+      if (!mapState.map || !mapState.currentPosition) {
+        toast('Lokasi GPS belum tersedia');
+        return;
+      }
+      fitDriverRoute();
+      return;
+    }
+
+    if (action === 'refresh-map') {
+      var routeTask = selectedTask();
+      if (!routeTask || !mapState.currentPosition) {
+        toast('Lokasi GPS belum tersedia');
+        return;
+      }
+      fetchDriverRoute(mapState.currentPosition, routeTask);
       return;
     }
 
