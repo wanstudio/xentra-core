@@ -540,7 +540,6 @@
           // Driver -> Driver PWA
           if (role === 'driver') {
             if (prefix === 'driver' || urlParams.get('target') === 'driver' || isDriverSurface) return '/driver/';
-            if (baseDomain) return protocol + '//driver.' + baseDomain + '/';
             return '/driver/';
           }
 
@@ -577,6 +576,11 @@
 
         var prefix = currentHost.split('.')[0].toLowerCase();
         var baseDomain = match[1];
+
+        // Driver login may be initiated on the existing tenant host with target=driver.
+        if (role === 'driver' && isDriverSurface) {
+          return { allowed: true };
+        }
 
         // Managerial Environment (m.* / merchant.* / owner.* / dashboard.*) -> Owner, Brand Manager, Branch Manager
         if (prefix === 'm' || prefix === 'merchant' || prefix === 'owner' || prefix === 'dashboard') {
