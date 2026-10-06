@@ -42,6 +42,7 @@ class PermissionModel {
     // Delivery Operations
     DELIVERY_MANAGE: 'delivery:manage',
     DELIVERY_VIEW: 'delivery:view',
+    DELIVERY_EXECUTE: 'delivery:execute',
 
     // Storefront Marketing / Banner
     BANNER_MANAGE: 'banner:manage',
@@ -143,6 +144,10 @@ class PermissionModel {
       'order:view',
       'order:prepare',
       'order:complete'
+    ],
+    [RoleModel.ROLES.DRIVER]: [
+      'delivery:view',
+      'delivery:execute'
     ],
     [RoleModel.ROLES.CUSTOMER]: [
       'menu:view',
