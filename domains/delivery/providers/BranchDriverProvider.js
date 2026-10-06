@@ -28,6 +28,20 @@ class BranchDriverProvider {
       throw new Error(`[BranchDriverProvider] Order "${order_id}" tidak ditemukan.`);
     }
 
+    const driver = orderRepository.db.prepare ? orderRepository.db.prepare(
+      `SELECT id, brand_id, branch_id, full_name, role, status
+       FROM users WHERE id = ? LIMIT 1`
+    ).get(driver_id) : null;
+    if (!driver) {
+      throw new Error('[BranchDriverProvider] Driver tidak ditemukan.');
+    }
+    if (driver.role !== 'driver' || driver.status !== 'active') {
+      throw new Error('[BranchDriverProvider] Akun yang dipilih bukan Driver aktif.');
+    }
+    if (driver.brand_id !== order.brand_id || driver.branch_id !== order.branch_id) {
+      throw new Error('[BranchDriverProvider] Driver harus berasal dari branch yang sama dengan pesanan.');
+    }
+
     const now = new Date().toISOString();
 
     orderRepository.insertOrUpdateDeliveryAssignment({
