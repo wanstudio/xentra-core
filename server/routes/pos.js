@@ -14,6 +14,74 @@ module.exports = function registerPosRoutes(router, deps) {
   const { PosOrderService, PosPaymentGroupService } = require('../../domains/pos');
   const { OrderAdditionService } = require('../../domains/commerce');
 
+router.post('/pos/orders/:id/cod-handover', requireAuth(['cashier']), (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const cashierId = req.user ? (req.user.id || req.user.userId) : null;
+    const userBranchId = req.user ? (req.user.branch_id || req.user.branchId) : null;
+    const receivedAmount = Number(req.body && req.body.received_amount);
+
+    if (!cashierId || !userBranchId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Akun kasir belum memiliki identitas/cabang yang valid.'
+      });
+    }
+
+    if (!Number.isFinite(receivedAmount) || receivedAmount <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Nominal COD yang diterima Cashier wajib diisi dengan angka positif.'
+      });
+    }
+
+    const order = db.prepare(
+      'SELECT * FROM orders WHERE id = ? AND brand_id = ? AND branch_id = ?'
+    ).get(orderId, req.brand_id, userBranchId);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: 'Pesanan tidak ditemukan atau berada di luar kewenangan cabang Anda.'
+      });
+    }
+
+    if (order.order_type !== 'delivery' || order.payment_method !== 'cash') {
+      return res.status(400).json({
+        success: false,
+        error: 'COD handover hanya berlaku untuk order delivery dengan pembayaran Cash.'
+      });
+    }
+
+    const activeShift = db.prepare(
+      "SELECT id, branch_id, cashier_id, status FROM pos_shifts WHERE cashier_id = ? AND branch_id = ? AND status = 'open' ORDER BY opened_at DESC LIMIT 1"
+    ).get(cashierId, userBranchId);
+
+    if (!activeShift) {
+      return res.status(400).json({
+        success: false,
+        error: 'Kasir belum membuka shift aktif.'
+      });
+    }
+
+    const { DeliveryDispatchService } = require('../../domains/delivery');
+    const result = DeliveryDispatchService.recordCodHandover({
+      order_id: orderId,
+      cashier_id: cashierId,
+      branch_id: userBranchId,
+      received_amount: receivedAmount
+    });
+
+    res.json({
+      success: true,
+      message: result.idempotent ? 'Handover COD sudah tercatat sebelumnya.' : 'Handover COD berhasil dikonfirmasi.',
+      handover: result
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 router.post('/pos/orders/:id/settle-cash', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
   try {
     const orderId = req.params.id;
