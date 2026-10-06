@@ -735,8 +735,8 @@ app.get(['/driver/sw.js', '/driver-app/sw.js', '/driver/service-worker.js', '/dr
   res.sendFile(path.join(__dirname, '../apps/driver-app/sw.js'));
 });
 
-// Driver App entry point. UI-only happy-path surface; auth/API wiring follows separately.
-app.get([/^\\/driver(\\/.*)?$/, /^\\/driver-app(\\/.*)?$/], (req, res) => {
+// Driver App entry point. Authentication and Driver API are tenant-scoped; delivery execution wiring remains incremental by contract layer.
+app.get([/^\/driver(\/.*)?$/, /^\/driver-app(\/.*)?$/], (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(__dirname, '../apps/driver-app/index.html'));
 });
