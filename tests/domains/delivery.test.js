@@ -89,6 +89,26 @@ test('Delivery 2 — Delivery Calculator: calculates exact fee, promo discount, 
 // ==============================================================================
 // Delivery 3 — Branch Driver Dispatch & Lifecycle Transitions
 // ==============================================================================
+test('Delivery 2b — Delivery assignment is blocked before order READY', () => {
+  const orderId = `ord_not_ready_driver_${Date.now()}`;
+  db.prepare(`
+    INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
+    VALUES (?, ?, 'brand_del', 'branch_del', 'Not Ready', '62812345678', 'delivery', 'customer_app', 25000, 25000, 'cash', 'preparing')
+  `).run(orderId, 'ORD-NOT-READY-' + Date.now());
+
+  assert.throws(
+    () => DeliveryDispatchService.assign({
+      order_id: orderId,
+      provider_type: DeliveryModel.PROVIDER_TYPES.BRANCH_DRIVER,
+      driver_id: 'driver_not_ready',
+      driver_name: 'Budi Kurir',
+      driver_phone: '081299998888',
+      assigned_by: 'manager_1'
+    }),
+    /setelah pesanan berstatus ready/
+  );
+});
+
 test('Delivery 3 — Branch Driver Provider: assigns internal driver and advances delivery status to delivered', async () => {
   const orderId = `ord_test_del_${Date.now()}`;
   const orderNumber = `ORD-DEL-${Date.now()}`;
@@ -260,7 +280,7 @@ test('Delivery 5 — COD lifecycle requires Driver collection, explicit Cashier 
   const settlement = CashSettlementService.settleCashPayment({
     order_id: orderId,
     amount: 35000,
-    amount_tendered: 40000,
+    amount_tendered: 35000,
     cashier_id: cashierId,
     shift_id: shiftId
   });
