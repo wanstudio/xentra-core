@@ -50,11 +50,32 @@ The Domain Registry MUST be persistent and MUST NOT rely on the current in-memor
 
 Minimum domain resource shape:
 
-`id, hostname, organization_id, brand_id, type, is_primary, verification_status, verification_method, verification_token/challenge, provisioning_status, tls_status, status, created_at, updated_at`
+`id, hostname, organization_id, brand_id, type, surface_type, is_primary, verification_status, verification_method, verification_token/challenge, provisioning_status, tls_status, status, created_at, updated_at`
+
+For application surfaces, `surface_type` is authoritative data and MUST NOT be inferred from hostname prefixes.
+
+Supported Xentra application surfaces include:
+
+- `customer`
+- `merchant`
+- `pos`
+- `driver`
+
+For Bangjo, the canonical client surface mapping is:
+
+| Surface | Hostname |
+|---|---|
+| Customer | `app.mybangjo.com` |
+| Merchant / Owner | `m.mybangjo.com` |
+| POS | `pos.mybangjo.com` |
+| Driver | `driver.mybangjo.com` |
+
+The Driver mapping is part of the locked domain architecture. Its domain record MUST use `surface_type = driver`.
 
 The registry is authoritative for:
 
 - domain → organization/brand/tenant association
+- domain → application surface association
 - verification lifecycle
 - primary/secondary state
 - provisioning lifecycle
@@ -74,12 +95,15 @@ The registry is authoritative for:
 - Cloudflare/DNS and SSL lifecycle belong to domain provisioning/management, not ad-hoc deployment steps.
 - Do not create special cases such as `if host == app.mybangjo.com -> Bangjo`.
 - Do not make `app.mybangjo.com` a special runtime identity.
+- Do not make `driver.mybangjo.com` a special runtime identity; it is a registered Driver surface for the Bangjo tenant.
 
 ## Runtime rules
 
 - Tenant resolution MUST use an authoritative domain registry/configuration.
+- Application surface selection MUST use the authoritative registered `surface_type`.
 - Tenant identity MUST NOT be selected from an untrusted request payload, query parameter, or arbitrary client-controlled header for protected operations.
 - Unknown/unregistered domains MUST fail closed.
+- A Driver request on `driver.mybangjo.com` MUST resolve to Bangjo through the registered domain record; hostname-prefix inference is not the tenant authority.
 - The runtime must remain generic and reusable for any future Xentra client.
 
 ## Separation of responsibilities
@@ -112,6 +136,7 @@ The following are prohibited as the final architecture:
 server_name app.mybangjo.com;
 if ($host = app.mybangjo.com) { ... }
 if (cleanHost === 'app.mybangjo.com') { ... }
+if (cleanHost === 'driver.mybangjo.com') { ... }
 ```
 
 A domain may appear in generated infrastructure state as a consequence of provisioning, but it must originate from the Control Plane domain registry rather than source-code special casing.
