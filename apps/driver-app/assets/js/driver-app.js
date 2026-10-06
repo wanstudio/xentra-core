@@ -399,8 +399,7 @@
         style: 'mapbox://styles/mapbox/streets-v12',
         center: [dest.longitude, dest.latitude],
         zoom: 14,
-        attributionControl: true,
-        cooperativeGestures: true
+        attributionControl: true
       });
 
       mapState.destinationMarker = new window.mapboxgl.Marker({ color: '#e5484d' })
