@@ -7562,7 +7562,7 @@ async function loadMenusView() {
   }
 
   function _timRoleLabel(role) {
-    var labels = { owner: 'Owner', brand_manager: 'Brand Manager', branch_manager: 'Branch Manager', cashier: 'Kasir', kitchen: 'Dapur' };
+    var labels = { owner: 'Owner', brand_manager: 'Brand Manager', branch_manager: 'Branch Manager', cashier: 'Kasir', kitchen: 'Dapur', driver: 'Driver' };
     return labels[role] || role;
   }
 
@@ -7570,6 +7570,7 @@ async function loadMenusView() {
     if (role === 'owner') return 'x-badge-info';
     if (role === 'brand_manager') return 'x-badge-success';
     if (role === 'branch_manager') return 'x-badge-warning';
+    if (role === 'driver') return 'x-badge-primary';
     return 'x-badge-muted';
   }
 
@@ -7714,11 +7715,11 @@ async function loadMenusView() {
     var roleSelect = $('user-role');
     roleSelect.innerHTML = '';
     if (_timCurrentUserRole === 'owner') {
-      roleSelect.innerHTML = '<option value="brand_manager">Brand Manager</option><option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option>';
+      roleSelect.innerHTML = '<option value="brand_manager">Brand Manager</option><option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option>';
     } else if (_timCurrentUserRole === 'brand_manager') {
-      roleSelect.innerHTML = '<option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option>';
+      roleSelect.innerHTML = '<option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option>';
     } else if (_timCurrentUserRole === 'branch_manager') {
-      roleSelect.innerHTML = '<option value="cashier">Kasir</option>';
+      roleSelect.innerHTML = '<option value="cashier">Kasir</option><option value="driver">Driver (Kurir)</option>';
     }
 
     // Populate branch options
@@ -7759,11 +7760,11 @@ async function loadMenusView() {
     var roleSelect = $('user-role');
     roleSelect.innerHTML = '';
     if (_timCurrentUserRole === 'owner') {
-      roleSelect.innerHTML = '<option value="brand_manager">Manager</option><option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option>';
+      roleSelect.innerHTML = '<option value="brand_manager">Manager</option><option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option>';
     } else if (_timCurrentUserRole === 'brand_manager') {
-      roleSelect.innerHTML = '<option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option>';
+      roleSelect.innerHTML = '<option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option>';
     } else if (_timCurrentUserRole === 'branch_manager') {
-      roleSelect.innerHTML = '<option value="cashier">Kasir</option>';
+      roleSelect.innerHTML = '<option value="cashier">Kasir</option><option value="driver">Driver (Kurir)</option>';
     }
     roleSelect.value = user.role;
 
@@ -7824,6 +7825,11 @@ async function loadMenusView() {
 
     if (!payload.full_name) {
       showToast('Nama lengkap wajib diisi.');
+      return;
+    }
+
+    if (payload.role === 'driver' && !payload.branch_id) {
+      showToast('Role Driver wajib ditugaskan ke salah satu cabang.');
       return;
     }
 
@@ -8096,11 +8102,11 @@ async function loadMenusView() {
     var roleSelect = $('invite-input-role');
     roleSelect.innerHTML = '';
     if (_timCurrentUserRole === 'owner') {
-      roleSelect.innerHTML = '<option value="branch_manager">Branch Manager</option><option value="brand_manager">Brand Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option>';
+      roleSelect.innerHTML = '<option value="branch_manager">Branch Manager</option><option value="brand_manager">Brand Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option>';
     } else if (_timCurrentUserRole === 'brand_manager') {
-      roleSelect.innerHTML = '<option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option>';
+      roleSelect.innerHTML = '<option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option>';
     } else if (_timCurrentUserRole === 'branch_manager') {
-      roleSelect.innerHTML = '<option value="cashier">Kasir</option><option value="kitchen">Dapur</option>';
+      roleSelect.innerHTML = '<option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option>';
     }
 
     // Populate branches
@@ -8138,7 +8144,7 @@ async function loadMenusView() {
     var role = $('invite-input-role').value;
     var branchGroup = $('invite-branch-group');
     var branchSelect = $('invite-input-branch');
-    var isBranchRequired = role === 'branch_manager' || role === 'cashier' || role === 'kitchen';
+    var isBranchRequired = role === 'branch_manager' || role === 'cashier' || role === 'kitchen' || role === 'driver';
     
     if (role === 'brand_manager') {
       if (branchGroup) branchGroup.style.display = 'none';
@@ -8161,7 +8167,7 @@ async function loadMenusView() {
       return;
     }
 
-    if ((role === 'branch_manager' || role === 'cashier' || role === 'kitchen') && !branchId) {
+    if ((role === 'branch_manager' || role === 'cashier' || role === 'kitchen' || role === 'driver') && !branchId) {
       showToast('Peran ' + role + ' wajib memilih cabang penugasan.');
       return;
     }
