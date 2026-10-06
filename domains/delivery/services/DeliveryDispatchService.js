@@ -54,6 +54,9 @@ class DeliveryDispatchService {
     if (order.status !== 'ready') {
       throw new Error('[DeliveryDispatchService] Driver hanya dapat di-assign setelah pesanan berstatus ready.');
     }
+    if (!driver_id) {
+      throw new Error('[DeliveryDispatchService] driver_id wajib ditentukan untuk assignment Driver.');
+    }
 
     const existing = orderRepository.findDeliveryByOrderId(order_id);
     if (existing && !['unassigned', 'assigned'].includes(String(existing.status || ''))) {
