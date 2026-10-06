@@ -194,6 +194,13 @@ class DeliveryDispatchService {
         if (latestOrder.status !== 'ready') throw new Error('[DeliveryDispatchService] Pickup hanya dapat dilakukan setelah pesanan ready.');
       } else if (status === DeliveryModel.STATUS.ON_DELIVERY) {
         if (latestOrder.status !== 'ready') throw new Error('[DeliveryDispatchService] Driver hanya dapat memulai pengantaran setelah pesanan berstatus ready.');
+      } else if (status === DeliveryModel.STATUS.ON_DELIVERY) {
+        if (latestOrder.status !== 'ready') throw new Error('[DeliveryDispatchService] Driver hanya dapat memulai pengantaran setelah pesanan berstatus ready.');
+        OrderStateMachine.transition({
+          order_id, target_status: 'out_for_delivery', actor_type: 'driver', actor_id,
+          note: notes || 'Driver memulai pengantaran'
+        }, { dbTransactionProvided: true });
+        orderRepository.updateDeliveryStatus({ orderId: order_id, status, updatedAt: now });
       } else if (status === DeliveryModel.STATUS.DELIVERED) {
         if (latestOrder.status !== 'out_for_delivery') {
           throw new Error('[DeliveryDispatchService] Delivery hanya dapat diselesaikan setelah status pengantaran dimulai.');
