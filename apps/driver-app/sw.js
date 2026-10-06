@@ -1,7 +1,10 @@
-const CACHE_NAME = 'xentra-driver-shell-v2';
+const CACHE_NAME = 'xentra-driver-shell-v3';
 const APP_SHELL = [
   '/driver/',
   '/driver/manifest.json',
+  '/merchant-shared/fonts/plus-jakarta-sans.css',
+  '/merchant-shared/css/shared.css',
+  '/merchant-shared/js/crop-editor.js',
   '/driver/assets/css/driver.css',
   '/driver/assets/js/driver-app.js'
 ];

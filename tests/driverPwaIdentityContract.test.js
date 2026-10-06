@@ -57,3 +57,27 @@ test('DRIVER-UX-02: Production Driver UI does not ship hardcoded business demo r
   assert.match(driverUi, /\/driver\/tasks/);
   assert.match(driverUi, /\/driver\/me/);
 });
+
+test('DRIVER-UX-03: Driver profile photo upload integrates with XentraCropEditor and Media Engine', () => {
+  const indexHtml = read('apps/driver-app/index.html');
+  const driverUi = read('apps/driver-app/assets/js/driver-app.js');
+  const driverRoute = read('server/routes/driver.js');
+
+  // DOM modal & shared assets wired in index.html
+  assert.match(indexHtml, /id="modal-crop-editor"/);
+  assert.match(indexHtml, /\/merchant-shared\/js\/crop-editor\.js/);
+  assert.match(indexHtml, /\/merchant-shared\/css\/shared\.css/);
+
+  // Crop editor invoked for 1:1 avatar
+  assert.match(driverUi, /window\.XentraCropEditor/);
+  assert.match(driverUi, /assetType:\s*'avatar'/);
+  assert.match(driverUi, /aspectRatio:\s*1\.0/);
+  assert.match(driverUi, /payload\.crop_spec = cropSpec/);
+
+  // Backend receives crop_spec and uses MediaService
+  assert.match(driverRoute, /router\.post\('\/driver\/avatar'/);
+  assert.match(driverRoute, /mediaService\.stageUpload/);
+  assert.match(driverRoute, /mediaService\.processMedia/);
+  assert.match(driverRoute, /cropSpec:\s*crop_spec/);
+});
+

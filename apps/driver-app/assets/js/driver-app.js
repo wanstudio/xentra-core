@@ -1076,25 +1076,39 @@
         var file = avatarInput.files && avatarInput.files[0];
         if (!file) return;
         if (!file.type.startsWith('image/')) {
+          avatarInput.value = '';
           return toast('File harus berupa gambar (JPG, PNG, WebP).');
         }
-        if (file.size > 5 * 1024 * 1024) {
-          return toast('Ukuran foto maksimal 5 MB.');
+        if (file.size > 10 * 1024 * 1024) {
+          avatarInput.value = '';
+          return toast('Ukuran foto maksimal 10 MB.');
         }
 
-        toast('Mengunggah foto profil…');
-        var reader = new FileReader();
-        reader.onload = async function (e) {
+        async function doUpload(rawFile, cropSpec, previewUrl) {
+          toast('Mengompres dan mengunggah foto profil…');
           try {
-            var base64 = e.target.result;
+            var base64 = previewUrl;
+            if (!base64) {
+              base64 = await new Promise(function (resolve, reject) {
+                var reader = new FileReader();
+                reader.onload = function () { resolve(reader.result); };
+                reader.onerror = function () { reject(new Error('Gagal membaca gambar.')); };
+                reader.readAsDataURL(rawFile);
+              });
+            }
+
+            var payload = {
+              image_base64: base64,
+              mime_type: rawFile.type || 'image/jpeg',
+              original_filename: rawFile.name || 'driver-avatar.jpg'
+            };
+            if (cropSpec) payload.crop_spec = cropSpec;
+
             var res = await api('/driver/avatar', {
               method: 'POST',
-              body: JSON.stringify({
-                image_base64: base64,
-                mime_type: file.type,
-                original_filename: file.name
-              })
+              body: JSON.stringify(payload)
             });
+
             if (res.success && res.avatar_url) {
               if (state.driver) {
                 state.driver.avatar_url = res.avatar_url;
@@ -1107,9 +1121,27 @@
             }
           } catch (err) {
             toast(err.message || 'Gagal mengunggah foto profil.');
+          } finally {
+            avatarInput.value = '';
           }
-        };
-        reader.readAsDataURL(file);
+        }
+
+        if (window.XentraCropEditor && typeof window.XentraCropEditor.open === 'function') {
+          window.XentraCropEditor.open({
+            source: file,
+            assetType: 'avatar',
+            aspectRatio: 1.0,
+            title: 'Sesuaikan Foto Profil Driver (1:1)',
+            onConfirm: function (cropSpec, previewDataUrl) {
+              doUpload(file, cropSpec, previewDataUrl);
+            },
+            onCancel: function () {
+              avatarInput.value = '';
+            }
+          });
+        } else {
+          doUpload(file, null, null);
+        }
       });
     }
 
