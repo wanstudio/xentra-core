@@ -107,7 +107,7 @@ function registerDriverRoutes(router, deps = {}) {
       const userId = actorId(req);
       const user = db.prepare(
         'SELECT id, username, email, full_name, role, status, brand_id, organization_id, branch_id, ' +
-        'created_at, updated_at, last_login_at ' +
+        'avatar_url, avatar_media_id, created_at, updated_at, last_login_at ' +
         'FROM users WHERE id = ? AND brand_id = ? AND role = ? LIMIT 1'
       ).get(userId, req.brand_id, 'driver');
 
@@ -137,6 +137,8 @@ function registerDriverRoutes(router, deps = {}) {
           full_name: user.full_name || user.username,
           role: user.role,
           status: user.status,
+          avatar_url: user.avatar_url || null,
+          avatar_media_id: user.avatar_media_id || null,
           brand_id: user.brand_id,
           organization_id: user.organization_id,
           branch_id: user.branch_id,
@@ -147,6 +149,56 @@ function registerDriverRoutes(router, deps = {}) {
     } catch (err) {
       const status = err.status || 500;
       res.status(status).json({ success: false, code: err.code || 'DRIVER_PROFILE_ERROR', error: err.message });
+    }
+  });
+
+  router.post('/driver/avatar', driverAuth, async (req, res) => {
+    try {
+      const userId = actorId(req);
+      const { image_base64, mime_type, original_filename, crop_spec } = req.body || {};
+      if (!image_base64) {
+        return res.status(400).json({ success: false, code: 'MISSING_IMAGE', error: 'File foto profil wajib dikirim.' });
+      }
+
+      const mediaService = deps.mediaService;
+      let avatarUrl = null;
+      let mediaId = null;
+
+      if (mediaService) {
+        const staged = await mediaService.stageUpload({
+          brandId: req.brand_id,
+          tenantId: req.brand ? req.brand.organization_id : null,
+          userId: userId,
+          imageBase64: image_base64,
+          mimeType: mime_type || 'image/jpeg',
+          declaredFilename: original_filename || 'driver-avatar.jpg',
+          assetType: 'avatar',
+          enforceAspectRatio: true
+        });
+
+        const asset = await mediaService.processMedia({
+          mediaId: staged.media_id,
+          brandId: req.brand_id,
+          cropSpec: crop_spec || { aspect_ratio: 1.0 }
+        });
+
+        mediaId = asset.media_id;
+        avatarUrl = asset.cdn_url || asset.url || `/media/${mediaId}`;
+      } else {
+        avatarUrl = image_base64.startsWith('data:') ? image_base64 : `data:${mime_type || 'image/jpeg'};base64,${image_base64}`;
+      }
+
+      db.prepare(
+        "UPDATE users SET avatar_url = ?, avatar_media_id = ?, updated_at = datetime('now') WHERE id = ? AND brand_id = ?"
+      ).run(avatarUrl, mediaId, userId, req.brand_id);
+
+      res.json({
+        success: true,
+        avatar_url: avatarUrl,
+        avatar_media_id: mediaId
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, code: 'AVATAR_UPLOAD_FAILED', error: err.message });
     }
   });
 

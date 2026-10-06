@@ -442,6 +442,8 @@
       user: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>',
       history: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><polyline points="12 7 12 12 15 15"/></svg>',
       truck: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>',
+      motor: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="16" r="3"/><circle cx="19" cy="16" r="3"/><path d="M12 17h4l2-5h-4l-2 5Z"/><path d="m8 16 3-8h3l2 4"/><path d="M9 8h2"/><circle cx="13" cy="5" r="1"/></svg>',
+      camera: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>',
       settings: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>',
       nav: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>',
       box: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>',
@@ -749,13 +751,19 @@
     var phone = state.driver.phone || 'Nomor telepon belum diatur';
     var totalDelivered = state.history ? state.history.length : 0;
 
+    var avatarContent = state.driver.avatar_url
+      ? '<img src="' + escapeHTML(state.driver.avatar_url) + '" alt="' + escapeHTML(driverName) + '" class="profile-avatar-img">'
+      : icon('user');
+
     var body =
       '<div class="profile-header-card">' +
         '<div class="profile-avatar-wrap">' +
-          '<div class="profile-avatar">' +
-            icon('user') +
+          '<div class="profile-avatar" id="btn-trigger-avatar" title="Klik untuk ganti foto profil">' +
+            avatarContent +
+            '<button type="button" class="profile-avatar-edit-badge" aria-label="Ganti Foto Profil">' + icon('camera') + '</button>' +
           '</div>' +
           '<span class="profile-status-indicator" title="Driver Aktif"></span>' +
+          '<input type="file" id="driver-avatar-input" accept="image/*" style="display:none">' +
         '</div>' +
         '<div class="profile-main-info">' +
           '<h2 class="profile-name">' + escapeHTML(driverName) + '</h2>' +
@@ -783,7 +791,8 @@
       '<div class="profile-group-title">Operasional & Pengiriman</div>' +
       '<div class="profile-list-card">' +
         profileItem(icon('check'), 'Status Kerja', 'Siap Menerima Pesanan', 'availability') +
-        profileItem(icon('truck'), 'Kendaraan', 'Motor • Standar Operasional') +
+        profileItem(icon('motor'), 'Kendaraan', 'Sepeda Motor (Reguler)') +
+        profileItem(icon('camera'), 'Ganti Foto Profil', 'Perbarui foto diri', 'change-avatar') +
         profileItem(icon('map'), 'Navigasi Pilihan', 'Google Maps / Waze', 'navigate') +
       '</div>' +
 
@@ -1060,9 +1069,65 @@
         if (out) out.textContent = rupiah(change);
       });
     }
+
+    var avatarInput = document.getElementById('driver-avatar-input');
+    if (avatarInput) {
+      avatarInput.addEventListener('change', async function () {
+        var file = avatarInput.files && avatarInput.files[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+          return toast('File harus berupa gambar (JPG, PNG, WebP).');
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          return toast('Ukuran foto maksimal 5 MB.');
+        }
+
+        toast('Mengunggah foto profil…');
+        var reader = new FileReader();
+        reader.onload = async function (e) {
+          try {
+            var base64 = e.target.result;
+            var res = await api('/driver/avatar', {
+              method: 'POST',
+              body: JSON.stringify({
+                image_base64: base64,
+                mime_type: file.type,
+                original_filename: file.name
+              })
+            });
+            if (res.success && res.avatar_url) {
+              if (state.driver) {
+                state.driver.avatar_url = res.avatar_url;
+                persistUser();
+              }
+              toast('Foto profil berhasil diperbarui.');
+              render();
+            } else {
+              toast('Gagal memperbarui foto profil.');
+            }
+          } catch (err) {
+            toast(err.message || 'Gagal mengunggah foto profil.');
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    var avatarTrigger = document.getElementById('btn-trigger-avatar');
+    if (avatarTrigger) {
+      avatarTrigger.addEventListener('click', function () {
+        if (avatarInput) avatarInput.click();
+      });
+    }
   }
 
   async function handleAction(action) {
+    if (action === 'change-avatar') {
+      var input = document.getElementById('driver-avatar-input');
+      if (input) input.click();
+      return;
+    }
+
     if (action === 'back' || action === 'back-tasks') {
       state.lastCompleted = null;
       state.page = 'tasks';

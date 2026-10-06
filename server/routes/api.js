@@ -815,7 +815,7 @@ registerCheckoutRoutes(router, {
 });
 
 // Business onboarding and tenant claim routes are isolated in server/routes/onboarding.js.
-registerDriverRoutes(router, { db, requireAuth, DeliveryDispatchService });
+registerDriverRoutes(router, { db, requireAuth, DeliveryDispatchService, mediaService });
 
 registerOnboardingRoutes(router, {
   db,
