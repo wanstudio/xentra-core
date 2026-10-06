@@ -208,6 +208,15 @@ test('Delivery 3 — Branch Driver Provider: assigns internal driver and advance
   const deliveredRecord = DeliveryDispatchService.getDelivery(orderId);
   assert.strictEqual(deliveredRecord.status, 'delivered');
 
+  assert.throws(
+    () => DeliveryDispatchService.updateStatus({
+      order_id: orderId,
+      status: DeliveryModel.STATUS.DELIVERED,
+      actor_id: 'driver_other'
+    }),
+    /tidak berwenang/
+  );
+
   const orderRecord = db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId);
   assert.strictEqual(orderRecord.status, 'completed');
 
