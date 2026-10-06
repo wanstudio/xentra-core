@@ -80,6 +80,9 @@ class CashSettlementService {
       if (collectedCod !== expectedCod) {
         throw new Error('[COD_CASH_VARIANCE_REQUIRES_EXCEPTION_FLOW]: Nominal COD yang dibawa ke Cashier tidak sama dengan tagihan.');
       }
+      if (Number(amount_tendered) !== collectedCod) {
+        throw new Error('[COD_SETTLEMENT_AMOUNT_MISMATCH]: Settlement COD harus menggunakan nominal cash yang benar-benar diserahkan ke Cashier, bukan nominal tender customer sebelumnya.');
+      }
     }
 
     const expectedAmount = Number(order.grand_total);
