@@ -12,8 +12,8 @@ test('DRIVER-NAV-01: Driver delivery screen uses real browser GPS and Mapbox GL'
   assert.match(ui, /navigator\.geolocation\.getCurrentPosition/);
   assert.match(ui, /navigator\.geolocation\.watchPosition/);
   assert.match(ui, /navigator\.geolocation\.clearWatch/);
-  assert.match(ui, /mapbox-gl\/v' \+ MAPBOX_VERSION \+ '\/mapbox-gl\.js/);
-  assert.match(ui, /mapbox-gl\/v' \+ MAPBOX_VERSION \+ '\/mapbox-gl\.css/);
+  assert.match(ui, /mapbox-gl-js\/v' \+ MAPBOX_VERSION \+ '\/mapbox-gl\.js/);
+  assert.match(ui, /mapbox-gl-js\/v' \+ MAPBOX_VERSION \+ '\/mapbox-gl\.css/);
   assert.match(ui, /window\.mapboxgl\.accessToken = MAPBOX_TOKEN/);
   assert.match(ui, /new window\.mapboxgl\.Map/);
   assert.match(ui, /new window\.mapboxgl\.Marker\(\{ color: '#1463ff' \}\)/);
