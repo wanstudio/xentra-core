@@ -5,7 +5,7 @@ const db = require('../../server/database/db');
 const { defaultEmailProvider } = require('./EmailProvider');
 
 const INVITATION_TTL_DAYS = 7;
-const ALLOWED_INVITATION_ROLES = ['brand_manager', 'branch_manager', 'cashier', 'kitchen'];
+const ALLOWED_INVITATION_ROLES = ['brand_manager', 'branch_manager', 'cashier', 'kitchen', 'driver'];
 
 function isValidEmail(email) {
   if (typeof email !== 'string') return false;
@@ -62,9 +62,9 @@ class WorkforceInvitationService {
     // Role ceiling: determine what roles this actor can invite
     let allowedRoles = [];
     if (actor.actor_role === 'owner') {
-      allowedRoles = ['brand_manager', 'branch_manager', 'cashier', 'kitchen'];
+      allowedRoles = ['brand_manager', 'branch_manager', 'cashier', 'kitchen', 'driver'];
     } else if (actor.actor_role === 'brand_manager') {
-      allowedRoles = ['branch_manager', 'cashier', 'kitchen'];
+      allowedRoles = ['branch_manager', 'cashier', 'kitchen', 'driver'];
     } else if (actor.actor_role === 'branch_manager') {
       allowedRoles = ['cashier', 'kitchen'];
     } else {
@@ -114,7 +114,7 @@ class WorkforceInvitationService {
     // - branch_manager: MUST have a specific branch_id
     // - cashier / kitchen: MUST have a specific branch_id
     // - brand_manager: branch_id is null (brand-wide)
-    if (role === 'branch_manager' || role === 'cashier' || role === 'kitchen') {
+    if (role === 'branch_manager' || role === 'cashier' || role === 'kitchen' || role === 'driver') {
       if (!targetBranchId && actor.actor_role === 'branch_manager') {
         targetBranchId = actor.actor_branch_id;
       }
