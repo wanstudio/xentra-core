@@ -10,7 +10,9 @@
     driver: null,
     brand: null,
     tasks: [],
+    history: [],
     selectedOrderId: null,
+    lastCompleted: null,
     loading: true,
     error: null,
     busy: false
@@ -34,9 +36,7 @@
   }
 
   function persistUser() {
-    if (state.driver) {
-      localStorage.setItem(USER_KEY, JSON.stringify(state.driver));
-    }
+    if (state.driver) localStorage.setItem(USER_KEY, JSON.stringify(state.driver));
   }
 
   function clearSession() {
@@ -57,16 +57,14 @@
         headers: headers,
         credentials: 'same-origin'
       }));
-    } catch (err) {
+    } catch (_) {
       var networkError = new Error('Koneksi ke Xentra gagal. Periksa koneksi internet Anda.');
       networkError.code = 'NETWORK_ERROR';
       throw networkError;
     }
 
     var data = null;
-    try {
-      data = await res.json();
-    } catch (_) {}
+    try { data = await res.json(); } catch (_) {}
 
     if (res.status === 401) {
       clearSession();
@@ -108,6 +106,10 @@
     return task.delivery_status === 'assigned' && task.assignment_status === 'pending';
   }
 
+  function isAcceptedAssigned(task) {
+    return task.delivery_status === 'assigned' && task.assignment_status === 'accepted';
+  }
+
   function isActiveTask(task) {
     return task.delivery_status === 'picked_up' || task.delivery_status === 'on_delivery';
   }
@@ -136,8 +138,9 @@
     bind();
 
     if (state.busy) {
-      var primaryButtons = app.querySelectorAll('.primary-btn, .danger-btn, .secondary-btn');
-      primaryButtons.forEach(function (button) { button.disabled = true; });
+      app.querySelectorAll('.primary-btn, .danger-btn, .secondary-btn').forEach(function (button) {
+        button.disabled = true;
+      });
     }
   }
 
@@ -157,17 +160,16 @@
     var customer = task.customer || {};
     var destination = task.destination || {};
     var payment = task.payment || {};
-    var label = formatDeliveryStatus(task);
-    var action = isNewTask(task) ? 'new-task' : 'delivery-detail';
+    var newTask = isNewTask(task);
 
     return '<article class="card task-card">' +
-      '<div class="task-top"><span class="task-id">' + escapeHTML(task.order_number || task.order_id) + '</span><span class="pill ' + (isNewTask(task) ? 'orange' : 'blue') + '">' + escapeHTML(label) + '</span></div>' +
+      '<div class="task-top"><span class="task-id">' + escapeHTML(task.order_number || task.order_id) + '</span><span class="pill ' + (newTask ? 'orange' : 'blue') + '">' + escapeHTML(formatDeliveryStatus(task)) + '</span></div>' +
       '<div class="customer-row"><span class="pin">' + icon('pin') + '</span><div style="min-width:0"><div class="customer-name">' + escapeHTML(customer.name || 'Pelanggan') + '</div><div class="address">' + escapeHTML(destination.address || 'Alamat tujuan belum tersedia') + '</div></div></div>' +
       '<div class="meta-row"><span class="meta-item">' + icon('bag') + ' ' + Number(task.item_count || 0) + ' item</span>' +
       (payment.is_cod ? '<span class="meta-item">🟧 COD ' + rupiah(payment.amount) + '</span>' : '<span class="meta-item">✓ Online</span>') +
       '</div>' +
-      '<button class="primary-btn" data-order="' + escapeHTML(task.order_id) + '" data-page="' + action + '" style="margin-top:14px">' +
-      (isNewTask(task) ? 'Lihat Tugas' : 'Lihat Pengantaran') + ' ' + icon('arrow') + '</button>' +
+      '<button class="primary-btn" data-order="' + escapeHTML(task.order_id) + '" data-page="' + (newTask ? 'new-task' : 'delivery-detail') + '" style="margin-top:14px">' +
+      (newTask ? 'Lihat Tugas' : 'Lihat Pengantaran') + ' ' + icon('arrow') + '</button>' +
     '</article>';
   }
 
@@ -177,9 +179,7 @@
 
     var newTasks = state.tasks.filter(isNewTask);
     var activeTasks = state.tasks.filter(isActiveTask);
-    var acceptedAssigned = state.tasks.filter(function (task) {
-      return task.delivery_status === 'assigned' && task.assignment_status === 'accepted';
-    });
+    var acceptedAssigned = state.tasks.filter(isAcceptedAssigned);
 
     var body = '<h1 class="screen-title">Tugas</h1><div class="screen-subtitle">Pengantaran yang ditugaskan kepada Anda.</div>' +
       '<div class="status-card"><div class="status-dot">✓</div><div><div class="status-title">Tersedia</div><div class="status-copy">Status availability akan dihubungkan pada tahap berikutnya.</div></div></div>';
@@ -234,34 +234,129 @@
     var c = task.customer || {};
     var d = task.destination || {};
     var p = task.payment || {};
-    var accepted = task.delivery_status === 'assigned' && task.assignment_status === 'accepted';
-    var active = isActiveTask(task);
+    var action = '';
+    var actionLabel = '';
 
-    var nextBlock = accepted
-      ? '<div class="info-box"><span>→</span><div><strong>Langkah berikutnya: Ambil Pesanan.</strong><br>Wiring pickup akan diaktifkan setelah boundary Driver API tahap ini selesai.</div></div>'
-      : (active
-        ? '<div class="info-box success"><span>✓</span><div><strong>' + escapeHTML(formatDeliveryStatus(task)) + '</strong><br>Pengantaran ini sedang Anda jalankan.</div></div>'
-        : '<div class="info-box"><span>i</span><div>Status pengantaran saat ini: ' + escapeHTML(task.delivery_status) + '.</div></div>');
+    if (isAcceptedAssigned(task)) {
+      action = 'pickup';
+      actionLabel = 'Ambil Pesanan';
+    } else if (task.delivery_status === 'picked_up') {
+      action = 'start-delivery';
+      actionLabel = 'Mulai Antar';
+    } else if (task.delivery_status === 'on_delivery') {
+      action = 'delivery-map';
+      actionLabel = 'Lihat Pengantaran';
+    }
+
+    var statusBox = isAcceptedAssigned(task)
+      ? '<div class="info-box"><span>→</span><div><strong>Tugas Diterima</strong><br>Pesanan siap untuk diambil dari cabang.</div></div>'
+      : task.delivery_status === 'picked_up'
+        ? '<div class="info-box success"><span>✓</span><div><strong>Pesanan Diambil</strong><br>Siap dimulai untuk pengantaran.</div></div>'
+        : '<div class="info-box success"><span>✓</span><div><strong>Sedang Diantar</strong><br>Pengantaran sedang berjalan.</div></div>';
 
     var body = '<div class="back-row"><button class="back-btn" data-action="back">‹</button><div class="back-title">Pengantaran ' + escapeHTML(task.order_number || task.order_id) + '</div></div>' +
-      '<div class="card">' + nextBlock + '</div>' +
+      '<div class="card">' + statusBox + '</div>' +
       '<div class="card"><div class="section-title">Tujuan</div><div class="customer-row"><span class="pin">' + icon('pin') + '</span><div style="flex:1"><div class="customer-name">' + escapeHTML(c.name || 'Pelanggan') + '</div><div class="address">' + escapeHTML(d.address || 'Alamat tujuan belum tersedia') + '</div></div><button class="icon-btn" data-action="call" aria-label="Telepon pelanggan">☎</button></div><button class="secondary-btn" data-action="navigate" style="margin-top:13px">⌖ Buka Navigasi</button></div>' +
       '<div class="card"><div class="section-title">Pesanan</div><div class="meta-row"><span class="meta-item">▣ ' + Number(task.item_count || 0) + ' item</span></div></div>' +
       '<div class="card"><div class="section-title">Pembayaran</div><div class="money">' + (p.is_cod ? rupiah(p.amount) : 'Sudah dibayar') + '</div><div class="pill ' + (p.is_cod ? 'orange' : 'green') + '" style="margin-top:8px">' + (p.is_cod ? 'Bayar di Tempat (COD)' : 'Online') + '</div></div>';
 
-    if (accepted) {
-      body += '<div class="sticky-action"><button class="secondary-btn" disabled>Ambil Pesanan • Tahap berikutnya</button></div>';
-    } else if (active) {
-      body += '<div class="sticky-action"><button class="secondary-btn" data-action="next-stage-info">Tahap aktif</button></div>';
+    if (action) {
+      body += '<div class="sticky-action"><button class="primary-btn" data-action="' + action + '">' + actionLabel + ' ' + icon('arrow') + '</button></div>';
     }
 
     shell('Detail Pengantaran', body, 'tasks', {hideNav:true});
   }
 
+  function renderPickup() {
+    var task = selectedTask();
+    if (!task) return shell('Ambil Pesanan', errorBody('Tugas tidak ditemukan.'), 'tasks', {hideNav:true});
+
+    var p = task.payment || {};
+    var pickupName = task.pickup && task.pickup.branch_name || 'Cabang';
+    var body = '<div class="back-row"><button class="back-btn" data-action="back">‹</button><div class="back-title">Ambil Pesanan</div></div>' +
+      '<div class="card"><div class="customer-row" style="margin-top:0"><span class="pin" style="background:#fff0f4;color:#d64572">▣</span><div><div class="customer-name">' + escapeHTML(pickupName) + '</div><div class="address">Tunjukkan nomor pesanan kepada staf.</div></div></div></div>' +
+      '<div class="card"><div class="task-top"><span class="task-id">Pesanan ' + escapeHTML(task.order_number || task.order_id) + '</span><span class="pill blue">' + Number(task.item_count || 0) + ' item</span></div>' +
+      (p.is_cod ? '<div class="money-card"><div class="money-label">COD</div><div class="money">' + rupiah(p.amount) + '</div></div>' : '') +
+      '<div class="info-box"><span>i</span><div>Pastikan jumlah dan kondisi pesanan sesuai sebelum Anda mengonfirmasi pengambilan.</div></div>' +
+      '<div class="check-list"><div class="check"><span class="check-icon">✓</span>Jumlah item sesuai</div><div class="check"><span class="check-icon">✓</span>Kemasan dalam kondisi baik</div></div></div>' +
+      '<div class="sticky-action"><button class="primary-btn" data-action="confirm-pickup">Konfirmasi Pesanan Diambil ' + icon('arrow') + '</button></div>';
+
+    shell('Ambil Pesanan', body, 'tasks', {hideNav:true});
+  }
+
+  function renderMap() {
+    var task = selectedTask();
+    if (!task) return shell('Sedang Mengantar', errorBody('Tugas pengantaran tidak ditemukan.'), 'tasks', {hideNav:true});
+
+    var c = task.customer || {};
+    var d = task.destination || {};
+    var body = '<div class="hero-map"><div class="map-grid"></div><div class="nav-banner"><div class="nav-turn">Tujuan Pengantaran</div><div class="nav-road">' + escapeHTML(d.address || 'Alamat tujuan') + '</div></div><div class="route"></div><div class="map-pin a">A</div><div class="map-pin b">B</div><div class="map-controls"><button class="map-control">➤</button><button class="map-control">⌾</button></div></div>' +
+      '<div class="map-sheet"><div class="route-stats"><div class="route-stat"><strong>' + escapeHTML(task.duration_seconds ? Math.round(Number(task.duration_seconds) / 60) + ' menit' : '—') + '</strong><span>ETA</span></div><div class="route-stat"><strong>' + escapeHTML(task.distance_meters ? (Number(task.distance_meters) / 1000).toFixed(1) + ' km' : '—') + '</strong><span>jarak</span></div></div>' +
+      '<div class="customer-row" style="margin-top:0"><span class="pin" style="background:#fff0f0;color:var(--red)">●</span><div style="flex:1"><div class="customer-name">' + escapeHTML(c.name || 'Pelanggan') + '</div><div class="address">' + escapeHTML(d.address || 'Alamat tujuan belum tersedia') + '</div></div><button class="icon-btn" data-action="call" aria-label="Telepon pelanggan">☎</button></div>' +
+      '<button class="secondary-btn" data-action="navigate" style="margin-top:13px">⌖ Buka Navigasi</button>' +
+      '<div class="sticky-action"><button class="primary-btn green" data-action="complete-delivery">Selesaikan Pengantaran ' + icon('arrow') + '</button></div></div>';
+
+    shell('Sedang Mengantar', body, 'tasks', {hideNav:true});
+  }
+
+  function renderCod() {
+    var task = selectedTask();
+    if (!task) return shell('Konfirmasi COD', errorBody('Tugas pengantaran tidak ditemukan.'), 'tasks', {hideNav:true});
+
+    var p = task.payment || {};
+    var body = '<div class="back-row"><button class="back-btn" data-action="back">‹</button><div class="back-title">Konfirmasi COD</div></div>' +
+      '<div class="card"><div class="money-card"><div class="money-label">Yang harus dibayar (COD)</div><div class="money">' + rupiah(p.amount) + '</div></div>' +
+      '<label class="input-label" for="tendered">Uang diterima dari pelanggan</label><input id="tendered" class="money-input" inputmode="numeric" autocomplete="off" placeholder="Masukkan nominal">' +
+      '<div class="change-box"><div class="change-label">Kembalian untuk pelanggan</div><div id="change" class="change-value">Rp0</div></div>' +
+      '<div class="info-box warning" style="margin-top:12px"><span>!</span><div>Uang tunai ini akan tetap berada pada Anda sampai diserahkan kepada Kasir.</div></div></div>' +
+      '<div class="sticky-action"><button class="primary-btn" data-action="complete-cod">Konfirmasi Uang Diterima</button></div>';
+
+    shell('Konfirmasi COD', body, 'tasks', {hideNav:true});
+  }
+
+  function renderComplete() {
+    var task = state.lastCompleted || selectedTask();
+    if (!task) return shell('Pengantaran Selesai', errorBody('Ringkasan pengantaran tidak tersedia.'), 'tasks', {hideNav:true});
+
+    var c = task.customer || {};
+    var p = task.payment || {};
+    var amount = p.collected_amount != null ? p.collected_amount : p.amount;
+    var cashState = p.is_cod
+      ? '<div class="cash-custody"><div class="label">UANG COD DI TANGAN ANDA</div><div class="value">' + rupiah(amount) + '</div><div style="font-size:12px;color:#8b520b;margin-top:5px">Serahkan uang ini kepada Kasir untuk penyelesaian pembayaran.</div></div>'
+      : '<div class="info-box success"><span>✓</span><div>Pembayaran online sudah tercatat. Tidak ada kas COD yang perlu diserahkan.</div></div>';
+
+    var body = '<div class="card complete"><div class="summary-icon">✓</div><h2>Pengantaran Selesai</h2><p>Pelanggan telah menerima pesanan.</p></div>' +
+      '<div class="card"><div class="customer-row" style="margin-top:0"><span class="pin">▣</span><div><div class="customer-name">Pesanan ' + escapeHTML(task.order_number || task.order_id) + '</div><div class="address">' + escapeHTML(c.name || 'Pelanggan') + '</div></div></div><div class="meta-row"><span class="meta-item">▣ ' + Number(task.item_count || 0) + ' item</span>' +
+      (p.is_cod ? '<span class="meta-item">🟧 COD ' + rupiah(p.amount) + '</span><span class="pill green">✓ Uang diterima</span>' : '<span class="pill green">✓ Online</span>') +
+      '</div></div>' + cashState +
+      '<div class="sticky-action"><button class="primary-btn" data-action="back-tasks">Kembali ke Tugas</button></div>';
+
+    shell('Pengantaran Selesai', body, 'tasks', {hideNav:true});
+  }
+
   function renderHistory() {
-    var body = '<h1 class="screen-title">Riwayat Pengantaran</h1><div class="screen-subtitle">Riwayat akan menggunakan endpoint delivery history setelah API tahap berikutnya tersedia.</div>' +
-      '<div class="empty"><div class="empty-art">' + icon('history') + '</div><h3>Riwayat belum dihubungkan</h3><p>Implementasi pertama Driver PWA berfokus pada identity dan assignment. Riwayat tidak menggunakan data contoh.</p></div>';
+    if (state.loading) return shell('Riwayat', loadingBody('Memuat riwayat…'), 'history');
+    if (state.error) return shell('Riwayat', errorBody(state.error), 'history');
+
+    var body = '<h1 class="screen-title">Riwayat Pengantaran</h1><div class="screen-subtitle">Pengantaran yang sudah selesai.</div>';
+
+    if (!state.history.length) {
+      body += '<div class="empty"><div class="empty-art">' + icon('history') + '</div><h3>Belum ada riwayat</h3><p>Riwayat akan muncul setelah Anda menyelesaikan pengantaran.</p></div>';
+    } else {
+      body += '<div class="history-group"><div class="history-date">Terbaru</div>';
+      state.history.forEach(function (task) {
+        var c = task.customer || {};
+        var p = task.payment || {};
+        body += historyRow(task.order_number || task.order_id, c.name || 'Pelanggan', p.is_cod ? 'COD ' + rupiah(p.amount) : 'Online');
+      });
+      body += '</div>';
+    }
+
     shell('Riwayat', body, 'history');
+  }
+
+  function historyRow(id, name, payment) {
+    return '<div class="history-row"><span class="history-pin">●</span><div class="history-main"><div class="history-id">' + escapeHTML(id) + '</div><div class="history-name">' + escapeHTML(name) + '</div><div class="history-time">Terkirim</div></div><div class="history-right"><span class="pill green">Terkirim</span><div class="amount">' + escapeHTML(payment) + '</div></div></div>';
   }
 
   function renderProfile() {
@@ -272,11 +367,12 @@
       '<div class="profile-list">' +
         profileItem('●','Status','Tersedia','availability') +
         profileItem('▱','Kendaraan','Belum dikonfigurasi') +
-        profileItem('➤','Aplikasi Navigasi','Pilih saat wiring navigasi','navigate') +
+        profileItem('➤','Aplikasi Navigasi','Google Maps','navigate') +
         profileItem('?','Bantuan') +
         profileItem('i','Tentang Xentra') +
         profileItem('↪','Keluar','', 'logout') +
       '</div>';
+
     shell('Profil', body, 'profile');
   }
 
@@ -304,7 +400,7 @@
         '<div class="sheet-handle"></div>' +
         '<h3 id="reject-title">Tolak Tugas</h3>' +
         '<p>Alasan penolakan wajib dicatat agar Branch Manager dapat menindaklanjuti penugasan.</p>' +
-        '<textarea id="driver-reject-reason" maxlength="500" placeholder="Contoh: sedang tidak tersedia untuk mengambil pesanan."></textarea>' +
+        '<textarea id="driver-reject-reason" maxlength="500" placeholder="Masukkan alasan penolakan"></textarea>' +
         '<div class="sheet-actions"><button class="danger-btn" data-sheet-action="cancel">Batal</button><button class="primary-btn" data-sheet-action="submit">Tolak Tugas</button></div>' +
       '</div>';
     document.body.appendChild(overlay);
@@ -313,18 +409,20 @@
       if (event.target === overlay) return;
       var action = event.target.closest('[data-sheet-action]');
       if (!action) return;
-      var actionName = action.getAttribute('data-sheet-action');
-      if (actionName === 'cancel') {
+
+      if (action.getAttribute('data-sheet-action') === 'cancel') {
         overlay.remove();
         return;
       }
-      var reasonInput = document.getElementById('driver-reject-reason');
-      var reason = reasonInput ? reasonInput.value.trim() : '';
+
+      var input = document.getElementById('driver-reject-reason');
+      var reason = input ? input.value.trim() : '';
       if (!reason) {
         toast('Alasan penolakan wajib diisi');
-        if (reasonInput) reasonInput.focus();
+        if (input) input.focus();
         return;
       }
+
       overlay.remove();
       await rejectTask(reason);
     });
@@ -338,13 +436,15 @@
     if (!task || state.busy) return;
     state.busy = true;
     renderNewTask();
+
     try {
-      await api('/driver/tasks/' + encodeURIComponent(task.order_id) + '/accept', { method: 'POST' });
-      toast('Tugas diterima');
-      await refreshTasks(false);
-      state.selectedOrderId = task.order_id;
-      state.page = 'delivery-detail';
+      var data = await api('/driver/tasks/' + encodeURIComponent(task.order_id) + '/accept', { method: 'POST' });
       state.busy = false;
+      state.selectedOrderId = task.order_id;
+      await refreshTasks(false);
+      if (data && data.task) state.tasks.push(data.task);
+      state.page = 'delivery-detail';
+      toast('Tugas diterima');
       render();
     } catch (err) {
       state.busy = false;
@@ -362,16 +462,52 @@
         method: 'POST',
         body: JSON.stringify({ reason: reason })
       });
-      toast('Tugas ditolak');
       state.selectedOrderId = null;
       state.busy = false;
       await refreshTasks(false);
       state.page = 'tasks';
+      toast('Tugas ditolak');
       render();
     } catch (err) {
       state.busy = false;
       render();
       toast(err.message || 'Tugas gagal ditolak');
+    }
+  }
+
+  async function transitionTask(endpoint, payload, nextPage) {
+    var task = selectedTask();
+    if (!task || state.busy) return;
+
+    state.busy = true;
+    render();
+
+    try {
+      var data = await api('/driver/tasks/' + encodeURIComponent(task.order_id) + '/' + endpoint, {
+        method: 'POST',
+        body: payload ? JSON.stringify(payload) : undefined
+      });
+
+      state.busy = false;
+      if (data && data.task) {
+        if (nextPage === 'complete') state.lastCompleted = data.task;
+      }
+
+      if (nextPage === 'complete') {
+        state.page = 'complete';
+        state.lastCompleted = (data && data.task) || task;
+      } else {
+        await refreshTasks(false);
+        state.selectedOrderId = task.order_id;
+        state.page = nextPage;
+      }
+
+      toast(endpoint === 'pickup' ? 'Pesanan berhasil diambil' : endpoint === 'start' ? 'Pengantaran dimulai' : 'Pengantaran selesai');
+      render();
+    } catch (err) {
+      state.busy = false;
+      render();
+      toast(err.message || 'Tindakan gagal diproses');
     }
   }
 
@@ -381,6 +517,7 @@
       state.error = null;
       renderTasks();
     }
+
     try {
       var data = await api('/driver/tasks');
       state.tasks = Array.isArray(data.tasks) ? data.tasks : [];
@@ -395,9 +532,28 @@
     }
   }
 
+  async function refreshHistory() {
+    state.loading = true;
+    state.error = null;
+    renderHistory();
+
+    try {
+      var data = await api('/driver/history');
+      state.history = Array.isArray(data.deliveries) ? data.deliveries : [];
+      state.loading = false;
+      return data;
+    } catch (err) {
+      if (err.status === 401) return null;
+      state.loading = false;
+      state.error = err.message || 'Riwayat tidak dapat dimuat.';
+      return null;
+    }
+  }
+
   async function loadDriver() {
     state.loading = true;
     state.error = null;
+
     if (!token()) {
       window.location.href = '/login?target=driver';
       return;
@@ -421,7 +577,13 @@
     render();
   }
 
-  function go(page) {
+  async function go(page) {
+    if (page === 'history') {
+      state.page = 'history';
+      await refreshHistory();
+      render();
+      return;
+    }
     state.page = page;
     render();
   }
@@ -430,6 +592,10 @@
     if (state.page === 'tasks') return renderTasks();
     if (state.page === 'new-task') return renderNewTask();
     if (state.page === 'delivery-detail') return renderDetail();
+    if (state.page === 'pickup') return renderPickup();
+    if (state.page === 'map') return renderMap();
+    if (state.page === 'cod') return renderCod();
+    if (state.page === 'complete') return renderComplete();
     if (state.page === 'history') return renderHistory();
     if (state.page === 'profile') return renderProfile();
     return renderTasks();
@@ -450,42 +616,108 @@
         handleAction(el.getAttribute('data-action'));
       });
     });
+
+    var input = document.getElementById('tendered');
+    if (input) {
+      input.addEventListener('input', function () {
+        var value = Number(String(input.value).replace(/[^0-9]/g, '')) || 0;
+        var task = selectedTask();
+        var expected = task && task.payment ? Number(task.payment.amount || 0) : 0;
+        var change = Math.max(0, value - expected);
+        var out = document.getElementById('change');
+        if (out) out.textContent = rupiah(change);
+      });
+    }
   }
 
   async function handleAction(action) {
-    if (action === 'back') return go('tasks');
+    if (action === 'back' || action === 'back-tasks') {
+      state.lastCompleted = null;
+      state.page = 'tasks';
+      return refreshTasks(false).then(render);
+    }
+
     if (action === 'reload') {
-      await refreshTasks(true);
+      if (state.page === 'history') await refreshHistory();
+      else await refreshTasks(true);
       render();
       return;
     }
+
     if (action === 'accept') return acceptTask();
     if (action === 'reject') return showRejectSheet();
-    if (action === 'next-stage-info') return toast('Tahap pickup akan dihubungkan setelah API pickup selesai.');
-    if (action === 'call') {
+
+    if (action === 'pickup') {
+      state.page = 'pickup';
+      return render();
+    }
+
+    if (action === 'confirm-pickup') {
+      return transitionTask('pickup', null, 'delivery-detail');
+    }
+
+    if (action === 'start-delivery') {
+      return transitionTask('start', null, 'map');
+    }
+
+    if (action === 'delivery-map') {
+      state.page = 'map';
+      return render();
+    }
+
+    if (action === 'complete-delivery') {
       var task = selectedTask();
-      var phone = task && task.customer && task.customer.phone;
+      if (!task) return toast('Tugas pengantaran tidak ditemukan');
+      if (task.payment && task.payment.is_cod) {
+        state.page = 'cod';
+        return render();
+      }
+      return transitionTask('complete', null, 'complete');
+    }
+
+    if (action === 'complete-cod') {
+      var codTask = selectedTask();
+      var input = document.getElementById('tendered');
+      var tendered = input ? Number(String(input.value).replace(/[^0-9]/g, '')) || 0 : 0;
+      var expected = codTask && codTask.payment ? Number(codTask.payment.amount || 0) : 0;
+      if (tendered < expected) {
+        toast('Uang yang diterima kurang dari total COD');
+        return;
+      }
+      return transitionTask('complete', { cod_amount_tendered: tendered }, 'complete');
+    }
+
+    if (action === 'call') {
+      var selected = selectedTask() || state.lastCompleted;
+      var phone = selected && selected.customer && selected.customer.phone;
       if (!phone) return toast('Nomor pelanggan tidak tersedia');
       window.location.href = 'tel:' + phone;
       return;
     }
+
     if (action === 'navigate') {
-      return toast('Navigasi akan dihubungkan dengan GPS + Mapbox/OSRM pada tahap berikutnya.');
+      var navTask = selectedTask();
+      var destination = navTask && navTask.destination;
+      if (!destination || destination.latitude == null || destination.longitude == null) {
+        return toast('Koordinat tujuan belum tersedia');
+      }
+      window.location.href = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(destination.latitude + ',' + destination.longitude);
+      return;
     }
-    if (action === 'availability') {
-      return toast('Availability Driver akan dihubungkan setelah contract availability API diterapkan.');
-    }
+
+    if (action === 'availability') return toast('Availability Driver akan dihubungkan setelah API availability diterapkan.');
+    if (action === 'next-stage-info') return toast('Tahap berikutnya mengikuti state Delivery dari server.');
+
     if (action === 'logout') {
-      try {
-        await api('/auth/logout', { method: 'POST' });
-      } catch (_) {}
+      try { await api('/auth/logout', { method: 'POST' }); } catch (_) {}
       clearSession();
       window.location.href = '/login?target=driver';
     }
   }
 
   window.addEventListener('popstate', function () {
-    go('tasks');
+    state.page = 'tasks';
+    refreshTasks(false).then(render);
   });
 
   loadDriver();
