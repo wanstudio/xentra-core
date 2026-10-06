@@ -24,7 +24,7 @@ function registerDriverRoutes(router, deps = {}) {
     return row ? row.name : null;
   }
 
-  function getTask(orderId, driverId, brandId) {
+  function getTask(orderId, driverId, brandId, driverBranchId) {
     const task = db.prepare(
       'SELECT ' +
       'd.id AS delivery_id, d.order_id, d.driver_id, d.driver_name, d.driver_phone, ' +
@@ -40,9 +40,9 @@ function registerDriverRoutes(router, deps = {}) {
       'FROM order_deliveries d ' +
       'JOIN orders o ON o.id = d.order_id ' +
       'LEFT JOIN branches b ON b.id = o.branch_id ' +
-      'WHERE d.order_id = ? AND d.driver_id = ? AND o.brand_id = ? AND o.order_type = ? ' +
+      'WHERE d.order_id = ? AND d.driver_id = ? AND o.brand_id = ? AND o.order_type = ? AND o.branch_id = ? ' +
       'LIMIT 1'
-    ).get(orderId, driverId, brandId, 'delivery');
+    ).get(orderId, driverId, brandId, 'delivery', driverBranchId);
 
     if (!task) return null;
 
@@ -157,7 +157,7 @@ function registerDriverRoutes(router, deps = {}) {
         'SELECT d.order_id ' +
         'FROM order_deliveries d ' +
         'JOIN orders o ON o.id = d.order_id ' +
-        'WHERE d.driver_id = ? AND o.brand_id = ? AND o.order_type = ? ' +
+        'WHERE d.driver_id = ? AND o.brand_id = ? AND o.order_type = ? AND o.branch_id = ? ' +
         'AND d.status IN (?, ?, ?) ' +
         'ORDER BY CASE WHEN d.status = ? THEN 0 WHEN d.status = ? THEN 1 ELSE 2 END, ' +
         'datetime(d.updated_at) DESC, d.rowid DESC'
@@ -165,6 +165,7 @@ function registerDriverRoutes(router, deps = {}) {
         driverId,
         req.brand_id,
         'delivery',
+        req.user.branchId || req.user.branch_id,
         DeliveryModel.STATUS.ASSIGNED,
         DeliveryModel.STATUS.PICKED_UP,
         DeliveryModel.STATUS.ON_DELIVERY,
@@ -190,7 +191,7 @@ function registerDriverRoutes(router, deps = {}) {
 
   router.get('/driver/tasks/:orderId', driverAuth, (req, res) => {
     try {
-      const task = getTask(req.params.orderId, actorId(req), req.brand_id);
+      const task = getTask(req.params.orderId, actorId(req), req.brand_id, req.user.branchId || req.user.branch_id);
       if (!task) {
         return res.status(404).json({
           success: false,
