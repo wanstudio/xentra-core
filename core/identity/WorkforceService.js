@@ -60,6 +60,11 @@ class WorkforceService {
       throw { status: 409, code: 'USERNAME_EXISTS', message: 'Username already exists in this brand.' };
     }
 
+    // Driver accounts are always branch-scoped.
+    if (role === 'driver' && !branch_id) {
+      throw { status: 400, code: 'DRIVER_BRANCH_REQUIRED', message: 'Role Driver harus ditugaskan ke cabang tertentu.' };
+    }
+
     // Validate branch exists if provided
     if (branch_id) {
       const branch = this.repository.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(branch_id, brand_id);
