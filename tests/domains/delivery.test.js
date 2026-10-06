@@ -130,7 +130,22 @@ test('Delivery 3 — Branch Driver Provider: assigns internal driver and advance
   assert.ok(assignedEvent);
   assert.strictEqual(assignedEvent.payload.driver_name, 'Budi Kurir');
 
-  // 2. Driver pickup
+  // 2. Driver must explicitly accept before pickup.
+  assert.throws(
+    () => DeliveryDispatchService.updateStatus({
+      order_id: orderId,
+      status: DeliveryModel.STATUS.PICKED_UP,
+      actor_id: 'driver_1'
+    }),
+    /harus diterima Driver/
+  );
+
+  const accepted = DeliveryDispatchService.acceptAssignment({
+    order_id: orderId,
+    actor_id: 'driver_1'
+  });
+  assert.strictEqual(accepted.assignment_status, 'accepted');
+
   DeliveryDispatchService.updateStatus({
     order_id: orderId,
     status: DeliveryModel.STATUS.PICKED_UP,
@@ -169,6 +184,101 @@ test('Delivery 3 — Branch Driver Provider: assigns internal driver and advance
   // Verify Event
   assert.ok(completedEvent);
   assert.strictEqual(completedEvent.payload.order_id, orderId);
+});
+
+test('Delivery 5 — COD lifecycle requires Driver collection, explicit Cashier handover, then settlement', () => {
+  const orderId = `ord_cod_delivery_${Date.now()}`;
+  const shiftId = `shift_cod_delivery_${Date.now()}`;
+  const cashierId = `cashier_cod_delivery_${Date.now()}`;
+
+  db.prepare(`
+    INSERT INTO users (id, brand_id, branch_id, username, email, password_hash, full_name, role, status)
+    VALUES (?, 'brand_del', 'branch_del', ?, ?, 'hash', 'Kasir COD', 'cashier', 'active')
+  `).run(cashierId, 'cashier_' + cashierId, cashierId + '@test.local');
+
+  db.prepare(`
+    INSERT INTO pos_shifts (id, branch_id, cashier_id, starting_float, total_cash_sales, status, opened_at)
+    VALUES (?, 'branch_del', ?, 100000, 0, 'open', datetime('now'))
+  `).run(shiftId, cashierId);
+
+  db.prepare(`
+    INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, delivery_fee, grand_total, payment_method, status)
+    VALUES (?, ?, 'brand_del', 'branch_del', 'COD Buyer', '628111111111', 'delivery', 'customer_app', 30000, 5000, 35000, 'cash', 'ready')
+  `).run(orderId, 'ORD-COD-' + Date.now());
+
+  db.prepare(`
+    INSERT INTO order_payments (id, order_id, provider, payment_method, payment_status, amount)
+    VALUES (?, ?, 'cash', 'cash', 'pending', 35000)
+  `).run('pay_' + orderId, orderId);
+
+  DeliveryDispatchService.assign({
+    order_id: orderId,
+    provider_type: DeliveryModel.PROVIDER_TYPES.BRANCH_DRIVER,
+    driver_id: 'driver_cod_1',
+    driver_name: 'Driver COD',
+    driver_phone: '081200000001',
+    assigned_by: 'manager_1'
+  });
+  DeliveryDispatchService.acceptAssignment({ order_id: orderId, actor_id: 'driver_cod_1' });
+  DeliveryDispatchService.updateStatus({ order_id: orderId, status: DeliveryModel.STATUS.PICKED_UP, actor_id: 'driver_cod_1' });
+  DeliveryDispatchService.updateStatus({ order_id: orderId, status: DeliveryModel.STATUS.ON_DELIVERY, actor_id: 'driver_cod_1' });
+  DeliveryDispatchService.updateStatus({
+    order_id: orderId,
+    status: DeliveryModel.STATUS.DELIVERED,
+    actor_id: 'driver_cod_1',
+    cod_amount_tendered: 40000
+  });
+
+  const deliveryAfterDelivery = DeliveryDispatchService.getDelivery(orderId);
+  assert.strictEqual(deliveryAfterDelivery.status, 'delivered');
+  assert.strictEqual(deliveryAfterDelivery.cod_collection_status, 'collected');
+  assert.strictEqual(deliveryAfterDelivery.cod_cash_custody, 'driver');
+  assert.strictEqual(Number(deliveryAfterDelivery.cod_collected_amount), 35000);
+  assert.strictEqual(Number(deliveryAfterDelivery.cod_amount_tendered), 40000);
+  assert.strictEqual(Number(deliveryAfterDelivery.cod_change_given), 5000);
+
+  const { CashSettlementService } = require('../../domains/payment');
+  assert.throws(
+    () => CashSettlementService.settleCashPayment({
+      order_id: orderId,
+      amount: 35000,
+      amount_tendered: 35000,
+      cashier_id: cashierId,
+      shift_id: shiftId
+    }),
+    /COD_HANDOVER_REQUIRED/
+  );
+
+  const handover = DeliveryDispatchService.recordCodHandover({
+    order_id: orderId,
+    cashier_id: cashierId,
+    branch_id: 'branch_del',
+    received_amount: 35000
+  });
+  assert.strictEqual(handover.cod_cash_custody, 'cashier');
+
+  const settlement = CashSettlementService.settleCashPayment({
+    order_id: orderId,
+    amount: 35000,
+    amount_tendered: 40000,
+    cashier_id: cashierId,
+    shift_id: shiftId
+  });
+  assert.strictEqual(settlement.payment_status, 'settlement');
+
+  const finalDelivery = DeliveryDispatchService.getDelivery(orderId);
+  const finalPayment = db.prepare('SELECT payment_status FROM order_payments WHERE order_id = ?').get(orderId);
+  assert.strictEqual(finalDelivery.cod_collection_status, 'handed_over');
+  assert.strictEqual(finalDelivery.cod_cash_custody, 'cashier');
+  assert.strictEqual(finalPayment.payment_status, 'settlement');
+
+  const repeatHandover = DeliveryDispatchService.recordCodHandover({
+    order_id: orderId,
+    cashier_id: cashierId,
+    branch_id: 'branch_del',
+    received_amount: 35000
+  });
+  assert.strictEqual(repeatHandover.idempotent, true);
 });
 
 test('Delivery 4 — driver assignment rejects non-delivery fulfillment environments', () => {
