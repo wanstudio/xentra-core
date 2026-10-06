@@ -507,14 +507,12 @@
   <script>
     (function () {
       'use strict';
-      var currentHostForStorage = window.location.hostname || '';
-      var isDriverSurface = currentHostForStorage.toLowerCase().startsWith('driver.');
-      var TOKEN_KEY = isDriverSurface ? 'xentra_driver_token' : 'xentra_merchant_token';
-      var USER_KEY = isDriverSurface ? 'xentra_driver_user' : 'xentra_merchant_user';
-
       // Context Detection for login shell
       var host = (window.location.hostname || '').toLowerCase();
       var urlParams = new URLSearchParams(window.location.search);
+      var isDriverSurface = host.startsWith('driver.') || urlParams.get('target') === 'driver' || window.location.pathname.indexOf('/driver/') === 0;
+      var TOKEN_KEY = isDriverSurface ? 'xentra_driver_token' : 'xentra_merchant_token';
+      var USER_KEY = isDriverSurface ? 'xentra_driver_user' : 'xentra_merchant_user';
       var isPlatform = urlParams.get('context') === 'platform' || (urlParams.get('context') !== 'client' && host === 'xentra.cloud');
 
       // POS terminal setup is a managerial bootstrap only. It is intentionally
@@ -538,6 +536,13 @@
           var prefix = currentHost.split('.')[0].toLowerCase();
           var baseDomain = match[1];
           var protocol = window.location.protocol;
+
+          // Driver -> Driver PWA
+          if (role === 'driver') {
+            if (prefix === 'driver' || urlParams.get('target') === 'driver' || isDriverSurface) return '/driver/';
+            if (baseDomain) return protocol + '//driver.' + baseDomain + '/';
+            return '/driver/';
+          }
 
           // Branch Manager / Manager -> Merchant App
           if (role === 'branch_manager' || role === 'manager') {
