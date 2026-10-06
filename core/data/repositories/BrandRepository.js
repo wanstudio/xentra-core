@@ -62,42 +62,40 @@ class BrandRepository {
       const cached = readDomainCache(clean);
       if (cached) return cached;
     }
-    let brand = this.db.queryOne(`
-      SELECT *
-      FROM brands
-      WHERE lower(trim(custom_domain)) = ?
-      LIMIT 1
-    `, [clean]);
 
-    if (!brand && typeof clean === 'string') {
-      const match = clean.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app|customer)\.(.+)$/);
-      if (match) {
-        const baseDomain = match[1];
-        const candidates = [
-          baseDomain,
-          'app.' + baseDomain,
-          'customer.' + baseDomain,
-          'dashboard.' + baseDomain,
-          'owner.' + baseDomain,
-          'm.' + baseDomain,
-          'merchant.' + baseDomain,
-          'pos.' + baseDomain,
-          'kasir.' + baseDomain
-        ];
-        const placeholders = candidates.map(() => '?').join(',');
-        brand = this.db.queryOne(`
-          SELECT *
-          FROM brands
-          WHERE lower(trim(custom_domain)) IN (${placeholders})
-          LIMIT 1
-        `, candidates);
-      }
+    // Authoritative tenant/client domain registry is the primary source.
+    // Application surface is returned as data (including `driver`).
+    let brand = null;
+    try {
+      brand = this.db.queryOne(`
+        SELECT b.*,
+               td.hostname AS registered_hostname,
+               td.surface_type AS surface_type
+        FROM tenant_domains td
+        JOIN brands b ON b.id = td.brand_id
+        WHERE lower(trim(td.hostname)) = ?
+          AND lower(trim(td.status)) = 'active'
+          AND lower(trim(td.verification_status)) = 'verified'
+        LIMIT 1
+      `, [clean]);
+    } catch (_) {
+      // Legacy database compatibility: the registry table may not exist yet.
+    }
+
+    // Transitional compatibility for existing tests/tenants: exact custom_domain only.
+    // Never infer tenant identity by hostname prefix.
+    if (!brand) {
+      brand = this.db.queryOne(`
+        SELECT *
+        FROM brands
+        WHERE lower(trim(custom_domain)) = ?
+        LIMIT 1
+      `, [clean]);
     }
 
     if (cacheable && brand) writeDomainCache(clean, brand);
     return brand;
   }
-
   clearCustomDomainCache() {
     clearDomainCache();
   }
