@@ -44,7 +44,7 @@ class WorkforceService {
     }
 
     // Validate role
-    const allowedRoles = ['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen'];
+    const allowedRoles = ['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen', 'driver'];
     if (!allowedRoles.includes(role)) {
       throw { status: 400, code: 'INVALID_ROLE', message: `Role must be one of: ${allowedRoles.join(', ')}` };
     }
