@@ -10,16 +10,17 @@ class RoleModel {
    * - 'branch_manager': Branch-scoped authority.
    * - 'cashier': POS branch operational authority.
    * - 'kitchen': KDS branch display authority.
+   * - 'driver': Delivery branch execution and COD collection authority.
    * - 'customer': Customer self-service scope.
    */
   static ROLES = {
     PLATFORM_OWNER: 'platform_owner',
-    PLATFORM_ADMIN: 'platform_admin',
     OWNER: 'owner',
     BRAND_MANAGER: 'brand_manager',
     BRANCH_MANAGER: 'branch_manager',
     CASHIER: 'cashier',
     KITCHEN: 'kitchen',
+    DRIVER: 'driver',
     CUSTOMER: 'customer'
   };
 

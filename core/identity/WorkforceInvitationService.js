@@ -5,7 +5,7 @@ const db = require('../../server/database/db');
 const { defaultEmailProvider } = require('./EmailProvider');
 
 const INVITATION_TTL_DAYS = 7;
-const ALLOWED_INVITATION_ROLES = ['brand_manager', 'branch_manager', 'cashier', 'kitchen'];
+const ALLOWED_INVITATION_ROLES = ['brand_manager', 'branch_manager', 'cashier', 'kitchen', 'driver'];
 
 function isValidEmail(email) {
   if (typeof email !== 'string') return false;
@@ -62,7 +62,7 @@ class WorkforceInvitationService {
     // Role ceiling: determine what roles this actor can invite
     let allowedRoles = [];
     if (actor.actor_role === 'owner') {
-      allowedRoles = ['brand_manager', 'branch_manager', 'cashier', 'kitchen'];
+      allowedRoles = ['brand_manager', 'branch_manager', 'cashier', 'kitchen', 'driver'];
     } else if (actor.actor_role === 'brand_manager') {
       allowedRoles = ['branch_manager', 'cashier', 'kitchen'];
     } else if (actor.actor_role === 'branch_manager') {
@@ -114,7 +114,7 @@ class WorkforceInvitationService {
     // - branch_manager: MUST have a specific branch_id
     // - cashier / kitchen: MUST have a specific branch_id
     // - brand_manager: branch_id is null (brand-wide)
-    if (role === 'branch_manager' || role === 'cashier' || role === 'kitchen') {
+    if (role === 'branch_manager' || role === 'cashier' || role === 'kitchen' || role === 'driver') {
       if (!targetBranchId && actor.actor_role === 'branch_manager') {
         targetBranchId = actor.actor_branch_id;
       }
@@ -1150,16 +1150,13 @@ class WorkforceInvitationService {
         };
       }
 
-      // Assign role and scope to user strictly from invitation record.
-      // If invited role is cashier, onboarding status becomes 'ACCEPTED' (mandatory onboarding begins).
-      const initialCashierStatus = invitation.role === 'cashier' ? 'ACCEPTED' : 'IDENTITY_COMPLETED';
+      // Assign role and scope to user strictly from invitation record
       this.db.prepare(`
         UPDATE users
         SET role = ?,
             brand_id = ?,
             organization_id = ?,
             branch_id = ?,
-            cashier_onboarding_status = CASE WHEN ? = 'cashier' THEN 'ACCEPTED' ELSE cashier_onboarding_status END,
             updated_at = ?
         WHERE id = ?
       `).run(
@@ -1167,7 +1164,6 @@ class WorkforceInvitationService {
         invitation.brand_id,
         invitation.organization_id,
         invitation.branch_id || null,
-        invitation.role,
         now,
         userRecord.id
       );
@@ -1555,8 +1551,8 @@ class WorkforceInvitationService {
         this.db.prepare(`
           INSERT INTO users (
             id, username, email, password_hash, full_name, role, status,
-            organization_id, brand_id, branch_id, email_verified_at, cashier_onboarding_status, created_at, updated_at
-          ) VALUES (?, ?, ?, NULL, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?)
+            organization_id, brand_id, branch_id, email_verified_at, created_at, updated_at
+          ) VALUES (?, ?, ?, NULL, ?, ?, 'active', ?, ?, ?, ?, ?, ?)
         `).run(
           targetUserId,
           candidateUsername,
@@ -1567,7 +1563,6 @@ class WorkforceInvitationService {
           invitation.brand_id,
           invitation.branch_id || null,
           now,
-          invitation.role === 'cashier' ? 'ACCEPTED' : 'IDENTITY_COMPLETED',
           now,
           now
         );
@@ -1578,7 +1573,6 @@ class WorkforceInvitationService {
               brand_id = ?,
               organization_id = ?,
               branch_id = ?,
-              cashier_onboarding_status = CASE WHEN ? = 'cashier' THEN 'ACCEPTED' ELSE cashier_onboarding_status END,
               updated_at = ?
           WHERE id = ?
         `).run(
@@ -1586,7 +1580,6 @@ class WorkforceInvitationService {
           invitation.brand_id,
           invitation.organization_id,
           invitation.branch_id || null,
-          invitation.role,
           now,
           targetUserId
         );

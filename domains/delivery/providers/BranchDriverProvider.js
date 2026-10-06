@@ -12,14 +12,15 @@ class BranchDriverProvider {
    * 
    * @param {Object} params
    * @param {string} params.order_id
+   * @param {string} [params.driver_id]
    * @param {string} params.driver_name
    * @param {string} params.driver_phone
    * @param {string} [params.assigned_by]
    * @returns {Object} Dispatch assignment result
    */
-  static assignDriver({ order_id, driver_name, driver_phone, assigned_by = null }) {
-    if (!order_id || !driver_name || !driver_phone) {
-      throw new Error('[BranchDriverProvider] "order_id", "driver_name", and "driver_phone" are required.');
+  static assignDriver({ order_id, driver_id = null, driver_name, driver_phone, assigned_by = null }) {
+    if (!order_id || !driver_id || !driver_name || !driver_phone) {
+      throw new Error('[BranchDriverProvider] "order_id", "driver_id", "driver_name", and "driver_phone" are required.');
     }
 
     const order = orderRepository.findById(order_id);
@@ -27,10 +28,25 @@ class BranchDriverProvider {
       throw new Error(`[BranchDriverProvider] Order "${order_id}" tidak ditemukan.`);
     }
 
+    const driver = orderRepository.db.prepare ? orderRepository.db.prepare(
+      `SELECT id, brand_id, branch_id, full_name, role, status
+       FROM users WHERE id = ? LIMIT 1`
+    ).get(driver_id) : null;
+    if (!driver) {
+      throw new Error('[BranchDriverProvider] Driver tidak ditemukan.');
+    }
+    if (driver.role !== 'driver' || driver.status !== 'active') {
+      throw new Error('[BranchDriverProvider] Akun yang dipilih bukan Driver aktif.');
+    }
+    if (driver.brand_id !== order.brand_id || driver.branch_id !== order.branch_id) {
+      throw new Error('[BranchDriverProvider] Driver harus berasal dari branch yang sama dengan pesanan.');
+    }
+
     const now = new Date().toISOString();
 
     orderRepository.insertOrUpdateDeliveryAssignment({
       orderId: order_id,
+      driverId: driver_id || null,
       driverName: driver_name.trim(),
       driverPhone: driver_phone.trim(),
       updatedAt: now
@@ -44,6 +60,7 @@ class BranchDriverProvider {
         order_number: order.order_number,
         branch_id: order.branch_id,
         provider_type: DeliveryModel.PROVIDER_TYPES.BRANCH_DRIVER,
+        driver_id: driver_id || null,
         driver_name,
         driver_phone,
         assigned_by
@@ -54,9 +71,11 @@ class BranchDriverProvider {
       success: true,
       provider: DeliveryModel.PROVIDER_TYPES.BRANCH_DRIVER,
       order_id,
+      driver_id: driver_id || null,
       driver_name,
       driver_phone,
-      status: 'assigned'
+      status: 'assigned',
+      assignment_status: DeliveryModel.ASSIGNMENT_RESPONSES.PENDING
     };
   }
 }

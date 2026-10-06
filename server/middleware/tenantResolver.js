@@ -1,16 +1,10 @@
-const { BrandRepository, TenantDomainRepository } = require('../../core/data/repositories');
-const TenantDomainResolver = require('../../core/identity/TenantDomainResolver');
+const { BrandRepository } = require('../../core/data/repositories');
 
 const brandRepository = new BrandRepository();
-const domainRepository = new TenantDomainRepository();
-const tenantDomainResolver = new TenantDomainResolver({
-  domainRepository,
-  brandRepository
-});
 
 async function tenantResolver(req, res, next) {
   try {
-    await tenantDomainResolver.ready();
+    await brandRepository.ready();
 
     // Public platform routes & Control Plane endpoints originate before a tenant/brand exists
     // or operate at the platform level without tenant resolution.
@@ -57,7 +51,6 @@ async function tenantResolver(req, res, next) {
           req.brand = brandBySlug;
           req.brand_id = brandBySlug.id;
           req.organization_id = brandBySlug.organization_id;
-          req.surface_type = 'customer';
           return next();
         }
       }
@@ -68,7 +61,6 @@ async function tenantResolver(req, res, next) {
           req.brand = brandById;
           req.brand_id = brandById.id;
           req.organization_id = brandById.organization_id;
-          req.surface_type = 'customer';
           return next();
         }
       }
@@ -77,13 +69,11 @@ async function tenantResolver(req, res, next) {
       if ((req.path === '/auth/handoff/exchange' || req.path === '/api/v1/auth/handoff/exchange') && req.headers.origin) {
         try {
           const originHost = new URL(req.headers.origin).hostname.toLowerCase().trim();
-          const originContext = await tenantDomainResolver.resolve(originHost);
-          if (originContext) {
-            req.brand = originContext.brand;
-            req.brand_id = originContext.brand_id;
-            req.organization_id = originContext.organization_id;
-            req.surface_type = originContext.surface_type;
-            req.domain_record = originContext.domain_record;
+          const originBrand = brandRepository.findByCustomDomain(originHost);
+          if (originBrand) {
+            req.brand = originBrand;
+            req.brand_id = originBrand.id;
+            req.organization_id = originBrand.organization_id;
             return next();
           }
         } catch (_) {}
@@ -91,13 +81,13 @@ async function tenantResolver(req, res, next) {
       return next();
     }
 
-    let resolved = null;
+    let brand = null;
 
     try {
-      // Production tenant resolution is authoritative: exact host → registered custom domain in persistent registry.
+      // Production tenant resolution is authoritative: exact host → registered custom domain.
       // Client-specific hostnames must never be hardcoded in application code.
       if (cleanHost) {
-        resolved = await tenantDomainResolver.resolve(cleanHost);
+        brand = brandRepository.findByCustomDomain(cleanHost);
       }
 
       // Localhost fallback exists only to keep isolated local developer execution practical.
@@ -107,19 +97,8 @@ async function tenantResolver(req, res, next) {
         cleanHost === '127.0.0.1' ||
         cleanHost === '::1';
 
-      if (!resolved && isLocal) {
-        const localBrand = brandRepository.findFirstForLocalDevelopment();
-        if (localBrand) {
-          resolved = {
-            organization_id: localBrand.organization_id,
-            brand_id: localBrand.id,
-            surface_type: 'customer',
-            hostname: 'localhost',
-            is_primary: true,
-            domain_record: null,
-            brand: localBrand
-          };
-        }
+      if (!brand && isLocal) {
+        brand = brandRepository.findFirstForLocalDevelopment();
       }
     } catch (dbErr) {
       console.error('[TenantResolver DB lookup failure]:', dbErr.message);
@@ -130,8 +109,8 @@ async function tenantResolver(req, res, next) {
       });
     }
 
-    // STRICT MULTI-TENANT SECURITY BOUNDARY: Fail closed if the host is not registered or resolved.
-    if (!resolved || !resolved.brand) {
+    // STRICT MULTI-TENANT SECURITY BOUNDARY: Fail closed if the host is not registered.
+    if (!brand) {
       return res.status(404).json({
         success: false,
         error: 'TENANT_NOT_FOUND',
@@ -139,11 +118,12 @@ async function tenantResolver(req, res, next) {
       });
     }
 
-    req.brand = resolved.brand;
-    req.brand_id = resolved.brand_id;
-    req.organization_id = resolved.organization_id;
-    req.surface_type = resolved.surface_type;
-    req.domain_record = resolved.domain_record;
+    req.brand = brand;
+    req.brand_id = brand.id;
+    req.organization_id = brand.organization_id;
+    // Surface is authoritative registry data when available. Legacy brand-only
+    // domains remain supported but do not manufacture a surface from hostname.
+    req.surface_type = brand.surface_type || null;
 
     next();
   } catch (err) {

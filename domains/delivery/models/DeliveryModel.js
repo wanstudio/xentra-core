@@ -17,6 +17,23 @@ class DeliveryModel {
     EXTERNAL_API: 'external_api'
   };
 
+  static ASSIGNMENT_RESPONSES = {
+    PENDING: 'pending',
+    ACCEPTED: 'accepted',
+    REJECTED: 'rejected'
+  };
+
+  static COD_COLLECTION_STATUS = {
+    PENDING: 'pending',
+    COLLECTED: 'collected',
+    HANDED_OVER: 'handed_over'
+  };
+
+  static COD_CASH_CUSTODY = {
+    DRIVER: 'driver',
+    CASHIER: 'cashier'
+  };
+
   /**
    * Validates if status is valid.
    * 

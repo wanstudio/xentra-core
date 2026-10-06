@@ -2712,6 +2712,7 @@ function bootstrapEssentialTenant(targetDb) {
     seedDomainStmt.run('td_bangjo_customer', 'app.mybangjo.com', orgId, brandId, 'customer', 1);
     seedDomainStmt.run('td_bangjo_merchant', 'm.mybangjo.com', orgId, brandId, 'merchant', 0);
     seedDomainStmt.run('td_bangjo_pos', 'pos.mybangjo.com', orgId, brandId, 'pos', 0);
+    seedDomainStmt.run('td_bangjo_driver', 'driver.mybangjo.com', orgId, brandId, 'driver', 0);
   } catch (e) {}
 
   // In test environment only: seed default test merchant owner if users table is empty

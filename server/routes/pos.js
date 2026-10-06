@@ -14,7 +14,75 @@ module.exports = function registerPosRoutes(router, deps) {
   const { PosOrderService, PosPaymentGroupService } = require('../../domains/pos');
   const { OrderAdditionService } = require('../../domains/commerce');
 
-router.post('/pos/orders/:id/settle-cash', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
+router.post('/pos/orders/:id/cod-handover', requireAuth(['cashier']), (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const cashierId = req.user ? (req.user.id || req.user.userId) : null;
+    const userBranchId = req.user ? (req.user.branch_id || req.user.branchId) : null;
+    const receivedAmount = Number(req.body && req.body.received_amount);
+
+    if (!cashierId || !userBranchId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Akun kasir belum memiliki identitas/cabang yang valid.'
+      });
+    }
+
+    if (!Number.isFinite(receivedAmount) || receivedAmount <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Nominal COD yang diterima Cashier wajib diisi dengan angka positif.'
+      });
+    }
+
+    const order = db.prepare(
+      'SELECT * FROM orders WHERE id = ? AND brand_id = ? AND branch_id = ?'
+    ).get(orderId, req.brand_id, userBranchId);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: 'Pesanan tidak ditemukan atau berada di luar kewenangan cabang Anda.'
+      });
+    }
+
+    if (order.order_type !== 'delivery' || order.payment_method !== 'cash') {
+      return res.status(400).json({
+        success: false,
+        error: 'COD handover hanya berlaku untuk order delivery dengan pembayaran Cash.'
+      });
+    }
+
+    const activeShift = db.prepare(
+      "SELECT id, branch_id, cashier_id, status FROM pos_shifts WHERE cashier_id = ? AND branch_id = ? AND status = 'open' ORDER BY opened_at DESC LIMIT 1"
+    ).get(cashierId, userBranchId);
+
+    if (!activeShift) {
+      return res.status(400).json({
+        success: false,
+        error: 'Kasir belum membuka shift aktif.'
+      });
+    }
+
+    const { DeliveryDispatchService } = require('../../domains/delivery');
+    const result = DeliveryDispatchService.recordCodHandover({
+      order_id: orderId,
+      cashier_id: cashierId,
+      branch_id: userBranchId,
+      received_amount: receivedAmount
+    });
+
+    res.json({
+      success: true,
+      message: result.idempotent ? 'Handover COD sudah tercatat sebelumnya.' : 'Handover COD berhasil dikonfirmasi.',
+      handover: result
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/pos/orders/:id/settle-cash', requireAuth(['cashier']), (req, res) => {
   try {
     const orderId = req.params.id;
     const { amount_tendered, shift_id } = req.body;
@@ -237,35 +305,6 @@ router.post('/pos/orders/:id/cancel-qris-static', requireAuth(['cashier']), (req
     res.json(ManualQrisSettlementService.cancelStaticQrisPayment({ order_id: req.params.id, cashier_id: cashierId, branch_id: branchId, reason: req.body?.reason || 'QRIS statis dibatalkan oleh kasir.' }));
   } catch (err) { res.status(400).json({ success: false, error: err.message }); }
 });
-router.get('/pos/orders/:id', requireAuth(['cashier', 'branch_manager', 'brand_manager', 'owner']), (req, res) => {
-  try {
-    const branchId = req.user.branch_id || req.user.branchId;
-    const userRole = req.user.role;
-    let sql = 'SELECT * FROM orders WHERE id = ? AND brand_id = ?';
-    const params = [req.params.id, req.brand_id];
-    if (['cashier', 'branch_manager'].includes(userRole) && branchId) {
-      sql += ' AND branch_id = ?';
-      params.push(branchId);
-    }
-    const order = db.prepare(sql).get(...params);
-    if (!order) return res.status(404).json({ success: false, error: 'Pesanan tidak ditemukan.' });
-
-    const items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(order.id);
-    const payment = db.prepare('SELECT * FROM order_payments WHERE order_id = ? LIMIT 1').get(order.id);
-    const delivery = db.prepare('SELECT * FROM order_deliveries WHERE order_id = ? LIMIT 1').get(order.id);
-
-    res.json({
-      success: true,
-      order,
-      items,
-      payment: payment || null,
-      delivery: delivery || null
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
 router.get('/pos/sales', requireAuth(['cashier']), (req, res) => {
   try {
     const branchId = req.user.branch_id || req.user.branchId;
@@ -275,18 +314,10 @@ router.get('/pos/sales', requireAuth(['cashier']), (req, res) => {
     }
 
     const rows = db.prepare(`
-      SELECT o.*, p.payment_status AS payment_status,
-             d.status AS delivery_status,
-             d.driver_name, d.driver_phone,
-             d.cod_collection_status, d.cod_cash_custody, d.cod_collected_amount,
-             d.cod_handed_over_at, d.cod_handed_over_to
+      SELECT o.*, p.payment_status AS payment_status
       FROM orders o
       LEFT JOIN order_payments p ON p.order_id = o.id
-      LEFT JOIN order_deliveries d ON d.order_id = o.id
-      WHERE o.brand_id = ? AND o.branch_id = ? AND (
-        o.order_channel = 'pos_cashier'
-        OR (o.order_type = 'delivery' AND o.payment_method = 'cash')
-      )
+      WHERE o.brand_id = ? AND o.branch_id = ? AND o.order_channel = 'pos_cashier'
       ORDER BY o.created_at DESC
       LIMIT 100
     `).all(req.brand_id, branchId);
@@ -1064,56 +1095,6 @@ router.post('/pos/offline-sync/batch', requireAuth(['owner', 'brand_manager', 'b
 });
 
 
-// Mengembalikan konteks terminal untuk perangkat yang belum punya binding lokal
-// (localStorage bersih, browser/PWA baru, atau origin/domain baru) supaya kasir
-// bisa memakai PIN tanpa aktivasi manager.
-//
-// Tanpa sesi, jadi sengaja dibatasi ketat:
-//   - tenant tetap dari domain (req.brand_id hasil tenantResolver; host tak
-//     terdaftar sudah gagal closed sebelum sampai ke sini);
-//   - hanya menjawab kalau brand ini punya TEPAT SATU terminal aktif, sehingga
-//     cabangnya tidak ambigu. Kalau nol atau lebih dari satu, klien tetap harus
-//     lewat alur aktivasi manager (pilih cabang);
-//   - tidak mengembalikan data pengguna apa pun; PIN kasir tetap satu-satunya
-//     kredensial, dengan rate-limit dan lockout yang sudah berlaku.
-router.get('/pos/terminal/resolve', (req, res) => {
-  try {
-    if (!req.brand_id) {
-      return res.status(400).json({ success: false, error: 'Brand tidak terdeteksi dari domain ini.' });
-    }
-
-    // LIMIT 2 cukup untuk membedakan "tepat satu" dari "lebih dari satu".
-    const terminals = db.prepare(`
-      SELECT t.id, t.branch_id, b.name AS branch_name
-      FROM pos_terminals t
-      JOIN branches b ON b.id = t.branch_id
-      WHERE b.brand_id = ? AND t.status = 'active' AND b.is_active = 1
-      ORDER BY t.created_at ASC
-      LIMIT 2
-    `).all(req.brand_id);
-
-    if (terminals.length === 0) {
-      return res.json({ success: true, terminal: null, reason: 'NO_ACTIVE_TERMINAL' });
-    }
-    if (terminals.length > 1) {
-      return res.json({ success: true, terminal: null, reason: 'MULTIPLE_ACTIVE_TERMINALS' });
-    }
-
-    const terminal = terminals[0];
-    res.json({
-      success: true,
-      reason: 'SINGLE_ACTIVE_TERMINAL',
-      terminal: {
-        id: terminal.id,
-        branch_id: terminal.branch_id,
-        branch_name: terminal.branch_name || ''
-      }
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Gagal menyelesaikan konteks terminal.' });
-  }
-});
-
 // Terminal binding is readable by Cashier for normal POS boot and by
 // Manager/Owner for the explicit first-time terminal activation flow.
 // Registration remains a Manager/Owner administrative capability.
@@ -1196,55 +1177,6 @@ router.post('/pos/terminal/register', requireAuth(['owner', 'brand_manager', 'br
       device_name: req.body.device_name,
       device_identifier: req.body.device_identifier,
       config_version: req.body.config_version || 1
-    });
-
-    res.json({ success: true, terminal });
-  } catch (err) {
-    res.status(400).json({ success: false, error: err.message });
-  }
-});
-
-router.post('/pos/terminal/replace', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), async (req, res) => {
-  try {
-    const userRole = req.user.role;
-    const userBranchId = req.user.branch_id || req.user.branchId;
-    let targetBranchId = req.body.branch_id || userBranchId;
-
-    if (userRole === 'cashier') {
-      if (!userBranchId) {
-        return res.status(403).json({
-          success: false,
-          error: 'Akses ditolak: Akun kasir belum memiliki cabang terdaftar.'
-        });
-      }
-      if (req.body.branch_id && req.body.branch_id !== userBranchId) {
-        return res.status(403).json({
-          success: false,
-          error: `Akses ditolak: Kasir hanya berwenang menghubungkan terminal untuk cabang sendiri (${userBranchId}).`
-        });
-      }
-      targetBranchId = userBranchId;
-    } else if (userRole === 'branch_manager') {
-      if (userBranchId && req.body.branch_id && req.body.branch_id !== userBranchId) {
-        return res.status(403).json({
-          success: false,
-          error: `Akses ditolak: Anda hanya berwenang mengganti terminal untuk cabang Anda (${userBranchId}).`
-        });
-      }
-      targetBranchId = userBranchId;
-    }
-
-    if (!targetBranchId) {
-      return res.status(400).json({ success: false, error: 'Cabang (branch_id) wajib ditentukan.' });
-    }
-
-    const { PosLocalOperationService } = require('../../domains/pos');
-    const terminal = PosLocalOperationService.replaceTerminal({
-      branch_id: targetBranchId,
-      device_name: req.body.device_name,
-      device_identifier: req.body.device_identifier,
-      config_version: req.body.config_version || 1,
-      replaced_by: req.user.id || req.user.user_id || null
     });
 
     res.json({ success: true, terminal });

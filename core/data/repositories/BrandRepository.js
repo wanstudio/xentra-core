@@ -63,27 +63,27 @@ class BrandRepository {
       if (cached) return cached;
     }
 
-    // 1. CANONICAL RESOLUTION: Check Persistent Domain Registry (tenant_domains)
-    // Domain must be verified and active to serve as a valid tenant entry point.
-    let brand = undefined;
+    // Authoritative tenant/client domain registry is the primary source.
+    // Application surface is returned as data (including `driver`).
+    let brand = null;
     try {
-      const domainRecord = this.db.queryOne(`
-        SELECT td.brand_id, td.surface_type, td.status, td.verification_status, b.*
+      brand = this.db.queryOne(`
+        SELECT b.*,
+               td.hostname AS registered_hostname,
+               td.surface_type AS surface_type
         FROM tenant_domains td
         JOIN brands b ON b.id = td.brand_id
         WHERE lower(trim(td.hostname)) = ?
-          AND td.status = 'active'
-          AND td.verification_status = 'verified'
+          AND lower(trim(td.status)) = 'active'
+          AND lower(trim(td.verification_status)) = 'verified'
         LIMIT 1
       `, [clean]);
+    } catch (_) {
+      // Legacy database compatibility: the registry table may not exist yet.
+    }
 
-      if (domainRecord) {
-        brand = domainRecord;
-      }
-    } catch (_) {}
-
-    // 2. COMPATIBILITY FALLBACK: Exact match on brands.custom_domain
-    // Strictly fail closed if unregistered. No speculative regex / prefix guessing.
+    // Transitional compatibility for existing tests/tenants: exact custom_domain only.
+    // Never infer tenant identity by hostname prefix.
     if (!brand) {
       brand = this.db.queryOne(`
         SELECT *
@@ -96,7 +96,6 @@ class BrandRepository {
     if (cacheable && brand) writeDomainCache(clean, brand);
     return brand;
   }
-
   clearCustomDomainCache() {
     clearDomainCache();
   }

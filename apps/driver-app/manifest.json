@@ -1,0 +1,12 @@
+{
+  "name": "Xentra Driver",
+  "short_name": "Driver",
+  "description": "Xentra Driver — aplikasi eksekusi pengantaran.",
+  "start_url": "/driver/",
+  "scope": "/driver/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "lang": "id-ID"
+}

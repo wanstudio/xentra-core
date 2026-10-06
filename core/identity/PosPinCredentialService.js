@@ -88,7 +88,7 @@ class PosPinCredentialService {
     if (!terminal) throw { status: 403, code: 'POS_TERMINAL_MISMATCH', message: 'Terminal POS tidak sah untuk cabang ini.' };
     const candidates = this.repository.prepare(`
       SELECT id, brand_id, organization_id, branch_id, username, email, full_name, role, status,
-             avatar_url, pos_pin_salt, pos_pin_hash, pos_pin_failed_attempts, pos_pin_locked_until
+             pos_pin_salt, pos_pin_hash, pos_pin_failed_attempts, pos_pin_locked_until
       FROM users WHERE brand_id = ? AND branch_id = ? AND role = 'cashier' AND status = 'active'
         AND pos_pin_hash IS NOT NULL AND pos_pin_salt IS NOT NULL
     `).all(brandId, branchId);
@@ -97,7 +97,7 @@ class PosPinCredentialService {
       if (!verifyDerivedPin(normalized, credential)) continue;
       if (candidate.pos_pin_locked_until && new Date(candidate.pos_pin_locked_until) > new Date()) throw { status: 423, code: 'POS_PIN_LOCKED', message: 'PIN kasir terkunci sementara. Silakan gunakan login akun atau tunggu sebelum mencoba lagi.' };
       this.repository.prepare("UPDATE users SET pos_pin_failed_attempts = 0, pos_pin_locked_until = NULL, updated_at = datetime('now') WHERE id = ?").run(candidate.id);
-      return { success: true, user: { id: candidate.id, username: candidate.username, email: candidate.email, full_name: candidate.full_name, role: candidate.role, avatar_url: candidate.avatar_url || null, branch_id: candidate.branch_id, organization_id: candidate.organization_id, status: candidate.status, email_verified: true }, offline_credential: credential };
+      return { success: true, user: { id: candidate.id, username: candidate.username, email: candidate.email, full_name: candidate.full_name, role: candidate.role, branch_id: candidate.branch_id, organization_id: candidate.organization_id, status: candidate.status, email_verified: true }, offline_credential: credential };
     }
     throw { status: 401, code: 'INVALID_POS_PIN', message: 'PIN Kasir salah.' };
   }

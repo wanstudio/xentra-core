@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="color-scheme" content="light">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Xentra Driver">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="/driver/manifest.json">
+  <link rel="stylesheet" href="/driver/assets/css/driver.css?v=2">
+  <title>Xentra Driver</title>
+</head>
+<body>
+  <div id="driver-app" class="driver-app"></div>
+  <script src="/driver/assets/js/driver-app.js?v=2"></script>
+  <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/driver/sw.js", { scope: "/driver/" }).catch(function () {}); }</script>
+</body>
+</html>

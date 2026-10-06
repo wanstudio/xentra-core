@@ -234,13 +234,14 @@ function getRequestSubdomainType(req) {
   if (host.startsWith('m.') || host.startsWith('merchant.')) return 'managerial';
   if (host.startsWith('owner.') || host.startsWith('dashboard.') || host === 'biz.xentra.cloud') return 'owner';
   if (host.startsWith('pos.') || host.startsWith('kasir.')) return 'pos';
+  if (host.startsWith('driver.')) return 'driver';
   if (host.startsWith('customer.')) return 'customer';
   return null;
 }
 
 function getBaseTenantDomain(req) {
   const host = (req.headers['x-forwarded-host'] || req.headers.host || '').split(':')[0].trim().toLowerCase();
-  const match = host.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app|customer)\.(.+)$/);
+  const match = host.match(/^(?:m|merchant|owner|dashboard|pos|kasir|driver|admin|app|customer)\.(.+)$/);
   return match ? match[1] : host;
 }
 
@@ -350,6 +351,18 @@ app.get(['/manifest.json', '/pwa/manifest.json'], async (req, res) => {
       return res.sendFile(manifestPath);
     }
   }
+  if (subType === 'driver') {
+    const manifestPath = path.join(__dirname, '../apps/driver-app/manifest.json');
+    try {
+      const data = applyCanonicalPwaTheme(JSON.parse(fs.readFileSync(manifestPath, 'utf8')));
+      data.id = '/';
+      data.start_url = '/';
+      data.scope = '/';
+      return res.json(data);
+    } catch (_) {
+      return res.sendFile(manifestPath);
+    }
+  }
   if (subType === 'pos') {
     const manifestPath = path.join(__dirname, '../apps/pos-app/manifest.json');
     try {
@@ -388,6 +401,9 @@ app.get(['/service-worker.js', '/sw.js', '/pwa/service-worker.js'], (req, res) =
   const subType = getRequestSubdomainType(req);
   if (subType === 'managerial' || subType === 'owner') {
     return res.sendFile(path.join(__dirname, '../apps/merchant-app/sw.js'));
+  }
+  if (subType === 'driver') {
+    return res.sendFile(path.join(__dirname, '../apps/driver-app/sw.js'));
   }
   if (subType === 'pos') {
     return res.sendFile(path.join(__dirname, '../apps/pos-app/sw.js'));
@@ -560,6 +576,10 @@ app.get(['/', '/landing', '/landing/'], async (req, res, next) => {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     return res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/index.html'));
   }
+  if (subType === 'driver') {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    return res.sendFile(path.join(__dirname, '../apps/driver-app/index.html'));
+  }
   if (subType === 'pos') {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     return res.sendFile(path.join(__dirname, '../apps/pos-app/index.html'));
@@ -702,6 +722,35 @@ app.get([/^\/merchant-app(\/.*)?$/, /^\/merchant(\/.*)?$/], async (req, res) => 
   res.sendFile(path.join(__dirname, '../apps/merchant-app/index.html'));
 });
 
+// Driver App Assets (standalone delivery execution surface)
+app.use(['/driver/assets', '/driver-app/assets'], express.static(path.join(__dirname, '../apps/driver-app/assets'), {
+  maxAge: 0,
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+}));
+
+// Driver PWA manifest & service worker
+app.get(['/driver/manifest.json', '/driver-app/manifest.json'], (req, res) => {
+  res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, '../apps/driver-app/manifest.json'));
+});
+
+app.get(['/driver/sw.js', '/driver-app/sw.js', '/driver/service-worker.js', '/driver-app/service-worker.js'], (req, res) => {
+  res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+  res.setHeader('Service-Worker-Allowed', '/driver/');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, '../apps/driver-app/sw.js'));
+});
+
+// Driver App entry point. Authentication and Driver API are tenant-scoped; delivery execution wiring remains incremental by contract layer.
+app.get([/^\/driver(\/.*)?$/, /^\/driver-app(\/.*)?$/], (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, '../apps/driver-app/index.html'));
+});
 
 // POS App Assets (standalone cashier execution surface)
 app.use('/pos/assets', express.static(path.join(__dirname, '../apps/pos-app/assets'), {

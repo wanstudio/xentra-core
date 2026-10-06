@@ -17,8 +17,7 @@ module.exports = function registerMerchantAuthRoutes(router, deps) {
     RateLimiter,
     TokenSessionStore,
     requireAuth,
-    serializePublicBrand,
-    mediaService
+    serializePublicBrand
   } = deps;
 
   // Merchant authentication boundary.
@@ -275,7 +274,7 @@ module.exports = function registerMerchantAuthRoutes(router, deps) {
   });
   
   // GET /auth/merchant/me: Authenticated operator/merchant profile
-  router.get('/auth/merchant/me', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen']), (req, res) => {
+  router.get('/auth/merchant/me', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen', 'driver']), (req, res) => {
     let brand = req.brand || null;
     const userId = req.user.id || req.user.userId;
     const brandId = req.user.brandId || req.user.brand_id || req.brand_id || null;
@@ -306,22 +305,14 @@ module.exports = function registerMerchantAuthRoutes(router, deps) {
       } catch (_) {}
     }
 
-    let userRow = null;
-    if (userId) {
-      try {
-        userRow = db.prepare('SELECT id, full_name, avatar_url, nik FROM users WHERE id = ?').get(userId);
-      } catch (_) {}
-    }
-
     res.json({
       success: true,
       user: {
         id: userId,
         username: req.user.username,
         email: req.user.email,
-        full_name: (userRow && userRow.full_name) || req.user.full_name || req.user.fullName,
+        full_name: req.user.full_name || req.user.fullName,
         role: req.user.role,
-        avatar_url: (userRow && userRow.avatar_url) || null,
         brand_id: brandId,
         organization_id: organizationId,
         branch_id: branchId,
@@ -348,6 +339,8 @@ module.exports = function registerMerchantAuthRoutes(router, deps) {
   
   function resolveLanding(role) {
     switch (role) {
+      case 'driver':
+        return '/driver/';
       case 'branch_manager':
         return '/merchant/';
       case 'kitchen':
@@ -530,156 +523,6 @@ module.exports = function registerMerchantAuthRoutes(router, deps) {
     }
   });
 
-  // 10.1.2 Mandatory Cashier Identity Onboarding Endpoints (Contract v1)
-  router.get('/auth/cashier-onboarding/status', requireAuth(['cashier']), (req, res) => {
-    try {
-      const { CashierOnboardingService } = require('../../core/identity');
-      const service = new CashierOnboardingService();
-      const userId = req.user.id || req.user.userId;
-      const state = service.getOnboardingState(userId, req.brand_id);
-      res.json({ success: true, ...state });
-    } catch (err) {
-      const status = err.status || 500;
-      res.status(status).json({ success: false, code: err.code || 'ONBOARDING_STATUS_ERROR', error: err.message || 'Gagal memuat status onboarding kasir.' });
-    }
-  });
-
-  router.post('/auth/cashier-onboarding/pin', requireAuth(['cashier']), (req, res) => {
-    try {
-      const { CashierOnboardingService } = require('../../core/identity');
-      const service = new CashierOnboardingService();
-      const userId = req.user.id || req.user.userId;
-      const body = req.body || {};
-      const result = service.setPin({
-        userId,
-        brandId: req.brand_id,
-        pin: body.pin,
-        pin_confirmation: body.pin_confirmation
-      });
-      res.json({ success: true, ...result });
-    } catch (err) {
-      const status = err.status || 500;
-      res.status(status).json({ success: false, code: err.code || 'SET_PIN_ERROR', error: err.message || 'Gagal menyimpan PIN kasir.' });
-    }
-  });
-
-  router.post('/auth/cashier-onboarding/identity', requireAuth(['cashier']), (req, res) => {
-    try {
-      const { CashierOnboardingService } = require('../../core/identity');
-      const service = new CashierOnboardingService();
-      const userId = req.user.id || req.user.userId;
-      const body = req.body || {};
-      const result = service.setIdentity({
-        userId,
-        brandId: req.brand_id,
-        name: body.name,
-        nik: body.nik
-      });
-      res.json({ success: true, ...result });
-    } catch (err) {
-      const status = err.status || 500;
-      res.status(status).json({ success: false, code: err.code || 'SET_IDENTITY_ERROR', error: err.message || 'Gagal menyimpan identitas kasir.' });
-    }
-  });
-
-  router.post('/auth/cashier-onboarding/avatar', requireAuth(['cashier']), async (req, res) => {
-    try {
-      if (!mediaService) {
-        return res.status(500).json({ success: false, code: 'MEDIA_SERVICE_UNAVAILABLE', error: 'Media Service tidak tersedia.' });
-      }
-
-      const userId = req.user.id || req.user.userId;
-      const { image_base64, mime_type, original_filename, crop_spec: cropSpec } = req.body || {};
-
-      if (!image_base64) {
-        return res.status(400).json({ success: false, code: 'MISSING_IMAGE_DATA', error: 'Data foto profil kasir wajib dikirim.' });
-      }
-
-      const userRow = db.prepare('SELECT id, brand_id, organization_id, avatar_media_id FROM users WHERE id = ?').get(userId);
-      if (!userRow) {
-        return res.status(404).json({ success: false, code: 'USER_NOT_FOUND', error: 'Akun kasir tidak ditemukan.' });
-      }
-
-      const effectiveBrandId = req.brand_id || userRow.brand_id;
-      const effectiveTenantId = (req.brand && req.brand.organization_id) || userRow.organization_id || null;
-      const oldMediaId = userRow.avatar_media_id;
-
-      // 1. Stage upload via Media Engine
-      const staged = await mediaService.stageUpload({
-        brandId: effectiveBrandId,
-        tenantId: effectiveTenantId,
-        userId,
-        imageBase64: image_base64,
-        mimeType: mime_type || 'image/jpeg',
-        declaredFilename: original_filename || 'avatar.jpg',
-        assetType: 'avatar',
-        enforceAspectRatio: false
-      });
-
-      // 2. Set Crop Spec if provided
-      if (cropSpec && typeof cropSpec === 'object') {
-        await mediaService.setCropSpec({ mediaId: staged.media_id, brandId: effectiveBrandId, cropSpec });
-      }
-
-      // 3. Process media (crop, resize, webp variants)
-      const processed = await mediaService.processMedia({
-        mediaId: staged.media_id,
-        brandId: effectiveBrandId,
-        cropSpec: cropSpec || null
-      });
-
-      // 4. Attach to entity 'user_avatar'
-      await mediaService.attachToEntity({
-        mediaId: processed.media_id,
-        brandId: effectiveBrandId,
-        entityType: 'user_avatar',
-        entityId: userId
-      });
-
-      // 5. Replace previous avatar media if exists (mark old as orphan)
-      if (oldMediaId && oldMediaId !== processed.media_id) {
-        await mediaService.replaceEntityMedia({
-          newMediaId: processed.media_id,
-          oldMediaId,
-          brandId: effectiveBrandId,
-          entityType: 'user_avatar',
-          entityId: userId
-        }).catch(() => {});
-      }
-
-      // 6. Resolve delivery URL (prefer variant around 320px for avatar)
-      let avatarUrl = processed.url;
-      if (Array.isArray(processed.variants) && processed.variants.length > 0) {
-        const sorted = [...processed.variants].sort((a, b) => a.width - b.width);
-        const candidate = sorted.find(v => v.width >= 320) || sorted[sorted.length - 1];
-        if (candidate) avatarUrl = candidate.url;
-      }
-
-      // 7. Update users table with canonical avatar_media_id and avatar_url
-      db.prepare(`
-        UPDATE users
-        SET avatar_media_id = ?,
-            avatar_url = ?,
-            updated_at = datetime('now')
-        WHERE id = ?
-      `).run(processed.media_id, avatarUrl, userId);
-
-      res.status(200).json({
-        success: true,
-        message: 'Foto profil kasir berhasil diperbarui.',
-        media_id: processed.media_id,
-        avatar_url: avatarUrl
-      });
-    } catch (err) {
-      const status = err.status || 500;
-      res.status(status).json({
-        success: false,
-        code: err.code || 'AVATAR_UPLOAD_ERROR',
-        error: err.message || 'Gagal memproses foto profil kasir.'
-      });
-    }
-  });
-
   router.post('/auth/pos/pin', (req, res) => {
     try {
       const { PosPinCredentialService, WorkforceService } = require('../../core/identity');
@@ -730,7 +573,6 @@ module.exports = function registerMerchantAuthRoutes(router, deps) {
           email: user.email,
           full_name: user.full_name,
           role: 'cashier',
-          avatar_url: user.avatar_url || null,
           branch_id: user.branch_id,
           email_verified: user.email_verified
         },

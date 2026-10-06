@@ -42,6 +42,7 @@ class PermissionModel {
     // Delivery Operations
     DELIVERY_MANAGE: 'delivery:manage',
     DELIVERY_VIEW: 'delivery:view',
+    DELIVERY_EXECUTE: 'delivery:execute',
 
     // Storefront Marketing / Banner
     BANNER_MANAGE: 'banner:manage',
@@ -53,15 +54,7 @@ class PermissionModel {
     // Platform Control Plane Permissions
     PLATFORM_MANAGE: 'platform:manage',
     PLATFORM_TENANT_MANAGE: 'platform:tenant:manage',
-    PLATFORM_AUDIT_VIEW: 'platform:audit:view',
-
-    // Domain Management Permissions (LOCKED architecture contract)
-    DOMAIN_READ: 'domain:read',
-    DOMAIN_CREATE: 'domain:create',
-    DOMAIN_VERIFY: 'domain:verify',
-    DOMAIN_UPDATE: 'domain:update',
-    DOMAIN_DISABLE: 'domain:disable',
-    DOMAIN_DELETE: 'domain:delete'
+    PLATFORM_AUDIT_VIEW: 'platform:audit:view'
   };
 
   /**
@@ -71,24 +64,7 @@ class PermissionModel {
     [RoleModel.ROLES.PLATFORM_OWNER]: [
       'platform:manage',
       'platform:tenant:manage',
-      'platform:audit:view',
-      'domain:read',
-      'domain:create',
-      'domain:verify',
-      'domain:update',
-      'domain:disable',
-      'domain:delete'
-    ],
-    [RoleModel.ROLES.PLATFORM_ADMIN]: [
-      'platform:manage',
-      'platform:tenant:manage',
-      'platform:audit:view',
-      'domain:read',
-      'domain:create',
-      'domain:verify',
-      'domain:update',
-      'domain:disable',
-      'domain:delete'
+      'platform:audit:view'
     ],
     [RoleModel.ROLES.OWNER]: [
       'org:manage',
@@ -168,6 +144,10 @@ class PermissionModel {
       'order:view',
       'order:prepare',
       'order:complete'
+    ],
+    [RoleModel.ROLES.DRIVER]: [
+      'delivery:view',
+      'delivery:execute'
     ],
     [RoleModel.ROLES.CUSTOMER]: [
       'menu:view',

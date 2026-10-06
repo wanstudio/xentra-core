@@ -83,7 +83,7 @@ router.post('/admin/users', requireAuth(['owner', 'brand_manager', 'branch_manag
     let targetBranchId = branch_id;
 
     if (actor.actor_role === 'owner') {
-      allowedRoles = ['brand_manager', 'branch_manager', 'cashier', 'kitchen'];
+      allowedRoles = ['brand_manager', 'branch_manager', 'cashier', 'kitchen', 'driver'];
     } else if (actor.actor_role === 'brand_manager') {
       allowedRoles = ['branch_manager', 'cashier', 'kitchen'];
     } else if (actor.actor_role === 'branch_manager') {
@@ -614,7 +614,7 @@ const handleAcceptInvitation = async (req, res) => {
 
     // Preserve the unified role-based landing contract after invitation acceptance.
     // Cashiers execute transactions in POS; management roles use the dashboard.
-    let redirectUrl = result.role === 'cashier' ? '/pos/' : '/dashboard/';
+    let redirectUrl = result.role === 'driver' ? '/driver/' : (result.role === 'cashier' ? '/pos/' : '/dashboard/');
     const host = req.headers.host || '';
     const cleanHost = host.split(':')[0].trim().toLowerCase();
     if (result.brand_id && cleanHost === 'xentra.cloud') {
