@@ -48,3 +48,59 @@ test('DRIVER-NAV-04: Map fallback keeps external navigation available when GPS/m
   assert.match(ui, /Gunakan navigasi eksternal/);
   assert.match(ui, /https:\/\/www\.google\.com\/maps\/dir\/\?api=1&destination=/);
 });
+
+test('DRIVER-NAV-05: GPS failure states (permission denied, timeout, unavailable, and stale watch) are handled gracefully', () => {
+  const ui = read('apps/driver-app/assets/js/driver-app.js');
+
+  // Permission denied (code 1)
+  assert.match(ui, /error\.code === 1/);
+  assert.match(ui, /Izin lokasi ditolak/);
+
+  // Timeout (code 3)
+  assert.match(ui, /error\.code === 3/);
+  assert.match(ui, /GPS terlalu lama merespons/);
+
+  // Unavailable / unsupported
+  assert.match(ui, /GPS tidak didukung perangkat ini/);
+  assert.match(ui, /Lokasi GPS belum tersedia/);
+
+  // Watch stopped after initial position
+  assert.match(ui, /GPS berhenti memperbarui/);
+});
+
+test('DRIVER-NAV-06: Destination coordinate validation handles missing or non-finite latitude/longitude', () => {
+  const ui = read('apps/driver-app/assets/js/driver-app.js');
+
+  assert.match(ui, /function destinationCoordinates\(task\)/);
+  assert.match(ui, /Number\.isFinite\(lat\)/);
+  assert.match(ui, /Number\.isFinite\(lng\)/);
+  assert.match(ui, /Koordinat tujuan belum tersedia/);
+});
+
+test('DRIVER-NAV-07: OSRM failure handling covers HTTP error, non-Ok code, empty routes, and error messaging', () => {
+  const ui = read('apps/driver-app/assets/js/driver-app.js');
+
+  assert.match(ui, /!response\.ok/);
+  assert.match(ui, /data\.code === 'Ok'/);
+  assert.match(ui, /!route\.geometry/);
+  assert.match(ui, /Rute gagal dihitung\. Gunakan navigasi eksternal\./);
+  assert.match(ui, /Rute peta tidak tersedia saat ini\./);
+});
+
+test('DRIVER-NAV-08: routeRequestId isolates stale async responses and cleanupDriverMap cleans up watcher and map', () => {
+  const ui = read('apps/driver-app/assets/js/driver-app.js');
+
+  // Route request ID increment and stale checks
+  assert.match(ui, /var requestId = \+\+mapState\.routeRequestId;/);
+  assert.match(ui, /requestId !== mapState\.routeRequestId/);
+  assert.match(ui, /state\.page !== 'map'/);
+
+  // Map cleanup and clearWatch
+  assert.match(ui, /function cleanupDriverMap\(\)/);
+  assert.match(ui, /navigator\.geolocation\.clearWatch\(mapState\.watchId\)/);
+  assert.match(ui, /mapState\.routeRequestId \+= 1;/);
+  assert.match(ui, /mapState\.map\.remove\(\)/);
+  assert.match(ui, /mapState\.watchId = null;/);
+  assert.match(ui, /mapState\.currentPosition = null;/);
+});
+
