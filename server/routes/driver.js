@@ -242,6 +242,54 @@ function registerDriverRoutes(router, deps = {}) {
       });
     }
   });
+
+  function executeDeliveryTransition(req, res, targetStatus, extra) {
+    try {
+      const task = getTask(req.params.orderId, actorId(req), req.brand_id, req.user.branchId || req.user.branch_id);
+      if (!task) {
+        return res.status(404).json({
+          success: false,
+          code: 'DRIVER_TASK_NOT_FOUND',
+          error: 'Tugas pengantaran tidak ditemukan atau bukan milik Driver ini.'
+        });
+      }
+
+      const result = DeliveryDispatchService.updateStatus(Object.assign({
+        order_id: req.params.orderId,
+        status: targetStatus,
+        actor_id: actorId(req)
+      }, extra || {}));
+
+      const refreshed = getTask(req.params.orderId, actorId(req), req.brand_id, req.user.branchId || req.user.branch_id);
+      res.json({ success: true, ...result, task: shapeTask(refreshed) });
+    } catch (err) {
+      const status = err.status || 409;
+      res.status(status).json({
+        success: false,
+        code: err.code || 'DRIVER_DELIVERY_TRANSITION_FAILED',
+        error: err.message
+      });
+    }
+  }
+
+  router.post('/driver/tasks/:orderId/pickup', driverAuth, (req, res) => {
+    executeDeliveryTransition(req, res, DeliveryModel.STATUS.PICKED_UP);
+  });
+
+  router.post('/driver/tasks/:orderId/start', driverAuth, (req, res) => {
+    executeDeliveryTransition(req, res, DeliveryModel.STATUS.ON_DELIVERY);
+  });
+
+  router.post('/driver/tasks/:orderId/complete', driverAuth, (req, res) => {
+    const rawTendered = req.body && req.body.cod_amount_tendered;
+    const hasTendered = rawTendered !== undefined && rawTendered !== null && rawTendered !== '';
+    executeDeliveryTransition(
+      req,
+      res,
+      DeliveryModel.STATUS.DELIVERED,
+      hasTendered ? { cod_amount_tendered: Number(rawTendered) } : {}
+    );
+  });
 }
 
 module.exports = registerDriverRoutes;
