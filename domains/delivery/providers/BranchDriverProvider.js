@@ -19,8 +19,8 @@ class BranchDriverProvider {
    * @returns {Object} Dispatch assignment result
    */
   static assignDriver({ order_id, driver_id = null, driver_name, driver_phone, assigned_by = null }) {
-    if (!order_id || !driver_name || !driver_phone) {
-      throw new Error('[BranchDriverProvider] "order_id", "driver_name", and "driver_phone" are required.');
+    if (!order_id || !driver_id || !driver_name || !driver_phone) {
+      throw new Error('[BranchDriverProvider] "order_id", "driver_id", "driver_name", and "driver_phone" are required.');
     }
 
     const order = orderRepository.findById(order_id);
