@@ -82,7 +82,7 @@ router.post('/pos/orders/:id/cod-handover', requireAuth(['cashier']), (req, res)
   }
 });
 
-router.post('/pos/orders/:id/settle-cash', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
+router.post('/pos/orders/:id/settle-cash', requireAuth(['cashier']), (req, res) => {
   try {
     const orderId = req.params.id;
     const { amount_tendered, shift_id } = req.body;
