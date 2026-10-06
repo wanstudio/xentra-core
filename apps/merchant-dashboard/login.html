@@ -507,8 +507,10 @@
   <script>
     (function () {
       'use strict';
-      var TOKEN_KEY = 'xentra_merchant_token';
-      var USER_KEY = 'xentra_merchant_user';
+      var currentHostForStorage = window.location.hostname || '';
+      var isDriverSurface = currentHostForStorage.toLowerCase().startsWith('driver.');
+      var TOKEN_KEY = isDriverSurface ? 'xentra_driver_token' : 'xentra_merchant_token';
+      var USER_KEY = isDriverSurface ? 'xentra_driver_user' : 'xentra_merchant_user';
 
       // Context Detection for login shell
       var host = (window.location.hostname || '').toLowerCase();
@@ -531,7 +533,7 @@
         }
 
         var currentHost = window.location.hostname;
-        var match = currentHost.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app|customer)\.(.+)$/);
+        var match = currentHost.match(/^(?:m|merchant|owner|dashboard|pos|kasir|driver|admin|app|customer)\.(.+)$/);
         if (match) {
           var prefix = currentHost.split('.')[0].toLowerCase();
           var baseDomain = match[1];
@@ -547,6 +549,11 @@
             if (prefix === 'm' || prefix === 'merchant') return '/dashboard/';
             return protocol + '//m.' + baseDomain + '/dashboard/';
           }
+          // Driver -> Driver App
+          if (role === 'driver') {
+            if (prefix === 'driver') return '/';
+            return protocol + '//driver.' + baseDomain + '/';
+          }
           // Cashier -> POS App
           if (role === 'cashier') {
             if (prefix === 'pos' || prefix === 'kasir') return '/';
@@ -560,7 +567,7 @@
       function validateSubdomainRole(user) {
         var role = user && user.role;
         var currentHost = window.location.hostname;
-        var match = currentHost.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app|customer)\.(.+)$/);
+        var match = currentHost.match(/^(?:m|merchant|owner|dashboard|pos|kasir|driver|admin|app|customer)\.(.+)$/);
         if (!match) return { allowed: true };
 
         var prefix = currentHost.split('.')[0].toLowerCase();
@@ -582,6 +589,17 @@
           return {
             allowed: false,
             message: 'Aplikasi ini khusus manajerial (Owner & Manager). Akun Anda tidak memiliki akses ke aplikasi ini.'
+          };
+        }
+
+        // Driver App (driver.*) -> driver
+        if (prefix === 'driver') {
+          if (role === 'driver') return { allowed: true };
+          return {
+            allowed: false,
+            targetUrl: 'https://m.' + baseDomain + '/',
+            targetLabel: 'm.' + baseDomain,
+            message: 'Aplikasi ini khusus Driver. Akun Anda tidak memiliki akses ke aplikasi Driver.'
           };
         }
 
@@ -630,7 +648,15 @@
         var passwordLabel = document.querySelector('label[for="password"]');
         if (passwordLabel) passwordLabel.textContent = 'Password Administrator';
       } else {
-        if (storeNameBadge && host && host !== 'localhost' && host !== '127.0.0.1') {
+        if (isDriverSurface) {
+          if (storeNameBadge) storeNameBadge.textContent = 'Xentra Driver';
+          if (cardTitle) cardTitle.textContent = 'Masuk ke Xentra Driver';
+          document.title = 'Login Driver — Xentra';
+          var usernameLabelDriver = document.querySelector('label[for="username"]');
+          if (usernameLabelDriver) usernameLabelDriver.textContent = 'Username / Email Driver';
+          var passwordLabelDriver = document.querySelector('label[for="password"]');
+          if (passwordLabelDriver) passwordLabelDriver.textContent = 'Password Driver';
+        } else if (storeNameBadge && host && host !== 'localhost' && host !== '127.0.0.1') {
           storeNameBadge.textContent = 'Portal Restaurant: ' + host;
         }
       }
