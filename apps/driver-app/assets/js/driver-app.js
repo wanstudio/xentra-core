@@ -299,7 +299,14 @@
       mapState.currentPosition.accuracy > 100 ? 'warning' : 'success'
     );
 
-    if (mapState.map && mapState.driverMarker) {
+    if (mapState.map && !mapState.driverMarker) {
+      mapState.driverMarker = new window.mapboxgl.Marker({ color: '#1463ff' })
+        .setLngLat([
+          mapState.currentPosition.longitude,
+          mapState.currentPosition.latitude
+        ])
+        .addTo(mapState.map);
+    } else if (mapState.map && mapState.driverMarker) {
       mapState.driverMarker.setLngLat([
         mapState.currentPosition.longitude,
         mapState.currentPosition.latitude
