@@ -82,35 +82,112 @@ class OrderRepository {
     return this.db.queryOne('SELECT * FROM order_deliveries WHERE order_id = ?', [orderId]);
   }
 
-  insertOrUpdateDeliveryAssignment({ orderId, driverName, driverPhone, updatedAt }) {
+  insertOrUpdateDeliveryAssignment({
+    orderId,
+    driverId = null,
+    driverName,
+    driverPhone,
+    updatedAt
+  }) {
     const existing = this.findDeliveryByOrderId(orderId);
     if (existing) {
       return this.db.execute(`
         UPDATE order_deliveries
-        SET driver_name = ?,
+        SET driver_id = ?,
+            driver_name = ?,
             driver_phone = ?,
             status = 'assigned',
+            driver_assignment_status = 'pending',
+            driver_assignment_responded_at = NULL,
+            driver_assignment_responded_by = NULL,
+            driver_assignment_rejection_reason = NULL,
             updated_at = ?
         WHERE order_id = ?
-      `, [driverName, driverPhone, updatedAt, orderId]);
+      `, [driverId || null, driverName, driverPhone, updatedAt, orderId]);
     }
 
-    const deliveryId = `del_${Date.now()}`;
+    const deliveryId = 'del_' + Date.now();
     return this.db.execute(`
       INSERT INTO order_deliveries (
-        id, order_id, driver_name, driver_phone, status, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, 'assigned', ?, ?)
-    `, [deliveryId, orderId, driverName, driverPhone, updatedAt, updatedAt]);
+        id, order_id, driver_id, driver_name, driver_phone,
+        status, driver_assignment_status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, 'assigned', 'pending', ?, ?)
+    `, [deliveryId, orderId, driverId || null, driverName, driverPhone, updatedAt, updatedAt]);
   }
 
-  updateDeliveryStatus({ orderId, status, updatedAt }) {
+  respondToDriverAssignment({
+    orderId,
+    response,
+    respondedBy,
+    rejectionReason = null,
+    updatedAt
+  }) {
     return this.db.execute(`
       UPDATE order_deliveries
-      SET status = ?, updated_at = ?
+      SET driver_assignment_status = ?,
+          driver_assignment_responded_at = ?,
+          driver_assignment_responded_by = ?,
+          driver_assignment_rejection_reason = ?,
+          status = ?,
+          updated_at = ?
       WHERE order_id = ?
-    `, [status, updatedAt, orderId]);
+    `, [
+      response,
+      updatedAt,
+      respondedBy || null,
+      rejectionReason || null,
+      response === 'rejected' ? 'unassigned' : 'assigned',
+      updatedAt,
+      orderId
+    ]);
   }
 
+  updateDeliveryStatus({
+    orderId,
+    status,
+    updatedAt,
+    codCollectionStatus = null,
+    codCashCustody = null,
+    codCollectedAmount = null,
+    codAmountTendered = null,
+    codChangeGiven = null
+  }) {
+    return this.db.execute(`
+      UPDATE order_deliveries
+      SET status = ?,
+          cod_collection_status = COALESCE(?, cod_collection_status),
+          cod_cash_custody = COALESCE(?, cod_cash_custody),
+          cod_collected_amount = COALESCE(?, cod_collected_amount),
+          cod_amount_tendered = COALESCE(?, cod_amount_tendered),
+          cod_change_given = COALESCE(?, cod_change_given),
+          updated_at = ?
+      WHERE order_id = ?
+    `, [
+      status,
+      codCollectionStatus,
+      codCashCustody,
+      codCollectedAmount,
+      codAmountTendered,
+      codChangeGiven,
+      updatedAt,
+      orderId
+    ]);
+  }
+
+  recordDeliveryCodHandover({ orderId, codHandedOverTo = null, updatedAt }) {
+    return this.db.execute(`
+      UPDATE order_deliveries
+      SET cod_collection_status = 'handed_over',
+          cod_cash_custody = 'cashier',
+          cod_handed_over_at = ?,
+          cod_handed_over_to = ?,
+          updated_at = ?
+      WHERE order_id = ?
+        AND status = 'delivered'
+        AND cod_collection_status = 'collected'
+        AND cod_cash_custody = 'driver'
+    `, [updatedAt, codHandedOverTo, updatedAt, orderId]);
+  }
   markDelivered({ orderId, updatedAt }) {
     return this.db.execute(`
       UPDATE orders
