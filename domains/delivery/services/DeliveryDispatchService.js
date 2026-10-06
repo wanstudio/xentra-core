@@ -162,17 +162,17 @@ class DeliveryDispatchService {
     const currentDelivery = orderRepository.findDeliveryByOrderId(order_id);
     const currentDeliveryStatus = currentDelivery ? String(currentDelivery.status || 'unassigned') : 'unassigned';
 
+    if ([DeliveryModel.STATUS.PICKED_UP, DeliveryModel.STATUS.ON_DELIVERY, DeliveryModel.STATUS.DELIVERED].includes(status)) {
+      this._assertDriverActor(currentDelivery, actor_id);
+    }
+
+    // Idempotency is allowed only after actor authorization has passed.
     if (currentDeliveryStatus === status) {
       return { success: true, order_id, status, updated_at: currentDelivery.updated_at || new Date().toISOString(), idempotent: true };
     }
     if (!this.canTransition(currentDeliveryStatus, status)) {
       throw new Error('[DeliveryDispatchService] Perubahan Delivery Job tidak valid: dari "' + currentDeliveryStatus + '" ke "' + status + '".');
     }
-
-    if ([DeliveryModel.STATUS.PICKED_UP, DeliveryModel.STATUS.ON_DELIVERY, DeliveryModel.STATUS.DELIVERED].includes(status)) {
-      this._assertDriverActor(currentDelivery, actor_id);
-    }
-
     const now = new Date().toISOString();
     orderRepository.beginTransaction();
     try {
