@@ -444,14 +444,14 @@ body { -webkit-tap-highlight-color: transparent; }
 
 /* Modern Driver Profile Screen */
 .profile-header-card {
-  background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
-  border: 1px solid rgba(2, 132, 199, 0.18);
+  background: linear-gradient(145deg, #0f172a 0%, #1e293b 100%);
+  border: 1px solid rgba(51, 65, 85, 0.7);
   border-radius: 20px;
   padding: 20px;
   display: flex;
   align-items: center;
   gap: 16px;
-  box-shadow: 0 4px 18px rgba(2, 132, 199, 0.06);
+  box-shadow: 0 10px 25px -4px rgba(15, 23, 42, 0.35);
   margin-bottom: 14px;
 }
 
@@ -462,16 +462,26 @@ body { -webkit-tap-highlight-color: transparent; }
 
 .profile-avatar {
   position: relative;
-  width: 64px;
-  height: 64px;
-  border-radius: 18px;
-  background: #0284c7;
-  color: #ffffff;
+  width: 68px;
+  height: 68px;
+  border-radius: 20px;
+  background: #1e293b;
+  border: 2px solid rgba(148, 163, 184, 0.2);
+  color: #cbd5e1;
   display: grid;
   place-items: center;
-  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
   cursor: pointer;
   overflow: hidden;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.profile-avatar:hover {
+  border-color: rgba(148, 163, 184, 0.5);
+}
+
+.profile-avatar:active {
+  transform: scale(0.96);
 }
 
 .profile-avatar-img {
@@ -484,19 +494,26 @@ body { -webkit-tap-highlight-color: transparent; }
 
 .profile-avatar-edit-badge {
   position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 22px;
-  height: 22px;
-  background: rgba(15, 23, 42, 0.72);
-  color: #ffffff;
-  border: 0;
-  border-top-left-radius: 8px;
+  right: 4px;
+  bottom: 4px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #0f172a;
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  color: #f1f5f9;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   padding: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.profile-avatar-edit-badge:hover {
+  background: #1e293b;
+  transform: scale(1.08);
 }
 
 .profile-avatar-edit-badge svg {
@@ -517,7 +534,7 @@ body { -webkit-tap-highlight-color: transparent; }
   height: 16px;
   border-radius: 50%;
   background: #10b981;
-  border: 3px solid #ffffff;
+  border: 3px solid #0f172a;
   z-index: 2;
 }
 
@@ -527,9 +544,9 @@ body { -webkit-tap-highlight-color: transparent; }
 }
 
 .profile-name {
-  font-size: 18px;
+  font-size: 18.5px;
   font-weight: 800;
-  color: var(--ink);
+  color: #f8fafc;
   margin: 0;
   letter-spacing: -0.02em;
   word-break: break-word;
@@ -541,16 +558,28 @@ body { -webkit-tap-highlight-color: transparent; }
   margin: 6px 0;
 }
 
+.profile-badge-row .pill.blue {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.profile-badge-row .pill.green {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
 .profile-branch-text {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
-  color: var(--muted);
+  color: #94a3b8;
 }
 .profile-branch-text svg {
-  color: #0284c7;
+  color: #38bdf8;
   flex-shrink: 0;
 }
 
@@ -646,11 +675,17 @@ body { -webkit-tap-highlight-color: transparent; }
   width: 38px;
   height: 38px;
   border-radius: 11px;
-  background: #f0f9ff;
-  color: #0284c7;
+  background: #f1f5f9;
+  color: #334155;
   display: grid;
   place-items: center;
   flex-shrink: 0;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.profile-list-item:hover .item-icon-box {
+  background: #0f172a;
+  color: #f8fafc;
 }
 
 .item-text-box {
