@@ -189,6 +189,32 @@ function registerDriverRoutes(router, deps = {}) {
     }
   });
 
+  router.get('/driver/history', driverAuth, (req, res) => {
+    try {
+      const driverId = actorId(req);
+      const branchId = req.user.branchId || req.user.branch_id;
+      const rows = db.prepare(
+        'SELECT d.order_id ' +
+        'FROM order_deliveries d ' +
+        'JOIN orders o ON o.id = d.order_id ' +
+        'WHERE d.driver_id = ? AND o.brand_id = ? AND o.branch_id = ? ' +
+        'AND d.status = ? ' +
+        'ORDER BY datetime(d.updated_at) DESC, d.rowid DESC ' +
+        'LIMIT 100'
+      ).all(driverId, req.brand_id, branchId, DeliveryModel.STATUS.DELIVERED);
+
+      const deliveries = rows
+        .map(row => getTask(row.order_id, driverId, req.brand_id, branchId))
+        .filter(Boolean)
+        .map(shapeTask);
+
+      res.json({ success: true, deliveries });
+    } catch (err) {
+      const status = err.status || 500;
+      res.status(status).json({ success: false, code: err.code || 'DRIVER_HISTORY_ERROR', error: err.message });
+    }
+  });
+
   router.get('/driver/tasks/:orderId', driverAuth, (req, res) => {
     try {
       const task = getTask(req.params.orderId, actorId(req), req.brand_id, req.user.branchId || req.user.branch_id);
