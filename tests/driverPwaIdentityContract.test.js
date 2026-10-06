@@ -81,3 +81,24 @@ test('DRIVER-UX-03: Driver profile photo upload integrates with XentraCropEditor
   assert.match(driverRoute, /cropSpec:\s*crop_spec/);
 });
 
+test('DRIVER-UX-04: Driver personal details and KTP identity verification are persisted', () => {
+  const dbSchema = read('server/database/db.js');
+  const driverRoute = read('server/routes/driver.js');
+  const driverUi = read('apps/driver-app/assets/js/driver-app.js');
+
+  // Database persistence columns
+  assert.match(dbSchema, /phone TEXT/);
+  assert.match(dbSchema, /nik TEXT/);
+  assert.match(dbSchema, /ktp_url TEXT/);
+
+  // Profile endpoints
+  assert.match(driverRoute, /router\.put\('\/driver\/profile'/);
+  assert.match(driverRoute, /router\.post\('\/driver\/ktp'/);
+
+  // Frontend sheet & crop integration for KTP
+  assert.match(driverUi, /showEditProfileSheet/);
+  assert.match(driverUi, /showVerifyKtpSheet/);
+  assert.match(driverUi, /aspectRatio:\s*1\.586/);
+});
+
+

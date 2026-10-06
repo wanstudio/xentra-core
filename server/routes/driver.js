@@ -106,7 +106,7 @@ function registerDriverRoutes(router, deps = {}) {
     try {
       const userId = actorId(req);
       const user = db.prepare(
-        'SELECT id, username, email, full_name, role, status, brand_id, organization_id, branch_id, ' +
+        'SELECT id, username, email, full_name, phone, nik, ktp_url, ktp_media_id, role, status, brand_id, organization_id, branch_id, ' +
         'avatar_url, avatar_media_id, created_at, updated_at, last_login_at ' +
         'FROM users WHERE id = ? AND brand_id = ? AND role = ? LIMIT 1'
       ).get(userId, req.brand_id, 'driver');
@@ -135,6 +135,10 @@ function registerDriverRoutes(router, deps = {}) {
           username: user.username,
           email: user.email,
           full_name: user.full_name || user.username,
+          phone: user.phone || null,
+          nik: user.nik || null,
+          ktp_url: user.ktp_url || null,
+          ktp_media_id: user.ktp_media_id || null,
           role: user.role,
           status: user.status,
           avatar_url: user.avatar_url || null,
@@ -149,6 +153,117 @@ function registerDriverRoutes(router, deps = {}) {
     } catch (err) {
       const status = err.status || 500;
       res.status(status).json({ success: false, code: err.code || 'DRIVER_PROFILE_ERROR', error: err.message });
+    }
+  });
+
+  router.put('/driver/profile', driverAuth, (req, res) => {
+    try {
+      const userId = actorId(req);
+      const { full_name, phone, nik } = req.body || {};
+
+      const current = db.prepare('SELECT id FROM users WHERE id = ? AND brand_id = ? AND role = ? LIMIT 1')
+        .get(userId, req.brand_id, 'driver');
+      if (!current) {
+        return res.status(404).json({ success: false, code: 'DRIVER_NOT_FOUND', error: 'Driver tidak ditemukan.' });
+      }
+
+      const updates = [];
+      const params = [];
+
+      if (typeof full_name === 'string') {
+        const trimmedName = full_name.trim();
+        if (!trimmedName) {
+          return res.status(400).json({ success: false, code: 'INVALID_NAME', error: 'Nama lengkap tidak boleh kosong.' });
+        }
+        updates.push('full_name = ?');
+        params.push(trimmedName);
+      }
+
+      if (typeof phone === 'string') {
+        const cleanPhone = phone.trim();
+        updates.push('phone = ?');
+        params.push(cleanPhone || null);
+      }
+
+      if (typeof nik === 'string') {
+        const cleanNik = nik.trim();
+        updates.push('nik = ?');
+        params.push(cleanNik || null);
+      }
+
+      if (!updates.length) {
+        return res.status(400).json({ success: false, code: 'NO_UPDATES', error: 'Tidak ada data yang diperbarui.' });
+      }
+
+      updates.push("updated_at = datetime('now')");
+      params.push(userId, req.brand_id);
+
+      db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ? AND brand_id = ?`).run(...params);
+
+      const updated = db.prepare(
+        'SELECT id, username, email, full_name, phone, nik, ktp_url, ktp_media_id, role, status, brand_id, organization_id, branch_id, avatar_url ' +
+        'FROM users WHERE id = ? AND brand_id = ? LIMIT 1'
+      ).get(userId, req.brand_id);
+
+      res.json({
+        success: true,
+        driver: {
+          ...updated,
+          branch_name: getBranchName(updated.branch_id)
+        }
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, code: 'PROFILE_UPDATE_FAILED', error: err.message });
+    }
+  });
+
+  router.post('/driver/ktp', driverAuth, async (req, res) => {
+    try {
+      const userId = actorId(req);
+      const { image_base64, mime_type, original_filename, crop_spec } = req.body || {};
+      if (!image_base64) {
+        return res.status(400).json({ success: false, code: 'MISSING_IMAGE', error: 'File foto KTP wajib dikirim.' });
+      }
+
+      const mediaService = deps.mediaService;
+      let ktpUrl = null;
+      let mediaId = null;
+
+      if (mediaService) {
+        const staged = await mediaService.stageUpload({
+          brandId: req.brand_id,
+          tenantId: req.brand ? req.brand.organization_id : null,
+          userId: userId,
+          imageBase64: image_base64,
+          mimeType: mime_type || 'image/jpeg',
+          declaredFilename: original_filename || 'driver-ktp.jpg',
+          assetType: 'general',
+          enforceAspectRatio: false
+        });
+
+        const asset = await mediaService.processMedia({
+          mediaId: staged.media_id,
+          brandId: req.brand_id,
+          cropSpec: crop_spec || { aspect_ratio: 1.586 }
+        });
+
+        mediaId = asset.media_id;
+        ktpUrl = asset.cdn_url || asset.url || `/media/${mediaId}`;
+      } else {
+        ktpUrl = image_base64.startsWith('data:') ? image_base64 : `data:${mime_type || 'image/jpeg'};base64,${image_base64}`;
+      }
+
+      db.prepare(
+        "UPDATE users SET ktp_url = ?, ktp_media_id = ?, updated_at = datetime('now') WHERE id = ? AND brand_id = ?"
+      ).run(ktpUrl, mediaId, userId, req.brand_id);
+
+      res.json({
+        success: true,
+        ktp_url: ktpUrl,
+        ktp_media_id: mediaId
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, code: 'KTP_UPLOAD_FAILED', error: err.message });
     }
   });
 

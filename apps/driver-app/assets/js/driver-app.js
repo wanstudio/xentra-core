@@ -447,7 +447,8 @@
       settings: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>',
       nav: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>',
       box: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>',
-      info: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>',
+      idcard: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><circle cx="8" cy="12" r="2"/><path d="M14 9h4"/><path d="M14 13h4"/><path d="M14 17h2"/></svg>',
+      document: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>',
       logout: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>'
     };
     return icons[name] || '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg>';
@@ -788,18 +789,23 @@
         '</div>' +
       '</div>' +
 
+      '<div class="profile-group-title">Data Diri & Identitas Mitra</div>' +
+      '<div class="profile-list-card">' +
+        profileItem(icon('user'), 'Edit Data Profil', escapeHTML(driverName) + ' • ' + (phone !== 'Nomor telepon belum diatur' ? escapeHTML(phone) : 'Belum diisi'), 'edit-profile') +
+        profileItem(icon('idcard'), 'Verifikasi KTP / NIK', state.driver.nik ? ('NIK: ' + escapeHTML(state.driver.nik)) : 'Belum diverifikasi', 'verify-ktp') +
+      '</div>' +
+
       '<div class="profile-group-title">Operasional & Pengiriman</div>' +
       '<div class="profile-list-card">' +
         profileItem(icon('check'), 'Status Kerja', 'Siap Menerima Pesanan', 'availability') +
         profileItem(icon('motor'), 'Kendaraan', 'Sepeda Motor (Reguler)') +
-        profileItem(icon('camera'), 'Ganti Foto Profil', 'Perbarui foto diri', 'change-avatar') +
         profileItem(icon('map'), 'Navigasi Pilihan', 'Google Maps / Waze', 'navigate') +
       '</div>' +
 
       '<div class="profile-group-title">Akun & Bantuan</div>' +
       '<div class="profile-list-card">' +
-        profileItem(icon('phone'), 'Kontak Telepon', escapeHTML(phone)) +
-        profileItem(icon('info'), 'Versi Sistem', 'Xentra Driver v1.2') +
+        profileItem(icon('phone'), 'Bantuan Admin Cabang', escapeHTML(branchName)) +
+        profileItem(icon('document'), 'Versi Sistem', 'Xentra Driver v1.3') +
         profileItem(icon('logout'), 'Keluar dari Akun', '', 'logout', true) +
       '</div>';
 
@@ -826,6 +832,255 @@
     el.textContent = message;
     el.classList.add('show');
     setTimeout(function () { el.classList.remove('show'); }, 2200);
+  }
+
+  function showEditProfileSheet() {
+    var existing = document.getElementById('driver-edit-profile-sheet');
+    if (existing) existing.remove();
+
+    var driver = state.driver || {};
+    var overlay = document.createElement('div');
+    overlay.id = 'driver-edit-profile-sheet';
+    overlay.className = 'sheet-backdrop';
+    overlay.innerHTML =
+      '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="edit-profile-title">' +
+        '<div class="sheet-handle"></div>' +
+        '<h3 id="edit-profile-title">Edit Data Diri Mitra</h3>' +
+        '<p>Perbarui informasi kontak dan identitas akun pengemudi Anda.</p>' +
+        '<div class="form-group">' +
+          '<label class="input-label" for="edit-driver-name">Nama Lengkap</label>' +
+          '<input type="text" id="edit-driver-name" class="sheet-input" value="' + escapeHTML(driver.full_name || '') + '" placeholder="Nama lengkap">' +
+        '</div>' +
+        '<div class="form-group" style="margin-top:12px">' +
+          '<label class="input-label" for="edit-driver-phone">Nomor HP / WhatsApp Aktif</label>' +
+          '<input type="tel" id="edit-driver-phone" class="sheet-input" value="' + escapeHTML(driver.phone || '') + '" placeholder="Contoh: 08123456789">' +
+        '</div>' +
+        '<div class="form-group" style="margin-top:12px">' +
+          '<label class="input-label" for="edit-driver-email">Email Terdaftar</label>' +
+          '<input type="email" id="edit-driver-email" class="sheet-input" value="' + escapeHTML(driver.email || '') + '" disabled style="opacity:0.6;background:#f1f5f9">' +
+        '</div>' +
+        '<div class="sheet-actions" style="margin-top:20px">' +
+          '<button type="button" class="secondary-btn" data-sheet-action="cancel">Batal</button>' +
+          '<button type="button" class="primary-btn" data-sheet-action="save">Simpan Perubahan</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+
+    overlay.addEventListener('click', async function (event) {
+      if (event.target === overlay) return;
+      var action = event.target.closest('[data-sheet-action]');
+      if (!action) return;
+
+      var act = action.getAttribute('data-sheet-action');
+      if (act === 'cancel') {
+        overlay.remove();
+        return;
+      }
+
+      if (act === 'save') {
+        var nameInput = document.getElementById('edit-driver-name');
+        var phoneInput = document.getElementById('edit-driver-phone');
+        var nameVal = nameInput ? nameInput.value.trim() : '';
+        var phoneVal = phoneInput ? phoneInput.value.trim() : '';
+
+        if (!nameVal) {
+          toast('Nama lengkap wajib diisi');
+          if (nameInput) nameInput.focus();
+          return;
+        }
+
+        action.disabled = true;
+        action.textContent = 'Menyimpan…';
+
+        try {
+          var res = await api('/driver/profile', {
+            method: 'PUT',
+            body: JSON.stringify({
+              full_name: nameVal,
+              phone: phoneVal
+            })
+          });
+
+          if (res.success && res.driver) {
+            state.driver = res.driver;
+            persistUser();
+            overlay.remove();
+            toast('Profil berhasil diperbarui');
+            render();
+          } else {
+            toast('Gagal memperbarui profil: ' + (res.error || 'kesalahan sistem'));
+            action.disabled = false;
+            action.textContent = 'Simpan Perubahan';
+          }
+        } catch (err) {
+          toast(err.message || 'Gagal memperbarui profil');
+          action.disabled = false;
+          action.textContent = 'Simpan Perubahan';
+        }
+      }
+    });
+  }
+
+  function showVerifyKtpSheet() {
+    var existing = document.getElementById('driver-ktp-sheet');
+    if (existing) existing.remove();
+
+    var driver = state.driver || {};
+    var ktpImg = driver.ktp_url
+      ? '<img src="' + escapeHTML(driver.ktp_url) + '" alt="Foto KTP" class="ktp-preview-img">'
+      : '<div class="ktp-empty-box"><span style="font-size:32px">🪪</span><span>Belum ada foto KTP</span></div>';
+
+    var overlay = document.createElement('div');
+    overlay.id = 'driver-ktp-sheet';
+    overlay.className = 'sheet-backdrop';
+    overlay.innerHTML =
+      '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="ktp-title">' +
+        '<div class="sheet-handle"></div>' +
+        '<h3 id="ktp-title">Verifikasi Identitas KTP</h3>' +
+        '<p>Nomor KTP dan foto identitas resmi untuk keperluan verifikasi operasional pengantaran.</p>' +
+        '<div class="form-group">' +
+          '<label class="input-label" for="edit-driver-nik">Nomor Induk Kependudukan (NIK 16 Digit)</label>' +
+          '<input type="text" id="edit-driver-nik" class="sheet-input" maxlength="16" value="' + escapeHTML(driver.nik || '') + '" placeholder="Masukkan 16 digit NIK">' +
+        '</div>' +
+        '<div class="form-group" style="margin-top:14px">' +
+          '<label class="input-label">Foto KTP / Dokumen Identitas</label>' +
+          '<div class="ktp-upload-card" id="btn-trigger-ktp-file">' +
+            ktpImg +
+            '<div class="ktp-overlay-btn">' + icon('camera') + ' <span>Unggah & Potong KTP</span></div>' +
+          '</div>' +
+          '<input type="file" id="driver-ktp-input" accept="image/*" style="display:none">' +
+        '</div>' +
+        '<div class="sheet-actions" style="margin-top:20px">' +
+          '<button type="button" class="secondary-btn" data-sheet-action="cancel">Tutup</button>' +
+          '<button type="button" class="primary-btn" data-sheet-action="save-nik">Simpan NIK</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+
+    var ktpTrigger = overlay.querySelector('#btn-trigger-ktp-file');
+    var ktpInput = overlay.querySelector('#driver-ktp-input');
+
+    if (ktpTrigger && ktpInput) {
+      ktpTrigger.addEventListener('click', function () { ktpInput.click(); });
+      ktpInput.addEventListener('change', function () {
+        var file = ktpInput.files && ktpInput.files[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+          ktpInput.value = '';
+          return toast('File harus berupa gambar (JPG, PNG, WebP).');
+        }
+
+        async function doUploadKtp(rawFile, cropSpec, previewUrl) {
+          toast('Memproses dan mengunggah foto KTP…');
+          try {
+            var base64 = previewUrl;
+            if (!base64) {
+              base64 = await new Promise(function (resolve, reject) {
+                var reader = new FileReader();
+                reader.onload = function () { resolve(reader.result); };
+                reader.onerror = function () { reject(new Error('Gagal membaca gambar.')); };
+                reader.readAsDataURL(rawFile);
+              });
+            }
+
+            var payload = {
+              image_base64: base64,
+              mime_type: rawFile.type || 'image/jpeg',
+              original_filename: rawFile.name || 'driver-ktp.jpg'
+            };
+            if (cropSpec) payload.crop_spec = cropSpec;
+
+            var res = await api('/driver/ktp', {
+              method: 'POST',
+              body: JSON.stringify(payload)
+            });
+
+            if (res.success && res.ktp_url) {
+              if (state.driver) {
+                state.driver.ktp_url = res.ktp_url;
+                persistUser();
+              }
+              toast('Foto KTP berhasil diunggah.');
+              overlay.remove();
+              render();
+            } else {
+              toast('Gagal mengunggah foto KTP: ' + (res.error || 'kesalahan'));
+            }
+          } catch (err) {
+            toast(err.message || 'Gagal mengunggah foto KTP.');
+          } finally {
+            ktpInput.value = '';
+          }
+        }
+
+        if (window.XentraCropEditor && typeof window.XentraCropEditor.open === 'function') {
+          window.XentraCropEditor.open({
+            source: file,
+            assetType: 'general',
+            aspectRatio: 1.586, // Standar rasio kartu KTP ID-1 ISO/IEC 7810 (85.6mm x 53.98mm ~1.586)
+            title: 'Sesuaikan & Potong Foto KTP (1.58:1)',
+            onConfirm: function (cropSpec, previewDataUrl) {
+              doUploadKtp(file, cropSpec, previewDataUrl);
+            },
+            onCancel: function () {
+              ktpInput.value = '';
+            }
+          });
+        } else {
+          doUploadKtp(file, null, null);
+        }
+      });
+    }
+
+    overlay.addEventListener('click', async function (event) {
+      if (event.target === overlay) return;
+      var action = event.target.closest('[data-sheet-action]');
+      if (!action) return;
+
+      var act = action.getAttribute('data-sheet-action');
+      if (act === 'cancel') {
+        overlay.remove();
+        return;
+      }
+
+      if (act === 'save-nik') {
+        var nikInput = document.getElementById('edit-driver-nik');
+        var nikVal = nikInput ? nikInput.value.trim() : '';
+
+        if (nikVal && (!/^\d{16}$/.test(nikVal))) {
+          toast('Nomor NIK harus terdiri dari 16 digit angka');
+          if (nikInput) nikInput.focus();
+          return;
+        }
+
+        action.disabled = true;
+        action.textContent = 'Menyimpan…';
+
+        try {
+          var res = await api('/driver/profile', {
+            method: 'PUT',
+            body: JSON.stringify({ nik: nikVal })
+          });
+
+          if (res.success && res.driver) {
+            state.driver = res.driver;
+            persistUser();
+            overlay.remove();
+            toast('NIK berhasil disimpan');
+            render();
+          } else {
+            toast('Gagal menyimpan NIK: ' + (res.error || 'kesalahan'));
+            action.disabled = false;
+            action.textContent = 'Simpan NIK';
+          }
+        } catch (err) {
+          toast(err.message || 'Gagal menyimpan NIK');
+          action.disabled = false;
+          action.textContent = 'Simpan NIK';
+        }
+      }
+    });
   }
 
   function showRejectSheet() {
@@ -1154,6 +1409,14 @@
   }
 
   async function handleAction(action) {
+    if (action === 'edit-profile') {
+      return showEditProfileSheet();
+    }
+
+    if (action === 'verify-ktp') {
+      return showVerifyKtpSheet();
+    }
+
     if (action === 'change-avatar') {
       var input = document.getElementById('driver-avatar-input');
       if (input) input.click();

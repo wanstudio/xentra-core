@@ -868,6 +868,9 @@ function initSchema(targetDb) {
       pos_pin_updated_at TEXT,
       cashier_onboarding_status TEXT DEFAULT 'IDENTITY_COMPLETED',
       nik TEXT,
+      phone TEXT,
+      ktp_url TEXT,
+      ktp_media_id TEXT,
       avatar_url TEXT,
       avatar_media_id TEXT,
       created_at TEXT DEFAULT (datetime('now')),
@@ -2282,6 +2285,9 @@ function initSchema(targetDb) {
   try { targetDb.exec('ALTER TABLE users ADD COLUMN email_verified_at TEXT;'); } catch (e) {}
   try { targetDb.exec("ALTER TABLE users ADD COLUMN cashier_onboarding_status TEXT DEFAULT 'IDENTITY_COMPLETED';"); } catch (e) {}
   try { targetDb.exec('ALTER TABLE users ADD COLUMN nik TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE users ADD COLUMN phone TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE users ADD COLUMN ktp_url TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE users ADD COLUMN ktp_media_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE users ADD COLUMN avatar_url TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE users ADD COLUMN avatar_media_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL;'); } catch (e) {}
 
