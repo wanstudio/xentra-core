@@ -229,7 +229,7 @@ function getRequestSubdomainType(req) {
 
 function getBaseTenantDomain(req) {
   const host = (req.headers['x-forwarded-host'] || req.headers.host || '').split(':')[0].trim().toLowerCase();
-  const match = host.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app|customer)\.(.+)$/);
+  const match = host.match(/^(?:m|merchant|owner|dashboard|pos|kasir|driver|admin|app|customer)\.(.+)$/);
   return match ? match[1] : host;
 }
 
@@ -563,6 +563,10 @@ app.get(['/', '/landing', '/landing/'], async (req, res, next) => {
     }
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     return res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/index.html'));
+  }
+  if (subType === 'driver') {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    return res.sendFile(path.join(__dirname, '../apps/driver-app/index.html'));
   }
   if (subType === 'pos') {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
