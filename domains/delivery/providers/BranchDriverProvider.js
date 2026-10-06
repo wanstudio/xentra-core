@@ -12,12 +12,13 @@ class BranchDriverProvider {
    * 
    * @param {Object} params
    * @param {string} params.order_id
+   * @param {string} [params.driver_id]
    * @param {string} params.driver_name
    * @param {string} params.driver_phone
    * @param {string} [params.assigned_by]
    * @returns {Object} Dispatch assignment result
    */
-  static assignDriver({ order_id, driver_name, driver_phone, assigned_by = null }) {
+  static assignDriver({ order_id, driver_id = null, driver_name, driver_phone, assigned_by = null }) {
     if (!order_id || !driver_name || !driver_phone) {
       throw new Error('[BranchDriverProvider] "order_id", "driver_name", and "driver_phone" are required.');
     }
@@ -31,6 +32,7 @@ class BranchDriverProvider {
 
     orderRepository.insertOrUpdateDeliveryAssignment({
       orderId: order_id,
+      driverId: driver_id || null,
       driverName: driver_name.trim(),
       driverPhone: driver_phone.trim(),
       updatedAt: now
@@ -44,6 +46,7 @@ class BranchDriverProvider {
         order_number: order.order_number,
         branch_id: order.branch_id,
         provider_type: DeliveryModel.PROVIDER_TYPES.BRANCH_DRIVER,
+        driver_id: driver_id || null,
         driver_name,
         driver_phone,
         assigned_by
@@ -54,9 +57,11 @@ class BranchDriverProvider {
       success: true,
       provider: DeliveryModel.PROVIDER_TYPES.BRANCH_DRIVER,
       order_id,
+      driver_id: driver_id || null,
       driver_name,
       driver_phone,
-      status: 'assigned'
+      status: 'assigned',
+      assignment_status: DeliveryModel.ASSIGNMENT_RESPONSES.PENDING
     };
   }
 }
