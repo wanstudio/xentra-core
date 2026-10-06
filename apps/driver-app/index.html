@@ -15,5 +15,6 @@
 <body>
   <div id="driver-app" class="driver-app"></div>
   <script src="/driver/assets/js/driver-app.js?v=1"></script>
+  <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/driver/sw.js", { scope: "/driver/" }).catch(function () {}); }</script>
 </body>
 </html>
