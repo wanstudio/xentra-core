@@ -581,3 +581,9 @@ Home rules:
 
 **LOCKED — Home UI Contract v1 is the implementation source of truth for Merchant App / Beranda.**
 \n\n## 🔒 LOCKED ADDENDUM — Presentation Shell vs Feature Context v1\n\nThe Merchant UI follows the canonical Xentra Presentation Shell vs Feature Context contract: `docs/decisions/xentra-presentation-shell-vs-feature-context-v1.md`.\n\nReusable presentation shells (Page, Bottom Sheet, Dialog/Modal, Overlay, Side Sheet/Panel, Picker where applicable) are separate from feature contexts. Feature contexts such as Category Editor, Flavor Editor, Product Editor, and Branch Editor must not be permanently coupled to one shell. Select the shell from task complexity and UX context; reuse the existing mature Xentra primitive rather than duplicating feature-specific shells.\n
+
+## 🔒 APPLICATION TOPOLOGY RECONCILIATION — 2026-10-07
+
+This UX/IA contract is retained as the mobile-operating design source for the managerial surface, but the previous assumption that Owner Dashboard and Merchant App are permanently separate UI products is superseded by `docs/decisions/xentra-managerial-application-role-driven-surface-v1.md`.
+
+The Managerial Application remains mobile-first and action-oriented. Owner, Manager, and authorized operational staff receive role-appropriate navigation and workflows from Role + Permission + Scope + Assigned Work. The visual grammar and task-oriented principles in this document remain valid.
