@@ -1,6 +1,6 @@
 # Xentra — Multi-Branch Production / Supply Topology Simulation v1
 
-**Status:** 🔎 ANALYSIS / INPUT TO NEXT BUSINESS DECISION  
+**Status:** 🔎 ANALYSIS / EVIDENCE — SUPERSEDED BY LOCKED CONTRACT  
 **Date:** 2026-10-07  
 **Purpose:** Test the locked Catalog → Production → Material → Inventory → Procurement architecture against realistic multi-branch operating models without prematurely locking merchant policy.
 
@@ -59,6 +59,10 @@ Before schema implementation, Xentra must resolve:
 - Is Material master data centrally defined and reused?
 - Should low stock create only a warning, a Shopping List, a Purchase Request, or ever an automatic Purchase Order?
 - How are units, pack sizes, yields, lead times, safety stock, and reorder quantities governed?
+
+## Relationship to Locked Contract
+
+This simulation is supporting evidence for the now-locked `docs/decisions/xentra-multibranch-supply-stock-topology-contract-v1.md`. The topology questions identified here have been resolved by that contract. This document remains useful as the scenario/test evidence behind the decision.
 
 ## Recommended architectural direction
 
