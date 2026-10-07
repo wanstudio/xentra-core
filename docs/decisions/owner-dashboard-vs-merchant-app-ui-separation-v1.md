@@ -134,3 +134,18 @@ Do not change business lifecycle/state machines, RBAC semantics, checkout, custo
 - Notion: 🔒 Owner ↔ Branch Manager Dashboard Boundary v1
 - Notion: 🔒 Branch Manager Operational Center — Business Contract v1
 \n\n## 🔒 LOCKED ADDENDUM — Shared Presentation Shell Boundary\n\nOwner Dashboard and Merchant App may have different surface-owned composition, but both follow the Xentra presentation-shell rule: reusable presentation primitives are separated from feature contexts. Page, Bottom Sheet, Dialog/Modal, Overlay, and Side Sheet/Panel are presentation mechanisms, not feature/domain identities. Feature contexts may be composed into the appropriate shell without duplicating business logic or creating a second domain authority.\n
+
+## 🔒 APPLICATION TOPOLOGY RECONCILIATION — 2026-10-07
+
+The two-application topology defined by this document (Owner Dashboard vs Merchant App) is superseded by `docs/decisions/xentra-managerial-application-role-driven-surface-v1.md`.
+
+The current target is **one unified Managerial Application** serving Owner, Manager, and authorized operational staff through Role + Permission + Scope + Assigned Work.
+
+The following rules remain valid:
+- Owner and Branch Manager have different authority;
+- branch scope and organization/multi-branch governance scope remain distinct;
+- Owner is not automatically the daily operational authority for Branch workflows;
+- Branch Manager does not become Master Catalog authority;
+- Core remains authoritative for RBAC, scope, persistence, audit, and business state.
+
+The existing frontend split may remain temporarily during incremental migration. This document is retained as migration history and authority for the role/scope distinctions that remain valid.
