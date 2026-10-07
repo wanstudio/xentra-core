@@ -372,6 +372,25 @@ Assessment: **API/BUSINESS VOCABULARY IS CLEAR; STORAGE NAMING IS LEGACY/INCONSI
 
 Action: do not rename now. Record as a low-risk naming debt and resolve during a later Catalog schema cleanup only if migration cost is justified.
 
+
+## 17A. Taxonomy Identity Consistency Finding
+
+The current forward Menu schema contains `sub_category_id`, but the runtime Menu creation path currently does not populate it. `ComposedMenuService.createMenu()` sets the local sub-category/level variable to null, and `ComposedMenuRepository.createMenu()` inserts `sub_category_id` as NULL.
+
+The current unique Menu identity also uses:
+
+```text
+brand_id + category_id + title_id + rasa_id
+```
+
+while the target taxonomy work previously identified Sub Category as a meaningful dimension of product/menu identity.
+
+Therefore the current implementation is **not yet evidence that Sub Category participates correctly in the canonical identity model**.
+
+**Assessment:** HIGH — target data-model / taxonomy consistency gap.
+
+**Action:** resolve the exact meaning and identity relationship of Category + Sub Category + Rasa + Product + Menu during Target Data Model Design. Do not patch the unique index or start a global migration until that relationship is explicitly locked.
+
 ## 18. Catalog Boundary Status
 
 `domains/commerce/services/CatalogService.js` is already a documented compatibility shim to Catalog.
