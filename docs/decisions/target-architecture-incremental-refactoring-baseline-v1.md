@@ -300,3 +300,72 @@ Shells own presentation lifecycle/placement behavior; feature contexts own task 
 This is an application/UI composition rule and does not change Core authority, domain boundaries, RBAC, routing authority, or business state machines.
 
 Canonical detailed decision: `docs/decisions/xentra-presentation-shell-vs-feature-context-v1.md`.
+
+
+## 🔒 LOCKED ADDENDUM — Domain Boundary & Canonical Vocabulary Architecture v1 — 2026-10-07
+
+The authoritative domain/vocabulary decision is:
+`docs/decisions/xentra-domain-vocabulary-boundary-v1.md`.
+
+This addendum updates the domain-ownership portion of this baseline without authorizing a big-bang rewrite.
+
+### Target business-domain structure
+
+Current implemented business domains:
+- Catalog
+- Commerce
+- Dining
+- POS
+- Inventory
+- Payment
+- Delivery
+- Promotion
+- Banner / Storefront Content
+- Reporting
+
+New target business domains:
+- Production
+- Material
+- Procurement
+
+Previously locked future domains remain:
+- Affiliate
+- Internal Client Communication & Notifications
+
+Core/platform capabilities and application surfaces are not counted as business domains.
+
+### Canonical vocabulary rule
+
+Business entities are owned by one domain and must not become generic cross-domain entities.
+
+In particular:
+- Catalog owns Product/Menu concepts.
+- Production owns Recipe/BoM/Production concepts.
+- Material owns Material identity.
+- Inventory owns stock state and stock movements.
+- Procurement owns purchasing documents and receiving workflow.
+- Core owns identity/authorization/platform capabilities.
+- Application surfaces do not create duplicate business authority.
+
+The detailed ownership, cross-domain dependency, open questions, and refactoring guardrails are defined in the authoritative decision above.
+
+### Existing boundary debt
+
+The following are recognized as migration targets:
+- Commerce catalog responsibilities → Catalog;
+- Dining implementation currently under POS → Dining;
+- Purchase Order implementation currently under Inventory → Procurement.
+
+These are **architecture targets only**. Do not perform broad refactoring until the required vocabulary/consumer/data-impact audit is completed.
+
+### Refactoring gate
+
+Before structural changes:
+1. complete vocabulary audit;
+2. establish domain ownership matrix;
+3. map all consumers/FKs/API contracts;
+4. design target data model;
+5. define compatibility seams;
+6. migrate incrementally with regression/data verification.
+
+No implementation may silently redefine the locked domain ownership.
