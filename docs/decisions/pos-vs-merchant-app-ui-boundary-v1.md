@@ -206,3 +206,10 @@ This decision is aligned with the current Xentra contracts for:
 - POS Offline Operation, Branch Inventory & Multi-Channel Conflict
 - Inventory Check → Commit → Consume
 - Driver + COD Flow
+
+
+## 🔒 APPLICATION TOPOLOGY RECONCILIATION — 2026-10-07
+
+The term **Merchant App** in this document now refers to the managerial application responsibility, not a requirement for a separate Owner-vs-Manager application topology. The authoritative application-topology decision is `docs/decisions/xentra-managerial-application-role-driven-surface-v1.md`.
+
+POS remains a separate execution surface. Managerial users may include Owner, Manager, Staff Gudang, Buyer, Receiver, Production Staff, and other authorized roles within one Managerial Application. The POS ↔ managerial responsibility boundary remains unchanged: **Managerial Application = Manage + Operate + Observe; POS = Execute transaction.**
