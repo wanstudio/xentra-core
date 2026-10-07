@@ -369,3 +369,26 @@ Before structural changes:
 6. migrate incrementally with regression/data verification.
 
 No implementation may silently redefine the locked domain ownership.
+
+
+## 🔒 LOCKED ADDENDUM — Managerial Application Role-Driven Surface Architecture v1 — 2026-10-07
+
+The authoritative application-topology decision is:
+`docs/decisions/xentra-managerial-application-role-driven-surface-v1.md`.
+
+Xentra uses one unified **Managerial Application** for Owner, Manager, and authorized operational staff roles. Role differences are expressed through server-authoritative **Role + Permission + Scope + Assigned Work**, not by automatically creating a separate application/PWA for each role.
+
+Target application/surface set:
+- Customer PWA
+- Managerial Application
+- POS App
+- Driver App
+- Xentra Control Plane
+
+Kitchen/KDS remains a workflow/surface inside the Managerial Application unless a future explicit decision justifies a dedicated application.
+
+This supersedes the older Owner Dashboard vs Merchant App **application-topology** split. The older role, scope, authority, POS boundary, and business-domain ownership rules remain valid unless explicitly contradicted by the new contract.
+
+The Managerial Application is task-oriented rather than entity-oriented. Example: a Staff Gudang may see only authorized purchasing, receiving, transfer, and stock-location work; an Owner may see organization-wide governance; a Branch Manager may see branch operations. Frontend hiding is never the authorization boundary; Core remains authoritative for authentication, authorization, scope enforcement, persistence, and audit.
+
+This is an architecture direction, not authorization for a big-bang frontend merge. Existing `apps/merchant-dashboard/` and `apps/merchant-app/` may coexist during incremental migration until route, session, deep-link, PWA, RBAC, and regression parity are verified.
