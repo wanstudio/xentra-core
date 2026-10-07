@@ -621,3 +621,61 @@ Conversely, separate domains are justified only when they represent distinct bus
 This decision intentionally establishes boundaries first and postpones schema mechanics until evidence from the vocabulary/consumer audit is available.
 
 **LOCKED — Architecture Decision v1.**
+
+
+## 🔒 LOCKED ADDENDUM — Multi-Branch Production / Supply Topology v1 — 2026-10-07
+
+The previously locked future domains are now explicitly included in active Xentra development:
+- Affiliate
+- Internal Client Communication & Notifications
+
+Their existing domain contracts remain authoritative.
+
+A structured multi-branch simulation establishes the following architecture constraint:
+
+**Xentra must support branch-direct procurement, central procurement/distribution, and hybrid sourcing without creating separate domain models for each topology.**
+
+The topology is operating policy/configuration. The underlying domain capabilities remain shared.
+
+The simulation also exposes a target Inventory requirement:
+
+**Branch is organizational/operational scope; Stock Location is physical inventory custody/location.**
+
+The target Inventory model therefore needs a Stock Location abstraction capable of representing, as business requires:
+- Branch stock locations;
+- central warehouse;
+- central kitchen;
+- other authorized inventory locations.
+
+This is a semantic architecture requirement, not a final table/schema decision.
+
+The existing one shared sellable-stock-pool-per-Branch rule remains valid for the current POS/PWA/channel model. Additional physical locations must not become channel-specific stock pools.
+
+Cross-domain implications:
+- Material identity is reusable and is not tied to one Branch.
+- Inventory owns Product/Material stock balances, stock movements, and inter-location transfers.
+- Production has a production location/context and uses explicit Inventory mutation contracts.
+- Procurement purchase documents have an explicit receiving/destination location and do not own stock balances.
+- Catalog/Menu adoption does not imply that a Branch directly purchases the Menu's materials.
+
+Replenishment default boundary:
+**Demand/Stock Condition → Replenishment Requirement → Purchase Request/Shopping List → Procurement Decision → Purchase Order → Goods Receipt → Inventory Mutation.**
+
+A low-stock signal is not automatically a Purchase Order. Autonomous purchasing requires a separate explicit business policy.
+
+The following remain open and require dedicated business decisions before schema implementation:
+- Organization vs Brand vs Branch stock ownership;
+- stock-location types and hierarchy;
+- central warehouse operating model;
+- sourcing priority;
+- Branch procurement autonomy;
+- transfer approval;
+- receiving authority;
+- Material master scope;
+- production planning mode;
+- reorder algorithm;
+- autonomous purchasing policy.
+
+**No production/procurement implementation may assume central, Branch-direct, or hybrid operation as universal truth before these decisions are resolved.**
+
+**LOCKED — Architecture implication and simulation result.**
