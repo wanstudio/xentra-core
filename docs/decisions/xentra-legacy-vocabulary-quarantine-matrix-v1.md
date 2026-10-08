@@ -60,6 +60,7 @@ The matrix governs semantics, not immediate physical deletion.
 | bare `HPP` | REMOVE / AMBIGUOUS | Indonesian prose only when the context explicitly means HPP Penjualan | Canonical code/database/service/entity name for other cost meanings | New codebase vocabulary migrated |
 | `branch_products.stock` | MIGRATION | Legacy Product stock compatibility during inventory migration | New Material Stock authority; independent new Product Stock authority | Canonical Product Stock migration verified |
 | `inventory_movements` | MIGRATION | Legacy Product-oriented ledger compatibility/reporting | Raw-material ledger or universal polymorphic stock authority | Explicit Product/Material stock movement models verified |
+| `Costing / Product HPP` legacy cost readers | REMOVE | Explicitly migrated to Inventory/Costing services | New Product/Menu/production valuation authority | No active costing path reads legacy cost fields |
 | legacy procurement `product_id` | MIGRATION | Historical compatibility for old purchase flow | New Material procurement identity | Procurement/Material flow migrated |
 | Catalog → Material direct reference | REMOVE | None in canonical model | New Catalog business logic | Never introduce; isolate any old path |
 | generic unqualified `Item` | REMOVE | Local prose only when explicitly scoped | New cross-domain entity/FK authority | Replaced with Product, Material, Menu Item, etc. |
@@ -178,6 +179,8 @@ COGS
 ```
 
 No rename-only migration is sufficient.
+
+Sale COGS authority is now canonical `Product Stock SALE movement → Cost of Sales snapshot`; legacy `inventory_movements.sale_deduction` is not a new COGS authority.
 
 For example:
 
