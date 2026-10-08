@@ -363,10 +363,11 @@ class PosLocalOperationService {
         updatedAt: now
       });
 
-      // 2. Insert items & deduct inventory.
-      // Canonical Menu components are aggregated first so one Product shared by
-      // several Menu lines is deducted exactly once for the total requirement.
-      const canonicalRequirements = new Map();
+      // 2. Insert items and resolve stock requirements.
+      // Canonical Menu components are aggregated first so shared Products are
+      // deducted once. Canonical Direct Products are aggregated separately.
+      const canonicalMenuRequirements = new Map();
+      const canonicalDirectRequirements = [];
 
       for (const item of verifiedItems) {
         const itemId = 'item_' + crypto.randomBytes(6).toString('hex');
@@ -394,113 +395,130 @@ class PosLocalOperationService {
             }
 
             const productId = String(component.product_id || '').trim();
-            if (!productId) throw new Error('[INVALID_MENU_COMPOSITION] Product ID komponen Menu offline tidak ditemukan.');
+            if (!productId) {
+              throw new Error('[INVALID_MENU_COMPOSITION] Product ID komponen Menu offline tidak ditemukan.');
+            }
 
             const sku = component.sku == null ? '' : String(component.sku).trim();
             if (!sku) continue;
 
             const required = item.quantity * componentQty;
-            if (!canonicalRequirements.has(productId)) {
-              canonicalRequirements.set(productId, {
+            const existing = canonicalMenuRequirements.get(productId);
+            if (existing) {
+              existing.quantity += required;
+            } else {
+              canonicalMenuRequirements.set(productId, {
                 product_id: productId,
                 product_name: component.product_name || productId,
-                quantity: 0
+                quantity: required
               });
             }
-            canonicalRequirements.get(productId).quantity += required;
           }
           continue;
         }
 
-        const canonicalSaleRequirements = itemRequiresCanonicalInventory(verifiedItems, canonicalRequirements);
+        const product = inventoryRepository.findProductForValuation(item.product_id);
+        const sku = product && product.sku != null ? String(product.sku).trim() : '';
+        if (sku) {
+          canonicalDirectRequirements.push({
+            product_id: item.product_id,
+            product_name: item.name || item.product_name || item.product_id,
+            quantity: item.quantity,
+            source_item_reference: itemId
+          });
+        }
+      }
 
-        let canonicalSalePosted = false;
-        if (canonicalSaleRequirements.length > 0) {
-          const canonicalSale = InventorySalePostingService.postCanonicalSale({
-            branchId: branch_id,
-            requirements: canonicalSaleRequirements,
+      const canonicalRequirements = canonicalMenuRequirements.size > 0
+        ? Array.from(canonicalMenuRequirements.values())
+        : canonicalDirectRequirements;
+
+      let canonicalSalePosted = false;
+
+      if (canonicalRequirements.length > 0) {
+        const canonicalSale = InventorySalePostingService.postCanonicalSale({
+          branchId: branch_id,
+          requirements: canonicalRequirements,
+          sourceType: 'ORDER',
+          sourceReference: orderNumber,
+          actorId: terminal_id,
+          postingTimestamp: now,
+          dbTransactionProvided: true
+        });
+
+        if (canonicalSale.status === 'AVAILABLE') {
+          canonicalSalePosted = true;
+
+          CostOfSalesService.capture({
             sourceType: 'ORDER',
             sourceReference: orderNumber,
-            actorId: terminal_id,
-            postingTimestamp: now,
-            dbTransactionProvided: true
+            orderId,
+            totalCost: canonicalSale.total_cost,
+            currencyCode: canonicalSale.currency_code,
+            costLines: canonicalSale.cost_lines
           });
+        }
+      }
 
-          if (canonicalSale.status === 'AVAILABLE') {
-            canonicalSalePosted = true;
+      if (!canonicalSalePosted) {
+        // Explicit migration seam: preserve the historical local stock path
+        // only when canonical Product Stock is not yet available.
+        if (canonicalMenuRequirements.size > 0) {
+          for (const requirement of canonicalMenuRequirements.values()) {
+            const before = inventoryRepository.findBranchProduct(branch_id, requirement.product_id);
+            const prevStock = before ? Number(before.stock || 0) : 0;
+            const deductResult = inventoryRepository.deductBranchProduct({
+              quantity: requirement.quantity,
+              branchId: branch_id,
+              productId: requirement.product_id
+            });
 
-            CostOfSalesService.capture({
-              sourceType: 'ORDER',
-              sourceReference: orderNumber,
-              orderId,
-              totalCost: canonicalSale.total_cost,
-              currencyCode: canonicalSale.currency_code,
-              costLines: canonicalSale.cost_lines
+            if (!deductResult || deductResult.changes === 0) {
+              throw new Error('[INSUFFICIENT_LOCAL_STOCK] Stok lokal komponen ' + requirement.product_name + ' tidak mencukupi untuk penjualan offline (tersisa ' + prevStock + ', diminta ' + requirement.quantity + ').');
+            }
+
+            inventoryRepository.insertSaleDeduction({
+              id: 'mov_' + crypto.randomBytes(6).toString('hex'),
+              branchId: branch_id,
+              productId: requirement.product_id,
+              quantity: requirement.quantity,
+              previousStock: prevStock,
+              currentStock: prevStock - requirement.quantity,
+              referenceId: orderNumber,
+              actorId: terminal_id,
+              notes: 'Pemotongan stok offline komponen Menu ' + orderNumber + ' (' + terminal_id + ')',
+              createdAt: now
+            });
+          }
+        } else {
+          for (const item of verifiedItems) {
+            const before = inventoryRepository.findBranchProduct(branch_id, item.product_id);
+            const prevStock = before ? Number(before.stock || 0) : 0;
+            const deductResult = inventoryRepository.deductBranchProduct({
+              quantity: item.quantity,
+              branchId: branch_id,
+              productId: item.product_id
+            });
+
+            if (!deductResult || deductResult.changes === 0) {
+              throw new Error('[INSUFFICIENT_LOCAL_STOCK] Stok lokal produk ' + item.name + ' tidak mencukupi untuk penjualan offline.');
+            }
+
+            inventoryRepository.insertSaleDeduction({
+              id: 'mov_' + crypto.randomBytes(6).toString('hex'),
+              branchId: branch_id,
+              productId: item.product_id,
+              quantity: item.quantity,
+              previousStock: prevStock,
+              currentStock: prevStock - item.quantity,
+              referenceId: orderNumber,
+              actorId: terminal_id,
+              notes: 'Pemotongan stok offline lokal ' + orderNumber + ' (' + terminal_id + ')',
+              createdAt: now
             });
           }
         }
-
-        if (!canonicalSalePosted) {
-          // Migration seam only: until the canonical Product Stock balance exists
-          // for this branch/product set, preserve existing offline local stock.
-          if (canonicalRequirements.size > 0) {
-            for (const requirement of canonicalRequirements.values()) {
-              const before = inventoryRepository.findBranchProduct(branch_id, requirement.product_id);
-              const prevStock = before ? Number(before.stock || 0) : 0;
-              const deductResult = inventoryRepository.deductBranchProduct({
-                quantity: requirement.quantity,
-                branchId: branch_id,
-                productId: requirement.product_id
-              });
-
-              if (!deductResult || deductResult.changes === 0) {
-                throw new Error('[INSUFFICIENT_LOCAL_STOCK] Stok lokal komponen ' + requirement.product_name + ' tidak mencukupi untuk penjualan offline (tersisa ' + prevStock + ', diminta ' + requirement.quantity + ').');
-              }
-
-              const currentStock = prevStock - requirement.quantity;
-              inventoryRepository.insertSaleDeduction({
-                id: 'mov_' + crypto.randomBytes(6).toString('hex'),
-                branchId: branch_id,
-                productId: requirement.product_id,
-                quantity: requirement.quantity,
-                previousStock: prevStock,
-                currentStock,
-                referenceId: orderNumber,
-                actorId: terminal_id,
-                notes: 'Pemotongan stok offline komponen Menu ' + orderNumber + ' (' + terminal_id + ')',
-                createdAt: now
-              });
-            }
-          } else {
-            for (const item of verifiedItems) {
-              const before = inventoryRepository.findBranchProduct(branch_id, item.product_id);
-              const prevStock = before ? Number(before.stock || 0) : 0;
-              const deductResult = inventoryRepository.deductBranchProduct({
-                quantity: item.quantity,
-                branchId: branch_id,
-                productId: item.product_id
-              });
-
-              if (!deductResult || deductResult.changes === 0) {
-                throw new Error('[INSUFFICIENT_LOCAL_STOCK] Stok lokal produk ' + item.name + ' tidak mencukupi untuk penjualan offline.');
-              }
-
-              const currentStock = prevStock - item.quantity;
-              inventoryRepository.insertSaleDeduction({
-                id: 'mov_' + crypto.randomBytes(6).toString('hex'),
-                branchId: branch_id,
-                productId: item.product_id,
-                quantity: item.quantity,
-                previousStock: prevStock,
-                currentStock,
-                referenceId: orderNumber,
-                actorId: terminal_id,
-                notes: 'Pemotongan stok offline lokal ' + orderNumber + ' (' + terminal_id + ')',
-                createdAt: now
-              });
-            }
-          }
-        }
+      }
 
       // 3. Shift cash effect (if shift_id provided)
       if (shift_id) {
