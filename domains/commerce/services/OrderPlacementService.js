@@ -126,7 +126,8 @@ function deductComposedStock({
       sourceType,
       sourceReference: stockReferenceId || (referenceId + ':menu'),
       actorId,
-      postingTimestamp: now
+      postingTimestamp: now,
+      dbTransactionProvided: true
     });
 
     if (canonicalResult.status === 'AVAILABLE') {
@@ -661,7 +662,8 @@ class OrderPlacementService {
           sourceType: 'ADDITIONAL_ORDER',
           sourceReference: reference_id + ':direct',
           actorId: actor_id,
-          postingTimestamp: now
+          postingTimestamp: now,
+          dbTransactionProvided: true
         });
 
         if (canonicalDirect.status === 'AVAILABLE') {
@@ -785,7 +787,8 @@ class OrderPlacementService {
           sourceType: 'ORDER',
           sourceReference: order.order_number + ':direct',
           actorId: order.customer_phone || 'online_payment',
-          postingTimestamp: now
+          postingTimestamp: now,
+          dbTransactionProvided: true
         });
 
         if (canonicalDirect.status === 'AVAILABLE') {
