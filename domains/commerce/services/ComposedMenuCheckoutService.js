@@ -2,7 +2,7 @@
 
 const ComposedMenuRepository = require('../../catalog/repositories/ComposedMenuRepository');
 const ComposedMenuResolver = require('../../catalog/services/ComposedMenuResolver');
-const InventoryRepository = require('../../core/data/repositories/InventoryRepository');
+const InventoryRepository = require('../../../core/data/repositories/InventoryRepository');
 
 const repository = new ComposedMenuRepository();
 const inventoryRepository = new InventoryRepository();
