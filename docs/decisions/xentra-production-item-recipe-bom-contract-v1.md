@@ -81,7 +81,7 @@ When production is requested for a Product at a Production Location, the Product
 
 If multiple active Production Items are equally eligible, the system must not silently choose one. The routing policy must explicitly resolve the selection.
 
-The exact persistence model for location applicability and routing priority remains an implementation detail of the later routing contract.
+Production Item location applicability and the v1 deterministic routing rule are defined by `docs/decisions/xentra-production-routing-stock-location-contract-v1.md`: one active Production Item per Product + Production Stock Location.
 
 ## 3. Production Item Meaning
 
@@ -375,7 +375,7 @@ The routing layer selects the applicable Production Item for the execution conte
 
 ## 18. Explicitly Open for Later Contracts
 
-- exact Production Item → Stock Location routing schema and priority rules;
+- advanced route priority when multiple methods must coexist at one location;
 - WIP;
 - semi-finished Products / sub-assemblies as Recipe Components;
 - by-products;
