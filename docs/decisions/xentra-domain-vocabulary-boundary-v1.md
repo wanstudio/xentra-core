@@ -1,3 +1,53 @@
+# 🔒 CURRENT END-TO-END LIFECYCLE BINDING — 2026-10-08
+
+The domain boundary decision is now connected by the locked lifecycle contract:
+
+`docs/decisions/xentra-material-production-selling-lifecycle-contract-v1.md`
+
+Canonical business lifecycle:
+
+```
+Material
+  ↓
+Replenishment Requirement
+  ↓
+Shopping List / Purchase Request
+  ↓
+Purchase Order
+  ↓
+Verified Goods Receipt
+  ↓
+Material Stock
+  ↓
+Production / Recipe / BoM
+  ↓
+Production Batch / Output
+  ↓
+Sellable Product Stock
+  ↓
+Menu / Menu Items / Item Choices
+  ↓
+Order / Sale
+  ↓
+Sellable Product Stock Consumption
+```
+
+The lifecycle is a business boundary, not a mandatory synchronous call chain.
+
+Locked invariants:
+- Procurement never owns stock balance.
+- Production never owns stock balance.
+- Inventory owns physical stock mutation.
+- Catalog owns commercial Menu semantics.
+- Item Choice changes effective Menu composition but does not directly mutate Material Stock.
+- Selling does not automatically replay raw-material Recipe consumption.
+- Branch-direct, central, and hybrid supply use the same domain model.
+- Make-to-order may be introduced later without creating alternate domains.
+
+Detailed schema, UOM, costing/HPP, Recipe versioning, Product ↔ Production Item cardinality, planning mode, and Choice → Material mapping remain separate OPEN gates.
+
+---
+
 # Xentra — Domain Boundary & Canonical Vocabulary Architecture Decision v1
 
 **Status:** 🔒 LOCKED / ACTIVE  
