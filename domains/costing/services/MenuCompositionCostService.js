@@ -41,9 +41,18 @@ function resolvePurchasedProductCost({ product, stockLocationId, repo }) {
     };
   }
 
-  const movement = repo.findLatestMaterialMovement
-    ? null
-    : null;
+  const movement = repo.findLatestProductMovement({
+    stockLocationId,
+    productId: product.id
+  });
+  if (!movement || !movement.currency_code) {
+    return {
+      status: 'UNAVAILABLE',
+      reason: 'PRODUCT_INVENTORY_CURRENCY_UNAVAILABLE',
+      product_id: product.id
+    };
+  }
+
   return {
     status: 'AVAILABLE',
     source: 'PRODUCT_INVENTORY_CARRYING_COST',
@@ -51,7 +60,8 @@ function resolvePurchasedProductCost({ product, stockLocationId, repo }) {
     unit_cost: Number(balance.moving_average_unit_cost),
     total_value: Number(balance.carrying_value),
     valuation_version: Number(balance.valuation_version),
-    currency_code: null
+    currency_code: normalizeCurrency(movement.currency_code),
+    source_movement_id: movement.id
   };
 }
 
