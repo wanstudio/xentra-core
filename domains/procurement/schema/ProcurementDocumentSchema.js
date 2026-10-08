@@ -241,6 +241,16 @@ function ensureProcurementDocumentSchema(db) {
     END;
   `);
 
+  const packColumns = db.prepare('PRAGMA table_info(supplier_material_packs)').all();
+  const hasContentQuantity = packColumns.some(row => row && row.name === 'content_quantity');
+  const hasLegacyContentQuantityBase = packColumns.some(row => row && row.name === 'content_quantity_base');
+  if (!hasContentQuantity) {
+    db.exec('ALTER TABLE supplier_material_packs ADD COLUMN content_quantity REAL');
+    if (hasLegacyContentQuantityBase) {
+      db.exec('UPDATE supplier_material_packs SET content_quantity = content_quantity_base WHERE content_quantity IS NULL');
+    }
+  }
+
   ensuredDbs.add(db);
 }
 
