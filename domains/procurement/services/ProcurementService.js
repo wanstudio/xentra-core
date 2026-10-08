@@ -317,7 +317,6 @@ class ProcurementService {
   }) {
     const po = repository.findPurchaseOrder(purchaseOrderId);
     if (!po) throw fail('PURCHASE_ORDER_NOT_FOUND');
-    if (!['ORDERED', 'PARTIALLY_RECEIVED'].includes(po.status)) throw fail('GOODS_RECEIPT_NOT_ALLOWED');
 
     const postingId = text(goodsReceiptPostingId, 'GOODS_RECEIPT_POSTING_ID_REQUIRED');
     const receiptId = text(goodsReceiptId || ('gr_' + crypto.randomBytes(8).toString('hex')), 'GOODS_RECEIPT_ID_REQUIRED');
@@ -341,6 +340,8 @@ class ProcurementService {
 
     const existingReceipt = repository.findGoodsReceipt(receiptId);
     if (existingReceipt) throw fail('GOODS_RECEIPT_ALREADY_EXISTS');
+
+    if (!['ORDERED', 'PARTIALLY_RECEIVED'].includes(po.status)) throw fail('GOODS_RECEIPT_NOT_ALLOWED');
 
     if (!Array.isArray(lines) || lines.length === 0) throw fail('GOODS_RECEIPT_LINES_REQUIRED');
 
