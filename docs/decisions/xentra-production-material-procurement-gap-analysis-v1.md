@@ -858,7 +858,7 @@ These still require product/business choices:
 - exact production scheduling/capacity model;
 - exact HPP/valuation method;
 - exact autonomous purchasing thresholds;
-- exact Item Choice → Product / Production mapping;
+- direct Choice → Production variant / Material recipe override; Product stock-effect mapping is now locked by `docs/decisions/xentra-menu-item-choice-stock-production-integration-contract-v1.md`;
 - exact byproduct/sub-product handling.
 
 ## 29. Recommended Contract Order
