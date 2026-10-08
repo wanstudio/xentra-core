@@ -329,10 +329,14 @@ These are intentionally OPEN:
 
 This contract does not lock:
 - exact Stock Location schema;
-- exact Product ↔ Production Item relationship;
-- Recipe/BoM versioning;
+- exact Recipe / Production Item location applicability schema;
 - production planning/scheduling;
-- output SKU rules;
+- exact Production Batch state machine;
+- WIP;
+- semi-finished/by-product model;
+- lot / expiry;
+- Make-to-Order trigger/reservation semantics;
+- exact transfer state machine;
 - exact UOM master schema/reference-data implementation;
 - UOM precision/rounding rules;
 - costing/valuation/HPP algorithm;
@@ -340,7 +344,10 @@ This contract does not lock:
 - exact procurement/receiving/production role matrix;
 - exact Item Choice → Material/Production mapping.
 
-These decisions require their own contracts.
+Product ↔ Production Item routing and Recipe / Recipe Version semantics are now locked by:
+- docs/decisions/xentra-production-item-recipe-bom-contract-v1.md
+
+The remaining items require their own contracts.
 
 ## 11. Implementation Gate
 
