@@ -192,7 +192,7 @@ Tambah Item
   ↓
 [optional] Pilihan Item on a specific Item
   ↓
-HPP / cost view
+Menu Composition Cost / cost view
   ↓
 Harga Jual
   ↓
@@ -285,15 +285,15 @@ The Menu image must not be derived by silently treating the first Item image as 
 
 New Menu media uses the canonical Media Engine.
 
-## 14. HPP
+## 14. Menu Composition Cost
 
-HPP is a derived view of the Menu's effective composition/cost.
+Menu Composition Cost is a derived view of the Menu's effective composition and applicable Product cost basis.
 
 The Menu Editor may display Item-level costs for transparency.
 
-This derived cost is not a second inventory or costing authority. Accounting COGS and the exact business meaning of “HPP” remain separate policy terminology and must not be inferred from this field.
+This derived cost is not a second inventory or costing authority. It must not be treated as accounting COGS or historical HPP Penjualan. The canonical accounting term is Cost of Goods Sold (COGS); HPP is reserved for the Indonesian reporting label when it means Harga Pokok Penjualan.
 
-The exact cost basis for production-backed and non-production Items is governed by the Costing/HPP contract and its still-open valuation/reporting policy.
+The exact cost basis for production-backed and non-production Items is governed by the Costing/HPP contract as terminology-revised by the Costing Vocabulary Revision v1.1 and its still-open valuation/reporting policy.
 
 ## 15. Customer PWA
 
