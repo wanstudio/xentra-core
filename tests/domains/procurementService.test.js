@@ -70,6 +70,8 @@ test.before(async () => {
     currencyCode: 'IDR'
   });
   packId = pack.id;
+  assert.equal(Number(pack.content_quantity), 25);
+  assert.equal(pack.content_uom_id, 'uom_kg');
 
   const po = ProcurementService.createPurchaseOrder({
     organizationId: ORG,
