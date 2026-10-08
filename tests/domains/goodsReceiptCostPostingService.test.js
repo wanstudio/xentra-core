@@ -19,7 +19,7 @@ test.before(async () => {
   await db.readyPromise;
 
   db.prepare(
-    'CREATE TABLE IF NOT EXISTS materials (id TEXT PRIMARY KEY, organization_id TEXT NOT NULL, name TEXT NOT NULL, base_uom_id TEXT, is_active INTEGER NOT NULL DEFAULT 1)'
+    'CREATE TABLE IF NOT EXISTS materials (id TEXT PRIMARY KEY, organization_id TEXT NOT NULL, name TEXT NOT NULL, base_uom_id TEXT, status TEXT NOT NULL DEFAULT 'ACTIVE')'
   ).run();
 
   db.prepare('INSERT OR IGNORE INTO organizations (id, name, slug) VALUES (?, ?, ?)').run(
@@ -40,7 +40,7 @@ test.before(async () => {
   ).run(LOCATION, ORG, BRANCH, 'GR-COST', 'Goods Receipt Cost Location', 'BRANCH');
 
   db.prepare(
-    'INSERT OR IGNORE INTO materials (id, organization_id, name, base_uom_id, is_active) VALUES (?, ?, ?, ?, 1), (?, ?, ?, ?, 1)'
+    'INSERT OR IGNORE INTO materials (id, organization_id, name, base_uom_id, status) VALUES (?, ?, ?, ?, 'ACTIVE'), (?, ?, ?, ?, 'ACTIVE')'
   ).run(
     MATERIAL_A, ORG, 'Rice Premium', 'kg',
     MATERIAL_B, ORG, 'Cooking Oil', 'L'
