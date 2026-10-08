@@ -44,6 +44,63 @@ class InventoryRepository {
     );
   }
 
+  findBranchProductInventoryView({ branchId, brandId }) {
+    const location = this.findCanonicalProductStockLocation(branchId);
+    const locationId = location.location ? location.location.id : null;
+
+    return this.db.queryMany(
+      `SELECT
+         p.id AS product_id,
+         p.name AS product_name,
+         p.sku,
+         bp.is_available,
+         bp.low_stock_threshold,
+         psb.quantity AS product_stock_quantity,
+         bpi.stock_qty AS branch_inventory_quantity,
+         bp.stock AS legacy_branch_stock,
+         CASE
+           WHEN ? IS NOT NULL AND psb.product_id IS NOT NULL
+             THEN psb.quantity
+           WHEN bpi.product_id IS NOT NULL
+             THEN bpi.stock_qty
+           WHEN bp.product_id IS NOT NULL
+             THEN COALESCE(bp.stock, 0)
+           ELSE NULL
+         END AS stock,
+         CASE
+           WHEN ? IS NOT NULL AND psb.product_id IS NOT NULL
+             THEN 'canonical'
+           WHEN bpi.product_id IS NOT NULL
+             THEN 'branch_product_inventory'
+           WHEN bp.product_id IS NOT NULL
+             THEN 'legacy_branch_products'
+           ELSE 'none'
+         END AS stock_source
+       FROM products p
+       LEFT JOIN branch_products bp
+         ON bp.branch_id = ? AND bp.product_id = p.id
+       LEFT JOIN branch_product_inventory bpi
+         ON bpi.branch_id = ? AND bpi.product_id = p.id
+       LEFT JOIN product_stock_balances psb
+         ON psb.stock_location_id = ? AND psb.product_id = p.id
+       WHERE p.brand_id = ?
+         AND (
+           psb.product_id IS NOT NULL
+           OR bpi.product_id IS NOT NULL
+           OR bp.product_id IS NOT NULL
+         )
+       ORDER BY p.name ASC, p.id ASC`,
+      [
+        locationId,
+        locationId,
+        branchId,
+        branchId,
+        locationId,
+        brandId
+      ]
+    );
+  }
+
   findProductStockStatesByBranch({ branchId, productIds = [] }) {
     const ids = Array.from(new Set(
       (Array.isArray(productIds) ? productIds : [])
