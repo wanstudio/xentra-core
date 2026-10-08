@@ -822,24 +822,30 @@ The following can be promoted with high confidence:
 1. Stock Location is the physical stock boundary.
 2. Material Stock and Product Stock are separate stock identities.
 3. Product SKU is not a Production Batch / Lot identity.
-4. Production Batch references an immutable Recipe Version.
-5. Production mutation is atomic across input consumption and output posting when persisted in one transaction.
-6. Supplier Material is separate from Material identity.
-7. PO does not mutate stock; Goods Receipt does.
-8. Purchase Request / Shopping work is separate from PO.
-9. Partial Goods Receipt is first-class.
-10. UOM conversion is explicit and transaction quantities must preserve resolved base quantities.
-11. Menu Item needs a stable identity before Choice persistence.
-12. Choice-driven stock effects resolve through structured composition, never direct raw-material mutation.
+4. Product → 0..N Production Items, with each Production Item producing exactly one Product, and routing resolving one unambiguous active Production Item for the production context.
+5. Each Production Item has one logical Recipe in v1; formula revisions use immutable Recipe Versions.
+6. Production Batch references an immutable Recipe Version.
+7. Production mutation is atomic across input consumption and output posting when persisted in one transaction.
+8. Recipe Components reference Material explicitly in v1.
+9. Supplier Material is separate from Material identity.
+10. PO does not mutate stock; Goods Receipt does.
+11. Purchase Request / Shopping work is separate from PO.
+12. Partial Goods Receipt is first-class.
+13. UOM conversion is explicit and transaction quantities must preserve resolved base quantities.
+14. Menu Item needs a stable identity before Choice persistence.
+15. Choice-driven stock effects resolve through structured composition, never direct raw-material mutation.
+
+Production Item + Recipe / BoM Contract v1 was promoted on 2026-10-08:
+docs/decisions/xentra-production-item-recipe-bom-contract-v1.md
 
 ## 28. Decisions That Should Remain Explicitly OPEN
 
 These still require product/business choices:
 
+- exact Production Item → Stock Location applicability schema and routing priority;
 - whether WIP is mandatory in MVP or only supported by the target model;
-- exact Product ↔ Production Item location/routing policy;
-- exact recipe component types (Material only vs Material + semi-finished output);
-- exact lot/expiry activation timeline;
+- semi-finished output / sub-assembly model;
+- lot/expiry activation timeline;
 - exact make-to-order trigger and reservation semantics;
 - exact transfer state machine;
 - exact role approval matrix;
