@@ -2,7 +2,9 @@
 
 **Status:** 🔎 PROPOSED TARGET DATA MODEL / PRE-IMPLEMENTATION DESIGN
 **Date:** 2026-10-08
-**Prerequisite:** `docs/decisions/xentra-production-material-procurement-vocabulary-gate-v1.md`
+**Prerequisites:**
+- `docs/decisions/xentra-production-material-procurement-vocabulary-gate-v1.md`
+- `docs/decisions/xentra-material-supplier-material-contract-v1.md`
 
 This document defines the target logical model only. It does not authorize immediate SQLite migration or runtime refactoring.
 
@@ -138,12 +140,19 @@ Do not duplicate Material merely because different suppliers or branches buy it 
 
 ## 9. Supplier Material
 
-Recommended logical entity: `supplier_materials`.
+Recommended logical entities:
+- `supplier_materials`
+- `supplier_material_packs`
 
-Conceptual fields:
-`id`, `supplier_id`, `material_id`, `supplier_item_code`, `purchase_uom_id`, `conversion_to_base_uom`, `unit_price`, `currency`, `minimum_order_quantity`, `lead_time_days`, validity fields, `is_active`.
+Conceptual `supplier_materials` fields:
+`id`, `supplier_id`, `material_id`, `supplier_item_code`, `is_active`, validity fields, and current/default sourcing metadata.
+
+A Supplier Material may have one-to-many dated purchase forms/packs. Conceptual `supplier_material_packs` fields include:
+`id`, `supplier_material_id`, `name`, `purchase_uom_id` nullable, `content_quantity_base`, `content_uom_id`, `minimum_order_quantity`, `unit_price`, `currency`, `effective_from`, `effective_to`, `is_active`.
 
 `Supplier Material` owns supplier-specific commercial data. `Material` remains the identity of what the input actually is.
+
+Important: purchase UOM and supplier pack are different vocabulary concepts. A directly convertible measurement such as `5,000 g → 5 kg` uses UOM conversion. A commercial representation such as `1 sack = 25 kg` is modeled as a pack/content definition. Historical PO/Receipt lines snapshot the resolved conversion/content.
 
 ## 10. Production Item
 
