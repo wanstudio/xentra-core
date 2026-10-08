@@ -21,7 +21,7 @@ Demand / Stock Condition
     ↓
 Replenishment Requirement
     ↓
-Shopping List / Purchase Request
+Shopping List (optional planning/read view) → Purchase Request
     ↓
 Procurement
     ↓
@@ -287,7 +287,7 @@ The exact mapping is deliberately left to the future Production/Material contrac
 - Product Stock unavailable → selling is constrained by the active Menu/Inventory contract.
 - Transfer failure → remains an Inventory transfer problem; it is not silently converted into a Purchase Order.
 
-## 8. HPP / Costing Boundary
+## 8. Costing / HPP Boundary
 
 Conceptual cost path:
 
@@ -296,20 +296,20 @@ Material cost
 → Material Stock
 → Production consumption + yield
 → Production Output cost
-→ effective Product/Menu cost
+→ effective Product/Menu composition cost
 → Selling Price
 ~~~
 
-HPP is a derived business view, not a second inventory ledger.
+Costing/HPP is a derived capability, not a second inventory ledger.
 
-These are intentionally OPEN:
-- valuation method;
-- exact UOM master schema/reference-data implementation;
-- UOM precision/rounding rules;
-- overhead allocation;
-- waste costing;
-- recipe costing versioning;
-- HPP calculation timing.
+The Costing/HPP Contract v1 locks the direct-material costing boundary, historical cost evidence, and transfer cost continuity.
+
+Still open as separate policy:
+- exact inventory valuation method and scope;
+- exact Menu HPP reporting basis (latest actual Product cost vs current theoretical Production cost);
+- financial/accounting COGS integration;
+- overhead/labor/landed-cost allocation;
+- waste/yield variance costing.
 
 ## 9. Locked Invariants
 
