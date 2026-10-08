@@ -395,7 +395,7 @@ Do not lock these from this document:
 - make-to-order trigger/reservation semantics;
 - exact transfer state machine;
 - production scheduling/capacity;
-- HPP/valuation;
+- detailed physical valuation-state implementation governed by docs/decisions/xentra-inventory-valuation-policy-v1.md;
 - procurement approval matrix;
 - autonomous replenishment;
 - exact Item Choice → Product/Production mapping.
