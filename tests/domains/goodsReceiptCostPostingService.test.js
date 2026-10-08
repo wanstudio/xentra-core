@@ -40,7 +40,7 @@ test.before(async () => {
   ).run(LOCATION, ORG, BRANCH, 'GR-COST', 'Goods Receipt Cost Location', 'BRANCH');
 
   db.prepare(
-    'INSERT OR IGNORE INTO materials (id, organization_id, name, base_uom_id, status) VALUES (?, ?, ?, ?, 'ACTIVE'), (?, ?, ?, ?, 'ACTIVE')'
+    "INSERT OR IGNORE INTO materials (id, organization_id, name, base_uom_id, status) VALUES (?, ?, ?, ?, 'ACTIVE'), (?, ?, ?, ?, 'ACTIVE')"
   ).run(
     MATERIAL_A, ORG, 'Rice Premium', 'kg',
     MATERIAL_B, ORG, 'Cooking Oil', 'L'
