@@ -249,7 +249,8 @@ Safe editorial and contract-alignment corrections:
 8. Clarify Recipe as canonical Xentra term and BoM/BOM as external synonym.
 9. Clarify Transfer Request as state/process wording, not a canonical entity.
 10. HPP terminology is resolved by Costing Vocabulary Revision v1.1; continue to keep Menu Composition Cost and COGS separate.
-11. Keep UOM decimal arithmetic as an implementation gate.
+11. Legacy cost vocabulary is now governed by `docs/audits/xentra-legacy-cost-vocabulary-quarantine-v1.md`.
+12. Keep UOM decimal arithmetic as an implementation gate.
 
 ## Audit conclusion
 
