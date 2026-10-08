@@ -115,6 +115,15 @@ class ProductionService {
     return repository.findProductionItem(itemId);
   }
 
+  static activateProductionItem({ productionItemId, repository = productionRepository }) {
+    const item = repository.findProductionItem(productionItemId);
+    if (!item || item.status === 'ARCHIVED') throw fail('PRODUCTION_ITEM_NOT_FOUND');
+    const now = new Date().toISOString();
+    const result = repository.updateProductionItemStatus({ id: productionItemId, status: 'ACTIVE', updatedAt: now });
+    if (!result || result.changes !== 1) throw fail('PRODUCTION_ITEM_STATUS_INVALID');
+    return repository.findProductionItem(productionItemId);
+  }
+
   static addProductionLocation({
     productionItemId,
     stockLocationId,
@@ -157,6 +166,15 @@ class ProductionService {
       updatedAt: now
     });
     return repository.findRecipeByProductionItemId(productionItemId);
+  }
+
+  static activateRecipe({ recipeId, repository = productionRepository }) {
+    const recipe = repository.db.queryOne('SELECT * FROM recipes WHERE id = ?', [recipeId]);
+    if (!recipe || recipe.status === 'ARCHIVED') throw fail('RECIPE_NOT_FOUND');
+    const now = new Date().toISOString();
+    const result = repository.updateRecipeStatus({ id: recipeId, status: 'ACTIVE', updatedAt: now });
+    if (!result || result.changes !== 1) throw fail('RECIPE_STATUS_INVALID');
+    return repository.findRecipeByProductionItemId(recipe.production_item_id);
   }
 
   static createRecipeVersion({
@@ -315,7 +333,10 @@ class ProductionService {
   static planProductionBatch({ productionBatchId, repository = productionRepository }) {
     const batch = repository.findProductionBatch(productionBatchId);
     if (!batch || batch.status !== 'DRAFT') throw fail('PRODUCTION_BATCH_STATUS_INVALID');
-    const result = repository.updateBatchStatus({ id: batch.id, status: 'PLANNED', actorField: 'started_by', actorId: null, timestamp: new Date().toISOString() });
+    const result = repository.updateProductionBatchPlan({
+      id: batch.id,
+      timestamp: new Date().toISOString()
+    });
     if (!result || result.changes !== 1) throw fail('PRODUCTION_BATCH_STATUS_INVALID');
     return repository.findProductionBatch(batch.id);
   }
