@@ -1187,7 +1187,7 @@
         component_snapshot: componentSnapshot,
         menu_snapshot: {
           menu_id: menu.menu_id || menu.id,
-          menu_type: menu.menu_type || 'SINGLE',
+          menu_type: menu.menu_type || null,
           title: menu.title || menu.package_name || 'Menu',
           subtitle: menu.subtitle || null,
           price: Number(menu.price || 0),
