@@ -321,7 +321,8 @@ These are intentionally OPEN:
 6. Menu is commercial; Recipe/Production is operational transformation.
 7. Item Choice is Menu-Item-scoped and does not directly mutate raw-material stock.
 8. Selling consumes ready-to-sell Product Stock according to the active Inventory contract.
-9. Branch-direct, central, and hybrid sourcing share the same domains.
+9. Costing/HPP is derived from authoritative Inventory/Production/Product cost sources and is not a second stock ledger.
+10. Branch-direct, central, and hybrid sourcing share the same domains.
 10. Make-to-order, when later enabled, does not create a second architecture.
 11. Core authorization and scope remain authoritative across all stages.
 
@@ -338,7 +339,8 @@ This contract does not lock:
 - partial dispatch and transfer scheduling policy;
 - exact UOM master schema/reference-data implementation;
 - UOM precision/rounding rules;
-- costing/valuation/HPP algorithm;
+- exact valuation method and scope;
+- exact Menu HPP preference between latest actual Product cost and current theoretical Production cost;
 - autonomous purchase limits;
 - exact procurement/receiving/production role matrix;
 - exact direct Choice → Production variant / Material recipe override; Product stock-effect mapping is now locked by `docs/decisions/xentra-menu-item-choice-stock-production-integration-contract-v1.md`.
