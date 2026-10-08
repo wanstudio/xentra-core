@@ -10,6 +10,7 @@
 - docs/decisions/xentra-costing-hpp-contract-v1.md
 - docs/decisions/xentra-stock-location-stock-identity-target-data-model-v1.md
 - docs/decisions/xentra-uom-master-precision-rounding-contract-v1.md
+- docs/decisions/xentra-cost-bearing-stock-movement-data-model-v1.md
 - docs/decisions/xentra-material-production-selling-lifecycle-contract-v1.md
 
 ## 1. Purpose
