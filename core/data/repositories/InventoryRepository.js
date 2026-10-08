@@ -37,6 +37,123 @@ class InventoryRepository {
     return Boolean(product && product.sku != null && String(product.sku).trim() !== '');
   }
 
+  findStockLocation(stockLocationId) {
+    return this.db.queryOne(
+      'SELECT id, organization_id, branch_id, code, name, location_type, is_active FROM stock_locations WHERE id = ?',
+      [stockLocationId]
+    );
+  }
+
+  findProductForValuation(productId) {
+    return this.db.queryOne(
+      `SELECT p.id, p.brand_id, b.organization_id, p.is_active
+       FROM products p
+       JOIN brands b ON b.id = p.brand_id
+       WHERE p.id = ?`,
+      [productId]
+    );
+  }
+
+  findMaterialForValuation(materialId) {
+    return this.db.queryOne(
+      `SELECT id, organization_id, is_active, base_uom_id
+       FROM materials
+       WHERE id = ?`,
+      [materialId]
+    );
+  }
+
+  findMaterialValuationBalance({ stockLocationId, materialId }) {
+    return this.db.queryOne(
+      `SELECT
+        stock_location_id,
+        material_id,
+        quantity_base,
+        carrying_value,
+        moving_average_unit_cost,
+        cost_availability_status,
+        valuation_version,
+        created_at,
+        updated_at
+       FROM material_stock_balances
+       WHERE stock_location_id = ? AND material_id = ?`,
+      [stockLocationId, materialId]
+    );
+  }
+
+  findProductValuationBalance({ stockLocationId, productId }) {
+    return this.db.queryOne(
+      `SELECT
+        stock_location_id,
+        product_id,
+        quantity,
+        carrying_value,
+        moving_average_unit_cost,
+        cost_availability_status,
+        valuation_version,
+        created_at,
+        updated_at
+       FROM product_stock_balances
+       WHERE stock_location_id = ? AND product_id = ?`,
+      [stockLocationId, productId]
+    );
+  }
+
+  findLatestMaterialValuationMovement({ stockLocationId, materialId }) {
+    return this.db.queryOne(
+      `SELECT
+        id, movement_type, quantity_base, unit_cost, total_cost, currency_code,
+        cost_basis_type, source_type, source_reference, posting_mutation_id,
+        posting_timestamp, valuation_version, resolver_version
+       FROM material_stock_movements
+       WHERE stock_location_id = ? AND material_id = ?
+       ORDER BY valuation_version DESC
+       LIMIT 1`,
+      [stockLocationId, materialId]
+    );
+  }
+
+  findLatestProductValuationMovement({ stockLocationId, productId }) {
+    return this.db.queryOne(
+      `SELECT
+        id, movement_type, quantity, unit_cost, total_cost, currency_code,
+        cost_basis_type, source_type, source_reference, posting_mutation_id,
+        posting_timestamp, valuation_version, resolver_version
+       FROM product_stock_movements
+       WHERE stock_location_id = ? AND product_id = ?
+       ORDER BY valuation_version DESC
+       LIMIT 1`,
+      [stockLocationId, productId]
+    );
+  }
+
+  findMaterialValuationMovementByPostingMutationId(postingMutationId) {
+    return this.db.queryOne(
+      `SELECT
+        id, stock_location_id, material_id, movement_type, quantity_base,
+        unit_cost, total_cost, currency_code, cost_basis_type, source_type,
+        source_reference, posting_mutation_id, posting_timestamp,
+        valuation_version, resolver_version
+       FROM material_stock_movements
+       WHERE posting_mutation_id = ?
+       LIMIT 1`,
+      [postingMutationId]
+    );
+  }
+
+  findProductValuationMovementByPostingMutationId(postingMutationId) {
+    return this.db.queryOne(
+      `SELECT
+        id, stock_location_id, product_id, movement_type, quantity,
+        unit_cost, total_cost, currency_code, cost_basis_type, source_type,
+        source_reference, posting_mutation_id, posting_timestamp,
+        valuation_version, resolver_version
+       FROM product_stock_movements
+       WHERE posting_mutation_id = ?
+       LIMIT 1`,
+      [postingMutationId]
+    );
+  }
   ensureBranchProductInventory({ branchId, productId, lowStockThreshold = 5 }) {
     const product = this._findProductStockIdentity(productId);
     if (!product) return { changes: 0 };
