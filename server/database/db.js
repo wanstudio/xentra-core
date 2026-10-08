@@ -2661,6 +2661,52 @@ function initSchema(targetDb) {
     throw e;
   }
 
+  // Canonical UOM + Material masters must exist before cost-bearing Inventory,
+  // because Material Stock is keyed by materials.id and Material owns base_uom_id.
+  try {
+    const { ensureUomMasterSchema } = require('../../domains/uom/schema/UomMasterSchema');
+    ensureUomMasterSchema(targetDb);
+  } catch (schemaErr) {
+    throw new Error('[Database] Failed to initialize canonical UOM schema: ' + schemaErr.message);
+  }
+
+  try {
+    const { ensureMaterialMasterSchema } = require('../../domains/material/schema/MaterialMasterSchema');
+    ensureMaterialMasterSchema(targetDb);
+  } catch (schemaErr) {
+    throw new Error('[Database] Failed to initialize canonical Material schema: ' + schemaErr.message);
+  }
+
+  // Cost-bearing Inventory target schema is additive and intentionally separate from
+  // legacy branch_products / inventory_movements compatibility structures.
+  try {
+    const { ensureCostBearingInventorySchema } = require('../../domains/inventory/schema/CostBearingInventorySchema');
+    ensureCostBearingInventorySchema(targetDb);
+  } catch (schemaErr) {
+    throw new Error('[Database] Failed to initialize cost-bearing Inventory target schema: ' + schemaErr.message);
+  }
+
+  try {
+    const { ensureProcurementDocumentSchema } = require('../../domains/procurement/schema/ProcurementDocumentSchema');
+    ensureProcurementDocumentSchema(targetDb);
+  } catch (schemaErr) {
+    throw new Error('[Database] Failed to initialize canonical Procurement schema: ' + schemaErr.message);
+  }
+
+  try {
+    const { ensureProductionSchema } = require('../../domains/production/schema/ProductionSchema');
+    ensureProductionSchema(targetDb);
+  } catch (schemaErr) {
+    throw new Error('[Database] Failed to initialize canonical Production schema: ' + schemaErr.message);
+  }
+
+  try {
+    const { ensureCostOfSalesSchema } = require('../../domains/costing/schema/CostOfSalesSchema');
+    ensureCostOfSalesSchema(targetDb);
+  } catch (schemaErr) {
+    throw new Error('[Database] Failed to initialize Cost of Sales schema: ' + schemaErr.message);
+  }
+
   // Authoritative separation: Schema initialization only provisions essential tenant structure
   // (organization, brand, initial merchant owner if absent).
   // Demo fixtures (demo branches, demo products, demo promotions) are NEVER automatically seeded on startup.

@@ -12,6 +12,10 @@ const BranchRepository = require('./BranchRepository');
 const BrandRepository = require('./BrandRepository');
 const PosShiftRepository = require('./PosShiftRepository');
 const InventoryRepository = require('./InventoryRepository');
+const UomRepository = require('./UomRepository');
+const MaterialRepository = require('./MaterialRepository');
+const ProcurementRepository = require('./ProcurementRepository');
+const ProductionRepository = require('./ProductionRepository');
 const UserRepository = require('./UserRepository');
 const EligibilityRepository = require('./EligibilityRepository');
 const ReportingRepository = require('./ReportingRepository');
@@ -38,6 +42,10 @@ module.exports = {
   BrandRepository,
   PosShiftRepository,
   InventoryRepository,
+  UomRepository,
+  MaterialRepository,
+  ProcurementRepository,
+  ProductionRepository,
   UserRepository,
   EligibilityRepository,
   ReportingRepository,
@@ -51,3 +59,4 @@ module.exports = {
   OrderAdditionRepository,
   TenantDomainRepository
 };
+
