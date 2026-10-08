@@ -62,7 +62,7 @@ Therefore the next step is architecture-first target modeling, not direct runtim
 9. Production yield / variance / waste
 10. Lot / batch / expiry traceability
 11. Replenishment route policy
-12. Transfer lifecycle / in-transit representation
+12. Transfer lifecycle / in-transit representation ✅
 13. Role / approval matrix
 14. Production scheduling / capacity
 15. HPP / costing / valuation
