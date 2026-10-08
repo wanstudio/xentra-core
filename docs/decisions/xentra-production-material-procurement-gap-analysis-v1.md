@@ -917,5 +917,5 @@ Item Choice Resolution
 Sale
 ```
 
-The architecture is ready for the next design gate: **Stock Location + Stock Identity Target Data Model**.
+The Production Item + Recipe / BoM identity layer is now locked. The architecture is ready for the next design gate: **Production Batch + Posting / Mutation Contract**.
 
