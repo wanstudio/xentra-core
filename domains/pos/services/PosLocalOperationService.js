@@ -21,6 +21,8 @@ const {
   PosShiftRepository
 } = require('../../../core/data/repositories');
 const OfflineReconciliationService = require('./OfflineReconciliationService');
+const { InventorySalePostingService } = require('../../inventory');
+const { CostOfSalesService } = require('../../costing');
 const { ensureComposedMenuSchema } = require('../../catalog/schema/ComposedMenuSchema');
 
 const posOperationalRepository = new PosOperationalRepository();
@@ -56,10 +58,48 @@ function buildOfflineStockRequirements(items) {
   return Array.from(requirements.values());
 }
 
+function itemRequiresCanonicalInventory(items, canonicalRequirements) {
+  if (canonicalRequirements.size > 0) {
+    return Array.from(canonicalRequirements.values()).map(requirement => ({
+      product_id: requirement.product_id,
+      product_name: requirement.product_name,
+      quantity: requirement.quantity
+    }));
+  }
+
+  return (Array.isArray(items) ? items : [])
+    .map(item => {
+      const productId = String(item && item.product_id || '').trim();
+      const product = productId
+        ? inventoryRepository.findProductForValuation(productId)
+        : null;
+      const sku = product && product.sku != null ? String(product.sku).trim() : '';
+      if (!productId || !sku) return null;
+      return {
+        product_id: productId,
+        product_name: item.name || item.product_name || productId,
+        quantity: Number(item.quantity),
+        source_item_reference: item.id || productId
+      };
+    })
+    .filter(Boolean);
+}
+
 function findFirstOfflineStockDeficit(branchId, items) {
-  for (const requirement of buildOfflineStockRequirements(items)) {
-    const branchProduct = inventoryRepository.findBranchProduct(branchId, requirement.product_id);
-    const available = branchProduct ? Number(branchProduct.stock || 0) : 0;
+  const requirements = buildOfflineStockRequirements(items);
+  if (!requirements.length) return null;
+
+  const rows = inventoryRepository.findProductStockStatesByBranch({
+    branchId,
+    productIds: requirements.map(item => item.product_id)
+  });
+  const rowMap = new Map(rows.map(row => [String(row.product_id), row]));
+
+  for (const requirement of requirements) {
+    const row = rowMap.get(String(requirement.product_id));
+    const available = row
+      ? Number(row.stock)
+      : Number((inventoryRepository.findBranchProduct(branchId, requirement.product_id) || {}).stock || 0);
     if (available < requirement.quantity) return { requirement, available };
   }
   return null;
@@ -372,61 +412,95 @@ class PosLocalOperationService {
           continue;
         }
 
-        // Legacy Product compatibility path.
-        const bpBefore = inventoryRepository.findBranchProduct(branch_id, item.product_id);
-        const prevStock = bpBefore ? Number(bpBefore.stock || 0) : 0;
-        const deductResult = inventoryRepository.deductBranchProduct({
-          quantity: item.quantity,
-          branchId: branch_id,
-          productId: item.product_id
-        });
+        const canonicalSaleRequirements = itemRequiresCanonicalInventory(verifiedItems, canonicalRequirements);
 
-        if (!deductResult || deductResult.changes === 0) {
-          throw new Error('[INSUFFICIENT_LOCAL_STOCK] Stok lokal produk ' + item.name + ' tidak mencukupi untuk penjualan offline.');
+        let canonicalSalePosted = false;
+        if (canonicalSaleRequirements.length > 0) {
+          const canonicalSale = InventorySalePostingService.postCanonicalSale({
+            branchId: branch_id,
+            requirements: canonicalSaleRequirements,
+            sourceType: 'ORDER',
+            sourceReference: orderNumber,
+            actorId: terminal_id,
+            postingTimestamp: now,
+            dbTransactionProvided: true
+          });
+
+          if (canonicalSale.status === 'AVAILABLE') {
+            canonicalSalePosted = true;
+
+            CostOfSalesService.capture({
+              sourceType: 'ORDER',
+              sourceReference: orderNumber,
+              orderId,
+              totalCost: canonicalSale.total_cost,
+              currencyCode: canonicalSale.currency_code,
+              costLines: canonicalSale.cost_lines
+            });
+          }
         }
 
-        const currentStock = prevStock - item.quantity;
-        inventoryRepository.insertSaleDeduction({
-          id: 'mov_' + crypto.randomBytes(6).toString('hex'),
-          branchId: branch_id,
-          productId: item.product_id,
-          quantity: item.quantity,
-          previousStock: prevStock,
-          currentStock,
-          referenceId: orderNumber,
-          actorId: terminal_id,
-          notes: 'Pemotongan stok offline lokal ' + orderNumber + ' (' + terminal_id + ')',
-          createdAt: now
-        });
-      }
+        if (!canonicalSalePosted) {
+          // Migration seam only: until the canonical Product Stock balance exists
+          // for this branch/product set, preserve existing offline local stock.
+          if (canonicalRequirements.size > 0) {
+            for (const requirement of canonicalRequirements.values()) {
+              const before = inventoryRepository.findBranchProduct(branch_id, requirement.product_id);
+              const prevStock = before ? Number(before.stock || 0) : 0;
+              const deductResult = inventoryRepository.deductBranchProduct({
+                quantity: requirement.quantity,
+                branchId: branch_id,
+                productId: requirement.product_id
+              });
 
-      for (const requirement of canonicalRequirements.values()) {
-        const before = inventoryRepository.findBranchProduct(branch_id, requirement.product_id);
-        const prevStock = before ? Number(before.stock || 0) : 0;
-        const deductResult = inventoryRepository.deductBranchProduct({
-          quantity: requirement.quantity,
-          branchId: branch_id,
-          productId: requirement.product_id
-        });
+              if (!deductResult || deductResult.changes === 0) {
+                throw new Error('[INSUFFICIENT_LOCAL_STOCK] Stok lokal komponen ' + requirement.product_name + ' tidak mencukupi untuk penjualan offline (tersisa ' + prevStock + ', diminta ' + requirement.quantity + ').');
+              }
 
-        if (!deductResult || deductResult.changes === 0) {
-          throw new Error('[INSUFFICIENT_LOCAL_STOCK] Stok lokal komponen ' + requirement.product_name + ' tidak mencukupi untuk penjualan offline (tersisa ' + prevStock + ', diminta ' + requirement.quantity + ').');
+              const currentStock = prevStock - requirement.quantity;
+              inventoryRepository.insertSaleDeduction({
+                id: 'mov_' + crypto.randomBytes(6).toString('hex'),
+                branchId: branch_id,
+                productId: requirement.product_id,
+                quantity: requirement.quantity,
+                previousStock: prevStock,
+                currentStock,
+                referenceId: orderNumber,
+                actorId: terminal_id,
+                notes: 'Pemotongan stok offline komponen Menu ' + orderNumber + ' (' + terminal_id + ')',
+                createdAt: now
+              });
+            }
+          } else {
+            for (const item of verifiedItems) {
+              const before = inventoryRepository.findBranchProduct(branch_id, item.product_id);
+              const prevStock = before ? Number(before.stock || 0) : 0;
+              const deductResult = inventoryRepository.deductBranchProduct({
+                quantity: item.quantity,
+                branchId: branch_id,
+                productId: item.product_id
+              });
+
+              if (!deductResult || deductResult.changes === 0) {
+                throw new Error('[INSUFFICIENT_LOCAL_STOCK] Stok lokal produk ' + item.name + ' tidak mencukupi untuk penjualan offline.');
+              }
+
+              const currentStock = prevStock - item.quantity;
+              inventoryRepository.insertSaleDeduction({
+                id: 'mov_' + crypto.randomBytes(6).toString('hex'),
+                branchId: branch_id,
+                productId: item.product_id,
+                quantity: item.quantity,
+                previousStock: prevStock,
+                currentStock,
+                referenceId: orderNumber,
+                actorId: terminal_id,
+                notes: 'Pemotongan stok offline lokal ' + orderNumber + ' (' + terminal_id + ')',
+                createdAt: now
+              });
+            }
+          }
         }
-
-        const currentStock = prevStock - requirement.quantity;
-        inventoryRepository.insertSaleDeduction({
-          id: 'mov_' + crypto.randomBytes(6).toString('hex'),
-          branchId: branch_id,
-          productId: requirement.product_id,
-          quantity: requirement.quantity,
-          previousStock: prevStock,
-          currentStock,
-          referenceId: orderNumber,
-          actorId: terminal_id,
-          notes: 'Pemotongan stok offline komponen Menu ' + orderNumber + ' (' + terminal_id + ')',
-          createdAt: now
-        });
-      }
 
       // 3. Shift cash effect (if shift_id provided)
       if (shift_id) {
@@ -508,9 +582,17 @@ class PosLocalOperationService {
    * Locked Rule 4 & 5: Alert only, does NOT automatically mutate stock or disable product.
    */
   static evaluateLocalStock({ branch_id, product_id, custom_threshold = null }) {
-    const bp = inventoryRepository.findBranchProduct(branch_id, product_id);
-    const stock = bp ? Number(bp.stock || 0) : 0;
-    const threshold = custom_threshold != null ? Number(custom_threshold) : 5;
+    const rows = inventoryRepository.findProductStockStatesByBranch({
+      branchId: branch_id,
+      productIds: [product_id]
+    });
+    const state = rows[0] || null;
+    const stock = state
+      ? Number(state.stock)
+      : Number((inventoryRepository.findBranchProduct(branch_id, product_id) || {}).stock || 0);
+    const threshold = custom_threshold != null
+      ? Number(custom_threshold)
+      : (state && state.low_stock_threshold != null ? Number(state.low_stock_threshold) : 5);
 
     const isLow = stock <= threshold && stock > 0;
     const isOutOfStock = stock <= 0;
