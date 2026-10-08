@@ -102,7 +102,7 @@ function buildPurchaseLine({ supplierMaterial, quantity, purchaseUomId, supplier
     if (agreedPrice === undefined || agreedPrice === null) throw fail('PURCHASE_PRICE_REQUIRED');
     if (agreedCurrency === undefined || agreedCurrency === null) throw fail('CURRENCY_BASIS_UNRESOLVED');
   } else {
-    if (Number(representation.pack.content_quantity_base) <= 0) throw fail('SUPPLIER_MATERIAL_PACK_INVALID');
+    if (Number(representation.pack.content_quantity) <= 0) throw fail('SUPPLIER_MATERIAL_PACK_INVALID');
 
     const contentUom = uomRepository.findById(representation.pack.content_uom_id);
     if (!contentUom || Number(contentUom.is_active) !== 1) throw fail('SUPPLIER_MATERIAL_PACK_UOM_INVALID');
