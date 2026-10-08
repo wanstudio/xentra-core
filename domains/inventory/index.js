@@ -7,6 +7,7 @@ const PurchaseOrderService = require('./services/PurchaseOrderService');
 const CostResolutionService = require('./services/CostResolutionService');
 const GoodsReceiptCostPostingService = require('./services/GoodsReceiptCostPostingService');
 const InventorySalePostingService = require('./services/InventorySalePostingService');
+const InventoryAdjustmentService = require('./services/InventoryAdjustmentService');
 
 const INVENTORY_IDENTITY = {
   name: 'inventory',
@@ -60,5 +61,6 @@ module.exports = {
   PurchaseOrderService,
   CostResolutionService,
   GoodsReceiptCostPostingService,
-  InventorySalePostingService
+  InventorySalePostingService,
+  InventoryAdjustmentService
 };
