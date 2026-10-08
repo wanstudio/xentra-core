@@ -7,10 +7,11 @@ const materialRepository = new MaterialRepository();
 const uomRepository = new UomRepository();
 
 function registerAdminMaterialRoutes(router, deps = {}) {
-  const requireAuth = deps.requireAuth || ((req, res, next) => next());
+  const requireAuth = typeof deps.requireAuth === 'function' ? deps.requireAuth : () => (req, res, next) => next();
+  const authGate = requireAuth(['owner', 'brand_manager']);
 
   // GET /admin/uoms — List all active UOMs for recipe/material configuration
-  router.get('/admin/uoms', requireAuth, (req, res) => {
+  router.get('/admin/uoms', authGate, (req, res) => {
     try {
       const uoms = uomRepository.listActive();
       return res.json({ success: true, uoms });
@@ -20,7 +21,7 @@ function registerAdminMaterialRoutes(router, deps = {}) {
   });
 
   // GET /admin/materials — List materials for current organization
-  router.get('/admin/materials', requireAuth, (req, res) => {
+  router.get('/admin/materials', authGate, (req, res) => {
     try {
       const orgId = req.user?.organization_id || req.brand?.organization_id || 'org_xentra_holding';
       const materials = materialRepository.listByOrganization(orgId, {
@@ -33,7 +34,7 @@ function registerAdminMaterialRoutes(router, deps = {}) {
   });
 
   // POST /admin/materials — Create a new canonical Material
-  router.post('/admin/materials', requireAuth, (req, res) => {
+  router.post('/admin/materials', authGate, (req, res) => {
     try {
       const orgId = req.user?.organization_id || req.brand?.organization_id || 'org_xentra_holding';
       const { material_code, name, description, base_uom_id, status } = req.body || {};
@@ -57,7 +58,7 @@ function registerAdminMaterialRoutes(router, deps = {}) {
   });
 
   // PUT /admin/materials/:id/archive — Archive a material
-  router.put('/admin/materials/:id/archive', requireAuth, (req, res) => {
+  router.put('/admin/materials/:id/archive', authGate, (req, res) => {
     try {
       const updated = MaterialService.archiveMaterial({
         materialId: req.params.id,
@@ -71,7 +72,7 @@ function registerAdminMaterialRoutes(router, deps = {}) {
   });
 
   // PUT /admin/materials/:id/status — Update material status (ACTIVE, DRAFT, ARCHIVED)
-  router.put('/admin/materials/:id/status', requireAuth, (req, res) => {
+  router.put('/admin/materials/:id/status', authGate, (req, res) => {
     try {
       const { status } = req.body || {};
       const targetStatus = String(status || '').toUpperCase();
