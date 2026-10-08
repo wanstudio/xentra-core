@@ -15,9 +15,8 @@
  *   Canonical Menu path:
  *     menus / menu_items                         (commercial Menu + composition)
  *     branch_menus                               (Branch Menu adoption/availability)
- *     branch_product_inventory                   (Product stock by Branch)
- *   Legacy Product compatibility path:
- *     products / branch_products                 (temporary migration compatibility)
+ *     product_stock_balances + Stock Location   (canonical Product stock)
+ *     branch_product_inventory / branch_products (migration fallback)
  *   Fulfillment capability:
  *     branch_delivery_settings.is_delivery_active /
  *       is_pickup_active
@@ -40,10 +39,9 @@
  *     delivery/pickup flag for them.
  *   - Operating schedule / opening hours are not implemented (B1 gap); the
  *     only authoritative open/close fact is branches.is_open_override.
- *   - Unrecorded inventory (stock NULL) is treated as 0, matching the locked
- *     consumer semantics established in C1/C2 (CatalogService reports 0,
- *     InventoryStockService starts adjustments from 0, PrePaymentVerificationGate
- *     resolves NULL stock to 0).
+ *   - Unrecorded inventory (stock NULL) is treated as 0. During migration,
+ *     Inventory resolves canonical Product Stock first and falls back to the
+ *     existing branch inventory structures only when canonical stock is not yet present.
  *
  * Result contract: deterministic `reasons` codes (one per blocking check,
  * evaluated in the fixed order below). Cross-brand / cross-organization inputs
@@ -51,9 +49,11 @@
  * leaked across tenant boundaries.
  */
 const { EligibilityRepository } = require('../../../core/data/repositories');
+const InventoryRepository = require('../../../core/data/repositories/InventoryRepository');
 const { verifyComposedCheckout } = require('./ComposedMenuCheckoutService');
 
 const eligibilityRepository = new EligibilityRepository();
+const inventoryRepository = new InventoryRepository();
 
 // order types whose fulfillment capability IS represented in the schema
 const CAPABILITY_REPRESENTED = { delivery: 'is_delivery_active', pickup: 'is_pickup_active' };
@@ -156,12 +156,26 @@ class EligibilityService {
       return { eligible: false, reasons: [EligibilityService.REASONS.PRODUCT_UNAVAILABLE], branch_id, brand_id, product_id, quantity: qty };
     }
 
-    const stock = bp.stock != null ? Number(bp.stock) : 0;
+    const stockRows = inventoryRepository.findProductStockStatesByBranch({
+      branchId: branch_id,
+      productIds: [product_id]
+    });
+    const stockState = stockRows[0] || null;
+    const stock = stockState ? Number(stockState.stock) : (bp.stock != null ? Number(bp.stock) : 0);
+
     if (stock < qty) {
       return { eligible: false, reasons: [EligibilityService.REASONS.INSUFFICIENT_STOCK], branch_id, brand_id, product_id, quantity: qty };
     }
 
-    return { eligible: true, reasons: [], branch_id, brand_id, product_id, quantity: qty };
+    return {
+      eligible: true,
+      reasons: [],
+      branch_id,
+      brand_id,
+      product_id,
+      quantity: qty,
+      stock_source: stockState ? stockState.stock_source : 'LEGACY_BRANCH_PRODUCTS'
+    };
   }
 
   static evaluateMenu({ brand_id, branch_id, menu_id, quantity = 1, order_type = null }) {
