@@ -103,7 +103,8 @@ function deductComposedStock({
   notes,
   dbTransactionProvided = false,
   sourceType = 'ORDER',
-  captureCostOfSales = true
+  captureCostOfSales = true,
+  stockReferenceId = null
 }) {
   const requirements = aggregateComposedRequirements(items);
   if (!requirements.length) return { success: true, deducted_items: [], cost_lines: [], cost_status: 'NOT_APPLICABLE' };
@@ -123,7 +124,7 @@ function deductComposedStock({
         source_item_reference: item.product_id
       })),
       sourceType,
-      sourceReference: referenceId,
+      sourceReference: stockReferenceId || (referenceId + ':menu'),
       actorId,
       postingTimestamp: now
     });
@@ -658,7 +659,7 @@ class OrderPlacementService {
             source_item_reference: item.id || item.product_id
           })),
           sourceType: 'ADDITIONAL_ORDER',
-          sourceReference: reference_id,
+          sourceReference: reference_id + ':direct',
           actorId: actor_id,
           postingTimestamp: now
         });
@@ -782,7 +783,7 @@ class OrderPlacementService {
             source_item_reference: item.id || item.product_id
           })),
           sourceType: 'ORDER',
-          sourceReference: order.order_number,
+          sourceReference: order.order_number + ':direct',
           actorId: order.customer_phone || 'online_payment',
           postingTimestamp: now
         });
@@ -859,7 +860,8 @@ class OrderPlacementService {
           notes: 'Pemotongan stok otomatis komponen Menu setelah pembayaran [' + order.order_number + ']',
           dbTransactionProvided: true,
           sourceType: 'ORDER',
-          captureCostOfSales: false
+          captureCostOfSales: false,
+          stockReferenceId: order.order_number + ':menu'
         });
 
         deductedItems.push(...composedResult.deducted_items);
