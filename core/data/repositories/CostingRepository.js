@@ -35,6 +35,13 @@ class CostingRepository {
     );
   }
 
+  findLatestProductMovement({ stockLocationId, productId }) {
+    return this.db.queryOne(
+      "SELECT id, currency_code, posting_timestamp, valuation_version FROM product_stock_movements WHERE stock_location_id = ? AND product_id = ? ORDER BY valuation_version DESC LIMIT 1",
+      [stockLocationId, productId]
+    );
+  }
+
   findProductionRoute({ productId, stockLocationId }) {
     return this.db.queryMany(
       "SELECT pi.id, pi.organization_id, pi.output_product_id, pi.status, pil.stock_location_id FROM production_items pi JOIN production_item_locations pil ON pil.production_item_id = pi.id WHERE pi.output_product_id = ? AND pil.stock_location_id = ? AND pi.status = 'ACTIVE' AND pil.is_active = 1 ORDER BY pi.id",
