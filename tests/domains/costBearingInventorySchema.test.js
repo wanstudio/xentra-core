@@ -219,12 +219,12 @@ test('posted product movement is immutable', () => {
 test('transfer source and destination preserve carried value', () => {
   db.prepare(`
     UPDATE product_stock_balances
-       SET quantity = 5,
-           carrying_value = 50000,
-           moving_average_unit_cost = 10000,
-           valuation_version = 1
+       SET quantity = 25,
+           carrying_value = 283333.3333333333,
+           moving_average_unit_cost = 11333.333333333334,
+           valuation_version = 2
      WHERE stock_location_id = ? AND product_id = ?
-  `).run(LOCATION_B, PRODUCT);
+  `).run(LOCATION_A, PRODUCT);
 
   db.prepare(`
     INSERT INTO product_stock_movements (
@@ -235,19 +235,19 @@ test('transfer source and destination preserve carried value', () => {
       valuation_version, posting_timestamp, resolver_version
     ) VALUES (
       'movement_cost_schema_transfer_out', ?, ?, 'TRANSFER_OUT',
-      -5, 10, 5,
-      10000, -50000, 'MOVING_AVERAGE', 'CURRENT_MOVING_AVERAGE',
+      -5, 30, 25,
+      11333.333333333334, -56666.66666666667, 'MOVING_AVERAGE', 'CURRENT_MOVING_AVERAGE',
       'TEST', 'TRANSFER-1', 'mutation-transfer-out-1',
-      1, '2026-10-08T19:05:00+07:00', 'v1'
+      2, '2026-10-08T19:05:00+07:00', 'v1'
     )
   `).run(LOCATION_A, PRODUCT);
 
   db.prepare(`
     UPDATE product_stock_balances
-       SET quantity = 15,
-           carrying_value = 122666.66666666667,
-           moving_average_unit_cost = 8177.777777777778,
-           valuation_version = 2
+       SET quantity = 7,
+           carrying_value = 76666.66666666667,
+           moving_average_unit_cost = 10952.380952380952,
+           valuation_version = 1
      WHERE stock_location_id = ? AND product_id = ?
   `).run(LOCATION_B, PRODUCT);
 
@@ -260,10 +260,10 @@ test('transfer source and destination preserve carried value', () => {
       posting_mutation_id, valuation_version, posting_timestamp, resolver_version
     ) VALUES (
       'movement_cost_schema_transfer_in', ?, ?, 'TRANSFER_IN',
-      5, 10, 15,
+      5, 2, 7,
       11333.333333333334, 56666.66666666667, 'MOVING_AVERAGE', 'TRANSFER_CARRIED',
       'TEST', 'TRANSFER-1', 'movement_cost_schema_transfer_out',
-      'mutation-transfer-in-1', 2, '2026-10-08T19:06:00+07:00', 'v1'
+      'mutation-transfer-in-1', 1, '2026-10-08T19:06:00+07:00', 'v1'
     )
   `).run(LOCATION_B, PRODUCT);
 
