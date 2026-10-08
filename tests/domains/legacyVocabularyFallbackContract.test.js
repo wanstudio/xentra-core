@@ -107,3 +107,33 @@ test('legacy menu_type may remain only as bounded compatibility data, not as a f
     'POS must not invent SINGLE as a canonical default'
   );
 });
+
+test('legacy vocabulary quarantine: canonical costing/production paths do not establish legacy cost authority', () => {
+  const canonicalSources = [
+    'domains/inventory/services/CostResolutionService.js',
+    'domains/inventory/services/GoodsReceiptCostPostingService.js',
+    'domains/inventory/services/InventoryProductionPostingService.js',
+    'domains/inventory/services/InventorySalePostingService.js',
+    'domains/production/services/ProductionService.js',
+    'domains/costing/services/MenuCompositionCostService.js',
+    'domains/costing/services/CostOfSalesService.js'
+  ];
+
+  for (const relativePath of canonicalSources) {
+    const source = read(relativePath);
+    assert.doesNotMatch(
+      source,
+      /\bcostPrice\b|\bcost_price\b|\bMenu HPP\b|\bProduct HPP\b|\bRecipe HPP\b|HPP item terjual/i,
+      relativePath + ' must not use legacy costing vocabulary as runtime authority'
+    );
+  }
+
+  const costingSource = read('domains/costing/services/MenuCompositionCostService.js');
+  assert.match(costingSource, /ACTUAL_OUTPUT/);
+  assert.match(costingSource, /THEORETICAL_RECIPE/);
+  assert.match(costingSource, /MENU_COST_BASIS_REQUIRED/);
+
+  const cogsSource = read('domains/costing/services/CostOfSalesService.js');
+  assert.match(cogsSource, /product_stock_movements/);
+  assert.doesNotMatch(cogsSource, /inventory_movements/);
+});
