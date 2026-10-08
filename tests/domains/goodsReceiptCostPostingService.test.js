@@ -19,7 +19,7 @@ test.before(async () => {
   await db.readyPromise;
 
   db.prepare(
-    'CREATE TABLE IF NOT EXISTS materials (id TEXT PRIMARY KEY, organization_id TEXT NOT NULL, name TEXT NOT NULL, base_uom_id TEXT, status TEXT NOT NULL DEFAULT 'ACTIVE')'
+    "CREATE TABLE IF NOT EXISTS materials (id TEXT PRIMARY KEY, organization_id TEXT NOT NULL, name TEXT NOT NULL, base_uom_id TEXT, status TEXT NOT NULL DEFAULT 'ACTIVE')"
   ).run();
 
   db.prepare('INSERT OR IGNORE INTO organizations (id, name, slug) VALUES (?, ?, ?)').run(
