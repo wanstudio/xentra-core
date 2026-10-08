@@ -1588,6 +1588,11 @@
 
     var products=[];
     menus.forEach(function(menu){
+      if(!menu || !(menu.menu_id || menu.id)) return;
+      if(!String(menu.title || '').trim()){
+        console.warn('[XENTRA CONTRACT] Skipping POS Menu without canonical title:', menu.menu_id || menu.id);
+        return;
+      }
       var branchCategories=Array.isArray(menu.branch_categories)?menu.branch_categories:[];
       var categoryRefs=branchCategories.length
         ? branchCategories
@@ -1597,11 +1602,11 @@
       var product=Object.assign({},menu,{
         id:menu.menu_id || menu.id,
         menu_id:menu.menu_id || menu.id,
-        product_id:menu.menu_type==='SINGLE' && Array.isArray(menu.components) && menu.components[0]
+        product_id:Array.isArray(menu.components) && menu.components[0]
           ? menu.components[0].product_id
           : null,
-        name:menu.title || menu.package_name || 'Menu',
-        product_name:menu.title || menu.package_name || 'Menu',
+        name:menu.title,
+        product_name:menu.title,
         subtitle:menu.subtitle || null,
         price:Number(menu.price || 0),
         regular_price:Number(menu.price || 0),
