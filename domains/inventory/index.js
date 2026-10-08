@@ -4,6 +4,7 @@ const { domain } = require('../../core');
 const InventoryMovementModel = require('./models/InventoryMovementModel');
 const InventoryStockService = require('./services/InventoryStockService');
 const PurchaseOrderService = require('./services/PurchaseOrderService');
+const CostResolutionService = require('./services/CostResolutionService');
 
 const INVENTORY_IDENTITY = {
   name: 'inventory',
@@ -54,5 +55,6 @@ module.exports = {
   registration,
   InventoryMovementModel,
   InventoryStockService,
-  PurchaseOrderService
+  PurchaseOrderService,
+  CostResolutionService
 };
