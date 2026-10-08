@@ -707,7 +707,7 @@ Each document must have a clear posting boundary.
 | Purchase Request | Procurement workflow | None |
 | Purchase Order | Procurement commitment | None |
 | Goods Receipt | Receipt verification | + Material Stock |
-| Inventory Transfer | Physical movement | Source -, Transit +, Destination + |
+| Inventory Transfer | Physical movement | Source -, in-transit state, Destination + |
 | Production Batch | Transformation execution | Material -, Output + |
 | Menu | Commercial definition | None |
 | Order | Commercial demand | Current sellable-stock rules |
@@ -835,6 +835,7 @@ The following can be promoted with high confidence:
 14. Menu Item needs a stable identity before Choice persistence.
 15. Choice-driven stock effects resolve through structured composition, never direct raw-material mutation.
 16. Choice Value stock effects are explicit Product mappings using NONE / ADD_PRODUCT / REPLACE_PRODUCT semantics; direct Choice → Production/Material effects remain future.
+17. Inventory Transfer uses explicit Stock Location source/destination, Inventory-owned dispatch/receipt boundaries, partial receipt, atomic posting, and idempotency.
 
 Production Item + Recipe / BoM Contract v1 was promoted on 2026-10-08:
 docs/decisions/xentra-production-item-recipe-bom-contract-v1.md
@@ -851,6 +852,9 @@ docs/decisions/xentra-menu-item-choice-stock-production-integration-contract-v1.
 Production Routing + Stock Location Contract v1 was promoted on 2026-10-08:
 docs/decisions/xentra-production-routing-stock-location-contract-v1.md
 
+Inventory Transfer State Machine Contract v1 was promoted on 2026-10-08:
+docs/decisions/xentra-inventory-transfer-state-machine-contract-v1.md
+
 ## 28. Decisions That Should Remain Explicitly OPEN
 
 These still require product/business choices:
@@ -861,7 +865,9 @@ These still require product/business choices:
 - semi-finished output / sub-assembly model;
 - lot/expiry activation timeline;
 - exact make-to-order trigger and reservation semantics;
-- exact transfer state machine;
+- partial dispatch workflow;
+- transfer variance / loss / damage workflow;
+- transfer scheduling and reservation;
 - exact role approval matrix;
 - exact production scheduling/capacity model;
 - exact HPP/valuation method;
@@ -890,13 +896,15 @@ Recommended sequence:
         ↓
 7. Production Routing + Stock Location Contract ✅
         ↓
-8. Costing / HPP Contract
+8. Inventory Transfer State Machine Contract ✅
         ↓
-8. Incremental schema + API implementation
+9. Costing / HPP Contract
         ↓
-9. Compatibility migration
+10. Incremental schema + API implementation
         ↓
-10. Legacy quarantine / removal
+11. Compatibility migration
+        ↓
+12. Legacy quarantine / removal
 ```
 
 This order resolves identity before transaction flow and transaction flow before costing.
