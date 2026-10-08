@@ -101,9 +101,9 @@ router.patch('/admin/branches/:id/inventory/:productId', requireAuth(['owner', '
     }
 
     // Forward inventory boundary:
-    // - SKU Product -> canonical branch_product_inventory; no Branch Menu adoption is required
-    //   for stock to exist.
-    // - Product without SKU -> legacy branch_products compatibility path.
+    // - SKU Product -> canonical Product Stock when the branch Stock Location + balance exist.
+    // - Unmigrated branch/product state remains an explicit legacy compatibility path.
+    // - Branch Menu adoption is not the authority for physical Product Stock.
     const product = db.prepare(`
       SELECT id, brand_id, sku
       FROM products
@@ -175,7 +175,7 @@ router.patch('/admin/branches/:id/inventory/:productId', requireAuth(['owner', '
         stock,
         stock_source: 'legacy'
       });
-    }    }
+    }
   } catch (err) {
     console.error('[API Error PATCH /admin/branches/:id/inventory/:productId]:', err);
     res.status(500).json({ success: false, error: err.message });
