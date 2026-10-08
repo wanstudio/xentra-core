@@ -375,6 +375,7 @@ class OrderPlacementService {
     const recipientPhone = (recipient && recipient.phone) || '';
 
     let confirmedComposedDeductions = [];
+    let confirmedSaleResult = null;
     try {
       orderRepository.beginTransaction();
       orderRepository.insertOrder({
@@ -431,46 +432,24 @@ class OrderPlacementService {
           componentSnapshot: item.component_snapshot ? JSON.stringify(item.component_snapshot) : null
         });
 
-        // Only deduct stock at creation if order is already confirmed (e.g. pos_cashier walk-in sales)
-        // For orders that enter pending state (customer_app cash/online), stock is deducted upon merchant acceptance
-        if (insertedStatus === 'confirmed' && !item.menu_id) {
-          const bpBefore = inventoryRepository.findBranchProduct(branch_id, item.product_id);
-          const prevStock = bpBefore ? Number(bpBefore.stock || 0) : 0;
-          const deductResult = inventoryRepository.deductBranchProduct({ quantity: item.quantity, branchId: branch_id, productId: item.product_id });
-          if (!deductResult || deductResult.changes === 0) {
-            throw new Error(`[CONCURRENCY_RACE] Stok untuk produk "${item.name}" baru saja habis atau tidak mencukupi.`);
-          }
-          const currentStock = prevStock - Number(item.quantity);
-          inventoryRepository.insertSaleDeduction({
-            id: `mov_${crypto.randomBytes(6).toString('hex')}`,
-            branchId: branch_id,
-            productId: item.product_id,
-            quantity: item.quantity,
-            previousStock: prevStock,
-            currentStock,
-            referenceId: orderNumber,
-            actorId: customer.phone || 'customer_order',
-            notes: `Pemotongan stok otomatis pesanan ${orderNumber} (${effectiveOrderType}/${order_channel})`,
-            createdAt: now
-          });
-        }
       }
 
       if (insertedStatus === 'confirmed') {
-        const composedItems = verifiedItems.filter(item => item && item.menu_id);
-        if (composedItems.length > 0) {
-          // Deduct component Products atomically, once per Product, after every
-          // canonical Menu line is persisted. This prevents shared components
-          // from being double-counted per Menu line.
-          confirmedComposedDeductions = deductComposedStock({
-            order: { branch_id },
-            items: composedItems,
-            referenceId: orderNumber,
-            actorId: customer.phone || 'customer_order',
-            notes: 'Pemotongan stok otomatis komponen Menu [' + orderNumber + ']',
-            dbTransactionProvided: true
-          }).deducted_items;
-        }
+        // One canonical acceptance/sale boundary for both direct Products and
+        // composed Menu components. This keeps Inventory + COGS atomic with
+        // Order creation for already-confirmed POS/Cash sales.
+        const confirmedSale = OrderPlacementService.deductStockForSettledOrder(
+          orderId,
+          { dbTransactionProvided: true }
+        );
+
+        const composedProductIds = new Set(
+          aggregateComposedRequirements(verifiedItems).map(item => String(item.product_id))
+        );
+        confirmedComposedDeductions = (confirmedSale.deducted_items || []).filter(item =>
+          composedProductIds.has(String(item.product_id))
+        );
+        confirmedSaleResult = confirmedSale;
       }
 
       if (delivery_record) {
