@@ -154,6 +154,13 @@ class InventoryRepository {
       [postingMutationId]
     );
   }
+  findMaterialValuationMovementsBySourceReference({ sourceType, sourceReference }) {
+    return this.db.queryMany(
+      'SELECT id, stock_location_id, material_id, quantity_base, unit_cost, total_cost, currency_code, cost_basis_type, source_type, source_reference, posting_mutation_id, valuation_version, posting_timestamp, resolver_version FROM material_stock_movements WHERE source_type = ? AND source_reference = ? ORDER BY valuation_version ASC, id ASC',
+      [sourceType, sourceReference]
+    );
+  }
+
   updateMaterialValuationBalance({
     stockLocationId,
     materialId,
