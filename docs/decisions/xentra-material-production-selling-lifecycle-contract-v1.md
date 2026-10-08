@@ -331,8 +331,6 @@ This contract does not lock:
 - exact Stock Location schema;
 - exact Recipe / Production Item location applicability schema;
 - production planning/scheduling;
-- exact Production Batch state machine;
-- WIP;
 - semi-finished/by-product model;
 - lot / expiry;
 - Make-to-Order trigger/reservation semantics;
