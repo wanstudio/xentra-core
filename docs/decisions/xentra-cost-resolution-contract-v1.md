@@ -90,7 +90,7 @@ stock_identity_id
 direction
 quantity_base
 posting_reference
-posting_mutation_id
+posting_mutation_id (movement-level)
 posting_timestamp
 actor / authorization context
 ~~~
