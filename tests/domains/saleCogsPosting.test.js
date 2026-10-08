@@ -199,18 +199,18 @@ test('canonical Sale rejects insufficient stock without partially committing ano
   assert.equal(Number(failedMovement), 0);
 });
 
-test('legacy-only Product Stock remains an explicit migration seam and never invents COGS', () => {
-  const result = InventorySalePostingService.postCanonicalSale({
-    branchId: BRANCH,
-    sourceType: 'ORDER',
-    sourceReference: 'sale-cogs-legacy',
-    actorId: 'merchant-1',
-    postingTimestamp: '2026-10-08T13:00:00.000Z',
-    requirements: [
-      { product_id: 'missing-canonical-product-balance', quantity: 1 }
-    ]
-  });
-
-  // Product identity itself is missing, so no mutation is permitted.
-  assert.throws(() => result, error => error && error.code === 'PRODUCT_NOT_FOUND');
+test('missing Product identity fails closed and never invents COGS', () => {
+  assert.throws(
+    () => InventorySalePostingService.postCanonicalSale({
+      branchId: BRANCH,
+      sourceType: 'ORDER',
+      sourceReference: 'sale-cogs-legacy',
+      actorId: 'merchant-1',
+      postingTimestamp: '2026-10-08T13:00:00.000Z',
+      requirements: [
+        { product_id: 'missing-canonical-product-balance', quantity: 1 }
+      ]
+    }),
+    error => error && error.code === 'PRODUCT_NOT_FOUND'
+  );
 });
