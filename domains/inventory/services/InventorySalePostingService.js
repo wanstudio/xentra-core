@@ -86,7 +86,8 @@ class InventorySalePostingService {
     actorId = null,
     postingTimestamp,
     repository = inventoryRepository,
-    dbTransactionProvided = false
+    dbTransactionProvided = false,
+    manageTransaction = false
   }) {
     const normalizedBranchId = text(branchId, 'BRANCH_REQUIRED');
     const reference = text(sourceReference, 'SALE_REFERENCE_REQUIRED');
@@ -112,7 +113,7 @@ class InventorySalePostingService {
     const existingMovements = [];
     let hasLegacyRequirement = false;
 
-    const ownsTransaction = !dbTransactionProvided;
+    const ownsTransaction = Boolean(manageTransaction && !dbTransactionProvided);
     if (ownsTransaction) repository.beginTransaction();
 
     try {
