@@ -18,6 +18,7 @@ function placeholders(count) {
 class ComposedMenuRepository {
   constructor(db = DataAccess) {
     this.db = db;
+    this.inventoryRepository = new InventoryRepository(db);
   }
 
   ensureSchema() {
@@ -236,9 +237,6 @@ class ComposedMenuRepository {
     const normalized = ids(menuIds);
     if (!normalized.length) return [];
 
-    // Resolve Menu IDs to their Product components first. Passing Menu IDs
-    // directly into product_id was a silent identity mismatch for PACKAGEs and
-    // could return the wrong/empty inventory set.
     const componentRows = this.db.queryMany(
       "SELECT mi.menu_id, mi.product_id, mi.quantity " +
       "FROM menu_items mi " +
@@ -252,15 +250,17 @@ class ComposedMenuRepository {
     const productIds = ids(componentRows.map(row => row.product_id));
     if (!productIds.length) return [];
 
-    return this.db.queryMany(
-      "SELECT bpi.branch_id, bpi.product_id, bpi.stock_qty, bpi.low_stock_threshold, p.sku " +
-      "FROM branch_product_inventory bpi " +
-      "JOIN products p ON p.id = bpi.product_id AND p.brand_id = ? " +
-      "JOIN branches b ON b.id = bpi.branch_id AND b.brand_id = ? " +
-      "WHERE bpi.branch_id = ? AND bpi.product_id IN (" + placeholders(productIds.length) + ")",
-      [brandId, brandId, branchId, ...productIds]
-    );
+    const inventory = this.getInventory({
+      branchId,
+      productIds
+    });
+
+    return inventory.map(row => ({
+      branch_id: branchId,
+      ...row
+    }));
   }
+
 
   findBranchMenu({ brandId, branchId, menuId }) {
     return this.db.queryOne(
@@ -370,13 +370,19 @@ class ComposedMenuRepository {
   getInventory({ branchId, productIds }) {
     const normalized = ids(productIds);
     if (!normalized.length) return [];
-    return this.db.queryMany(
-      "SELECT bpi.branch_id, bpi.product_id, bpi.stock_qty, bpi.low_stock_threshold, p.sku " +
-      "FROM branch_product_inventory bpi JOIN products p ON p.id = bpi.product_id " +
-      "WHERE bpi.branch_id = ? AND bpi.product_id IN (" + placeholders(normalized.length) + ")",
-      [branchId, ...normalized]
-    );
+
+    return this.inventoryRepository.findProductStockStatesByBranch({
+      branchId,
+      productIds: normalized
+    }).map(row => ({
+      product_id: row.product_id,
+      stock_qty: row.stock,
+      low_stock_threshold: row.low_stock_threshold,
+      sku: row.sku,
+      stock_source: row.stock_source
+    }));
   }
+
 
   ensureInventoryRow({ branchId, productId, lowStockThreshold = 5 }) {
     return this.db.execute(
