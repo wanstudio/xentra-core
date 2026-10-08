@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 
 const db = require('../../server/database/db');
 const { UomConversionService } = require('../../domains/uom');
-const MaterialService = require('../../domains/material/MaterialService');
+const MaterialService = require('../../domains/material/services/MaterialService');
 
 test.before(async () => {
   await db.readyPromise;
