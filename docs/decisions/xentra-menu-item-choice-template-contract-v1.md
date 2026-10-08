@@ -439,7 +439,7 @@ The following are locked by this contract:
 The following remain separate design gates:
 - exact database schema/table names for Item Choices;
 - exact template registry storage;
-- exact option-to-recipe/material relationship;
+- exact direct Choice → Production variant / Material recipe override; Product stock-effect integration is now locked by `docs/decisions/xentra-menu-item-choice-stock-production-integration-contract-v1.md`;
 - exact HPP timing and production costing;
 - branch-level price policy;
 - advanced multi-select limits and inventory allocation edge cases.
