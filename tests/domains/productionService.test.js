@@ -11,7 +11,7 @@ const BRAND = 'brand_production_v1_test';
 const BRANCH = 'branch_production_v1_test';
 const INPUT_LOCATION = 'loc_production_input_v1';
 const OUTPUT_LOCATION = 'loc_production_output_v1';
-const MATERIAL = 'mat_production_v1';
+let MATERIAL = null;
 const PRODUCT = 'prod_production_v1';
 
 let batchId;
@@ -52,6 +52,7 @@ test.before(async () => {
     status: 'ACTIVE'
   });
   assert.equal(material.status, 'ACTIVE');
+  MATERIAL = material.id;
 
   // Seed an authoritative incoming Material Stock state at Rp10,000/kg.
   db.prepare(
