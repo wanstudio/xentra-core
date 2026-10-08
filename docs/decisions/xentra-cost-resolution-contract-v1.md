@@ -689,9 +689,11 @@ Next stage:
 Cost Resolution Contract v1
         ✅ LOCKED
               ↓
-Cost-bearing Stock Movement Data Model
+Cost-bearing Stock Movement Data Model v1
+              ✅
               ↓
-Goods Receipt Cost Posting Integration
+Goods Receipt Cost Posting Integration v1
+              ✅
               ↓
 Production Cost Snapshot / Output Cost
               ↓
