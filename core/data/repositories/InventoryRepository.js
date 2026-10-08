@@ -127,6 +127,20 @@ class InventoryRepository {
     );
   }
 
+  findMaterialValuationMovementById(movementId) {
+    return this.db.queryOne(
+      'SELECT id, stock_location_id, material_id, movement_type, quantity_base, unit_cost, total_cost, currency_code, cost_basis_type, source_type, source_reference, posting_mutation_id, valuation_version, posting_timestamp, resolver_version FROM material_stock_movements WHERE id = ?',
+      [movementId]
+    );
+  }
+
+  findProductValuationMovementById(movementId) {
+    return this.db.queryOne(
+      'SELECT id, stock_location_id, product_id, movement_type, quantity, unit_cost, total_cost, currency_code, cost_basis_type, source_type, source_reference, posting_mutation_id, valuation_version, posting_timestamp, resolver_version FROM product_stock_movements WHERE id = ?',
+      [movementId]
+    );
+  }
+
   findMaterialValuationMovementByPostingMutationId(postingMutationId) {
     return this.db.queryOne(
       `SELECT
