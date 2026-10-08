@@ -2573,6 +2573,15 @@ function initSchema(targetDb) {
     throw e;
   }
 
+  // Cost-bearing Inventory target schema is additive and intentionally separate from
+  // legacy branch_products / inventory_movements compatibility structures.
+  try {
+    const { ensureCostBearingInventorySchema } = require('../../domains/inventory/schema/CostBearingInventorySchema');
+    ensureCostBearingInventorySchema(targetDb);
+  } catch (schemaErr) {
+    throw new Error('[Database] Failed to initialize cost-bearing Inventory target schema: ' + schemaErr.message);
+  }
+
   // Authoritative separation: Schema initialization only provisions essential tenant structure
   // (organization, brand, initial merchant owner if absent).
   // Demo fixtures (demo branches, demo products, demo promotions) are NEVER automatically seeded on startup.
