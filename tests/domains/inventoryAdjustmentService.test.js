@@ -46,6 +46,7 @@ test.before(async () => {
 });
 
 test.after(() => {
+  db.prepare('DELETE FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?').run(BRANCH, PRODUCT);
   db.prepare('DELETE FROM product_stock_movements WHERE stock_location_id = ?').run(LOCATION);
   db.prepare('DELETE FROM product_stock_balances WHERE stock_location_id = ?').run(LOCATION);
   db.prepare('DELETE FROM stock_locations WHERE id = ?').run(LOCATION);
