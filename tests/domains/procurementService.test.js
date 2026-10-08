@@ -10,7 +10,7 @@ const ORG = 'org_procurement_v1_test';
 const BRAND = 'brand_procurement_v1_test';
 const BRANCH = 'branch_procurement_v1_test';
 const LOCATION = 'loc_procurement_v1_test';
-const MATERIAL = 'mat_procurement_v1_test';
+let MATERIAL = null;
 
 let supplierId;
 let supplierMaterialId;
@@ -44,6 +44,7 @@ test.before(async () => {
     status: 'ACTIVE'
   });
   assert.equal(material.status, 'ACTIVE');
+  MATERIAL = material.id;
 
   const supplier = ProcurementService.createSupplier({
     organizationId: ORG,
