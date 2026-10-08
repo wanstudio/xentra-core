@@ -7,6 +7,18 @@ class ProcurementRepository {
     this.db = dataAccess;
   }
 
+  beginTransaction() {
+    return this.db.exec('BEGIN IMMEDIATE;');
+  }
+
+  commitTransaction() {
+    return this.db.exec('COMMIT;');
+  }
+
+  rollbackTransaction() {
+    return this.db.exec('ROLLBACK;');
+  }
+
   findSupplier(id) {
     return this.db.queryOne(
       'SELECT id, organization_id, supplier_code, name, status FROM suppliers WHERE id = ?',
