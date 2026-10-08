@@ -1939,154 +1939,182 @@
             <span id="master-menu-editor-breadcrumb" style="font-weight:600;font-size:14px;">Tambah Menu</span>
           </div>
 
-          <form id="form-master-menu" class="x-form" style="max-width:920px;margin:0 auto;">
+          <form id="form-master-menu" class="x-form" style="max-width:540px;margin:0 auto;display:flex;flex-direction:column;gap:16px;">
             <input type="hidden" id="master-menu-id" value="">
             <input type="hidden" id="master-menu-type" value="SINGLE">
+            <span id="master-menu-editor-title" style="display:none;"></span>
 
-            <div class="x-card" style="margin-bottom:14px;">
-              <span id="master-menu-editor-title" style="display:none;"></span>
-              <!-- 1. Foto Menu -->
-              <div class="x-form-group">
-                <label for="btn-cm-image-pick">Foto Menu</label>
-                <div class="x-image-upload-control">
-                  <div class="x-image-upload-preview-box" id="cm-image-preview-box" style="width:84px;height:84px;">
-                    <img id="cm-image-preview" alt="Foto Menu" style="display:none;width:100%;height:100%;object-fit:cover;">
-                    <div id="cm-image-empty" class="x-image-upload-empty" style="font-size:24px;">🍽️</div>
+            <!-- 1. FOTO CARD -->
+            <div class="x-card" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px;">
+                <div style="flex:1;">
+                  <h4 style="margin:0 0 6px 0;font-size:16px;font-weight:700;color:#0F172A;">Foto</h4>
+                  <p style="margin:0;font-size:12px;color:#64748B;line-height:1.45;">Upload foto yang menarik dan menggugah selera, supaya membuat pelangganmu tertarik.</p>
+                  <div style="margin-top:6px;font-size:11px;color:#94A3B8;">Foto customer-facing milik Menu ini (Satuan maupun Paket) — bukan foto Product. JPG, PNG, atau WebP · Maks. 20 MB · Rasio 1:1 · Xentra akan crop, resize, dan kompresi otomatis.</div>
+                </div>
+                <div class="x-image-upload-preview-box" id="cm-image-preview-box" style="width:84px;height:84px;min-width:84px;border-radius:14px;background:#F1F5F9;border:1px solid #E2E8F0;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+                  <img id="cm-image-preview" alt="Foto Menu" style="display:none;width:100%;height:100%;object-fit:cover;">
+                  <div id="cm-image-empty" class="x-image-upload-empty" style="font-size:11px;color:#94A3B8;text-align:center;padding:8px;line-height:1.2;">Belum ada foto</div>
+                </div>
+              </div>
+              <div style="display:flex;gap:10px;">
+                <button type="button" id="btn-cm-image-pick" class="x-btn-secondary" style="flex:1;padding:12px;border-radius:12px;border:1px solid #CBD5E1;background:#FFFFFF;color:#0F172A;font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                  <span>Pilih foto</span>
+                </button>
+                <button type="button" id="btn-cm-image-remove" class="x-btn-secondary" style="display:none;padding:12px 16px;border-radius:12px;border:1px solid #FCA5A5;background:#FEF2F2;color:#DC2626;font-weight:600;font-size:13px;cursor:pointer;">Hapus</button>
+              </div>
+              <input type="file" id="cm-image-file" accept="image/jpeg,image/png,image/webp" style="display:none;">
+              <input type="hidden" id="cm-image-removed" value="0">
+            </div>
+
+            <!-- 2. KATEGORI CARD -->
+            <div class="x-card" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+              <h4 style="margin:0 0 4px 0;font-size:16px;font-weight:700;color:#0F172A;">Kategori</h4>
+              <p style="margin:0 0 14px 0;font-size:12px;color:#64748B;">Pilih, atau tambahkan kategori sesuai dengan menu yang ingin kamu buat.</p>
+              <div style="display:flex;gap:8px;">
+                <select id="cm-category" class="x-input" required style="flex:1;height:44px;border-radius:12px;border:1px solid #CBD5E1;padding:0 14px;font-size:13px;background:#FFFFFF;"></select>
+                <button type="button" id="btn-quick-add-category" class="x-btn-secondary" style="width:44px;height:44px;min-width:44px;border-radius:12px;border:1px solid #CBD5E1;background:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;color:#475569;cursor:pointer;" title="Tambah Kategori">+</button>
+              </div>
+            </div>
+
+            <!-- 3. JUDUL CARD -->
+            <div class="x-card" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+              <h4 style="margin:0 0 4px 0;font-size:16px;font-weight:700;color:#0F172A;">Judul</h4>
+              <p style="margin:0 0 14px 0;font-size:12px;color:#64748B;">Nama yang jelas, singkat dan menarik akan sangat membantu pelanggan kamu untuk memilih menu.</p>
+              <input type="text" id="cm-title-input" class="x-input" maxlength="150" placeholder="Cth: Ayam Tulang Lunak Lombok Ijo" style="width:100%;height:44px;border-radius:12px;border:1px solid #CBD5E1;padding:0 14px;font-size:13px;box-sizing:border-box;">
+              <div style="text-align:right;font-size:11px;color:#94A3B8;margin-top:6px;">
+                <span id="cm-title-char-count">0</span>/150
+              </div>
+              <!-- Hidden select for compatibility with title repository/tests -->
+              <select id="cm-title" style="display:none;"></select>
+              <button type="button" id="btn-quick-add-title" style="display:none;">+</button>
+            </div>
+
+            <!-- 4. MENU ITEMS CARD (Frame 159 & Frame 162) -->
+            <div class="x-card" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+              <h4 style="margin:0 0 4px 0;font-size:16px;font-weight:700;color:#0F172A;">Menu items</h4>
+              <p style="margin:0 0 14px 0;font-size:12px;color:#64748B;">Masukkan item yang akan dijual, sesuaikan dengan judul menu yang sedang kamu buat.</p>
+              
+              <!-- Container dynamic items list -->
+              <div id="cm-items-container" style="display:flex;flex-direction:column;gap:12px;margin-bottom:14px;"></div>
+              
+              <button type="button" id="btn-cm-add-item" style="width:100%;height:44px;border-radius:12px;border:1px solid #E2E8F0;background:#F8FAFC;color:#0F172A;font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:background 0.15s ease;">
+                <span style="font-size:16px;font-weight:700;">+</span>
+                <span>Tambah item</span>
+              </button>
+
+              <!-- Hidden backward compatibility elements -->
+              <div id="master-menu-single-fields" style="display:none;"><select id="cm-product"></select></div>
+              <div id="master-menu-package-fields" style="display:none;"><input type="text" id="cm-package-name"><div id="cm-package-components"></div><button type="button" id="btn-cm-add-component"></button></div>
+              <div style="display:none;"><select id="cm-rasa"></select><button type="button" id="btn-quick-add-rasa"></button><input type="checkbox" id="cm-spice-toggle"><input type="hidden" id="cm-spice-level-val"><div id="cm-spice-scale-wrapper"><div id="cm-spice-dots-row"></div></div></div>
+            </div>
+
+            <!-- 5. HPP (MODAL MENU) CARD (Frame 162) -->
+            <div class="x-card" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+              <h4 style="margin:0 0 4px 0;font-size:16px;font-weight:700;color:#0F172A;">HPP (modal menu)</h4>
+              <p style="margin:0 0 14px 0;font-size:12px;color:#64748B;">Jumlah total modal yang digunakan untuk menu ini.</p>
+              
+              <div id="cm-hpp-breakdown-box" style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:14px;padding:16px;">
+                <div id="cm-hpp-items-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
+                  <div style="font-size:12px;color:#94A3B8;text-align:center;padding:8px;">Belum ada item dipilih</div>
+                </div>
+                <div style="border-top:1px solid #E2E8F0;padding-top:12px;display:flex;justify-content:space-between;align-items:center;">
+                  <span style="font-size:14px;font-weight:700;color:#0F172A;">Total HPP</span>
+                  <strong id="cm-hpp-total-display" style="font-size:15px;font-weight:700;color:#0F172A;">Rp0</strong>
+                </div>
+              </div>
+              <!-- Hidden cost input for backward compatibility with form submit -->
+              <input type="hidden" id="cm-cost" data-input-type="currency" value="0">
+              <span id="cm-cost-display" style="display:none;"></span>
+              <span id="cm-cost-formula" style="display:none;"></span>
+            </div>
+
+            <!-- 6. HARGA JUAL CARD (Fixed vs Range) -->
+            <div class="x-card" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+              <h4 style="margin:0 0 4px 0;font-size:16px;font-weight:700;color:#0F172A;">
+                Harga jual (Rp) <span style="font-size:13px;font-weight:400;color:#64748B;font-style:italic;">termasuk pajak</span>
+              </h4>
+              <p style="margin:0 0 14px 0;font-size:12px;color:#64748B;line-height:1.45;">
+                Tentukan harga jual menu ini, kamu bisa pilih harga tetap (Fixed) atau rentang harga (Range) sesuai kebutuhanmu.
+              </p>
+
+              <!-- Tabs: Fixed vs Range -->
+              <div style="display:flex;border-bottom:1px solid #E2E8F0;margin-bottom:14px;">
+                <button type="button" id="tab-price-fixed" onclick="switchPricePolicyMode('FIXED')" style="flex:1;padding:10px;font-size:14px;font-weight:700;border:none;background:none;cursor:pointer;color:#0F172A;border-bottom:2px solid #0F172A;">Fixed</button>
+                <button type="button" id="tab-price-range" onclick="switchPricePolicyMode('RANGE')" style="flex:1;padding:10px;font-size:14px;font-weight:600;border:none;background:none;cursor:pointer;color:#94A3B8;border-bottom:2px solid transparent;">Range</button>
+              </div>
+
+              <!-- Fixed Mode Input -->
+              <div id="price-mode-fixed-container">
+                <input type="text" id="cm-price" class="x-input" data-input-type="currency" inputmode="numeric" required placeholder="0" style="width:100%;height:44px;border-radius:12px;border:1px solid #CBD5E1;padding:0 14px;font-size:15px;font-weight:600;color:#0F172A;box-sizing:border-box;">
+              </div>
+
+              <!-- Range Mode Input -->
+              <div id="price-mode-range-container" style="display:none;">
+                <div style="display:flex;gap:12px;align-items:center;">
+                  <div style="flex:1;">
+                    <label style="display:block;font-size:11px;font-weight:600;color:#64748B;margin-bottom:4px;">Min (Rp)</label>
+                    <input type="text" id="cm-price-min" class="x-input" data-input-type="currency" inputmode="numeric" placeholder="0" style="width:100%;height:44px;border-radius:12px;border:1px solid #CBD5E1;padding:0 14px;font-size:14px;box-sizing:border-box;">
                   </div>
-                  <div class="x-image-upload-info">
-                    <div class="x-image-upload-actions">
-                      <button type="button" id="btn-cm-image-pick" class="x-btn-secondary" style="font-size:12px;padding:6px 12px;">📁 Pilih Foto</button>
-                      <button type="button" id="btn-cm-image-remove" class="x-btn-secondary" style="font-size:12px;padding:6px 12px;color:#ef4444;display:none;">Hapus Foto</button>
-                    </div>
-                    <input type="file" id="cm-image-file" accept="image/jpeg,image/png,image/webp" style="display:none;">
-                    <input type="hidden" id="cm-image-removed" value="0">
-                    <div class="x-image-specs-text">Foto customer-facing milik Menu ini (Satuan maupun Paket) — bukan foto Product. JPG, PNG, atau WebP · Maks. 20 MB · Rasio 1:1 · Xentra akan crop, resize, dan kompresi otomatis.</div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 2. Kategori -->
-              <div class="x-form-group" style="margin-top:16px;">
-                <label for="cm-category">Kategori <span class="x-required-mark">*</span></label>
-                <select id="cm-category" class="x-input" required></select>
-              </div>
-
-              <!-- 3. Judul -->
-              <div class="x-form-group" style="margin-top:16px;">
-                <label for="cm-title">Judul <span class="x-required-mark">*</span></label>
-                <div class="x-master-inline-select-row">
-                  <select id="cm-title" class="x-input" required></select>
-                  <button type="button" class="x-master-inline-link" id="btn-quick-add-title" aria-label="Tambah Judul" title="Tambah Judul">+</button>
-                </div>
-              </div>
-
-              <!-- 4. Rasa -->
-              <div class="x-form-group" style="margin-top:16px;">
-                <label for="cm-rasa">Rasa</label>
-                <div class="x-master-inline-select-row">
-                  <select id="cm-rasa" class="x-input"></select>
-                  <button type="button" class="x-master-inline-link" id="btn-quick-add-rasa" aria-label="Tambah Rasa" title="Tambah Rasa">+</button>
-                </div>
-              </div>
-
-              <!-- 5. Level Pedas -->
-              <div class="x-form-group" style="margin-top:16px;">
-                <label>Level Pedas</label>
-                <div style="display:flex;align-items:center;gap:12px;min-height:38px;">
-                  <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-weight:normal;margin:0;">
-                    <input type="checkbox" id="cm-spice-toggle" style="width:16px;height:16px;cursor:pointer;">
-                    <span>Level Pedas</span>
-                  </label>
-                  <div id="cm-spice-scale-wrapper" class="x-spice-selector" style="display:none;">
-                    <div class="x-spice-dots-row" id="cm-spice-dots-row" role="radiogroup" aria-label="Tingkat pedas 1 sampai 4">
-                      <button type="button" class="x-spice-dot-btn" data-spice-pos="1" role="radio" aria-checked="false" aria-label="Level 1" title="Level 1"></button>
-                      <button type="button" class="x-spice-dot-btn" data-spice-pos="2" role="radio" aria-checked="false" aria-label="Level 2" title="Level 2"></button>
-                      <button type="button" class="x-spice-dot-btn" data-spice-pos="3" role="radio" aria-checked="false" aria-label="Level 3" title="Level 3"></button>
-                      <button type="button" class="x-spice-dot-btn" data-spice-pos="4" role="radio" aria-checked="false" aria-label="Level 4" title="Level 4"></button>
-                    </div>
-                    <input type="hidden" id="cm-spice-level-val" value="">
-                  </div>
-                </div>
-              </div>
-
-              <!-- 6. Menu Items -->
-              <div class="x-form-group" style="margin-top:16px;">
-                <label>Menu Items <span class="x-required-mark">*</span></label>
-                <div id="cm-items-container" class="x-composed-menu-components"></div>
-                <button type="button" class="x-btn-secondary" id="btn-cm-add-item" style="margin-top:8px;">+ Tambah Item</button>
-              </div>
-
-              <!-- Hidden legacy wrappers to preserve compatibility for existing tests -->
-              <div id="master-menu-single-fields" style="display:none;">
-                <select id="cm-product" class="x-input"></select>
-              </div>
-              <div id="master-menu-package-fields" style="display:none;">
-                <input type="text" id="cm-package-name" class="x-input">
-                <div id="cm-package-components" class="x-composed-menu-components"></div>
-                <button type="button" id="btn-cm-add-component"></button>
-              </div>
-
-              <!-- 7. Modal Menu (Rp) -->
-              <div class="x-form-group" style="margin-top:16px;">
-                <label for="cm-cost">Modal Menu (Rp)</label>
-                <div id="cm-cost-breakdown-box" style="margin-bottom:8px;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;">
-                  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-                    <span style="font-size:12px;color:#64748b;font-weight:600;">Total Modal Otomatis:</span>
-                    <strong id="cm-cost-display" style="font-size:16px;color:#0f172a;font-weight:700;">Rp0</strong>
-                  </div>
-                  <div id="cm-cost-formula" style="margin-top:4px;font-size:11px;color:#64748b;line-height:1.4;">Belum ada item dipilih</div>
-                </div>
-                <input type="text" id="cm-cost" class="x-input" data-input-type="currency" inputmode="numeric" placeholder="0" readonly style="background:#f1f5f9;cursor:not-allowed;color:#475569;font-weight:600;">
-              </div>
-
-              <!-- 8. Harga Jual Menu (Rp) -->
-              <div class="x-form-group" style="margin-top:16px;">
-                <label for="cm-price">Harga Jual Menu (Rp) <span class="x-required-mark">*</span></label>
-                <input type="text" id="cm-price" class="x-input" data-input-type="currency" inputmode="numeric" required placeholder="0">
-              </div>
-
-              <!-- 9. Status (hidden) -->
-              <div class="x-form-group" style="display:none;">
-                <label for="cm-status">Status</label>
-                <select id="cm-status" class="x-input">
-                  <option value="DRAFT">Draft</option>
-                  <option value="ACTIVE">Aktif</option>
-                  <option value="ARCHIVED">Arsip</option>
-                </select>
-              </div>
-
-              <div class="x-master-composition-preview-section" style="margin-top:16px;">
-                <div class="x-master-composition-preview-head">
-                  <div>
-                    <strong>Preview Customer PWA</strong>
-                    <span>Preview memakai resolver Menu canonical.</span>
-                  </div>
-                  <span class="x-badge x-badge-info">Live Preview</span>
-                </div>
-                <div class="x-master-customer-preview" id="composed-menu-customer-preview">
-                  <div class="x-master-customer-preview-card">
-                    <div class="x-master-customer-preview-info">
-                      <div class="x-master-customer-preview-title" id="cm-preview-title">Pilih komposisi menu</div>
-                      <div class="x-master-customer-preview-subtitle" id="cm-preview-subtitle"></div>
-                      <div class="x-master-customer-preview-detail" id="cm-preview-detail"></div>
-                      <div class="x-master-customer-preview-indicator" id="cm-preview-indicator"></div>
-                      <div class="x-master-customer-preview-price" id="cm-preview-price">Rp0</div>
-                    </div>
-                    <div class="x-master-customer-preview-media">
-                      <img id="cm-preview-image" alt="" style="display:none;width:100%;height:100%;object-fit:cover;">
-                      <span id="cm-preview-image-empty" style="display:inline-flex;align-items:center;justify-content:center;font-size:30px;width:100%;height:100%;">🍲</span>
-                    </div>
+                  <span style="color:#94A3B8;margin-top:16px;">—</span>
+                  <div style="flex:1;">
+                    <label style="display:block;font-size:11px;font-weight:600;color:#64748B;margin-bottom:4px;">Max (Rp)</label>
+                    <input type="text" id="cm-price-max" class="x-input" data-input-type="currency" inputmode="numeric" placeholder="0" style="width:100%;height:44px;border-radius:12px;border:1px solid #CBD5E1;padding:0 14px;font-size:14px;box-sizing:border-box;">
                   </div>
                 </div>
               </div>
             </div>
 
-            <div class="x-form-actions x-master-menu-editor-actions">
-              <div class="x-master-menu-editor-actions-row">
-                <button type="button" class="x-btn-secondary" id="btn-cancel-master-menu">Batal</button>
-                <button type="button" class="x-btn-secondary" id="btn-save-master-menu-draft">Simpan Draft</button>
+            <!-- 7. PREVIEW CARD (Customer PWA Card) -->
+            <div class="x-card" id="composed-menu-customer-preview" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+              <h4 style="margin:0 0 4px 0;font-size:16px;font-weight:700;color:#0F172A;">Preview</h4>
+              <p style="margin:0 0 14px 0;font-size:12px;color:#64748B;">Seperti inilah yang akan pelanggan kamu lihat, cek kembali apakah sudah sesuai dengan menu yang ingin kamu jual.</p>
+
+              <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:16px;padding:16px;display:flex;justify-content:space-between;align-items:stretch;gap:14px;box-shadow:0 2px 8px rgba(0,0,0,0.03);">
+                <div style="flex:1;display:flex;flex-direction:column;justify-content:space-between;">
+                  <div>
+                    <div id="cm-preview-title" style="font-size:15px;font-weight:700;color:#0F172A;line-height:1.35;margin-bottom:4px;">Judul Menu</div>
+                    <div id="cm-preview-items-list" style="font-size:12px;color:#64748B;line-height:1.4;">list item dalam menu</div>
+                    <div id="cm-preview-subtitle" style="display:none;"></div>
+                    <div id="cm-preview-detail" style="display:none;"></div>
+                    <div id="cm-preview-indicator" style="display:none;"></div>
+                  </div>
+                  <div id="cm-preview-price" style="font-size:15px;font-weight:700;color:#0F172A;margin-top:10px;">Rp0</div>
+                </div>
+                <div style="width:72px;height:72px;min-width:72px;border-radius:12px;background:#F1F5F9;border:1px solid #E2E8F0;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+                  <img id="cm-preview-image" alt="Preview Menu" style="display:none;width:100%;height:100%;object-fit:cover;">
+                  <div id="cm-preview-image-empty" style="font-size:24px;color:#CBD5E1;">🍽️</div>
+                </div>
               </div>
-              <button type="submit" class="x-btn-primary x-master-menu-editor-submit-btn" id="btn-save-master-menu-active">Simpan &amp; Aktifkan</button>
+            </div>
+
+            <!-- 8. AKTIFKAN MENU TOGGLE CARD -->
+            <div class="x-card" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.02);display:flex;justify-content:space-between;align-items:center;gap:16px;">
+              <div>
+                <h4 style="margin:0 0 4px 0;font-size:16px;font-weight:700;color:#0F172A;">Aktifkan menu</h4>
+                <p style="margin:0;font-size:12px;color:#64748B;line-height:1.4;">Menu aktif akan muncul di aplikasi customer kamu dan bisa langsung dipesan oleh pelanggan.</p>
+              </div>
+              <label class="x-switch" style="position:relative;display:inline-block;width:50px;height:28px;flex-shrink:0;">
+                <input type="checkbox" id="cm-toggle-active" checked style="opacity:0;width:0;height:0;">
+                <span class="x-slider round" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#E2E8F0;transition:0.3s;border-radius:28px;"></span>
+              </label>
+              <select id="cm-status" style="display:none;">
+                <option value="ACTIVE" selected>Aktif</option>
+                <option value="DRAFT">Draft</option>
+                <option value="ARCHIVED">Arsip</option>
+              </select>
+            </div>
+
+            <!-- ACTION FOOTER: SIMPAN -->
+            <div style="margin-top:8px;padding-bottom:32px;">
+              <button type="submit" class="x-btn-primary" id="btn-save-master-menu-active" style="width:100%;height:48px;border-radius:14px;background:#059669;color:#FFFFFF;border:none;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 2px 6px rgba(5,150,105,0.2);display:flex;align-items:center;justify-content:center;">
+                Simpan
+              </button>
+              <div style="display:flex;gap:10px;margin-top:10px;">
+                <button type="button" class="x-btn-secondary" id="btn-cancel-master-menu" style="flex:1;height:42px;border-radius:12px;border:1px solid #CBD5E1;background:#FFFFFF;color:#475569;font-weight:600;font-size:13px;cursor:pointer;">Batal</button>
+                <button type="button" class="x-btn-secondary" id="btn-save-master-menu-draft" style="display:none;">Simpan Draft</button>
+              </div>
             </div>
           </form>
         </section>
@@ -4242,6 +4270,49 @@
           </div>
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       BOTTOM SHEET: PILIH ITEM (FRAME 195.PNG)
+       Muncul saat tombol [+ Tambah item] di Menu Editor diklik
+       ========================================================================= -->
+  <button type="button" class="x-bottom-sheet-ext-close" id="sheet-pick-item-ext-close" onclick="closePickItemSheet()" aria-label="Tutup">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+  </button>
+  <div class="x-bottom-sheet-overlay" id="sheet-pick-item-overlay" style="display:none;" onclick="closePickItemSheet()"></div>
+  <div class="x-bottom-sheet" id="sheet-pick-item" style="display:none;max-height:85vh;display:flex;flex-direction:column;" role="dialog" aria-modal="true" aria-labelledby="sheet-pick-item-title">
+    <div class="x-bottom-sheet-handle"></div>
+    <div style="padding:4px 8px 12px;border-bottom:1px solid #F1F5F9;">
+      <h3 id="sheet-pick-item-title" style="margin:0 0 12px 0;font-size:17px;font-weight:700;color:#0F172A;text-align:left;">
+        Pilih item
+      </h3>
+      
+      <!-- Search Input -->
+      <div style="position:relative;margin-bottom:12px;">
+        <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#94A3B8;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="search" id="pick-item-search" placeholder="Cari item..." style="width:100%;height:42px;border-radius:12px;border:1px solid #CBD5E1;padding:0 12px 0 38px;font-size:13px;box-sizing:border-box;">
+      </div>
+
+      <!-- Category Filter Pills (Horizontal Scrollable) -->
+      <div id="pick-item-cat-pills" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;-webkit-overflow-scrolling:touch;">
+        <button type="button" class="x-pick-item-pill active" data-cat-id="all" onclick="filterPickItemCategory('all')" style="padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;border:none;background:#0F172A;color:#FFFFFF;cursor:pointer;white-space:nowrap;">Semua</button>
+      </div>
+    </div>
+
+    <!-- Selectable Items List (Scrollable Area) -->
+    <div id="pick-item-list-container" style="flex:1;overflow-y:auto;padding:12px 8px;display:flex;flex-direction:column;gap:10px;">
+      <div style="text-align:center;padding:24px;color:#94A3B8;font-size:13px;">Memuat daftar item...</div>
+    </div>
+
+    <!-- Sticky Bottom Actions -->
+    <div style="padding:12px 8px 8px;border-top:1px solid #E2E8F0;display:flex;gap:10px;background:#FFFFFF;">
+      <button type="button" onclick="closePickItemSheet()" style="flex:1;height:44px;border-radius:12px;border:1px solid #CBD5E1;background:#FFFFFF;color:#475569;font-weight:600;font-size:14px;cursor:pointer;">
+        Batal
+      </button>
+      <button type="button" id="btn-confirm-pick-item" onclick="confirmPickedItem()" style="flex:1;height:44px;border-radius:12px;border:none;background:#059669;color:#FFFFFF;font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 2px 6px rgba(5,150,105,0.2);">
+        Pilih
+      </button>
     </div>
   </div>
 
