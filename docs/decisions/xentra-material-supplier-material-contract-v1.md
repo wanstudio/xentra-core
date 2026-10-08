@@ -183,6 +183,89 @@ Typical valid examples:
 
 A generic UOM engine must reject nonsensical cross-dimension conversions such as kg → L unless an explicit business-specific conversion model exists.
 
+### 5.4 Who determines the Base Stock UOM?
+
+The **Owner / authorized Material master-data role** selects the Base Stock UOM when creating the Material.
+
+The Owner does **not** invent the UOM vocabulary and does **not** derive the Base UOM from a supplier's pack. The selectable UOM values come from Xentra's canonical shared UOM reference data.
+
+The decision is operational:
+
+> **Base Stock UOM = the unit in which Xentra wants the Material's physical stock to be consistently counted, consumed, replenished, and reported.**
+
+The choice should be based on these factors:
+
+1. **How the business counts the physical stock.**
+   Example:
+   ```
+   Rice        → kg
+   Cooking Oil → L
+   Eggs        → pcs
+   ```
+
+2. **How the Material is consumed by Recipe / Production.**
+   If a recipe consumes 150 g of flour, the Material may still use kg as Base Stock UOM:
+   ```
+   150 g = 0.15 kg
+   ```
+   Base UOM is not required to be the smallest unit used in a recipe.
+
+3. **Consistency across suppliers and Stock Locations.**
+   Supplier A may sell rice in 25 kg bags while Supplier B sells 50 kg bags. The Material can still remain:
+   ```
+   Rice → Base UOM = kg
+   ```
+   The supplier's commercial form is handled separately by Supplier Material / Supplier Pack.
+
+4. **Practical precision required by operations.**
+   Food materials commonly require fractional quantities, so the chosen Base UOM and quantity precision must be able to represent actual consumption without semantic distortion.
+
+5. **Operational reporting and replenishment.**
+   Stock-on-hand, usage, reorder conditions, transfer quantities, and production consumption should be interpretable in the same base measurement for that Material.
+
+### 5.5 Base UOM is Material authority, not Supplier authority
+
+The following are separate decisions:
+
+```
+Material
+  Rice
+  Base UOM = kg
+       ↓
+Supplier A
+  1 bag = 25 kg
+       ↓
+PO
+  4 bags
+       ↓
+Goods Receipt
+  +100 kg
+       ↓
+Material Stock
+  100 kg
+```
+
+The supplier's bag, sack, carton, or similar commercial term must not replace the Material Base Stock UOM merely because it is the supplier's selling unit.
+
+Conversely, a supplier may sell directly in a canonical dimensional UOM:
+
+```
+Material Base UOM = kg
+Supplier Purchase UOM = kg
+PO = 100 kg
+```
+
+In that case no special pack representation is required.
+
+### 5.6 Stability of Base UOM
+
+Base Stock UOM is part of Material master semantics.
+
+Once a Material has stock, recipes, purchase/receipt history, or other operational references, changing its Base UOM must be treated as a **controlled data migration/change**, not an ordinary display edit.
+
+Historical Purchase Orders, Goods Receipts, stock movements, and production records must not be silently rewritten. Any approved Base UOM change must preserve equivalent quantities and an auditable conversion history.
+
+
 ## 6. Purchase UOM vs Supplier Pack
 
 This distinction is important for engine clarity.
