@@ -834,6 +834,7 @@ The following can be promoted with high confidence:
 13. UOM conversion is explicit and transaction quantities must preserve resolved base quantities.
 14. Menu Item needs a stable identity before Choice persistence.
 15. Choice-driven stock effects resolve through structured composition, never direct raw-material mutation.
+16. Choice Value stock effects are explicit Product mappings using NONE / ADD_PRODUCT / REPLACE_PRODUCT semantics; direct Choice → Production/Material effects remain future.
 
 Production Item + Recipe / BoM Contract v1 was promoted on 2026-10-08:
 docs/decisions/xentra-production-item-recipe-bom-contract-v1.md
@@ -843,6 +844,9 @@ docs/decisions/xentra-production-batch-posting-mutation-contract-v1.md
 
 Procurement Document Contract v1 was promoted on 2026-10-08:
 docs/decisions/xentra-procurement-document-contract-v1.md
+
+Menu Item Choice → Stock / Production Integration Contract v1 was promoted on 2026-10-08:
+docs/decisions/xentra-menu-item-choice-stock-production-integration-contract-v1.md
 
 ## 28. Decisions That Should Remain Explicitly OPEN
 
@@ -878,7 +882,7 @@ Recommended sequence:
         ↓
 5. Procurement Document Contract ✅
         ↓
-6. Menu Item Choice → Stock / Production Integration Contract
+6. Menu Item Choice → Stock / Production Integration Contract ✅
         ↓
 7. Costing / HPP Contract
         ↓
@@ -923,5 +927,5 @@ Item Choice Resolution
 Sale
 ```
 
-The Production Item + Recipe / BoM identity layer is now locked. The architecture is ready for the next design gate: **Production Batch + Posting / Mutation Contract**.
+Production Item + Recipe / BoM, Production Batch + Posting, Procurement Document, dan Menu Item Choice → Stock / Production Integration identity/transaction gates are now locked. Remaining work is limited to explicit operational/policy gates such as routing priority, transfer lifecycle, role approval, lot/expiry, MTO, scheduling, HPP/valuation, and autonomous procurement.
 
