@@ -244,7 +244,7 @@ class ProcurementService {
         requiredAt,
         createdBy,
         createdAt: now,
-        updatedAt: postingTimestamp
+        updatedAt: now
       });
 
       for (const input of lines) {
@@ -274,7 +274,7 @@ class ProcurementService {
           currencyCode: built.currencyCode,
           baseQuantityPerPurchaseUnit: built.baseQuantityPerPurchaseUnit,
           createdAt: now,
-          updatedAt: postingTimestamp
+          updatedAt: now
         });
       }
 
@@ -458,7 +458,7 @@ class ProcurementService {
         repository.updatePurchaseOrderLineReceived({
           id: line.poLine.id,
           receivedBaseQuantity: updatedReceived,
-          updatedAt: now
+          updatedAt: postingTimestamp
         });
       }
 
@@ -471,7 +471,7 @@ class ProcurementService {
       repository.updatePurchaseOrderStatus({
         id: po.id,
         status: fullyReceived ? 'RECEIVED' : 'PARTIALLY_RECEIVED',
-        updatedAt: now
+        updatedAt: postingTimestamp
       });
 
       repository.commitTransaction();
