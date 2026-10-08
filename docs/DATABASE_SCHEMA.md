@@ -46,9 +46,11 @@ the target semantics while this branch is under construction.
 
 ## 1. Tenancy & Hierarchy Tables
 
-> **Implementation note (2026-10-03):** the live SQLite schema still contains legacy
-> `branch_products` assignment/compatibility storage because migration is staged. For the
-> forward Product → Menu → Inventory model, `branch_menus` owns Menu adoption and Branch Menu
+> **Implementation note (2026-10-08):** the live SQLite schema still contains legacy
+> `branch_products` assignment/compatibility storage and `branch_product_inventory` migration
+> storage because stock migration is staged. For the forward Product → Menu → Inventory model,
+> `branch_menus` owns Menu adoption and the valuation-bearing Product Stock authority is
+> `product_stock_balances` at a Stock Location.
 > availability/price override, while `branch_product_inventory` owns Product stock quantity.
 > `branch_products.stock`, `branch_products.is_available`, legacy snapshot/override fields,
 > and legacy branch-price fields are compatibility data only until consumer migration is
