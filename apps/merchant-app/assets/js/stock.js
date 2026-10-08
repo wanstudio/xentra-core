@@ -154,7 +154,10 @@
     if (selectType) selectType.value = 'audit_adjustment';
 
     var qtyInput = $('bm-adjust-quantity');
-    if (qtyInput) qtyInput.value = '';
+    if (qtyInput) {
+      qtyInput.value = '';
+      qtyInput.oninput = onBMAdjustTypeChange;
+    }
 
     var unitCostInput = $('bm-adjust-unit-cost');
     if (unitCostInput) unitCostInput.value = '';
