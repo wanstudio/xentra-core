@@ -885,7 +885,9 @@ Recommended sequence:
         ↓
 6. Menu Item Choice → Stock / Production Integration Contract ✅
         ↓
-7. Costing / HPP Contract
+7. Production Routing + Stock Location Contract ✅
+        ↓
+8. Costing / HPP Contract
         ↓
 8. Incremental schema + API implementation
         ↓
