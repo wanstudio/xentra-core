@@ -13243,7 +13243,7 @@ async function loadMenusView() {
     }
 
     var addMenu = $('btn-add-master-menu');
-    if (addMenu) addMenu.addEventListener('click', function() { openMenuTypeSheet(); });
+    if (addMenu) addMenu.addEventListener('click', function() { openNewOwnerMasterMenu('SINGLE'); });
     if (addSingle) addSingle.addEventListener('click', function() { openNewOwnerMasterMenu('SINGLE'); });
     if (addPackage) addPackage.addEventListener('click', function() { openNewOwnerMasterMenu('PACKAGE'); });
 
