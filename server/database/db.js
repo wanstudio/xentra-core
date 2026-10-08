@@ -2612,6 +2612,13 @@ function initSchema(targetDb) {
     throw new Error('[Database] Failed to initialize canonical Production schema: ' + schemaErr.message);
   }
 
+  try {
+    const { ensureCostOfSalesSchema } = require('../../domains/costing/schema/CostOfSalesSchema');
+    ensureCostOfSalesSchema(targetDb);
+  } catch (schemaErr) {
+    throw new Error('[Database] Failed to initialize Cost of Sales schema: ' + schemaErr.message);
+  }
+
   // Authoritative separation: Schema initialization only provisions essential tenant structure
   // (organization, brand, initial merchant owner if absent).
   // Demo fixtures (demo branches, demo products, demo promotions) are NEVER automatically seeded on startup.
