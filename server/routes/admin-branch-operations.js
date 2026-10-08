@@ -10,6 +10,7 @@
 module.exports = function registerAdminBranchOperationsRoutes(router, deps) {
   const { db, requireAuth, InventoryStockService } = deps;
   const InventoryRepository = require('../../core/data/repositories/InventoryRepository');
+  const InventoryAdjustmentService = require('../../domains/inventory/services/InventoryAdjustmentService');
   const inventoryRepository = new InventoryRepository();
 
 
@@ -126,6 +127,35 @@ router.patch('/admin/branches/:id/inventory/:productId', requireAuth(['owner', '
     }
 
     try {
+      const canonicalAdjustment = InventoryAdjustmentService.postProductAdjustment({
+        branchId: req.params.id,
+        productId: req.params.productId,
+        movementType: movement_type,
+        quantity,
+        mutationId: mutation_id,
+        unitCost: req.body && req.body.unit_cost,
+        currencyCode: req.body && req.body.currency_code,
+        actorId: req.user.userId || req.user.id || req.user.username || 'system',
+        notes,
+        postingTimestamp: new Date().toISOString()
+      });
+
+      if (canonicalAdjustment.status === 'AVAILABLE') {
+        return res.json({
+          success: true,
+          movement: canonicalAdjustment,
+          stock: canonicalAdjustment.current_stock,
+          stock_source: 'canonical'
+        });
+      }
+
+      if (canonicalAdjustment.status !== 'LEGACY_COMPATIBILITY_REQUIRED') {
+        throw new Error('INVENTORY_ADJUSTMENT_FAILED');
+      }
+
+      // Migration seam: only unmigrated branches/products continue through the
+      // existing operational inventory ledger. Canonical Product Stock never
+      // falls back after a canonical mutation has been selected.
       const movement = InventoryStockService.recordMovement({
         branch_id: req.params.id,
         product_id: req.params.productId,
@@ -139,23 +169,13 @@ router.patch('/admin/branches/:id/inventory/:productId', requireAuth(['owner', '
       });
 
       const stock = InventoryStockService.getStock(req.params.id, req.params.productId);
-      res.json({
+      return res.json({
         success: true,
         movement,
         stock,
-        stock_source: canonicalStock ? 'canonical' : 'legacy'
+        stock_source: 'legacy'
       });
-    } catch (stockErr) {
-      const msg = String(stockErr && stockErr.message || '');
-      if (msg.includes('Stok tidak boleh negatif')) {
-        return res.status(409).json({ success: false, error: 'INSUFFICIENT_STOCK', message: stockErr.message });
-      }
-      if (msg.includes('tidak terdaftar di cabang')) {
-        return res.status(404).json({ success: false, error: 'Produk tidak dialokasikan ke cabang ini.' });
-      }
-      console.error('[API Error PATCH /admin/branches/:id/inventory/:productId]:', stockErr);
-      res.status(500).json({ success: false, error: stockErr.message });
-    }
+    }    }
   } catch (err) {
     console.error('[API Error PATCH /admin/branches/:id/inventory/:productId]:', err);
     res.status(500).json({ success: false, error: err.message });
