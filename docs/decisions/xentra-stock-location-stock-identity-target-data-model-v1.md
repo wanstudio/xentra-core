@@ -172,7 +172,7 @@ A Production Item is a production/preparation definition, not a second Product m
 Core recommendation:
 `production_items.output_product_id → products.id`.
 
-The exact routing and location-selection policy remains a separate business decision.
+The Product ↔ Production Item relationship is locked by `docs/decisions/xentra-production-item-recipe-bom-contract-v1.md`: Product → 0..N Production Items, each Production Item has exactly one `output_product_id`, and routing must resolve one unambiguous active Production Item for the production context.
 
 ## 11. Recipe and Recipe Version
 
@@ -190,6 +190,10 @@ Recipe Version should be immutable after publication.
 
 Conceptual fields:
 `recipe_id`, `version_no`, `status`, `effective_from`, `effective_to`, production-location applicability, `yield_quantity`, `yield_uom_id`, approval metadata.
+
+Relationship: `recipes.production_item_id → production_items.id`.
+
+A Production Item has one logical Recipe in v1; formula changes create new Recipe Versions rather than new Recipes or Products. Published Recipe Versions are immutable.
 
 A Production Batch must record exactly which Recipe Version it used.
 
@@ -223,9 +227,11 @@ Recommended logical entity: `production_outputs`.
 Conceptual fields:
 `id`, `production_batch_id`, `product_id`, `quantity`, `uom_id`, `stock_location_id`.
 
-At current make-to-stock scope, completed output becomes Product Stock through Inventory posting.
+At current make-to-stock scope, a Production Batch produces one main Product output. The `production_outputs.product_id` must match the Production Item's `output_product_id` for that batch.
 
-The model should not yet introduce a polymorphic output identity for semi-finished goods; that needs a separate decision.
+Completed output becomes Product Stock through Inventory posting.
+
+The model should not yet introduce a polymorphic output identity for semi-finished goods; semi-finished outputs and by-products require a later explicit contract.
 
 ## 15. Procurement target chain
 
@@ -378,8 +384,7 @@ Catalog resolves composition. Production decides production impact. Inventory po
 ## 23. Still OPEN
 
 Do not lock these from this document:
-- exact Product ↔ Production Item routing rules;
-- exact Recipe location applicability;
+- exact Recipe / Production Item location applicability schema;
 - mandatory WIP vs simple issue-and-produce flow;
 - semi-finished/by-product model;
 - lot/expiry activation and data model;
@@ -408,4 +413,4 @@ https://www.gs1.org/standards/gs1-global-traceability-standard/current-standard
 Vocabulary Gate: PASS.
 Stock Location + Stock Identity model: sufficiently defined for the next contract layer.
 
-The next design gate should therefore be **Material + Supplier Material Contract**, using the exact vocabulary and Stock Location identity defined here.
+The next design gate is **Production Batch + Posting / Mutation Contract**, using the locked Production Item + Recipe / BoM semantics and this Stock Location / Stock Identity model.
