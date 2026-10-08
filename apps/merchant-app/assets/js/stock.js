@@ -156,6 +156,15 @@
     var qtyInput = $('bm-adjust-quantity');
     if (qtyInput) qtyInput.value = '';
 
+    var unitCostInput = $('bm-adjust-unit-cost');
+    if (unitCostInput) unitCostInput.value = '';
+    var currencyInput = $('bm-adjust-currency-code');
+    if (currencyInput) currencyInput.value = 'IDR';
+    var mutationInput = $('bm-adjust-mutation-id');
+    if (mutationInput) mutationInput.value = (window.crypto && window.crypto.randomUUID)
+      ? window.crypto.randomUUID()
+      : ('adj_' + Date.now() + '_' + Math.random().toString(36).slice(2));
+
     var notesInput = $('bm-adjust-notes');
     if (notesInput) notesInput.value = '';
 
@@ -174,6 +183,7 @@
     var selectType = $('bm-adjust-movement-type');
     var hint = $('bm-adjust-qty-hint');
     var qtyInput = $('bm-adjust-quantity');
+    var costFields = $('bm-adjust-cost-fields');
     if (!selectType || !hint) return;
 
     if (selectType.value === 'waste_spoilage') {
@@ -182,9 +192,12 @@
       if (qtyInput && Number(qtyInput.value) > 0) {
         qtyInput.value = '-' + qtyInput.value;
       }
+      if (costFields) costFields.style.display = 'none';
     } else {
       hint.textContent = 'Gunakan angka positif untuk menambah, negatif untuk mengurangi.';
       hint.style.color = 'var(--text-muted)';
+      var showCost = qtyInput && Number(qtyInput.value) > 0;
+      if (costFields) costFields.style.display = showCost ? 'block' : 'none';
     }
   }
   window.onBMAdjustTypeChange = onBMAdjustTypeChange;
@@ -199,6 +212,9 @@
     var movementType = $('bm-adjust-movement-type') ? $('bm-adjust-movement-type').value : '';
     var qty = $('bm-adjust-quantity') ? Number($('bm-adjust-quantity').value) : NaN;
     var notes = $('bm-adjust-notes') ? $('bm-adjust-notes').value.trim() : '';
+    var mutationId = $('bm-adjust-mutation-id') ? $('bm-adjust-mutation-id').value.trim() : '';
+    var unitCost = $('bm-adjust-unit-cost') ? Number($('bm-adjust-unit-cost').value) : NaN;
+    var currencyCode = $('bm-adjust-currency-code') ? $('bm-adjust-currency-code').value.trim().toUpperCase() : '';
 
     if (!productId || isNaN(qty) || qty === 0) {
       showToast('Masukkan jumlah penyesuaian yang valid (bukan 0).');
@@ -208,6 +224,22 @@
     if (movementType === 'waste_spoilage' && qty > 0) {
       showToast('Barang rusak (waste_spoilage) hanya menerima pengurangan stok (angka negatif).');
       return;
+    }
+
+    if (!mutationId) {
+      showToast('Identitas mutasi tidak tersedia. Buka kembali form penyesuaian.');
+      return;
+    }
+
+    if (movementType === 'audit_adjustment' && qty > 0) {
+      if (!Number.isFinite(unitCost) || unitCost < 0) {
+        showToast('Biaya per unit wajib diisi saat menambah stok melalui audit.');
+        return;
+      }
+      if (!/^[A-Z]{3}$/.test(currencyCode)) {
+        showToast('Kode mata uang harus 3 huruf, misalnya IDR.');
+        return;
+      }
     }
 
     var submitBtn = $('btn-bm-submit-adjust');
@@ -220,6 +252,9 @@
         body: JSON.stringify({
           movement_type: movementType,
           quantity: qty,
+          mutation_id: mutationId,
+          unit_cost: (movementType === 'audit_adjustment' && qty > 0) ? unitCost : null,
+          currency_code: (movementType === 'audit_adjustment' && qty > 0) ? currencyCode : null,
           notes: notes
         })
       });
