@@ -19,6 +19,20 @@ class ProcurementRepository {
     return this.db.exec('ROLLBACK;');
   }
 
+  findSupplierByCode(organizationId, supplierCode) {
+    return this.db.queryOne(
+      'SELECT id, organization_id, supplier_code, name, status FROM suppliers WHERE organization_id = ? AND lower(trim(supplier_code)) = lower(trim(?))',
+      [organizationId, supplierCode]
+    );
+  }
+
+  findSupplierMaterialByIdentity(supplierId, materialId) {
+    return this.db.queryOne(
+      'SELECT id, supplier_id, material_id, supplier_item_code, is_active FROM supplier_materials WHERE supplier_id = ? AND material_id = ?',
+      [supplierId, materialId]
+    );
+  }
+
   findSupplier(id) {
     return this.db.queryOne(
       'SELECT id, organization_id, supplier_code, name, status FROM suppliers WHERE id = ?',
