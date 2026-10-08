@@ -2573,6 +2573,22 @@ function initSchema(targetDb) {
     throw e;
   }
 
+  // Canonical UOM + Material masters must exist before cost-bearing Inventory,
+  // because Material Stock is keyed by materials.id and Material owns base_uom_id.
+  try {
+    const { ensureUomMasterSchema } = require('../../domains/uom/schema/UomMasterSchema');
+    ensureUomMasterSchema(targetDb);
+  } catch (schemaErr) {
+    throw new Error('[Database] Failed to initialize canonical UOM schema: ' + schemaErr.message);
+  }
+
+  try {
+    const { ensureMaterialMasterSchema } = require('../../domains/material/schema/MaterialMasterSchema');
+    ensureMaterialMasterSchema(targetDb);
+  } catch (schemaErr) {
+    throw new Error('[Database] Failed to initialize canonical Material schema: ' + schemaErr.message);
+  }
+
   // Cost-bearing Inventory target schema is additive and intentionally separate from
   // legacy branch_products / inventory_movements compatibility structures.
   try {
