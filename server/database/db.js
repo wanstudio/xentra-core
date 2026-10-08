@@ -2605,6 +2605,13 @@ function initSchema(targetDb) {
     throw new Error('[Database] Failed to initialize canonical Procurement schema: ' + schemaErr.message);
   }
 
+  try {
+    const { ensureProductionSchema } = require('../../domains/production/schema/ProductionSchema');
+    ensureProductionSchema(targetDb);
+  } catch (schemaErr) {
+    throw new Error('[Database] Failed to initialize canonical Production schema: ' + schemaErr.message);
+  }
+
   // Authoritative separation: Schema initialization only provisions essential tenant structure
   // (organization, brand, initial merchant owner if absent).
   // Demo fixtures (demo branches, demo products, demo promotions) are NEVER automatically seeded on startup.
