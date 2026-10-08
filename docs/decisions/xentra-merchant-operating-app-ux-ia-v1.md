@@ -1,3 +1,40 @@
+# 🔒 CURRENT MENU AUTHORING BINDING — 2026-10-08
+
+For Menu authoring, the current forward contract is:
+
+```
+Menu
+├── Category       → grouping/classification
+├── Title          → explicit customer-facing commercial name
+└── Menu Items
+     └── optional Item Choices
+```
+
+This binding supersedes older Menu/Product composition assumptions in this historical UX/IA document.
+
+Owner flow:
+- choose/create Category;
+- enter Menu Title;
+- add Menu Items;
+- optionally add **Pilihan item** inside a specific Menu Item;
+- review HPP, selling price, preview, and activation.
+
+Item Choice:
+- **Kamu mengatur** = Owner fixes the value;
+- **Pelanggan memilih** = Customer chooses at ordering time;
+- Owner first chooses an Xentra-provided Choice Template;
+- the template controls semantic meaning, validation, and presentation policy;
+- Owner can edit displayed labels/values;
+- **Pilihan lainnya** uses a generic renderer and does not expose a custom UI/template editor to Owner.
+
+The separate navigation/capability label **Variasi menu** must not be interpreted as a second or parallel Menu Choice authoring system. The current authoring flow is item-scoped.
+
+Git authority:
+- `docs/decisions/catalog-menu-domain-contract-v2.md`
+- `docs/decisions/xentra-menu-item-choice-template-contract-v1.md`
+
+---
+
 # Xentra Merchant Operating App — UX / IA Contract v1
 
 **Status:** LOCKED
