@@ -115,12 +115,23 @@ class ComposedProductService {
     const nextSku = sku === undefined ? previousSku : normalizeSku(sku);
     if (previousSku !== nextSku && previousSku && !nextSku) {
       const positiveStock = repository.db.queryOne(
-        "SELECT 1 AS found FROM branches b " +
-        "LEFT JOIN branch_product_inventory bpi ON bpi.branch_id = b.id AND bpi.product_id = ? " +
-        "LEFT JOIN branch_products bp ON bp.branch_id = b.id AND bp.product_id = ? " +
+        "SELECT 1 AS found " +
+        "FROM branches b " +
+        "LEFT JOIN stock_locations sl " +
+        "  ON sl.branch_id = b.id AND sl.location_type = 'BRANCH' AND sl.is_active = 1 " +
+        "LEFT JOIN product_stock_balances psb " +
+        "  ON psb.stock_location_id = sl.id AND psb.product_id = ? " +
+        "LEFT JOIN branch_product_inventory bpi " +
+        "  ON bpi.branch_id = b.id AND bpi.product_id = ? " +
+        "LEFT JOIN branch_products bp " +
+        "  ON bp.branch_id = b.id AND bp.product_id = ? " +
         "WHERE b.brand_id = ? AND b.is_active = 1 " +
-        "AND (COALESCE(bpi.stock_qty, 0) > 0 OR COALESCE(bp.stock, 0) > 0) LIMIT 1",
-        [productId, productId, brandId]
+        "AND ( " +
+        "  (psb.product_id IS NOT NULL AND COALESCE(psb.quantity, 0) > 0) " +
+        "  OR " +
+        "  (psb.product_id IS NULL AND (COALESCE(bpi.stock_qty, 0) > 0 OR COALESCE(bp.stock, 0) > 0)) " +
+        ") LIMIT 1",
+        [productId, productId, productId, brandId]
       );
       if (positiveStock) throw new Error('PRODUCT_SKU_REMOVAL_BLOCKED_STOCK');
     }
