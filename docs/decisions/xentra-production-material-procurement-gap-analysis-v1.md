@@ -871,7 +871,7 @@ Recommended sequence:
         ↓
 3. Production Item + Recipe / BoM Contract
         ↓
-4. Production Batch + Posting / Mutation Contract
+4. Production Batch + Posting / Mutation Contract ✅
         ↓
 5. Procurement Document Contract
         ↓
