@@ -852,7 +852,8 @@ docs/decisions/xentra-menu-item-choice-stock-production-integration-contract-v1.
 
 These still require product/business choices:
 
-- exact Production Item → Stock Location applicability schema and routing priority;
+- exact `production_item_locations` column/effective-date implementation;
+- advanced route priority when multiple methods must coexist at one location;
 - WIP and multi-step production beyond the v1 direct issue-and-produce flow;
 - semi-finished output / sub-assembly model;
 - lot/expiry activation timeline;
