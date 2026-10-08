@@ -21,6 +21,7 @@ const registerPlatformDomainRoutes = require('./platform-domains');
 const registerAdminCatalogRoutes = require('./admin-catalog');
 const registerAdminMenuCompositionRoutes = require('./admin-menu-composition');
 const registerAdminComposedMenuRoutes = require('./admin-composed-menu');
+const registerAdminMaterialRoutes = require('./admin-materials');
 const registerAdminBrandRoutes = require('./admin-brand');
 const registerAdminBranchRoutes = require('./admin-branches');
 const registerAdminOrderRoutes = require('./admin-orders');
@@ -1024,6 +1025,9 @@ registerAdminCatalogRoutes(router, { db, requireAuth });
 registerAdminMenuCompositionRoutes(router, { requireAuth });
 // New locked Product → Menu → Inventory construction boundary.
 registerAdminComposedMenuRoutes(router, { db, requireAuth });
+// Canonical Material Master & UOM registry routes
+registerAdminMaterialRoutes(router, { requireAuth });
+
 
 // Admin branch management routes are isolated in server/routes/admin-branches.js.
 registerAdminBranchRoutes(router, { db, crypto, requireAuth });
