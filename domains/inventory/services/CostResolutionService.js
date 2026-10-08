@@ -265,7 +265,6 @@ class CostResolutionService {
     const reference = assertPostingReference(postingReference);
     const mutationId = assertPostingReference(postingMutationId);
     const timestamp = assertPostingTimestamp(postingTimestamp);
-    const currency = assertCurrencyCode(currencyCode);
 
     assertLocationAndIdentity({
       repository,
@@ -332,7 +331,7 @@ class CostResolutionService {
         costBasisType: existing.cost_basis_type,
         sourceType: existing.source_type,
         sourceReference: existing.source_reference || reference,
-        currencyCode: assertCurrencyCode(existing.currency_code || currency),
+        currencyCode: assertCurrencyCode(existing.currency_code || currencyCode),
         valuationVersion: Number(existing.valuation_version),
         latestMovementId: existing.id,
         resolvedAt: timestamp,
@@ -345,6 +344,11 @@ class CostResolutionService {
       : repository.findLatestMaterialValuationMovement({ stockLocationId, materialId: stockIdentityId });
 
     assertNotBackdated(timestamp, latest);
+
+    const currency = currencyCode
+      ? assertCurrencyCode(currencyCode)
+      : assertCurrencyCode(latest && latest.currency_code);
+
     assertCurrencyContinuity(currency, latest);
 
     const rawBalance = identityType === 'PRODUCT'
