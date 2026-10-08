@@ -834,10 +834,10 @@ The following can be promoted with high confidence:
 13. UOM conversion is explicit and transaction quantities must preserve resolved base quantities.
 14. Canonical UOM uses shared UOM Categories, one Reference UOM per category, explicit conversion factors, 6-decimal stock quantity precision, 12-decimal conversion-factor precision, and HALF_UP posting rounding.
 15. Menu Item needs a stable identity before Choice persistence.
-15. Choice-driven stock effects resolve through structured composition, never direct raw-material mutation.
-16. Choice Value stock effects are explicit Product mappings using NONE / ADD_PRODUCT / REPLACE_PRODUCT semantics; direct Choice → Production/Material effects remain future.
+16. Choice-driven stock effects resolve through structured composition, never direct raw-material mutation.
+17. Choice Value stock effects are explicit Product mappings using NONE / ADD_PRODUCT / REPLACE_PRODUCT semantics; direct Choice → Production/Material effects remain future.
 17. Inventory Transfer uses explicit Stock Location source/destination, Inventory-owned dispatch/receipt boundaries, partial receipt, atomic posting, and idempotency.
-18. Costing/HPP has an explicit ownership and calculation boundary: Inventory supplies resolved cost basis, Production computes actual direct-material cost, and Menu HPP derives from effective Product composition.
+19. Costing/HPP has an explicit ownership and calculation boundary: Inventory supplies resolved cost basis, Production computes actual direct-material cost, and Menu HPP derives from effective Product composition.
 
 Production Item + Recipe / BoM Contract v1 was promoted on 2026-10-08:
 docs/decisions/xentra-production-item-recipe-bom-contract-v1.md
@@ -909,11 +909,13 @@ Recommended sequence:
         ↓
 9. Costing / HPP Contract ✅
         ↓
-10. Incremental schema + API implementation
+10. UOM Master + Precision / Rounding Contract ✅
         ↓
-11. Compatibility migration
+11. Incremental schema + API implementation
         ↓
-12. Legacy quarantine / removal
+12. Compatibility migration
+        ↓
+13. Legacy quarantine / removal
 ```
 
 This order resolves identity before transaction flow and transaction flow before costing.
@@ -950,5 +952,5 @@ Item Choice Resolution
 Sale
 ```
 
-Production Item + Recipe / BoM, Production Batch + Posting, Procurement Document, dan Menu Item Choice → Stock / Production Integration identity/transaction gates are now locked. Remaining work is limited to explicit operational/policy gates such as routing priority, transfer lifecycle, role approval, lot/expiry, MTO, scheduling, HPP/valuation, and autonomous procurement.
+Production Item + Recipe / BoM, Production Batch + Posting, Procurement Document, dan Menu Item Choice → Stock / Production Integration identity/transaction gates are now locked. Remaining work is limited to explicit operational/policy gates such as routing priority, transfer variance, role approval, lot/expiry, MTO, scheduling, exact valuation policy, and autonomous procurement.
 
