@@ -1046,17 +1046,20 @@ The implementation sequence after this decision is:
 
 ~~~
 Inventory Valuation Policy v1
-        ↓
-Cost Resolution Contract
-        ↓
-Cost-bearing Stock Movement Data Model
-        ↓
+        ✅ LOCKED
+              ↓
+Cost Resolution Contract v1
+        ✅ LOCKED
+              ↓
+Cost-bearing Stock Movement Data Model v1
+        ✅ LOCKED
+              ↓
 Goods Receipt Cost Posting Integration
-        ↓
+              ↓
 Production Cost Snapshot / Output Cost
-        ↓
+              ↓
 Menu Composition Cost Resolver
-        ↓
+              ↓
 Sale → COGS Snapshot
 ~~~
 
