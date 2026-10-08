@@ -5,6 +5,7 @@
 **Simulation evidence:** `docs/decisions/xentra-material-production-selling-lifecycle-simulation-v1.md`
 **Related authorities:**
 - `docs/decisions/xentra-domain-vocabulary-boundary-v1.md`
+- `docs/decisions/xentra-costing-vocabulary-revision-v1.1.md`
 - `docs/decisions/xentra-multibranch-supply-stock-topology-contract-v1.md`
 - `docs/decisions/catalog-menu-domain-contract-v2.md`
 - `docs/decisions/xentra-menu-item-choice-template-contract-v1.md`
@@ -329,16 +330,12 @@ Still open as separate policy:
 ## 10. Explicitly Open
 
 This contract does not lock:
-- exact Stock Location schema;
-- exact Recipe / Production Item location applicability schema;
 - production planning/scheduling;
 - semi-finished/by-product model;
 - lot / expiry;
 - Make-to-Order trigger/reservation semantics;
 - transfer variance / loss / damage workflow;
 - partial dispatch and transfer scheduling policy;
-- exact UOM master schema/reference-data implementation;
-- UOM precision/rounding rules;
 - exact valuation method and scope;
 - exact Menu Composition Cost reporting basis (latest actual Product cost vs current theoretical Production cost);
 - exact accounting/COGS integration policy;
