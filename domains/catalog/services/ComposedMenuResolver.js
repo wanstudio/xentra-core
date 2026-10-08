@@ -36,7 +36,7 @@ function isOriginalRasa(name) {
 function resolveCustomerTitle(menu) {
   const title = String(menu.title_name || '').trim();
   const rasa = String(menu.rasa_name || '').trim();
-  if (!title) return 'Menu';
+  if (!title) return null;
   if (!rasa || isOriginalRasa(rasa)) return title;
   return title + ' ' + rasa;
 }
@@ -48,10 +48,12 @@ function resolveMenuBase(menu, branchState = null) {
     ? String(branchState.display_name_override).trim()
     : null;
 
+  const canonicalTitle = resolveCustomerTitle(menu);
+
   return {
     id: menu.id,
     menu_id: menu.id,
-    title: displayNameOverride || resolveCustomerTitle(menu),
+    title: canonicalTitle ? (displayNameOverride || canonicalTitle) : null,
     subtitle: menu.rasa_name && !rasaIsOriginal ? menu.rasa_name : null,
     price: Number(menu.selling_price),
     category: menu.category_id
@@ -151,6 +153,7 @@ class ComposedMenuResolver {
 
     const items = repository.listMenuItems({ brandId, menuIds: [menuId] });
     const base = resolveMenuBase(menu);
+    if (!base.title) throw new Error('MENU_TITLE_UNAVAILABLE');
 
     return {
       ...base,
@@ -186,12 +189,13 @@ class ComposedMenuResolver {
       const base = resolveMenuBase(menu);
       const menuItems = itemMap.get(String(menu.id)) || [];
       const inventoryState = calculateInventory(menuItems, [], false);
-      const available = inventoryState.blocking_reason == null && String(menu.status).toUpperCase() === 'ACTIVE';
+      const identityBlocking = base.title ? null : 'MENU_TITLE_UNAVAILABLE';
+      const available = identityBlocking == null && inventoryState.blocking_reason == null && String(menu.status).toUpperCase() === 'ACTIVE';
       return {
         ...base,
         is_available: available,
         availability: available,
-        blocking_reason: inventoryState.blocking_reason,
+        blocking_reason: identityBlocking || inventoryState.blocking_reason,
         components: menuItems.map(item => ({
           product_id: item.product_id,
           product_name: item.product_name,
@@ -248,7 +252,8 @@ class ComposedMenuResolver {
       const categoryMemberships = membershipMap.get(String(menu.id)) || [];
       const activeBranchCategories = categoryMemberships.filter(row => row.branch_category_is_active !== 0);
       let blockingReason = null;
-      if (!branchState.is_available) blockingReason = 'BRANCH_MENU_UNAVAILABLE';
+      if (!base.title) blockingReason = 'MENU_TITLE_UNAVAILABLE';
+      else if (!branchState.is_available) blockingReason = 'BRANCH_MENU_UNAVAILABLE';
       else if (!menuStatusValid) blockingReason = 'MENU_INACTIVE';
       else if (categoryMemberships.length > 0 && activeBranchCategories.length === 0) blockingReason = 'BRANCH_CATEGORY_UNAVAILABLE';
       else if (inventoryState.blocking_reason) blockingReason = inventoryState.blocking_reason;
