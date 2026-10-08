@@ -142,7 +142,7 @@ class InventoryAdjustmentService {
         stockLocationId,
         productId: product
       });
-      if (!lockedBalance) return this._legacyResult(stockLocationId);
+      if (!lockedBalance) throw fail('VALUATION_STATE_INVALID');
 
       let resolution;
       let transition;
