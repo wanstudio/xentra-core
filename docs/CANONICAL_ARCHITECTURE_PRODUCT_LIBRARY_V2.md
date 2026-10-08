@@ -1,3 +1,84 @@
+# 🔒 CURRENT CATALOG / MENU RECONCILIATION — 2026-10-08
+
+This Library contains historical decisions from multiple stages of the Xentra Catalog/Menu migration. The following current contracts control forward implementation:
+
+- `docs/decisions/catalog-menu-domain-contract-v2.md`
+- `docs/decisions/xentra-menu-item-choice-template-contract-v1.md`
+- `docs/decisions/xentra-domain-vocabulary-boundary-v1.md`
+
+## Current forward Menu model
+
+```
+Menu
+├── Category       → grouping/classification
+├── Title          → explicit customer-facing commercial name
+└── Menu Items
+     └── optional Item Choices
+```
+
+Current Owner mental model:
+
+```
+Create Menu
+  ↓
+Choose Category
+  ↓
+Enter Title
+  ↓
+Add Menu Items
+  ↓
+Optional: add Item Choice to a specific Menu Item
+  ↓
+HPP / Price / Preview / Activate
+```
+
+Item Choice rules:
+- scope is one specific Menu Item;
+- Owner may fix the value (**Kamu mengatur**);
+- or Customer may choose the value (**Pelanggan memilih**);
+- Owner first selects an Xentra-provided Choice Template;
+- template establishes semantic meaning, validation, and presentation policy;
+- Owner may edit customer-facing labels and values;
+- Custom means custom labels/values rendered by the generic component, not an Owner-created UI template;
+- renderer selection is data-driven and must never infer semantics from the display label.
+
+Examples of predefined presentation policy:
+
+```
+Level Pedas → scale
+Sambal      → select
+Ukuran      → choice/segmented
+Suhu        → choice/segmented
+Rasa        → choice
+Topping     → multi-select
+```
+
+## What this reconciliation supersedes
+
+Older sections in this Library may describe:
+- Product-centric Menu authoring;
+- Category + Sub Category + Rasa as Menu identity;
+- Product Name mapped directly to Customer Menu title;
+- Master Rasa/Complement/Level as universal Menu composition;
+- a separate global Menu Configuration layer.
+
+Those sections remain as **historical decision records only** where explicitly dated/superseded. They must not be treated as competing current contracts.
+
+The active Menu identity/authoring meaning is governed by Catalog/Menu Domain v2 above.
+
+## Governance
+
+When an older Library section conflicts with a current locked contract:
+
+1. keep the historical record for traceability;
+2. follow the current locked contract for new implementation;
+3. record a newer reconciliation rather than silently rewriting history;
+4. do not make source-code compatibility behavior authoritative merely because it exists or passes legacy tests.
+
+**LOCKED — this reconciliation is the current Library binding for Catalog/Menu work.**
+
+---
+
 ## 22. Owner Dashboard Business / More Hub IA — 2026-09-28
 
 The Owner mobile shell keeps the five top-level modules: Beranda, Bisnis, Pesanan, Keuangan, and Lainnya.
