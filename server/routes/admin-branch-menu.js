@@ -72,7 +72,7 @@ function registerAdminBranchMenuRoutes(router, deps = {}) {
         const cats = categoryMap.get(String(menu.menu_id)) || [];
         const primary = Array.isArray(menu.components) && menu.components.length ? menu.components[0] : null;
         return Object.assign({}, menu, {
-          name: menu.title || 'Menu',
+          name: menu.title,
           image_url: menu.image_url || (primary && primary.image_url) || '',
           menu_composition: menu,
           category_ids: cats.map(c => String(c.id)),
