@@ -132,8 +132,8 @@ test('product stock valuation is organization-scoped by Stock Location', () => {
     () => db.prepare(`
       INSERT INTO product_stock_balances (
         stock_location_id, product_id, quantity, carrying_value,
-        moving_average_unit_cost, valuation_version
-      ) VALUES (?, ?, 1, 10000, 10000, 0)
+        moving_average_unit_cost, cost_availability_status, valuation_version
+      ) VALUES (?, ?, 1, 10000, 10000, 'AVAILABLE', 0)
     `).run(LOCATION_OTHER_ORG, PRODUCT),
     /PRODUCT_STOCK_LOCATION_ORG_SCOPE_MISMATCH/
   );
