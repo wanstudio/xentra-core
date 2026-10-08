@@ -1330,13 +1330,17 @@
     if (Array.isArray(data.menus)) {
       data.menus.forEach(function (menu) {
         if (!menu || !(menu.menu_id || menu.id)) return;
+        if (!String(menu.title || '').trim()) {
+          console.warn('[XENTRA CONTRACT] Skipping Checkout Menu without canonical title:', menu.menu_id || menu.id);
+          return;
+        }
         var components = Array.isArray(menu.components) ? menu.components : [];
         var first = components.length === 1 ? components[0] : null;
         list.push(Object.assign({}, menu, {
           id: menu.menu_id || menu.id,
           menu_id: menu.menu_id || menu.id,
-          name: menu.title || menu.package_name || 'Menu',
-          menu_title: menu.title || menu.package_name || 'Menu',
+          name: menu.title,
+          menu_title: menu.title,
           menu_subtitle: menu.subtitle || '',
           price: Number(menu.price || 0),
           regular_price: Number(menu.price || 0),
@@ -1348,7 +1352,7 @@
           menu_snapshot: menu.menu_snapshot || {
             menu_id: menu.menu_id || menu.id,
             menu_type: menu.menu_type,
-            title: menu.title || menu.package_name || 'Menu',
+            title: menu.title,
             subtitle: menu.subtitle || null,
             price: Number(menu.price || 0)
           }
