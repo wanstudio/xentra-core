@@ -340,7 +340,7 @@ This contract does not lock:
 - costing/valuation/HPP algorithm;
 - autonomous purchase limits;
 - exact procurement/receiving/production role matrix;
-- exact Item Choice → Material/Production mapping.
+- exact direct Choice → Production variant / Material recipe override; Product stock-effect mapping is now locked by `docs/decisions/xentra-menu-item-choice-stock-production-integration-contract-v1.md`.
 
 Product ↔ Production Item routing and Recipe / Recipe Version semantics are now locked by:
 - docs/decisions/xentra-production-item-recipe-bom-contract-v1.md
