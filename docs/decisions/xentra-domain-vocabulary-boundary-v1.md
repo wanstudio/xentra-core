@@ -369,9 +369,9 @@ MATERIAL
         │ held as stock
         ▼
 INVENTORY
-  Material Stock
-  Product Stock
-  Product Stock Balance / Material Stock Balance / typed Stock Movement
+  Material Stock Balance
+  Product Stock Balance
+  Typed Stock Movements
         ▲
         │ verified receipt / replenishment input
         │
