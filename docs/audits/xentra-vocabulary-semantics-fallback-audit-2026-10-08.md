@@ -182,11 +182,18 @@ Goods Receipt still mutates Branch/Product stock.
 
 This is legacy compatibility behavior, not the canonical Procurement contract.
 
-### 15. Business fallback audit — PASS
+### 15. Business fallback audit — PASS WITH EXCEPTIONS
 
-No new forward contract introduces a hidden business fallback for identity or routing.
+### 16. Master Menu / Menu Title vocabulary collision — HIGH
 
-Correct behavior now is:
+The active Catalog v2 contract defines `Menu` + direct customer-facing `Title` as the forward model, while current runtime still treats `Master Menu`, `title_id`, `menu_titles`, and legacy `package_name` as operationally meaningful. These names represent a UI scope plus legacy persistence, not additional business entities.
+
+Forward implementation should converge to `Menu` and `Title`. Legacy `menu_titles` may remain as a migration bridge, but new APIs must not introduce it as a second title authority.
+
+
+The contracts largely reject hidden business fallback for identity or routing. However, the current Catalog runtime still contains legacy fallback paths that can mask missing canonical Menu data. These are migration findings, not new business rules.
+
+Correct target behavior is:
 - zero production route → explicit route-not-found failure;
 - multiple active routes → integrity failure;
 - Branch does not implicitly become Production Location;
@@ -201,7 +208,7 @@ Technical fallbacks such as OSRM → Haversine, node:sqlite → sql.js, and serv
 | Term | Canonical meaning | Do not use as synonym |
 |---|---|---|
 | Product | Catalog reusable identity | Menu, Material, Production Item |
-| Menu | Customer-facing commercial offering | Product, Package |
+| Menu | Customer-facing commercial offering | Product, Package, separate “Master Menu” entity |
 | Menu Item | Component/reference within a Menu | generic Item entity |
 | Item Choice | Choice scoped to one Menu Item | Menu Configuration |
 | Material | Physical input identity | Raw Material as separate entity |
@@ -223,7 +230,7 @@ Technical fallbacks such as OSRM → Haversine, node:sqlite → sql.js, and serv
 | Inventory Transfer | Stock Location to Stock Location movement | Transfer Request entity |
 | DISPATCHED | Persisted v1 in-transit state | Transit Location |
 | Cost Basis | Unit/value basis used for costing/valuation | Selling Price |
-| Menu Composition Cost | Theoretical/derived cost of effective Menu composition | accounting COGS unless explicitly defined |
+| Menu Composition Cost | Derived cost of effective Menu composition | accounting COGS or unspecified “HPP” authority |
 | HPP / COGS | Pending explicit v1.1 terminology decision | interchangeable synonym |
 | Replenishment Requirement | Need to replenish Material at a Stock Location | Purchase Order |
 
@@ -254,7 +261,7 @@ Safe editorial and contract-alignment corrections:
 
 ## Audit conclusion
 
-**Overall status: PASS WITH CORRECTIONS.**
+**Overall status: PASS WITH CORRECTIONS / RUNTIME LEGACY FINDINGS REMAIN.**
 
 No evidence requires changing the fundamental Xentra domain boundaries.
 
