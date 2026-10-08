@@ -145,8 +145,7 @@ router.patch('/admin/branches/:id/inventory/:productId', requireAuth(['owner', '
       }
     }
 
-    try {
-      const canonicalAdjustment = InventoryAdjustmentService.postProductAdjustment({
+    const canonicalAdjustment = InventoryAdjustmentService.postProductAdjustment({
         branchId: req.params.id,
         productId: req.params.productId,
         movementType: movement_type,
@@ -194,7 +193,6 @@ router.patch('/admin/branches/:id/inventory/:productId', requireAuth(['owner', '
         stock,
         stock_source: 'legacy'
       });
-    }
   } catch (err) {
     const code = String(err && (err.code || err.message) || 'INVENTORY_ADJUSTMENT_FAILED');
     console.error('[API Error PATCH /admin/branches/:id/inventory/:productId]:', err);
