@@ -124,25 +124,17 @@ Receiving is the physical/operational process.
 
 Do not collapse document and process into one entity name.
 
-### 11. HPP terminology — HIGH / BUSINESS DECISION REQUIRED
+### 11. HPP terminology — RESOLVED BY v1.1
 
-Current Costing/HPP v1 uses Menu HPP for a derived Menu composition cost.
+The previous audit identified a collision between “Menu HPP” and Indonesian accounting/business usage of HPP / Cost of Goods Sold.
 
-This can be confused with Indonesian accounting/business usage of HPP and with Cost of Goods Sold.
+The issue is now resolved by `docs/decisions/xentra-costing-vocabulary-revision-v1.1.md`:
+- **Menu Composition Cost** = derived cost of the current effective Menu composition;
+- **COGS** = Cost of Goods Sold for sold inventory;
+- **HPP Penjualan (COGS)** = allowed Indonesian reporting/UI label;
+- bare **HPP** is not a new canonical engineering term.
 
-The external ERP terminology separates:
-- inventory valuation;
-- stock movement cost;
-- production cost;
-- COGS recognition.
-
-Therefore the current contract has a semantic language risk even though its calculation boundary is internally consistent.
-
-Do not silently rewrite the locked Costing/HPP v1 contract.
-
-A separate v1.1 decision must choose whether:
-- Menu HPP becomes an explicitly defined management/theoretical Menu Cost term and accounting COGS is named separately; or
-- HPP is redefined to match the intended accounting/business meaning.
+The underlying Costing/HPP v1 formulas and authority boundaries remain unchanged.
 
 ### 12. UOM arithmetic implementation risk — HIGH
 
@@ -230,8 +222,8 @@ Technical fallbacks such as OSRM → Haversine, node:sqlite → sql.js, and serv
 | Inventory Transfer | Stock Location to Stock Location movement | Transfer Request entity |
 | DISPATCHED | Persisted v1 in-transit state | Transit Location |
 | Cost Basis | Unit/value basis used for costing/valuation | Selling Price |
-| Menu Composition Cost | Derived cost of effective Menu composition | accounting COGS or unspecified “HPP” authority |
-| HPP / COGS | Pending explicit v1.1 terminology decision | interchangeable synonym |
+| Menu Composition Cost | Derived cost of effective Menu composition | accounting COGS / HPP Penjualan |
+| HPP Penjualan (COGS) | Indonesian reporting label for COGS | Menu Composition Cost |
 | Replenishment Requirement | Need to replenish Material at a Stock Location | Purchase Order |
 
 ## Source-code status
@@ -256,7 +248,7 @@ Safe editorial and contract-alignment corrections:
 7. Clarify Production Item versus routing.
 8. Clarify Recipe as canonical Xentra term and BoM/BOM as external synonym.
 9. Clarify Transfer Request as state/process wording, not a canonical entity.
-10. Keep HPP terminology issue as an explicit unresolved v1.1 business decision.
+10. HPP terminology is resolved by Costing Vocabulary Revision v1.1; continue to keep Menu Composition Cost and COGS separate.
 11. Keep UOM decimal arithmetic as an implementation gate.
 
 ## Audit conclusion
@@ -267,6 +259,6 @@ No evidence requires changing the fundamental Xentra domain boundaries.
 
 The highest-priority correction is vocabulary/document synchronization.
 
-One substantive business-language issue remains: the contract currently calls a theoretical/current Menu composition cost “HPP”, which may collide with accounting/COGS terminology. That must be resolved explicitly before a canonical HPP/COGS reporting API is implemented.
+One substantive business-language issue identified by the audit is now resolved: the canonical Menu term is Menu Composition Cost, while accounting/reporting COGS may be labeled HPP Penjualan in Indonesian. A future COGS reporting API must use explicit COGS semantics and must not infer COGS from Menu Composition Cost.
 
 **No mass runtime rewrite is authorized by this audit.**
