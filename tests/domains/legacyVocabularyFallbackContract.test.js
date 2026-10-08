@@ -137,3 +137,39 @@ test('legacy vocabulary quarantine: canonical costing/production paths do not es
   assert.match(cogsSource, /product_stock_movements/);
   assert.doesNotMatch(cogsSource, /inventory_movements/);
 });
+
+test('legacy inventory stock is not allowed to become the primary reader in canonical runtime paths', () => {
+  const canonicalInventoryReaders = [
+    'domains/commerce/services/ComposedMenuCheckoutService.js',
+    'domains/commerce/services/EligibilityService.js',
+    'domains/catalog/services/ComposedMenuResolver.js',
+    'domains/catalog/repositories/ComposedMenuRepository.js',
+    'domains/catalog/repositories/MasterMenuCompositionRepository.js',
+    'domains/inventory/services/InventorySalePostingService.js',
+    'domains/inventory/services/InventoryAdjustmentService.js'
+  ];
+
+  for (const relativePath of canonicalInventoryReaders) {
+    const source = read(relativePath);
+    assert.doesNotMatch(
+      source,
+      /branch_products\\s*\\.\\s*stock|inventory_movements/,
+      relativePath + ' must not read the legacy Product stock quantity/ledger directly'
+    );
+  }
+
+  const orderPlacement = read('domains/commerce/services/OrderPlacementService.js');
+  assert.doesNotMatch(
+    orderPlacement,
+    /SELECT\\s+stock[^;]*FROM\\s+branch_products|UPDATE\\s+branch_products\\s+SET\\s+stock/i,
+    'OrderPlacementService must not directly mutate legacy Product stock'
+  );
+
+  const inventoryRoute = read('server/routes/admin-branch-operations.js');
+  assert.match(
+    inventoryRoute,
+    /findBranchProductInventoryView/,
+    'Branch inventory UI must read through the Inventory repository boundary'
+  );
+});
+
