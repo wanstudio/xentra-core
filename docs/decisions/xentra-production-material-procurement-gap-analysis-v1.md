@@ -843,7 +843,7 @@ docs/decisions/xentra-production-item-recipe-bom-contract-v1.md
 These still require product/business choices:
 
 - exact Production Item → Stock Location applicability schema and routing priority;
-- whether WIP is mandatory in MVP or only supported by the target model;
+- WIP and multi-step production beyond the v1 direct issue-and-produce flow;
 - semi-finished output / sub-assembly model;
 - lot/expiry activation timeline;
 - exact make-to-order trigger and reservation semantics;
