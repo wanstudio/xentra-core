@@ -146,13 +146,6 @@ class ProductionRepository {
     );
   }
 
-  updateRecipeStatus({ id, status, updatedAt }) {
-    return this.db.execute(
-      'UPDATE recipes SET status = ?, updated_at = ? WHERE id = ?',
-      [status, updatedAt, id]
-    );
-  }
-
   updateProductionBatchPlan({ id, timestamp }) {
     return this.db.execute(
       "UPDATE production_batches SET status = 'PLANNED', updated_at = ? WHERE id = ? AND status = 'DRAFT'",
