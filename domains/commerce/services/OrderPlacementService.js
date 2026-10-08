@@ -639,9 +639,14 @@ class OrderPlacementService {
         deductedItems.push(...composedResult.deducted_items);
       }
 
-      const directStockManagedItems = legacyItems.filter(item =>
-        item && String(item.sku || '').trim() !== ''
-      );
+      const directStockManagedItems = legacyItems
+        .map(item => ({
+          ...item,
+          sku: item && (item.sku || (
+            inventoryRepository.findProductForValuation(item.product_id)?.sku || ''
+          ))
+        }))
+        .filter(item => item && String(item.sku || '').trim() !== '');
 
       if (directStockManagedItems.length === legacyItems.length && directStockManagedItems.length > 0) {
         const canonicalDirect = InventorySalePostingService.postCanonicalSale({
@@ -758,9 +763,14 @@ class OrderPlacementService {
 
     try {
       const directItems = items.filter(item => item && !item.menu_id);
-      const directStockManagedItems = directItems.filter(item =>
-        String(item.sku || '').trim() !== ''
-      );
+      const directStockManagedItems = directItems
+        .map(item => ({
+          ...item,
+          sku: item.sku || (
+            inventoryRepository.findProductForValuation(item.product_id)?.sku || ''
+          )
+        }))
+        .filter(item => String(item.sku || '').trim() !== '');
 
       if (directStockManagedItems.length === directItems.length && directStockManagedItems.length > 0) {
         const canonicalDirect = InventorySalePostingService.postCanonicalSale({
