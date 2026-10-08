@@ -85,7 +85,8 @@ class InventorySalePostingService {
     sourceReference,
     actorId = null,
     postingTimestamp,
-    repository = inventoryRepository
+    repository = inventoryRepository,
+    dbTransactionProvided = false
   }) {
     const normalizedBranchId = text(branchId, 'BRANCH_REQUIRED');
     const reference = text(sourceReference, 'SALE_REFERENCE_REQUIRED');
@@ -110,6 +111,11 @@ class InventorySalePostingService {
     // Validate the complete canonical requirement set before any mutation.
     const existingMovements = [];
     let hasLegacyRequirement = false;
+
+    const ownsTransaction = !dbTransactionProvided;
+    if (ownsTransaction) repository.beginTransaction();
+
+    try {
 
     for (const line of lines) {
       const product = repository.findProductForValuation(line.product_id);
@@ -287,7 +293,7 @@ class InventorySalePostingService {
       totalCost += resolution.total_cost;
     }
 
-    return {
+    const result = {
       status: 'AVAILABLE',
       idempotent: false,
       stock_location_id: stockLocationId,
@@ -298,6 +304,15 @@ class InventorySalePostingService {
       deducted_items: deductedItems,
       cost_lines: costLines
     };
+
+    if (ownsTransaction) repository.commitTransaction();
+    return result;
+    } catch (error) {
+      if (ownsTransaction) {
+        try { repository.rollbackTransaction(); } catch (_) {}
+      }
+      throw error;
+    }
   }
 }
 
