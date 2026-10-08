@@ -155,16 +155,25 @@ Inventory still owns the stock mutation.
 
 ## 6. Material Valuation Method
 
-Xentra v1 supports a valuation-policy abstraction but does not force one financial valuation algorithm into every merchant.
+The exact valuation method is now locked by:
 
-Candidate methods include:
-- Standard Cost;
-- Moving Average / Average Cost;
-- FIFO.
+- docs/decisions/xentra-inventory-valuation-policy-v1.md
 
-The exact enabled method, scope, and accounting treatment remain a later valuation-policy decision.
+Xentra v1 uses:
 
-The interface is locked:
+~~~text
+MOVING_AVERAGE
+~~~
+
+for valuation-bearing Material Stock and stock-managed Product Stock.
+
+Valuation is resolved independently for each:
+
+~~~text
+Stock Location × Stock Identity
+~~~
+
+The valuation interface remains:
 
 ~~~text
 Inventory valuation policy
@@ -172,7 +181,9 @@ Inventory valuation policy
   → records the resolved cost on the movement
 ~~~
 
-Established ERP systems similarly separate valuation methods such as Standard Cost, Average Cost, and FIFO and apply those methods to stock movements. ERPNext documents FIFO and Moving Average valuation, while Odoo documents Standard Price, Average Cost, and FIFO. These are supporting patterns, not Xentra authority.
+Cost Resolution is an explicit service/boundary and must never be implemented as a Product master cost field.
+
+FIFO and Standard Cost remain future policy options only through an explicit valuation-policy revision.
 
 ## 7. Production Cost
 
@@ -565,9 +576,7 @@ Margin reporting is a derived commercial report, not part of Inventory stock mut
 
 ## 22. Explicitly Open for Later Contracts
 
-- exact valuation method selection and scope;
 - FIFO layer persistence;
-- Moving Average calculation details;
 - Standard Cost publishing/versioning;
 - landed cost and freight allocation;
 - labor cost;
@@ -581,7 +590,7 @@ Margin reporting is a derived commercial report, not part of Inventory stock mut
 - revaluation workflow;
 - accounting journal integration;
 - whether Menu HPP prefers latest actual output cost or theoretical current recipe cost;
-- location-specific valuation policy;
+- location-specific valuation policy beyond the locked Moving Average scope;
 - lot-specific costing.
 
 ## 23. Current Runtime / Migration Boundary
