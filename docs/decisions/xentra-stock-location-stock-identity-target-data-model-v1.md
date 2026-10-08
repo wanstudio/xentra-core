@@ -415,6 +415,6 @@ https://www.gs1.org/standards/gs1-global-traceability-standard/current-standard
 ## 25. Final assessment
 
 Vocabulary Gate: PASS.
-Stock Location + Stock Identity model: sufficiently defined for the next contract layer.
+Stock Location + Stock Identity model: sufficiently defined for the transfer, production, and procurement contract layers.
 
-The next design gate is **Production Batch + Posting / Mutation Contract**, using the locked Production Item + Recipe / BoM semantics and this Stock Location / Stock Identity model.
+The Inventory Transfer State Machine is now locked separately. This target data model remains a logical pre-implementation model and does not authorize direct runtime migration.
