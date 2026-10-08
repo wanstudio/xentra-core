@@ -293,7 +293,7 @@ test('movement rejects inconsistent total cost and cannot use zero as implicit u
         -1, 10, 9,
         10000, -1, 'MOVING_AVERAGE', 'CURRENT_MOVING_AVERAGE',
         'TEST', 'TEST-BAD-TOTAL', 'mutation-bad-total',
-        2, '2026-10-08T19:10:00+07:00', 'v1'
+        3, '2026-10-08T19:10:00+07:00', 'v1'
       )
     `).run(LOCATION_A, PRODUCT),
     /CHECK constraint failed/
