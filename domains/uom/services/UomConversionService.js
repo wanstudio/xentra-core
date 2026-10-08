@@ -36,6 +36,21 @@ class UomConversionService {
     const source = this.getUom(sourceUomId, repo);
     const target = this.getUom(targetUomId, repo);
 
+    const sourcePrecision = Math.min(
+      MAX_STOCK_QUANTITY_DECIMALS,
+      Math.max(0, Number(source.quantity_precision))
+    );
+    const sourceRounded = roundHalfUp(sourceQuantity, sourcePrecision);
+    if (Math.abs(sourceQuantity - sourceRounded) > 1e-9) {
+      throw fail('INVALID_QUANTITY');
+    }
+    if (
+      Number(source.allows_fraction) !== 1 &&
+      Math.abs(sourceQuantity - Math.round(sourceQuantity)) > 1e-9
+    ) {
+      throw fail('UOM_FRACTION_NOT_ALLOWED');
+    }
+
     if (String(source.category_id) !== String(target.category_id)) {
       throw fail('UOM_CATEGORY_MISMATCH');
     }
