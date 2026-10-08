@@ -108,7 +108,13 @@ function buildPurchaseLine({ supplierMaterial, quantity, purchaseUomId, supplier
     if (!contentUom || Number(contentUom.is_active) !== 1) throw fail('SUPPLIER_MATERIAL_PACK_UOM_INVALID');
     if (String(contentUom.category_id) !== String(base.category_id)) throw fail('UOM_CATEGORY_MISMATCH');
 
-    baseQuantityPerPurchaseUnit = Number(representation.pack.content_quantity_base);
+    const convertedPackContent = UomConversionService.convertQuantity({
+      quantity: Number(representation.pack.content_quantity),
+      sourceUomId: contentUom.id,
+      targetUomId: base.id,
+      repository: uomRepository
+    });
+    baseQuantityPerPurchaseUnit = Number(convertedPackContent.target_quantity);
     const rawBaseQuantity = Number(quantity) * baseQuantityPerPurchaseUnit;
     resolvedBaseQuantity = roundHalfUp(rawBaseQuantity, Number(base.quantity_precision));
 
@@ -195,7 +201,7 @@ class ProcurementService {
       supplierMaterialId,
       name: text(name, 'SUPPLIER_MATERIAL_PACK_NAME_REQUIRED'),
       purchaseUomId: null,
-      contentQuantityBase: content,
+      contentQuantity: content,
       contentUomId: contentUom.id,
       minimumOrderQuantity: minQty,
       unitPrice: price,
