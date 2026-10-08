@@ -607,6 +607,40 @@ function ensureCostBearingInventorySchema(db) {
     END;
   `);
 
+  // Base Stock UOM becomes historical infrastructure after the first valued
+  // stock reference. Do not silently reinterpret posted Material quantities.
+  db.exec(`
+    CREATE TRIGGER IF NOT EXISTS trg_material_base_uom_change_after_stock
+    BEFORE UPDATE OF base_uom_id ON materials
+    FOR EACH ROW
+    WHEN NEW.base_uom_id <> OLD.base_uom_id
+      AND (
+        EXISTS (
+          SELECT 1 FROM material_stock_balances
+           WHERE material_id = OLD.id
+        )
+        OR EXISTS (
+          SELECT 1 FROM material_stock_movements
+           WHERE material_id = OLD.id
+        )
+      )
+    BEGIN
+      SELECT RAISE(ABORT, 'MATERIAL_BASE_UOM_CHANGE_REQUIRES_MIGRATION');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_product_stock_uom_change_after_stock
+    BEFORE UPDATE OF product_stock_uom_id ON products
+    FOR EACH ROW
+    WHEN NEW.product_stock_uom_id IS NOT OLD.product_stock_uom_id
+      AND EXISTS (
+        SELECT 1 FROM product_stock_balances
+         WHERE product_id = OLD.id
+      )
+    BEGIN
+      SELECT RAISE(ABORT, 'PRODUCT_STOCK_UOM_CHANGE_REQUIRES_MIGRATION');
+    END;
+  `);
+
   // Additive upgrades for target tables created before cost availability/currency evidence existed.
   const ensureColumn = (table, column, definition) => {
     const columns = db.prepare(`PRAGMA table_info(${table})`).all();
