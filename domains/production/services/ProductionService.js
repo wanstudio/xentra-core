@@ -171,6 +171,21 @@ class ProductionService {
 
     const yieldUom = uomRepository.findById(yieldUomId);
     if (!yieldUom || Number(yieldUom.is_active) !== 1) throw fail('YIELD_UOM_INVALID');
+
+    const outputProduct = inventoryRepository.findProductForValuation(recipe.output_product_id);
+    if (!outputProduct || Number(outputProduct.is_active) !== 1) throw fail('PRODUCT_NOT_FOUND');
+    const outputUomRow = inventoryRepository.db.queryOne(
+      'SELECT product_stock_uom_id FROM products WHERE id = ?',
+      [recipe.output_product_id]
+    );
+    const outputUom = outputUomRow && outputUomRow.product_stock_uom_id
+      ? uomRepository.findById(outputUomRow.product_stock_uom_id)
+      : null;
+    if (!outputUom || Number(outputUom.is_active) !== 1) throw fail('PRODUCT_STOCK_UOM_UNRESOLVED');
+    if (String(yieldUom.category_id) !== String(outputUom.category_id)) {
+      throw fail('YIELD_UOM_CATEGORY_MISMATCH');
+    }
+
     const yieldQty = positive(plannedYieldQuantity, 'INVALID_YIELD_QUANTITY');
 
     const last = repository.db.queryOne(
@@ -205,8 +220,10 @@ class ProductionService {
 
         const componentUom = uomRepository.findById(component.planned_uom_id);
         if (!componentUom || Number(componentUom.is_active) !== 1) throw fail('RECIPE_COMPONENT_UOM_INVALID');
-        if (String(componentUom.category_id) !== String(yieldUom.category_id) && componentUom.id === yieldUom.id) {
-          throw fail('RECIPE_COMPONENT_UOM_INVALID');
+        const materialBaseUom = uomRepository.findById(material.base_uom_id);
+        if (!materialBaseUom || Number(materialBaseUom.is_active) !== 1) throw fail('BASE_UOM_UNRESOLVED');
+        if (String(componentUom.category_id) !== String(materialBaseUom.category_id)) {
+          throw fail('RECIPE_COMPONENT_UOM_CATEGORY_MISMATCH');
         }
 
         repository.insertRecipeComponent({
@@ -251,6 +268,7 @@ class ProductionService {
     outputProductId,
     productionStockLocationId,
     inputStockLocationId,
+    outputStockLocationId = null,
     plannedOutputQuantity,
     createdBy = null,
     repository = productionRepository
@@ -258,7 +276,9 @@ class ProductionService {
     const productId = text(outputProductId, 'PRODUCT_NOT_FOUND');
     const productionLocationId = text(productionStockLocationId, 'PRODUCTION_LOCATION_REQUIRED');
     const inputLocationId = text(inputStockLocationId, 'INPUT_STOCK_LOCATION_REQUIRED');
+    const outputLocationId = text(outputStockLocationId || productionLocationId, 'OUTPUT_STOCK_LOCATION_REQUIRED');
     const orgId = assertSameOrganization(productionLocationId, inputLocationId);
+    assertSameOrganization(productionLocationId, outputLocationId);
 
     const routes = repository.findProductionItemByProductAndLocation(productId, productionLocationId);
     if (routes.length === 0) throw fail('PRODUCTION_ROUTE_NOT_FOUND');
@@ -282,7 +302,7 @@ class ProductionService {
       recipeVersionId: version.id,
       productionStockLocationId: productionLocationId,
       inputStockLocationId: inputLocationId,
-      outputStockLocationId: productionLocationId,
+      outputStockLocationId: outputLocationId,
       plannedOutputQuantity: plannedQty,
       createdBy,
       createdAt: now,
@@ -348,9 +368,10 @@ class ProductionService {
 
     if (batch.status !== 'IN_PROGRESS') throw fail('PRODUCTION_BATCH_STATUS_INVALID');
 
-    const { product, uom: outputUom } = assertProductStockUom(
-      inventory.db.queryOne('SELECT output_product_id AS id FROM production_items WHERE id = ?', [batch.production_item_id]).id
-    );
+    const productionItem = repository.findProductionItem(batch.production_item_id);
+    if (!productionItem) throw fail('PRODUCTION_ITEM_NOT_FOUND');
+    const { product, uom: outputUom } = assertProductStockUom(productionItem.output_product_id);
+    if (String(product.id) !== String(productionItem.output_product_id)) throw fail('PRODUCTION_OUTPUT_PRODUCT_MISMATCH');
     const actualOutput = assertOutputQuantity({ quantity: actualOutputQuantity, uom: outputUom });
 
     if (!Array.isArray(actualConsumptions) || actualConsumptions.length === 0) {
@@ -388,6 +409,11 @@ class ProductionService {
         baseUomId: materialBase.id
       });
     }
+
+    const recipeVersion = repository.findRecipeVersion(batch.recipe_version_id);
+    if (!recipeVersion || recipeVersion.status === 'RETIRED') throw fail('RECIPE_VERSION_UNAVAILABLE');
+    const recipe = repository.findRecipeByProductionItemId(batch.production_item_id);
+    if (!recipe || String(recipeVersion.recipe_id) !== String(recipe.id)) throw fail('RECIPE_VERSION_MISMATCH');
 
     const components = repository.findRecipeComponents(batch.recipe_version_id);
     const componentMaterialIds = new Set(components.map(component => String(component.material_id)));
