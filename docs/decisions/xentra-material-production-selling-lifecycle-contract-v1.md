@@ -334,7 +334,8 @@ This contract does not lock:
 - semi-finished/by-product model;
 - lot / expiry;
 - Make-to-Order trigger/reservation semantics;
-- exact transfer state machine;
+- transfer variance / loss / damage workflow;
+- partial dispatch and transfer scheduling policy;
 - exact UOM master schema/reference-data implementation;
 - UOM precision/rounding rules;
 - costing/valuation/HPP algorithm;
