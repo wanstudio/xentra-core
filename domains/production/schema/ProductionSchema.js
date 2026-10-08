@@ -206,6 +206,22 @@ function ensureProductionSchema(db) {
       SELECT RAISE(ABORT, 'PRODUCTION_LOCATION_SCOPE_INVALID');
     END;
 
+    CREATE TRIGGER IF NOT EXISTS trg_production_item_location_scope_update
+    BEFORE UPDATE OF production_item_id, stock_location_id, is_active ON production_item_locations
+    FOR EACH ROW
+    WHEN NEW.is_active = 1
+      AND (
+        (SELECT id FROM production_items WHERE id = NEW.production_item_id) IS NULL
+        OR
+        (SELECT organization_id FROM production_items WHERE id = NEW.production_item_id) <>
+        (SELECT organization_id FROM stock_locations WHERE id = NEW.stock_location_id)
+        OR
+        (SELECT is_active FROM stock_locations WHERE id = NEW.stock_location_id) <> 1
+      )
+    BEGIN
+      SELECT RAISE(ABORT, 'PRODUCTION_LOCATION_SCOPE_INVALID');
+    END;
+
     CREATE TRIGGER IF NOT EXISTS trg_production_route_single_active
     BEFORE INSERT ON production_item_locations
     FOR EACH ROW
@@ -238,6 +254,40 @@ function ensureProductionSchema(db) {
       )
     BEGIN
       SELECT RAISE(ABORT, 'PRODUCTION_ROUTE_AMBIGUOUS');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_recipe_version_yield_uom_active
+    BEFORE INSERT ON recipe_versions
+    FOR EACH ROW
+    WHEN (SELECT is_active FROM uoms WHERE id = NEW.yield_uom_id) <> 1
+      OR (SELECT id FROM uoms WHERE id = NEW.yield_uom_id) IS NULL
+    BEGIN
+      SELECT RAISE(ABORT, 'YIELD_UOM_INVALID');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_recipe_component_uom_active
+    BEFORE INSERT ON recipe_components
+    FOR EACH ROW
+    WHEN (SELECT is_active FROM uoms WHERE id = NEW.planned_uom_id) <> 1
+      OR (SELECT id FROM uoms WHERE id = NEW.planned_uom_id) IS NULL
+    BEGIN
+      SELECT RAISE(ABORT, 'RECIPE_COMPONENT_UOM_INVALID');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_recipe_component_material_scope
+    BEFORE INSERT ON recipe_components
+    FOR EACH ROW
+    WHEN
+      (SELECT id FROM materials WHERE id = NEW.material_id) IS NULL
+      OR
+      (SELECT pi.organization_id
+         FROM recipes r
+         JOIN production_items pi ON pi.id = r.production_item_id
+        WHERE r.id = (SELECT recipe_id FROM recipe_versions WHERE id = NEW.recipe_version_id))
+      <>
+      (SELECT organization_id FROM materials WHERE id = NEW.material_id)
+    BEGIN
+      SELECT RAISE(ABORT, 'MATERIAL_ORG_SCOPE_INVALID');
     END;
 
     CREATE TRIGGER IF NOT EXISTS trg_production_recipe_version_immutable
