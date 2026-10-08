@@ -231,9 +231,13 @@ function ensureProcurementDocumentSchema(db) {
     WHEN
       (SELECT id FROM supplier_materials WHERE id = NEW.supplier_material_id) IS NULL
       OR
-      (SELECT supplier_id FROM supplier_materials WHERE id = NEW.supplier_material_id) IS NULL
+      (SELECT s.organization_id
+         FROM supplier_materials sm
+         JOIN suppliers s ON s.id = sm.supplier_id
+        WHERE sm.id = NEW.supplier_material_id) <>
+      (SELECT organization_id FROM purchase_orders WHERE id = NEW.purchase_order_id)
     BEGIN
-      SELECT RAISE(ABORT, 'PURCHASE_ORDER_LINE_INVALID');
+      SELECT RAISE(ABORT, 'PURCHASE_ORDER_LINE_SCOPE_INVALID');
     END;
   `);
 
