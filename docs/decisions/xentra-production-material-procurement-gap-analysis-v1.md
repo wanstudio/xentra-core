@@ -836,6 +836,7 @@ The following can be promoted with high confidence:
 15. Choice-driven stock effects resolve through structured composition, never direct raw-material mutation.
 16. Choice Value stock effects are explicit Product mappings using NONE / ADD_PRODUCT / REPLACE_PRODUCT semantics; direct Choice → Production/Material effects remain future.
 17. Inventory Transfer uses explicit Stock Location source/destination, Inventory-owned dispatch/receipt boundaries, partial receipt, atomic posting, and idempotency.
+18. Costing/HPP has an explicit ownership and calculation boundary: Inventory supplies resolved cost basis, Production computes actual direct-material cost, and Menu HPP derives from effective Product composition.
 
 Production Item + Recipe / BoM Contract v1 was promoted on 2026-10-08:
 docs/decisions/xentra-production-item-recipe-bom-contract-v1.md
@@ -870,7 +871,8 @@ These still require product/business choices:
 - transfer scheduling and reservation;
 - exact role approval matrix;
 - exact production scheduling/capacity model;
-- exact HPP/valuation method;
+- exact valuation method and scope;
+- exact Menu HPP preference between latest actual Product cost and current theoretical Production cost;
 - exact autonomous purchasing thresholds;
 - direct Choice → Production variant / Material recipe override; Product stock-effect mapping is now locked by `docs/decisions/xentra-menu-item-choice-stock-production-integration-contract-v1.md`;
 - exact byproduct/sub-product handling.
@@ -898,7 +900,7 @@ Recommended sequence:
         ↓
 8. Inventory Transfer State Machine Contract ✅
         ↓
-9. Costing / HPP Contract
+9. Costing / HPP Contract ✅
         ↓
 10. Incremental schema + API implementation
         ↓
@@ -911,7 +913,7 @@ This order resolves identity before transaction flow and transaction flow before
 
 ## 30. Final Assessment
 
-The end-to-end lifecycle is now conceptually solid, but the remaining holes are concentrated in **identity, versioning, posting boundaries, and cross-domain mappings**, not in the high-level business sequence.
+The end-to-end lifecycle is now conceptually solid, but the remaining holes are concentrated in **valuation policy, operational variance, traceability, permissions, scheduling, and advanced execution**, not in the high-level business sequence.
 
 The most important discovery is that the Production work must not begin with a generic "recipe table".
 
