@@ -2439,92 +2439,166 @@
             </div>
           </div>
 
-          <div class="x-owner-stock-kpis" aria-label="Ringkasan stok">
-            <div class="x-owner-stock-kpi">
-              <span class="x-owner-stock-kpi-icon tracked" aria-hidden="true">
-                <svg viewBox="0 0 48 48"><use href="/merchant-dashboard/assets/icons/quick-access.svg#stock"></use></svg>
-              </span>
-              <div>
-                <span class="x-owner-stock-kpi-label">Item Tercatat</span>
-                <strong id="owner-stock-tracked-count">0</strong>
-              </div>
-            </div>
-            <div class="x-owner-stock-kpi warning">
-              <span class="x-owner-stock-kpi-icon warning" aria-hidden="true">
-                <svg viewBox="0 0 48 48"><path d="M24 7 42 39H6L24 7Z" fill="#FFF4D8" stroke="#F2AE2E" stroke-width="2"/><path d="M24 17v11" stroke="#D48806" stroke-width="3" stroke-linecap="round"/><circle cx="24" cy="33" r="1.8" fill="#D48806"/></svg>
-              </span>
-              <div>
-                <span class="x-owner-stock-kpi-label">Menipis</span>
-                <strong id="owner-stock-low-count">0</strong>
-              </div>
-            </div>
-            <div class="x-owner-stock-kpi danger">
-              <span class="x-owner-stock-kpi-icon danger" aria-hidden="true">
-                <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="17" fill="#FFF0F0" stroke="#F27B7B" stroke-width="2"/><path d="M17 17l14 14M31 17 17 31" stroke="#D64545" stroke-width="3" stroke-linecap="round"/></svg>
-              </span>
-              <div>
-                <span class="x-owner-stock-kpi-label">Habis</span>
-                <strong id="owner-stock-out-count">0</strong>
-              </div>
-            </div>
-            <div class="x-owner-stock-kpi">
-              <span class="x-owner-stock-kpi-icon units" aria-hidden="true">
-                <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="18" fill="#ECF8F2"/><path d="M13 25h22M16 18h16M17 32h14" stroke="#269B68" stroke-width="3" stroke-linecap="round"/></svg>
-              </span>
-              <div>
-                <span class="x-owner-stock-kpi-label">Total Unit</span>
-                <strong id="owner-stock-total-units">0</strong>
-              </div>
-            </div>
+          <!-- SUB-NAVIGATION PILLS: Stok Cabang vs Bahan Baku (Materials) -->
+          <div class="x-owner-stock-nav-pills" style="display:flex; gap:8px; margin-bottom:20px; border-bottom:1px solid #E2E8F0; padding-bottom:12px;">
+            <button type="button" class="x-btn-pill active" id="btn-subtab-stock-branches" onclick="switchStockSubtab('branches')" style="padding:8px 16px; border-radius:20px; font-weight:600; font-size:13px; border:none; background:#0F172A; color:#FFFFFF; cursor:pointer;">
+              Stok Cabang (Produk Jadi)
+            </button>
+            <button type="button" class="x-btn-pill" id="btn-subtab-stock-materials" onclick="switchStockSubtab('materials')" style="padding:8px 16px; border-radius:20px; font-weight:600; font-size:13px; border:1px solid #CBD5E1; background:#FFFFFF; color:#475569; cursor:pointer;">
+              Bahan Baku (Materials)
+            </button>
           </div>
 
-          <div class="x-owner-stock-grid">
-            <section class="x-owner-stock-panel x-owner-stock-attention-panel">
-              <div class="x-owner-stock-panel-head">
+          <!-- SUBTAB CONTENT 1: STOK CABANG -->
+          <div id="subtab-content-stock-branches">
+            <div class="x-owner-stock-kpis" aria-label="Ringkasan stok">
+              <div class="x-owner-stock-kpi">
+                <span class="x-owner-stock-kpi-icon tracked" aria-hidden="true">
+                  <svg viewBox="0 0 48 48"><use href="/merchant-dashboard/assets/icons/quick-access.svg#stock"></use></svg>
+                </span>
                 <div>
-                  <h3>Perlu Perhatian</h3>
-                  <p>Item yang sudah mencapai atau melewati batas minimum.</p>
+                  <span class="x-owner-stock-kpi-label">Item Tercatat</span>
+                  <strong id="owner-stock-tracked-count">0</strong>
                 </div>
-                <button type="button" class="x-owner-stock-link" id="btn-owner-stock-full-report">Lihat laporan
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
-                </button>
               </div>
-              <div id="owner-stock-alerts-list" class="x-owner-stock-alerts" aria-live="polite">
-                <div class="x-owner-stock-loading">Memuat stok...</div>
+              <div class="x-owner-stock-kpi warning">
+                <span class="x-owner-stock-kpi-icon warning" aria-hidden="true">
+                  <svg viewBox="0 0 48 48"><path d="M24 7 42 39H6L24 7Z" fill="#FFF4D8" stroke="#F2AE2E" stroke-width="2"/><path d="M24 17v11" stroke="#D48806" stroke-width="3" stroke-linecap="round"/><circle cx="24" cy="33" r="1.8" fill="#D48806"/></svg>
+                </span>
+                <div>
+                  <span class="x-owner-stock-kpi-label">Menipis</span>
+                  <strong id="owner-stock-low-count">0</strong>
+                </div>
               </div>
-            </section>
+              <div class="x-owner-stock-kpi danger">
+                <span class="x-owner-stock-kpi-icon danger" aria-hidden="true">
+                  <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="17" fill="#FFF0F0" stroke="#F27B7B" stroke-width="2"/><path d="M17 17l14 14M31 17 17 31" stroke="#D64545" stroke-width="3" stroke-linecap="round"/></svg>
+                </span>
+                <div>
+                  <span class="x-owner-stock-kpi-label">Habis</span>
+                  <strong id="owner-stock-out-count">0</strong>
+                </div>
+              </div>
+              <div class="x-owner-stock-kpi">
+                <span class="x-owner-stock-kpi-icon units" aria-hidden="true">
+                  <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="18" fill="#ECF8F2"/><path d="M13 25h22M16 18h16M17 32h14" stroke="#269B68" stroke-width="3" stroke-linecap="round"/></svg>
+                </span>
+                <div>
+                  <span class="x-owner-stock-kpi-label">Total Unit</span>
+                  <strong id="owner-stock-total-units">0</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="x-owner-stock-grid">
+              <section class="x-owner-stock-panel x-owner-stock-attention-panel">
+                <div class="x-owner-stock-panel-head">
+                  <div>
+                    <h3>Perlu Perhatian</h3>
+                    <p>Item yang sudah mencapai atau melewati batas minimum.</p>
+                  </div>
+                  <button type="button" class="x-owner-stock-link" id="btn-owner-stock-full-report">Lihat laporan
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+                  </button>
+                </div>
+                <div id="owner-stock-alerts-list" class="x-owner-stock-alerts" aria-live="polite">
+                  <div class="x-owner-stock-loading">Memuat stok...</div>
+                </div>
+              </section>
+
+              <section class="x-owner-stock-panel">
+                <div class="x-owner-stock-panel-head">
+                  <div>
+                    <h3>Status Cabang</h3>
+                    <p>Ringkasan stok per cabang.</p>
+                  </div>
+                </div>
+                <div id="owner-stock-branch-list" class="x-owner-stock-branches" aria-live="polite">
+                  <div class="x-owner-stock-loading">Memuat cabang...</div>
+                </div>
+              </section>
+            </div>
 
             <section class="x-owner-stock-panel">
               <div class="x-owner-stock-panel-head">
                 <div>
-                  <h3>Status Cabang</h3>
-                  <p>Ringkasan stok per cabang.</p>
+                  <h3>Mutasi Persediaan</h3>
+                  <p>Ringkasan seluruh pergerakan stok yang tercatat di Core.</p>
                 </div>
               </div>
-              <div id="owner-stock-branch-list" class="x-owner-stock-branches" aria-live="polite">
-                <div class="x-owner-stock-loading">Memuat cabang...</div>
+              <div id="owner-stock-movement-list" class="x-owner-stock-movements" aria-live="polite">
+                <div class="x-owner-stock-loading">Memuat mutasi...</div>
               </div>
             </section>
+
+            <div class="x-owner-stock-note">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 10v6"></path><circle cx="12" cy="7" r="1"></circle></svg>
+              <span>Owner hanya memantau kondisi stok. Penyesuaian stok dilakukan dari surface operasional cabang sesuai hak akses.</span>
+            </div>
           </div>
 
-          <section class="x-owner-stock-panel">
-            <div class="x-owner-stock-panel-head">
+          <!-- SUBTAB CONTENT 2: BAHAN BAKU (MATERIALS) -->
+          <div id="subtab-content-stock-materials" style="display:none;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
               <div>
-                <h3>Mutasi Persediaan</h3>
-                <p>Ringkasan seluruh pergerakan stok yang tercatat di Core.</p>
+                <h3 style="margin:0 0 4px 0; font-size:16px; font-weight:700; color:#0F172A;">Katalog Bahan Baku (Material Master)</h3>
+                <p style="margin:0; font-size:13px; color:#64748B;">Identitas bahan mentah untuk resep dapur dan pengadaan belanja.</p>
+              </div>
+              <button type="button" class="x-btn-primary" onclick="openAddMaterialModal()" style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:8px; font-weight:600; font-size:13px; background:#0F172A; color:#FFFFFF; border:none; cursor:pointer;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                <span>Tambah Bahan Baku</span>
+              </button>
+            </div>
+
+            <div class="x-owner-stock-panel" style="background:#FFFFFF; border-radius:12px; border:1px solid #E2E8F0; padding:16px;">
+              <div id="owner-materials-table-container">
+                <div class="x-owner-stock-loading">Memuat daftar bahan baku...</div>
               </div>
             </div>
-            <div id="owner-stock-movement-list" class="x-owner-stock-movements" aria-live="polite">
-              <div class="x-owner-stock-loading">Memuat mutasi...</div>
-            </div>
-          </section>
-
-          <div class="x-owner-stock-note">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 10v6"></path><circle cx="12" cy="7" r="1"></circle></svg>
-            <span>Owner hanya memantau kondisi stok. Penyesuaian stok dilakukan dari surface operasional cabang sesuai hak akses.</span>
           </div>
         </div>
       </section>
+
+      <!-- MODAL: TAMBAH BAHAN BAKU (MATERIAL MODAL) -->
+      <div id="modal-add-material" class="x-modal-backdrop" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.6); z-index:9999; justify-content:center; align-items:center;">
+        <div class="x-modal-card" style="background:#FFFFFF; border-radius:16px; width:90%; max-width:440px; padding:24px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.1);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <h3 style="margin:0; font-size:16px; font-weight:700; color:#0F172A;">Tambah Bahan Baku Baru</h3>
+            <button type="button" onclick="closeAddMaterialModal()" style="background:none; border:none; cursor:pointer; color:#64748B;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </div>
+          <form id="form-add-material" onsubmit="submitAddMaterialForm(event)">
+            <div style="margin-bottom:14px;">
+              <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">Kode Bahan (SKU/Code)</label>
+              <input type="text" id="mat-input-code" required placeholder="Contoh: MAT-AYAM-01" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px;">
+            </div>
+            <div style="margin-bottom:14px;">
+              <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">Nama Bahan Baku</label>
+              <input type="text" id="mat-input-name" required placeholder="Contoh: Daging Ayam Broiler" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px;">
+            </div>
+            <div style="margin-bottom:14px;">
+              <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">Satuan Dasar (Base UOM)</label>
+              <select id="mat-input-uom" required style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px; background:#FFFFFF;">
+                <option value="">Pilih Satuan Dasar...</option>
+                <option value="uom_kg">Kilogram (kg)</option>
+                <option value="uom_g">Gram (g)</option>
+                <option value="uom_l">Liter (L)</option>
+                <option value="uom_ml">Milliliter (ml)</option>
+                <option value="uom_pcs">Pieces (pcs)</option>
+              </select>
+            </div>
+            <div style="margin-bottom:20px;">
+              <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">Catatan / Deskripsi (Opsional)</label>
+              <textarea id="mat-input-desc" rows="2" placeholder="Keterangan spesifikasi..." style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px;"></textarea>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:8px;">
+              <button type="button" onclick="closeAddMaterialModal()" style="padding:10px 16px; border:1px solid #CBD5E1; background:#FFFFFF; border-radius:8px; font-weight:600; font-size:13px; color:#475569; cursor:pointer;">Batal</button>
+              <button type="submit" id="btn-save-material" style="padding:10px 16px; border:none; background:#0F172A; border-radius:8px; font-weight:600; font-size:13px; color:#FFFFFF; cursor:pointer;">Simpan Bahan</button>
+            </div>
+          </form>
+        </div>
+      </div>
 
       <!-- =====================================================================
            PHASE 6: CLIENT OWNER DASHBOARD — FINANCE & MARKETING SECTIONS

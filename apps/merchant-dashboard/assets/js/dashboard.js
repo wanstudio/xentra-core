@@ -6884,6 +6884,259 @@ async function loadMenusView() {
   }
 
   /* =========================================================================
+     MATERIAL MASTER (BAHAN BAKU) & UOM CONTROLS
+     Owner & Brand Manager catalog management for production & procurement.
+     ========================================================================= */
+  var _ownerMaterials = [];
+  var _ownerUoms = [];
+
+  function switchStockSubtab(subtab) {
+    var branchBtn = $('btn-subtab-stock-branches');
+    var matBtn = $('btn-subtab-stock-materials');
+    var branchContent = $('subtab-content-stock-branches');
+    var matContent = $('subtab-content-stock-materials');
+
+    if (subtab === 'materials') {
+      if (branchBtn) {
+        branchBtn.style.background = '#FFFFFF';
+        branchBtn.style.color = '#475569';
+        branchBtn.style.border = '1px solid #CBD5E1';
+      }
+      if (matBtn) {
+        matBtn.style.background = '#0F172A';
+        matBtn.style.color = '#FFFFFF';
+        matBtn.style.border = 'none';
+      }
+      if (branchContent) branchContent.style.display = 'none';
+      if (matContent) matContent.style.display = 'block';
+      loadOwnerMaterials();
+      loadOwnerUoms();
+    } else {
+      if (branchBtn) {
+        branchBtn.style.background = '#0F172A';
+        branchBtn.style.color = '#FFFFFF';
+        branchBtn.style.border = 'none';
+      }
+      if (matBtn) {
+        matBtn.style.background = '#FFFFFF';
+        matBtn.style.color = '#475569';
+        matBtn.style.border = '1px solid #CBD5E1';
+      }
+      if (branchContent) branchContent.style.display = 'block';
+      if (matContent) matContent.style.display = 'none';
+      loadOwnerStockOverview();
+    }
+  }
+
+  function loadOwnerUoms() {
+    return adminFetch('/api/admin/uoms', { headers: getAuthHeaders() })
+      .then(function (res) {
+        if (!res.ok) throw new Error('Gagal memuat UOM');
+        return res.json();
+      })
+      .then(function (data) {
+        _ownerUoms = data.uoms || [];
+        var select = $('mat-input-uom');
+        if (select && _ownerUoms.length > 0) {
+          var html = '<option value="">Pilih Satuan Dasar...</option>';
+          _ownerUoms.forEach(function (u) {
+            html += '<option value="' + escapeHtml(u.id) + '">' + escapeHtml(u.name) + ' (' + escapeHtml(u.code) + ')</option>';
+          });
+          select.innerHTML = html;
+        }
+      })
+      .catch(function (err) {
+        console.warn('[Materials] Load UOM error:', err.message);
+      });
+  }
+
+  function loadOwnerMaterials() {
+    var container = $('owner-materials-table-container');
+    if (container) {
+      container.innerHTML = '<div class="x-owner-stock-loading">Memuat daftar bahan baku...</div>';
+    }
+
+    adminFetch('/api/admin/materials', { headers: getAuthHeaders() })
+      .then(function (res) {
+        if (!res.ok) throw new Error('Gagal mengambil data bahan baku (HTTP ' + res.status + ')');
+        return res.json();
+      })
+      .then(function (data) {
+        _ownerMaterials = data.materials || [];
+        renderOwnerMaterialsTable(_ownerMaterials);
+      })
+      .catch(function (err) {
+        if (container) {
+          container.innerHTML = '<div class="x-owner-stock-error" style="color:#DC2626; padding:16px;">' + escapeHtml(err.message) + '</div>';
+        }
+      });
+  }
+
+  function renderOwnerMaterialsTable(materials) {
+    var container = $('owner-materials-table-container');
+    if (!container) return;
+
+    if (!materials || materials.length === 0) {
+      container.innerHTML = (
+        '<div style="text-align:center; padding:32px 16px; color:#64748B;">' +
+          '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.5" style="margin-bottom:8px;"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/></svg>' +
+          '<div style="font-size:14px; font-weight:600; color:#334155; margin-bottom:4px;">Belum ada bahan baku</div>' +
+          '<p style="font-size:13px; margin:0 0 16px 0;">Tambahkan bahan baku pertama untuk menyusun resep dan procurement.</p>' +
+          '<button type="button" onclick="openAddMaterialModal()" style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:8px; font-weight:600; font-size:13px; background:#0F172A; color:#FFFFFF; border:none; cursor:pointer;">+ Tambah Bahan</button>' +
+        '</div>'
+      );
+      return;
+    }
+
+    var rows = materials.map(function (m) {
+      var isArchived = m.status === 'archived';
+      var statusBadge = isArchived
+        ? '<span style="background:#F1F5F9; color:#64748B; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:600;">Diarsipkan</span>'
+        : '<span style="background:#ECFDF5; color:#059669; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:600;">Aktif</span>';
+
+      var actionBtn = isArchived
+        ? '<span style="font-size:12px; color:#94A3B8;">-</span>'
+        : '<button type="button" onclick="archiveOwnerMaterial(\'' + escapeHtml(m.id) + '\', \'' + escapeHtml(m.name).replace(/'/g, "\\'") + '\')" style="background:none; border:none; color:#DC2626; cursor:pointer; font-size:12px; font-weight:600; padding:4px 8px;">Arsipkan</button>';
+
+      var uomLabel = m.base_uom_name ? (m.base_uom_name + ' (' + m.base_uom_code + ')') : (m.base_uom_code || m.base_uom_id);
+
+      return (
+        '<tr style="border-bottom:1px solid #F1F5F9;">' +
+          '<td style="padding:12px 14px; font-weight:600; color:#0F172A; font-size:13px;">' + escapeHtml(m.material_code) + '</td>' +
+          '<td style="padding:12px 14px; color:#334155; font-size:13px;">' +
+            '<div style="font-weight:600;">' + escapeHtml(m.name) + '</div>' +
+            (m.description ? '<div style="font-size:11px; color:#64748B;">' + escapeHtml(m.description) + '</div>' : '') +
+          '</td>' +
+          '<td style="padding:12px 14px; color:#475569; font-size:13px;">' + escapeHtml(uomLabel) + '</td>' +
+          '<td style="padding:12px 14px; font-size:13px;">' + statusBadge + '</td>' +
+          '<td style="padding:12px 14px; text-align:right; font-size:13px;">' + actionBtn + '</td>' +
+        '</tr>'
+      );
+    }).join('');
+
+    container.innerHTML = (
+      '<div style="overflow-x:auto;">' +
+        '<table style="width:100%; border-collapse:collapse; text-align:left;">' +
+          '<thead>' +
+            '<tr style="background:#F8FAFC; border-bottom:1px solid #E2E8F0; color:#64748B; font-size:12px; text-transform:uppercase; letter-spacing:0.025em;">' +
+              '<th style="padding:10px 14px; font-weight:600;">Kode</th>' +
+              '<th style="padding:10px 14px; font-weight:600;">Nama Bahan</th>' +
+              '<th style="padding:10px 14px; font-weight:600;">Satuan Dasar</th>' +
+              '<th style="padding:10px 14px; font-weight:600;">Status</th>' +
+              '<th style="padding:10px 14px; font-weight:600; text-align:right;">Aksi</th>' +
+            '</tr>' +
+          '</thead>' +
+          '<tbody>' + rows + '</tbody>' +
+        '</table>' +
+      '</div>'
+    );
+  }
+
+  function openAddMaterialModal() {
+    var modal = $('modal-add-material');
+    if (modal) {
+      modal.style.display = 'flex';
+      loadOwnerUoms();
+    }
+  }
+
+  function closeAddMaterialModal() {
+    var modal = $('modal-add-material');
+    if (modal) modal.style.display = 'none';
+    var form = $('form-add-material');
+    if (form) form.reset();
+  }
+
+  function submitAddMaterialForm(event) {
+    if (event && event.preventDefault) event.preventDefault();
+
+    var code = ($('mat-input-code') ? $('mat-input-code').value : '').trim();
+    var name = ($('mat-input-name') ? $('mat-input-name').value : '').trim();
+    var uomId = ($('mat-input-uom') ? $('mat-input-uom').value : '').trim();
+    var desc = ($('mat-input-desc') ? $('mat-input-desc').value : '').trim();
+    var btn = $('btn-save-material');
+
+    if (!code || !name || !uomId) {
+      showToast('Harap lengkapi kode, nama, dan satuan dasar bahan.', 'warning');
+      return;
+    }
+
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Menyimpan...';
+    }
+
+    var payload = {
+      material_code: code,
+      name: name,
+      base_uom_id: uomId,
+      description: desc || null
+    };
+
+    adminFetch('/api/admin/materials', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    })
+      .then(function (res) {
+        if (!res.ok) {
+          return res.json().then(function (errData) {
+            throw new Error(errData.message || 'Gagal menyimpan bahan baku');
+          });
+        }
+        return res.json();
+      })
+      .then(function () {
+        showToast('✅ Bahan baku berhasil ditambahkan.', 'success');
+        closeAddMaterialModal();
+        loadOwnerMaterials();
+      })
+      .catch(function (err) {
+        showToast('❌ Gagal: ' + err.message, 'error');
+      })
+      .finally(function () {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Simpan Bahan';
+        }
+      });
+  }
+
+  function archiveOwnerMaterial(id, name) {
+    if (!confirm('Apakah Anda yakin ingin mengarsipkan bahan baku "' + name + '"?')) {
+      return;
+    }
+
+    adminFetch('/api/admin/materials/' + encodeURIComponent(id) + '/archive', {
+      method: 'PUT',
+      headers: getAuthHeaders()
+    })
+      .then(function (res) {
+        if (!res.ok) {
+          return res.json().then(function (errData) {
+            throw new Error(errData.message || 'Gagal mengarsipkan');
+          });
+        }
+        return res.json();
+      })
+      .then(function () {
+        showToast('✅ Bahan baku berhasil diarsipkan.', 'success');
+        loadOwnerMaterials();
+      })
+      .catch(function (err) {
+        showToast('❌ Gagal: ' + err.message, 'error');
+      });
+  }
+
+  // Export to window for inline HTML onclick handlers
+  window.switchStockSubtab = switchStockSubtab;
+  window.openAddMaterialModal = openAddMaterialModal;
+  window.closeAddMaterialModal = closeAddMaterialModal;
+  window.submitAddMaterialForm = submitAddMaterialForm;
+  window.archiveOwnerMaterial = archiveOwnerMaterial;
+  window.loadOwnerMaterials = loadOwnerMaterials;
+
+  /* =========================================================================
      MODUL 6: REPORTS ENGINE (PHASE 4)
      ========================================================================= */
   var _activeReportType = 'overview';
