@@ -144,6 +144,7 @@ class ProcurementService {
     const lifecycle = String(status || 'DRAFT').toUpperCase();
     if (!['DRAFT', 'ACTIVE', 'ARCHIVED'].includes(lifecycle)) throw fail('SUPPLIER_STATUS_INVALID');
 
+    if (repository.findSupplierByCode(orgId, code)) throw fail('SUPPLIER_CODE_ALREADY_EXISTS');
     const id = 'sup_' + crypto.randomBytes(8).toString('hex');
     const now = new Date().toISOString();
     repository.insertSupplier({ id, organizationId: orgId, supplierCode: code, name: supplierName, status: lifecycle, createdAt: now, updatedAt: now });
@@ -157,6 +158,7 @@ class ProcurementService {
     if (!material || material.status === 'ARCHIVED') throw fail('MATERIAL_NOT_FOUND');
     if (String(supplier.organization_id) !== String(material.organization_id)) throw fail('SUPPLIER_MATERIAL_ORG_SCOPE_INVALID');
 
+    if (repository.findSupplierMaterialByIdentity(supplierId, materialId)) throw fail('SUPPLIER_MATERIAL_ALREADY_EXISTS');
     const id = 'sm_' + crypto.randomBytes(8).toString('hex');
     const now = new Date().toISOString();
     repository.insertSupplierMaterial({ id, supplierId, materialId, supplierItemCode, createdAt: now, updatedAt: now });
