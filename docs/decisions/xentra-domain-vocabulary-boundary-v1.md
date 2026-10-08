@@ -44,7 +44,7 @@ Locked invariants:
 - Branch-direct, central, and hybrid supply use the same domain model.
 - Make-to-order may be introduced later without creating alternate domains.
 
-Detailed target schema and selected policy mechanics remain separate implementation/policy gates. Production Item cardinality, Recipe Versioning, Transfer State Machine, Costing/HPP boundary, and UOM Master + Precision/Rounding are governed by their dedicated locked contracts.
+Detailed target schema and selected policy mechanics remain separate implementation/policy gates. Production Item cardinality, Recipe Versioning, Transfer State Machine, Costing boundary and its Costing Vocabulary Revision v1.1, and UOM Master + Precision/Rounding are governed by their dedicated locked contracts.
 
 ---
 
