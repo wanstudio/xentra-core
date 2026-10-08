@@ -838,6 +838,9 @@ The following can be promoted with high confidence:
 Production Item + Recipe / BoM Contract v1 was promoted on 2026-10-08:
 docs/decisions/xentra-production-item-recipe-bom-contract-v1.md
 
+Production Batch + Posting / Mutation Contract v1 was promoted on 2026-10-08:
+docs/decisions/xentra-production-batch-posting-mutation-contract-v1.md
+
 ## 28. Decisions That Should Remain Explicitly OPEN
 
 These still require product/business choices:
