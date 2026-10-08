@@ -13,7 +13,7 @@ Xentra has two different inventory concepts with different business purposes:
    - Stock of products/menu items that are already **ready to sell**.
    - Example: Nasi Goreng = 20 portions ready for sale.
    - Used by Customer PWA, Merchant operations, and POS sales.
-   - In the current canonical model this quantity is stored in `branch_product_inventory.stock_qty` per Branch + Product. `branch_products.stock` is legacy compatibility data during migration.
+   - In the current valuation-bearing canonical model this quantity is stored in `product_stock_balances.quantity` per Stock Location + Product. `branch_product_inventory.stock_qty` and `branch_products.stock` are migration compatibility quantities and must not outrank canonical Product Stock when the canonical balance exists.
    - It is **one Branch sellable stock pool**, not separate POS/PWA/Dine-in/Delivery/WhatsApp stock pools.
 
 2. **Procurement / Raw Material Inventory**
@@ -159,7 +159,7 @@ Any implementation that treats these as the same quantity or mixes their busines
 
 The existing Inventory Check → Commit → Consume contract remains useful for inventory domains that explicitly need reservation/commitment semantics.
 
-However, it must **not** be read as redefining the legacy `branch_products.stock` field into a raw-material or hidden reservation ledger. Canonical ready-to-sell Product stock is `branch_product_inventory.stock_qty`.
+However, it must **not** be read as redefining the legacy `branch_products.stock` or `branch_product_inventory.stock_qty` fields into a raw-material or hidden reservation ledger. Canonical valuation-bearing ready-to-sell Product stock is `product_stock_balances.quantity` at the Branch Stock Location; legacy quantities remain migration fallbacks only.
 
 For the current ready-to-sell product model, order acceptance is the stock-decrease boundary defined above.
 
