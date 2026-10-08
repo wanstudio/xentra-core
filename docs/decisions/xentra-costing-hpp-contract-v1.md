@@ -281,11 +281,11 @@ Menu HPP
 Σ(effective component quantity × effective Product unit cost)
 ~~~
 
-For a Product with Production Item backing, the Product unit cost may come from:
-- the latest applicable completed Production Output Unit Cost; or
-- the current approved theoretical Production cost.
+For a Product with Production Item backing, the costing service must use an explicitly declared cost basis:
+- `ACTUAL_OUTPUT` = completed Production Output Unit Cost; or
+- `THEORETICAL_RECIPE` = current approved theoretical Production cost.
 
-The exact reporting rule for preferring latest actual output cost versus theoretical current cost remains a later reporting-policy choice and must be represented explicitly rather than silently mixed.
+v1 does **not** permit silent fallback from one basis to the other. The reporting policy that selects the basis remains a later explicit policy contract.
 
 For a purchased Product:
 
