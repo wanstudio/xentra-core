@@ -287,7 +287,7 @@ The exact mapping is deliberately left to the future Production/Material contrac
 - Product Stock unavailable → selling is constrained by the active Menu/Inventory contract.
 - Transfer failure → remains an Inventory transfer problem; it is not silently converted into a Purchase Order.
 
-## 8. Costing / HPP Boundary
+## 8. Costing Boundary
 
 Conceptual cost path:
 
@@ -300,13 +300,13 @@ Material cost
 → Selling Price
 ~~~
 
-Costing/HPP is a derived capability, not a second inventory ledger.
+Costing is a derived capability, not a second inventory ledger. Menu Composition Cost is a derived Menu cost view; COGS/HPP Penjualan is the cost recognized for sold inventory.
 
-The Costing/HPP Contract v1 locks the direct-material costing boundary, historical cost evidence, and transfer cost continuity.
+The Costing/HPP Contract v1, with terminology refined by the Costing Vocabulary Revision v1.1, locks the direct-material costing boundary, historical cost evidence, and transfer cost continuity.
 
 Still open as separate policy:
 - exact inventory valuation method and scope;
-- exact Menu HPP reporting basis (latest actual Product cost vs current theoretical Production cost);
+- exact Menu Composition Cost reporting basis (latest actual Product cost vs current theoretical Production cost);
 - financial/accounting COGS integration;
 - overhead/labor/landed-cost allocation;
 - waste/yield variance costing.
@@ -321,7 +321,7 @@ Still open as separate policy:
 6. Menu is commercial; Recipe/Production is operational transformation.
 7. Item Choice is Menu-Item-scoped and does not directly mutate raw-material stock.
 8. Selling consumes ready-to-sell Product Stock according to the active Inventory contract.
-9. Costing/HPP is derived from authoritative Inventory/Production/Product cost sources and is not a second stock ledger.
+9. Costing is derived from authoritative Inventory/Production/Product cost sources and is not a second stock ledger.
 10. Branch-direct, central, and hybrid sourcing share the same domains.
 10. Make-to-order, when later enabled, does not create a second architecture.
 11. Core authorization and scope remain authoritative across all stages.
@@ -341,7 +341,7 @@ This contract does not lock:
 - UOM precision/rounding rules;
 - exact valuation method and scope;
 - exact Menu Composition Cost reporting basis (latest actual Product cost vs current theoretical Production cost);
-- HPP terminology and accounting COGS integration;
+- exact accounting/COGS integration policy;
 - autonomous purchase limits;
 - exact procurement/receiving/production role matrix;
 - exact direct Choice → Production variant / Material recipe override; Product stock-effect mapping is now locked by `docs/decisions/xentra-menu-item-choice-stock-production-integration-contract-v1.md`.
