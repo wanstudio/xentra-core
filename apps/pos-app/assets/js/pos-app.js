@@ -1324,7 +1324,7 @@
       payload.component_snapshot=Array.isArray(p.components) ? p.components : (Array.isArray(p.component_snapshot) ? p.component_snapshot : []);
       payload.menu_snapshot=p.menu_snapshot || {
         menu_id:p.menu_id,
-        menu_type:p.menu_type || 'SINGLE',
+        menu_type:p.menu_type || null,
         title:p.name || p.title || '',
         subtitle:p.subtitle || null,
         price:Number(p.price || 0),
