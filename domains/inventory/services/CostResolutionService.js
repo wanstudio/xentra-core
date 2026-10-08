@@ -273,35 +273,6 @@ class CostResolutionService {
       stockIdentityId
     });
 
-    if (basis === 'TRANSFER_CARRIED') {
-      const sourceMovement = identityType === 'PRODUCT'
-        ? repository.findProductValuationMovementById(sourceMovementId)
-        : repository.findMaterialValuationMovementById(sourceMovementId);
-
-      const sourceQuantity = sourceMovement
-        ? Number(identityType === 'PRODUCT' ? sourceMovement.quantity : sourceMovement.quantity_base)
-        : NaN;
-      const sourceTotalCost = sourceMovement ? Number(sourceMovement.total_cost) : NaN;
-      const sourceCurrency = sourceMovement
-        ? normalizeText(sourceMovement.currency_code).toUpperCase()
-        : '';
-
-      if (
-        !sourceMovement ||
-        sourceMovement.movement_type !== 'TRANSFER_OUT' ||
-        String(sourceMovement.stock_location_id) === String(stockLocationId) ||
-        String(identityType === 'PRODUCT' ? sourceMovement.product_id : sourceMovement.material_id) !== String(stockIdentityId) ||
-        !Number.isFinite(sourceQuantity) ||
-        sourceQuantity >= 0 ||
-        Math.abs(Math.abs(sourceQuantity) - qty) > QUANTITY_EPSILON ||
-        !Number.isFinite(sourceTotalCost) ||
-        Math.abs(sourceTotalCost + totalCost) > VALUE_EPSILON ||
-        sourceCurrency !== currency
-      ) {
-        throw fail('TRANSFER_COST_SOURCE_INVALID', 'TRANSFER_COST_SOURCE_INVALID');
-      }
-    }
-
     const existing = lookupExistingMovement({
       repository,
       stockIdentityType: identityType,
@@ -443,6 +414,35 @@ class CostResolutionService {
       stockIdentityType: identityType,
       stockIdentityId
     });
+
+    if (basis === 'TRANSFER_CARRIED') {
+      const sourceMovement = identityType === 'PRODUCT'
+        ? repository.findProductValuationMovementById(sourceMovementId)
+        : repository.findMaterialValuationMovementById(sourceMovementId);
+
+      const sourceQuantity = sourceMovement
+        ? Number(identityType === 'PRODUCT' ? sourceMovement.quantity : sourceMovement.quantity_base)
+        : NaN;
+      const sourceTotalCost = sourceMovement ? Number(sourceMovement.total_cost) : NaN;
+      const sourceCurrency = sourceMovement
+        ? normalizeText(sourceMovement.currency_code).toUpperCase()
+        : '';
+
+      if (
+        !sourceMovement ||
+        sourceMovement.movement_type !== 'TRANSFER_OUT' ||
+        String(sourceMovement.stock_location_id) === String(stockLocationId) ||
+        String(identityType === 'PRODUCT' ? sourceMovement.product_id : sourceMovement.material_id) !== String(stockIdentityId) ||
+        !Number.isFinite(sourceQuantity) ||
+        sourceQuantity >= 0 ||
+        Math.abs(Math.abs(sourceQuantity) - qty) > QUANTITY_EPSILON ||
+        !Number.isFinite(sourceTotalCost) ||
+        Math.abs(sourceTotalCost + totalCost) > VALUE_EPSILON ||
+        sourceCurrency !== currency
+      ) {
+        throw fail('TRANSFER_COST_SOURCE_INVALID', 'TRANSFER_COST_SOURCE_INVALID');
+      }
+    }
 
     const existing = lookupExistingMovement({
       repository,
