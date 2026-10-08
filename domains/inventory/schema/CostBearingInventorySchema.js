@@ -609,7 +609,7 @@ function ensureCostBearingInventorySchema(db) {
 
   // Additive upgrades for target tables created before cost availability/currency evidence existed.
   const ensureColumn = (table, column, definition) => {
-    const columns = db.queryMany(`PRAGMA table_info(${table})`, []);
+    const columns = db.prepare(`PRAGMA table_info(${table})`).all();
     if (!columns.some(row => row && row.name === column)) {
       db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
     }
