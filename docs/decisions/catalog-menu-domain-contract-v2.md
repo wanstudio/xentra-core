@@ -10,15 +10,17 @@
 The forward Catalog/Menu model is:
 
 ```
-Catalog
-├── Master Menu
-└── Master Category
+Catalog — Owner Master Catalog
+├── Menu
+└── Category
 
 Menu
 ├── Category (grouping/classification)
 ├── Title (customer-facing commercial name)
 └── Menu Items
      └── optional Item Choices
+
+“Master Menu” / “Menu Master” is a UI/workspace label for an Owner-managed Menu in this master catalog. It is not a second Menu entity.
 ```
 
 This contract supersedes the earlier model that treated Category + Sub Category + Rasa as the universal Menu identity.
@@ -289,9 +291,9 @@ HPP is a derived view of the Menu's effective composition/cost.
 
 The Menu Editor may display Item-level costs for transparency.
 
-HPP is not a second inventory or costing authority.
+This derived cost is not a second inventory or costing authority. Accounting COGS and the exact business meaning of “HPP” remain separate policy terminology and must not be inferred from this field.
 
-The exact cost calculation across production-backed and non-production Items is subject to the Production/Material data-model design.
+The exact cost basis for production-backed and non-production Items is governed by the Costing/HPP contract and its still-open valuation/reporting policy.
 
 ## 15. Customer PWA
 
