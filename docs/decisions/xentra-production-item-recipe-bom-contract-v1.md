@@ -86,7 +86,9 @@ Production Item location applicability and the v1 deterministic routing rule are
 ## 3. Production Item Meaning
 
 Production Item is the Production domain answer to:
-> What production definition / route do we use to make this Product?
+> What production definition do we use to make this Product?
+
+Routing is a separate resolution process that selects an eligible Production Item for a specific Production Stock Location.
 
 It may carry production-specific metadata such as production_item_id, internal name/code, output_product_id, lifecycle state, and production-location applicability.
 
@@ -363,7 +365,7 @@ The routing layer selects the applicable Production Item for the execution conte
 2. A Product may have 0..N Production Items.
 3. Every Production Item produces exactly one canonical Product in v1.
 4. production_items.output_product_id is the canonical Product reference.
-5. Production Item represents a distinct production definition/route, not a Product duplicate.
+5. Production Item represents a distinct production definition, not a Product duplicate.
 6. Recipe version changes do not require a new Product or Production Item.
 7. Each Production Item has one canonical Recipe identity in v1.
 8. Recipe has one-to-many Recipe Versions.
