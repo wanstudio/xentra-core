@@ -336,7 +336,7 @@ This contract does not lock:
 - Make-to-Order trigger/reservation semantics;
 - transfer variance / loss / damage workflow;
 - partial dispatch and transfer scheduling policy;
-- exact valuation method and scope;
+- exact valuation method and scope is governed by docs/decisions/xentra-inventory-valuation-policy-v1.md;
 - exact Menu Composition Cost reporting basis (latest actual Product cost vs current theoretical Production cost);
 - exact accounting/COGS integration policy;
 - autonomous purchase limits;
