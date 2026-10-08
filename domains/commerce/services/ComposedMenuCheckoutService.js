@@ -2,8 +2,10 @@
 
 const ComposedMenuRepository = require('../../catalog/repositories/ComposedMenuRepository');
 const ComposedMenuResolver = require('../../catalog/services/ComposedMenuResolver');
+const InventoryRepository = require('../../core/data/repositories/InventoryRepository');
 
 const repository = new ComposedMenuRepository();
+const inventoryRepository = new InventoryRepository();
 
 function normalizeItems(items) {
   return (Array.isArray(items) ? items : []).map(item => ({
@@ -88,20 +90,26 @@ function getInventoryRequirements({ branchId, requirements }) {
   if (!requirements.length) return new Map();
 
   const productIds = requirements.map(item => item.product_id);
-  const rows = repository.getInventory({ branchId, productIds });
+  const rows = inventoryRepository.findProductStockStatesByBranch({
+    branchId,
+    productIds
+  });
   const inventoryMap = new Map(rows.map(row => [String(row.product_id), row]));
 
   return new Map(requirements.map(item => {
     const row = inventoryMap.get(String(item.product_id));
     const stockManaged = Boolean(item.sku);
-    const currentStock = stockManaged ? Number(row ? row.stock_qty : 0) : null;
+    const currentStock = stockManaged ? Number(row ? row.stock : 0) : null;
     return [
       String(item.product_id),
       {
         ...item,
         stock_managed: stockManaged,
         current_stock: currentStock,
-        low_stock_threshold: stockManaged ? Number(row ? row.low_stock_threshold : 5) : null
+        low_stock_threshold: stockManaged
+          ? Number(row && row.low_stock_threshold != null ? row.low_stock_threshold : 5)
+          : null,
+        stock_source: stockManaged ? (row ? row.stock_source : 'UNRECORDED') : 'NOT_STOCK_MANAGED'
       }
     ];
   }));
