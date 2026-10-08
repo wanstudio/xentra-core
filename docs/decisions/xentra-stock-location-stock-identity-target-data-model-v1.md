@@ -385,7 +385,7 @@ Catalog resolves composition. Production decides production impact. Inventory po
 
 Do not lock these from this document:
 - exact Recipe / Production Item location applicability schema;
-- mandatory WIP vs simple issue-and-produce flow;
+- exact WIP / multi-step production model beyond the v1 direct issue-and-produce flow;
 - semi-finished/by-product model;
 - lot/expiry activation and data model;
 - make-to-order trigger/reservation semantics;
