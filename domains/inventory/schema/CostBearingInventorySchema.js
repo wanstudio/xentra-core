@@ -79,18 +79,26 @@ function ensureCostBearingInventorySchema(db) {
         CHECK (carrying_value >= 0),
       moving_average_unit_cost REAL NOT NULL DEFAULT 0
         CHECK (moving_average_unit_cost >= 0),
+      cost_availability_status TEXT NOT NULL DEFAULT 'UNAVAILABLE'
+        CHECK (cost_availability_status IN ('AVAILABLE', 'ESTIMATED', 'UNAVAILABLE')),
       valuation_version INTEGER NOT NULL DEFAULT 0
         CHECK (valuation_version >= 0),
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
       PRIMARY KEY (stock_location_id, material_id),
       CHECK (
-        quantity_base = 0
-        AND carrying_value = 0
-        AND moving_average_unit_cost = 0
+        (
+          quantity_base = 0
+          AND carrying_value = 0
+          AND moving_average_unit_cost = 0
+          AND cost_availability_status = 'UNAVAILABLE'
+        )
         OR
-        quantity_base > 0
-        AND abs(carrying_value - (quantity_base * moving_average_unit_cost)) <= 0.000001
+        (
+          quantity_base > 0
+          AND abs(carrying_value - (quantity_base * moving_average_unit_cost)) <= 0.000001
+          AND cost_availability_status IN ('AVAILABLE', 'ESTIMATED')
+        )
       ),
       FOREIGN KEY (stock_location_id) REFERENCES stock_locations(id) ON DELETE RESTRICT,
       FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE RESTRICT
@@ -136,18 +144,26 @@ function ensureCostBearingInventorySchema(db) {
         CHECK (carrying_value >= 0),
       moving_average_unit_cost REAL NOT NULL DEFAULT 0
         CHECK (moving_average_unit_cost >= 0),
+      cost_availability_status TEXT NOT NULL DEFAULT 'UNAVAILABLE'
+        CHECK (cost_availability_status IN ('AVAILABLE', 'ESTIMATED', 'UNAVAILABLE')),
       valuation_version INTEGER NOT NULL DEFAULT 0
         CHECK (valuation_version >= 0),
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
       PRIMARY KEY (stock_location_id, product_id),
       CHECK (
-        quantity = 0
-        AND carrying_value = 0
-        AND moving_average_unit_cost = 0
+        (
+          quantity = 0
+          AND carrying_value = 0
+          AND moving_average_unit_cost = 0
+          AND cost_availability_status = 'UNAVAILABLE'
+        )
         OR
-        quantity > 0
-        AND abs(carrying_value - (quantity * moving_average_unit_cost)) <= 0.000001
+        (
+          quantity > 0
+          AND abs(carrying_value - (quantity * moving_average_unit_cost)) <= 0.000001
+          AND cost_availability_status IN ('AVAILABLE', 'ESTIMATED')
+        )
       ),
       FOREIGN KEY (stock_location_id) REFERENCES stock_locations(id) ON DELETE RESTRICT,
       FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT
@@ -220,6 +236,7 @@ function ensureCostBearingInventorySchema(db) {
       unit_cost REAL NOT NULL
         CHECK (unit_cost >= 0),
       total_cost REAL NOT NULL,
+      currency_code TEXT,
       valuation_method TEXT NOT NULL DEFAULT 'MOVING_AVERAGE'
         CHECK (valuation_method = 'MOVING_AVERAGE'),
       cost_basis_type TEXT NOT NULL
@@ -279,6 +296,14 @@ function ensureCostBearingInventorySchema(db) {
 
     CREATE INDEX IF NOT EXISTS idx_material_stock_movements_source_movement
       ON material_stock_movements(source_movement_id);
+
+    CREATE TRIGGER IF NOT EXISTS trg_material_stock_movement_currency_required
+    BEFORE INSERT ON material_stock_movements
+    FOR EACH ROW
+    WHEN NEW.currency_code IS NULL OR trim(NEW.currency_code) = ''
+    BEGIN
+      SELECT RAISE(ABORT, 'CURRENCY_BASIS_UNRESOLVED');
+    END;
 
     CREATE TRIGGER IF NOT EXISTS trg_material_stock_movement_scope_insert
     BEFORE INSERT ON material_stock_movements
@@ -411,6 +436,7 @@ function ensureCostBearingInventorySchema(db) {
       unit_cost REAL NOT NULL
         CHECK (unit_cost >= 0),
       total_cost REAL NOT NULL,
+      currency_code TEXT,
       valuation_method TEXT NOT NULL DEFAULT 'MOVING_AVERAGE'
         CHECK (valuation_method = 'MOVING_AVERAGE'),
       cost_basis_type TEXT NOT NULL
@@ -470,6 +496,14 @@ function ensureCostBearingInventorySchema(db) {
 
     CREATE INDEX IF NOT EXISTS idx_product_stock_movements_source_movement
       ON product_stock_movements(source_movement_id);
+
+    CREATE TRIGGER IF NOT EXISTS trg_product_stock_movement_currency_required
+    BEFORE INSERT ON product_stock_movements
+    FOR EACH ROW
+    WHEN NEW.currency_code IS NULL OR trim(NEW.currency_code) = ''
+    BEGIN
+      SELECT RAISE(ABORT, 'CURRENCY_BASIS_UNRESOLVED');
+    END;
 
     CREATE TRIGGER IF NOT EXISTS trg_product_stock_movement_scope_insert
     BEFORE INSERT ON product_stock_movements
@@ -570,6 +604,117 @@ function ensureCostBearingInventorySchema(db) {
     FOR EACH ROW
     BEGIN
       SELECT RAISE(ABORT, 'POSTED_STOCK_MOVEMENT_IMMUTABLE');
+    END;
+  `);
+
+  // Additive upgrades for target tables created before cost availability/currency evidence existed.
+  const ensureColumn = (table, column, definition) => {
+    const columns = db.queryMany(`PRAGMA table_info(${table})`, []);
+    if (!columns.some(row => row && row.name === column)) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    }
+  };
+
+  ensureColumn('material_stock_balances', 'cost_availability_status', "TEXT NOT NULL DEFAULT 'UNAVAILABLE'");
+  ensureColumn('product_stock_balances', 'cost_availability_status', "TEXT NOT NULL DEFAULT 'UNAVAILABLE'");
+  ensureColumn('material_stock_movements', 'currency_code', "TEXT");
+  ensureColumn('product_stock_movements', 'currency_code', "TEXT");
+
+  // Existing target rows are migrated conservatively: only empty balances are
+  // UNAVAILABLE; populated balances must carry an explicit persisted state.
+  db.exec(`
+    CREATE TRIGGER IF NOT EXISTS trg_material_stock_balance_cost_status_insert
+    BEFORE INSERT ON material_stock_balances
+    FOR EACH ROW
+    WHEN (
+      NEW.quantity_base = 0
+      AND (
+        NEW.carrying_value <> 0
+        OR NEW.moving_average_unit_cost <> 0
+        OR NEW.cost_availability_status <> 'UNAVAILABLE'
+      )
+    )
+    OR (
+      NEW.quantity_base > 0
+      AND NEW.cost_availability_status NOT IN ('AVAILABLE', 'ESTIMATED')
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'MATERIAL_VALUATION_STATUS_INVALID');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_material_stock_balance_cost_status_update
+    BEFORE UPDATE OF quantity_base, carrying_value, moving_average_unit_cost, cost_availability_status
+    ON material_stock_balances
+    FOR EACH ROW
+    WHEN (
+      NEW.quantity_base = 0
+      AND (
+        NEW.carrying_value <> 0
+        OR NEW.moving_average_unit_cost <> 0
+        OR NEW.cost_availability_status <> 'UNAVAILABLE'
+      )
+    )
+    OR (
+      NEW.quantity_base > 0
+      AND NEW.cost_availability_status NOT IN ('AVAILABLE', 'ESTIMATED')
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'MATERIAL_VALUATION_STATUS_INVALID');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_product_stock_balance_cost_status_insert
+    BEFORE INSERT ON product_stock_balances
+    FOR EACH ROW
+    WHEN (
+      NEW.quantity = 0
+      AND (
+        NEW.carrying_value <> 0
+        OR NEW.moving_average_unit_cost <> 0
+        OR NEW.cost_availability_status <> 'UNAVAILABLE'
+      )
+    )
+    OR (
+      NEW.quantity > 0
+      AND NEW.cost_availability_status NOT IN ('AVAILABLE', 'ESTIMATED')
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'PRODUCT_VALUATION_STATUS_INVALID');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_product_stock_balance_cost_status_update
+    BEFORE UPDATE OF quantity, carrying_value, moving_average_unit_cost, cost_availability_status
+    ON product_stock_balances
+    FOR EACH ROW
+    WHEN (
+      NEW.quantity = 0
+      AND (
+        NEW.carrying_value <> 0
+        OR NEW.moving_average_unit_cost <> 0
+        OR NEW.cost_availability_status <> 'UNAVAILABLE'
+      )
+    )
+    OR (
+      NEW.quantity > 0
+      AND NEW.cost_availability_status NOT IN ('AVAILABLE', 'ESTIMATED')
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'PRODUCT_VALUATION_STATUS_INVALID');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_material_stock_movement_currency_validate
+    BEFORE INSERT ON material_stock_movements
+    FOR EACH ROW
+    WHEN NEW.currency_code IS NULL OR trim(NEW.currency_code) = ''
+    BEGIN
+      SELECT RAISE(ABORT, 'CURRENCY_BASIS_UNRESOLVED');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_product_stock_movement_currency_validate
+    BEFORE INSERT ON product_stock_movements
+    FOR EACH ROW
+    WHEN NEW.currency_code IS NULL OR trim(NEW.currency_code) = ''
+    BEGIN
+      SELECT RAISE(ABORT, 'CURRENCY_BASIS_UNRESOLVED');
     END;
   `);
 
