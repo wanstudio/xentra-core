@@ -38,6 +38,38 @@ function ensureCostBearingInventorySchema(db) {
     CREATE INDEX IF NOT EXISTS idx_stock_locations_branch_active
       ON stock_locations(branch_id, is_active);
 
+    CREATE TRIGGER IF NOT EXISTS trg_stock_locations_branch_org_scope_insert
+    BEFORE INSERT ON stock_locations
+    FOR EACH ROW
+    WHEN NEW.branch_id IS NOT NULL
+      AND (
+        (SELECT id FROM branches WHERE id = NEW.branch_id) IS NULL
+        OR
+        (SELECT b2.organization_id
+           FROM branches b1
+           JOIN brands b2 ON b2.id = b1.brand_id
+          WHERE b1.id = NEW.branch_id) <> NEW.organization_id
+      )
+    BEGIN
+      SELECT RAISE(ABORT, 'STOCK_LOCATION_BRANCH_ORG_SCOPE_MISMATCH');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_stock_locations_branch_org_scope_update
+    BEFORE UPDATE OF organization_id, branch_id ON stock_locations
+    FOR EACH ROW
+    WHEN NEW.branch_id IS NOT NULL
+      AND (
+        (SELECT id FROM branches WHERE id = NEW.branch_id) IS NULL
+        OR
+        (SELECT b2.organization_id
+           FROM branches b1
+           JOIN brands b2 ON b2.id = b1.brand_id
+          WHERE b1.id = NEW.branch_id) <> NEW.organization_id
+      )
+    BEGIN
+      SELECT RAISE(ABORT, 'STOCK_LOCATION_BRANCH_ORG_SCOPE_MISMATCH');
+    END;
+
     CREATE TABLE IF NOT EXISTS material_stock_balances (
       stock_location_id TEXT NOT NULL,
       material_id TEXT NOT NULL,
@@ -168,8 +200,8 @@ function ensureCostBearingInventorySchema(db) {
           'COUNT_CORRECTION',
           'CURRENT_MOVING_AVERAGE'
         )),
-      source_type TEXT NOT NULL,
-      source_reference TEXT NOT NULL,
+      source_type TEXT NOT NULL CHECK (trim(source_type) <> ''),
+      source_reference TEXT NOT NULL CHECK (trim(source_reference) <> ''),
       source_movement_id TEXT,
       posting_mutation_id TEXT NOT NULL UNIQUE,
       valuation_version INTEGER NOT NULL
@@ -306,8 +338,8 @@ function ensureCostBearingInventorySchema(db) {
           'COUNT_CORRECTION',
           'CURRENT_MOVING_AVERAGE'
         )),
-      source_type TEXT NOT NULL,
-      source_reference TEXT NOT NULL,
+      source_type TEXT NOT NULL CHECK (trim(source_type) <> ''),
+      source_reference TEXT NOT NULL CHECK (trim(source_reference) <> ''),
       source_movement_id TEXT,
       posting_mutation_id TEXT NOT NULL UNIQUE,
       valuation_version INTEGER NOT NULL
