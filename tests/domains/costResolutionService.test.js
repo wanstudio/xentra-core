@@ -58,7 +58,7 @@ function postInbound({
   quantity,
   unitCost,
   totalCost,
-  basis = 'PURCHASE_RECEIPT',
+  basis = 'OPENING_ACTUAL',
   sourceReference,
   mutationId,
   postingTimestamp,
@@ -72,7 +72,7 @@ function postInbound({
     costBasisType: basis,
     incomingUnitCost: unitCost,
     incomingTotalCost: totalCost,
-    sourceType: 'GOODS_RECEIPT',
+    sourceType: 'TEST_VALUATION',
     sourceReference,
     postingMutationId: mutationId,
     postingTimestamp,
@@ -124,7 +124,7 @@ function postInbound({
       );
     }
 
-    const movementType = basis === 'PURCHASE_RECEIPT' ? 'PURCHASE_RECEIPT' : 'ADJUSTMENT_IN';
+    const movementType = basis === 'OPENING_ACTUAL' || basis === 'OPENING_ESTIMATE' ? 'OPENING_STOCK' : 'ADJUSTMENT_IN';
     repository.db.execute(
       "INSERT INTO product_stock_movements (id, stock_location_id, product_id, movement_type, quantity, previous_quantity, current_quantity, unit_cost, total_cost, currency_code, valuation_method, cost_basis_type, source_type, source_reference, posting_mutation_id, valuation_version, posting_timestamp, resolver_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'MOVING_AVERAGE', ?, ?, ?, ?, ?, ?, 'v1')",
       [
@@ -161,7 +161,8 @@ test('Cost Resolution — first inbound resolves explicit purchase cost', () => 
     quantity: 10,
     unitCost: 100,
     totalCost: 1000,
-    sourceReference: 'GR-COST-001',
+    basis: 'OPENING_ACTUAL',
+    sourceReference: 'OPENING-COST-001',
     mutationId: 'cost-mut-001',
     postingTimestamp: '2026-10-08T10:00:00.000Z'
   });
@@ -180,7 +181,8 @@ test('Cost Resolution — second inbound produces the weighted Moving Average st
     quantity: 20,
     unitCost: 120,
     totalCost: 2400,
-    sourceReference: 'GR-COST-002',
+    basis: 'COUNT_CORRECTION',
+    sourceReference: 'COUNT-COST-002',
     mutationId: 'cost-mut-002',
     postingTimestamp: '2026-10-08T11:00:00.000Z'
   });
@@ -259,10 +261,10 @@ test('Cost Resolution — idempotent replay preserves the originally posted cost
     stockIdentityType: 'PRODUCT',
     stockIdentityId: PRODUCT,
     quantityBase: 999,
-    costBasisType: 'PURCHASE_RECEIPT',
+    costBasisType: 'COUNT_CORRECTION',
     incomingUnitCost: 9999,
     incomingTotalCost: 9989001,
-    sourceType: 'GOODS_RECEIPT',
+    sourceType: 'TEST_VALUATION',
     sourceReference: 'SHOULD-NOT-REPLACE',
     postingMutationId: 'cost-mut-002',
     postingTimestamp: '2026-10-08T11:01:00.000Z',
@@ -282,10 +284,10 @@ test('Cost Resolution — backdating and currency changes fail closed', () => {
     stockIdentityType: 'PRODUCT',
     stockIdentityId: PRODUCT,
     quantityBase: 1,
-    costBasisType: 'PURCHASE_RECEIPT',
+    costBasisType: 'COUNT_CORRECTION',
     incomingUnitCost: 50,
     incomingTotalCost: 50,
-    sourceType: 'GOODS_RECEIPT',
+    sourceType: 'TEST_VALUATION',
     sourceReference: 'GR-COST-BACKDATE',
     postingMutationId: 'cost-mut-backdate',
     postingTimestamp: '2026-10-08T10:59:00.000Z',
@@ -297,10 +299,10 @@ test('Cost Resolution — backdating and currency changes fail closed', () => {
     stockIdentityType: 'PRODUCT',
     stockIdentityId: PRODUCT,
     quantityBase: 1,
-    costBasisType: 'PURCHASE_RECEIPT',
+    costBasisType: 'COUNT_CORRECTION',
     incomingUnitCost: 50,
     incomingTotalCost: 50,
-    sourceType: 'GOODS_RECEIPT',
+    sourceType: 'TEST_VALUATION',
     sourceReference: 'GR-COST-USD',
     postingMutationId: 'cost-mut-usd',
     postingTimestamp: '2026-10-08T13:00:00.000Z',
@@ -314,21 +316,21 @@ test('Cost Resolution — valuation is isolated by Stock Location', () => {
     quantity: 10,
     unitCost: 140,
     totalCost: 1400,
-    basis: 'OPENING_ACTUAL',
+    basis: 'COUNT_CORRECTION',
     sourceReference: 'OPENING-COST-002',
     mutationId: 'cost-mut-loc-b-actual',
     postingTimestamp: '2026-10-08T10:00:00.000Z'
   });
 
-  assert.equal(result.status, 'ESTIMATED');
+  assert.equal(result.status, 'AVAILABLE');
 
   const a = repository.findProductValuationBalance({ stockLocationId: LOCATION_A, productId: PRODUCT });
   const b = repository.findProductValuationBalance({ stockLocationId: LOCATION_B, productId: PRODUCT });
 
   assert.equal(Number(a.quantity), 30);
   assert.ok(Math.abs(Number(a.moving_average_unit_cost) - (3400 / 30)) < 1e-9);
-  assert.equal(Number(b.quantity), 20);
-  assert.equal(Number(b.carrying_value), 2400);
-  assert.equal(Number(b.moving_average_unit_cost), 120);
-  assert.equal(b.cost_availability_status, 'ESTIMATED');
+  assert.equal(Number(b.quantity), 30);
+  assert.equal(Number(b.carrying_value), 3800);
+  assert.ok(Math.abs(Number(b.moving_average_unit_cost) - (3800 / 30)) < 1e-9);
+  assert.equal(b.cost_availability_status, 'AVAILABLE');
 });
