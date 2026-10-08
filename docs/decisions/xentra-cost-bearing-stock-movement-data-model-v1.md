@@ -290,17 +290,30 @@ Stock movement stores the evidence pointer; it does not become the source busine
 
 ## 11. Posting Identity
 
-Every canonical stock mutation has:
+Every posted stock movement has its own immutable:
 
 ~~~
 posting_mutation_id
 ~~~
 
-which is unique for that logical mutation.
+which is unique at the canonical **movement-row mutation** boundary.
 
-This prevents duplicate stock and duplicate cost posting.
+A higher-level source transaction may contain multiple movement mutations.
 
-The same identity must be preserved across the canonical posting path.
+Example:
+
+~~~
+Goods Receipt Posting
+  = one aggregate goods_receipt_posting_id
+  ↓
+Rice movement      = mutation A
+Oil movement       = mutation B
+Eggs movement      = mutation C
+~~~
+
+The aggregate source transaction provides retry/idempotency at its own document boundary; each resulting stock movement also has a unique movement-level mutation identity.
+
+This prevents a single movement from being applied twice while still allowing one receipt/production/sale operation to produce multiple stock movements.
 
 ## 12. Valuation Version
 
