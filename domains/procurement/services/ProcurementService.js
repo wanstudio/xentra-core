@@ -165,6 +165,48 @@ class ProcurementService {
     return repository.findSupplierMaterial(id);
   }
 
+  static createSupplierMaterialPack({
+    supplierMaterialId,
+    name,
+    contentQuantityBase,
+    contentUomId,
+    unitPrice,
+    currencyCode,
+    minimumOrderQuantity = 1,
+    repository = procurementRepository
+  }) {
+    const supplierMaterial = repository.findSupplierMaterial(supplierMaterialId);
+    if (!supplierMaterial || Number(supplierMaterial.is_active) !== 1) throw fail('SUPPLIER_MATERIAL_NOT_FOUND');
+
+    const materialInfo = materialBaseUom(supplierMaterial.material_id);
+    const contentUom = uomRepository.findById(contentUomId);
+    if (!contentUom || Number(contentUom.is_active) !== 1) throw fail('SUPPLIER_MATERIAL_PACK_UOM_INVALID');
+    if (String(contentUom.category_id) !== String(materialInfo.base.category_id)) throw fail('UOM_CATEGORY_MISMATCH');
+
+    const content = positive(contentQuantityBase, 'SUPPLIER_MATERIAL_PACK_INVALID');
+    const price = nonNegative(unitPrice, 'PURCHASE_PRICE_INVALID');
+    const minQty = positive(minimumOrderQuantity, 'SUPPLIER_MATERIAL_PACK_INVALID');
+    const cur = currency(currencyCode);
+
+    const id = 'smp_' + crypto.randomBytes(8).toString('hex');
+    const now = new Date().toISOString();
+    repository.insertSupplierMaterialPack({
+      id,
+      supplierMaterialId,
+      name: text(name, 'SUPPLIER_MATERIAL_PACK_NAME_REQUIRED'),
+      purchaseUomId: null,
+      contentQuantityBase: content,
+      contentUomId: contentUom.id,
+      minimumOrderQuantity: minQty,
+      unitPrice: price,
+      currencyCode: cur,
+      createdAt: now,
+      updatedAt: now
+    });
+
+    return repository.findSupplierMaterialPack(id);
+  }
+
   static createPurchaseOrder({
     organizationId,
     supplierId,
@@ -173,7 +215,6 @@ class ProcurementService {
     createdBy = null,
     requiredAt = null,
     repository = procurementRepository,
-    initialStatus = 'DRAFT'
   }) {
     const orgId = text(organizationId, 'ORGANIZATION_REQUIRED');
     const supplier = repository.findSupplier(supplierId);
@@ -189,9 +230,6 @@ class ProcurementService {
       throw fail('STOCK_LOCATION_INVALID');
     }
 
-    const status = String(initialStatus || 'DRAFT').toUpperCase();
-    if (!['DRAFT', 'ORDERED'].includes(status)) throw fail('PURCHASE_ORDER_STATUS_INVALID');
-
     const poId = 'po_' + crypto.randomBytes(8).toString('hex');
     const now = new Date().toISOString();
 
@@ -206,7 +244,7 @@ class ProcurementService {
         requiredAt,
         createdBy,
         createdAt: now,
-        updatedAt: now
+        updatedAt: postingTimestamp
       });
 
       for (const input of lines) {
@@ -236,12 +274,8 @@ class ProcurementService {
           currencyCode: built.currencyCode,
           baseQuantityPerPurchaseUnit: built.baseQuantityPerPurchaseUnit,
           createdAt: now,
-          updatedAt: now
+          updatedAt: postingTimestamp
         });
-      }
-
-      if (status === 'ORDERED') {
-        repository.updatePurchaseOrderStatus({ id: poId, status: 'ORDERED', updatedAt: now, orderedAt: now });
       }
 
       repository.commitTransaction();
@@ -365,7 +399,8 @@ class ProcurementService {
       throw fail('GOODS_RECEIPT_ACCEPTED_LINES_REQUIRED');
     }
 
-    const now = receivedAt ? text(receivedAt, 'RECEIVED_AT_INVALID') : new Date().toISOString();
+    const receivedTimestamp = receivedAt ? text(receivedAt, 'RECEIVED_AT_INVALID') : null;
+    const postingTimestamp = new Date().toISOString();
     const actor = receivedBy || null;
 
     repository.beginTransaction();
@@ -376,9 +411,9 @@ class ProcurementService {
         destinationStockLocationId: po.destination_stock_location_id,
         goodsReceiptPostingId: postingId,
         receivedBy: actor,
-        receivedAt: now,
-        createdAt: now,
-        updatedAt: now
+        receivedAt: receivedTimestamp || postingTimestamp,
+        createdAt: postingTimestamp,
+        updatedAt: postingTimestamp
       });
 
       const inventoryLines = normalized
@@ -397,7 +432,7 @@ class ProcurementService {
         goodsReceiptId: receiptId,
         goodsReceiptPostingId: postingId,
         stockLocationId: po.destination_stock_location_id,
-        postingTimestamp: now,
+        postingTimestamp,
         actorId: actor,
         lines: inventoryLines
       });
@@ -427,7 +462,7 @@ class ProcurementService {
         });
       }
 
-      repository.updateGoodsReceiptPosted({ id: receiptId, postedAt: now, updatedAt: now });
+      repository.updateGoodsReceiptPosted({ id: receiptId, postedAt: postingTimestamp, updatedAt: postingTimestamp });
 
       const refreshedLines = repository.findPurchaseOrderLines(po.id);
       const fullyReceived = refreshedLines.every(line =>
@@ -449,7 +484,7 @@ class ProcurementService {
         purchase_order_id: po.id,
         status: 'POSTED',
         destination_stock_location_id: po.destination_stock_location_id,
-        posted_at: now,
+        posted_at: postingTimestamp,
         inventory: inventoryResult
       };
     } catch (e) {
