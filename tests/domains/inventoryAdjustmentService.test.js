@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 
 const db = require('../../server/database/db');
 const { InventoryAdjustmentService } = require('../../domains/inventory');
+const InventoryRepository = require('../../core/data/repositories/InventoryRepository');
 
 const ORG = 'org_inventory_adjust_v1';
 const BRAND = 'brand_inventory_adjust_v1';
@@ -52,6 +53,25 @@ test.after(() => {
   db.prepare('DELETE FROM branches WHERE id = ?').run(BRANCH);
   db.prepare('DELETE FROM brands WHERE id = ?').run(BRAND);
   db.prepare('DELETE FROM organizations WHERE id = ?').run(ORG);
+});
+
+
+test('branch inventory view prefers canonical Product Stock over migration quantities', () => {
+  const inventoryRepository = new InventoryRepository();
+  db.prepare(
+    'INSERT OR REPLACE INTO branch_product_inventory (branch_id, product_id, stock_qty, low_stock_threshold) VALUES (?, ?, 3, 1)'
+  ).run(BRANCH, PRODUCT);
+
+  const rows = inventoryRepository.findBranchProductInventoryView({
+    branchId: BRANCH,
+    brandId: BRAND
+  });
+  const row = rows.find(item => String(item.product_id) === PRODUCT);
+
+  assert.ok(row);
+  assert.equal(Number(row.stock), 10);
+  assert.equal(row.stock_source, 'canonical');
+  assert.equal(Number(row.branch_inventory_quantity), 3);
 });
 
 test('positive audit adjustment requires explicit incoming cost evidence', () => {
