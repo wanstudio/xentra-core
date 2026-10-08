@@ -107,7 +107,7 @@ The operational purchasing work proceeds through:
 
 ~~~
 Replenishment Requirement
-→ Shopping List / Purchase Request
+→ Shopping List (optional planning/read view) → Purchase Request
 → Procurement Decision
 → Purchase Order
 ~~~
@@ -137,7 +137,7 @@ Verified receipt = 18 kg
 
 ### 3.6 Production
 
-Production consumes Material according to a Recipe / BoM and produces an output with a defined yield.
+Production consumes Material according to a Recipe and produces a Production Output with a defined yield.
 
 Example:
 
@@ -196,7 +196,7 @@ Menu resolution
 → Sellable Product Stock consumption
 ~~~
 
-Raw materials already consumed by a Production Batch are not consumed again by the later sale.
+Material quantities already consumed by a Production Batch are not consumed again by the later sale.
 
 ## 4. Central / Branch / Hybrid Topology
 
