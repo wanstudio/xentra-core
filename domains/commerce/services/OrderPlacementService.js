@@ -102,7 +102,8 @@ function deductComposedStock({
   actorId,
   notes,
   dbTransactionProvided = false,
-  sourceType = 'ORDER'
+  sourceType = 'ORDER',
+  captureCostOfSales = true
 }) {
   const requirements = aggregateComposedRequirements(items);
   if (!requirements.length) return { success: true, deducted_items: [], cost_lines: [], cost_status: 'NOT_APPLICABLE' };
@@ -128,14 +129,16 @@ function deductComposedStock({
     });
 
     if (canonicalResult.status === 'AVAILABLE') {
-      const cogs = CostOfSalesService.capture({
-        sourceType,
-        sourceReference: referenceId,
-        orderId: order.id,
-        totalCost: canonicalResult.total_cost,
-        currencyCode: canonicalResult.currency_code,
-        costLines: canonicalResult.cost_lines
-      });
+      const cogs = captureCostOfSales
+        ? CostOfSalesService.capture({
+            sourceType,
+            sourceReference: referenceId,
+            orderId: order.id,
+            totalCost: canonicalResult.total_cost,
+            currencyCode: canonicalResult.currency_code,
+            costLines: canonicalResult.cost_lines
+          })
+        : null;
 
       if (ownsTransaction) inventoryRepository.commitTransaction();
 
@@ -766,39 +769,95 @@ class OrderPlacementService {
 
     const now = new Date().toISOString();
     const deductedItems = [];
+    const saleCostLines = [];
+    let saleCostStatus = 'AVAILABLE';
+    let saleCostCurrency = null;
+    let saleCostTotal = 0;
     const ownsTransaction = !dbTransactionProvided;
 
     if (ownsTransaction) inventoryRepository.beginTransaction();
 
     try {
-      for (const item of items) {
-        if (item && item.menu_id) continue;
-        const isVirtualPromo = (item.unit_price === 0 || Number(item.unit_price) === 0) &&
-          (item.note?.includes('Promo') || item.note?.includes('Bonus') || String(item.product_id).startsWith('prm_') || String(item.product_id).startsWith('reward_'));
-        const bpBefore = inventoryRepository.findBranchProduct(order.branch_id, item.product_id);
-        if (!bpBefore) continue;
+      const directItems = items.filter(item => item && !item.menu_id);
+      const directStockManagedItems = directItems.filter(item =>
+        String(item.sku || '').trim() !== ''
+      );
 
-        const prevStock = Number(bpBefore.stock || 0);
-        const deductResult = inventoryRepository.deductBranchProduct({ quantity: item.quantity, branchId: order.branch_id, productId: item.product_id });
-        if (!deductResult || deductResult.changes === 0) {
-          throw new Error(`[OUT_OF_STOCK_RACE] Stok untuk produk "${item.product_name || item.product_id}" tidak mencukupi saat pembayaran diselesaikan (tersisa ${prevStock}, diminta ${item.quantity}).`);
-        }
-
-        const currentStock = prevStock - Number(item.quantity);
-        inventoryRepository.insertSaleDeduction({
-          id: `mov_${crypto.randomBytes(6).toString('hex')}`,
+      if (directStockManagedItems.length === directItems.length && directStockManagedItems.length > 0) {
+        const canonicalDirect = InventorySalePostingService.postCanonicalSale({
           branchId: order.branch_id,
-          productId: item.product_id,
-          quantity: item.quantity,
-          previousStock: prevStock,
-          currentStock,
-          referenceId: order.order_number,
+          requirements: directStockManagedItems.map(item => ({
+            product_id: item.product_id,
+            product_name: item.product_name || item.name || item.product_id,
+            quantity: item.quantity,
+            source_item_reference: item.id || item.product_id
+          })),
+          sourceType: 'ORDER',
+          sourceReference: order.order_number,
           actorId: order.customer_phone || 'online_payment',
-          notes: `Pemotongan stok otomatis pembayaran lunas [${order.order_number}]`,
-          createdAt: now
+          postingTimestamp: now
         });
 
-        deductedItems.push({ product_id: item.product_id, product_name: item.product_name, quantity: item.quantity, previous_stock: prevStock, current_stock: currentStock });
+        if (canonicalDirect.status === 'AVAILABLE') {
+          deductedItems.push(...canonicalDirect.deducted_items);
+          saleCostLines.push(...canonicalDirect.cost_lines);
+          saleCostTotal += Number(canonicalDirect.total_cost || 0);
+          saleCostCurrency = canonicalDirect.currency_code || saleCostCurrency;
+        } else {
+          saleCostStatus = 'UNAVAILABLE';
+        }
+      }
+
+      // Legacy compatibility path for direct Products while those Products have
+      // not yet been initialized in the cost-bearing Product Stock model.
+      if (
+        directStockManagedItems.length !== directItems.length ||
+        saleCostStatus === 'UNAVAILABLE'
+      ) {
+        for (const item of directItems) {
+          const isVirtualPromo = (item.unit_price === 0 || Number(item.unit_price) === 0) &&
+            (item.note?.includes('Promo') || item.note?.includes('Bonus') ||
+             String(item.product_id).startsWith('prm_') ||
+             String(item.product_id).startsWith('reward_'));
+
+          const bpBefore = inventoryRepository.findBranchProduct(order.branch_id, item.product_id);
+          if (!bpBefore) continue;
+
+          const prevStock = Number(bpBefore.stock || 0);
+          const deductResult = inventoryRepository.deductBranchProduct({
+            quantity: item.quantity,
+            branchId: order.branch_id,
+            productId: item.product_id
+          });
+
+          if (!deductResult || deductResult.changes === 0) {
+            throw new Error(`[OUT_OF_STOCK_RACE] Stok untuk produk "${item.product_name || item.product_id}" tidak mencukupi saat pembayaran diselesaikan (tersisa ${prevStock}, diminta ${item.quantity}).`);
+          }
+
+          const currentStock = prevStock - Number(item.quantity);
+          inventoryRepository.insertSaleDeduction({
+            id: `mov_${crypto.randomBytes(6).toString('hex')}`,
+            branchId: order.branch_id,
+            productId: item.product_id,
+            quantity: item.quantity,
+            previousStock: prevStock,
+            currentStock,
+            referenceId: order.order_number,
+            actorId: order.customer_phone || 'online_payment',
+            notes: isVirtualPromo
+              ? `Pemotongan stok otomatis promo [${order.order_number}]`
+              : `Pemotongan stok otomatis pembayaran lunas [${order.order_number}]`,
+            createdAt: now
+          });
+
+          deductedItems.push({
+            product_id: item.product_id,
+            product_name: item.product_name,
+            quantity: Number(item.quantity),
+            previous_stock: prevStock,
+            current_stock: currentStock
+          });
+        }
       }
 
       const canonicalItems = items.filter(item => item && item.menu_id);
@@ -809,20 +868,73 @@ class OrderPlacementService {
           referenceId: order.order_number,
           actorId: order.customer_phone || 'online_payment',
           notes: 'Pemotongan stok otomatis komponen Menu setelah pembayaran [' + order.order_number + ']',
-          dbTransactionProvided: true
+          dbTransactionProvided: true,
+          sourceType: 'ORDER',
+          captureCostOfSales: false
         });
+
         deductedItems.push(...composedResult.deducted_items);
+
+        if (composedResult.cost_status === 'AVAILABLE') {
+          saleCostLines.push(...(composedResult.cost_lines || []));
+          saleCostTotal += Number(
+            (composedResult.cost_lines || []).reduce((sum, line) => sum + Number(line.total_cost || 0), 0)
+          );
+          if (composedResult.cost_lines && composedResult.cost_lines.length > 0) {
+            const currencies = new Set(
+              composedResult.cost_lines.map(line => String(line.currency_code || '').toUpperCase()).filter(Boolean)
+            );
+            if (currencies.size > 1) throw new Error('COST_CURRENCY_MISMATCH');
+            const composedCurrency = currencies.size === 1 ? Array.from(currencies)[0] : null;
+            if (saleCostCurrency && composedCurrency && saleCostCurrency !== composedCurrency) {
+              throw new Error('COST_CURRENCY_MISMATCH');
+            }
+            saleCostCurrency = saleCostCurrency || composedCurrency;
+          }
+        } else {
+          saleCostStatus = 'UNAVAILABLE';
+        }
+      }
+
+      // A canonical COGS snapshot is only recorded when every stock-managed
+      // Product in this sale was posted through canonical cost-bearing stock.
+      if (saleCostStatus === 'AVAILABLE' && saleCostLines.length > 0) {
+        const cogs = CostOfSalesService.capture({
+          sourceType: 'ORDER',
+          sourceReference: order.order_number,
+          orderId: order.id,
+          totalCost: saleCostTotal,
+          currencyCode: saleCostCurrency,
+          costLines: saleCostLines
+        });
+
+        if (ownsTransaction) inventoryRepository.commitTransaction();
+
+        return {
+          success: true,
+          idempotent: Boolean(cogs.idempotent),
+          deducted_items: deductedItems,
+          cost_lines: saleCostLines,
+          cost_of_sales: cogs,
+          cost_status: 'AVAILABLE'
+        };
       }
 
       if (ownsTransaction) inventoryRepository.commitTransaction();
+
+      return {
+        success: true,
+        idempotent: false,
+        deducted_items: deductedItems,
+        cost_lines: [],
+        cost_status: 'UNAVAILABLE'
+      };
     } catch (err) {
       if (ownsTransaction) {
         try { inventoryRepository.rollbackTransaction(); } catch (_) {}
       }
       throw err;
     }
-
-    return { success: true, deducted_items: deductedItems };
   }
 }
 
