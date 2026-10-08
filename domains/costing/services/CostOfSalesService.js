@@ -51,6 +51,9 @@ class CostOfSalesService {
     repository: repo = repository
   }) {
     const type = text(sourceType, 'COST_OF_SALES_SOURCE_TYPE_REQUIRED').toUpperCase();
+    if (!new Set(['ORDER', 'ADDITIONAL_ORDER']).has(type)) {
+      throw fail('COST_OF_SALES_SOURCE_TYPE_INVALID');
+    }
     const reference = text(sourceReference, 'COST_OF_SALES_SOURCE_REFERENCE_REQUIRED');
     const total = nonNegative(totalCost, 'COST_OF_SALES_TOTAL_INVALID');
     const currency = text(currencyCode, 'CURRENCY_BASIS_UNRESOLVED').toUpperCase();
