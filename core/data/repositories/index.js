@@ -15,6 +15,7 @@ const InventoryRepository = require('./InventoryRepository');
 const UomRepository = require('./UomRepository');
 const MaterialRepository = require('./MaterialRepository');
 const ProcurementRepository = require('./ProcurementRepository');
+const ProductionRepository = require('./ProductionRepository');
 const UserRepository = require('./UserRepository');
 const EligibilityRepository = require('./EligibilityRepository');
 const ReportingRepository = require('./ReportingRepository');
@@ -43,6 +44,7 @@ module.exports = {
   UomRepository,
   MaterialRepository,
   ProcurementRepository,
+  ProductionRepository,
   UserRepository,
   EligibilityRepository,
   ReportingRepository,
