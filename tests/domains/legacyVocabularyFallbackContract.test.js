@@ -153,7 +153,7 @@ test('legacy inventory stock is not allowed to become the primary reader in cano
     const source = read(relativePath);
     assert.doesNotMatch(
       source,
-      /branch_products\\s*\\.\\s*stock|inventory_movements/,
+      /branch_products\s*\.\s*stock|inventory_movements/,
       relativePath + ' must not read the legacy Product stock quantity/ledger directly'
     );
   }
@@ -161,7 +161,7 @@ test('legacy inventory stock is not allowed to become the primary reader in cano
   const orderPlacement = read('domains/commerce/services/OrderPlacementService.js');
   assert.doesNotMatch(
     orderPlacement,
-    /SELECT\\s+stock[^;]*FROM\\s+branch_products|UPDATE\\s+branch_products\\s+SET\\s+stock/i,
+    /SELECT\s+stock[^;]*FROM\s+branch_products|UPDATE\s+branch_products\s+SET\s+stock/i,
     'OrderPlacementService must not directly mutate legacy Product stock'
   );
 
