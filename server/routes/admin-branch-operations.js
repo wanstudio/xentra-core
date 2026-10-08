@@ -9,6 +9,8 @@
 
 module.exports = function registerAdminBranchOperationsRoutes(router, deps) {
   const { db, requireAuth, InventoryStockService } = deps;
+  const InventoryRepository = require('../../core/data/repositories/InventoryRepository');
+  const inventoryRepository = new InventoryRepository();
 
 
 router.get('/admin/branches/:id/inventory', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
@@ -29,42 +31,10 @@ router.get('/admin/branches/:id/inventory', requireAuth(['owner', 'brand_manager
       return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
     }
 
-    const rows = db.prepare(`
-      SELECT
-        p.id AS product_id,
-        p.name AS product_name,
-        p.sku,
-        CASE
-          WHEN p.sku IS NOT NULL AND trim(p.sku) <> ''
-            THEN COALESCE(bpi.stock_qty, 0)
-          ELSE COALESCE(bp.stock, 0)
-        END AS stock,
-        CASE
-          WHEN p.sku IS NOT NULL AND trim(p.sku) <> ''
-            THEN COALESCE(bpi.low_stock_threshold, 5)
-          ELSE COALESCE(bp.low_stock_threshold, 5)
-        END AS low_stock_threshold,
-        CASE
-          WHEN p.sku IS NOT NULL AND trim(p.sku) <> '' THEN 'canonical'
-          WHEN bp.product_id IS NOT NULL THEN 'legacy'
-          ELSE 'none'
-        END AS stock_source,
-        CASE
-          WHEN p.sku IS NOT NULL AND trim(p.sku) <> '' THEN NULL
-          ELSE bp.is_available
-        END AS is_available
-      FROM products p
-      LEFT JOIN branch_product_inventory bpi
-        ON bpi.branch_id = ? AND bpi.product_id = p.id
-      LEFT JOIN branch_products bp
-        ON bp.branch_id = ? AND bp.product_id = p.id
-      WHERE p.brand_id = ?
-        AND (
-          (p.sku IS NOT NULL AND trim(p.sku) <> '')
-          OR bp.product_id IS NOT NULL
-        )
-      ORDER BY p.name ASC, p.id ASC
-    `).all(req.params.id, req.params.id, req.brand_id);
+    const rows = inventoryRepository.findBranchProductInventoryView({
+      branchId: req.params.id,
+      brandId: req.brand_id
+    });
 
     res.json({ success: true, branch_id: req.params.id, inventory: rows || [] });
   } catch (err) {
