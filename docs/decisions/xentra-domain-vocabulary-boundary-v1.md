@@ -11,7 +11,7 @@ Material
   ↓
 Replenishment Requirement
   ↓
-Shopping List / Purchase Request
+Shopping List (optional planning/read view) → Purchase Request
   ↓
 Purchase Order
   ↓
@@ -19,9 +19,9 @@ Verified Goods Receipt
   ↓
 Material Stock
   ↓
-Production / Recipe / BoM
+Production / Recipe
   ↓
-Production Batch / Output
+Production Batch / Production Output
   ↓
 Sellable Product Stock
   ↓
@@ -206,7 +206,6 @@ Canonical concepts:
 - Production Item;
 - Recipe;
 - Recipe Component;
-- Recipe;
 - Yield;
 - Production Batch;
 - Production Output;
@@ -229,8 +228,9 @@ Production does not own:
 Canonical concepts:
 
 - Material;
-- Material input classification;
-- material identity/specification needed by production/procurement.
+- material input classification/specification needed by production/procurement.
+
+“Raw Material” is descriptive language only; it is not a second canonical entity.
 
 Material answers:
 
@@ -346,7 +346,7 @@ Promotion remains a separate domain.
 
 Reporting is never the source mutation authority for business state.
 
-## 7. Canonical Layering for Recipe / BOM / Replenishment
+## 7. Canonical Layering for Recipe / Replenishment
 
 Xentra adopts the following conceptual layering:
 
