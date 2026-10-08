@@ -31,7 +31,7 @@ Verified Goods Receipt
     ↓
 Material Stock
     ↓
-Production / Recipe / BoM
+Production / Recipe
     ↓
 Production Batch
     ↓
@@ -58,7 +58,7 @@ Make-to-order is a supported future operational variant, but it requires a separ
 | Shopping / Purchase Request | Procurement workflow | Operational request to replenish |
 | Purchase Order | Procurement | Purchase lifecycle |
 | Goods Receipt | Procurement + Inventory contract | Verify receipt and mutate physical stock |
-| Recipe / BoM | Production | Transformation definition |
+| Recipe | Production | Transformation definition |
 | Production Batch | Production | Execute/record transformation and output |
 | Menu | Catalog | Commercial selling entity |
 | Order | Commerce | Customer order/checkout lifecycle |
@@ -340,7 +340,8 @@ This contract does not lock:
 - exact UOM master schema/reference-data implementation;
 - UOM precision/rounding rules;
 - exact valuation method and scope;
-- exact Menu HPP preference between latest actual Product cost and current theoretical Production cost;
+- exact Menu Composition Cost reporting basis (latest actual Product cost vs current theoretical Production cost);
+- HPP terminology and accounting COGS integration;
 - autonomous purchase limits;
 - exact procurement/receiving/production role matrix;
 - exact direct Choice → Production variant / Material recipe override; Product stock-effect mapping is now locked by `docs/decisions/xentra-menu-item-choice-stock-production-integration-contract-v1.md`.
