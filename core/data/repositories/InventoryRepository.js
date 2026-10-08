@@ -37,6 +37,19 @@ class InventoryRepository {
     return Boolean(product && product.sku != null && String(product.sku).trim() !== '');
   }
 
+  findBranchStockLocations(branchId) {
+    return this.db.queryMany(
+      "SELECT id, organization_id, branch_id, code, name, location_type, is_active FROM stock_locations WHERE branch_id = ? AND location_type = 'BRANCH' AND is_active = 1 ORDER BY id",
+      [branchId]
+    );
+  }
+
+  findCanonicalProductStockLocation(branchId) {
+    const locations = this.findBranchStockLocations(branchId);
+    if (locations.length !== 1) return { status: locations.length === 0 ? 'NOT_FOUND' : 'AMBIGUOUS', location: null, locations };
+    return { status: 'AVAILABLE', location: locations[0], locations };
+  }
+
   findStockLocation(stockLocationId) {
     return this.db.queryOne(
       'SELECT id, organization_id, branch_id, code, name, location_type, is_active FROM stock_locations WHERE id = ?',
