@@ -56,7 +56,11 @@ class InventoryRepository {
 
   findMaterialForValuation(materialId) {
     return this.db.queryOne(
-      `SELECT id, organization_id, is_active, base_uom_id
+      `SELECT id,
+              organization_id,
+              status,
+              CASE WHEN status = 'ACTIVE' THEN 1 ELSE 0 END AS is_active,
+              base_uom_id
        FROM materials
        WHERE id = ?`,
       [materialId]
