@@ -12,6 +12,8 @@ const BranchRepository = require('./BranchRepository');
 const BrandRepository = require('./BrandRepository');
 const PosShiftRepository = require('./PosShiftRepository');
 const InventoryRepository = require('./InventoryRepository');
+const UomRepository = require('./UomRepository');
+const MaterialRepository = require('./MaterialRepository');
 const UserRepository = require('./UserRepository');
 const EligibilityRepository = require('./EligibilityRepository');
 const ReportingRepository = require('./ReportingRepository');
@@ -37,6 +39,8 @@ module.exports = {
   BrandRepository,
   PosShiftRepository,
   InventoryRepository,
+  UomRepository,
+  MaterialRepository,
   UserRepository,
   EligibilityRepository,
   ReportingRepository,
