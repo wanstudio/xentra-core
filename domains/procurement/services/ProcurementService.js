@@ -102,7 +102,7 @@ function buildPurchaseLine({ supplierMaterial, quantity, purchaseUomId, supplier
     if (agreedPrice === undefined || agreedPrice === null) throw fail('PURCHASE_PRICE_REQUIRED');
     if (agreedCurrency === undefined || agreedCurrency === null) throw fail('CURRENCY_BASIS_UNRESOLVED');
   } else {
-    if (String(representation.pack.content_quantity_base) <= 0) throw fail('SUPPLIER_MATERIAL_PACK_INVALID');
+    if (Number(representation.pack.content_quantity_base) <= 0) throw fail('SUPPLIER_MATERIAL_PACK_INVALID');
 
     const contentUom = uomRepository.findById(representation.pack.content_uom_id);
     if (!contentUom || Number(contentUom.is_active) !== 1) throw fail('SUPPLIER_MATERIAL_PACK_UOM_INVALID');
@@ -143,10 +143,6 @@ class ProcurementService {
     const supplierName = text(name, 'SUPPLIER_NAME_REQUIRED');
     const lifecycle = String(status || 'DRAFT').toUpperCase();
     if (!['DRAFT', 'ACTIVE', 'ARCHIVED'].includes(lifecycle)) throw fail('SUPPLIER_STATUS_INVALID');
-
-    if (repository.findSupplier(code)) {
-      // findSupplier expects id; uniqueness is enforced by the database.
-    }
 
     const id = 'sup_' + crypto.randomBytes(8).toString('hex');
     const now = new Date().toISOString();
