@@ -280,6 +280,67 @@ class InventoryRepository {
     );
   }
 
+  updateProductValuationBalance({
+    stockLocationId,
+    productId,
+    quantity,
+    carryingValue,
+    movingAverageUnitCost,
+    costAvailabilityStatus,
+    valuationVersion,
+    updatedAt
+  }) {
+    return this.db.execute(
+      'UPDATE product_stock_balances SET quantity = ?, carrying_value = ?, moving_average_unit_cost = ?, cost_availability_status = ?, valuation_version = ?, updated_at = ? WHERE stock_location_id = ? AND product_id = ?',
+      [quantity, carryingValue, movingAverageUnitCost, costAvailabilityStatus, valuationVersion, updatedAt, stockLocationId, productId]
+    );
+  }
+
+  insertProductValuationBalance({
+    stockLocationId,
+    productId,
+    quantity,
+    carryingValue,
+    movingAverageUnitCost,
+    costAvailabilityStatus,
+    valuationVersion,
+    createdAt,
+    updatedAt
+  }) {
+    return this.db.execute(
+      'INSERT INTO product_stock_balances (stock_location_id, product_id, quantity, carrying_value, moving_average_unit_cost, cost_availability_status, valuation_version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [stockLocationId, productId, quantity, carryingValue, movingAverageUnitCost, costAvailabilityStatus, valuationVersion, createdAt, updatedAt]
+    );
+  }
+
+  insertProductValuationMovement({
+    id,
+    stockLocationId,
+    productId,
+    movementType,
+    quantity,
+    previousQuantity,
+    currentQuantity,
+    unitCost,
+    totalCost,
+    currencyCode,
+    costBasisType,
+    sourceType,
+    sourceReference,
+    postingMutationId,
+    valuationVersion,
+    postingTimestamp,
+    resolverVersion = 'v1',
+    actorId = null,
+    notes = null,
+    sourceMovementId = null
+  }) {
+    return this.db.execute(
+      'INSERT INTO product_stock_movements (id, stock_location_id, product_id, movement_type, quantity, previous_quantity, current_quantity, unit_cost, total_cost, currency_code, valuation_method, cost_basis_type, source_type, source_reference, source_movement_id, posting_mutation_id, valuation_version, posting_timestamp, actor_id, resolver_version, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \'MOVING_AVERAGE\', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, stockLocationId, productId, movementType, quantity, previousQuantity, currentQuantity, unitCost, totalCost, currencyCode, costBasisType, sourceType, sourceReference, sourceMovementId, postingMutationId, valuationVersion, postingTimestamp, actorId, resolverVersion, notes]
+    );
+  }
+
   ensureBranchProductInventory({ branchId, productId, lowStockThreshold = 5 }) {
     const product = this._findProductStockIdentity(productId);
     if (!product) return { changes: 0 };
