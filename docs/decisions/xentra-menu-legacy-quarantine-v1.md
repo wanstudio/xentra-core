@@ -1,251 +1,111 @@
 # Xentra Legacy Menu Architecture Quarantine v1
 
-**Status:** LOCKED — LEGACY QUARANTINE / NON-CANONICAL  
-**Date:** 2026-09-29  
-**Superseded by:** `docs/proposals/xentra-taxonomy-composed-menu-v1.md` (LOCKED TARGET CONTRACT, 2026-10-03)
+**Status:** 🔒 LOCKED — LEGACY QUARANTINE / NON-CANONICAL  
+**Original date:** 2026-09-29  
+**Current forward authority:** `docs/decisions/catalog-menu-domain-contract-v2.md`  
+**Current Item Choice authority:** `docs/decisions/xentra-menu-item-choice-template-contract-v1.md`
 
 ## 1. Purpose
 
-This document quarantines the previous Branch Catalog / Menu architecture so legacy behavior does not contaminate the approved new Master Menu Composition direction.
+This document quarantines the earlier Branch Catalog / Product-centric Menu implementation so legacy behavior is not reintroduced into the current Menu architecture.
 
-The quarantine is an **architecture boundary**, not a destructive data purge.
+It is a **migration boundary**, not a second active Menu contract.
 
-## 2. New canonical direction
+## 2. What is quarantined
 
-The canonical forward direction is defined by the locked Product → Menu → Inventory contract:
+The following earlier mechanisms remain legacy/compatibility material:
 
-```
-Owner creates Product / Menu composition
-    ↓
-Menu Satuan / Menu Paket becomes the commercial selling entity
-    ↓
-Branch adopts Menu
-    ↓
-Branch Menu Category membership + Branch operational state
-    ↓
-Customer PWA consumes resolved Menu View Model
-    ↓
-Order stores immutable Menu + component snapshots
-```
+- legacy Branch Product content overrides;
+- legacy Product/Menu snapshot fields;
+- legacy scalar Branch Category relation;
+- old Product-centric Menu composition;
+- old Product Options/variation structures where they conflict with the new Menu Item Choice contract;
+- legacy Menu/Product endpoints that expose the old composition model.
 
-Product remains the reusable atomic stock identity. Menu owns the customer-facing selling identity, taxonomy, composition and selling price. Branch adoption is Menu-scoped; Product inventory is separate.
+Their presence in source or database does not make them current business authority.
 
-## 3. Legacy behavior now quarantined
+## 3. Current forward Menu model
 
-The following are **legacy/non-canonical** for the new Menu architecture:
-
-### Branch Product legacy content overrides
+New Menu work follows:
 
 ```
-branch_products.description_override
-branch_products.image_override
+Menu
+├── Category
+├── Title
+└── Menu Items
+     └── optional Item Choices
 ```
 
-These legacy fields MUST NOT be used for new Customer Menu composition work. They remain temporarily for compatibility and migration only.
+Category is grouping/classification.
 
-### Branch Product name override
+Title is explicit customer-facing commercial naming.
 
-`branch_products.name_override` is **not legacy anymore**. It is the narrow canonical Branch Customer Display Name Override governed by:
+Item Choice belongs to a specific Menu Item.
 
-`docs/decisions/xentra-product-name-category-display-boundary-v1.md`
+Use:
+- `docs/decisions/catalog-menu-domain-contract-v2.md`
+- `docs/decisions/xentra-menu-item-choice-template-contract-v1.md`
 
-and the corresponding Master Menu Composition branch-adoption contract.
+Do not derive new behavior from the historical Product → Rasa/Complement/Level composition described by earlier versions of this document.
 
-It is presentation-only, Branch-scoped, and does not change Master Product identity, taxonomy, composition, image ownership, or Menu pricing.
+## 4. Legacy compatibility rule
 
-Forward Merchant UI must use the canonical Menu display-name endpoint:
+Legacy routes, fields, and adapters may remain while migration requires them.
 
-```
-PATCH /admin/branches/:branchId/menu/:menuId/display-name
-```
+They must:
+- remain explicitly marked as compatibility/legacy;
+- not become a new source of truth;
+- not be extended to satisfy new Menu requirements;
+- not be exposed as the canonical Owner Menu authoring model;
+- be removed only after consumer/data migration evidence is complete.
 
-### Legacy Branch override UI
+## 5. Branch boundary
 
-The former Branch Catalog UI that exposed:
+Branch adoption/operations remain separate from Owner Menu authoring.
 
-- free-form branch description override;
-- branch image override;
-- branch price override;
-- legacy scalar category override;
+Branch does not create a second Master Menu composition.
 
-is legacy compatibility UI.
+Branch operational availability and Inventory stock remain separate authorities.
 
-It has been removed from the forward Branch Catalog surfaces in PR #7. The remaining Product Override modal/transport is retained only for historical/compatibility boundaries and must not regain an active caller.
+The exact active Branch adoption and permission rules are governed by their current contracts; this quarantine document does not redefine them.
 
-### Legacy Branch override API
+## 6. Customer boundary
 
-```
-PATCH /admin/branches/:id/products/:productId/override
-```
+New Customer PWA/Menu work must consume the current resolved Menu contract.
 
-is legacy compatibility infrastructure.
+Do not reconstruct customer Menu semantics from:
+- legacy Product fields;
+- legacy Branch override fields;
+- old Product composition relations;
+- raw internal Item/Product fields.
 
-No new field may be added to this endpoint for the new Menu Composition model. Forward Branch Catalog UI must not call it.
+## 7. Migration / retirement
 
-### Legacy snapshot columns
-
-```
-product_name
-product_description
-product_image_url
-```
-
-are migration/backward-compatibility columns only.
-
-They are not a new data source for Customer Menu composition.
-
-### Legacy scalar Branch Category relation
-
-```
-branch_products.branch_category_id
-```
-
-is not the canonical Branch Category membership authority.
-
-The canonical relationship is:
-
-```
-branch_product_categories
-```
-
-with Branch scope enforced by Core.
-
-## 4. What remains valid and is NOT quarantined
-
-These concepts remain valid:
-
-- Master Product identity;
-- Master Category ownership by Owner/Brand;
-- Menu ownership of customer-facing selling identity;
-- Branch Menu adoption (`branch_menus`);
-- Branch Category ownership;
-- Branch availability;
-- Branch stock / Inventory authority;
-- Pricing Policy;
-- existing POS Variant/Add-on contract in `products.options_config`;
-- immutable order snapshots;
-- RBAC and branch scope;
-- audit and Core authorization.
-
-Quarantine applies to the **old Menu composition/override mechanism**, not to the whole Catalog, Branch, Inventory, POS, or Order architecture.
-
-## 5. Runtime compatibility rule
-
-Until migration is complete, legacy runtime paths may continue to exist because old data, tests, and compatibility clients can still depend on them. They are not permission for forward code to consume the legacy model.
-
-Current forward runtime boundary:
-
-- Customer Home/catalog → `/catalog/composed-menu` / `/catalog/composed-menu/search` → `ComposedMenuResolver`.
-- Customer Checkout canonical verification → `ComposedMenuCheckoutService` → `ComposedMenuResolver` and `menus.selling_price`.
-- POS catalog → `/catalog/composed-menu?branch_id=...`.
-- Banner Product CTA → canonical composed Menu component resolution only; Product ID is an identity pointer, never commercial authority.
-- `/catalog/menu` and `/home` are legacy compatibility endpoints and may call `CatalogService` only for compatibility consumers/tests.
-- `/products` is a legacy Product listing endpoint; it must not become a source for canonical Customer/POS/Checkout Menu state.
-- `MasterMenuResolver` is retained only for explicit legacy compatibility/admin paths and must not replace `ComposedMenuResolver` in forward commerce.
-
-However:
-
-1. no new feature may depend on legacy override fields;
-2. no new Customer PWA presentation may be designed around legacy free-text overrides;
-3. no new Merchant Menu UX may expose legacy override semantics as the canonical model;
-4. all new Menu APIs must use the new structured composition contract;
-5. migration work may read legacy fields only to reconcile existing data;
-6. legacy paths must be removed or disabled after migration acceptance.
-
-## 6. Agent / implementation rule
-
-When an AI agent, developer, or future implementation task encounters conflicting references:
-
-- the **Master Menu Composition & Branch Adoption Contract v1** is the forward-looking Menu architecture;
-- this document marks the previous Branch Override/Snapshot mechanisms as legacy;
-- old docs mentioning Branch Override/Snapshot are historical unless explicitly marked as still authoritative for an unrelated domain;
-- do not revive legacy behavior merely because existing source code still contains it.
-
-## 7. Documentation reconciliation
-
-The following legacy documents/sections must not remain authoritative for Menu composition:
-
-- `docs/BRANCH_CATALOG_MODEL.md` — mark SUPERSEDED; retain for history only.
-- prior Branch Catalog Snapshot / Save Point language — historical.
-- prior Master Product Default + Branch Optional Override language for Menu content — superseded for the new Menu composition direction.
-- Merchant Menu IA references to name/description/image overrides — superseded by the new structured Master composition model.
-
-The existing POS `options_config` contract is explicitly excluded from this supersession.
-
-## 8. Migration boundary
-
-Migration must be explicit and staged:
+Use the existing staged migration principle:
 
 ```
 Legacy data
    ↓
 reconcile / map
    ↓
-Master Component Library
+canonical Menu model
    ↓
-Product Composition relations
+switch consumers
    ↓
-Branch Adoption
+verify
    ↓
-Customer Menu resolver
-   ↓
-legacy path removal
+remove legacy paths
 ```
 
-Do not perform destructive deletion of legacy columns before migrated data has been verified.
+Destructive cleanup is always a separate verified step.
 
-## 9. Completion criteria
+## 8. Worker rule
 
-Quarantine is considered complete only when:
+When a source file, test, or historical document conflicts with the current Menu contract:
 
-- new Menu composition is the sole canonical Customer Menu path;
-- Merchant cannot edit Master composition;
-- Customer PWA no longer depends on legacy branch content overrides;
-- legacy override endpoint has no active consumer;
-- legacy override UI has no active consumer;
-- Branch Category M:N is canonical;
-- migration tests prove no meaningful legacy data is lost;
-- legacy compatibility fields can be removed or formally archived.
+1. classify the conflicting material as current, compatibility, superseded, or historical;
+2. follow the current locked contract for new work;
+3. do not make a legacy behavior canonical merely because existing tests pass;
+4. if the current contract itself is insufficient, stop and record the missing business decision before inventing a substitute.
 
-**LOCKED — Legacy Menu/Snapshot/Branch-Override architecture is quarantined. It is retained only as compatibility material until the new Master Menu Composition migration is accepted.**
-
-
-## 6. Legacy endpoint retirement readiness — 2026-10-04
-
-Forward runtime inventory now confirms:
-
-- Customer catalog uses `/catalog/composed-menu`; `/products` and `/catalog/menu` are compatibility-only.
-- Merchant/Owner Branch Catalog uses canonical Branch Menu transport.
-- Merchant `Hari Ini` availability alerts use `GET /admin/branches/:id/menu`; the previous legacy `GET /admin/branches/:id/products` read has been removed.
-- The quarantined `GET /admin/branches/:id/products` route has exactly one registration owner: `server/routes/admin-branch-catalog.js`. Its duplicate registration in `admin-branch-operations.js` was removed.
-- Shared client methods `setBranchProductAvailability`, `removeBranchProduct`, and `updateBranchProductOverride` remain exported only for compatibility; forward Owner/Merchant branch-catalog UI must not call them.
-- Owner Promotion Builder writes `target_menu_id` only. Existing legacy promotions with only `target_product_id` must be migrated by selecting a canonical Menu before the UI will save edits.
-- API/repository support for `target_product_id` remains compatibility-only until legacy rows are explicitly migrated; it must not regain forward UI authority.
-
-Retirement rule: do not delete compatibility routes/fields solely because forward UI no longer calls them. Removal requires a separate data migration and compatibility-consumer inventory proving no deployed older client still depends on them.
-
-## 10. Legacy data readiness inventory — 2026-10-04
-
-A read-only inventory service now exists at:
-
-`domains/catalog/services/LegacyDataReadinessService.js`
-
-It is intentionally **report-only** and issues SELECT statements only. It does not reconcile, migrate, update, or delete any data.
-
-The inventory reports:
-
-- Product migration status and schema-version distribution;
-- Products that do or do not have canonical Menu composition references through `menu_items`;
-- legacy Promotion Rewards that still target Product, including whether the Product resolves to zero, one, or multiple canonical Menu candidates in the same brand;
-- legacy `branch_products` assignments, including whether exactly one canonical `branch_menus` adoption exists for the same branch;
-- legacy `branch_product_categories` row count;
-- cross-brand canonical Product → Menu integrity anomalies.
-
-Readiness statuses:
-
-- `CANONICAL_READY` — no remaining compatibility data/blocker was detected by this inventory;
-- `LEGACY_REQUIRES_MIGRATION` — legacy rows remain, but the inventory found no unresolved/ambiguous mapping;
-- `NEEDS_REVIEW` — at least one legacy Product reference has zero or multiple canonical candidates;
-- `BLOCKED` — canonical Product/Menu brand integrity is inconsistent.
-
-This report is a **prerequisite for retirement**, not a migration command. A status other than `CANONICAL_READY` must not be interpreted as permission to delete legacy fields, routes, or compatibility transports.
+**LOCKED — legacy Menu architecture remains quarantined and is not a competing implementation authority.**
