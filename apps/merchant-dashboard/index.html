@@ -4197,6 +4197,54 @@
     </div>
   </div>
 
+  <!-- =========================================================================
+       BOTTOM SHEET: PILIH TIPE MENU (MENU SATUAN VS MENU PAKET)
+       Reference: Frame 193 (2).png
+       Muncul saat tombol [+ Tambah Menu] diklik di Menu Master
+       ========================================================================= -->
+  <button type="button" class="x-bottom-sheet-ext-close" id="sheet-menu-type-ext-close" onclick="closeMenuTypeSheet()" aria-label="Tutup">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+  </button>
+  <div class="x-bottom-sheet-overlay" id="sheet-menu-type-overlay" style="display:none;" onclick="closeMenuTypeSheet()"></div>
+  <div class="x-bottom-sheet" id="sheet-menu-type" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="sheet-menu-type-title">
+    <div class="x-bottom-sheet-handle"></div>
+    <div style="padding:4px 4px 16px;">
+      <h3 id="sheet-menu-type-title" style="margin:0 0 16px 0; font-size:17px; font-weight:700; color:#0F172A; text-align:left;">
+        Mau jual satuan atau sekalian paket?
+      </h3>
+      
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <!-- Option 1: Menu Satuan -->
+        <button type="button" class="x-menu-type-card-btn" onclick="selectMenuTypeAndProceed('SINGLE')" style="display:flex; align-items:center; width:100%; padding:14px; background:#FFFFFF; border:1px solid #E2E8F0; border-radius:18px; box-shadow:0 2px 8px rgba(0,0,0,0.04); cursor:pointer; text-align:left; transition:border-color 0.15s ease, background 0.15s ease;">
+          <div style="width:64px; height:64px; min-width:64px; border:1px solid #E2E8F0; border-radius:14px; display:flex; align-items:center; justify-content:center; background:#FFFFFF; margin-right:14px;">
+            <img src="/merchant-dashboard/assets/icons/menu/menu-satuan.png" alt="Menu Satuan" style="width:48px; height:48px; object-fit:contain;">
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:15px; font-weight:700; color:#0F172A; margin-bottom:4px;">Menu Satuan</div>
+            <div style="font-size:12px; color:#64748B; line-height:1.35;">Satu menu, satu pilihan untuk pelanggan.</div>
+          </div>
+          <div style="color:#94A3B8; margin-left:8px; display:flex; align-items:center;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </div>
+        </button>
+
+        <!-- Option 2: Menu Paket -->
+        <button type="button" class="x-menu-type-card-btn" onclick="selectMenuTypeAndProceed('PACKAGE')" style="display:flex; align-items:center; width:100%; padding:14px; background:#FFFFFF; border:1px solid #E2E8F0; border-radius:18px; box-shadow:0 2px 8px rgba(0,0,0,0.04); cursor:pointer; text-align:left; transition:border-color 0.15s ease, background 0.15s ease;">
+          <div style="width:64px; height:64px; min-width:64px; border:1px solid #E2E8F0; border-radius:14px; display:flex; align-items:center; justify-content:center; background:#FFFFFF; margin-right:14px;">
+            <img src="/merchant-dashboard/assets/icons/menu/menu-paket.png" alt="Menu Paket" style="width:48px; height:48px; object-fit:contain;">
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:15px; font-weight:700; color:#0F172A; margin-bottom:4px;">Menu Paket</div>
+            <div style="font-size:12px; color:#64748B; line-height:1.35;">Gabungkan beberapa menu jadi satu pilihan.</div>
+          </div>
+          <div style="color:#94A3B8; margin-left:8px; display:flex; align-items:center;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- PRESENTATION CONTENT: MASTER REFERENCE QUICK ADD
        The content is feature-owned; XentraPresentation supplies the casing. -->
   <div id="master-reference-quick-add-anchor" hidden></div>

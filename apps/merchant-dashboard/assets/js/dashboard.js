@@ -7102,10 +7102,9 @@ async function loadMenusView() {
       });
   }
 
-  function archiveOwnerMaterial(id, name) {
-    if (!confirm('Apakah Anda yakin ingin mengarsipkan bahan baku "' + name + '"?')) {
-      return;
-    }
+  async function archiveOwnerMaterial(id, name) {
+    var confirmed = await confirmFeatureAction('archive-material', 'Arsipkan Bahan Baku', 'Apakah Anda yakin ingin mengarsipkan bahan baku "' + name + '"?', 'Arsipkan');
+    if (!confirmed) return;
 
     adminFetch('/api/admin/materials/' + encodeURIComponent(id) + '/archive', {
       method: 'PUT',
@@ -13043,6 +13042,55 @@ async function loadMenusView() {
     navigateTo('catalog/master-menus/new');
   }
 
+  function openMenuTypeSheet() {
+    document.body.classList.add('x-sheet-open');
+    var overlay = $('sheet-menu-type-overlay');
+    var sheet = $('sheet-menu-type');
+    var extClose = $('sheet-menu-type-ext-close');
+
+    if (overlay) {
+      overlay.style.display = 'block';
+      setTimeout(function () { overlay.classList.add('open'); }, 10);
+    }
+    if (sheet) {
+      sheet.style.display = 'block';
+      setTimeout(function () {
+        sheet.classList.add('open');
+        if (extClose) {
+          var sheetH = sheet.offsetHeight || 280;
+          extClose.style.bottom = (sheetH + 12) + 'px';
+          extClose.classList.add('open');
+        }
+      }, 10);
+    }
+  }
+
+  function closeMenuTypeSheet() {
+    document.body.classList.remove('x-sheet-open');
+    var extClose = $('sheet-menu-type-ext-close');
+    var overlay = $('sheet-menu-type-overlay');
+    var sheet = $('sheet-menu-type');
+
+    if (extClose) extClose.classList.remove('open');
+    if (overlay) {
+      overlay.classList.remove('open');
+      setTimeout(function () { overlay.style.display = 'none'; }, 260);
+    }
+    if (sheet) {
+      sheet.classList.remove('open');
+      setTimeout(function () { sheet.style.display = 'none'; }, 280);
+    }
+  }
+
+  function selectMenuTypeAndProceed(type) {
+    closeMenuTypeSheet();
+    openNewOwnerMasterMenu(type);
+  }
+
+  window.openMenuTypeSheet = openMenuTypeSheet;
+  window.closeMenuTypeSheet = closeMenuTypeSheet;
+  window.selectMenuTypeAndProceed = selectMenuTypeAndProceed;
+
   window.XentraOwnerMasterMenu = {
     upsertDependency: upsertOwnerMasterMenuDependency,
     addPackageProduct: addOwnerMasterMenuPackageProduct
@@ -13195,7 +13243,7 @@ async function loadMenusView() {
     }
 
     var addMenu = $('btn-add-master-menu');
-    if (addMenu) addMenu.addEventListener('click', function() { openNewOwnerMasterMenu('SINGLE'); });
+    if (addMenu) addMenu.addEventListener('click', function() { openMenuTypeSheet(); });
     if (addSingle) addSingle.addEventListener('click', function() { openNewOwnerMasterMenu('SINGLE'); });
     if (addPackage) addPackage.addEventListener('click', function() { openNewOwnerMasterMenu('PACKAGE'); });
 

@@ -5420,7 +5420,7 @@ input[type="file"].x-input,
   /* Owner mobile application shell: route content scrolls independently from persistent chrome. */
   body:not(.x-merchant-app) .x-dash-main {
     padding-top: max(68px, calc(68px + env(safe-area-inset-top, 0px))) !important;
-    padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px)) !important;
   }
 
   /* Owner Command Center on Mobile */
@@ -5925,6 +5925,21 @@ input[type="file"].x-input,
     background: #0f172a;
     transform: scale(0.98);
   }
+
+  /* Bottom Sheet: Menu Type Selection (Single vs Package) - Frame 193 (2).png */
+  .x-menu-type-card-btn {
+    transition: transform 0.12s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .x-menu-type-card-btn:hover {
+    border-color: #CBD5E1 !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.07) !important;
+  }
+  .x-menu-type-card-btn:active {
+    transform: scale(0.985);
+    background: #F8FAFC !important;
+  }
+
   .x-occ-custom-range-row {
     display: flex;
     align-items: center;
