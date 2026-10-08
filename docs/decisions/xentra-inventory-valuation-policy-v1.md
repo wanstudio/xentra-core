@@ -1054,7 +1054,8 @@ Cost Resolution Contract v1
 Cost-bearing Stock Movement Data Model v1
         ✅ LOCKED
               ↓
-Goods Receipt Cost Posting Integration
+Goods Receipt Cost Posting Integration v1
+        ✅ LOCKED
               ↓
 Production Cost Snapshot / Output Cost
               ↓
