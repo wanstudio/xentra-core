@@ -28,16 +28,16 @@ function normalizeLines(lines) {
 }
 
 class GoodsReceiptCostPostingService {
-  static postGoodsReceipt({ goodsReceiptId, goodsReceiptPostingId, stockLocationId, postingTimestamp, actorId = null, lines, repository = inventoryRepository }) {
+  static postGoodsReceipt({ goodsReceiptId, goodsReceiptPostingId, stockLocationId, postingTimestamp, actorId = null, lines, repository = inventoryRepository, manageTransaction = true }) {
     const receiptId = text(goodsReceiptId, 'GOODS_RECEIPT_ID_REQUIRED');
     const aggregateId = text(goodsReceiptPostingId, 'GOODS_RECEIPT_POSTING_ID_REQUIRED');
     const locationId = text(stockLocationId, 'STOCK_LOCATION_REQUIRED');
     const timestamp = text(postingTimestamp, 'POSTING_TIMESTAMP_REQUIRED');
     const normalizedLines = normalizeLines(lines);
 
-    // Begin the authoritative write transaction before idempotency/source checks.
-    // BEGIN IMMEDIATE serializes competing receipt postings on this DB connection.
-    repository.beginTransaction();
+    // The caller may already own a larger Procurement transaction. When this
+    // boundary is used standalone, it owns BEGIN/COMMIT/ROLLBACK itself.
+    if (manageTransaction) repository.beginTransaction();
     try {
       const existing = normalizedLines.map((line) => repository.findMaterialValuationMovementByPostingMutationId(line.mutationId));
       const existingCount = existing.filter(Boolean).length;
@@ -53,7 +53,7 @@ class GoodsReceiptCostPostingService {
           }
         }
 
-        repository.commitTransaction();
+        if (manageTransaction) repository.commitTransaction();
 
         return {
           success: true,
@@ -102,10 +102,12 @@ class GoodsReceiptCostPostingService {
         if (!inserted || inserted.changes !== 1) throw fail('VALUATION_STATE_INVALID');
         posted.push({ movement_id: movementId(line.mutationId), material_id: line.materialId, accepted_quantity_base: resolution.quantity_base, unit_cost: resolution.unit_cost, total_cost: resolution.total_cost, currency_code: resolution.currency_code, valuation_version: transition.valuation_version, posting_mutation_id: line.mutationId });
       }
-      repository.commitTransaction();
+      if (manageTransaction) repository.commitTransaction();
       return { success: true, idempotent: false, goods_receipt_id: receiptId, goods_receipt_posting_id: aggregateId, stock_location_id: locationId, posting_timestamp: timestamp, movements: posted };
     } catch (e) {
-      try { repository.rollbackTransaction(); } catch (_) {}
+      if (manageTransaction) {
+        try { repository.rollbackTransaction(); } catch (_) {}
+      }
       throw e;
     }
   }
