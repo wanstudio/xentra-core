@@ -435,7 +435,8 @@ class ProcurementService {
         stockLocationId: po.destination_stock_location_id,
         postingTimestamp,
         actorId: actor,
-        lines: inventoryLines
+        lines: inventoryLines,
+        manageTransaction: false
       });
 
       for (const line of normalized) {
