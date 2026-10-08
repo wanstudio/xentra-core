@@ -169,10 +169,13 @@ Product
 
 A Production Item is a production/preparation definition, not a second Product master.
 
-Core recommendation:
+Core relation:
 `production_items.output_product_id → products.id`.
 
-The Product ↔ Production Item relationship is locked by `docs/decisions/xentra-production-item-recipe-bom-contract-v1.md`: Product → 0..N Production Items, each Production Item has exactly one `output_product_id`, and routing must resolve one unambiguous active Production Item for the production context.
+The Product ↔ Production Item relationship is locked by `docs/decisions/xentra-production-item-recipe-bom-contract-v1.md`.
+
+Production Item location applicability is represented by a logical `production_item_locations` relation to `stock_locations`.
+For v1, one Product + one Production Stock Location may have only one active Production Item. Routing therefore resolves deterministically: exactly one active route proceeds; zero is `PRODUCTION_ROUTE_NOT_FOUND`; more than one is a data-integrity failure.
 
 ## 11. Recipe and Recipe Version
 
@@ -384,7 +387,8 @@ Catalog resolves composition. Production decides production impact. Inventory po
 ## 23. Still OPEN
 
 Do not lock these from this document:
-- exact Recipe / Production Item location applicability schema;
+- exact `production_item_locations` column/effective-date implementation;
+- advanced route priority when multiple methods must coexist at one location;
 - exact WIP / multi-step production model beyond the v1 direct issue-and-produce flow;
 - semi-finished/by-product model;
 - lot/expiry activation and data model;
