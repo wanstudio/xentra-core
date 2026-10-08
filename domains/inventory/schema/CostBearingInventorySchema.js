@@ -266,6 +266,30 @@ function ensureCostBearingInventorySchema(db) {
       END;
     END;
 
+    CREATE TRIGGER IF NOT EXISTS trg_material_stock_movement_transfer_value
+    BEFORE INSERT ON material_stock_movements
+    FOR EACH ROW
+    WHEN NEW.movement_type = 'TRANSFER_IN'
+    BEGIN
+      SELECT CASE
+        WHEN NEW.source_movement_id IS NULL
+          OR abs(
+            (SELECT total_cost
+               FROM material_stock_movements
+              WHERE id = NEW.source_movement_id) + NEW.total_cost
+          ) > 0.000001
+          OR abs(
+            (SELECT abs(quantity_base)
+               FROM material_stock_movements
+              WHERE id = NEW.source_movement_id) - abs(NEW.quantity_base)
+          ) > 0.000001
+          OR (SELECT stock_location_id
+                FROM material_stock_movements
+               WHERE id = NEW.source_movement_id) = NEW.stock_location_id
+        THEN RAISE(ABORT, 'TRANSFER_CARRIED_VALUE_INVALID')
+      END;
+    END;
+
     CREATE TRIGGER IF NOT EXISTS trg_material_stock_movement_balance_match
     AFTER INSERT ON material_stock_movements
     FOR EACH ROW
@@ -401,6 +425,30 @@ function ensureCostBearingInventorySchema(db) {
                WHERE id = NEW.source_movement_id) <> NEW.product_id
           OR NEW.source_movement_id = NEW.id
         THEN RAISE(ABORT, 'TRANSFER_SOURCE_MOVEMENT_INVALID')
+      END;
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_product_stock_movement_transfer_value
+    BEFORE INSERT ON product_stock_movements
+    FOR EACH ROW
+    WHEN NEW.movement_type = 'TRANSFER_IN'
+    BEGIN
+      SELECT CASE
+        WHEN NEW.source_movement_id IS NULL
+          OR abs(
+            (SELECT total_cost
+               FROM product_stock_movements
+              WHERE id = NEW.source_movement_id) + NEW.total_cost
+          ) > 0.000001
+          OR abs(
+            (SELECT abs(quantity)
+               FROM product_stock_movements
+              WHERE id = NEW.source_movement_id) - abs(NEW.quantity)
+          ) > 0.000001
+          OR (SELECT stock_location_id
+                FROM product_stock_movements
+               WHERE id = NEW.source_movement_id) = NEW.stock_location_id
+        THEN RAISE(ABORT, 'TRANSFER_CARRIED_VALUE_INVALID')
       END;
     END;
 
