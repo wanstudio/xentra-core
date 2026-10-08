@@ -44,7 +44,7 @@ Locked invariants:
 - Branch-direct, central, and hybrid supply use the same domain model.
 - Make-to-order may be introduced later without creating alternate domains.
 
-Detailed schema, UOM, costing/HPP, Recipe versioning, Product ↔ Production Item cardinality, planning mode, and Choice → Material mapping remain separate OPEN gates.
+Detailed target schema and selected policy mechanics remain separate implementation/policy gates. Production Item cardinality, Recipe Versioning, Transfer State Machine, Costing/HPP boundary, and UOM Master + Precision/Rounding are governed by their dedicated locked contracts.
 
 ---
 
@@ -172,7 +172,7 @@ Canonical concepts:
 - Product;
 - Menu;
 - Menu Item;
-- Menu Package;
+- Menu composition;
 - Master catalog taxonomy;
 - Branch Menu adoption/configuration;
 - customer-facing Menu resolution.
@@ -206,7 +206,7 @@ Canonical concepts:
 - Production Item;
 - Recipe;
 - Recipe Component;
-- Bill of Materials (BoM);
+- Recipe;
 - Yield;
 - Production Batch;
 - Production Output;
@@ -229,7 +229,7 @@ Production does not own:
 Canonical concepts:
 
 - Material;
-- Raw Material;
+- Material input classification;
 - material identity/specification needed by production/procurement.
 
 Material answers:
@@ -246,10 +246,11 @@ Material does not own:
 
 Canonical concepts:
 
-- Product Stock;
-- Material Stock;
-- Stock Balance;
-- Stock Movement;
+- Product Stock Balance;
+- Material Stock Balance;
+- Product Stock Movement;
+- Material Stock Movement;
+- Inventory Transfer;
 - inventory mutation/ledger authority.
 
 Inventory answers:
@@ -268,8 +269,8 @@ Canonical concepts:
 - Supplier Material / supplier-specific sourcing definition;
 - Purchase Request;
 - Purchase Order;
-- Purchase Line;
-- Goods Receipt / Receiving workflow;
+- Purchase Order Line;
+- Goods Receipt;
 - procurement document lifecycle.
 
 Procurement answers:
@@ -357,20 +358,20 @@ CATALOG
         ▼
 PRODUCTION
   Production Item
-  Recipe / BoM
+  Recipe
   Production Batch
         │
         │ consumes
         ▼
 MATERIAL
-  Material / Raw Material
+  Material
         │
         │ held as stock
         ▼
 INVENTORY
   Material Stock
   Product Stock
-  Stock Balance / Movement
+  Product Stock Balance / Material Stock Balance / typed Stock Movement
         ▲
         │ verified receipt / replenishment input
         │
@@ -378,7 +379,7 @@ PROCUREMENT
   Supplier
   Purchase Request
   Purchase Order
-  Purchase Line
+  Purchase Order Line
   Goods Receipt
 ```
 
@@ -412,7 +413,7 @@ Menu: Ayam Geprek
 → Material requirements
 ```
 
-The exact Product ↔ Production Item schema is intentionally **not fully locked by this decision**. The semantic separation is locked; the concrete foreign-key design requires a dedicated implementation design after vocabulary audit.
+The Product ↔ Production Item relationship and deterministic routing rule are locked by the dedicated Production Item + Recipe / BoM and Production Routing contracts. The concrete database schema remains an implementation detail.
 
 ### 8.2 Product is not Material
 
@@ -580,8 +581,7 @@ The following remain intentionally open until their own audit/design:
 
 - exact database table names for Production;
 - exact database table names for Material;
-- exact Product ↔ Production Item cardinality;
-- exact Recipe/BoM versioning model;
+- exact database table structure for locked domain contracts;
 - batch scheduling/planning;
 - make-to-stock vs make-to-order policy;
 - waste accounting semantics beyond future explicit contracts;
@@ -589,9 +589,11 @@ The following remain intentionally open until their own audit/design:
 - reorder quantity algorithm;
 - supplier pricing/pack-size normalization details;
 - automatic shopping-list generation algorithm;
-- exact Goods Receipt entity decomposition;
+- exact Goods Receipt decomposition;
 - whether all Production Items are inventory-stocked;
-- whether all Materials are branch-scoped or centrally mastered.
+- whether all Materials are branch-scoped or centrally mastered;
+- exact valuation method and accounting integration;
+- transfer variance/loss/damage workflow.
 
 No implementation may infer these as locked from this document.
 
