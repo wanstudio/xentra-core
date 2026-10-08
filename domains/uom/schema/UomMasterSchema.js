@@ -40,19 +40,6 @@ function ensureUomMasterSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_uoms_category_active
       ON uoms(category_id, is_active, code);
 
-    CREATE TRIGGER IF NOT EXISTS trg_uom_category_reference_insert
-    BEFORE INSERT ON uom_categories
-    FOR EACH ROW
-    WHEN NEW.reference_uom_id IS NOT NULL
-      AND (
-        (SELECT id FROM uoms WHERE id = NEW.reference_uom_id) IS NULL
-        OR
-        (SELECT category_id FROM uoms WHERE id = NEW.reference_uom_id) <> NEW.id
-      )
-    BEGIN
-      SELECT RAISE(ABORT, 'UOM_REFERENCE_INVALID');
-    END;
-
     CREATE TRIGGER IF NOT EXISTS trg_uom_category_reference_update
     BEFORE UPDATE OF reference_uom_id ON uom_categories
     FOR EACH ROW
@@ -76,22 +63,6 @@ function ensureUomMasterSchema(db) {
     BEGIN
       SELECT RAISE(ABORT, 'UOM_REFERENCE_DELETE_FORBIDDEN');
     END;
-
-    CREATE TRIGGER IF NOT EXISTS trg_uom_category_must_have_reference
-    AFTER INSERT ON uom_categories
-    FOR EACH ROW
-    WHEN NEW.reference_uom_id IS NULL
-    BEGIN
-      SELECT RAISE(ABORT, 'UOM_REFERENCE_REQUIRED');
-    END;
-
-    CREATE TRIGGER IF NOT EXISTS trg_uom_category_reference_update_required
-    BEFORE UPDATE OF reference_uom_id ON uom_categories
-    FOR EACH ROW
-    WHEN NEW.reference_uom_id IS NULL
-    BEGIN
-      SELECT RAISE(ABORT, 'UOM_REFERENCE_REQUIRED');
-    END;
   `);
 
   // Seed the platform-owned canonical vocabulary. Existing rows are never overwritten.
@@ -101,22 +72,10 @@ function ensureUomMasterSchema(db) {
     ['uom_cat_count', 'COUNT', 'Count', 'uom_pcs']
   ];
 
-  // Reference UOM triggers require the category to already have a reference.
-  // For bootstrap, create categories with a temporary NULL only through direct
-  // SQL before the trigger, then establish the reference and never allow NULL
-  // in normal writes.
   for (const [id, code, name] of categories) {
-    db.exec(`INSERT OR IGNORE INTO uom_categories (id, code, name, reference_uom_id) VALUES ('${id}', '${code}', '${name}', 'bootstrap')`);
-  }
-
-  // The bootstrap INSERT above may be rejected by the reference trigger on a fresh DB.
-  // Replace the bootstrap path with explicit upsert/update if needed.
-  for (const [id, code, name] of categories) {
-    const exists = db.prepare('SELECT id FROM uom_categories WHERE id = ?').get(id);
-    if (!exists) {
-      db.exec('PRAGMA recursive_triggers = OFF');
-      db.prepare('INSERT INTO uom_categories (id, code, name, reference_uom_id) VALUES (?, ?, ?, NULL)').run(id, code, name);
-    }
+    db.prepare(
+      'INSERT OR IGNORE INTO uom_categories (id, code, name, reference_uom_id) VALUES (?, ?, ?, NULL)'
+    ).run(id, code, name);
   }
 
   const units = [
