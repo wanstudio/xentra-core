@@ -1,3 +1,48 @@
+# 🔒 CURRENT RECONCILIATION — Catalog / Menu Authoring v1 — 2026-10-08
+
+This entry is the current reconciliation point for older Catalog/Menu notes in this snapshot.
+
+## Active decisions
+
+The forward Owner Menu model is:
+
+```
+Menu
+├── Category       → grouping/classification
+├── Title          → explicit customer-facing commercial name
+└── Menu Items
+     └── optional Item Choices
+```
+
+Item Choice is scoped to the specific Menu Item. There is no separate global Menu Configuration section that duplicates Item input.
+
+When an Owner adds an Item Choice:
+1. Owner selects an Xentra-provided choice template.
+2. The template establishes semantic meaning, validation, and presentation policy.
+3. Owner edits the customer-facing label/values.
+4. Owner chooses whether **Kamu mengatur** the value or **Pelanggan memilih** it.
+5. A Custom choice uses the generic renderer; the Owner never creates a custom UI component/template.
+
+The UI renderer is data-driven and must not infer semantics from display labels. For example, a choice displayed as **Hot** is not automatically Temperature; its meaning comes from the selected template.
+
+Canonical Git contracts:
+- `docs/decisions/catalog-menu-domain-contract-v2.md`
+- `docs/decisions/xentra-menu-item-choice-template-contract-v1.md`
+
+## Superseded / historical notes
+
+Older entries in this snapshot may refer to:
+- Category + Sub Category + Rasa as Menu identity;
+- Product Name as the sole customer Menu title;
+- Master Rasa/Complement/Level as universal Menu composition;
+- Branch Product as the primary Menu authoring object.
+
+Those entries are retained as history only and must not be used to implement new Menu behavior.
+
+Do not edit historical entries to make them look like they were never decisions. Reconcile them through a newer explicit contract, as done above.
+
+---
+
 ## 🔒 LOCKED — Canonical Single Media Engine Boundary v1 — 2026-10-01
 
 **Status:** LOCKED / AUTHORITATIVE
