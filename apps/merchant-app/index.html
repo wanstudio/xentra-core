@@ -829,6 +829,18 @@
               <input type="number" id="bm-adjust-quantity" class="x-input" style="width:100%; font-size:14px;" placeholder="Mis. +5 atau -2" required>
               <small id="bm-adjust-qty-hint" style="font-size:11px; color:var(--text-muted); display:block; margin-top:4px;">Gunakan angka positif untuk menambah, negatif untuk mengurangi.</small>
             </div>
+            <div id="bm-adjust-cost-fields" style="display:none; margin-bottom:14px;">
+              <label for="bm-adjust-unit-cost" style="display:block; font-size:12px; font-weight:700; margin-bottom:4px; color:var(--text-muted);">Biaya per Unit (untuk penambahan stok)</label>
+              <input type="number" id="bm-adjust-unit-cost" class="x-input" style="width:100%; font-size:14px;" min="0" step="any" inputmode="decimal" placeholder="Masukkan biaya per unit">
+              <div style="display:flex; gap:10px; margin-top:8px;">
+                <div style="flex:0 0 90px;">
+                  <label for="bm-adjust-currency-code" style="display:block; font-size:11px; font-weight:700; margin-bottom:4px; color:var(--text-muted);">Mata Uang</label>
+                  <input type="text" id="bm-adjust-currency-code" class="x-input" style="width:100%; font-size:13px; text-transform:uppercase;" value="IDR" maxlength="3" placeholder="IDR">
+                </div>
+                <div style="flex:1; font-size:11px; color:var(--text-muted); padding-top:22px;">Biaya wajib diisi saat audit menambah stok karena stok canonical harus punya nilai masuk yang eksplisit.</div>
+              </div>
+            </div>
+            <input type="hidden" id="bm-adjust-mutation-id">
             <div style="margin-bottom:18px;">
               <label for="bm-adjust-notes" style="display:block; font-size:12px; font-weight:700; margin-bottom:4px; color:var(--text-muted);">Catatan / Alasan Mutasi</label>
               <textarea id="bm-adjust-notes" class="x-input" style="width:100%; font-size:13px; min-height:60px;" placeholder="Contoh: Stok opname shift pagi, telur pecah saat persiapan..."></textarea>
