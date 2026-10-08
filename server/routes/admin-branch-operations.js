@@ -12,6 +12,25 @@ module.exports = function registerAdminBranchOperationsRoutes(router, deps) {
   const InventoryRepository = require('../../core/data/repositories/InventoryRepository');
   const InventoryAdjustmentService = require('../../domains/inventory/services/InventoryAdjustmentService');
   const inventoryRepository = new InventoryRepository();
+  const INVENTORY_ADJUSTMENT_BAD_REQUEST = new Set([
+    'INVALID_MOVEMENT_TYPE',
+    'INVALID_QUANTITY',
+    'MUTATION_ID_REQUIRED',
+    'INBOUND_COST_UNRESOLVED',
+    'CURRENCY_BASIS_UNRESOLVED',
+    'PRODUCT_REQUIRED',
+    'BRANCH_REQUIRED',
+    'POSTING_TIMESTAMP_REQUIRED'
+  ]);
+  const INVENTORY_ADJUSTMENT_CONFLICT = new Set([
+    'INSUFFICIENT_STOCK',
+    'MUTATION_ID_REUSED',
+    'VALUATION_STATE_INVALID',
+    'BACKDATED_VALUATION_REJECTED',
+    'COST_UNAVAILABLE'
+  ]);
+
+
 
 
 router.get('/admin/branches/:id/inventory', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
@@ -177,7 +196,14 @@ router.patch('/admin/branches/:id/inventory/:productId', requireAuth(['owner', '
       });
     }
   } catch (err) {
+    const code = String(err && (err.code || err.message) || 'INVENTORY_ADJUSTMENT_FAILED');
     console.error('[API Error PATCH /admin/branches/:id/inventory/:productId]:', err);
+    if (INVENTORY_ADJUSTMENT_BAD_REQUEST.has(code)) {
+      return res.status(400).json({ success: false, error: code });
+    }
+    if (INVENTORY_ADJUSTMENT_CONFLICT.has(code)) {
+      return res.status(409).json({ success: false, error: code });
+    }
     res.status(500).json({ success: false, error: err.message });
   }
 });
