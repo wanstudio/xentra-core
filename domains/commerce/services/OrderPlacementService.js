@@ -14,6 +14,8 @@ const PrePaymentVerificationGate = require('./PrePaymentVerificationGate');
 const LowStockThresholdModel = require('../models/LowStockThresholdModel');
 const { DiningTableService } = require('../../dining');
 const { ensureComposedMenuSchema } = require('../../catalog/schema/ComposedMenuSchema');
+const { InventorySalePostingService } = require('../../inventory');
+const { CostOfSalesService } = require('../../costing');
 
 const orderRepository = new OrderRepository();
 const inventoryRepository = new InventoryRepository();
@@ -99,18 +101,60 @@ function deductComposedStock({
   referenceId,
   actorId,
   notes,
-  dbTransactionProvided = false
+  dbTransactionProvided = false,
+  sourceType = 'ORDER'
 }) {
   const requirements = aggregateComposedRequirements(items);
-  if (!requirements.length) return { success: true, deducted_items: [] };
+  if (!requirements.length) return { success: true, deducted_items: [], cost_lines: [], cost_status: 'NOT_APPLICABLE' };
 
   const ownsTransaction = !dbTransactionProvided;
   if (ownsTransaction) inventoryRepository.beginTransaction();
 
   const now = new Date().toISOString();
-  const deductedItems = [];
 
   try {
+    const canonicalResult = InventorySalePostingService.postCanonicalSale({
+      branchId: order.branch_id,
+      requirements: requirements.map(item => ({
+        product_id: item.product_id,
+        product_name: item.product_name,
+        quantity: item.quantity,
+        source_item_reference: item.product_id
+      })),
+      sourceType,
+      sourceReference: referenceId,
+      actorId,
+      postingTimestamp: now
+    });
+
+    if (canonicalResult.status === 'AVAILABLE') {
+      const cogs = CostOfSalesService.capture({
+        sourceType,
+        sourceReference: referenceId,
+        orderId: order.id,
+        totalCost: canonicalResult.total_cost,
+        currencyCode: canonicalResult.currency_code,
+        costLines: canonicalResult.cost_lines
+      });
+
+      if (ownsTransaction) inventoryRepository.commitTransaction();
+
+      return {
+        success: true,
+        idempotent: Boolean(canonicalResult.idempotent),
+        deducted_items: canonicalResult.deducted_items,
+        cost_lines: canonicalResult.cost_lines,
+        cost_of_sales: cogs,
+        cost_status: 'AVAILABLE',
+        stock_location_id: canonicalResult.stock_location_id
+      };
+    }
+
+    // Migration seam: when canonical Product Stock is not initialized or the
+    // branch has no unambiguous canonical stock location, preserve the existing
+    // legacy stock behavior. No COGS snapshot is invented from legacy cost data.
+    const deductedItems = [];
+
     for (const requirement of requirements) {
       const before = inventoryRepository.findBranchProduct(order.branch_id, requirement.product_id);
       if (!before) {
@@ -162,7 +206,16 @@ function deductComposedStock({
     }
 
     if (ownsTransaction) inventoryRepository.commitTransaction();
-    return { success: true, deducted_items: deductedItems };
+
+    return {
+      success: true,
+      idempotent: false,
+      deducted_items: deductedItems,
+      cost_lines: [],
+      cost_status: 'UNAVAILABLE',
+      cost_unavailable_reason: canonicalResult.reason,
+      stock_location_id: canonicalResult.stock_location_id
+    };
   } catch (err) {
     if (ownsTransaction) {
       try { inventoryRepository.rollbackTransaction(); } catch (_) {}
