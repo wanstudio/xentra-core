@@ -275,7 +275,7 @@ test('Cost Resolution — idempotent replay preserves the originally posted cost
   assert.equal(result.quantity_base, 20);
   assert.equal(result.unit_cost, 120);
   assert.equal(result.total_cost, 2400);
-  assert.equal(result.source_reference, 'GR-COST-002');
+  assert.equal(result.source_reference, 'COUNT-COST-002');
 });
 
 test('Cost Resolution — backdating and currency changes fail closed', () => {
@@ -329,8 +329,8 @@ test('Cost Resolution — valuation is isolated by Stock Location', () => {
 
   assert.equal(Number(a.quantity), 30);
   assert.ok(Math.abs(Number(a.moving_average_unit_cost) - (3400 / 30)) < 1e-9);
-  assert.equal(Number(b.quantity), 30);
-  assert.equal(Number(b.carrying_value), 3800);
-  assert.ok(Math.abs(Number(b.moving_average_unit_cost) - (3800 / 30)) < 1e-9);
-  assert.equal(b.cost_availability_status, 'AVAILABLE');
+  assert.equal(Number(b.quantity), 20);
+  assert.equal(Number(b.carrying_value), 2400);
+  assert.equal(Number(b.moving_average_unit_cost), 120);
+  assert.equal(b.cost_availability_status, 'ESTIMATED');
 });
