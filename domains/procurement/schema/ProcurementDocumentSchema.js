@@ -225,14 +225,13 @@ function ensureProcurementDocumentSchema(db) {
       SELECT RAISE(ABORT, 'PURCHASE_ORDER_SCOPE_INVALID');
     END;
 
-    CREATE TRIGGER IF NOT EXISTS trg_purchase_order_line_material_scope
+    CREATE TRIGGER IF NOT EXISTS trg_purchase_order_line_reference_scope
     BEFORE INSERT ON purchase_order_lines
     FOR EACH ROW
     WHEN
-      (SELECT material_id FROM supplier_materials WHERE id = NEW.supplier_material_id) IS NULL
+      (SELECT id FROM supplier_materials WHERE id = NEW.supplier_material_id) IS NULL
       OR
-      (SELECT material_id FROM supplier_materials WHERE id = NEW.supplier_material_id) <>
-      (SELECT material_id FROM purchase_order_lines WHERE id = NEW.id)
+      (SELECT supplier_id FROM supplier_materials WHERE id = NEW.supplier_material_id) IS NULL
     BEGIN
       SELECT RAISE(ABORT, 'PURCHASE_ORDER_LINE_INVALID');
     END;
