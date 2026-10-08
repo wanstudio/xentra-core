@@ -81,7 +81,40 @@ Purchase UOM = a directly convertible measurement used on a purchase transaction
 
 Supplier Pack = a commercial pack representation such as `1 sack = 25 kg`. A pack is not automatically a new Material and is not necessarily a dimensional UOM.
 
+**Base Stock UOM ownership:** the Owner / authorized Material master-data role selects the Base Stock UOM for each stock-managed Material from the canonical shared UOM reference data. The system must not infer the Base UOM from the supplier's pack size or purchase form.
+
+The selection answers one operational question:
+
+> In what unit should Xentra consistently count, consume, replenish, transfer, and report this Material's physical stock?
+
+The choice is driven by physical stock practice, production/recipe consumption, required precision, cross-supplier comparability, and operational reporting. It does not have to be the smallest unit used in a recipe.
+
+Example:
+
+```
+Material: Flour
+Base Stock UOM: kg
+
+Recipe consumption:
+150 g
+= 0.15 kg
+```
+
+Example:
+
+```
+Material: Rice
+Base Stock UOM: kg
+
+Supplier A: 25 kg bag
+Supplier B: 50 kg bag
+```
+
+The two supplier pack sizes do not change the Material Base UOM.
+
 Do not conflate `UOM conversion` with `supplier packaging`. The transaction must resolve both into the Material Base Stock UOM before Inventory posting.
+
+Once a Material has operational references, Base UOM changes require controlled migration/reconciliation. Historical transaction quantities and conversion snapshots must not be silently rewritten.
 
 ## 4. Critical current-code findings
 
