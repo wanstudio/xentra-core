@@ -160,7 +160,7 @@ test('product movement records signed cost evidence and must match resulting bal
     UPDATE product_stock_balances
        SET quantity = 30,
            carrying_value = 340000,
-           moving_average_unit_cost = 11333.333333,
+           moving_average_unit_cost = 11333.333333333334,
            valuation_version = 1
      WHERE stock_location_id = ? AND product_id = ?
   `).run(LOCATION_A, PRODUCT);
@@ -244,10 +244,10 @@ test('transfer source and destination preserve carried value', () => {
 
   db.prepare(`
     UPDATE product_stock_balances
-       SET quantity = 10,
-           carrying_value = 66000,
-           moving_average_unit_cost = 6600,
-           valuation_version = 1
+       SET quantity = 15,
+           carrying_value = 122666.66666666667,
+           moving_average_unit_cost = 8177.777777777778,
+           valuation_version = 2
      WHERE stock_location_id = ? AND product_id = ?
   `).run(LOCATION_B, PRODUCT);
 
@@ -260,10 +260,10 @@ test('transfer source and destination preserve carried value', () => {
       posting_mutation_id, valuation_version, posting_timestamp, resolver_version
     ) VALUES (
       'movement_cost_schema_transfer_in', ?, ?, 'TRANSFER_IN',
-      5, 5, 10,
-      10000, 50000, 'MOVING_AVERAGE', 'TRANSFER_CARRIED',
+      5, 10, 15,
+      11333.333333333334, 56666.66666666667, 'MOVING_AVERAGE', 'TRANSFER_CARRIED',
       'TEST', 'TRANSFER-1', 'movement_cost_schema_transfer_out',
-      'mutation-transfer-in-1', 1, '2026-10-08T19:06:00+07:00', 'v1'
+      'mutation-transfer-in-1', 2, '2026-10-08T19:06:00+07:00', 'v1'
     )
   `).run(LOCATION_B, PRODUCT);
 
