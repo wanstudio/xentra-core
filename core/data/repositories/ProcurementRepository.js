@@ -128,7 +128,7 @@ class ProcurementRepository {
   }) {
     return this.db.execute(
       'INSERT INTO supplier_material_packs (id, supplier_material_id, name, purchase_uom_id, content_quantity, content_uom_id, minimum_order_quantity, unit_price, currency_code, effective_from, effective_to, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [id, supplierMaterialId, name, purchaseUomId, contentQuantity, contentUomId, minimumOrderQuantity, unitPrice, currencyCode, effectiveFrom, effectiveTo, isActive, createdAt, updatedAt]
+      [id, supplierMaterialId, name, purchaseUomId, contentQuantityBase, contentUomId, minimumOrderQuantity, unitPrice, currencyCode, effectiveFrom, effectiveTo, isActive, createdAt, updatedAt]
     );
   }
 
