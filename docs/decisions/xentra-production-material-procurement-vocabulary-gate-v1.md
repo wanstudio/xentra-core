@@ -74,6 +74,15 @@ Always qualify Batch. Commerce already contains `order_addition_batches`; Produc
 ### Location
 Stock Location is the universal physical-inventory term. Warehouse and Central Kitchen are location types. Delivery Destination is a separate concept and is never a Stock Location.
 
+### UOM and Pack
+UOM = measurement unit used to express quantity, e.g. kg, g, L, ml, pcs. It is shared reference data and must not be duplicated across Material, Procurement, Production, and Inventory.
+
+Purchase UOM = a directly convertible measurement used on a purchase transaction.
+
+Supplier Pack = a commercial pack representation such as `1 sack = 25 kg`. A pack is not automatically a new Material and is not necessarily a dimensional UOM.
+
+Do not conflate `UOM conversion` with `supplier packaging`. The transaction must resolve both into the Material Base Stock UOM before Inventory posting.
+
 ## 4. Critical current-code findings
 
 ### 4.1 Current Branch Product inventory is compatibility vocabulary
