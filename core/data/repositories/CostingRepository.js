@@ -7,6 +7,53 @@ class CostingRepository {
     this.db = dataAccess;
   }
 
+  findCostOfSalesSnapshot({ sourceType, sourceReference }) {
+    return this.db.queryOne(
+      'SELECT id, source_type, source_reference, order_id, total_cost, currency_code, cost_availability_status, snapshot_version, created_at FROM cost_of_sales_snapshots WHERE source_type = ? AND source_reference = ?',
+      [sourceType, sourceReference]
+    );
+  }
+
+  findCostOfSalesSnapshotLines(snapshotId) {
+    return this.db.queryMany(
+      'SELECT id, cost_of_sales_snapshot_id, source_item_reference, product_id, quantity, unit_cost, total_cost, currency_code, inventory_movement_id, created_at FROM cost_of_sales_snapshot_lines WHERE cost_of_sales_snapshot_id = ? ORDER BY id',
+      [snapshotId]
+    );
+  }
+
+  insertCostOfSalesSnapshot({
+    id,
+    sourceType,
+    sourceReference,
+    orderId = null,
+    totalCost,
+    currencyCode,
+    createdAt
+  }) {
+    return this.db.execute(
+      "INSERT INTO cost_of_sales_snapshots (id, source_type, source_reference, order_id, total_cost, currency_code, cost_availability_status, snapshot_version, created_at) VALUES (?, ?, ?, ?, ?, ?, 'AVAILABLE', 1, ?)",
+      [id, sourceType, sourceReference, orderId, totalCost, currencyCode, createdAt]
+    );
+  }
+
+  insertCostOfSalesSnapshotLine({
+    id,
+    snapshotId,
+    sourceItemReference = null,
+    productId,
+    quantity,
+    unitCost,
+    totalCost,
+    currencyCode,
+    inventoryMovementId,
+    createdAt
+  }) {
+    return this.db.execute(
+      'INSERT INTO cost_of_sales_snapshot_lines (id, cost_of_sales_snapshot_id, source_item_reference, product_id, quantity, unit_cost, total_cost, currency_code, inventory_movement_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, snapshotId, sourceItemReference, productId, quantity, unitCost, totalCost, currencyCode, inventoryMovementId, createdAt]
+    );
+  }
+
   findMenu({ brandId, menuId }) {
     return this.db.queryOne(
       'SELECT id, brand_id, title_id, status, selling_price FROM menus WHERE id = ? AND brand_id = ?',
