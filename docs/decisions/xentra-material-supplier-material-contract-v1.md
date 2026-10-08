@@ -665,8 +665,7 @@ If the actual material specification changes materially, create a new Material.
 ## 19. Still OPEN
 
 These remain separate design gates:
-- exact UOM master schema and Core reference-data implementation;
-- exact UOM precision/rounding policy;
+- custom UOMs/localization beyond the locked UOM Master + Precision / Rounding Contract;
 - whether `supplier_material_packs` is a child table or a generalized sourcing-offer table;
 - advanced supplier price tiers / quotation history;
 - branch-specific Supplier Material terms;
