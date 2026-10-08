@@ -35,7 +35,7 @@ Received
 Destination Stock Location
 ~~~
 
-The persisted v1 state machine uses **DISPATCHED** as the state that means the source has released the stock and the quantity is now in transit. A separate persisted IN_TRANSIT state is not required in v1.
+The persisted v1 state machine uses **DISPATCHED** as the state that means the source has released the stock and the quantity is now in transit. **REQUESTED is a state of Inventory Transfer, not a separate Transfer Request entity.** A separate persisted IN_TRANSIT state is not required in v1.
 
 Therefore:
 
@@ -47,7 +47,7 @@ The UI may present DISPATCHED as **“Dalam Perjalanan / In Transit”**.
 
 Inventory owns:
 
-- Transfer Request and Transfer lifecycle;
+- Inventory Transfer lifecycle;
 - source/destination Stock Location references;
 - Product Stock / Material Stock transfer quantities;
 - dispatch posting;
@@ -176,7 +176,7 @@ For Material:
 
 For Product:
 
-- quantity is represented in the Product's current authoritative stock unit.
+- quantity is represented in the Product Stock UOM defined by the active Product/UOM contract.
 
 v1 does not perform an implicit UOM conversion during transfer.
 
