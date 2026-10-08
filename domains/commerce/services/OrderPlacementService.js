@@ -651,9 +651,52 @@ class OrderPlacementService {
           referenceId: reference_id,
           actorId: actor_id,
           notes,
-          dbTransactionProvided: true
+          dbTransactionProvided: true,
+          sourceType: 'ADDITIONAL_ORDER'
         });
         deductedItems.push(...composedResult.deducted_items);
+      }
+
+      const directStockManagedItems = legacyItems.filter(item =>
+        item && String(item.sku || '').trim() !== ''
+      );
+
+      if (directStockManagedItems.length === legacyItems.length && directStockManagedItems.length > 0) {
+        const canonicalDirect = InventorySalePostingService.postCanonicalSale({
+          branchId: order.branch_id,
+          requirements: directStockManagedItems.map(item => ({
+            product_id: item.product_id,
+            product_name: item.product_name || item.name || item.product_id,
+            quantity: item.quantity,
+            source_item_reference: item.id || item.product_id
+          })),
+          sourceType: 'ADDITIONAL_ORDER',
+          sourceReference: reference_id,
+          actorId: actor_id,
+          postingTimestamp: now
+        });
+
+        if (canonicalDirect.status === 'AVAILABLE') {
+          const cogs = CostOfSalesService.capture({
+            sourceType: 'ADDITIONAL_ORDER',
+            sourceReference: reference_id,
+            orderId: order.id,
+            totalCost: canonicalDirect.total_cost,
+            currencyCode: canonicalDirect.currency_code,
+            costLines: canonicalDirect.cost_lines
+          });
+          deductedItems.push(...canonicalDirect.deducted_items);
+          if (ownsTransaction) inventoryRepository.commitTransaction();
+          return {
+            success: true,
+            idempotent: Boolean(canonicalDirect.idempotent),
+            deducted_items: deductedItems,
+            cost_lines: canonicalDirect.cost_lines,
+            cost_of_sales: cogs,
+            cost_status: 'AVAILABLE',
+            stock_location_id: canonicalDirect.stock_location_id
+          };
+        }
       }
 
       for (const item of legacyItems) {
