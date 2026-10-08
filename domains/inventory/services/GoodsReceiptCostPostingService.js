@@ -35,21 +35,52 @@ class GoodsReceiptCostPostingService {
     const timestamp = text(postingTimestamp, 'POSTING_TIMESTAMP_REQUIRED');
     const normalizedLines = normalizeLines(lines);
 
-    const existing = normalizedLines.map((line) => repository.findMaterialValuationMovementByPostingMutationId(line.mutationId));
-    const existingCount = existing.filter(Boolean).length;
-    if (existingCount > 0 && existingCount !== normalizedLines.length) throw fail('GOODS_RECEIPT_POSTING_INCOMPLETE');
-    if (existingCount === normalizedLines.length) {
-      for (const m of existing) {
-        if (m.stock_location_id !== locationId || m.source_type !== 'GOODS_RECEIPT' || m.source_reference !== receiptId) throw fail('GOODS_RECEIPT_POSTING_IDENTITY_MISMATCH');
-      }
-      return { success: true, idempotent: true, goods_receipt_id: receiptId, goods_receipt_posting_id: aggregateId, stock_location_id: locationId, posting_timestamp: timestamp,
-        movements: existing.map((m) => ({ movement_id: m.id, material_id: m.material_id, accepted_quantity_base: Number(m.quantity_base), unit_cost: Number(m.unit_cost), total_cost: Number(m.total_cost), currency_code: m.currency_code, valuation_version: Number(m.valuation_version), posting_mutation_id: m.posting_mutation_id })) };
-    }
-
-    if (repository.findMaterialValuationMovementsBySourceReference({ sourceType: 'GOODS_RECEIPT', sourceReference: receiptId }).length > 0) throw fail('GOODS_RECEIPT_ALREADY_POSTED');
-
+    // Begin the authoritative write transaction before idempotency/source checks.
+    // BEGIN IMMEDIATE serializes competing receipt postings on this DB connection.
     repository.beginTransaction();
     try {
+      const existing = normalizedLines.map((line) => repository.findMaterialValuationMovementByPostingMutationId(line.mutationId));
+      const existingCount = existing.filter(Boolean).length;
+
+      if (existingCount > 0 && existingCount !== normalizedLines.length) {
+        throw fail('GOODS_RECEIPT_POSTING_INCOMPLETE');
+      }
+
+      if (existingCount === normalizedLines.length) {
+        for (const m of existing) {
+          if (m.stock_location_id !== locationId || m.source_type !== 'GOODS_RECEIPT' || m.source_reference !== receiptId) {
+            throw fail('GOODS_RECEIPT_POSTING_IDENTITY_MISMATCH');
+          }
+        }
+
+        repository.commitTransaction();
+
+        return {
+          success: true,
+          idempotent: true,
+          goods_receipt_id: receiptId,
+          goods_receipt_posting_id: aggregateId,
+          stock_location_id: locationId,
+          posting_timestamp: timestamp,
+          movements: existing.map((m) => ({
+            movement_id: m.id,
+            material_id: m.material_id,
+            accepted_quantity_base: Number(m.quantity_base),
+            unit_cost: Number(m.unit_cost),
+            total_cost: Number(m.total_cost),
+            currency_code: m.currency_code,
+            valuation_version: Number(m.valuation_version),
+            posting_mutation_id: m.posting_mutation_id
+          }))
+        };
+      }
+
+      if (repository.findMaterialValuationMovementsBySourceReference({
+        sourceType: 'GOODS_RECEIPT',
+        sourceReference: receiptId
+      }).length > 0) {
+        throw fail('GOODS_RECEIPT_ALREADY_POSTED');
+      }
       const posted = [];
       for (const line of normalizedLines) {
         const resolution = CostResolutionService.resolveInboundValuation({
