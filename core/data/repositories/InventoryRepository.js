@@ -44,6 +44,66 @@ class InventoryRepository {
     );
   }
 
+  findProductStockStatesByBranch({ branchId, productIds = [] }) {
+    const ids = Array.from(new Set(
+      (Array.isArray(productIds) ? productIds : [])
+        .map(value => String(value || '').trim())
+        .filter(Boolean)
+    ));
+    if (!ids.length) return [];
+
+    const location = this.findCanonicalProductStockLocation(branchId);
+    const placeholders = ids.map(() => '?').join(', ');
+
+    // Canonical Product Stock wins whenever a branch has its one unambiguous
+    // canonical Stock Location and a Product Stock Balance exists. Otherwise
+    // the historical branch_product_inventory / branch_products values remain
+    // explicit migration fallbacks.
+    return this.db.queryMany(
+      `SELECT
+         p.id AS product_id,
+         p.sku,
+         bp.is_available,
+         bp.low_stock_threshold,
+         psb.quantity AS product_stock_quantity,
+         bpi.stock_qty AS branch_inventory_quantity,
+         bp.stock AS legacy_branch_stock,
+         CASE
+           WHEN ? IS NOT NULL AND psb.product_id IS NOT NULL
+             THEN psb.quantity
+           WHEN bpi.product_id IS NOT NULL
+             THEN bpi.stock_qty
+           WHEN bp.product_id IS NOT NULL
+             THEN COALESCE(bp.stock, 0)
+           ELSE 0
+         END AS stock,
+         CASE
+           WHEN ? IS NOT NULL AND psb.product_id IS NOT NULL
+             THEN 'PRODUCT_STOCK_BALANCE'
+           WHEN bpi.product_id IS NOT NULL
+             THEN 'BRANCH_PRODUCT_INVENTORY'
+           WHEN bp.product_id IS NOT NULL
+             THEN 'LEGACY_BRANCH_PRODUCTS'
+           ELSE 'UNRECORDED'
+         END AS stock_source
+       FROM products p
+       LEFT JOIN branch_products bp
+         ON bp.branch_id = ? AND bp.product_id = p.id
+       LEFT JOIN branch_product_inventory bpi
+         ON bpi.branch_id = ? AND bpi.product_id = p.id
+       LEFT JOIN product_stock_balances psb
+         ON psb.stock_location_id = ? AND psb.product_id = p.id
+       WHERE p.id IN (${placeholders})
+       ORDER BY p.id`,
+      [location.location ? location.location.id : null,
+       location.location ? location.location.id : null,
+       branchId,
+       branchId,
+       location.location ? location.location.id : null,
+       ...ids]
+    );
+  }
+
   findCanonicalProductStockLocation(branchId) {
     const locations = this.findBranchStockLocations(branchId);
     if (locations.length !== 1) return { status: locations.length === 0 ? 'NOT_FOUND' : 'AMBIGUOUS', location: null, locations };
