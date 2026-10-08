@@ -53,7 +53,7 @@ Therefore the next step is architecture-first target modeling, not direct runtim
 3. Production Output identity
 4. Recipe / BoM versioning and applicability
 5. Production posting / Inventory mutation boundary
-6. UOM + conversion
+6. UOM + conversion ✅
 7. Procurement document model for Materials
 8. Menu Item identity for Item Choice integration
 
@@ -832,7 +832,8 @@ The following can be promoted with high confidence:
 11. Purchase Request / Shopping work is separate from PO.
 12. Partial Goods Receipt is first-class.
 13. UOM conversion is explicit and transaction quantities must preserve resolved base quantities.
-14. Menu Item needs a stable identity before Choice persistence.
+14. Canonical UOM uses shared UOM Categories, one Reference UOM per category, explicit conversion factors, 6-decimal stock quantity precision, 12-decimal conversion-factor precision, and HALF_UP posting rounding.
+15. Menu Item needs a stable identity before Choice persistence.
 15. Choice-driven stock effects resolve through structured composition, never direct raw-material mutation.
 16. Choice Value stock effects are explicit Product mappings using NONE / ADD_PRODUCT / REPLACE_PRODUCT semantics; direct Choice → Production/Material effects remain future.
 17. Inventory Transfer uses explicit Stock Location source/destination, Inventory-owned dispatch/receipt boundaries, partial receipt, atomic posting, and idempotency.
@@ -855,6 +856,12 @@ docs/decisions/xentra-production-routing-stock-location-contract-v1.md
 
 Inventory Transfer State Machine Contract v1 was promoted on 2026-10-08:
 docs/decisions/xentra-inventory-transfer-state-machine-contract-v1.md
+
+Costing / HPP Contract v1 was promoted on 2026-10-08:
+docs/decisions/xentra-costing-hpp-contract-v1.md
+
+UOM Master + Precision / Rounding Contract v1 was promoted on 2026-10-08:
+docs/decisions/xentra-uom-master-precision-rounding-contract-v1.md
 
 ## 28. Decisions That Should Remain Explicitly OPEN
 
