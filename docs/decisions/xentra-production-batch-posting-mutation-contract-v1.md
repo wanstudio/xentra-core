@@ -23,6 +23,7 @@ Every Production Batch has a stable production_batch_id.
 
 The batch references:
 - production_item_id;
+- production_stock_location_id;
 - exact recipe_version_id used;
 - input Material Stock Location;
 - output Product Stock Location;
@@ -122,7 +123,7 @@ By-products and semi-finished outputs are outside v1.
 
 The actual output quantity is posted to Product Stock at the selected output Stock Location.
 
-The current Product Stock compatibility model is integer-based. Fractional finished-good output requires a future Product Stock UOM contract before it is enabled.
+Finished-good quantity must follow the locked UOM policy: fractional output is permitted only when the Product Stock UOM allows fractions. The current compatibility runtime remains integer-based until the target Product Stock UOM implementation is introduced.
 
 ## 8. Completion Posting Boundary
 Completion is the physical mutation boundary.
@@ -284,10 +285,9 @@ The current Product/Branch Inventory service is compatibility code. This contrac
 - lot / expiry tracking;
 - Make-to-Order trigger/reservation semantics;
 - scheduling / capacity;
-- HPP / valuation;
+- exact valuation method / accounting integration;
 - reversal workflow and accounting treatment;
-- autonomous production/replenishment;
-- detailed Product Stock UOM contract if fractional finished-goods quantities are required.
+- autonomous production/replenishment.
 
 ## 21. External Supporting Evidence
 ERPNext documents Work Orders as manufacturing execution documents, separates material-consumption Stock Entries from Manufacture entries, and records consumed quantities and finished goods through the manufacturing flow. Odoo likewise separates manufacturing execution from Inventory movement and allows produced quantities/lots and component consumption to be registered before production is closed.
