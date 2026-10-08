@@ -35,28 +35,6 @@ function ensureComposedMenuSchema(db) {
     db.exec('ALTER TABLE products ADD COLUMN sku TEXT;');
   }
 
-  // Stock-managed Products must declare their Product Stock UOM.
-  // Compatibility Products without SKU remain valid during migration.
-  if (hasColumn(db, 'products', 'product_stock_uom_id')) {
-    db.exec(`
-      CREATE TRIGGER IF NOT EXISTS trg_products_stock_uom_required_insert
-      BEFORE INSERT ON products
-      FOR EACH ROW
-      WHEN NEW.sku IS NOT NULL AND trim(NEW.sku) <> '' AND NEW.product_stock_uom_id IS NULL
-      BEGIN
-        SELECT RAISE(ABORT, 'PRODUCT_STOCK_UOM_REQUIRED');
-      END;
-
-      CREATE TRIGGER IF NOT EXISTS trg_products_stock_uom_required_update
-      BEFORE UPDATE OF sku, product_stock_uom_id ON products
-      FOR EACH ROW
-      WHEN NEW.sku IS NOT NULL AND trim(NEW.sku) <> '' AND NEW.product_stock_uom_id IS NULL
-      BEGIN
-        SELECT RAISE(ABORT, 'PRODUCT_STOCK_UOM_REQUIRED');
-      END;
-    `);
-  }
-
   if (!hasColumn(db, 'menus', 'title_id')) {
     try { db.exec('ALTER TABLE menus ADD COLUMN title_id TEXT;'); } catch (_) {}
   }
