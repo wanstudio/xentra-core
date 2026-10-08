@@ -6,7 +6,7 @@ const MaterialRepository = require('../../../core/data/repositories/MaterialRepo
 const UomRepository = require('../../../core/data/repositories/UomRepository');
 const InventoryRepository = require('../../../core/data/repositories/InventoryRepository');
 const UomConversionService = require('../../uom/services/UomConversionService');
-const CostResolutionService = require('../../inventory/services/CostResolutionService');
+const InventoryProductionPostingService = require('../../inventory/services/InventoryProductionPostingService');
 
 const productionRepository = new ProductionRepository();
 const materialRepository = new MaterialRepository();
@@ -71,13 +71,6 @@ function assertSameOrganization(locationAId, locationBId, repository = inventory
   if (!a || Number(a.is_active) !== 1 || !b || Number(b.is_active) !== 1) throw fail('STOCK_LOCATION_INVALID');
   if (String(a.organization_id) !== String(b.organization_id)) throw fail('STOCK_LOCATION_SCOPE_INVALID');
   return a.organization_id;
-}
-
-function movementMutationId(productionPostingId, lineId, role) {
-  return 'prm_' + crypto.createHash('sha256')
-    .update(productionPostingId + ':' + role + ':' + lineId)
-    .digest('hex')
-    .slice(0, 24);
 }
 
 class ProductionService {
@@ -369,13 +362,15 @@ class ProductionService {
     repository = productionRepository,
     inventory = inventoryRepository
   }) {
+    const postingId = text(productionPostingId, 'PRODUCTION_POSTING_ID_REQUIRED');
     const batch = repository.findProductionBatch(productionBatchId);
     if (!batch) throw fail('PRODUCTION_BATCH_NOT_FOUND');
-    const postingId = text(productionPostingId, 'PRODUCTION_POSTING_ID_REQUIRED');
 
     const replay = repository.findProductionBatchByPostingId(postingId);
     if (replay) {
-      if (String(replay.id) !== String(batch.id) || replay.status !== 'COMPLETED') throw fail('PRODUCTION_POSTING_IDENTITY_MISMATCH');
+      if (String(replay.id) !== String(batch.id) || replay.status !== 'COMPLETED') {
+        throw fail('PRODUCTION_POSTING_IDENTITY_MISMATCH');
+      }
       const snapshot = repository.findProductionCostSnapshot(replay.id);
       return {
         success: true,
@@ -391,236 +386,154 @@ class ProductionService {
 
     const productionItem = repository.findProductionItem(batch.production_item_id);
     if (!productionItem) throw fail('PRODUCTION_ITEM_NOT_FOUND');
-    const { product, uom: outputUom } = assertProductStockUom(productionItem.output_product_id);
-    if (String(product.id) !== String(productionItem.output_product_id)) throw fail('PRODUCTION_OUTPUT_PRODUCT_MISMATCH');
-    const actualOutput = assertOutputQuantity({ quantity: actualOutputQuantity, uom: outputUom });
+
+    const currentRoute = repository.findProductionItemByProductAndLocation(
+      productionItem.output_product_id,
+      batch.production_stock_location_id
+    );
+    if (
+      currentRoute.length !== 1 ||
+      String(currentRoute[0].id) !== String(batch.production_item_id)
+    ) {
+      throw fail('PRODUCTION_ROUTE_INVALID');
+    }
+
+    const recipeVersion = repository.findRecipeVersion(batch.recipe_version_id);
+    if (!recipeVersion || recipeVersion.status === 'RETIRED') {
+      throw fail('RECIPE_VERSION_UNAVAILABLE');
+    }
+
+    const recipe = repository.findRecipeByProductionItemId(batch.production_item_id);
+    if (!recipe || String(recipeVersion.recipe_id) !== String(recipe.id)) {
+      throw fail('RECIPE_VERSION_MISMATCH');
+    }
+
+    const materialComponents = repository.findRecipeComponents(batch.recipe_version_id);
+    const componentMaterialIds = new Set(
+      materialComponents.map(component => String(component.material_id))
+    );
 
     if (!Array.isArray(actualConsumptions) || actualConsumptions.length === 0) {
       throw fail('ACTUAL_CONSUMPTION_REQUIRED');
     }
 
-    const targetCurrency = currencyCode(currency);
-    assertSameOrganization(batch.input_stock_location_id, batch.output_stock_location_id, inventory);
-
     const duplicateMaterials = new Set();
     const normalized = [];
+
     for (const input of actualConsumptions) {
       const materialId = text(input.material_id, 'MATERIAL_NOT_FOUND');
       if (duplicateMaterials.has(materialId)) throw fail('ACTUAL_CONSUMPTION_DUPLICATE');
       duplicateMaterials.add(materialId);
 
+      if (!componentMaterialIds.has(materialId)) {
+        throw fail('ACTUAL_CONSUMPTION_NOT_IN_RECIPE');
+      }
+
       const material = materialRepository.findById(materialId);
       if (!material || material.status !== 'ACTIVE') throw fail('MATERIAL_NOT_FOUND');
+
       const sourceUomId = text(input.source_uom_id, 'SOURCE_UOM_REQUIRED');
-      const sourceQuantity = positive(input.actual_quantity, 'INVALID_CONSUMPTION_QUANTITY');
+      const sourceQuantity = positive(
+        input.actual_quantity,
+        'INVALID_CONSUMPTION_QUANTITY'
+      );
+
       const converted = UomConversionService.resolveBaseQuantity({
         materialId,
         sourceUomId,
         quantity: sourceQuantity,
         repository: uomRepository
       });
+
       const materialBase = uomRepository.findById(material.base_uom_id);
-      if (!materialBase) throw fail('BASE_UOM_UNRESOLVED');
+      if (!materialBase || Number(materialBase.is_active) !== 1) {
+        throw fail('BASE_UOM_UNRESOLVED');
+      }
 
       normalized.push({
         materialId,
         sourceUomId,
         sourceQuantity,
-        baseQuantity: converted.target_quantity,
-        baseUomId: materialBase.id
+        baseQuantity: converted.target_quantity
       });
     }
 
-    const recipeVersion = repository.findRecipeVersion(batch.recipe_version_id);
-    if (!recipeVersion || recipeVersion.status === 'RETIRED') throw fail('RECIPE_VERSION_UNAVAILABLE');
-    const recipe = repository.findRecipeByProductionItemId(batch.production_item_id);
-    if (!recipe || String(recipeVersion.recipe_id) !== String(recipe.id)) throw fail('RECIPE_VERSION_MISMATCH');
-
-    const components = repository.findRecipeComponents(batch.recipe_version_id);
-    const componentMaterialIds = new Set(components.map(component => String(component.material_id)));
-    for (const line of normalized) {
-      if (!componentMaterialIds.has(String(line.materialId))) throw fail('ACTUAL_CONSUMPTION_NOT_IN_RECIPE');
+    const outputProduct = inventory.findProductForValuation(productionItem.output_product_id);
+    if (!outputProduct || Number(outputProduct.is_active) !== 1) {
+      throw fail('PRODUCTION_OUTPUT_PRODUCT_INVALID');
     }
 
+    const outputUomRow = inventory.db.queryOne(
+      'SELECT product_stock_uom_id FROM products WHERE id = ?',
+      [productionItem.output_product_id]
+    );
+    const outputUom = outputUomRow && outputUomRow.product_stock_uom_id
+      ? uomRepository.findById(outputUomRow.product_stock_uom_id)
+      : null;
+    if (!outputUom || Number(outputUom.is_active) !== 1) {
+      throw fail('PRODUCT_STOCK_UOM_UNRESOLVED');
+    }
+
+    const actualOutput = positive(actualOutputQuantity, 'INVALID_OUTPUT_QUANTITY');
+    const outputPrecision = Math.min(6, Math.max(0, Number(outputUom.quantity_precision)));
+    if (Math.abs(actualOutput - Number(actualOutput.toFixed(outputPrecision))) > 1e-9) {
+      throw fail('INVALID_OUTPUT_QUANTITY');
+    }
+    if (
+      Number(outputUom.allows_fraction) !== 1 &&
+      Math.abs(actualOutput - Math.round(actualOutput)) > 1e-9
+    ) {
+      throw fail('PRODUCT_STOCK_UOM_FRACTION_NOT_ALLOWED');
+    }
+
+    const targetCurrency = currencyCode(currency);
     const now = new Date().toISOString();
 
+    // One DB transaction owns both Inventory physical mutations and the
+    // Production historical cost snapshot.
     repository.beginTransaction();
     try {
-      const resolvedCosts = [];
-      let actualMaterialCost = 0;
-      let resolvedCurrency = targetCurrency;
-
-      for (const line of normalized) {
-        const resolution = CostResolutionService.resolveOutboundCost({
-          stockLocationId: batch.input_stock_location_id,
-          stockIdentityType: 'MATERIAL',
-          stockIdentityId: line.materialId,
-          quantityBase: line.baseQuantity,
-          postingReference: batch.id,
-          postingMutationId: movementMutationId(postingId, line.materialId, 'MATERIAL'),
-          postingTimestamp: now,
-          currencyCode: resolvedCurrency,
-          sourceType: 'PRODUCTION_BATCH',
-          repository: inventory
-        });
-
-        if (resolution.status !== 'AVAILABLE') throw fail('COST_UNAVAILABLE');
-        if (String(resolution.currency_code) !== String(resolvedCurrency)) {
-          throw fail('PRODUCTION_COST_CURRENCY_MISMATCH');
-        }
-
-        const balance = inventory.findMaterialValuationBalance({
-          stockLocationId: batch.input_stock_location_id,
-          materialId: line.materialId
-        });
-        const transition = CostResolutionService.applyOutboundTransition({
-          balance,
-          quantityBase: resolution.quantity_base
-        });
-
-        const updated = inventory.updateMaterialValuationBalance({
-          stockLocationId: batch.input_stock_location_id,
-          materialId: line.materialId,
-          quantityBase: transition.quantity,
-          carryingValue: transition.carrying_value,
-          movingAverageUnitCost: transition.moving_average_unit_cost,
-          costAvailabilityStatus: transition.cost_availability_status,
-          valuationVersion: transition.valuation_version,
-          updatedAt: now
-        });
-        if (!updated || updated.changes !== 1) throw fail('VALUATION_STATE_INVALID');
-
-        const movementIdValue = 'mov_' + crypto.createHash('sha256').update(postingId + ':' + line.materialId).digest('hex').slice(0, 24);
-        const movement = inventory.insertMaterialValuationMovement({
-          id: movementIdValue,
-          stockLocationId: batch.input_stock_location_id,
-          materialId: line.materialId,
-          movementType: 'PRODUCTION_ISSUE',
-          quantityBase: -resolution.quantity_base,
-          previousQuantity: balance.quantity_base,
-          currentQuantity: transition.quantity,
-          unitCost: resolution.unit_cost,
-          totalCost: -resolution.total_cost,
-          currencyCode: resolution.currency_code,
-          costBasisType: 'CURRENT_MOVING_AVERAGE',
-          sourceType: 'PRODUCTION_BATCH',
-          sourceReference: batch.id,
-          postingMutationId: movementMutationId(postingId, line.materialId, 'MATERIAL'),
-          valuationVersion: transition.valuation_version,
-          postingTimestamp: now,
-          resolverVersion: resolution.resolver_version,
-          actorId: completedBy
-        });
-        if (!movement || movement.changes !== 1) throw fail('VALUATION_STATE_INVALID');
-
-        actualMaterialCost += resolution.total_cost;
-        resolvedCosts.push({
-          materialId: line.materialId,
-          sourceUomId: line.sourceUomId,
-          sourceQuantity: line.sourceQuantity,
-          baseQuantity: resolution.quantity_base,
-          unitCost: resolution.unit_cost,
-          totalCost: resolution.total_cost,
-          currencyCode: resolution.currency_code,
-          inventoryMovementId: movementIdValue,
-          inputStockLocationId: batch.input_stock_location_id
-        });
+      // Re-read the Batch after transaction acquisition so a stale pre-check
+      // cannot turn into a second completion under a concurrent request.
+      const lockedBatch = repository.findProductionBatch(batch.id);
+      if (!lockedBatch || lockedBatch.status !== 'IN_PROGRESS') {
+        throw fail('PRODUCTION_BATCH_STATUS_INVALID');
+      }
+      if (lockedBatch.production_posting_id) {
+        throw fail('PRODUCTION_POSTING_ALREADY_APPLIED');
       }
 
-      const outputUnitCost = actualMaterialCost / actualOutput;
-      const outputResolution = CostResolutionService.resolveInboundValuation({
-        stockLocationId: batch.output_stock_location_id,
-        stockIdentityType: 'PRODUCT',
-        stockIdentityId: product.id,
-        quantityBase: actualOutput,
-        costBasisType: 'PRODUCTION_OUTPUT',
-        incomingUnitCost: outputUnitCost,
-        incomingTotalCost: actualMaterialCost,
-        sourceType: 'PRODUCTION_BATCH',
-        sourceReference: batch.id,
-        postingMutationId: movementMutationId(postingId, product.id, 'PRODUCT_OUTPUT'),
+      const posting = InventoryProductionPostingService.postProductionCompletion({
+        productionBatchId: lockedBatch.id,
+        productionPostingId: postingId,
+        inputStockLocationId: lockedBatch.input_stock_location_id,
+        outputStockLocationId: lockedBatch.output_stock_location_id,
+        outputProductId: productionItem.output_product_id,
+        actualOutputQuantity: actualOutput,
+        normalizedConsumptions: normalized,
+        currency: targetCurrency,
+        actorId: completedBy,
         postingTimestamp: now,
-        currencyCode: resolvedCurrency,
         repository: inventory
       });
-
-      const productBalance = inventory.findProductValuationBalance({
-        stockLocationId: batch.output_stock_location_id,
-        productId: product.id
-      });
-      const productTransition = CostResolutionService.applyInboundTransition({
-        balance: productBalance,
-        quantityBase: actualOutput,
-        totalCost: actualMaterialCost,
-        nextStatus: outputResolution.status
-      });
-
-      if (productBalance) {
-        const updated = inventory.updateProductValuationBalance({
-          stockLocationId: batch.output_stock_location_id,
-          productId: product.id,
-          quantity: productTransition.quantity,
-          carryingValue: productTransition.carrying_value,
-          movingAverageUnitCost: productTransition.moving_average_unit_cost,
-          costAvailabilityStatus: productTransition.cost_availability_status,
-          valuationVersion: productTransition.valuation_version,
-          updatedAt: now
-        });
-        if (!updated || updated.changes !== 1) throw fail('VALUATION_STATE_INVALID');
-      } else {
-        inventory.insertProductValuationBalance({
-          stockLocationId: batch.output_stock_location_id,
-          productId: product.id,
-          quantity: productTransition.quantity,
-          carryingValue: productTransition.carrying_value,
-          movingAverageUnitCost: productTransition.moving_average_unit_cost,
-          costAvailabilityStatus: productTransition.cost_availability_status,
-          valuationVersion: productTransition.valuation_version,
-          createdAt: now,
-          updatedAt: now
-        });
-      }
-
-      const outputMovementId = movementMutationId(postingId, product.id, 'PRODUCT_OUTPUT');
-      const outputMovement = inventory.insertProductValuationMovement({
-        id: 'mov_' + crypto.createHash('sha256').update(outputMovementId).digest('hex').slice(0, 24),
-        stockLocationId: batch.output_stock_location_id,
-        productId: product.id,
-        movementType: 'PRODUCTION_OUTPUT',
-        quantity: actualOutput,
-        previousQuantity: productBalance ? Number(productBalance.quantity) : 0,
-        currentQuantity: productTransition.quantity,
-        unitCost: outputUnitCost,
-        totalCost: actualMaterialCost,
-        currencyCode: resolvedCurrency,
-        costBasisType: 'PRODUCTION_OUTPUT',
-        sourceType: 'PRODUCTION_BATCH',
-        sourceReference: batch.id,
-        postingMutationId: outputMovementId,
-        valuationVersion: productTransition.valuation_version,
-        postingTimestamp: now,
-        resolverVersion: outputResolution.resolver_version,
-        actorId: completedBy
-      });
-      if (!outputMovement || outputMovement.changes !== 1) throw fail('VALUATION_STATE_INVALID');
 
       const snapshotId = id('pcs_');
       repository.insertProductionCostSnapshot({
         id: snapshotId,
-        productionBatchId: batch.id,
+        productionBatchId: lockedBatch.id,
         productionPostingId: postingId,
-        actualMaterialCost,
-        actualOutputQuantity: actualOutput,
-        productionOutputUnitCost: outputUnitCost,
-        currencyCode: resolvedCurrency,
+        actualMaterialCost: posting.actualMaterialCost,
+        actualOutputQuantity: posting.actualOutputQuantity,
+        productionOutputUnitCost: posting.productionOutputUnitCost,
+        currencyCode: posting.currencyCode,
         status: 'AVAILABLE',
         createdAt: now
       });
 
-      for (const line of resolvedCosts) {
+      for (const line of posting.resolvedCosts) {
         repository.insertProductionBatchConsumption({
           id: id('pbc_'),
-          productionBatchId: batch.id,
+          productionBatchId: lockedBatch.id,
           materialId: line.materialId,
           inputStockLocationId: line.inputStockLocationId,
           sourceUomId: line.sourceUomId,
@@ -648,33 +561,37 @@ class ProductionService {
       }
 
       repository.setBatchActualOutput({
-        id: batch.id,
-        actualOutputQuantity: actualOutput,
+        id: lockedBatch.id,
+        actualOutputQuantity: posting.actualOutputQuantity,
         productionPostingId: postingId,
         timestamp: now
       });
+
       const completed = repository.updateBatchStatus({
-        id: batch.id,
+        id: lockedBatch.id,
         status: 'COMPLETED',
         actorField: 'completed_by',
         actorId: completedBy,
         timestamp: now
       });
-      if (!completed || completed.changes !== 1) throw fail('PRODUCTION_BATCH_STATUS_INVALID');
+
+      if (!completed || completed.changes !== 1) {
+        throw fail('PRODUCTION_BATCH_STATUS_INVALID');
+      }
 
       repository.commitTransaction();
 
       return {
         success: true,
         idempotent: false,
-        production_batch_id: batch.id,
+        production_batch_id: lockedBatch.id,
         production_posting_id: postingId,
-        actual_material_cost: actualMaterialCost,
-        actual_output_quantity: actualOutput,
-        production_output_unit_cost: outputUnitCost,
-        currency_code: resolvedCurrency,
+        actual_material_cost: posting.actualMaterialCost,
+        actual_output_quantity: posting.actualOutputQuantity,
+        production_output_unit_cost: posting.productionOutputUnitCost,
+        currency_code: posting.currencyCode,
         snapshot_id: snapshotId,
-        consumptions: resolvedCosts
+        consumptions: posting.resolvedCosts
       };
     } catch (e) {
       try { repository.rollbackTransaction(); } catch (_) {}
