@@ -373,23 +373,45 @@ Assessment: **API/BUSINESS VOCABULARY IS CLEAR; STORAGE NAMING IS LEGACY/INCONSI
 Action: do not rename now. Record as a low-risk naming debt and resolve during a later Catalog schema cleanup only if migration cost is justified.
 
 
-## 17A. Taxonomy Identity Consistency Finding
+## 17A. Historical Taxonomy Identity Finding — SUPERSEDED
 
-The current forward Menu schema contains `sub_category_id`, but the runtime Menu creation path currently does not populate it. `ComposedMenuService.createMenu()` sets the local sub-category/level variable to null, and `ComposedMenuRepository.createMenu()` inserts `sub_category_id` as NULL.
+The audit originally flagged the presence of `sub_category_id` alongside a Menu identity using:
 
-The current unique Menu identity also uses:
-
-```text
+```
 brand_id + category_id + title_id + rasa_id
 ```
 
-while the target taxonomy work previously identified Sub Category as a meaningful dimension of product/menu identity.
+as a possible mismatch with an earlier Category + Sub Category + Rasa model.
 
-Therefore the current implementation is **not yet evidence that Sub Category participates correctly in the canonical identity model**.
+That finding is retained as historical audit evidence, but it is **no longer the active conclusion**.
 
-**Assessment:** HIGH — target data-model / taxonomy consistency gap.
+### 2026-10-08 reconciliation
 
-**Action:** resolve the exact meaning and identity relationship of Category + Sub Category + Rasa + Product + Menu during Target Data Model Design. Do not patch the unique index or start a global migration until that relationship is explicitly locked.
+Subsequent F&B stress-testing and Owner Menu Editor review established the current forward contract:
+
+```
+Menu
+├── Category        → grouping/classification
+├── Title           → explicit customer-facing commercial name
+└── Menu Items
+     └── optional Item Choices
+```
+
+Sub Category is **not** a universal Menu identity dimension.
+Rasa is **not** a universal Menu identity dimension.
+
+Item Choices such as Sambal, Level Pedas, Ukuran, Suhu, Rasa, Topping, and Filling are scoped to the specific Menu Item when applicable.
+
+The active decisions are now:
+
+- `docs/decisions/catalog-menu-domain-contract-v2.md`
+- `docs/decisions/xentra-menu-item-choice-template-contract-v1.md`
+
+The existing `sub_category_id` field is therefore treated as **legacy/migration residue** unless a separate explicit contract assigns it a new purpose.
+
+**Final assessment:** RESOLVED AS A DOCUMENTATION/CONTRACT RECONCILIATION; no runtime fix is implied by this audit section.
+
+Do not patch the unique index solely to satisfy the old 17A wording. Any schema migration must follow the current v2 contract and a separate data-model/consumer impact assessment.
 
 ## 18. Catalog Boundary Status
 
