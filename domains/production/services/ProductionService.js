@@ -400,9 +400,6 @@ class ProductionService {
     }
 
     const targetCurrency = currencyCode(currency);
-    if (String(batch.production_stock_location_id) !== String(batch.production_stock_location_id)) {
-      throw fail('PRODUCTION_LOCATION_INVALID');
-    }
     assertSameOrganization(batch.input_stock_location_id, batch.output_stock_location_id, inventory);
 
     const duplicateMaterials = new Set();
