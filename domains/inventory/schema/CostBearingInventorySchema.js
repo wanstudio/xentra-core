@@ -99,6 +99,34 @@ function ensureCostBearingInventorySchema(db) {
     CREATE INDEX IF NOT EXISTS idx_material_stock_balances_material
       ON material_stock_balances(material_id, stock_location_id);
 
+    CREATE TRIGGER IF NOT EXISTS trg_material_stock_balance_scope_insert
+    BEFORE INSERT ON material_stock_balances
+    FOR EACH ROW
+    WHEN
+      (SELECT is_active FROM stock_locations WHERE id = NEW.stock_location_id) <> 1
+      OR
+      (SELECT organization_id FROM materials WHERE id = NEW.material_id) IS NULL
+      OR
+      (SELECT organization_id FROM materials WHERE id = NEW.material_id) <>
+      (SELECT organization_id FROM stock_locations WHERE id = NEW.stock_location_id)
+    BEGIN
+      SELECT RAISE(ABORT, 'MATERIAL_STOCK_LOCATION_SCOPE_INVALID');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_material_stock_balance_scope_update
+    BEFORE UPDATE OF stock_location_id, material_id ON material_stock_balances
+    FOR EACH ROW
+    WHEN
+      (SELECT is_active FROM stock_locations WHERE id = NEW.stock_location_id) <> 1
+      OR
+      (SELECT organization_id FROM materials WHERE id = NEW.material_id) IS NULL
+      OR
+      (SELECT organization_id FROM materials WHERE id = NEW.material_id) <>
+      (SELECT organization_id FROM stock_locations WHERE id = NEW.stock_location_id)
+    BEGIN
+      SELECT RAISE(ABORT, 'MATERIAL_STOCK_LOCATION_SCOPE_INVALID');
+    END;
+
     CREATE TABLE IF NOT EXISTS product_stock_balances (
       stock_location_id TEXT NOT NULL,
       product_id TEXT NOT NULL,
@@ -247,6 +275,35 @@ function ensureCostBearingInventorySchema(db) {
 
     CREATE INDEX IF NOT EXISTS idx_material_stock_movements_source_movement
       ON material_stock_movements(source_movement_id);
+
+    CREATE TRIGGER IF NOT EXISTS trg_material_stock_movement_scope_insert
+    BEFORE INSERT ON material_stock_movements
+    FOR EACH ROW
+    WHEN
+      (SELECT is_active FROM stock_locations WHERE id = NEW.stock_location_id) <> 1
+      OR
+      (SELECT organization_id FROM materials WHERE id = NEW.material_id) IS NULL
+      OR
+      (SELECT organization_id FROM materials WHERE id = NEW.material_id) <>
+      (SELECT organization_id FROM stock_locations WHERE id = NEW.stock_location_id)
+    BEGIN
+      SELECT RAISE(ABORT, 'MATERIAL_MOVEMENT_SCOPE_INVALID');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_material_stock_movement_valuation_version
+    BEFORE INSERT ON material_stock_movements
+    FOR EACH ROW
+    BEGIN
+      SELECT CASE
+        WHEN NEW.valuation_version <> COALESCE((
+          SELECT MAX(m.valuation_version) + 1
+            FROM material_stock_movements m
+           WHERE m.stock_location_id = NEW.stock_location_id
+             AND m.material_id = NEW.material_id
+        ), 1)
+        THEN RAISE(ABORT, 'MATERIAL_VALUATION_VERSION_NOT_MONOTONIC')
+      END;
+    END;
 
     CREATE TRIGGER IF NOT EXISTS trg_material_stock_movement_transfer_source
     BEFORE INSERT ON material_stock_movements
@@ -409,6 +466,29 @@ function ensureCostBearingInventorySchema(db) {
 
     CREATE INDEX IF NOT EXISTS idx_product_stock_movements_source_movement
       ON product_stock_movements(source_movement_id);
+
+    CREATE TRIGGER IF NOT EXISTS trg_product_stock_movement_scope_insert
+    BEFORE INSERT ON product_stock_movements
+    FOR EACH ROW
+    WHEN (SELECT is_active FROM stock_locations WHERE id = NEW.stock_location_id) <> 1
+    BEGIN
+      SELECT RAISE(ABORT, 'PRODUCT_MOVEMENT_LOCATION_INACTIVE');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_product_stock_movement_valuation_version
+    BEFORE INSERT ON product_stock_movements
+    FOR EACH ROW
+    BEGIN
+      SELECT CASE
+        WHEN NEW.valuation_version <> COALESCE((
+          SELECT MAX(m.valuation_version) + 1
+            FROM product_stock_movements m
+           WHERE m.stock_location_id = NEW.stock_location_id
+             AND m.product_id = NEW.product_id
+        ), 1)
+        THEN RAISE(ABORT, 'PRODUCT_VALUATION_VERSION_NOT_MONOTONIC')
+      END;
+    END;
 
     CREATE TRIGGER IF NOT EXISTS trg_product_stock_movement_transfer_source
     BEFORE INSERT ON product_stock_movements
