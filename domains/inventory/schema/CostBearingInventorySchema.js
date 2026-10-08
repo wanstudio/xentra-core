@@ -160,6 +160,8 @@ function ensureCostBearingInventorySchema(db) {
     BEFORE INSERT ON product_stock_balances
     FOR EACH ROW
     WHEN
+      (SELECT is_active FROM stock_locations WHERE id = NEW.stock_location_id) <> 1
+      OR
       (SELECT organization_id
          FROM brands
         WHERE id = (SELECT brand_id FROM products WHERE id = NEW.product_id)) IS NULL
@@ -178,6 +180,8 @@ function ensureCostBearingInventorySchema(db) {
     BEFORE UPDATE OF stock_location_id, product_id ON product_stock_balances
     FOR EACH ROW
     WHEN
+      (SELECT is_active FROM stock_locations WHERE id = NEW.stock_location_id) <> 1
+      OR
       (SELECT organization_id
          FROM brands
         WHERE id = (SELECT brand_id FROM products WHERE id = NEW.product_id)) IS NULL
