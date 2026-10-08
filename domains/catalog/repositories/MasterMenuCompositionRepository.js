@@ -2,6 +2,7 @@
 
 const DataAccess = require('../../../core/data/DataAccess');
 const { ProductMenuMigrationRepository } = require('../migrations/ProductMenuMigrationRepository');
+const InventoryRepository = require('../../../core/data/repositories/InventoryRepository');
 
 
 const DEFINITIONS = Object.freeze({
@@ -47,6 +48,7 @@ function normalizeSlug(value, fallbackName) {
 class MasterMenuCompositionRepository {
   constructor(dataAccess = DataAccess) {
     this.db = dataAccess;
+    this.inventoryRepository = new InventoryRepository(dataAccess);
   }
   migrationRepository() {
     return new ProductMenuMigrationRepository(this.db);
@@ -234,16 +236,44 @@ class MasterMenuCompositionRepository {
   }
 
   findBranchProductStates({ brandId, branchId, productIds = [] }) {
-    const ids = Array.from(new Set((Array.isArray(productIds) ? productIds : []).map(v => String(v || '').trim()).filter(Boolean)));
+    const ids = Array.from(new Set(
+      (Array.isArray(productIds) ? productIds : [])
+        .map(v => String(v || '').trim())
+        .filter(Boolean)
+    ));
     if (!ids.length) return [];
-    const placeholders = ids.map(() => '?').join(',');
-    return this.db.queryMany(
-      `SELECT bp.product_id, bp.branch_id, bp.is_available, bp.stock, bp.low_stock_threshold
-       FROM branch_products bp
-       JOIN branches b ON b.id = bp.branch_id AND b.brand_id = ?
-       WHERE bp.branch_id = ? AND bp.product_id IN (${placeholders})`,
+
+    const products = this.db.queryMany(
+      `SELECT bp.product_id, bp.branch_id, bp.is_available, bp.low_stock_threshold
+         FROM branch_products bp
+         JOIN branches b ON b.id = bp.branch_id AND b.brand_id = ?
+        WHERE bp.branch_id = ? AND bp.product_id IN (${ids.map(() => '?').join(',')})`,
       [brandId, branchId, ...ids]
     );
+
+    const stockRows = this.inventoryRepository.findProductStockStatesByBranch({
+      branchId,
+      productIds: ids
+    });
+    const stockMap = new Map(stockRows.map(row => [String(row.product_id), row]));
+
+    return ids
+      .map(productId => {
+        const assignment = products.find(row => String(row.product_id) === productId);
+        if (!assignment) return null;
+        const stock = stockMap.get(productId);
+        return {
+          product_id: assignment.product_id,
+          branch_id: assignment.branch_id,
+          is_available: assignment.is_available,
+          stock: stock ? stock.stock : 0,
+          low_stock_threshold: assignment.low_stock_threshold != null
+            ? assignment.low_stock_threshold
+            : 5,
+          stock_source: stock ? stock.stock_source : 'UNRECORDED'
+        };
+      })
+      .filter(Boolean);
   }
 
   findBranchProductCategoryMemberships({ branchId, productIds = [] }) {
