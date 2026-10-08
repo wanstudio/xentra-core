@@ -136,10 +136,16 @@ If two production methods are materially different and need to coexist as separa
 This establishes:
 ~~~
 Production Item
-  = different production route / definition
+  = production definition for one Product
+
+Production Item Location Applicability
+  = eligibility mapping of that definition to a Stock Location
+
+Production routing
+  = resolution process that selects the applicable Production Item
 
 Recipe Version
-  = revision of the same production formula
+  = revision of the same Recipe
 ~~~
 
 ## 6. Recipe
@@ -263,7 +269,7 @@ Inventory
    └── Product Stock increase
 ~~~
 
-The exact Production Batch state machine and posting transaction are defined by a later contract.
+The Production Batch state machine and posting transaction are defined by the locked Production Batch + Posting / Mutation Contract v1.
 
 ## 13. Production Location
 
@@ -381,10 +387,9 @@ The routing layer selects the applicable Production Item for the execution conte
 - by-products;
 - lot / expiry;
 - Make-to-Order trigger/reservation;
-- exact Production Batch state machine;
 - scheduling / capacity;
 - yield variance / waste posting;
-- HPP / valuation;
+- exact valuation method / accounting integration;
 - autonomous production/replenishment;
 - exact Item Choice → Product / Production mapping.
 
