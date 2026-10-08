@@ -44,8 +44,8 @@ function ensureProcurementDocumentSchema(db) {
       supplier_material_id TEXT NOT NULL,
       name TEXT NOT NULL,
       purchase_uom_id TEXT,
-      content_quantity_base REAL NOT NULL
-        CHECK (content_quantity_base > 0),
+      content_quantity REAL NOT NULL
+        CHECK (content_quantity > 0),
       content_uom_id TEXT NOT NULL,
       minimum_order_quantity REAL NOT NULL DEFAULT 1
         CHECK (minimum_order_quantity > 0),
