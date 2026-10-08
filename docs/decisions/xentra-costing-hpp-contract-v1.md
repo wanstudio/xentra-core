@@ -2,6 +2,8 @@
 
 **Status:** 🔒 LOCKED / ACTIVE
 **Decision date:** 2026-10-08
+
+**Terminology revision:** `docs/decisions/xentra-costing-vocabulary-revision-v1.1.md` supersedes the naming of Menu HPP in this document. Wherever this v1 contract says **Menu HPP** for a derived Menu composition cost, the canonical term is now **Menu Composition Cost**. The underlying costing formulas and authority boundaries remain unchanged.
 **Scope:** Material unit cost, production output cost, Menu HPP, transfer cost continuity, cost snapshots, costing boundaries, and migration treatment of legacy cost fields.
 
 **Prerequisite authorities:**
