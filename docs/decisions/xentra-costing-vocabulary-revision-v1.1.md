@@ -5,7 +5,7 @@
 **Scope:** Canonical naming for Menu Composition Cost, Production/Product cost, Cost of Goods Sold (COGS), and Indonesian HPP terminology.
 
 **Supersedes:** `docs/decisions/xentra-costing-hpp-contract-v1.md` terminology only.
-The costing formulas, ownership boundaries, stock/cost snapshot rules, transfer cost continuity, and open valuation policy from Costing/HPP Contract v1 remain in force unless explicitly changed below.
+The costing formulas, ownership boundaries, stock/cost snapshot rules, and transfer cost continuity remain in force. Inventory valuation is now governed by `docs/decisions/xentra-inventory-valuation-policy-v1.md`, which locks Moving Average for v1.
 
 ## 1. Decision Summary
 
