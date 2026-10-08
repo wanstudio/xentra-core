@@ -14,6 +14,8 @@ const LOCATION = 'loc_menu_cost_v1';
 const PRODUCT_PURCHASED = 'prod_menu_cost_purchased';
 const PRODUCT_PRODUCED = 'prod_menu_cost_produced';
 const PRODUCT_THEORETICAL = 'prod_menu_cost_theoretical';
+const PRODUCT_USD = 'prod_menu_cost_usd';
+const MENU_CURRENCY = 'menu_cost_currency_v1';
 const MATERIAL_THEORETICAL = 'mat_menu_cost_theoretical';
 const MENU_ACTUAL = 'menu_cost_actual_v1';
 const MENU_THEORETICAL = 'menu_cost_theoretical_v1';
@@ -35,17 +37,25 @@ test.before(async () => {
   ).run(LOCATION, ORG, BRANCH, 'MENU-COST', 'Menu Cost Location', 'BRANCH');
 
   db.prepare(
-    'INSERT OR IGNORE INTO products (id, brand_id, name, slug, price, is_active, sku, product_stock_uom_id) VALUES (?, ?, ?, ?, 0, 1, ?, ?), (?, ?, ?, ?, 0, 1, ?, ?), (?, ?, ?, ?, 0, 1, ?, ?)'
+    'INSERT OR IGNORE INTO products (id, brand_id, name, slug, price, is_active, sku, product_stock_uom_id) VALUES (?, ?, ?, ?, 0, 1, ?, ?), (?, ?, ?, ?, 0, 1, ?, ?), (?, ?, ?, ?, 0, 1, ?, ?), (?, ?, ?, ?, 0, 1, ?, ?)'
   ).run(
     PRODUCT_PURCHASED, BRAND, 'Purchased Component', 'purchased-component', 'MC-P-001', 'uom_pcs',
     PRODUCT_PRODUCED, BRAND, 'Produced Component', 'produced-component', 'MC-R-001', 'uom_pcs',
-    PRODUCT_THEORETICAL, BRAND, 'Theoretical Component', 'theoretical-component', 'MC-T-001', 'uom_pcs'
+    PRODUCT_THEORETICAL, BRAND, 'Theoretical Component', 'theoretical-component', 'MC-T-001', 'uom_pcs',
+    PRODUCT_USD, BRAND, 'USD Component', 'usd-component', 'MC-U-001', 'uom_pcs'
   );
 
   // Purchased Product: current Product Stock carrying cost = Rp5,000/pcs.
   db.prepare(
     "INSERT INTO product_stock_balances (stock_location_id, product_id, quantity, carrying_value, moving_average_unit_cost, cost_availability_status, valuation_version) VALUES (?, ?, 10, 50000, 5000, 'AVAILABLE', 1)"
   ).run(LOCATION, PRODUCT_PURCHASED);
+
+  db.prepare(
+    "INSERT INTO product_stock_balances (stock_location_id, product_id, quantity, carrying_value, moving_average_unit_cost, cost_availability_status, valuation_version) VALUES (?, ?, 10, 50000, 5000, 'AVAILABLE', 1)"
+  ).run(LOCATION, PRODUCT_USD);
+  db.prepare(
+    "INSERT INTO product_stock_movements (id, stock_location_id, product_id, movement_type, quantity, previous_quantity, current_quantity, unit_cost, total_cost, currency_code, valuation_method, cost_basis_type, source_type, source_reference, posting_mutation_id, valuation_version, posting_timestamp, resolver_version) VALUES (?, ?, ?, 'OPENING_STOCK', 10, 0, 10, 5000, 50000, 'USD', 'MOVING_AVERAGE', 'OPENING_ACTUAL', 'TEST', 'MC-U-SEED', ?, 1, '2026-10-08T08:00:00.000Z', 'v1')"
+  ).run('mov_mc_usd', LOCATION, PRODUCT_USD, 'mc-usd-mut');
   db.prepare(
     "INSERT INTO product_stock_movements (id, stock_location_id, product_id, movement_type, quantity, previous_quantity, current_quantity, unit_cost, total_cost, currency_code, valuation_method, cost_basis_type, source_type, source_reference, posting_mutation_id, valuation_version, posting_timestamp, resolver_version) VALUES (?, ?, ?, 'OPENING_STOCK', 10, 0, 10, 5000, 50000, 'IDR', 'MOVING_AVERAGE', 'OPENING_ACTUAL', 'TEST', 'MC-P-SEED', ?, 1, '2026-10-08T08:00:00.000Z', 'v1')"
   ).run('mov_mc_purchased', LOCATION, PRODUCT_PURCHASED, 'mc-purchased-mut');
@@ -112,12 +122,23 @@ test.before(async () => {
     MENU_ACTUAL, BRAND, 'cat_menu_cost_v1', 'title_menu_cost_v1',
     MENU_THEORETICAL, BRAND, 'cat_menu_cost_v1', 'title_menu_cost_v1'
   );
+
+  db.prepare(
+    "INSERT OR IGNORE INTO menus (id, brand_id, category_id, title_id, selling_price, status) VALUES (?, ?, ?, ?, 50000, 'ACTIVE')"
+  ).run(MENU_CURRENCY, BRAND, 'cat_menu_cost_v1', 'title_menu_cost_v1');
   db.prepare(
     "INSERT OR REPLACE INTO menu_items (menu_id, product_id, quantity, sort_order) VALUES (?, ?, 2, 0), (?, ?, 1, 1)"
   ).run(
     MENU_ACTUAL, PRODUCT_PRODUCED,
     MENU_ACTUAL, PRODUCT_PURCHASED
   );
+
+  db.prepare(
+    "INSERT OR REPLACE INTO menu_items (menu_id, product_id, quantity, sort_order) VALUES (?, ?, 1, 0)"
+  ).run(MENU_CURRENCY, PRODUCT_PURCHASED);
+  db.prepare(
+    "INSERT OR REPLACE INTO menu_items (menu_id, product_id, quantity, sort_order) VALUES (?, ?, 1, 1)"
+  ).run(MENU_CURRENCY, PRODUCT_USD);
   db.prepare(
     "INSERT OR REPLACE INTO menu_items (menu_id, product_id, quantity, sort_order) VALUES (?, ?, 3, 0)"
   ).run(MENU_THEORETICAL, PRODUCT_THEORETICAL);
@@ -168,24 +189,19 @@ test('Menu Composition Cost — explicit basis is mandatory and no hidden fallba
   );
 
   const unavailable = MenuCompositionCostService.resolveProductUnitCost({
-    productId: PRODUCT_PRODUCED,
+    productId: PRODUCT_THEORETICAL,
     stockLocationId: LOCATION,
     basis: 'ACTUAL_OUTPUT'
   });
 
-  db.prepare('DELETE FROM production_cost_snapshots WHERE id = ?').run('pcs_mc_actual');
   assert.equal(unavailable.status, 'UNAVAILABLE');
   assert.equal(unavailable.reason, 'PRODUCTION_ACTUAL_OUTPUT_COST_UNAVAILABLE');
 });
 
 test('Menu Composition Cost — cross-currency composition fails closed', () => {
-  db.prepare(
-    "INSERT OR REPLACE INTO product_stock_movements (id, stock_location_id, product_id, movement_type, quantity, previous_quantity, current_quantity, unit_cost, total_cost, currency_code, valuation_method, cost_basis_type, source_type, source_reference, posting_mutation_id, valuation_version, posting_timestamp, resolver_version) VALUES (?, ?, ?, 'ADJUSTMENT_IN', 1, 10, 11, 5000, 5000, 'USD', 'MOVING_AVERAGE', 'COUNT_CORRECTION', 'TEST', 'MC-CURRENCY', ?, 2, '2026-10-08T09:00:00.000Z', 'v1')"
-  ).run('mov_mc_currency', LOCATION, PRODUCT_PURCHASED, 'mc-currency-mut');
-
   assert.throws(() => MenuCompositionCostService.calculateMenuCompositionCost({
     brandId: BRAND,
-    menuId: MENU_ACTUAL,
+    menuId: MENU_CURRENCY,
     stockLocationId: LOCATION,
     basis: 'ACTUAL_OUTPUT'
   }), error => error && error.code === 'COST_CURRENCY_MISMATCH');
