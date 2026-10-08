@@ -236,7 +236,7 @@
           menu_id: menuId,
           menu_name: displayName,
           name: displayName,
-          master_name: menu.title || menu.name || 'Menu',
+          master_name: menu.title,
           category_ids: categories.map(function (cat) { return String(cat.id); }),
           categories: categories,
           menu_composition: menu,
