@@ -2555,7 +2555,7 @@
                 <button type="button" class="x-title-back-btn x-owner-mobile-page-back" aria-label="Kembali" onclick="goBackFromChildPage()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
                 <span>Stok</span>
               </h3>
-              <p class="x-owner-mobile-page-sub">Pantau kesehatan persediaan seluruh cabang tanpa mengubah stok operasional.</p>
+              <p class="x-owner-mobile-page-sub">Kelola stok bahan dan produk siap jual, pengadaan, produksi, serta peringatan pengisian ulang per cabang.</p>
             </div>
             <div class="x-owner-stock-header-actions">
               <span class="x-owner-stock-scope" id="owner-stock-scope">Semua Cabang</span>
@@ -2679,7 +2679,7 @@
 
             <div class="x-owner-stock-note">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 10v6"></path><circle cx="12" cy="7" r="1"></circle></svg>
-              <span>Owner hanya memantau kondisi stok. Penyesuaian stok dilakukan dari surface operasional cabang sesuai hak akses.</span>
+              <span>KPI dan laporan di atas masih membaca jalur stok kompatibilitas lama. Gunakan tabel Stok Produk Canonical, Bahan Baku & Saldo, Pengadaan, dan Produksi untuk alur inventory baru.</span>
             </div>
           </div>
 
@@ -2798,6 +2798,9 @@
               <section class="x-owner-stock-panel">
                 <div class="x-owner-stock-panel-head"><div><h3>2. Catat Hasil Produksi</h3><p>Masukkan hasil yang benar-benar jadi dan bahan yang benar-benar terpakai. Posting mengurangi bahan serta menambah stok produk dalam satu transaksi.</p></div></div>
                 <form id="iw-form-batch" onsubmit="submitIWProductionBatch(event)" style="display:grid;gap:10px;">
+                  <input type="hidden" id="iw-batch-id">
+                  <input type="hidden" id="iw-batch-posting-id">
+                  <div id="iw-batch-resume-note" class="x-owner-stock-note" style="display:none;"></div>
                   <label>Resep aktif<select class="x-input" id="iw-batch-recipe" required onchange="renderIWBatchComponents()"></select></label>
                   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
                     <label>Rencana hasil<input type="number" min="0.000001" step="any" class="x-input" id="iw-batch-planned-output" required value="20" oninput="renderIWBatchComponents()"></label>
