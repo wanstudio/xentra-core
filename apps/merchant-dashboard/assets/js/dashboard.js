@@ -6799,8 +6799,9 @@ async function loadMenusView() {
           var threshold = Number(a.low_stock_threshold);
           var isOut = current <= 0;
           var gap = Math.max(threshold - current, 0);
+          var branchAttr = a.branch_id ? ' data-branch-id="' + escapeHtml(a.branch_id) + '"' : '';
           alertHtml +=
-            '<div class="x-owner-stock-alert-row ' + (isOut ? 'is-out' : '') + '">' +
+            '<div class="x-owner-stock-alert-row ' + (isOut ? 'is-out' : '') + '" style="cursor:pointer;"' + branchAttr + ' onclick="selectOwnerStockBranch(\'' + escapeHtml(a.branch_id || '') + '\')" title="Klik untuk filter ke cabang ini">' +
               '<div class="x-owner-stock-alert-main">' +
                 '<span class="x-owner-stock-alert-status">' + (isOut ? 'Habis' : 'Menipis') + '</span>' +
                 '<strong>' + escapeHtml(a.product_name || '-') + '</strong>' +
@@ -6836,8 +6837,9 @@ async function loadMenusView() {
           var out = Number(row.out_of_stock_count || 0);
           var status = out > 0 ? 'Perlu perhatian' : (low > 0 ? 'Menipis' : 'Aman');
           var statusClass = out > 0 ? 'danger' : (low > 0 ? 'warning' : 'good');
+          var branchId = escapeHtml(row.branch_id || '');
           return (
-            '<div class="x-owner-stock-branch-row">' +
+            '<div class="x-owner-stock-branch-row" style="cursor:pointer;" onclick="selectOwnerStockBranch(\'' + branchId + '\')" title="Klik untuk fokus pada cabang ini">' +
               '<div class="x-owner-stock-branch-copy">' +
                 '<strong>' + escapeHtml(row.branch_name || '-') + '</strong>' +
                 '<span>' + formatUnitCount(row.tracked_item_count) + ' item · ' + formatUnitCount(row.total_units) + ' unit</span>' +
@@ -6886,6 +6888,16 @@ async function loadMenusView() {
       navigateTo('reports/operations');
     });
   }
+
+  function selectOwnerStockBranch(branchId) {
+    if (!branchId) return;
+    var sel = $('dash-branch-context');
+    if (sel) {
+      sel.value = branchId;
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }
+  window.selectOwnerStockBranch = selectOwnerStockBranch;
 
   /* =========================================================================
      MATERIAL MASTER (BAHAN BAKU) & UOM CONTROLS
