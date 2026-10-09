@@ -22,6 +22,7 @@ const registerAdminCatalogRoutes = require('./admin-catalog');
 const registerAdminMenuCompositionRoutes = require('./admin-menu-composition');
 const registerAdminComposedMenuRoutes = require('./admin-composed-menu');
 const registerAdminMaterialRoutes = require('./admin-materials');
+const registerAdminInventoryWorkflowRoutes = require('./admin-inventory-workflow');
 const registerAdminBrandRoutes = require('./admin-brand');
 const registerAdminBranchRoutes = require('./admin-branches');
 const registerAdminOrderRoutes = require('./admin-orders');
@@ -1027,6 +1028,7 @@ registerAdminMenuCompositionRoutes(router, { requireAuth });
 registerAdminComposedMenuRoutes(router, { db, requireAuth });
 // Canonical Material Master & UOM registry routes
 registerAdminMaterialRoutes(router, { requireAuth });
+registerAdminInventoryWorkflowRoutes(router, { requireAuth });
 
 
 // Admin branch management routes are isolated in server/routes/admin-branches.js.
