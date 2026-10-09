@@ -7343,10 +7343,17 @@ async function loadMenusView() {
     if (!_inventoryWorkflowState) return;
     document.querySelectorAll('[data-iw-recipe-material]').forEach(function (select) {
       var current = select.value;
-      iwSetOptions(select.id || 'iw-unused-select', _inventoryWorkflowState.materials, 'id', function (material) {
+      var html = '<option value="">Pilih bahan baku</option>';
+      (_inventoryWorkflowState.materials || []).forEach(function (material) {
         var uom = (_inventoryWorkflowState.uoms || []).find(function (u) { return String(u.id) === String(material.base_uom_id); }) || {};
-        return material.name + ' · ' + (uom.code || uom.name || 'satuan dasar');
-      }, 'Pilih bahan baku', current);
+        html += '<option value="' + iwEsc(material.id) + '">' +
+          iwEsc(material.name + ' · ' + material.material_code + ' · ' + (uom.code || uom.name || 'satuan dasar')) +
+          '</option>';
+      });
+      select.innerHTML = html;
+      if (current && Array.from(select.options).some(function (option) { return option.value === current; })) {
+        select.value = current;
+      }
     });
   }
   function onIWRecipeProductChange() {
