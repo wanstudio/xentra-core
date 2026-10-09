@@ -754,3 +754,339 @@
   display: inline-flex;
   align-items: center;
 }
+
+/* ==========================================================================
+   PETUGAS BELANJA — 100% PURE MOBILE VIEW (DRIVER APP / GOJEK STYLE)
+   ========================================================================== */
+body.is-purchasing-mode {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+/* Hide desktop elements completely */
+body.is-purchasing-mode .x-dash-sidebar,
+body.is-purchasing-mode .x-sidebar-overlay,
+body.is-purchasing-mode .x-topbar-desktop,
+body.is-purchasing-mode .x-mobile-operational-row,
+body.is-purchasing-mode .x-btn-hamburger {
+  display: none !important;
+}
+
+/* Make layout 100% centered mobile container up to 540px like driver app */
+body.is-purchasing-mode .x-dash-layout {
+  display: flex !important;
+  justify-content: center !important;
+  background: #f1f5f9 !important;
+  min-height: 100dvh !important;
+  height: auto !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+body.is-purchasing-mode .x-dash-main {
+  width: 100% !important;
+  max-width: 520px !important;
+  min-height: 100dvh !important;
+  background: #f8fafc !important;
+  box-shadow: 0 4px 25px rgba(15, 23, 42, 0.08) !important;
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow-y: visible !important;
+  padding: 0 !important;
+  margin: 0 auto !important;
+}
+
+/* Sticky Mobile App Header like Driver App */
+body.is-purchasing-mode .x-dash-topbar {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 40 !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.9) !important;
+  padding: 0 !important;
+  width: 100% !important;
+}
+
+body.is-purchasing-mode .x-mobile-topbar {
+  display: block !important;
+  padding: max(10px, env(safe-area-inset-top)) 16px 10px !important;
+}
+
+body.is-purchasing-mode .x-mobile-topbar-main {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+}
+
+/* Clean mobile screen container for belanja */
+body.is-purchasing-mode #tab-bm-belanja {
+  padding: 16px 16px 120px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Native modern card styles */
+.purchasing-mobile-hero {
+  background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
+  color: #ffffff;
+  border-radius: 18px;
+  padding: 16px 18px;
+  box-shadow: 0 6px 20px -2px rgba(6, 78, 59, 0.25);
+  margin-bottom: 14px;
+}
+
+.purchasing-hero-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.purchasing-hero-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.purchasing-hero-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.16);
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+}
+
+.purchasing-hero-title {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0;
+  color: #ffffff;
+}
+
+.purchasing-hero-desc {
+  font-size: 11.5px;
+  color: #a7f3d0;
+  margin: 2px 0 0;
+}
+
+/* Kasbon Box inside mobile */
+.purchasing-kasbon-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+  margin-bottom: 14px;
+}
+
+.purchasing-kasbon-input-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f8fafc;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 8px 12px;
+  margin-top: 6px;
+  transition: all 0.15s ease;
+}
+
+.purchasing-kasbon-input-group:focus-within {
+  background: #ffffff;
+  border-color: #059669;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+.purchasing-kasbon-input {
+  border: none !important;
+  background: transparent !important;
+  font-size: 18px !important;
+  font-weight: 800 !important;
+  color: #065f46 !important;
+  width: 100% !important;
+  padding: 0 !important;
+  outline: none !important;
+  font-family: inherit;
+}
+
+/* Quick Filter Pills */
+.purchasing-filter-wrap {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.purchasing-filter-btn {
+  border: none;
+  border-radius: 99px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  background: #e2e8f0;
+  color: #475569;
+  transition: all 0.15s ease;
+}
+
+.purchasing-filter-btn.active {
+  background: #0f172a;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
+}
+
+/* Item Shopping Card (Mobile Native List) */
+.purchasing-item-card {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  padding: 14px;
+  margin-bottom: 10px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03);
+  transition: all 0.15s ease;
+}
+
+.purchasing-item-card.is-checked {
+  border-color: #86efac;
+  background: #ffffff;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.08);
+}
+
+.purchasing-item-card.is-unchecked {
+  opacity: 0.8;
+  background: #f8fafc;
+}
+
+.purchasing-item-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.purchasing-check-box {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  accent-color: #059669;
+  cursor: pointer;
+  margin-top: 2px;
+}
+
+.purchasing-item-name {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.purchasing-item-stock {
+  font-size: 11.5px;
+  color: #64748b;
+  margin-top: 3px;
+}
+
+.purchasing-item-subtotal {
+  font-size: 15px;
+  font-weight: 800;
+  color: #065f46;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.purchasing-item-control-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr;
+  gap: 10px;
+  margin-top: 12px;
+  background: #f8fafc;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #f1f5f9;
+}
+
+.purchasing-qty-stepper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.purchasing-step-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.purchasing-step-btn:active {
+  transform: scale(0.92);
+  background: #e2e8f0;
+}
+
+.purchasing-qty-input {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  text-align: center;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 800;
+  padding: 6px 4px;
+  outline: none;
+}
+
+.purchasing-price-input {
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 700;
+  padding: 7px 10px;
+  margin-top: 4px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+/* Floating / Sticky Mobile Bottom Action Bar (Grab / Driver App Style) */
+body.is-purchasing-mode #purchasing-bottom-bar {
+  position: fixed !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  bottom: 0 !important;
+  width: min(520px, 100%) !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+  backdrop-filter: blur(18px) !important;
+  -webkit-backdrop-filter: blur(18px) !important;
+  border-top: 1px solid rgba(226, 232, 240, 0.8) !important;
+  padding: 12px 18px max(14px, env(safe-area-inset-bottom)) !important;
+  box-shadow: 0 -8px 25px rgba(15, 23, 42, 0.12) !important;
+  z-index: 100 !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  box-sizing: border-box !important;
+}
+
+body.is-purchasing-mode .x-merchant-mobile-nav {
+  display: none !important;
+}
+

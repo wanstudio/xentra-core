@@ -130,53 +130,53 @@
       var uomCode = item.base_uom_code || item.base_uom_name || 'Unit';
 
       html +=
-        '<div class="x-card-panel" style="padding:14px 16px; border-radius:12px; border:1px solid ' + (isChecked ? '#86efac' : '#e2e8f0') + '; background:' + (isChecked ? '#ffffff' : '#f8fafc') + '; box-shadow:0 2px 4px rgba(0,0,0,0.02); transition:all 0.15s ease;">' +
-          '<div style="display:flex; align-items:flex-start; gap:12px;">' +
-            // Checkbox
-            '<div style="padding-top:2px;">' +
-              '<input type="checkbox" id="chk-' + esc(item.material_id) + '" ' + (isChecked ? 'checked' : '') + ' onchange="togglePurchasingItemCheck(\'' + esc(item.material_id) + '\', this.checked)" style="width:20px; height:20px; cursor:pointer; accent-color:#16a34a;">' +
+        '<div class="purchasing-item-card ' + (isChecked ? 'is-checked' : 'is-unchecked') + '">' +
+          '<div class="purchasing-item-header">' +
+            // Large touch-friendly Checkbox
+            '<div>' +
+              '<input type="checkbox" id="chk-' + esc(item.material_id) + '" class="purchasing-check-box" ' + (isChecked ? 'checked' : '') + ' onchange="togglePurchasingItemCheck(\'' + esc(item.material_id) + '\', this.checked)">' +
             '</div>' +
 
             // Content body
-            '<div style="flex:1;">' +
+            '<div style="flex:1; min-width:0;">' +
               '<div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">' +
                 '<div>' +
-                  '<label for="chk-' + esc(item.material_id) + '" style="font-size:15px; font-weight:800; color:' + (isChecked ? '#1e293b' : '#64748b') + '; cursor:pointer; display:block; margin-bottom:2px;">' +
+                  '<label for="chk-' + esc(item.material_id) + '" class="purchasing-item-name" style="cursor:pointer; display:block;">' +
                     esc(item.material_name) +
                   '</label>' +
-                  '<div style="font-size:11px; color:var(--text-muted);">' +
+                  '<div class="purchasing-item-stock">' +
                     'Stok saat ini: <strong>' + Number(item.current_stock).toFixed(1) + ' ' + esc(uomCode) + '</strong> ' +
-                    (item.is_low ? '<span style="color:#dc2626; font-weight:700;">(Menipis, Min: ' + item.minimum_quantity + ')</span>' : '') +
+                    (item.is_low ? '<span style="color:#dc2626; font-weight:800;">(Min ' + item.minimum_quantity + ')</span>' : '') +
                   '</div>' +
                 '</div>' +
                 '<div style="text-align:right;">' +
-                  '<div style="font-size:14px; font-weight:800; color:' + (isChecked ? '#166534' : '#94a3b8') + ';">' +
+                  '<div class="purchasing-item-subtotal">' +
                     formatMoney(subtotal) +
                   '</div>' +
-                  '<small style="font-size:10px; color:var(--text-muted);">Subtotal</small>' +
+                  '<small style="font-size:10px; color:#64748b; font-weight:600;">Subtotal</small>' +
                 '</div>' +
               '</div>' +
 
-              // Input row (Berapa banyak & Berapa harga per unit)
-              '<div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; background:' + (isChecked ? '#f0fdf4' : '#f1f5f9') + '; padding:10px 12px; border-radius:8px;">' +
+              // Input row (Stepper Qty & Harga Pasar)
+              '<div class="purchasing-item-control-grid">' +
                 // Qty Belanja
-                '<div style="flex:1; min-width:120px;">' +
-                  '<label style="display:block; font-size:11px; font-weight:700; color:#334155; margin-bottom:3px;">' +
-                    'Beli Berapa (' + esc(uomCode) + ')' +
+                '<div>' +
+                  '<label style="display:block; font-size:11px; font-weight:700; color:#334155;">' +
+                    'Beli (' + esc(uomCode) + ')' +
                   '</label>' +
-                  '<div style="display:flex; align-items:center; gap:4px;">' +
-                    '<button type="button" class="x-btn-secondary" onclick="stepPurchasingQty(\'' + esc(item.material_id) + '\', -1)" style="padding:4px 8px; font-size:12px; font-weight:800;">-</button>' +
-                    '<input type="number" min="0.1" step="any" value="' + item.buyQty + '" oninput="updatePurchasingItemQty(\'' + esc(item.material_id) + '\', this.value)" class="x-input" style="flex:1; padding:5px 8px; font-size:13px; font-weight:700; text-align:center; background:#ffffff;">' +
-                    '<button type="button" class="x-btn-secondary" onclick="stepPurchasingQty(\'' + esc(item.material_id) + '\', 1)" style="padding:4px 8px; font-size:12px; font-weight:800;">+</button>' +
+                  '<div class="purchasing-qty-stepper">' +
+                    '<button type="button" class="purchasing-step-btn" onclick="stepPurchasingQty(\'' + esc(item.material_id) + '\', -1)">−</button>' +
+                    '<input type="number" min="0.1" step="any" value="' + item.buyQty + '" oninput="updatePurchasingItemQty(\'' + esc(item.material_id) + '\', this.value)" class="purchasing-qty-input">' +
+                    '<button type="button" class="purchasing-step-btn" onclick="stepPurchasingQty(\'' + esc(item.material_id) + '\', 1)">＋</button>' +
                   '</div>' +
                 '</div>' +
 
                 // Harga Pasar Riil per Unit
-                '<div style="flex:1; min-width:140px;">' +
-                  '<label style="display:block; font-size:11px; font-weight:700; color:#334155; margin-bottom:3px;">' +
-                    'Harga Pasar / ' + esc(uomCode) + ' (Rp)' +
+                '<div>' +
+                  '<label style="display:block; font-size:11px; font-weight:700; color:#334155;">' +
+                    'Harga / ' + esc(uomCode) + ' (Rp)' +
                   '</label>' +
-                  '<input type="number" min="0" step="500" value="' + item.actualUnitPrice + '" oninput="updatePurchasingItemPrice(\'' + esc(item.material_id) + '\', this.value)" class="x-input" style="width:100%; padding:5px 8px; font-size:13px; font-weight:700; background:#ffffff;">' +
+                  '<input type="number" min="0" step="500" value="' + item.actualUnitPrice + '" oninput="updatePurchasingItemPrice(\'' + esc(item.material_id) + '\', this.value)" class="purchasing-price-input" placeholder="0">' +
                 '</div>' +
               '</div>' +
             '</div>' +

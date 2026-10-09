@@ -266,20 +266,15 @@
     var roleLabel = user.role === 'purchasing' ? 'Petugas Belanja' : (user.role || 'branch_manager').toUpperCase();
     if ($('dash-user-role')) $('dash-user-role').textContent = roleLabel;
 
-    // Purchasing staff specific surface adjustments: clean, focus on Belanja & Stok
+    // Purchasing staff specific surface adjustments: clean 100% mobile view (like Driver App)
     if (user.role === 'purchasing') {
+      document.body.classList.add('is-purchasing-mode');
       var mobileNav = $('x-merchant-mobile-nav');
       if (mobileNav) {
-        mobileNav.innerHTML =
-          '<button type="button" class="x-merchant-mobile-nav-item active" data-route="belanja" onclick="navigateTo(\'belanja\')">' +
-            '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>' +
-            '<span>Belanja Pasar</span>' +
-          '</button>' +
-          '<button type="button" class="x-merchant-mobile-nav-item" data-route="stok" onclick="navigateTo(\'stok\')">' +
-            '<svg viewBox="0 0 21 21" width="24" height="24" fill="currentColor"><path d="M7 7H8.75V5.24991C8.75 5.24991 8.75 4.19991 7.87432 4.19991C6.99863 4.19991 7 5.24991 7 5.24991V7ZM7 14.875C7 14.875 7 15.7499 7.87432 15.7499C8.74863 15.7499 8.75 14.875 8.75 14.875V10.5H7V14.875ZM5.25 19.25C4.76875 19.25 4.35692 19.0788 4.0145 18.7364C3.67208 18.394 3.50058 17.9818 3.5 17.5V9.625H17.5V17.5C17.5 17.9813 17.3288 18.3934 16.9864 18.7364C16.644 19.0794 16.2318 19.2506 15.75 19.25H5.25ZM3.5 7.875V3.5C3.5 3.01875 3.6715 2.60692 4.0145 2.2645C4.3575 1.92208 4.76933 1.75058 5.25 1.75H15.75C16.2313 1.75 16.6434 1.9215 16.9864 2.2645C17.3294 2.6075 17.5006 3.01933 17.5 3.5V7.875H3.5Z" fill="currentColor"/></svg>' +
-            '<span>Stok Gudang</span>' +
-          '</button>';
+        mobileNav.style.display = 'none';
       }
+    } else {
+      document.body.classList.remove('is-purchasing-mode');
     }
 
     var searchBtn = $('btn-global-search');
