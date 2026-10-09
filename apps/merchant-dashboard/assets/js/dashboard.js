@@ -6993,14 +6993,25 @@ async function loadMenusView() {
     iwSetOptions('iw-pack-uom', state.uoms, 'id', function (uom) { return uom.name + ' (' + uom.code + ')'; }, 'Satuan isi');
     iwSetOptions('iw-recipe-output-product', (state.products || []).filter(function (p) { return p.product_stock_uom_id; }), 'id', function (p) { return p.name + ' · ' + p.sku; }, 'Pilih Product/SKU');
     iwSetOptions('iw-recipe-yield-uom', state.uoms, 'id', function (uom) { return uom.name + ' (' + uom.code + ')'; }, 'Satuan hasil');
+    var latestPublishedByRecipe = {};
+    (state.recipes || []).forEach(function (recipe) {
+      if (recipe.recipe_version_status !== 'PUBLISHED') return;
+      var key = String(recipe.recipe_id);
+      if (!latestPublishedByRecipe[key] || Number(recipe.version_number) > Number(latestPublishedByRecipe[key].version_number)) {
+        latestPublishedByRecipe[key] = recipe;
+      }
+    });
     var resumableRecipeVersionIds = (state.batches || []).filter(function (batch) {
       return batch.status === 'IN_PROGRESS';
     }).map(function (batch) { return String(batch.recipe_version_id); });
     var batchRecipeOptions = (state.recipes || []).filter(function (recipe) {
-      return recipe.recipe_version_status === 'PUBLISHED' || resumableRecipeVersionIds.indexOf(String(recipe.recipe_version_id)) >= 0;
+      var latest = latestPublishedByRecipe[String(recipe.recipe_id)];
+      var isLatestPublished = recipe.recipe_version_status === 'PUBLISHED' && latest && String(latest.recipe_version_id) === String(recipe.recipe_version_id);
+      return isLatestPublished || resumableRecipeVersionIds.indexOf(String(recipe.recipe_version_id)) >= 0;
     });
     iwSetOptions('iw-batch-recipe', batchRecipeOptions, 'recipe_version_id', function (recipe) {
-      var historicalLabel = recipe.recipe_version_status === 'PUBLISHED' ? '' : ' · versi untuk batch berjalan';
+      var latest = latestPublishedByRecipe[String(recipe.recipe_id)];
+      var historicalLabel = latest && String(latest.recipe_version_id) === String(recipe.recipe_version_id) ? '' : ' · versi untuk batch berjalan';
       return recipe.production_item_name + ' · hasil ' + recipe.planned_yield_quantity + ' ' + recipe.yield_uom_name + ' · ' + recipe.output_product_sku + historicalLabel;
     }, 'Pilih resep aktif');
     if ($('iw-po-lines') && !$('iw-po-lines').children.length) addIWPoLine();
