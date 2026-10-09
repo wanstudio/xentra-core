@@ -752,6 +752,24 @@ function ensureCostBearingInventorySchema(db) {
     END;
   `);
 
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS inventory_reorder_policies (
+      stock_location_id TEXT NOT NULL,
+      identity_type TEXT NOT NULL CHECK (identity_type IN ('MATERIAL', 'PRODUCT')),
+      identity_id TEXT NOT NULL,
+      minimum_quantity REAL NOT NULL DEFAULT 0 CHECK (minimum_quantity >= 0),
+      target_quantity REAL NOT NULL DEFAULT 0 CHECK (target_quantity >= 0),
+      updated_by TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (stock_location_id, identity_type, identity_id),
+      CHECK (target_quantity >= minimum_quantity),
+      FOREIGN KEY (stock_location_id) REFERENCES stock_locations(id) ON DELETE RESTRICT
+    );
+    CREATE INDEX IF NOT EXISTS idx_inventory_reorder_policies_identity
+      ON inventory_reorder_policies(identity_type, identity_id);
+  `);
+
   ensuredDbs.add(db);
 }
 
