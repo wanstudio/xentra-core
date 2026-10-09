@@ -1078,20 +1078,22 @@
     var sel = $('dash-branch-context');
     if (!sel) return;
 
-    // Custom dropdown trigger
+    // Custom dropdown trigger (seluruh pill x-branch-selector dan isinya dapat diklik)
     var trigger = $('btn-branch-trigger');
     var wrapper = $('x-branch-selector');
-    if (trigger && wrapper) {
-      trigger.addEventListener('click', function (e) {
+    if (wrapper) {
+      wrapper.addEventListener('click', function (e) {
+        // Jangan toggle ulang jika yang diklik adalah item di dalam dropdown menu itu sendiri
+        if (e.target.closest('#branch-dropdown-menu')) return;
         e.stopPropagation();
         var isOpen = wrapper.classList.contains('open');
         wrapper.classList.toggle('open', !isOpen);
-        trigger.setAttribute('aria-expanded', !isOpen ? 'true' : 'false');
+        if (trigger) trigger.setAttribute('aria-expanded', !isOpen ? 'true' : 'false');
       });
       document.addEventListener('click', function (e) {
         if (wrapper.classList.contains('open') && !wrapper.contains(e.target)) {
           wrapper.classList.remove('open');
-          trigger.setAttribute('aria-expanded', 'false');
+          if (trigger) trigger.setAttribute('aria-expanded', 'false');
         }
       });
     }
@@ -6891,37 +6893,26 @@ async function loadMenusView() {
   var _ownerUoms = [];
 
   function switchStockSubtab(subtab) {
+    if (!subtab) subtab = 'branches';
     var branchBtn = $('btn-subtab-stock-branches');
     var matBtn = $('btn-subtab-stock-materials');
     var branchContent = $('subtab-content-stock-branches');
     var matContent = $('subtab-content-stock-materials');
 
+    document.querySelectorAll('#stock-subnav-tabs .x-subnav-tab').forEach(function (tab) {
+      tab.classList.toggle('active', tab.dataset.subtab === subtab);
+    });
+
     if (subtab === 'materials') {
-      if (branchBtn) {
-        branchBtn.style.background = '#FFFFFF';
-        branchBtn.style.color = '#475569';
-        branchBtn.style.border = '1px solid #CBD5E1';
-      }
-      if (matBtn) {
-        matBtn.style.background = '#0F172A';
-        matBtn.style.color = '#FFFFFF';
-        matBtn.style.border = 'none';
-      }
+      if (branchBtn) { branchBtn.classList.remove('active'); }
+      if (matBtn) { matBtn.classList.add('active'); }
       if (branchContent) branchContent.style.display = 'none';
       if (matContent) matContent.style.display = 'block';
       loadOwnerMaterials();
       loadOwnerUoms();
     } else {
-      if (branchBtn) {
-        branchBtn.style.background = '#0F172A';
-        branchBtn.style.color = '#FFFFFF';
-        branchBtn.style.border = 'none';
-      }
-      if (matBtn) {
-        matBtn.style.background = '#FFFFFF';
-        matBtn.style.color = '#475569';
-        matBtn.style.border = '1px solid #CBD5E1';
-      }
+      if (branchBtn) { branchBtn.classList.add('active'); }
+      if (matBtn) { matBtn.classList.remove('active'); }
       if (branchContent) branchContent.style.display = 'block';
       if (matContent) matContent.style.display = 'none';
       loadOwnerStockOverview();
@@ -8846,8 +8837,11 @@ async function loadMenusView() {
     }
 
     // Toggle subnav tabs active class
-    // Label dan tanda centang dropdown dijaga tetap sinkron, supaya membuka
-    // /dashboard/finance/payouts langsung pun menampilkan pilihan yang benar.
+    document.querySelectorAll('#finance-subnav-tabs .x-subnav-tab').forEach(function (tab) {
+      tab.classList.toggle('active', tab.dataset.subtab === subtab);
+    });
+
+    // Label dan tanda centang dropdown (jika ada) dijaga tetap sinkron
     var menu = document.querySelectorAll('#finance-section-menu .x-occ-dropdown-item');
     menu.forEach(function (item) {
       var isCurrent = item.dataset.value === subtab;
@@ -12227,7 +12221,7 @@ async function loadMenusView() {
     if (!box) return;
     var rows = _ownerMasterMenuState.menuItems || [];
     if (!rows.length) {
-      box.innerHTML = '<div class="x-empty-state text-muted" style="padding:16px;font-size:13px;text-align:center;background:#F8FAFC;border:1px dashed #CBD5E1;border-radius:12px;">Belum ada Item. Tambahkan item yang akan dijual.</div>';
+      box.innerHTML = '';
       return;
     }
 
@@ -12634,10 +12628,34 @@ async function loadMenusView() {
     var hppListEl = $('cm-hpp-items-list');
     var hppTotalEl = $('cm-hpp-total-display');
     if (hppListEl) {
-      hppListEl.innerHTML = hppRowsHtml || '<div style="font-size:12px;color:#94A3B8;text-align:center;padding:8px;">Belum ada item dipilih</div>';
+      if (hppRowsHtml) {
+        hppListEl.innerHTML = hppRowsHtml;
+      } else {
+        hppListEl.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;color:#94A3B8;"><span>item 1</span><span>Rp0</span></div>' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;color:#94A3B8;"><span>item 2</span><span>Rp0</span></div>' +
+          '<div style="font-size:12px;color:#CBD5E1;margin-top:-2px;">dst.</div>';
+      }
     }
     if (hppTotalEl) {
       hppTotalEl.textContent = formatMoney(totalCost);
+    }
+
+    // Sinkronisasi status visual tombol Simpan (aktif hijau saat valid, abu-abu saat belum)
+    var btnSaveActive = $('btn-save-master-menu-active');
+    if (btnSaveActive) {
+      var isTitleValid = !!(titleObj || ($('cm-title-input') && $('cm-title-input').value.trim()));
+      var isCatValid = !!($('cm-category') && $('cm-category').value);
+      var isPriceValid = (getOwnerMasterMenuMoney('cm-price') > 0) || (getOwnerMasterMenuMoney('cm-price-min') > 0 && getOwnerMasterMenuMoney('cm-price-max') > 0);
+      var isFormReady = isTitleValid && isCatValid && isPriceValid;
+      if (isFormReady) {
+        btnSaveActive.style.background = '#059669';
+        btnSaveActive.style.color = '#FFFFFF';
+        btnSaveActive.style.boxShadow = '0 2px 6px rgba(5,150,105,0.2)';
+      } else {
+        btnSaveActive.style.background = '#F1F5F9';
+        btnSaveActive.style.color = '#94A3B8';
+        btnSaveActive.style.boxShadow = 'none';
+      }
     }
 
     var previewItemsEl = $('cm-preview-items-list');
@@ -13429,6 +13447,7 @@ async function loadMenusView() {
             }
           }
         }
+        renderOwnerMasterMenuPreview();
       });
     }
 
@@ -13458,10 +13477,11 @@ async function loadMenusView() {
             previewPriceEl.textContent = 'Rp0';
           }
         }
+        renderOwnerMasterMenuPreview();
       });
     });
 
-    [product, titleSelect, rasa, packageName, price, costInput].forEach(function(el) {
+    [category, product, titleSelect, rasa, packageName, price, costInput].forEach(function(el) {
       if (!el) return;
       el.addEventListener('input', renderOwnerMasterMenuPreview);
       el.addEventListener('change', renderOwnerMasterMenuPreview);
@@ -14623,6 +14643,154 @@ async function loadMenusView() {
         }).catch(function () {});
       }
     }
+
+    // Standardize all filter selects into floating dropdown templates
+    initOwnerFloatingDropdowns();
+  }
+
+  /* =========================================================================
+     STANDARDIZED FLOATING DROPDOWN TEMPLATE ENGINE (Owner Context)
+     Converts native filter <select> into .x-floating-dropdown while keeping
+     underlying select fully synced with change events and form submissions.
+     ========================================================================= */
+  function createFloatingDropdown(select, options) {
+    if (!select || select.dataset.floatingEnhanced === '1') return null;
+    options = options || {};
+
+    var wrapper = document.createElement('div');
+    wrapper.className = 'x-floating-dropdown' + (options.className ? ' ' + options.className : '');
+    if (options.style) {
+      wrapper.setAttribute('style', options.style);
+    }
+
+    var trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = 'x-floating-dropdown-trigger';
+    trigger.setAttribute('aria-haspopup', 'listbox');
+    trigger.setAttribute('aria-expanded', 'false');
+    if (select.disabled) trigger.disabled = true;
+
+    var labelSpan = document.createElement('span');
+    labelSpan.className = 'x-floating-dropdown-label';
+
+    var chevronSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    chevronSvg.setAttribute('class', 'x-floating-dropdown-chevron');
+    chevronSvg.setAttribute('width', '13');
+    chevronSvg.setAttribute('height', '13');
+    chevronSvg.setAttribute('viewBox', '0 0 24 24');
+    chevronSvg.setAttribute('fill', 'none');
+    chevronSvg.setAttribute('stroke', 'currentColor');
+    chevronSvg.setAttribute('stroke-width', '2.2');
+    chevronSvg.innerHTML = '<polyline points="6 9 12 15 18 9"></polyline>';
+
+    trigger.appendChild(labelSpan);
+    trigger.appendChild(chevronSvg);
+
+    var menu = document.createElement('div');
+    menu.className = 'x-floating-dropdown-menu';
+    menu.setAttribute('role', 'listbox');
+
+    function syncItems() {
+      menu.innerHTML = '';
+      var currentVal = String(select.value);
+      var currentText = '';
+
+      Array.prototype.forEach.call(select.options, function (opt) {
+        var isCurrent = String(opt.value) === currentVal;
+        if (isCurrent || !currentText) {
+          currentText = opt.textContent;
+        }
+
+        var item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'x-floating-dropdown-item' + (isCurrent ? ' active' : '');
+        item.setAttribute('role', 'option');
+        item.setAttribute('aria-selected', isCurrent ? 'true' : 'false');
+        item.dataset.value = opt.value;
+        if (opt.disabled) item.disabled = true;
+
+        item.innerHTML = '<span>' + esc(opt.textContent) + '</span>' +
+          '<svg class="x-floating-check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+
+        item.addEventListener('click', function (e) {
+          e.stopPropagation();
+          if (item.disabled) return;
+          select.value = opt.value;
+          wrapper.classList.remove('open');
+          trigger.setAttribute('aria-expanded', 'false');
+          syncItems();
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+
+        menu.appendChild(item);
+      });
+
+      labelSpan.textContent = currentText || 'Pilih opsi';
+      trigger.disabled = Boolean(select.disabled);
+    }
+
+    wrapper.appendChild(trigger);
+    wrapper.appendChild(menu);
+
+    // Sembunyikan select asli tanpa memutus nilainya
+    select.parentNode.insertBefore(wrapper, select);
+    select.style.position = 'absolute';
+    select.style.opacity = '0';
+    select.style.pointerEvents = 'none';
+    select.style.width = '1px';
+    select.style.height = '1px';
+    select.style.overflow = 'hidden';
+    select.setAttribute('tabindex', '-1');
+    select.dataset.floatingEnhanced = '1';
+
+    // Interaktivitas
+    trigger.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (trigger.disabled) return;
+      var isOpen = wrapper.classList.contains('open');
+      document.querySelectorAll('.x-floating-dropdown.open').forEach(function (el) {
+        if (el !== wrapper) {
+          el.classList.remove('open');
+          var tr = el.querySelector('.x-floating-dropdown-trigger');
+          if (tr) tr.setAttribute('aria-expanded', 'false');
+        }
+      });
+      wrapper.classList.toggle('open', !isOpen);
+      trigger.setAttribute('aria-expanded', !isOpen ? 'true' : 'false');
+    });
+
+    document.addEventListener('click', function (e) {
+      if (wrapper.classList.contains('open') && !wrapper.contains(e.target)) {
+        wrapper.classList.remove('open');
+        trigger.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    // Tangani perubahan programmatic select asli atau observer
+    select.addEventListener('change', syncItems);
+    if (typeof MutationObserver === 'function') {
+      var observer = new MutationObserver(syncItems);
+      observer.observe(select, { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled'] });
+    }
+
+    syncItems();
+    return { wrapper: wrapper, trigger: trigger, menu: menu, sync: syncItems };
+  }
+  window.createFloatingDropdown = createFloatingDropdown;
+
+  function initOwnerFloatingDropdowns() {
+    var targets = [
+      'branch-filter-status',
+      'orders-filter-status',
+      'orders-filter-channel',
+      'orders-filter-fulfillment',
+      'mkt-banners-branch-filter'
+    ];
+
+    targets.forEach(function (id) {
+      var sel = $(id);
+      if (sel) createFloatingDropdown(sel);
+    });
   }
 
   if (document.readyState === 'loading') {
@@ -14632,3 +14800,4 @@ async function loadMenusView() {
   }
 
 })();
+

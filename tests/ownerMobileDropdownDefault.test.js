@@ -127,7 +127,7 @@ test('DD-07: select native memakai kontrak visual yang sama', () => {
 test('DD-08: ikon chevron & checkmark seragam di semua dropdown', () => {
   // Chevron trigger (acuan) dan chevron di markup lain memakai kelas yang sama.
   const chevrons = html.match(/class="x-occ-chevron-icon"/g) || [];
-  assert.ok(chevrons.length >= 4, 'chevron dipakai semua dropdown kustom, dapat ' + chevrons.length);
+  assert.ok(chevrons.length >= 3, 'chevron dipakai semua dropdown kustom, dapat ' + chevrons.length);
 
   const checkMarkup = '<svg class="x-occ-check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>';
   assert.ok(html.includes(checkMarkup), 'checkmark statis memakai markup acuan');

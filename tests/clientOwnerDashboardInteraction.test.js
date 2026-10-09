@@ -106,7 +106,7 @@ test('CLIENT OWNER DASHBOARD — Interaction, Navigation & Mobile Shell', async 
     const routes = [
       { sel: '[data-route="overview"]', expectedTab: 'tab-overview' },
       { sel: '[data-route="orders"]', expectedTab: 'tab-orders' },
-      { sel: '#nav-catalog-parent', expectedTab: 'tab-catalog-products' },
+      { sel: '#nav-catalog-parent', expectedTab: 'tab-catalog-master-menus' },
       { sel: '[data-route="catalog/categories"]', expectedTab: 'tab-catalog-categories' },
       { sel: '[data-route="catalog/products"]', expectedTab: 'tab-catalog-products' },
       { sel: '[data-route="catalog/menus"]', expectedTab: 'tab-catalog-menus' },

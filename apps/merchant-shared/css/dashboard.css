@@ -84,17 +84,23 @@ a:focus:not(:focus-visible),
 /* Sidebar */
 .x-dash-sidebar {
   width: 260px;
+  height: 100vh;
+  position: sticky;
+  top: 0;
   background-color: var(--bg-sidebar);
   color: #ffffff;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .x-dash-xentra-brand {
-  padding: 20px 20px 14px 20px;
+  padding: 14px 16px 10px 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
 }
 
 .x-dash-xentra-logo {
@@ -105,23 +111,25 @@ a:focus:not(:focus-visible),
 }
 
 .x-dash-brand-header {
-  padding: 16px 20px;
+  padding: 10px 16px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.02);
+  flex-shrink: 0;
 }
 
 .x-dash-logo-wrap {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .x-dash-logo {
@@ -131,51 +139,57 @@ a:focus:not(:focus-visible),
 }
 
 .x-dash-brand-info h2 {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   color: #ffffff;
   line-height: 1.2;
+  margin: 0;
 }
 
 .x-dash-badge-pro {
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   background: rgba(255, 255, 255, 0.12);
   color: #f1f5f9;
   border: 1px solid rgba(255, 255, 255, 0.16);
-  padding: 2px 7px;
+  padding: 2px 6px;
   border-radius: 4px;
   display: inline-block;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 /* Navigation Links */
 .x-dash-nav {
-  padding: 16px 12px;
+  padding: 12px 12px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  flex: 1;
+  gap: 4px;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 }
 
 .x-nav-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 14px;
+  padding: 9px 13px;
   border-radius: var(--radius-sm);
   color: #94a3b8;
   background: transparent;
   border: none;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.18s ease;
   width: 100%;
   text-align: left;
+  flex-shrink: 0;
 }
 
 .x-nav-item:hover {
@@ -194,8 +208,9 @@ a:focus:not(:focus-visible),
 }
 
 .x-dash-footer {
-  padding: 20px;
+  padding: 12px 14px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
 }
 
 .x-btn-view-store {
@@ -203,12 +218,12 @@ a:focus:not(:focus-visible),
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 10px 14px;
+  padding: 8px 12px;
   background: rgba(255, 255, 255, 0.08);
   color: #ffffff;
   border-radius: var(--radius-sm);
   text-decoration: none;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 600;
   transition: all 0.2s;
 }
@@ -1240,11 +1255,12 @@ input[type="file"].x-input,
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.8px;
-  color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.35);
   text-transform: uppercase;
-  padding: 14px 14px 4px 14px;
+  padding: 12px 14px 4px 14px;
   user-select: none;
   pointer-events: none;
+  flex-shrink: 0;
 }
 
 .x-nav-group-label:first-child {
@@ -1268,7 +1284,6 @@ input[type="file"].x-input,
   opacity: 0.5;
 }
 
-.x-nav-parent.active .x-nav-chevron,
 .x-nav-parent[aria-expanded="true"] .x-nav-chevron {
   transform: rotate(180deg);
   opacity: 1;
@@ -1278,8 +1293,8 @@ input[type="file"].x-input,
 .x-nav-sub {
   display: none;
   flex-direction: column;
-  padding: 2px 0 4px 42px;
-  gap: 2px;
+  padding: 3px 0 4px 42px;
+  gap: 3px;
 }
 
 .x-nav-sub.open {
@@ -1289,7 +1304,7 @@ input[type="file"].x-input,
 .x-nav-sub-item {
   display: flex;
   align-items: center;
-  padding: 7px 12px;
+  padding: 8px 12px;
   border-radius: var(--radius-sm);
   color: #94a3b8;
   background: transparent;
@@ -1450,6 +1465,8 @@ input[type="file"].x-input,
   flex-shrink: 0;
   transition: all 0.15s ease;
   box-sizing: border-box;
+  cursor: pointer;
+  user-select: none;
 }
 
 .x-branch-selector:hover {
@@ -1616,6 +1633,168 @@ input[type="file"].x-input,
 
 .x-branch-dropdown-item.active .x-branch-check-icon {
   opacity: 1;
+}
+
+/* ==========================================================================
+   REUSABLE FLOATING DROPDOWN COMPONENT TEMPLATE (.x-floating-dropdown)
+   Standardized floating dropdown language (topbar branch selector, filters, etc.)
+   ========================================================================== */
+.x-floating-dropdown {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.x-floating-dropdown-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: #ffffff;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: var(--radius-sm, 8px);
+  padding: 0 12px;
+  height: 40px;
+  min-height: 40px;
+  width: 100%;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-main, #0f172a);
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+/* Optional pill variant (e.g. for topbar badges/pills) */
+.x-floating-dropdown.x-floating-dropdown-pill .x-floating-dropdown-trigger,
+.x-floating-dropdown-trigger.x-pill {
+  border-radius: 20px;
+  padding: 0 14px;
+  height: 38px;
+  min-height: 38px;
+  width: auto;
+}
+
+.x-floating-dropdown-trigger:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.06);
+}
+
+.x-floating-dropdown-trigger:focus-visible,
+.x-floating-dropdown.open .x-floating-dropdown-trigger,
+.x-floating-dropdown-trigger[aria-expanded="true"] {
+  background: #ffffff;
+  border-color: #334155;
+  box-shadow: 0 0 0 2px rgba(51, 65, 85, 0.12), 0 2px 6px rgba(15, 23, 42, 0.08);
+}
+
+.x-floating-dropdown-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.x-floating-dropdown-chevron {
+  flex-shrink: 0;
+  color: #64748b;
+  transition: transform 0.2s ease;
+  pointer-events: none;
+}
+
+.x-floating-dropdown.open .x-floating-dropdown-chevron,
+.x-floating-dropdown-trigger[aria-expanded="true"] .x-floating-dropdown-chevron {
+  transform: rotate(180deg);
+}
+
+.x-floating-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: auto;
+  min-width: 100%;
+  max-width: 360px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 12px 28px -6px rgba(0, 0, 0, 0.14), 0 6px 10px -4px rgba(0, 0, 0, 0.07);
+  padding: 6px;
+  z-index: 220;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 290px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
+}
+
+.x-floating-dropdown.open .x-floating-dropdown-menu {
+  display: flex;
+  animation: floatingDropdownIn 0.15s ease-out;
+}
+
+@keyframes floatingDropdownIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.x-floating-dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 9px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s ease, color 0.12s ease;
+  box-sizing: border-box;
+  white-space: nowrap;
+}
+
+.x-floating-dropdown-item:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.x-floating-dropdown-item.active {
+  background: #f8fafc;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.x-floating-dropdown-item .x-floating-check-icon {
+  opacity: 0;
+  flex-shrink: 0;
+  color: #0f172a;
+  margin-left: 8px;
+  transition: opacity 0.12s ease;
+}
+
+.x-floating-dropdown-item.active .x-floating-check-icon {
+  opacity: 1;
+}
+
+.x-floating-dropdown-item.is-disabled,
+.x-floating-dropdown-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 /* Route placeholder pages */
@@ -6735,6 +6914,23 @@ input[type="file"].x-input,
   .x-owner-command-center { display: none !important; }
   .x-desktop-overview-view { display: block !important; }
 
+  /* Desktop Header: Sembunyikan tombol back mobile di samping judul page, align-left judul & sub */
+  .x-owner-mobile-page-back,
+  .x-title-back-btn.x-owner-mobile-page-back,
+  .x-owner-child-mobile-header button.x-owner-mobile-page-back {
+    display: none !important;
+  }
+  .x-desktop-overview-view .x-owner-mobile-page-sub,
+  .x-owner-child-page-shell .x-owner-mobile-page-sub,
+  body:not(.x-merchant-app) .x-owner-child-mobile-header .x-owner-mobile-page-sub {
+    margin-left: 0 !important;
+  }
+  .x-desktop-overview-view .x-owner-mobile-page-title,
+  .x-owner-child-page-shell .x-owner-mobile-page-title,
+  body:not(.x-merchant-app) .x-owner-child-mobile-header .x-owner-mobile-page-title {
+    margin-left: 0 !important;
+  }
+
   /* Dropdown .x-occ-dropdown konsisten drop ke bawah di desktop */
   .x-occ-dropdown {
     position: relative;
@@ -6857,7 +7053,100 @@ input[type="file"].x-input,
     display: block;
     width: 100%;
   }
+
+  /* ========================================================================
+     STANDARDIZED OWNER DESKTOP PAGE LAYOUT TEMPLATE
+     Pattern: Judul & Deskripsi Page berada di luar card (mengalir langsung di surface).
+     Card membungkus isi data / konfigurasi / tabel yang dipilih (seperti tab Team & Settings).
+     ======================================================================== */
+
+  /* Hilangkan card container luar pada halaman list view desktop */
+  body:not(.x-merchant-app) .x-tab-content > #orders-list-view,
+  body:not(.x-merchant-app) .x-tab-content > #branch-list-view,
+  body:not(.x-merchant-app) .x-tab-content > #master-menu-list-view,
+  body:not(.x-merchant-app) .x-tab-content > #product-list-view,
+  body:not(.x-merchant-app) .x-tab-content > #master-categories-page,
+  body:not(.x-merchant-app) .x-tab-content > #customers-list-view > .x-card-panel:first-child {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+
+  /* Header flex title & action bar di luar card: bersih dan align-left */
+  body:not(.x-merchant-app) .x-tab-content > #orders-list-view > .x-panel-header-flex,
+  body:not(.x-merchant-app) .x-tab-content > #branch-list-view > .x-panel-header-flex,
+  body:not(.x-merchant-app) .x-tab-content > #master-menu-list-view > .x-panel-header-flex,
+  body:not(.x-merchant-app) .x-tab-content > #product-list-view .x-panel-header-flex,
+  body:not(.x-merchant-app) .x-tab-content > #customers-list-view .x-panel-header-flex,
+  body:not(.x-merchant-app) .x-tab-content > .x-owner-child-mobile-header,
+  body:not(.x-merchant-app) .x-tab-content > #master-categories-page > .x-owner-child-mobile-header,
+  body:not(.x-merchant-app) .x-tab-content > .x-owner-stock-view > .x-owner-stock-header,
+  body:not(.x-merchant-app) .x-tab-content > .x-content-header {
+    margin-bottom: 20px !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Standardisasi Typografi Judul Page di Seluruh Desktop Owner */
+  body:not(.x-merchant-app) .x-tab-content .x-owner-mobile-page-title,
+  body:not(.x-merchant-app) .x-tab-content > #orders-list-view > .x-panel-header-flex h3,
+  body:not(.x-merchant-app) .x-tab-content > .x-content-header h2,
+  body:not(.x-merchant-app) .x-tab-content > .x-owner-child-mobile-header .x-owner-mobile-page-title {
+    font-size: 20px !important;
+    font-weight: 800 !important;
+    color: var(--text-main, #0f172a) !important;
+    line-height: 1.3 !important;
+    margin: 0 0 4px 0 !important;
+    text-align: left !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+
+  /* Standardisasi Typografi Deskripsi / Subtitle Page di Seluruh Desktop Owner */
+  body:not(.x-merchant-app) .x-tab-content .x-owner-mobile-page-sub,
+  body:not(.x-merchant-app) .x-tab-content > #orders-list-view > .x-panel-header-flex p,
+  body:not(.x-merchant-app) .x-tab-content > .x-content-header p,
+  body:not(.x-merchant-app) .x-tab-content > .x-owner-child-mobile-header .x-owner-mobile-page-sub {
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    color: var(--text-muted, #64748b) !important;
+    line-height: 1.5 !important;
+    margin: 0 !important;
+    text-align: left !important;
+  }
+
+  /* Kontrol filter dan tabel/grid pesanan, cabang, pelanggan dibungkus sebagai card */
+  body:not(.x-merchant-app) .x-tab-content > #orders-list-view > div[style*="display:flex"][style*="flex-wrap"],
+  body:not(.x-merchant-app) .x-tab-content > #branch-list-view > div[style*="display:flex"][style*="flex-wrap"] {
+    background: #ffffff;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: var(--radius-md, 12px) var(--radius-md, 12px) 0 0;
+    padding: 16px 20px;
+    margin-top: 0 !important;
+    border-bottom: none;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+  }
+
+  body:not(.x-merchant-app) .x-tab-content > #orders-list-view > .x-table-responsive,
+  body:not(.x-merchant-app) .x-tab-content > #branch-list-view > .x-branches-grid {
+    background: #ffffff;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 0 0 var(--radius-md, 12px) var(--radius-md, 12px);
+    padding: 0;
+    margin-top: 0 !important;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+    overflow: hidden;
+  }
+
+  body:not(.x-merchant-app) .x-tab-content > #branch-list-view > .x-branches-grid {
+    padding: 20px;
+  }
 }
+
 
 
 
@@ -9969,6 +10258,164 @@ body:not(.x-merchant-app) .x-owner-mobile-page-sub {
   padding: 10px 22px;
   text-align: center;
   justify-content: center;
+}
+
+/* ==========================================================================
+   Master Menu Editor Responsive Dual-Pane Workspace (Desktop vs Mobile)
+   ========================================================================== */
+.x-menu-editor-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+}
+
+.x-menu-editor-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.x-menu-editor-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+@media (min-width: 1024px) {
+  #master-menu-editor-view {
+    padding: 24px 32px 60px !important;
+  }
+  #form-master-menu {
+    max-width: 1120px !important;
+  }
+  .x-menu-editor-workspace {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 28px;
+  }
+  .x-menu-editor-main {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .x-menu-editor-sidebar {
+    width: 380px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 24px;
+  }
+
+  /* Desktop Header: sembunyikan tombol Back bulat mobile `<` & ratakan judul */
+  #master-menu-editor-view .x-owner-child-mobile-header .x-owner-mobile-page-back {
+    display: none !important;
+  }
+  #master-menu-editor-view .x-owner-child-mobile-header .x-owner-mobile-page-sub {
+    margin-left: 0 !important;
+    font-size: 13px !important;
+  }
+  #master-menu-editor-view .x-owner-child-mobile-header .x-owner-mobile-page-title {
+    font-size: 22px !important;
+  }
+  #master-menu-editor-view .x-owner-child-legacy-nav {
+    display: flex !important;
+    margin-bottom: 16px !important;
+  }
+
+  /* Desktop Modal: Ubah semua Bottom Sheet jadi Centered Modal Dialog Murni di Desktop */
+  #sheet-pick-item,
+  #sheet-menu-type,
+  #occ-date-sheet {
+    top: 50% !important;
+    left: 50% !important;
+    right: auto !important;
+    bottom: auto !important;
+    transform: translate(-50%, -50%) !important;
+    max-width: 520px !important;
+    width: 90% !important;
+    border-radius: 20px !important;
+    max-height: 85vh !important;
+    padding: 24px !important;
+    box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25) !important;
+    margin: 0 !important;
+  }
+  #sheet-pick-item.open,
+  #sheet-menu-type.open,
+  #occ-date-sheet.open {
+    transform: translate(-50%, -50%) !important;
+  }
+  #sheet-pick-item .x-bottom-sheet-handle,
+  #sheet-menu-type .x-bottom-sheet-handle,
+  #occ-date-sheet .x-bottom-sheet-handle {
+    display: none !important;
+  }
+  #sheet-pick-item-ext-close,
+  #sheet-menu-type-ext-close,
+  #occ-date-sheet-ext-close {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+  #sheet-pick-item .x-modal-close-desktop,
+  #sheet-menu-type .x-modal-close-desktop,
+  #occ-date-sheet .x-modal-close-desktop {
+    display: inline-flex !important;
+  }
+}
+
+@media (min-width: 769px) {
+  /* Di semua layar tablet landscape & desktop (>= 769px), sheet-pick-item, sheet-menu-type, occ-date-sheet tampil sebagai dialog modal tengah */
+  #sheet-pick-item,
+  #sheet-menu-type,
+  #occ-date-sheet {
+    top: 50% !important;
+    left: 50% !important;
+    right: auto !important;
+    bottom: auto !important;
+    transform: translate(-50%, -50%) !important;
+    max-width: 520px !important;
+    width: 90% !important;
+    border-radius: 20px !important;
+    max-height: 85vh !important;
+    padding: 24px !important;
+    box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25) !important;
+    margin: 0 !important;
+  }
+  #sheet-pick-item.open,
+  #sheet-menu-type.open,
+  #occ-date-sheet.open {
+    transform: translate(-50%, -50%) !important;
+  }
+  #sheet-pick-item .x-bottom-sheet-handle,
+  #sheet-menu-type .x-bottom-sheet-handle,
+  #occ-date-sheet .x-bottom-sheet-handle {
+    display: none !important;
+  }
+  #sheet-pick-item-ext-close,
+  #sheet-menu-type-ext-close,
+  #occ-date-sheet-ext-close {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+  #sheet-pick-item .x-modal-close-desktop,
+  #sheet-menu-type .x-modal-close-desktop,
+  #occ-date-sheet .x-modal-close-desktop {
+    display: inline-flex !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  #form-master-menu {
+    max-width: 440px !important;
+  }
+  #master-menu-editor-view .x-owner-child-legacy-nav {
+    display: none !important;
+  }
 }
 
 
