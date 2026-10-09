@@ -111,7 +111,9 @@ class InventorySalePostingService {
           : 'CANONICAL_BRANCH_STOCK_LOCATION_NOT_FOUND',
         stock_location_id: null,
         deducted_items: [],
-        cost_lines: []
+        cost_lines: [],
+        canonical_balance_count: 0,
+        required_line_count: lines.length
       };
     }
 
@@ -120,6 +122,7 @@ class InventorySalePostingService {
     // Validate the complete canonical requirement set before any mutation.
     const existingMovements = [];
     let hasLegacyRequirement = false;
+    let canonicalBalanceCount = 0;
 
     for (const line of lines) {
       const product = repository.findProductForValuation(line.product_id);
@@ -139,6 +142,7 @@ class InventorySalePostingService {
         hasLegacyRequirement = true;
         continue;
       }
+      canonicalBalanceCount += 1;
 
       const mutationId = movementMutationId(reference, line.product_id);
       const existingMovement = repository.findProductValuationMovementByPostingMutationId(mutationId);
@@ -203,7 +207,9 @@ class InventorySalePostingService {
         reason: 'PRODUCT_STOCK_BALANCE_NOT_CANONICAL',
         stock_location_id: stockLocationId,
         deducted_items: [],
-        cost_lines: []
+        cost_lines: [],
+        canonical_balance_count: canonicalBalanceCount,
+        required_line_count: lines.length
       };
     }
 
