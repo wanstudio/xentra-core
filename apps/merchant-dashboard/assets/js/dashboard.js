@@ -7068,7 +7068,7 @@ async function loadMenusView() {
       var quantity = balance ? Number(balance.quantity) : null;
       var minimum = policy ? Number(policy.minimum_quantity || 0) : (balance ? Number(balance.minimum_quantity || 0) : 0);
       var target = policy ? Number(policy.target_quantity || 0) : (balance ? Number(balance.target_quantity || 0) : 0);
-      var isBelowMinimum = minimum > 0 && (quantity === null ? 0 : quantity) <= minimum;
+      var isBelowMinimum = policy ? (quantity === null ? 0 : quantity) <= minimum : (minimum > 0 && (quantity === null ? 0 : quantity) <= minimum);
       var status = isBelowMinimum ? (quantity === null ? 'Belum ada saldo · perlu belanja' : 'Perlu belanja') : (!balance ? 'Belum ada saldo' : 'Tercatat');
       var badge = isBelowMinimum ? 'x-badge-warning' : (!balance ? 'x-badge-muted' : 'x-badge-success');
       return '<tr><td><strong>' + iwEsc(material.name) + '</strong><div class="text-muted" style="font-size:11px;">' + iwEsc(material.material_code) + '</div></td>' +
@@ -7097,7 +7097,7 @@ async function loadMenusView() {
       var quantity = balance ? Number(balance.quantity) : null;
       var minimum = policy ? Number(policy.minimum_quantity || 0) : (balance ? Number(balance.minimum_quantity || 0) : 0);
       var target = policy ? Number(policy.target_quantity || 0) : (balance ? Number(balance.target_quantity || 0) : 0);
-      var isBelowMinimum = minimum > 0 && (quantity === null ? 0 : quantity) <= minimum;
+      var isBelowMinimum = policy ? (quantity === null ? 0 : quantity) <= minimum : (minimum > 0 && (quantity === null ? 0 : quantity) <= minimum);
       var status = isBelowMinimum ? (quantity === null ? 'Belum ada saldo · perlu restock/produksi' : 'Perlu restock/produksi') : (!balance ? 'Belum ada saldo' : 'Tercatat');
       var badge = isBelowMinimum ? 'x-badge-warning' : (!balance ? 'x-badge-muted' : 'x-badge-success');
       return '<tr><td><strong>' + iwEsc(product.name) + '</strong><div class="text-muted" style="font-size:11px;">' + iwEsc(product.sku) + '</div></td>' +
@@ -7128,7 +7128,7 @@ async function loadMenusView() {
       var target = policy ? Number(policy.target_quantity || 0) : (balance ? Number(balance.target_quantity || 0) : 0);
       var quantity = balance ? Number(balance.quantity) : 0;
       var uom = balance ? balance.base_uom_name : (((state.uoms || []).find(function (item) { return String(item.id) === String(material.base_uom_id); }) || {}).name || '');
-      if (locationId && minimum > 0 && quantity <= minimum) {
+      if (locationId && (policy || minimum > 0) && quantity <= minimum) {
         alerts.push({ type: 'MATERIAL', id: material.id, name: material.name, quantity: quantity, uom: uom, target: target, minimum: minimum, hasBalance: Boolean(balance) });
       }
     });
@@ -7144,7 +7144,7 @@ async function loadMenusView() {
       var minimum = policy ? Number(policy.minimum_quantity || 0) : (balance ? Number(balance.minimum_quantity || 0) : 0);
       var target = policy ? Number(policy.target_quantity || 0) : (balance ? Number(balance.target_quantity || 0) : 0);
       var quantity = balance ? Number(balance.quantity) : 0;
-      if (locationId && minimum > 0 && quantity <= minimum) {
+      if (locationId && (policy || minimum > 0) && quantity <= minimum) {
         alerts.push({ type: 'PRODUCT', id: product.id, name: product.name, quantity: quantity, uom: product.stock_uom_name || 'unit', target: target, minimum: minimum, hasBalance: Boolean(balance) });
       }
     });
