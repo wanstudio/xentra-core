@@ -85,7 +85,8 @@
       var isActive = u.status === 'active';
       var roleBadge = u.role === 'cashier'
         ? '<span class="x-badge x-badge-warning">KASIR</span>'
-        : (u.role === 'kitchen' ? '<span class="x-badge" style="background:#ede9fe;color:#6d28d9;">DAPUR</span>' : '<span class="x-badge x-badge-info">' + esc(u.role).toUpperCase() + '</span>');
+        : (u.role === 'kitchen' ? '<span class="x-badge" style="background:#ede9fe;color:#6d28d9;">DAPUR</span>'
+        : (u.role === 'purchasing' ? '<span class="x-badge x-badge-success">PETUGAS BELANJA</span>' : '<span class="x-badge x-badge-info">' + esc(u.role).toUpperCase() + '</span>'));
 
       var statusToggle = '' +
         '<label class="x-toggle' + (isActive ? ' x-toggle-on' : '') + '" style="margin:0 auto;display:inline-block;vertical-align:middle;">' +
@@ -149,6 +150,8 @@
       return;
     }
 
+    var role = ($('bm-staff-role') ? $('bm-staff-role').value : 'cashier') || 'cashier';
+
     var btn = $('btn-bm-submit-cashier');
     if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan...'; }
 
@@ -161,13 +164,14 @@
           username: username,
           password: password,
           email: email || undefined,
-          role: 'cashier',
+          role: role,
           branch_id: branchId
         })
       });
       var data = await res.json();
       if (res.ok && data.success) {
-        showToast('Akun kasir ' + username + ' berhasil ditambahkan.');
+        var roleLabel = role === 'purchasing' ? 'Petugas Belanja' : 'Kasir';
+        showToast('Akun ' + roleLabel + ' ' + username + ' berhasil ditambahkan.');
         closeBMAddCashierModal();
         loadBMStaff();
       } else {

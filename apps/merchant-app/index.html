@@ -964,9 +964,12 @@
               <label for="bm-cashier-email" style="display:block; font-size:12px; font-weight:700; margin-bottom:4px; color:var(--text-muted);">Email (Opsional)</label>
               <input type="email" id="bm-cashier-email" class="x-input" placeholder="kasir@contoh.com" style="width:100%; font-size:13px;">
             </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; padding:10px 14px; border-radius:6px; margin-bottom:18px; border:1px solid var(--border-color);">
-              <span style="font-size:12px; font-weight:600; color:var(--text-muted);">Peran (Role):</span>
-              <span class="x-badge x-badge-info" style="font-size:11px;">KASIR CABANG</span>
+            <div style="margin-bottom:18px;">
+              <label for="bm-staff-role" style="display:block; font-size:12px; font-weight:700; margin-bottom:4px; color:var(--text-muted);">Peran (Role)</label>
+              <select id="bm-staff-role" class="x-input" style="width:100%; font-size:13px;" required>
+                <option value="cashier">Kasir Cabang</option>
+                <option value="purchasing">Petugas Belanja (Pasar)</option>
+              </select>
             </div>
             <div style="display:flex; justify-content:flex-end; gap:10px;">
               <button type="button" class="x-btn-secondary" onclick="closeBMAddCashierModal()" style="font-size:13px; padding:8px 14px;">Batal</button>

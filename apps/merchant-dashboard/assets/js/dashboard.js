@@ -8199,7 +8199,7 @@ async function loadMenusView() {
   }
 
   function _timRoleLabel(role) {
-    var labels = { owner: 'Owner', brand_manager: 'Brand Manager', branch_manager: 'Branch Manager', cashier: 'Kasir', kitchen: 'Dapur', driver: 'Driver' };
+    var labels = { owner: 'Owner', brand_manager: 'Brand Manager', branch_manager: 'Branch Manager', cashier: 'Kasir', kitchen: 'Dapur', driver: 'Driver', purchasing: 'Petugas Belanja' };
     return labels[role] || role;
   }
 
@@ -8208,6 +8208,7 @@ async function loadMenusView() {
     if (role === 'brand_manager') return 'x-badge-success';
     if (role === 'branch_manager') return 'x-badge-warning';
     if (role === 'driver') return 'x-badge-primary';
+    if (role === 'purchasing') return 'x-badge-success';
     return 'x-badge-muted';
   }
 
@@ -8352,11 +8353,11 @@ async function loadMenusView() {
     var roleSelect = $('user-role');
     roleSelect.innerHTML = '';
     if (_timCurrentUserRole === 'owner') {
-      roleSelect.innerHTML = '<option value="brand_manager">Brand Manager</option><option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option>';
+      roleSelect.innerHTML = '<option value="brand_manager">Brand Manager</option><option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option><option value="purchasing">Petugas Belanja (Purchasing)</option>';
     } else if (_timCurrentUserRole === 'brand_manager') {
-      roleSelect.innerHTML = '<option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option>';
+      roleSelect.innerHTML = '<option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option><option value="purchasing">Petugas Belanja (Purchasing)</option>';
     } else if (_timCurrentUserRole === 'branch_manager') {
-      roleSelect.innerHTML = '<option value="cashier">Kasir</option><option value="driver">Driver (Kurir)</option>';
+      roleSelect.innerHTML = '<option value="cashier">Kasir</option><option value="driver">Driver (Kurir)</option><option value="purchasing">Petugas Belanja (Purchasing)</option>';
     }
 
     // Populate branch options
@@ -8397,11 +8398,11 @@ async function loadMenusView() {
     var roleSelect = $('user-role');
     roleSelect.innerHTML = '';
     if (_timCurrentUserRole === 'owner') {
-      roleSelect.innerHTML = '<option value="brand_manager">Manager</option><option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option>';
+      roleSelect.innerHTML = '<option value="brand_manager">Brand Manager</option><option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option><option value="purchasing">Petugas Belanja (Purchasing)</option>';
     } else if (_timCurrentUserRole === 'brand_manager') {
-      roleSelect.innerHTML = '<option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option>';
+      roleSelect.innerHTML = '<option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option><option value="purchasing">Petugas Belanja (Purchasing)</option>';
     } else if (_timCurrentUserRole === 'branch_manager') {
-      roleSelect.innerHTML = '<option value="cashier">Kasir</option><option value="driver">Driver (Kurir)</option>';
+      roleSelect.innerHTML = '<option value="cashier">Kasir</option><option value="driver">Driver (Kurir)</option><option value="purchasing">Petugas Belanja (Purchasing)</option>';
     }
     roleSelect.value = user.role;
 
@@ -8465,8 +8466,9 @@ async function loadMenusView() {
       return;
     }
 
-    if (payload.role === 'driver' && !payload.branch_id) {
-      showToast('Role Driver wajib ditugaskan ke salah satu cabang.');
+    if ((payload.role === 'driver' || payload.role === 'purchasing') && !payload.branch_id) {
+      var roleName = payload.role === 'driver' ? 'Driver' : 'Petugas Belanja';
+      showToast('Role ' + roleName + ' wajib ditugaskan ke salah satu cabang.');
       return;
     }
 
@@ -8739,11 +8741,11 @@ async function loadMenusView() {
     var roleSelect = $('invite-input-role');
     roleSelect.innerHTML = '';
     if (_timCurrentUserRole === 'owner') {
-      roleSelect.innerHTML = '<option value="branch_manager">Branch Manager</option><option value="brand_manager">Brand Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option>';
+      roleSelect.innerHTML = '<option value="branch_manager">Branch Manager</option><option value="brand_manager">Brand Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option><option value="purchasing">Petugas Belanja (Purchasing)</option>';
     } else if (_timCurrentUserRole === 'brand_manager') {
-      roleSelect.innerHTML = '<option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option>';
+      roleSelect.innerHTML = '<option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option><option value="purchasing">Petugas Belanja (Purchasing)</option>';
     } else if (_timCurrentUserRole === 'branch_manager') {
-      roleSelect.innerHTML = '<option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option>';
+      roleSelect.innerHTML = '<option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option><option value="purchasing">Petugas Belanja (Purchasing)</option>';
     }
 
     // Populate branches
