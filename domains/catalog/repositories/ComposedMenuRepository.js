@@ -402,10 +402,13 @@ class ComposedMenuRepository {
         [locations[0].id, ...normalized]
       );
       const canonicalByProduct = new Map(canonicalRows.map(row => [String(row.product_id), row]));
-      const legacyIds = normalized.filter(productId => !canonicalByProduct.has(String(productId)));
-      const legacyRows = legacyInventory(legacyIds);
-      const legacyByProduct = new Map(legacyRows.map(row => [String(row.product_id), row]));
-      return normalized.map(productId => canonicalByProduct.get(String(productId)) || legacyByProduct.get(String(productId))).filter(Boolean);
+      if (canonicalByProduct.size > 0) {
+        // Do not combine canonical and legacy stock pools inside one Menu
+        // requirement set. Missing canonical balances stay unavailable until
+        // explicitly reconciled, matching the sale-posting boundary.
+        return normalized.map(productId => canonicalByProduct.get(String(productId))).filter(Boolean);
+      }
+      return legacyInventory(normalized);
     } catch (error) {
       if (error && /no such table/i.test(error.message || '')) return legacyInventory(normalized);
       throw error;
