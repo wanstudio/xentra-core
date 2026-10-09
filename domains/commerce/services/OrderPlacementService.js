@@ -130,9 +130,12 @@ function deductComposedStock({
     });
     if (
       canonicalPosting.status === 'LEGACY_COMPATIBILITY_REQUIRED' &&
-      Number(canonicalPosting.canonical_balance_count || 0) > 0
+      (
+        Number(canonicalPosting.canonical_balance_count || 0) > 0 ||
+        canonicalPosting.reason === 'CANONICAL_BRANCH_STOCK_LOCATION_AMBIGUOUS'
+      )
     ) {
-      throw new Error('[INVENTORY_MIGRATION_INCOMPLETE] Sebagian komponen Menu sudah memakai stok canonical dan sebagian masih legacy. Rekonsiliasi stok semua komponen sebelum menerima penjualan ini.');
+      throw new Error('[INVENTORY_MIGRATION_INCOMPLETE] Stok komponen Menu belum berada pada satu jalur inventory yang konsisten. Rekonsiliasi saldo canonical/legacy dan pastikan cabang hanya memiliki satu lokasi stok aktif sebelum menerima penjualan ini.');
     }
 
     if (canonicalPosting.status === 'AVAILABLE') {
