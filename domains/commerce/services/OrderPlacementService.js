@@ -444,7 +444,7 @@ class OrderPlacementService {
           // canonical Menu line is persisted. This prevents shared components
           // from being double-counted per Menu line.
           confirmedComposedDeductions = deductComposedStock({
-            order: { branch_id },
+            order: { branch_id, id: orderId },
             items: composedItems,
             referenceId: orderNumber,
             actorId: customer.phone || 'customer_order',
