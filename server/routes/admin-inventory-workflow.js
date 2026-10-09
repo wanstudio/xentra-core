@@ -82,7 +82,7 @@ function listContext(req, db) {
 function registerAdminInventoryWorkflowRoutes(router, deps = {}) {
   const requireAuth = typeof deps.requireAuth === 'function' ? deps.requireAuth : () => (req, res, next) => next();
   const authGate = requireAuth(['owner', 'brand_manager']);
-  const db = deps.db || inventoryRepository.db;
+  const db = deps.db && typeof deps.db.queryMany === 'function' ? deps.db : inventoryRepository.db;
 
   router.get('/admin/inventory-workflow/context', authGate, (req, res) => {
     try { return res.json({ success: true, data: listContext(req, db) }); }
