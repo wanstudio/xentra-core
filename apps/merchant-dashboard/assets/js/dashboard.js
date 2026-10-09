@@ -7160,7 +7160,7 @@ async function loadMenusView() {
         return String(row.stock_location_id) === String(locationId) && row.identity_type === 'PRODUCT' && String(row.identity_id) === String(product.id);
       });
       var minimum = policy ? Number(policy.minimum_quantity || 0) : (balance ? Number(balance.minimum_quantity || 0) : 0);
-      var target = policy ? Number(policy.target_quantity || 0) : (balance ? Number(balance.target_quantity || 0) : 0);
+      var target = policy ? Number(policy.target_quantity || 0) : (balance ? Math.max(Number(balance.target_quantity || 0), minimum) : minimum);
       var quantity = balance ? Number(balance.quantity) : 0;
       if (locationId && (policy || minimum > 0) && quantity <= minimum) {
         alerts.push({ type: 'PRODUCT', id: product.id, name: product.name, quantity: quantity, uom: product.stock_uom_name || 'unit', target: target, minimum: minimum, hasBalance: Boolean(balance) });
