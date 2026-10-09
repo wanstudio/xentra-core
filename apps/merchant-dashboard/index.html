@@ -1190,10 +1190,7 @@
         <div id="team-section-members">
           <div class="x-card-panel">
             <div class="x-panel-header-flex" style="justify-content:flex-end;">
-              <div style="display:flex;gap:8px;">
-                <button type="button" class="x-btn-secondary" id="btn-open-invite" onclick="openInviteUserModal()">✉️ Undang Anggota</button>
-                <button type="button" class="x-btn-primary" id="btn-add-user" onclick="openCreateUserModal()">+ Tambah Anggota</button>
-              </div>
+              <button type="button" class="x-btn-primary" id="btn-add-user" onclick="openCreateUserModal()">+ Tambah Anggota</button>
             </div>
 
             <!-- Role Filter Bar -->
@@ -2753,26 +2750,49 @@
 
         <!-- 1. Finance: Overview Subtab -->
         <div id="finance-view-overview" class="x-finance-subview">
-          <div class="x-stat-grid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:16px;margin-bottom:24px;">
-            <div class="x-stat-card">
-              <div class="x-stat-label">Total Penjualan Kotor (Gross)</div>
-              <div class="x-stat-value" id="fin-gross-sales">Rp 0</div>
-              <div class="x-stat-sub" style="font-size:11px;color:var(--text-muted);margin-top:4px;">Berdasarkan pesanan terkonfirmasi</div>
+          <div class="x-metrics-grid" style="margin-bottom:24px;">
+            <div class="x-metric-card">
+              <div class="x-metric-icon bg-green">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+              </div>
+              <div class="x-metric-info">
+                <span class="x-metric-label">Penjualan Kotor (Gross)</span>
+                <h3 id="fin-gross-sales" class="x-metric-value">Rp 0</h3>
+                <div class="x-stat-sub" style="font-size:11px;color:var(--text-muted);margin-top:2px;">Pesanan terkonfirmasi</div>
+              </div>
             </div>
-            <div class="x-stat-card">
-              <div class="x-stat-label">Total Pelunasan (Settled)</div>
-              <div class="x-stat-value" id="fin-total-settled" style="color:#059669;">Rp 0</div>
-              <div class="x-stat-sub" style="font-size:11px;color:var(--text-muted);margin-top:4px;">Tunai & Midtrans berhasil</div>
+
+            <div class="x-metric-card">
+              <div class="x-metric-icon bg-green">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+              </div>
+              <div class="x-metric-info">
+                <span class="x-metric-label">Pelunasan (Settled)</span>
+                <h3 id="fin-total-settled" class="x-metric-value" style="color:#059669;">Rp 0</h3>
+                <div class="x-stat-sub" style="font-size:11px;color:var(--text-muted);margin-top:2px;">Tunai & Midtrans berhasil</div>
+              </div>
             </div>
-            <div class="x-stat-card">
-              <div class="x-stat-label">Menunggu Pelunasan (Pending)</div>
-              <div class="x-stat-value" id="fin-total-pending" style="color:#d97706;">Rp 0</div>
-              <div class="x-stat-sub" style="font-size:11px;color:var(--text-muted);margin-top:4px;">Transaksi belum dibayar</div>
+
+            <div class="x-metric-card">
+              <div class="x-metric-icon bg-amber">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              </div>
+              <div class="x-metric-info">
+                <span class="x-metric-label">Menunggu Pelunasan (Pending)</span>
+                <h3 id="fin-total-pending" class="x-metric-value" style="color:#d97706;">Rp 0</h3>
+                <div class="x-stat-sub" style="font-size:11px;color:var(--text-muted);margin-top:2px;">Transaksi belum dibayar</div>
+              </div>
             </div>
-            <div class="x-stat-card">
-              <div class="x-stat-label">Belum Direkonsiliasi</div>
-              <div class="x-stat-value" id="fin-unreconciled-count">0</div>
-              <div class="x-stat-sub" id="fin-unreconciled-sub" style="font-size:11px;color:var(--text-muted);margin-top:4px;">Status sinkronisasi gateway</div>
+
+            <div class="x-metric-card">
+              <div class="x-metric-icon bg-blue">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+              </div>
+              <div class="x-metric-info">
+                <span class="x-metric-label">Belum Direkonsiliasi</span>
+                <h3 id="fin-unreconciled-count" class="x-metric-value">0</h3>
+                <div class="x-stat-sub" id="fin-unreconciled-sub" style="font-size:11px;color:var(--text-muted);margin-top:2px;">Status sinkronisasi gateway</div>
+              </div>
             </div>
           </div>
 
@@ -2989,26 +3009,49 @@
 
         <!-- 1. Marketing: Overview Subtab -->
         <div id="marketing-view-overview" class="x-marketing-subview" style="display:none;">
-          <div class="x-stat-grid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:16px;margin-bottom:24px;">
-            <div class="x-stat-card">
-              <div class="x-stat-label">Total Pelanggan Terdaftar</div>
-              <div class="x-stat-value" id="mkt-total-customers">0</div>
-              <div class="x-stat-sub" style="font-size:11px;color:var(--text-muted);margin-top:4px;">Nomor telepon unik</div>
+          <div class="x-metrics-grid" style="margin-bottom:24px;">
+            <div class="x-metric-card">
+              <div class="x-metric-icon bg-blue">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+              </div>
+              <div class="x-metric-info">
+                <span class="x-metric-label">Total Pelanggan Terdaftar</span>
+                <h3 id="mkt-total-customers" class="x-metric-value">0</h3>
+                <div class="x-stat-sub" style="font-size:11px;color:var(--text-muted);margin-top:2px;">Nomor telepon unik</div>
+              </div>
             </div>
-            <div class="x-stat-card">
-              <div class="x-stat-label">Pelanggan Setia (Returning)</div>
-              <div class="x-stat-value" id="mkt-returning-customers" style="color:#2563eb;">0</div>
-              <div class="x-stat-sub" id="mkt-repeat-rate-sub" style="font-size:11px;color:var(--text-muted);margin-top:4px;">Repeat rate: 0%</div>
+
+            <div class="x-metric-card">
+              <div class="x-metric-icon bg-blue">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><polyline points="16 11 18 13 22 9"></polyline></svg>
+              </div>
+              <div class="x-metric-info">
+                <span class="x-metric-label">Pelanggan Setia (Returning)</span>
+                <h3 id="mkt-returning-customers" class="x-metric-value" style="color:#2563eb;">0</h3>
+                <div class="x-stat-sub" id="mkt-repeat-rate-sub" style="font-size:11px;color:var(--text-muted);margin-top:2px;">Repeat rate: 0%</div>
+              </div>
             </div>
-            <div class="x-stat-card">
-              <div class="x-stat-label">Promosi Aktif</div>
-              <div class="x-stat-value" id="mkt-active-promotions" style="color:#059669;">0</div>
-              <div class="x-stat-sub" id="mkt-total-promotions-sub" style="font-size:11px;color:var(--text-muted);margin-top:4px;">Program promosi terdaftar</div>
+
+            <div class="x-metric-card">
+              <div class="x-metric-icon bg-green">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+              </div>
+              <div class="x-metric-info">
+                <span class="x-metric-label">Promosi Aktif</span>
+                <h3 id="mkt-active-promotions" class="x-metric-value" style="color:#059669;">0</h3>
+                <div class="x-stat-sub" id="mkt-total-promotions-sub" style="font-size:11px;color:var(--text-muted);margin-top:2px;">Program promosi terdaftar</div>
+              </div>
             </div>
-            <div class="x-stat-card">
-              <div class="x-stat-label">Total Klaim / Redemptions</div>
-              <div class="x-stat-value" id="mkt-total-redemptions">0</div>
-              <div class="x-stat-sub" id="mkt-benefit-sub" style="font-size:11px;color:var(--text-muted);margin-top:4px;">Total manfaat diberikan</div>
+
+            <div class="x-metric-card">
+              <div class="x-metric-icon bg-amber">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+              </div>
+              <div class="x-metric-info">
+                <span class="x-metric-label">Total Klaim / Redemptions</span>
+                <h3 id="mkt-total-redemptions" class="x-metric-value">0</h3>
+                <div class="x-stat-sub" id="mkt-benefit-sub" style="font-size:11px;color:var(--text-muted);margin-top:2px;">Total manfaat diberikan</div>
+              </div>
             </div>
           </div>
 

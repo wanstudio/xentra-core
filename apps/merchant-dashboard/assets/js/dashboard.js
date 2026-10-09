@@ -275,6 +275,7 @@
     'stock':               { title: 'Stok',         sub: 'Kesehatan persediaan dan perhatian stok seluruh cabang', tab: 'stock' },
     'team':               { title: 'Team',         sub: 'Kelola akun staf, role, dan hak akses', tab: 'tim' },
     'team/members':       { title: 'Team Members', sub: 'Daftar staf dan akun operator', tab: 'tim' },
+    'team/invitations':   { title: 'Undangan Tim', sub: 'Kelola status dan kirim undangan anggota tim', tab: 'tim' },
     'team/roles':         { title: 'Team Roles',   sub: 'Struktur role dan hak akses Xentra RBAC', tab: 'tim' },
     'team/permissions':   { title: 'Team Permissions', sub: 'Matriks wewenang dan batasan akses sistem', tab: 'tim' },
     'finance':                     { title: 'Finance',         sub: 'Laporan keuangan terverifikasi dan riwayat pelunasan', tab: 'finance' },
@@ -308,6 +309,7 @@
     'settings/integrations':       { title: 'Integrations',      sub: 'Modul integrasi payment gateway, POS, dan Xentra ecosystem', tab: 'settings' },
     'settings/notifications':      { title: 'Notifications',     sub: 'Preferensi notifikasi multi-channel WhatsApp, Email & Push', tab: 'settings' },
     'settings/security':           { title: 'Security & RBAC',   sub: 'Model otorisasi, sesi pengguna, dan jejak audit keamanan', tab: 'settings' },
+    'settings/data-refresh':       { title: 'Data Aplikasi',     sub: 'Segarkan cache dan sinkronisasi data aplikasi dari server', tab: 'settings' },
     // Owner mobile modules & hubs
     'business':                    { title: 'Bisnis',            sub: 'Pusat pengelolaan katalog, operasional, pelanggan, pemasaran, tim, dan brand', tab: 'business' },
     'more':                        { title: 'Lainnya',           sub: 'Pengaturan sistem, integrasi, keamanan, notifikasi, dan akun', tab: 'more' },
@@ -13655,7 +13657,8 @@ async function loadMenusView() {
         'channels', 'channels/website', 'channels/customer-app', 'channels/pos', 'channels/kiosk',
         'integrations',
         'notifications',
-        'security'
+        'security',
+        'data-refresh'
       ];
 
       var sec = sectionName;

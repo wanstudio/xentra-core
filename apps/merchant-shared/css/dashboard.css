@@ -7286,9 +7286,7 @@ input[type="file"].x-input,
    OWNER STOCK OVERVIEW — read-only inventory health surface
    ========================================================================== */
 .x-owner-stock-view {
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 8px 0 44px;
+  padding: 0 0 44px;
 }
 .x-owner-stock-header {
   display: flex;
