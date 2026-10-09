@@ -64,9 +64,9 @@ class WorkforceInvitationService {
     if (actor.actor_role === 'owner') {
       allowedRoles = ['brand_manager', 'branch_manager', 'cashier', 'kitchen', 'driver', 'purchasing'];
     } else if (actor.actor_role === 'brand_manager') {
-      allowedRoles = ['branch_manager', 'cashier', 'kitchen', 'purchasing'];
+      allowedRoles = ['branch_manager', 'cashier', 'kitchen', 'driver', 'purchasing'];
     } else if (actor.actor_role === 'branch_manager') {
-      allowedRoles = ['cashier', 'kitchen', 'purchasing'];
+      allowedRoles = ['cashier', 'kitchen', 'driver', 'purchasing'];
     } else {
       throw { status: 403, code: 'FORBIDDEN_ROLE_CEILING', message: 'Actor cannot invite team members.' };
     }
@@ -214,11 +214,12 @@ class WorkforceInvitationService {
       }
     } else if (actor_role === 'branch_manager') {
       // Branch Manager cannot resend or revoke managerial invitations (owner, brand_manager, branch_manager)
-      if (invitation.role !== 'cashier' && invitation.role !== 'kitchen') {
+      const manageableRoles = ['cashier', 'kitchen', 'driver', 'purchasing'];
+      if (!manageableRoles.includes(invitation.role)) {
         throw {
           status: 403,
           code: 'FORBIDDEN_ROLE_CEILING',
-          message: `Branch Manager cannot ${actionType} managerial invitations.`
+          message: `Branch Manager cannot ${actionType} invitations for role "${invitation.role}".`
         };
       }
 
