@@ -9,6 +9,8 @@ const {
   InventoryRepository,
   PosShiftRepository
 } = require('../../../core/data/repositories');
+const InventorySalePostingService = require('../../inventory/services/InventorySalePostingService');
+const CostOfSalesService = require('../../costing/services/CostOfSalesService');
 const { events } = require('../../../core');
 const PrePaymentVerificationGate = require('./PrePaymentVerificationGate');
 const LowStockThresholdModel = require('../models/LowStockThresholdModel');
@@ -99,7 +101,8 @@ function deductComposedStock({
   referenceId,
   actorId,
   notes,
-  dbTransactionProvided = false
+  dbTransactionProvided = false,
+  sourceType = 'ORDER'
 }) {
   const requirements = aggregateComposedRequirements(items);
   if (!requirements.length) return { success: true, deducted_items: [] };
@@ -111,6 +114,49 @@ function deductComposedStock({
   const deductedItems = [];
 
   try {
+    // Canonical-first: production output lives in Product Stock Balance and
+    // must be consumed from that same ledger when every required balance is canonical.
+    // Legacy compatibility remains only when Inventory explicitly reports a migration seam.
+    const canonicalPosting = InventorySalePostingService.postCanonicalSale({
+      branchId: order.branch_id,
+      requirements: requirements.map(function (requirement) {
+        return { product_id: requirement.product_id, product_name: requirement.product_name, quantity: requirement.quantity };
+      }),
+      sourceType: sourceType,
+      sourceReference: referenceId,
+      actorId: actorId,
+      postingTimestamp: now,
+      repository: inventoryRepository
+    });
+    if (
+      canonicalPosting.status === 'LEGACY_COMPATIBILITY_REQUIRED' &&
+      (
+        Number(canonicalPosting.canonical_balance_count || 0) > 0 ||
+        canonicalPosting.reason === 'CANONICAL_BRANCH_STOCK_LOCATION_AMBIGUOUS'
+      )
+    ) {
+      throw new Error('[INVENTORY_MIGRATION_INCOMPLETE] Stok komponen Menu belum berada pada satu jalur inventory yang konsisten. Rekonsiliasi saldo canonical/legacy dan pastikan cabang hanya memiliki satu lokasi stok aktif sebelum menerima penjualan ini.');
+    }
+
+    if (canonicalPosting.status === 'AVAILABLE') {
+      CostOfSalesService.capture({
+        sourceType: sourceType,
+        sourceReference: referenceId,
+        orderId: order.id || null,
+        totalCost: canonicalPosting.total_cost,
+        currencyCode: canonicalPosting.currency_code,
+        costLines: canonicalPosting.cost_lines
+      });
+      if (ownsTransaction) inventoryRepository.commitTransaction();
+      return {
+        success: true,
+        deducted_items: canonicalPosting.deducted_items,
+        cogs_status: 'AVAILABLE',
+        total_cost: canonicalPosting.total_cost,
+        idempotent: Boolean(canonicalPosting.idempotent)
+      };
+    }
+
     for (const requirement of requirements) {
       const before = inventoryRepository.findBranchProduct(order.branch_id, requirement.product_id);
       if (!before) {
@@ -408,7 +454,7 @@ class OrderPlacementService {
           // canonical Menu line is persisted. This prevents shared components
           // from being double-counted per Menu line.
           confirmedComposedDeductions = deductComposedStock({
-            order: { branch_id },
+            order: { branch_id, id: orderId },
             items: composedItems,
             referenceId: orderNumber,
             actorId: customer.phone || 'customer_order',
@@ -599,7 +645,8 @@ class OrderPlacementService {
           referenceId: reference_id,
           actorId: actor_id,
           notes,
-          dbTransactionProvided: true
+          dbTransactionProvided: true,
+          sourceType: 'ADDITIONAL_ORDER'
         });
         deductedItems.push(...composedResult.deducted_items);
       }
