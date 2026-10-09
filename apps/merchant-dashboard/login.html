@@ -543,8 +543,8 @@
             return '/driver/';
           }
 
-          // Branch Manager / Manager -> Merchant App
-          if (role === 'branch_manager' || role === 'manager') {
+          // Branch Manager / Manager / Purchasing -> Merchant App
+          if (role === 'branch_manager' || role === 'manager' || role === 'purchasing') {
             if (prefix === 'm' || prefix === 'merchant') return '/merchant/';
             return protocol + '//m.' + baseDomain + '/merchant/';
           }
@@ -582,9 +582,9 @@
           return { allowed: true };
         }
 
-        // Managerial Environment (m.* / merchant.* / owner.* / dashboard.*) -> Owner, Brand Manager, Branch Manager
+        // Managerial & Branch Staff Environment (m.* / merchant.* / owner.* / dashboard.*) -> Owner, Brand Manager, Branch Manager, Purchasing
         if (prefix === 'm' || prefix === 'merchant' || prefix === 'owner' || prefix === 'dashboard') {
-          if (role === 'owner' || role === 'brand_manager' || role === 'branch_manager' || role === 'manager') {
+          if (role === 'owner' || role === 'brand_manager' || role === 'branch_manager' || role === 'manager' || role === 'purchasing') {
             return { allowed: true };
           }
           if (role === 'cashier') {
