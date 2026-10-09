@@ -257,6 +257,7 @@ class ProcurementService {
         const supplierMaterial = repository.findSupplierMaterial(input.supplier_material_id);
         if (!supplierMaterial || Number(supplierMaterial.is_active) !== 1) throw fail('SUPPLIER_MATERIAL_NOT_FOUND');
         if (String(supplierMaterial.organization_id) !== orgId) throw fail('SUPPLIER_MATERIAL_ORG_SCOPE_INVALID');
+        if (String(supplierMaterial.supplier_id) !== String(supplierId)) throw fail('SUPPLIER_MATERIAL_SUPPLIER_MISMATCH');
 
         const quantity = positive(input.ordered_purchase_quantity, 'INVALID_QUANTITY');
         const built = buildPurchaseLine({

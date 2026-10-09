@@ -39,6 +39,16 @@ function movementId(mutationId) {
     .slice(0, 24);
 }
 
+function lowStockThreshold(repository, stockLocationId, branchId, productId) {
+  const policy = repository.db.queryOne(
+    "SELECT minimum_quantity FROM inventory_reorder_policies WHERE stock_location_id = ? AND identity_type = 'PRODUCT' AND identity_id = ?",
+    [stockLocationId, productId]
+  );
+  if (policy) return Number(policy.minimum_quantity);
+  const legacy = repository.findCanonicalBranchInventory(branchId, productId);
+  return legacy ? Number(legacy.low_stock_threshold || 5) : 5;
+}
+
 function normalizeRequirements(requirements) {
   if (!Array.isArray(requirements) || requirements.length === 0) {
     throw fail('SALE_REQUIREMENTS_REQUIRED');
@@ -92,7 +102,26 @@ class InventorySalePostingService {
     const timestamp = text(postingTimestamp, 'POSTING_TIMESTAMP_REQUIRED');
     const lines = normalizeRequirements(requirements);
 
-    const locationResult = repository.findCanonicalProductStockLocation(normalizedBranchId);
+    let locationResult;
+    try {
+      locationResult = repository.findCanonicalProductStockLocation(normalizedBranchId);
+    } catch (error) {
+      // Existing isolated/legacy runtimes may not have applied the canonical
+      // inventory schema yet. Preserve the explicit migration seam only for a
+      // missing schema; do not swallow unrelated data-access errors.
+      if (error && /no such table/i.test(error.message || '')) {
+        return {
+          status: 'LEGACY_COMPATIBILITY_REQUIRED',
+          reason: 'CANONICAL_INVENTORY_SCHEMA_NOT_AVAILABLE',
+          stock_location_id: null,
+          deducted_items: [],
+          cost_lines: [],
+          canonical_balance_count: 0,
+          required_line_count: lines.length
+        };
+      }
+      throw error;
+    }
     if (locationResult.status !== 'AVAILABLE') {
       return {
         status: 'LEGACY_COMPATIBILITY_REQUIRED',
@@ -101,7 +130,9 @@ class InventorySalePostingService {
           : 'CANONICAL_BRANCH_STOCK_LOCATION_NOT_FOUND',
         stock_location_id: null,
         deducted_items: [],
-        cost_lines: []
+        cost_lines: [],
+        canonical_balance_count: 0,
+        required_line_count: lines.length
       };
     }
 
@@ -110,6 +141,7 @@ class InventorySalePostingService {
     // Validate the complete canonical requirement set before any mutation.
     const existingMovements = [];
     let hasLegacyRequirement = false;
+    let canonicalBalanceCount = 0;
 
     for (const line of lines) {
       const product = repository.findProductForValuation(line.product_id);
@@ -129,6 +161,7 @@ class InventorySalePostingService {
         hasLegacyRequirement = true;
         continue;
       }
+      canonicalBalanceCount += 1;
 
       const mutationId = movementMutationId(reference, line.product_id);
       const existingMovement = repository.findProductValuationMovementByPostingMutationId(mutationId);
@@ -162,6 +195,14 @@ class InventorySalePostingService {
         inventory_movement_id: existingMovement.id,
         posting_mutation_id: existingMovement.posting_mutation_id
       }));
+      const replayDeductedItems = existingMovements.map(({ line, existingMovement }) => ({
+        product_id: line.product_id,
+        product_name: line.product_name,
+        quantity: Math.abs(Number(existingMovement.quantity)),
+        previous_stock: Number(existingMovement.previous_quantity),
+        current_stock: Number(existingMovement.current_quantity),
+        low_stock_threshold: lowStockThreshold(repository, stockLocationId, normalizedBranchId, line.product_id)
+      }));
 
       const currencies = new Set(costLines.map(line => String(line.currency_code || '').toUpperCase()).filter(Boolean));
       if (currencies.size > 1) throw fail('COST_CURRENCY_MISMATCH');
@@ -174,10 +215,7 @@ class InventorySalePostingService {
         source_type: sourceType,
         currency_code: currencies.size === 1 ? Array.from(currencies)[0] : null,
         total_cost: costLines.reduce((sum, line) => sum + line.total_cost, 0),
-        deducted_items: costLines.map(line => ({
-          product_id: line.product_id,
-          quantity: line.quantity
-        })),
+        deducted_items: replayDeductedItems,
         cost_lines: costLines
       };
     }
@@ -188,7 +226,9 @@ class InventorySalePostingService {
         reason: 'PRODUCT_STOCK_BALANCE_NOT_CANONICAL',
         stock_location_id: stockLocationId,
         deducted_items: [],
-        cost_lines: []
+        cost_lines: [],
+        canonical_balance_count: canonicalBalanceCount,
+        required_line_count: lines.length
       };
     }
 
@@ -281,7 +321,8 @@ class InventorySalePostingService {
         product_name: line.product_name,
         quantity: resolution.quantity_base,
         previous_stock: Number(balance.quantity),
-        current_stock: transition.quantity
+        current_stock: transition.quantity,
+        low_stock_threshold: lowStockThreshold(repository, stockLocationId, normalizedBranchId, line.product_id)
       });
 
       totalCost += resolution.total_cost;

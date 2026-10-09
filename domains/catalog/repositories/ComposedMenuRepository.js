@@ -360,12 +360,59 @@ class ComposedMenuRepository {
   getInventory({ branchId, productIds }) {
     const normalized = ids(productIds);
     if (!normalized.length) return [];
-    return this.db.queryMany(
-      "SELECT bpi.branch_id, bpi.product_id, bpi.stock_qty, bpi.low_stock_threshold, p.sku " +
-      "FROM branch_product_inventory bpi JOIN products p ON p.id = bpi.product_id " +
-      "WHERE bpi.branch_id = ? AND bpi.product_id IN (" + placeholders(normalized.length) + ")",
-      [branchId, ...normalized]
-    );
+
+    const legacyInventory = (idsToRead) => {
+      if (!idsToRead.length) return [];
+      return this.db.queryMany(
+        "SELECT bpi.branch_id, bpi.product_id, bpi.stock_qty, bpi.low_stock_threshold, p.sku " +
+        "FROM branch_product_inventory bpi JOIN products p ON p.id = bpi.product_id " +
+        "WHERE bpi.branch_id = ? AND bpi.product_id IN (" + placeholders(idsToRead.length) + ")",
+        [branchId, ...idsToRead]
+      );
+    };
+
+    // A branch with multiple active canonical stock locations is a configuration
+    // conflict. Fail closed so checkout cannot silently fall back to a competing
+    // legacy stock pool.
+    let locations;
+    try {
+      locations = this.db.queryMany(
+        "SELECT id FROM stock_locations WHERE branch_id = ? AND location_type = 'BRANCH' AND is_active = 1 ORDER BY id",
+        [branchId]
+      );
+    } catch (error) {
+      if (error && /no such table/i.test(error.message || '')) return legacyInventory(normalized);
+      throw error;
+    }
+
+    if (locations.length > 1) return [];
+    if (locations.length === 0) return legacyInventory(normalized);
+
+    try {
+      const canonicalRows = this.db.queryMany(
+        "SELECT sl.branch_id, psb.product_id, psb.quantity AS stock_qty, " +
+        "COALESCE(rp.minimum_quantity, bpi.low_stock_threshold, 5) AS low_stock_threshold, p.sku " +
+        "FROM product_stock_balances psb " +
+        "JOIN stock_locations sl ON sl.id = psb.stock_location_id " +
+        "JOIN products p ON p.id = psb.product_id " +
+        "LEFT JOIN inventory_reorder_policies rp ON rp.stock_location_id = sl.id " +
+        "AND rp.identity_type = 'PRODUCT' AND rp.identity_id = psb.product_id " +
+        "LEFT JOIN branch_product_inventory bpi ON bpi.branch_id = sl.branch_id AND bpi.product_id = psb.product_id " +
+        "WHERE sl.id = ? AND psb.product_id IN (" + placeholders(normalized.length) + ")",
+        [locations[0].id, ...normalized]
+      );
+      const canonicalByProduct = new Map(canonicalRows.map(row => [String(row.product_id), row]));
+      if (canonicalByProduct.size > 0) {
+        // Do not combine canonical and legacy stock pools inside one Menu
+        // requirement set. Missing canonical balances stay unavailable until
+        // explicitly reconciled, matching the sale-posting boundary.
+        return normalized.map(productId => canonicalByProduct.get(String(productId))).filter(Boolean);
+      }
+      return legacyInventory(normalized);
+    } catch (error) {
+      if (error && /no such table/i.test(error.message || '')) return legacyInventory(normalized);
+      throw error;
+    }
   }
 
   ensureInventoryRow({ branchId, productId, lowStockThreshold = 5 }) {
