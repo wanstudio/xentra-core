@@ -102,7 +102,26 @@ class InventorySalePostingService {
     const timestamp = text(postingTimestamp, 'POSTING_TIMESTAMP_REQUIRED');
     const lines = normalizeRequirements(requirements);
 
-    const locationResult = repository.findCanonicalProductStockLocation(normalizedBranchId);
+    let locationResult;
+    try {
+      locationResult = repository.findCanonicalProductStockLocation(normalizedBranchId);
+    } catch (error) {
+      // Existing isolated/legacy runtimes may not have applied the canonical
+      // inventory schema yet. Preserve the explicit migration seam only for a
+      // missing schema; do not swallow unrelated data-access errors.
+      if (error && /no such table/i.test(error.message || '')) {
+        return {
+          status: 'LEGACY_COMPATIBILITY_REQUIRED',
+          reason: 'CANONICAL_INVENTORY_SCHEMA_NOT_AVAILABLE',
+          stock_location_id: null,
+          deducted_items: [],
+          cost_lines: [],
+          canonical_balance_count: 0,
+          required_line_count: lines.length
+        };
+      }
+      throw error;
+    }
     if (locationResult.status !== 'AVAILABLE') {
       return {
         status: 'LEGACY_COMPATIBILITY_REQUIRED',
