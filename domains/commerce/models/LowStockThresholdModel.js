@@ -14,7 +14,7 @@ class LowStockThresholdModel {
    */
   static evaluate(currentStock, customThreshold = LowStockThresholdModel.DEFAULT_THRESHOLD) {
     const stock = Number(currentStock) || 0;
-    const parsedThreshold = Number(customThreshold);
+    const parsedThreshold = customThreshold === null || customThreshold === undefined || customThreshold === '' ? NaN : Number(customThreshold);
     const threshold = Number.isFinite(parsedThreshold) && parsedThreshold >= 0
       ? parsedThreshold
       : LowStockThresholdModel.DEFAULT_THRESHOLD;
