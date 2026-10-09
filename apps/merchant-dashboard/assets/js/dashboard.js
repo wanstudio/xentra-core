@@ -6993,8 +6993,15 @@ async function loadMenusView() {
     iwSetOptions('iw-pack-uom', state.uoms, 'id', function (uom) { return uom.name + ' (' + uom.code + ')'; }, 'Satuan isi');
     iwSetOptions('iw-recipe-output-product', (state.products || []).filter(function (p) { return p.product_stock_uom_id; }), 'id', function (p) { return p.name + ' · ' + p.sku; }, 'Pilih Product/SKU');
     iwSetOptions('iw-recipe-yield-uom', state.uoms, 'id', function (uom) { return uom.name + ' (' + uom.code + ')'; }, 'Satuan hasil');
-    iwSetOptions('iw-batch-recipe', state.recipes, 'recipe_version_id', function (recipe) {
-      return recipe.production_item_name + ' · hasil ' + recipe.planned_yield_quantity + ' ' + recipe.yield_uom_name + ' · ' + recipe.output_product_sku;
+    var resumableRecipeVersionIds = (state.batches || []).filter(function (batch) {
+      return batch.status === 'IN_PROGRESS';
+    }).map(function (batch) { return String(batch.recipe_version_id); });
+    var batchRecipeOptions = (state.recipes || []).filter(function (recipe) {
+      return recipe.recipe_version_status === 'PUBLISHED' || resumableRecipeVersionIds.indexOf(String(recipe.recipe_version_id)) >= 0;
+    });
+    iwSetOptions('iw-batch-recipe', batchRecipeOptions, 'recipe_version_id', function (recipe) {
+      var historicalLabel = recipe.recipe_version_status === 'PUBLISHED' ? '' : ' · versi untuk batch berjalan';
+      return recipe.production_item_name + ' · hasil ' + recipe.planned_yield_quantity + ' ' + recipe.yield_uom_name + ' · ' + recipe.output_product_sku + historicalLabel;
     }, 'Pilih resep aktif');
     if ($('iw-po-lines') && !$('iw-po-lines').children.length) addIWPoLine();
     renderIWPoLines();
