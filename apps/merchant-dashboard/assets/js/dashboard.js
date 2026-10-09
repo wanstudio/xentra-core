@@ -11926,9 +11926,8 @@ async function loadMenusView() {
     _ownerMasterMenuState.editingId = null;
     _ownerMasterMenuState.editingType = nextType;
     _ownerMasterMenuState.createType = nextType;
-    _ownerMasterMenuState.packageComponents = nextType === 'PACKAGE'
-      ? [{ product_id: '', quantity: 1 }, { product_id: '', quantity: 1 }]
-      : [];
+    _ownerMasterMenuState.packageComponents = [];
+    _ownerMasterMenuState.menuItems = [];
 
     $('master-menu-id').value = '';
     $('master-menu-type').value = nextType;
@@ -12810,8 +12809,8 @@ async function loadMenusView() {
           if ($('cm-product')) $('cm-product').value = preId;
           _ownerMasterMenuState.preselectedProductId = null;
         } else {
-          _ownerMasterMenuState.menuItems = [{ product_id: '', quantity: 1 }];
-          _ownerMasterMenuState.packageComponents = [{ product_id: '', quantity: 1 }];
+          _ownerMasterMenuState.menuItems = [];
+          _ownerMasterMenuState.packageComponents = [];
         }
         renderOwnerMasterMenuEditorForm();
       } catch (err) {
@@ -13345,6 +13344,13 @@ async function loadMenusView() {
     if (addMenu) addMenu.addEventListener('click', function() { openNewOwnerMasterMenu('SINGLE'); });
     if (addSingle) addSingle.addEventListener('click', function() { openNewOwnerMasterMenu('SINGLE'); });
     if (addPackage) addPackage.addEventListener('click', function() { openNewOwnerMasterMenu('PACKAGE'); });
+
+    var quickAddCategory = $('btn-quick-add-category');
+    if (quickAddCategory) {
+      quickAddCategory.addEventListener('click', function() {
+        openMasterReferenceQuickAdd('category');
+      });
+    }
 
     var quickAddTitle = $('btn-quick-add-title');
     if (quickAddTitle) {

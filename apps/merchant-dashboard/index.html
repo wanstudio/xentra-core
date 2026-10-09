@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="/merchant-shared/fonts/plus-jakarta-sans.css?v=1.0.0">
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.4">
   <link rel="stylesheet" href="/merchant-shared/css/presentation-shells.css?v=1.0.3">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.46">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.49">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#ffffff">
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
@@ -2022,7 +2022,7 @@
             <span id="master-menu-editor-breadcrumb" style="font-weight:600;font-size:14px;">Tambah Menu</span>
           </div>
 
-          <form id="form-master-menu" class="x-form" style="margin:0 auto;">
+          <form id="form-master-menu" class="x-form" style="margin:0;">
             <input type="hidden" id="master-menu-id" value="">
             <input type="hidden" id="master-menu-type" value="SINGLE">
             <span id="master-menu-editor-title" style="display:none;"></span>
@@ -2036,7 +2036,7 @@
                     <div style="flex:1;">
                       <h4 style="margin:0 0 6px 0;font-size:16px;font-weight:700;color:#0F172A;">Foto</h4>
                       <p style="margin:0 0 4px 0;font-size:12px;color:#64748B;line-height:1.45;">Upload foto yang menarik dan menggugah selera, supaya membuat pelangganmu tertarik.</p>
-                      <div style="font-size:11px;color:#94A3B8;line-height:1.4;">Foto customer-facing milik Menu ini (Satuan maupun Paket) — bukan foto Product. JPG, PNG, atau WebP · Maks. 20 MB · Rasio 1:1</div>
+                      <div style="font-size:11px;color:#94A3B8;line-height:1.4;">JPG, PNG, atau WebP · Maks. 20 MB · Rasio 1:1</div>
                     </div>
                     <div class="x-image-upload-preview-box" id="cm-image-preview-box" style="width:84px;height:84px;min-width:84px;border-radius:14px;background:#D9D9D9;border:1px solid #CBD5E1;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
                       <img id="cm-image-preview" alt="Foto Menu" style="display:none;width:100%;height:100%;object-fit:cover;">
@@ -2063,7 +2063,9 @@
                       <select id="cm-category" class="x-input" required style="width:100%;height:44px;border-radius:12px;border:1px solid #CBD5E1;padding:0 36px 0 14px;font-size:13px;background:#FFFFFF;appearance:none;-webkit-appearance:none;box-sizing:border-box;color:#0F172A;"></select>
                       <svg style="position:absolute;right:14px;top:50%;transform:translateY(-50%);pointer-events:none;color:#64748B;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
                     </div>
-                    <button type="button" id="btn-quick-add-category" class="x-btn-secondary" style="width:44px;height:44px;min-width:44px;border-radius:12px;border:1px solid #CBD5E1;background:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:500;color:#64748B;cursor:pointer;" title="Tambah Kategori">+</button>
+                    <button type="button" id="btn-quick-add-category" class="x-btn-secondary" style="width:44px;height:44px;min-width:44px;border-radius:12px;border:1px solid #CBD5E1;background:#FFFFFF;display:flex;align-items:center;justify-content:center;color:#475569;cursor:pointer;" title="Tambah Kategori">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    </button>
                   </div>
                 </div>
 
@@ -2112,9 +2114,7 @@
                     </div>
                   </div>
                   <!-- Hidden cost input for backward compatibility with form submit -->
-                  <input type="hidden" id="cm-cost" data-input-type="currency" value="0">
-                  <span id="cm-cost-display" style="display:none;"></span>
-                  <span id="cm-cost-formula" style="display:none;"></span>
+                  <input type="hidden" id="cm-cost" data-input-type="currency" value="0" style="display:none !important;" hidden>
                 </div>
 
                 <!-- 6. HARGA JUAL CARD -->
@@ -5463,14 +5463,14 @@
   <script src="/merchant-shared/js/action-menu.js?v=1.0.1"></script>
   <script src="/merchant-shared/js/crop-editor.js?v=1.0.2"></script>
   <script src="/merchant-shared/js/catalog-client.js?v=1.0.1"></script>
-  <script src="/merchant-shared/js/currency-input.js?v=1.0.0"></script>
+  <script src="/merchant-shared/js/currency-input.js?v=1.0.1"></script>
   <script src="/merchant-shared/js/live-search.js?v=1.0.0"></script>
   <script src="/merchant-shared/js/dropdown.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/branch-catalog-ui.js?v=1.0.3"></script>
   <script src="/merchant-dashboard/assets/js/owner-bottom-nav.js?v=1.0.0"></script>
   <script src="/merchant-shared/js/presentation-shells.js?v=1.0.2"></script>
   <script src="/merchant-dashboard/assets/js/owner-navigation.js?v=1.0.0"></script>
-  <script src="/dashboard/assets/js/dashboard.js?v=3.0.82"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=3.0.83"></script>
   <script src="/merchant-dashboard/assets/js/owner-master-menu-inline.js?v=1.0.2"></script>
 </body>
 </html>  

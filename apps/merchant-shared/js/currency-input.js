@@ -93,9 +93,11 @@
     el.__xCurrencyReady = true;
 
     // Keyboard angka di mobile, tanpa keyboard teks biasa.
-    if (!el.getAttribute('inputmode')) el.setAttribute('inputmode', 'numeric');
-    el.setAttribute('autocomplete', 'off');
-    el.setAttribute('type', 'text');
+    if (el.type !== 'hidden') {
+      if (!el.getAttribute('inputmode')) el.setAttribute('inputmode', 'numeric');
+      el.setAttribute('autocomplete', 'off');
+      el.setAttribute('type', 'text');
+    }
 
     el.addEventListener('input', function () { applyInput(el); });
     el.addEventListener('blur', function () { el.value = format(el.value); });

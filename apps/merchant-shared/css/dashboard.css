@@ -22,6 +22,8 @@
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-xl: 24px;
+  --topbar-height-desktop: 72px;
+  --topbar-height-mobile: 68px;
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.08);
@@ -246,9 +248,11 @@ a:focus:not(:focus-visible),
 .x-dash-topbar {
   position: sticky;
   top: 0;
-  z-index: 50;
+  z-index: 100;
   background: #ffffff;
-  padding: 18px 32px;
+  min-height: var(--topbar-height-desktop);
+  box-sizing: border-box;
+  padding: 16px 32px;
   border-bottom: 1px solid var(--border-color);
   display: flex;
   justify-content: space-between;
@@ -5416,8 +5420,8 @@ input[type="file"].x-input,
     left: 0 !important;
     right: 0 !important;
     width: 100% !important;
-    height: 68px !important;
-    min-height: 68px !important;
+    height: var(--topbar-height-mobile) !important;
+    min-height: var(--topbar-height-mobile) !important;
     padding: 0 20px !important;
     padding-top: env(safe-area-inset-top, 0px) !important;
     display: flex !important;
@@ -5598,7 +5602,7 @@ input[type="file"].x-input,
   /* Content area top and bottom spacers for fixed topbar and owner bottom nav */
   /* Owner mobile application shell: route content scrolls independently from persistent chrome. */
   body:not(.x-merchant-app) .x-dash-main {
-    padding-top: max(68px, calc(68px + env(safe-area-inset-top, 0px))) !important;
+    padding-top: max(var(--topbar-height-mobile), calc(var(--topbar-height-mobile) + env(safe-area-inset-top, 0px))) !important;
     padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px)) !important;
   }
 
@@ -10285,10 +10289,14 @@ body:not(.x-merchant-app) .x-owner-mobile-page-sub {
 
 @media (min-width: 1024px) {
   #master-menu-editor-view {
-    padding: 24px 32px 60px !important;
+    padding: 0 0 60px !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
   }
   #form-master-menu {
     max-width: 1120px !important;
+    margin: 0 !important;
   }
   .x-menu-editor-workspace {
     flex-direction: row;
@@ -10303,64 +10311,32 @@ body:not(.x-merchant-app) .x-owner-mobile-page-sub {
     width: 380px;
     flex-shrink: 0;
     position: sticky;
-    top: 24px;
+    top: calc(var(--topbar-height-desktop) + 70px);
+    z-index: 20;
+    align-self: flex-start;
   }
 
-  /* Desktop Header: sembunyikan tombol Back bulat mobile `<` & ratakan judul */
-  #master-menu-editor-view .x-owner-child-mobile-header .x-owner-mobile-page-back {
-    display: none !important;
+  /* Desktop Header: Tampilkan tombol Back panah kiri seperti di mobile di samping judul & subjudul */
+  #master-menu-editor-view .x-owner-child-mobile-header {
+    display: block !important;
+    margin-bottom: 24px !important;
   }
-  #master-menu-editor-view .x-owner-child-mobile-header .x-owner-mobile-page-sub {
-    margin-left: 0 !important;
-    font-size: 13px !important;
+  #master-menu-editor-view .x-owner-child-mobile-header .x-owner-mobile-page-back {
+    display: inline-flex !important;
   }
   #master-menu-editor-view .x-owner-child-mobile-header .x-owner-mobile-page-title {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
     font-size: 22px !important;
   }
+  #master-menu-editor-view .x-owner-child-mobile-header .x-owner-mobile-page-sub {
+    margin-left: 52px !important;
+    font-size: 13px !important;
+  }
+  /* Sembunyikan breadcrumb baris kedua karena sudah ada tombol back di samping judul */
   #master-menu-editor-view .x-owner-child-legacy-nav {
-    display: flex !important;
-    margin-bottom: 16px !important;
-  }
-
-  /* Desktop Modal: Ubah semua Bottom Sheet jadi Centered Modal Dialog Murni di Desktop */
-  #sheet-pick-item,
-  #sheet-menu-type,
-  #occ-date-sheet {
-    top: 50% !important;
-    left: 50% !important;
-    right: auto !important;
-    bottom: auto !important;
-    transform: translate(-50%, -50%) !important;
-    max-width: 520px !important;
-    width: 90% !important;
-    border-radius: 20px !important;
-    max-height: 85vh !important;
-    padding: 24px !important;
-    box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25) !important;
-    margin: 0 !important;
-  }
-  #sheet-pick-item.open,
-  #sheet-menu-type.open,
-  #occ-date-sheet.open {
-    transform: translate(-50%, -50%) !important;
-  }
-  #sheet-pick-item .x-bottom-sheet-handle,
-  #sheet-menu-type .x-bottom-sheet-handle,
-  #occ-date-sheet .x-bottom-sheet-handle {
     display: none !important;
-  }
-  #sheet-pick-item-ext-close,
-  #sheet-menu-type-ext-close,
-  #occ-date-sheet-ext-close {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-  }
-  #sheet-pick-item .x-modal-close-desktop,
-  #sheet-menu-type .x-modal-close-desktop,
-  #occ-date-sheet .x-modal-close-desktop {
-    display: inline-flex !important;
   }
 }
 
@@ -10381,11 +10357,18 @@ body:not(.x-merchant-app) .x-owner-mobile-page-sub {
     padding: 24px !important;
     box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25) !important;
     margin: 0 !important;
+    z-index: 1060 !important;
+    flex-direction: column !important;
   }
   #sheet-pick-item.open,
   #sheet-menu-type.open,
   #occ-date-sheet.open {
+    display: flex !important;
     transform: translate(-50%, -50%) !important;
+  }
+  #sheet-pick-item-overlay,
+  #sheet-menu-type-overlay {
+    z-index: 1055 !important;
   }
   #sheet-pick-item .x-bottom-sheet-handle,
   #sheet-menu-type .x-bottom-sheet-handle,

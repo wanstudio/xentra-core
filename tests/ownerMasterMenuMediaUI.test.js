@@ -27,8 +27,8 @@ test('OMM-01: form Master Menu punya kontrol foto Menu', () => {
   ['cm-image-preview', 'cm-image-empty', 'btn-cm-image-pick', 'btn-cm-image-remove', 'cm-image-file'].forEach((id) => {
     assert.ok(HTML.includes('id="' + id + '"'), 'elemen ' + id + ' ada di editor Menu');
   });
-  assert.ok(/Foto customer-facing milik Menu ini \(Satuan maupun Paket\) — bukan foto Product/.test(HTML),
-    'label menjelaskan kepemilikan foto');
+  assert.ok(/JPG, PNG, atau WebP · Maks\. 20 MB · Rasio 1:1/.test(HTML),
+    'label format dan rasio foto Menu');
   assert.ok(/accept="image\/jpeg,image\/png,image\/webp"/.test(HTML), 'format input sesuai slot');
 });
 
