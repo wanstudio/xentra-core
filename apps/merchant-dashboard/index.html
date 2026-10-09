@@ -2568,6 +2568,9 @@
             <button type="button" class="x-subnav-tab active" id="btn-subtab-stock-branches" data-subtab="branches" onclick="switchStockSubtab('branches')">
               Stok Cabang (Produk Jadi)
             </button>
+            <button type="button" class="x-subnav-tab" id="btn-subtab-stock-recipes" data-subtab="recipes" onclick="switchStockSubtab('recipes')">
+              Resep Masakan (BOM)
+            </button>
             <button type="button" class="x-subnav-tab" id="btn-subtab-stock-materials" data-subtab="materials" onclick="switchStockSubtab('materials')">
               Bahan Baku (Materials)
             </button>
@@ -2661,6 +2664,26 @@
             </div>
           </div>
 
+          <!-- SUBTAB CONTENT: RESEP MASAKAN (BOM) -->
+          <div id="subtab-content-stock-recipes" style="display:none;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+              <div>
+                <h3 style="margin:0 0 4px 0; font-size:16px; font-weight:700; color:#0F172A;">Resep Masakan & Komposisi Menu (BOM)</h3>
+                <p style="margin:0; font-size:13px; color:#64748B;">Atur formula bahan baku yang terpakai untuk setiap masakan agar stok terpotong otomatis dan HPP terhitung akurat.</p>
+              </div>
+              <button type="button" class="x-btn-primary" onclick="openAddRecipeModal()" style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:8px; font-weight:600; font-size:13px; background:#0F172A; color:#FFFFFF; border:none; cursor:pointer;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                <span>Buat Resep Baru</span>
+              </button>
+            </div>
+
+            <div class="x-owner-stock-panel" style="background:#FFFFFF; border-radius:12px; border:1px solid #E2E8F0; padding:16px;">
+              <div id="owner-recipes-list-container">
+                <div class="x-owner-stock-loading">Memuat daftar resep...</div>
+              </div>
+            </div>
+          </div>
+
           <!-- SUBTAB CONTENT 2: BAHAN BAKU (MATERIALS) -->
           <div id="subtab-content-stock-materials" style="display:none;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
@@ -2719,6 +2742,58 @@
             <div style="display:flex; justify-content:flex-end; gap:8px;">
               <button type="button" onclick="closeAddMaterialModal()" style="padding:10px 16px; border:1px solid #CBD5E1; background:#FFFFFF; border-radius:8px; font-weight:600; font-size:13px; color:#475569; cursor:pointer;">Batal</button>
               <button type="submit" id="btn-save-material" style="padding:10px 16px; border:none; background:#0F172A; border-radius:8px; font-weight:600; font-size:13px; color:#FFFFFF; cursor:pointer;">Simpan Bahan</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- MODAL TAMBAH RESEP MASAKAN (BOM) -->
+      <div id="modal-add-recipe" class="x-modal-backdrop" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.6); z-index:9999; justify-content:center; align-items:center;">
+        <div class="x-modal-card" style="background:#FFFFFF; border-radius:16px; width:92%; max-width:560px; max-height:90vh; overflow-y:auto; padding:24px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.1);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <div>
+              <h3 style="margin:0; font-size:16px; font-weight:700; color:#0F172A;">Buat Formula Resep Masakan</h3>
+              <p style="margin:2px 0 0 0; font-size:12px; color:#64748B;">Tentukan bahan mentah & bumbu untuk menu siap saji</p>
+            </div>
+            <button type="button" onclick="closeAddRecipeModal()" style="background:none; border:none; cursor:pointer; color:#64748B;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </div>
+          <form id="form-add-recipe" onsubmit="submitAddRecipeForm(event)">
+            <div style="margin-bottom:14px;">
+              <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">Menu Siap Saji (Produk Jadi)</label>
+              <select id="recipe-input-product" required style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px; background:#FFFFFF;">
+                <option value="">Pilih Menu Makanan / Minuman...</option>
+              </select>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 2fr 1fr; gap:12px; margin-bottom:16px;">
+              <div>
+                <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">Hasil Porsi per Formula</label>
+                <input type="number" id="recipe-input-yield" required min="1" step="1" value="1" placeholder="Misal: 1 porsi atau 10 porsi" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px;">
+              </div>
+              <div>
+                <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">Satuan Hasil</label>
+                <select id="recipe-input-yield-uom" required style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px; background:#FFFFFF;">
+                  <option value="uom_pcs">Porsi / Pcs</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="margin-bottom:16px; border-top:1px dashed #E2E8F0; padding-top:14px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <label style="font-size:13px; font-weight:700; color:#1E293B;">Komposisi Bahan Baku (BOM)</label>
+                <button type="button" onclick="addRecipeIngredientRow()" style="background:#F1F5F9; border:1px solid #CBD5E1; padding:4px 10px; border-radius:6px; font-size:12px; font-weight:600; color:#0F172A; cursor:pointer;">+ Tambah Bahan</button>
+              </div>
+
+              <div id="recipe-ingredients-container" style="display:flex; flex-direction:column; gap:8px;">
+                <!-- Ingredient rows dynamically added -->
+              </div>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:8px; border-top:1px solid #F1F5F9; padding-top:16px;">
+              <button type="button" onclick="closeAddRecipeModal()" style="padding:10px 16px; border:1px solid #CBD5E1; background:#FFFFFF; border-radius:8px; font-weight:600; font-size:13px; color:#475569; cursor:pointer;">Batal</button>
+              <button type="submit" id="btn-save-recipe" style="padding:10px 16px; border:none; background:#0F172A; border-radius:8px; font-weight:600; font-size:13px; color:#FFFFFF; cursor:pointer;">Simpan Resep Masakan</button>
             </div>
           </form>
         </div>
@@ -5471,7 +5546,7 @@
   <script src="/merchant-dashboard/assets/js/owner-bottom-nav.js?v=1.0.0"></script>
   <script src="/merchant-shared/js/presentation-shells.js?v=1.0.2"></script>
   <script src="/merchant-dashboard/assets/js/owner-navigation.js?v=1.0.0"></script>
-  <script src="/dashboard/assets/js/dashboard.js?v=3.0.84"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=3.0.85"></script>
   <script src="/merchant-dashboard/assets/js/owner-master-menu-inline.js?v=1.0.2"></script>
 </body>
 </html>  

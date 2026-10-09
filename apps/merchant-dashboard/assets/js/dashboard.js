@@ -6909,25 +6909,30 @@ async function loadMenusView() {
   function switchStockSubtab(subtab) {
     if (!subtab) subtab = 'branches';
     var branchBtn = $('btn-subtab-stock-branches');
+    var recipesBtn = $('btn-subtab-stock-recipes');
     var matBtn = $('btn-subtab-stock-materials');
     var branchContent = $('subtab-content-stock-branches');
+    var recipesContent = $('subtab-content-stock-recipes');
     var matContent = $('subtab-content-stock-materials');
 
     document.querySelectorAll('#stock-subnav-tabs .x-subnav-tab').forEach(function (tab) {
       tab.classList.toggle('active', tab.dataset.subtab === subtab);
     });
 
-    if (subtab === 'materials') {
-      if (branchBtn) { branchBtn.classList.remove('active'); }
-      if (matBtn) { matBtn.classList.add('active'); }
+    if (subtab === 'recipes') {
       if (branchContent) branchContent.style.display = 'none';
+      if (recipesContent) recipesContent.style.display = 'block';
+      if (matContent) matContent.style.display = 'none';
+      loadOwnerRecipes();
+    } else if (subtab === 'materials') {
+      if (branchContent) branchContent.style.display = 'none';
+      if (recipesContent) recipesContent.style.display = 'none';
       if (matContent) matContent.style.display = 'block';
       loadOwnerMaterials();
       loadOwnerUoms();
     } else {
-      if (branchBtn) { branchBtn.classList.add('active'); }
-      if (matBtn) { matBtn.classList.remove('active'); }
       if (branchContent) branchContent.style.display = 'block';
+      if (recipesContent) recipesContent.style.display = 'none';
       if (matContent) matContent.style.display = 'none';
       loadOwnerStockOverview();
     }
@@ -7132,6 +7137,350 @@ async function loadMenusView() {
       });
   }
 
+  /* =========================================================================
+     MODUL: RESEP MASAKAN & BOM (BILL OF MATERIALS)
+     ========================================================================= */
+  var _ownerRecipes = [];
+  var _ownerInventoryContext = null;
+
+  function loadOwnerRecipes() {
+    var container = $('owner-recipes-list-container');
+    if (container) {
+      container.innerHTML = '<div class="x-owner-stock-loading">Memuat resep masakan & komposisi bahan...</div>';
+    }
+
+    return adminFetch('/api/v1/admin/inventory-workflow/context', { credentials: 'omit', headers: getAuthHeaders() })
+      .then(function (res) {
+        if (!res.ok) {
+          return adminFetch('/admin/inventory-workflow/context', { credentials: 'omit', headers: getAuthHeaders() });
+        }
+        return res;
+      })
+      .then(function (res) {
+        if (!res.ok) throw new Error('Gagal memuat konteks resep masakan (HTTP ' + res.status + ')');
+        return res.json();
+      })
+      .then(function (resData) {
+        var data = resData.data || resData;
+        _ownerInventoryContext = data;
+        _ownerRecipes = data.recipes || [];
+        if (data.materials) _ownerMaterials = data.materials;
+        if (data.uoms) _ownerUoms = data.uoms;
+        renderOwnerRecipesList(_ownerRecipes);
+      })
+      .catch(function (err) {
+        if (container) {
+          container.innerHTML = '<div class="x-owner-stock-error" style="color:#DC2626; padding:16px;">' + escapeHtml(err.message) + '</div>';
+        }
+      });
+  }
+
+  function renderOwnerRecipesList(recipes) {
+    var container = $('owner-recipes-list-container');
+    if (!container) return;
+
+    if (!recipes || recipes.length === 0) {
+      container.innerHTML = (
+        '<div style="text-align:center; padding:36px 16px; color:#64748B;">' +
+          '<div style="font-size:36px; margin-bottom:8px;">🍲</div>' +
+          '<div style="font-size:15px; font-weight:700; color:#1E293B; margin-bottom:6px;">Belum Ada Resep Masakan</div>' +
+          '<p style="font-size:13px; max-width:440px; margin:0 auto 16px auto; color:#64748B; line-height:1.5;">' +
+            'Hubungkan menu siap saji dengan bahan mentah (ayam, bumbu, minyak, dll). Saat staf mencatat masak di dapur, bahan baku otomatis terpotong.' +
+          '</p>' +
+          '<button type="button" onclick="openAddRecipeModal()" style="display:inline-flex; align-items:center; gap:6px; padding:9px 18px; border-radius:8px; font-weight:600; font-size:13px; background:#0F172A; color:#FFFFFF; border:none; cursor:pointer;">' +
+            '<span>+ Buat Resep Pertama</span>' +
+          '</button>' +
+        '</div>'
+      );
+      return;
+    }
+
+    var cards = recipes.map(function (recipe) {
+      var componentsHtml = '';
+      if (recipe.components && recipe.components.length > 0) {
+        componentsHtml = recipe.components.map(function (c) {
+          return (
+            '<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid #F1F5F9; font-size:12px;">' +
+              '<span style="color:#334155; font-weight:500;">' + escapeHtml(c.material_name || c.material_code) + '</span>' +
+              '<span style="color:#64748B; font-weight:600; background:#F8FAFC; padding:2px 8px; border-radius:4px; border:1px solid #E2E8F0;">' +
+                escapeHtml(c.planned_quantity) + ' ' + escapeHtml(c.planned_uom_name || c.base_uom_name || '') +
+              '</span>' +
+            '</div>'
+          );
+        }).join('');
+      } else {
+        componentsHtml = '<div style="font-size:12px; color:#94A3B8; font-style:italic;">Tidak ada daftar rincian bahan</div>';
+      }
+
+      var yieldBadge = (recipe.planned_yield_quantity || 1) + ' ' + (recipe.yield_uom_name || 'porsi');
+
+      return (
+        '<div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:12px; padding:16px; display:flex; flex-direction:column; justify-content:space-between; box-shadow:0 1px 3px rgba(0,0,0,0.02);">' +
+          '<div>' +
+            '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">' +
+              '<div>' +
+                '<h4 style="margin:0 0 4px 0; font-size:15px; font-weight:700; color:#0F172A;">' + escapeHtml(recipe.output_product_name || recipe.recipe_name) + '</h4>' +
+                '<div style="font-size:12px; color:#64748B;">Formula: <strong style="color:#334155;">' + escapeHtml(recipe.recipe_name) + '</strong> (v' + (recipe.version_number || 1) + ')</div>' +
+              '</div>' +
+              '<span style="background:#F0FDF4; color:#166534; border:1px solid #BBF7D0; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px;">' +
+                'Hasil: ' + escapeHtml(yieldBadge) +
+              '</span>' +
+            '</div>' +
+            '<div style="margin-top:12px; background:#FAFAFA; border:1px solid #F1F5F9; border-radius:8px; padding:10px 12px;">' +
+              '<div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:#64748B; margin-bottom:6px;">Komposisi Bahan Masak (BOM)</div>' +
+              componentsHtml +
+            '</div>' +
+          '</div>' +
+          '<div style="margin-top:14px; padding-top:10px; border-top:1px solid #F1F5F9; display:flex; justify-content:space-between; align-items:center;">' +
+            '<span style="font-size:11px; color:#94A3B8;">SKU: ' + escapeHtml(recipe.output_product_sku || '-') + '</span>' +
+            '<span style="font-size:12px; color:#10B981; font-weight:600; display:inline-flex; align-items:center; gap:4px;">' +
+              '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Formula Aktif' +
+            '</span>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+
+    container.innerHTML = (
+      '<div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:16px;">' +
+        cards +
+      '</div>'
+    );
+  }
+
+  function openAddRecipeModal() {
+    var modal = $('modal-add-recipe');
+    if (!modal) return;
+    modal.style.display = 'flex';
+
+    var prodSelect = $('recipe-input-product');
+    if (prodSelect) {
+      prodSelect.innerHTML = '<option value="">Memuat produk...</option>';
+      var products = (_ownerInventoryContext && _ownerInventoryContext.products) ? _ownerInventoryContext.products : [];
+      if (products.length > 0) {
+        populateRecipeProducts(products);
+      } else {
+        adminFetch('/api/v1/admin/inventory-workflow/context', { credentials: 'omit', headers: getAuthHeaders() })
+          .then(function (res) { return res.json(); })
+          .then(function (resData) {
+            var data = resData.data || resData;
+            _ownerInventoryContext = data;
+            populateRecipeProducts(data.products || []);
+          })
+          .catch(function () {
+            prodSelect.innerHTML = '<option value="">Gagal memuat produk menu</option>';
+          });
+      }
+    }
+
+    var ingContainer = $('recipe-ingredients-container');
+    if (ingContainer) {
+      ingContainer.innerHTML = '';
+      addRecipeIngredientRow();
+    }
+  }
+
+  function populateRecipeProducts(products) {
+    var prodSelect = $('recipe-input-product');
+    if (!prodSelect) return;
+    if (!products || products.length === 0) {
+      prodSelect.innerHTML = '<option value="">Tidak ada menu aktif dengan SKU</option>';
+      return;
+    }
+    var html = '<option value="">Pilih Menu Makanan / Minuman...</option>';
+    products.forEach(function (p) {
+      html += '<option value="' + escapeHtml(p.id) + '">' + escapeHtml(p.name) + ' (' + escapeHtml(p.sku || 'No SKU') + ')</option>';
+    });
+    prodSelect.innerHTML = html;
+  }
+
+  function closeAddRecipeModal() {
+    var modal = $('modal-add-recipe');
+    if (modal) modal.style.display = 'none';
+    var form = $('form-add-recipe');
+    if (form) form.reset();
+  }
+
+  function addRecipeIngredientRow() {
+    var container = $('recipe-ingredients-container');
+    if (!container) return;
+
+    var rowId = 'ing-row-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+    var row = document.createElement('div');
+    row.id = rowId;
+    row.style.cssText = 'display:grid; grid-template-columns: 2fr 1fr 1fr auto; gap:8px; align-items:center; background:#F8FAFC; border:1px solid #E2E8F0; padding:8px 10px; border-radius:8px;';
+
+    var materials = _ownerMaterials || (_ownerInventoryContext && _ownerInventoryContext.materials) || [];
+    var matOptions = '<option value="">Pilih Bahan Mentah...</option>';
+    materials.forEach(function (m) {
+      matOptions += '<option value="' + escapeHtml(m.id) + '" data-uom="' + escapeHtml(m.base_uom_id) + '">' + escapeHtml(m.name) + ' (' + escapeHtml(m.material_code) + ')</option>';
+    });
+
+    var uoms = _ownerUoms || (_ownerInventoryContext && _ownerInventoryContext.uoms) || [];
+    var uomOptions = '<option value="">Satuan...</option>';
+    uoms.forEach(function (u) {
+      uomOptions += '<option value="' + escapeHtml(u.id) + '">' + escapeHtml(u.name) + ' (' + escapeHtml(u.code) + ')</option>';
+    });
+
+    row.innerHTML = (
+      '<div>' +
+        '<select class="recipe-ing-material" required onchange="handleRecipeMaterialChange(this, \'' + rowId + '\')" style="width:100%; box-sizing:border-box; padding:6px 8px; border:1px solid #CBD5E1; border-radius:6px; font-size:12px; background:#FFFFFF;">' +
+          matOptions +
+        '</select>' +
+      '</div>' +
+      '<div>' +
+        '<input type="number" step="any" min="0.001" placeholder="Jumlah" required class="recipe-ing-qty" style="width:100%; box-sizing:border-box; padding:6px 8px; border:1px solid #CBD5E1; border-radius:6px; font-size:12px;">' +
+      '</div>' +
+      '<div>' +
+        '<select class="recipe-ing-uom" required style="width:100%; box-sizing:border-box; padding:6px 8px; border:1px solid #CBD5E1; border-radius:6px; font-size:12px; background:#FFFFFF;">' +
+          uomOptions +
+        '</select>' +
+      '</div>' +
+      '<div>' +
+        '<button type="button" onclick="removeRecipeIngredientRow(\'' + rowId + '\')" style="background:none; border:none; color:#EF4444; cursor:pointer; padding:4px; display:inline-flex; align-items:center;" title="Hapus Bahan">' +
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
+        '</button>' +
+      '</div>'
+    );
+
+    container.appendChild(row);
+  }
+
+  function handleRecipeMaterialChange(selectElem, rowId) {
+    var selectedOpt = selectElem.options[selectElem.selectedIndex];
+    var baseUomId = selectedOpt ? selectedOpt.getAttribute('data-uom') : '';
+    if (baseUomId && rowId) {
+      var row = $(rowId);
+      if (row) {
+        var uomSelect = row.querySelector('.recipe-ing-uom');
+        if (uomSelect && baseUomId) {
+          uomSelect.value = baseUomId;
+        }
+      }
+    }
+  }
+
+  function removeRecipeIngredientRow(rowId) {
+    var row = $(rowId);
+    if (row) row.remove();
+  }
+
+  function submitAddRecipeForm(event) {
+    if (event && event.preventDefault) event.preventDefault();
+
+    var productId = ($('recipe-input-product') ? $('recipe-input-product').value : '').trim();
+    var yieldQty = Number($('recipe-input-yield') ? $('recipe-input-yield').value : 1);
+    var yieldUomId = ($('recipe-input-yield-uom') ? $('recipe-input-yield-uom').value : 'uom_pcs').trim();
+    var btn = $('btn-save-recipe');
+
+    if (!productId || yieldQty <= 0) {
+      showToast('Pilih menu dan tentukan hasil porsi masakan.', 'warning');
+      return;
+    }
+
+    var ingRows = document.querySelectorAll('#recipe-ingredients-container > div');
+    if (ingRows.length === 0) {
+      showToast('Masukkan minimal satu bahan baku untuk resep ini.', 'warning');
+      return;
+    }
+
+    var components = [];
+    var seenMats = new Set();
+    var hasError = false;
+
+    ingRows.forEach(function (row) {
+      var matId = (row.querySelector('.recipe-ing-material') ? row.querySelector('.recipe-ing-material').value : '').trim();
+      var qty = Number(row.querySelector('.recipe-ing-qty') ? row.querySelector('.recipe-ing-qty').value : 0);
+      var uomId = (row.querySelector('.recipe-ing-uom') ? row.querySelector('.recipe-ing-uom').value : '').trim();
+
+      if (!matId || qty <= 0 || !uomId) {
+        hasError = true;
+        return;
+      }
+      if (seenMats.has(matId)) {
+        hasError = true;
+        showToast('Ada bahan baku yang terduplikasi di formulir.', 'warning');
+        return;
+      }
+      seenMats.add(matId);
+
+      components.push({
+        material_id: matId,
+        planned_quantity: qty,
+        planned_uom_id: uomId
+      });
+    });
+
+    if (hasError || components.length === 0) {
+      if (!hasError) showToast('Harap lengkapi bahan, jumlah, dan satuan dengan benar.', 'warning');
+      return;
+    }
+
+    var locationId = null;
+    if (_ownerInventoryContext && _ownerInventoryContext.locations && _ownerInventoryContext.locations.length > 0) {
+      locationId = _ownerInventoryContext.locations[0].id;
+    }
+
+    var selectedProdName = '';
+    var prodSelect = $('recipe-input-product');
+    if (prodSelect && prodSelect.selectedIndex >= 0) {
+      selectedProdName = prodSelect.options[prodSelect.selectedIndex].text.split('(')[0].trim();
+    }
+
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Menyimpan Resep...';
+    }
+
+    var payload = {
+      output_product_id: productId,
+      stock_location_id: locationId,
+      name: 'Resep Standar ' + (selectedProdName || 'Menu'),
+      planned_yield_quantity: yieldQty,
+      yield_uom_id: yieldUomId,
+      components: components
+    };
+
+    var targetUrl = '/admin/inventory-workflow/recipes';
+    adminFetch('/api/v1' + targetUrl, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    })
+      .then(function (res) {
+        if (!res.ok) {
+          return adminFetch(targetUrl, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload)
+          });
+        }
+        return res;
+      })
+      .then(function (res) {
+        if (!res.ok) {
+          return res.json().then(function (err) {
+            throw new Error(err.message || 'Gagal menyimpan resep masakan');
+          });
+        }
+        return res.json();
+      })
+      .then(function () {
+        showToast('✅ Resep masakan berhasil disimpan.', 'success');
+        closeAddRecipeModal();
+        loadOwnerRecipes();
+      })
+      .catch(function (err) {
+        showToast('❌ Gagal: ' + err.message, 'error');
+      })
+      .finally(function () {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Simpan Resep Masakan';
+        }
+      });
+  }
+
   // Export to window for inline HTML onclick handlers
   window.switchStockSubtab = switchStockSubtab;
   window.openAddMaterialModal = openAddMaterialModal;
@@ -7139,6 +7488,13 @@ async function loadMenusView() {
   window.submitAddMaterialForm = submitAddMaterialForm;
   window.archiveOwnerMaterial = archiveOwnerMaterial;
   window.loadOwnerMaterials = loadOwnerMaterials;
+  window.loadOwnerRecipes = loadOwnerRecipes;
+  window.openAddRecipeModal = openAddRecipeModal;
+  window.closeAddRecipeModal = closeAddRecipeModal;
+  window.addRecipeIngredientRow = addRecipeIngredientRow;
+  window.handleRecipeMaterialChange = handleRecipeMaterialChange;
+  window.removeRecipeIngredientRow = removeRecipeIngredientRow;
+  window.submitAddRecipeForm = submitAddRecipeForm;
 
   /* =========================================================================
      MODUL 6: REPORTS ENGINE (PHASE 4)
