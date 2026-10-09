@@ -42,7 +42,7 @@ function makeId(prefix) {
 function respondError(res, error) {
   const code = error && (error.code || error.message) || 'INVENTORY_WORKFLOW_FAILED';
   const status = error && error.status || (/(NOT_FOUND|INVALID|REQUIRED|EXISTS|MISMATCH|INSUFFICIENT|UNRESOLVED|AMBIGUOUS|SCOPE|STATUS|QUANTITY|ALREADY|MISSING|DUPLICATE|CATEGORY|CURRENCY|COST|LOCATION|RECIPE|SUPPLIER|MATERIAL|PRODUCT|PURCHASE_ORDER|GOODS_RECEIPT|PRODUCTION|UOM|STOCK)/i.test(code) ? 400 : 500);
-  return res.status(status).json({ success: false, error: code, code });
+  return res.status(status).json({ success: false, error: code, code, batch_id: error && error.batchId ? error.batchId : null });
 }
 function organizationId(req) {
   const value = (req.user && req.user.organization_id) || (req.brand && req.brand.organization_id) || null;
@@ -64,6 +64,7 @@ function listContext(req, db) {
   const uoms = uomRepository.listActive();
   const materials = materialRepository.listByOrganization(orgId);
   const materialBalances = db.queryMany("SELECT msb.stock_location_id, sl.name AS stock_location_name, sl.branch_id, msb.material_id, m.material_code, m.name AS material_name, m.base_uom_id, u.name AS base_uom_name, u.code AS base_uom_code, msb.quantity_base AS quantity, msb.carrying_value, msb.moving_average_unit_cost, msb.cost_availability_status, COALESCE(rp.minimum_quantity, 0) AS minimum_quantity, COALESCE(rp.target_quantity, 0) AS target_quantity FROM material_stock_balances msb JOIN stock_locations sl ON sl.id = msb.stock_location_id JOIN materials m ON m.id = msb.material_id JOIN uoms u ON u.id = m.base_uom_id LEFT JOIN inventory_reorder_policies rp ON rp.stock_location_id = msb.stock_location_id AND rp.identity_type = 'MATERIAL' AND rp.identity_id = msb.material_id WHERE sl.organization_id = ? ORDER BY sl.name, m.name", [orgId]);
+  const reorderPolicies = db.queryMany("SELECT rp.stock_location_id, sl.branch_id, rp.identity_type, rp.identity_id, rp.minimum_quantity, rp.target_quantity, rp.updated_at FROM inventory_reorder_policies rp JOIN stock_locations sl ON sl.id = rp.stock_location_id WHERE sl.organization_id = ? ORDER BY sl.name, rp.identity_type, rp.identity_id", [orgId]);
   const products = db.queryMany("SELECT p.id, p.name, p.sku, p.brand_id, br.organization_id, p.product_stock_uom_id, u.name AS stock_uom_name, u.code AS stock_uom_code FROM products p JOIN brands br ON br.id = p.brand_id LEFT JOIN uoms u ON u.id = p.product_stock_uom_id WHERE br.organization_id = ? AND p.is_active = 1 AND p.sku IS NOT NULL AND trim(p.sku) <> '' ORDER BY p.name", [orgId]);
   const productBalances = db.queryMany("SELECT psb.stock_location_id, sl.name AS stock_location_name, sl.branch_id, psb.product_id, p.name AS product_name, p.sku, psb.quantity, psb.carrying_value, psb.moving_average_unit_cost, psb.cost_availability_status, COALESCE(rp.minimum_quantity, 0) AS minimum_quantity, COALESCE(rp.target_quantity, 0) AS target_quantity FROM product_stock_balances psb JOIN stock_locations sl ON sl.id = psb.stock_location_id JOIN products p ON p.id = psb.product_id LEFT JOIN inventory_reorder_policies rp ON rp.stock_location_id = psb.stock_location_id AND rp.identity_type = 'PRODUCT' AND rp.identity_id = psb.product_id WHERE sl.organization_id = ? ORDER BY sl.name, p.name", [orgId]);
   const suppliers = db.queryMany("SELECT id, organization_id, supplier_code, name, status FROM suppliers WHERE organization_id = ? AND status <> 'ARCHIVED' ORDER BY name", [orgId]);
@@ -75,8 +76,8 @@ function listContext(req, db) {
   recipes.forEach(function (recipe) {
     recipe.components = db.queryMany("SELECT rc.material_id, m.material_code, m.name AS material_name, rc.planned_quantity, rc.planned_uom_id, u.name AS planned_uom_name, m.base_uom_id, bu.name AS base_uom_name FROM recipe_components rc JOIN materials m ON m.id = rc.material_id JOIN uoms u ON u.id = rc.planned_uom_id JOIN uoms bu ON bu.id = m.base_uom_id WHERE rc.recipe_version_id = ? ORDER BY rc.sort_order, m.name", [recipe.recipe_version_id]);
   });
-  const batches = db.queryMany("SELECT pb.id, pb.status, pb.planned_output_quantity, pb.actual_output_quantity, pb.created_at, pb.started_at, pb.completed_at, pi.name AS production_item_name, p.name AS output_product_name, p.sku, rv.version_number, pcs.actual_material_cost, pcs.production_output_unit_cost, pcs.currency_code FROM production_batches pb JOIN production_items pi ON pi.id = pb.production_item_id JOIN products p ON p.id = pi.output_product_id JOIN recipe_versions rv ON rv.id = pb.recipe_version_id LEFT JOIN production_cost_snapshots pcs ON pcs.production_batch_id = pb.id WHERE pb.organization_id = ? ORDER BY pb.created_at DESC LIMIT 20", [orgId]);
-  return { organization_id: orgId, branches, locations, uoms, materials, material_balances: materialBalances, products, product_balances: productBalances, suppliers, supplier_materials: supplierItems, supplier_packs: supplierPacks, purchase_orders: purchaseOrders, purchase_order_lines: purchaseOrderLines, recipes, batches };
+  const batches = db.queryMany("SELECT pb.id, pb.status, pb.recipe_version_id, pb.production_item_id, pi.output_product_id, pb.production_stock_location_id, pb.input_stock_location_id, pb.output_stock_location_id, pb.planned_output_quantity, pb.actual_output_quantity, pb.production_posting_id, pb.created_at, pb.started_at, pb.completed_at, pi.name AS production_item_name, p.name AS output_product_name, p.sku, rv.version_number, rv.planned_yield_quantity, rv.yield_uom_id, pcs.actual_material_cost, pcs.production_output_unit_cost, pcs.currency_code FROM production_batches pb JOIN production_items pi ON pi.id = pb.production_item_id JOIN products p ON p.id = pi.output_product_id JOIN recipe_versions rv ON rv.id = pb.recipe_version_id LEFT JOIN production_cost_snapshots pcs ON pcs.production_batch_id = pb.id WHERE pb.organization_id = ? ORDER BY pb.created_at DESC LIMIT 20", [orgId]);
+  return { organization_id: orgId, branches, locations, uoms, materials, material_balances: materialBalances, reorder_policies: reorderPolicies, products, product_balances: productBalances, suppliers, supplier_materials: supplierItems, supplier_packs: supplierPacks, purchase_orders: purchaseOrders, purchase_order_lines: purchaseOrderLines, recipes, batches };
 }
 
 function registerAdminInventoryWorkflowRoutes(router, deps = {}) {
@@ -298,21 +299,41 @@ function registerAdminInventoryWorkflowRoutes(router, deps = {}) {
       const plannedOutput = positive(req.body && req.body.planned_output_quantity, 'INVALID_OUTPUT_QUANTITY');
       const actualOutput = positive(req.body && req.body.actual_output_quantity, 'INVALID_OUTPUT_QUANTITY');
       const actualConsumptions = req.body && req.body.actual_consumptions;
+      const postingId = required(req.body && req.body.production_posting_id, 'PRODUCTION_POSTING_ID_REQUIRED');
       if (!Array.isArray(actualConsumptions) || actualConsumptions.length === 0) throw fail('ACTUAL_CONSUMPTION_REQUIRED');
-      batch = ProductionService.createProductionBatch({
-        outputProductId: outputProductId,
-        productionStockLocationId: location.id,
-        inputStockLocationId: location.id,
-        outputStockLocationId: location.id,
-        plannedOutputQuantity: plannedOutput,
-        createdBy: req.user && req.user.id || null,
-        repository: productionRepository
-      });
-      ProductionService.planProductionBatch({ productionBatchId: batch.id, repository: productionRepository });
-      ProductionService.startProductionBatch({ productionBatchId: batch.id, startedBy: req.user && req.user.id || null, repository: productionRepository });
+
+      const requestedBatchId = req.body && req.body.production_batch_id ? required(req.body.production_batch_id, 'PRODUCTION_BATCH_NOT_FOUND') : null;
+      if (requestedBatchId) {
+        batch = productionRepository.findProductionBatch(requestedBatchId);
+        if (!batch || String(batch.organization_id) !== orgId) throw fail('PRODUCTION_BATCH_NOT_FOUND', 404);
+        if (
+          String(batch.production_stock_location_id) !== String(location.id) ||
+          String(batch.production_item_id) !== String((productionRepository.findProductionItemByProductAndLocation(outputProductId, location.id)[0] || {}).id)
+        ) throw fail('PRODUCTION_BATCH_CONTEXT_MISMATCH');
+        if (!['DRAFT', 'PLANNED', 'IN_PROGRESS', 'COMPLETED'].includes(batch.status)) throw fail('PRODUCTION_BATCH_STATUS_INVALID');
+      } else {
+        batch = ProductionService.createProductionBatch({
+          outputProductId: outputProductId,
+          productionStockLocationId: location.id,
+          inputStockLocationId: location.id,
+          outputStockLocationId: location.id,
+          plannedOutputQuantity: plannedOutput,
+          createdBy: req.user && req.user.id || null,
+          repository: productionRepository
+        });
+      }
+
+      if (batch.status === 'DRAFT') {
+        ProductionService.planProductionBatch({ productionBatchId: batch.id, repository: productionRepository });
+        batch = productionRepository.findProductionBatch(batch.id);
+      }
+      if (batch.status === 'PLANNED') {
+        ProductionService.startProductionBatch({ productionBatchId: batch.id, startedBy: req.user && req.user.id || null, repository: productionRepository });
+        batch = productionRepository.findProductionBatch(batch.id);
+      }
       const result = ProductionService.completeProductionBatch({
         productionBatchId: batch.id,
-        productionPostingId: required(req.body && req.body.production_posting_id, 'PRODUCTION_POSTING_ID_REQUIRED'),
+        productionPostingId: postingId,
         actualOutputQuantity: actualOutput,
         actualConsumptions: actualConsumptions.map(function (line) {
           return { material_id: required(line.material_id, 'MATERIAL_REQUIRED'), source_uom_id: required(line.source_uom_id, 'SOURCE_UOM_REQUIRED'), actual_quantity: positive(line.actual_quantity, 'INVALID_CONSUMPTION_QUANTITY') };
@@ -322,9 +343,9 @@ function registerAdminInventoryWorkflowRoutes(router, deps = {}) {
         repository: productionRepository,
         inventory: inventoryRepository
       });
-      return res.status(201).json({ success: true, production_batch: productionRepository.findProductionBatch(batch.id), posting: result });
+      return res.status(200).json({ success: true, production_batch: productionRepository.findProductionBatch(batch.id), posting: result, batch_id: batch.id });
     } catch (error) {
-      if (batch && batch.id) error.message = (error.message || 'PRODUCTION_FAILED') + ' (batch: ' + batch.id + ')';
+      if (batch && batch.id) error.batchId = batch.id;
       return respondError(res, error);
     }
   });
