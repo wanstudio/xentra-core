@@ -7213,6 +7213,29 @@ async function loadMenusView() {
       }
 
       var yieldBadge = (recipe.planned_yield_quantity || 1) + ' ' + (recipe.yield_uom_name || 'porsi');
+      var unitCost = Number(recipe.cost_per_unit || 0);
+      var sellPrice = Number(recipe.selling_price || 0);
+      var marginPct = (sellPrice > 0 && unitCost > 0) ? Math.round(((sellPrice - unitCost) / sellPrice) * 100) : null;
+
+      var costEconomicsHtml = '';
+      if (unitCost > 0) {
+        costEconomicsHtml = (
+          '<div style="margin-top:10px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:10px 12px; display:flex; justify-content:space-between; align-items:center;">' +
+            '<div>' +
+              '<div style="font-size:11px; color:#64748B;">Modal Bahan (HPP) / Porsi</div>' +
+              '<div style="font-size:14px; font-weight:800; color:#0F172A;">' + formatMoney(unitCost) + '</div>' +
+            '</div>' +
+            (sellPrice > 0 ? (
+              '<div style="text-align:right;">' +
+                '<div style="font-size:11px; color:#64748B;">Harga Jual / Margin</div>' +
+                '<div style="font-size:13px; font-weight:700; color:#166534;">' +
+                  formatMoney(sellPrice) + (marginPct !== null ? ' (' + marginPct + '%)' : '') +
+                '</div>' +
+              '</div>'
+            ) : '') +
+          '</div>'
+        );
+      }
 
       return (
         '<div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:12px; padding:16px; display:flex; flex-direction:column; justify-content:space-between; box-shadow:0 1px 3px rgba(0,0,0,0.02);">' +
@@ -7226,6 +7249,7 @@ async function loadMenusView() {
                 'Hasil: ' + escapeHtml(yieldBadge) +
               '</span>' +
             '</div>' +
+            costEconomicsHtml +
             '<div style="margin-top:12px; background:#FAFAFA; border:1px solid #F1F5F9; border-radius:8px; padding:10px 12px;">' +
               '<div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:#64748B; margin-bottom:6px;">Komposisi Bahan Masak</div>' +
               componentsHtml +
@@ -12967,7 +12991,7 @@ async function loadMenusView() {
         var product = ownerMasterMenuFindProduct(item.product_id);
         if (!product) return;
         var qty = Math.max(1, parseInt(item.quantity, 10) || 1);
-        var itemCost = Number(product.cost_price || 0);
+        var itemCost = Number(product.cost_price || (product.recipe && product.recipe.cost_per_unit) || 0);
         var subTotal = itemCost * qty;
         totalCost += subTotal;
 
@@ -12975,9 +12999,16 @@ async function loadMenusView() {
         formulaParts.push(partText);
         previewItemsArr.push(esc(product.name) + (qty > 1 ? ' (' + qty + ')' : ''));
 
-        hppRowsHtml += '<div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;">' +
-          '<span style="color:#0F172A;font-weight:500;">' + esc(product.name) + (qty > 1 ? ' <span style="color:#64748B;">(' + qty + 'x)</span>' : '') + '</span>' +
-          '<span style="color:#0F172A;font-weight:600;">' + formatMoney(subTotal) + '</span>' +
+        var recipeBadge = (product.recipe && product.recipe.name)
+          ? '<div style="font-size:11px;color:#16A34A;font-weight:600;margin-top:2px;">Resep: ' + esc(product.recipe.name) + ' (' + formatMoney(product.recipe.cost_per_unit) + '/porsi)</div>'
+          : '';
+
+        hppRowsHtml += '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:4px 0;border-bottom:1px dashed #E2E8F0;font-size:13px;">' +
+          '<div>' +
+            '<span style="color:#0F172A;font-weight:600;">' + esc(product.name) + (qty > 1 ? ' <span style="color:#64748B;">(' + qty + 'x)</span>' : '') + '</span>' +
+            recipeBadge +
+          '</div>' +
+          '<span style="color:#0F172A;font-weight:700;">' + formatMoney(subTotal) + '</span>' +
         '</div>';
       });
     }

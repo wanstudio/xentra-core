@@ -274,7 +274,7 @@ module.exports = function registerMerchantAuthRoutes(router, deps) {
   });
   
   // GET /auth/merchant/me: Authenticated operator/merchant profile
-  router.get('/auth/merchant/me', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen', 'driver']), (req, res) => {
+  router.get('/auth/merchant/me', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen', 'driver', 'purchasing']), (req, res) => {
     let brand = req.brand || null;
     const userId = req.user.id || req.user.userId;
     const brandId = req.user.brandId || req.user.brand_id || req.brand_id || null;
@@ -341,6 +341,7 @@ module.exports = function registerMerchantAuthRoutes(router, deps) {
     switch (role) {
       case 'driver':
         return '/driver/';
+      case 'purchasing':
       case 'branch_manager':
         return '/merchant/';
       case 'kitchen':

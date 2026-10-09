@@ -870,6 +870,72 @@
         </div>
       </div>
 
+      <!-- MODAL: BM Cooking / Preparation Batch (Catat Hasil Masak) -->
+      <div id="modal-bm-stock-prepare" class="x-modal" style="display:none; position:fixed; z-index:9999; inset:0; background:rgba(0,0,0,0.5); align-items:center; justify-content:center;">
+        <div class="x-card-panel" style="max-width:480px; width:92%; padding:22px; border-radius:16px; background:#ffffff; box-shadow:0 12px 30px rgba(0,0,0,0.18); max-height:90vh; overflow-y:auto;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:20px;">🍳</span>
+              <h4 style="font-size:16px; font-weight:800; margin:0;">Catat Hasil Masak</h4>
+            </div>
+            <button type="button" onclick="closeBMStockPrepareModal()" style="background:none; border:none; font-size:22px; cursor:pointer; color:var(--text-muted); line-height:1;">&times;</button>
+          </div>
+
+          <form id="form-bm-stock-prepare" onsubmit="submitBMStockPrepare(event)">
+            <input type="hidden" id="bm-prepare-product-id">
+
+            <div style="margin-bottom:14px; background:#f0fdf4; padding:12px; border-radius:10px; border:1px solid #bbf7d0;">
+              <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:#15803d; margin-bottom:2px;">Menu Yang Dimasak</div>
+              <div id="bm-prepare-product-name" style="font-size:15px; font-weight:800; color:#166534;">-</div>
+              <div id="bm-prepare-recipe-badge" style="font-size:12px; color:#15803d; margin-top:2px;">
+                Resep Terhubung: <strong id="bm-prepare-recipe-name">-</strong>
+              </div>
+            </div>
+
+            <div style="margin-bottom:16px;">
+              <label for="bm-prepare-portions" style="display:block; font-size:13px; font-weight:700; margin-bottom:6px; color:var(--text-main);">
+                Berapa Porsi Selesai Dimasak?
+              </label>
+              <div style="display:flex; gap:8px;">
+                <input type="number" id="bm-prepare-portions" min="1" step="1" value="10" class="x-input" style="flex:1; font-size:18px; font-weight:800; padding:10px; text-align:center;" oninput="updateBMPrepareMaterialsPreview()">
+                <div style="display:flex; align-items:center; font-weight:700; color:var(--text-muted); padding:0 8px;">Porsi</div>
+              </div>
+              <div style="display:flex; gap:6px; margin-top:8px;">
+                <button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 10px;" onclick="setBMPreparePortions(5)">5</button>
+                <button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 10px;" onclick="setBMPreparePortions(10)">10</button>
+                <button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 10px;" onclick="setBMPreparePortions(20)">20</button>
+                <button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 10px;" onclick="setBMPreparePortions(30)">30</button>
+                <button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 10px;" onclick="setBMPreparePortions(50)">50</button>
+              </div>
+            </div>
+
+            <!-- Preview Pemotongan Bahan Baku Gudang -->
+            <div style="margin-bottom:16px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <span style="font-size:12px; font-weight:700; color:var(--text-main);">Bahan Baku Yang Akan Dipotong:</span>
+                <span style="font-size:11px; color:var(--text-muted);" id="bm-prepare-loc-label">Gudang Cabang</span>
+              </div>
+              <div id="bm-prepare-components-list" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px; font-size:12px; max-height:160px; overflow-y:auto;">
+                <!-- Dinamis di-render oleh JS -->
+              </div>
+              <div id="bm-prepare-warning" style="display:none; margin-top:8px; padding:8px 12px; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; font-size:12px; color:#991b1b;">
+                ⚠️ <strong>Bahan Kurang:</strong> Beberapa bahan baku di gudang cabang tidak cukup untuk porsi ini.
+              </div>
+            </div>
+
+            <div style="margin-bottom:16px;">
+              <label for="bm-prepare-notes" style="display:block; font-size:11px; font-weight:700; margin-bottom:4px; color:var(--text-muted);">Catatan Dapur (Opsional)</label>
+              <input type="text" id="bm-prepare-notes" class="x-input" style="width:100%; font-size:12px;" placeholder="Mis. Batch pagi, koki Budi">
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+              <button type="button" class="x-btn-secondary" onclick="closeBMStockPrepareModal()" style="font-size:13px; padding:9px 15px;">Batal</button>
+              <button type="submit" class="x-btn-primary" id="btn-bm-submit-prepare" style="font-size:13px; padding:9px 20px; font-weight:700; background:#16a34a; border-color:#16a34a;">🍳 Potong Bahan & Tambah Porsi</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
       <!-- MODAL: BM Add Cashier -->
       <div id="modal-bm-add-cashier" class="x-modal" style="display:none; position:fixed; z-index:9999; inset:0; background:rgba(0,0,0,0.5); align-items:center; justify-content:center;">
         <div class="x-card-panel" style="max-width:480px; width:90%; padding:24px; border-radius:12px; background:#ffffff; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
@@ -909,6 +975,83 @@
           </form>
         </div>
       </div>
+
+      <!-- BM-BELANJA: Catatan Belanja Pasar & Kasbon (Human-Centric Shopping Checklist) -->
+      <section id="tab-bm-belanja" class="x-tab-content" data-tab="bm-belanja">
+        <!-- Top Hero Card / Kasbon Summary -->
+        <div class="x-card-panel" style="margin-bottom:16px; padding:18px 20px; border-radius:14px; background:linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); border:1px solid #bbf7d0;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+            <div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:22px;">🛒</span>
+                <h3 style="font-size:18px; font-weight:800; margin:0; color:#14532d;">Catatan Belanja Pasar</h3>
+              </div>
+              <p style="font-size:13px; color:#166534; margin:4px 0 0;">
+                Bawa catatan ini ke pasar. Centang barang yang dibeli dan sesuaikan harga riil jika ada perubahan.
+              </p>
+            </div>
+            <button type="button" class="x-btn-secondary" onclick="loadPurchasingChecklist()" style="font-size:12px; padding:6px 14px; border-radius:8px; display:flex; align-items:center; gap:6px; background:#ffffff;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+              Segarkan
+            </button>
+          </div>
+
+          <!-- Uang Kasbon Card Input -->
+          <div style="margin-top:16px; padding:14px 16px; background:#ffffff; border-radius:12px; border:1px solid #86efac; box-shadow:0 2px 6px rgba(0,0,0,0.03);">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+              <div style="flex:1; min-width:200px;">
+                <label for="input-purchasing-cash-advance" style="display:block; font-size:12px; font-weight:700; color:#15803d; margin-bottom:4px; text-transform:uppercase;">
+                  💵 Uang Kasbon Diterima (Rp)
+                </label>
+                <input type="number" id="input-purchasing-cash-advance" class="x-input" placeholder="0" min="0" step="1000" style="font-size:20px; font-weight:800; color:#14532d; width:100%; padding:8px 12px; border-radius:8px; border:1px solid #86efac;" oninput="recalculatePurchasingSummary()">
+                <small style="font-size:11px; color:var(--text-muted);">Masukkan uang tunai yang diberikan oleh kasir / owner.</small>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:11px; font-weight:600; color:var(--text-muted); text-transform:uppercase;">Estimasi Kebutuhan Belanja</div>
+                <div id="label-purchasing-est-budget" style="font-size:18px; font-weight:800; color:#1e293b;">Rp 0</div>
+                <span id="badge-purchasing-low-count" class="x-badge x-badge-warning" style="font-size:11px; margin-top:2px;">0 bahan menipis</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter & Search Bar -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px; flex-wrap:wrap;">
+          <div style="display:flex; gap:8px;">
+            <button type="button" class="x-btn-secondary active" id="btn-purchasing-filter-low" onclick="filterPurchasingList('low')" style="font-size:12px; padding:6px 14px; border-radius:20px;">
+              ⚠️ Perlu Dibeli Saja
+            </button>
+            <button type="button" class="x-btn-secondary" id="btn-purchasing-filter-all" onclick="filterPurchasingList('all')" style="font-size:12px; padding:6px 14px; border-radius:20px;">
+              Semua Bahan
+            </button>
+          </div>
+          <div style="font-size:12px; color:var(--text-muted);">
+            <span id="purchasing-item-count">0</span> barang ditampilkan
+          </div>
+        </div>
+
+        <!-- Checklist List Items Container -->
+        <div id="purchasing-checklist-container" style="display:flex; flex-direction:column; gap:12px; margin-bottom:100px;">
+          <div class="text-center py-6 text-muted">Memuat daftar belanja pasar...</div>
+        </div>
+
+        <!-- Sticky Bottom Summary Bar (Gojek / Grab Style) -->
+        <div id="purchasing-bottom-bar" style="position:fixed; bottom:64px; left:0; right:0; background:#ffffff; border-top:1px solid #e2e8f0; padding:12px 18px; box-shadow:0 -6px 20px rgba(0,0,0,0.08); z-index:900; display:flex; justify-content:space-between; align-items:center; max-width:768px; margin:0 auto;">
+          <div style="flex:1;">
+            <div style="display:flex; align-items:baseline; gap:6px;">
+              <span style="font-size:12px; color:var(--text-muted);">Total Belanja:</span>
+              <strong id="label-purchasing-total-real" style="font-size:16px; font-weight:800; color:#1e293b;">Rp 0</strong>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px; margin-top:2px;">
+              <span style="font-size:12px; color:var(--text-muted);">Sisa Kembalian:</span>
+              <strong id="label-purchasing-change-due" style="font-size:14px; font-weight:800; color:#16a34a;">Rp 0</strong>
+            </div>
+          </div>
+          <button type="button" class="x-btn-primary" id="btn-purchasing-submit-settle" onclick="submitPurchasingSettle()" style="background:#16a34a; border-color:#16a34a; font-weight:700; font-size:13px; padding:10px 18px; border-radius:10px; display:flex; align-items:center; gap:6px;">
+            <span>✓</span> Selesai & Masukkan Stok
+          </button>
+        </div>
+      </section>
 
       <!-- BM-4: Staff Operasional Cabang -->
       <section id="tab-bm-staff" class="x-tab-content" data-tab="bm-staff">
@@ -1698,10 +1841,11 @@
   <script src="/merchant-app/assets/js/reports.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/tables.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/stock.js?v=1.1.0"></script>
+  <script src="/merchant-app/assets/js/purchasing.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/promotions.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/staff.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/orders.js?v=1.0.1"></script>
-  <script src="/merchant-app/assets/js/merchant-app.js?v=1.0.2"></script>
+  <script src="/merchant-app/assets/js/merchant-app.js?v=1.0.3"></script>
 
   <!-- ═══════════════════════════════════════════════════
        MERCHANT PWA ENGINE (Service Worker & Install Flow)

@@ -95,12 +95,74 @@ class ComposedMenuRepository {
       const needle = '%' + String(query).trim().toLowerCase() + '%';
       params.push(needle, needle);
     }
-    return this.db.queryMany(
+    const products = this.db.queryMany(
       "SELECT p.id, p.brand_id, p.name, p.sku, p.cost_price, p.description, p.image_url, p.image, p.is_active " +
       "FROM products p WHERE " + clauses.join(' AND ') +
       " ORDER BY p.name ASC, p.id ASC",
       params
     );
+
+    // Attach active recipe formula and calculated recipe cost per unit
+    if (products.length > 0) {
+      const recipes = this.db.queryMany(
+        "SELECT pi.output_product_id, r.id AS recipe_id, r.name AS recipe_name, rv.id AS recipe_version_id, " +
+        "rv.planned_yield_quantity, yu.name AS yield_uom_name " +
+        "FROM recipes r " +
+        "JOIN production_items pi ON pi.id = r.production_item_id " +
+        "JOIN recipe_versions rv ON rv.recipe_id = r.id AND rv.status = 'PUBLISHED' " +
+        "JOIN uoms yu ON yu.id = rv.yield_uom_id " +
+        "WHERE r.status = 'ACTIVE' AND pi.status = 'ACTIVE' " +
+        "ORDER BY rv.version_number DESC"
+      );
+
+      const recipeMap = new Map();
+      recipes.forEach(rec => {
+        if (!recipeMap.has(rec.output_product_id)) {
+          recipeMap.set(rec.output_product_id, rec);
+        }
+      });
+
+      products.forEach(p => {
+        const rec = recipeMap.get(p.id);
+        if (rec) {
+          const comps = this.db.queryMany(
+            "SELECT rc.material_id, m.name AS material_name, rc.planned_quantity, u.name AS uom_name, " +
+            "COALESCE(msb.moving_average_unit_cost, 0) AS unit_cost " +
+            "FROM recipe_components rc " +
+            "JOIN materials m ON m.id = rc.material_id " +
+            "JOIN uoms u ON u.id = rc.planned_uom_id " +
+            "LEFT JOIN (SELECT material_id, AVG(moving_average_unit_cost) AS moving_average_unit_cost FROM material_stock_balances WHERE moving_average_unit_cost > 0 GROUP BY material_id) msb ON msb.material_id = rc.material_id " +
+            "WHERE rc.recipe_version_id = ?",
+            [rec.recipe_version_id]
+          );
+
+          let totalBatchCost = 0;
+          comps.forEach(c => {
+            totalBatchCost += Number(c.planned_quantity || 0) * Number(c.unit_cost || 0);
+          });
+          const yieldQty = Number(rec.planned_yield_quantity) || 1;
+          const costPerUnit = yieldQty > 0 ? (totalBatchCost / yieldQty) : totalBatchCost;
+
+          p.recipe = {
+            id: rec.recipe_id,
+            name: rec.recipe_name,
+            recipe_version_id: rec.recipe_version_id,
+            yield_quantity: yieldQty,
+            yield_uom_name: rec.yield_uom_name,
+            total_batch_cost: Math.round(totalBatchCost),
+            cost_per_unit: Math.round(costPerUnit),
+            components: comps
+          };
+          if (!p.cost_price || Number(p.cost_price) === 0) {
+            p.cost_price = Math.round(costPerUnit);
+          }
+        } else {
+          p.recipe = null;
+        }
+      });
+    }
+
+    return products;
   }
 
   findMenu({ brandId, menuId }) {

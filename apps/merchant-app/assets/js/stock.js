@@ -20,10 +20,12 @@
 
   var _bmStockState = {
     inventory: [],
+    recipes: [],
     searchQuery: '',
     statusFilter: 'all',
     fetchSeq: 0,
-    activeAdjustItem: null
+    activeAdjustItem: null,
+    activePrepareItem: null
   };
 
   async function loadBMStock() {
@@ -43,14 +45,26 @@
     var currentSeq = ++_bmStockState.fetchSeq;
 
     try {
-      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/inventory', {
-        headers: getAuthHeaders()
-      });
-      var data = await res.json();
+      var [invRes, recRes] = await Promise.all([
+        adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/inventory', {
+          headers: getAuthHeaders()
+        }),
+        adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/inventory/recipes', {
+          headers: getAuthHeaders()
+        }).catch(function () { return { ok: false }; })
+      ]);
+      var data = await invRes.json();
+      var recData = recRes.ok ? await recRes.json() : null;
 
       if (currentSeq !== _bmStockState.fetchSeq) return;
 
-      if (res.ok && data.success && Array.isArray(data.inventory)) {
+      if (recData && recData.success && Array.isArray(recData.recipes)) {
+        _bmStockState.recipes = recData.recipes;
+      } else {
+        _bmStockState.recipes = [];
+      }
+
+      if (invRes.ok && data.success && Array.isArray(data.inventory)) {
         _bmStockState.inventory = data.inventory;
         updateBMStockStats(data.inventory);
         renderBMStockView();
@@ -162,6 +176,11 @@
         : '<span class="x-stock-portion-display" title="Klik untuk edit porsi" onclick="openBMStockAdjustmentModal(\'' + esc(it.product_id) + '\')">' + s + '</span>' +
           '<span class="x-stock-portion-unit">Porsi</span>';
 
+      var recipe = (_bmStockState.recipes || []).find(function (r) { return r.output_product_id === it.product_id; });
+      var prepareBtnHtml = recipe
+        ? '<button type="button" class="x-btn-secondary" style="font-size:12px; padding:6px 10px; white-space:nowrap; background:#f0fdf4; border-color:#86efac; color:#15803d; font-weight:700;" onclick="openBMStockPrepareModal(\'' + esc(it.product_id) + '\')">🍳 Masak</button>'
+        : '';
+
       return '<div class="x-stock-item-card" data-product-id="' + esc(it.product_id) + '">' +
         '<div class="x-stock-item-main">' +
           '<div class="x-stock-item-title-row">' +
@@ -171,9 +190,11 @@
           '<div class="x-stock-item-meta">' +
             (it.sku ? '<span>SKU: ' + esc(it.sku) + '</span> • ' : '') +
             '<span>Batas Minimum: ' + (isUntracked ? '—' : th) + ' porsi</span>' +
+            (recipe ? ' • <span style="color:#16a34a; font-weight:700;">Resep: ' + esc(recipe.recipe_name) + '</span>' : '') +
           '</div>' +
         '</div>' +
         '<div class="x-stock-item-controls">' +
+          prepareBtnHtml +
           '<div class="x-stock-portion-counter" title="Atur sisa porsi harian">' +
             '<button type="button" class="x-stock-step-btn" ' + (isUntracked || s <= 0 ? 'disabled' : '') + ' onclick="quickAdjustBMStockStep(\'' + esc(it.product_id) + '\', -1)" aria-label="Kurang 1 porsi">-</button>' +
             '<div style="text-align:center;">' + portionDisplayHtml + '</div>' +
@@ -381,4 +402,146 @@
   }
   window.submitBMStockAdjustment = submitBMStockAdjustment;
 
+  /* Cooking / Preparation Batch Modal Handlers */
+  function openBMStockPrepareModal(productId) {
+    var item = (_bmStockState.inventory || []).find(function (it) { return it.product_id === productId; });
+    var recipe = (_bmStockState.recipes || []).find(function (r) { return r.output_product_id === productId; });
+    if (!item || !recipe) {
+      showToast('Resep masakan untuk menu ini belum terdaftar.');
+      return;
+    }
+
+    _bmStockState.activePrepareItem = item;
+    var modal = $('modal-bm-stock-prepare');
+    if (!modal) return;
+
+    if ($('bm-prepare-product-id')) $('bm-prepare-product-id').value = item.product_id;
+    if ($('bm-prepare-product-name')) $('bm-prepare-product-name').textContent = item.product_name;
+    if ($('bm-prepare-recipe-name')) $('bm-prepare-recipe-name').textContent = recipe.recipe_name + ' (Yield: ' + recipe.planned_yield_quantity + ' ' + (recipe.yield_uom_name || 'porsi') + ')';
+    if ($('bm-prepare-portions')) $('bm-prepare-portions').value = Number(recipe.planned_yield_quantity) || 10;
+    if ($('bm-prepare-notes')) $('bm-prepare-notes').value = '';
+
+    updateBMPrepareMaterialsPreview();
+    modal.style.display = 'flex';
+  }
+  window.openBMStockPrepareModal = openBMStockPrepareModal;
+
+  function closeBMStockPrepareModal() {
+    var modal = $('modal-bm-stock-prepare');
+    if (modal) modal.style.display = 'none';
+    _bmStockState.activePrepareItem = null;
+  }
+  window.closeBMStockPrepareModal = closeBMStockPrepareModal;
+
+  function setBMPreparePortions(val) {
+    var input = $('bm-prepare-portions');
+    if (input) {
+      input.value = val;
+      updateBMPrepareMaterialsPreview();
+    }
+  }
+  window.setBMPreparePortions = setBMPreparePortions;
+
+  function updateBMPrepareMaterialsPreview() {
+    var item = _bmStockState.activePrepareItem;
+    if (!item) return;
+    var recipe = (_bmStockState.recipes || []).find(function (r) { return r.output_product_id === item.product_id; });
+    if (!recipe || !Array.isArray(recipe.components)) return;
+
+    var portionsInput = $('bm-prepare-portions');
+    var portions = portionsInput ? Math.max(1, Number(portionsInput.value) || 1) : 1;
+    var yieldQty = Number(recipe.planned_yield_quantity) || 1;
+    var factor = portions / yieldQty;
+
+    var container = $('bm-prepare-components-list');
+    var warningEl = $('bm-prepare-warning');
+    var submitBtn = $('btn-bm-submit-prepare');
+    var hasShortage = false;
+
+    if (!container) return;
+
+    container.innerHTML = recipe.components.map(function (comp) {
+      var needed = Number(comp.planned_quantity) * factor;
+      var avail = Number(comp.branch_material_stock || 0);
+      var isShort = avail < needed;
+      if (isShort) hasShortage = true;
+
+      var neededFormatted = needed % 1 === 0 ? needed : needed.toFixed(2);
+      var availFormatted = avail % 1 === 0 ? avail : avail.toFixed(2);
+
+      return '<div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px dashed #e2e8f0;">' +
+        '<div>' +
+          '<strong>' + esc(comp.material_name) + '</strong>' +
+          '<div style="font-size:11px; color:' + (isShort ? '#b91c1c' : 'var(--text-muted)') + ';">' +
+            'Dibutuhkan: ' + neededFormatted + ' ' + esc(comp.planned_uom_name || '') +
+            ' • Ada: ' + availFormatted + ' ' + esc(comp.planned_uom_name || '') +
+          '</div>' +
+        '</div>' +
+        '<div>' +
+          (isShort
+            ? '<span class="x-badge x-badge-danger" style="font-size:10px;">KURANG</span>'
+            : '<span class="x-badge x-badge-success" style="font-size:10px;">CUKUP</span>') +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    if (warningEl) warningEl.style.display = hasShortage ? 'block' : 'none';
+    if (submitBtn) {
+      submitBtn.disabled = hasShortage;
+      submitBtn.style.opacity = hasShortage ? '0.5' : '1';
+      submitBtn.style.cursor = hasShortage ? 'not-allowed' : 'pointer';
+    }
+  }
+  window.updateBMPrepareMaterialsPreview = updateBMPrepareMaterialsPreview;
+
+  async function submitBMStockPrepare(e) {
+    if (e) e.preventDefault();
+    var user = getStoredUser();
+    var branchId = user ? (user.branch_id || user.branchId) : null;
+    if (!branchId) return;
+
+    var item = _bmStockState.activePrepareItem;
+    var productId = $('bm-prepare-product-id') ? $('bm-prepare-product-id').value : '';
+    if (!productId && item) productId = item.product_id;
+
+    var portionsInput = $('bm-prepare-portions');
+    var portions = portionsInput ? Number(portionsInput.value) : NaN;
+    var notes = $('bm-prepare-notes') ? $('bm-prepare-notes').value.trim() : '';
+
+    if (!productId || isNaN(portions) || portions <= 0) {
+      showToast('Masukkan jumlah porsi masak yang valid (> 0).');
+      return;
+    }
+
+    var submitBtn = $('btn-bm-submit-prepare');
+    if (submitBtn) submitBtn.disabled = true;
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/inventory/prepare', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          product_id: productId,
+          portions: portions,
+          notes: notes
+        })
+      });
+      var data = await res.json();
+
+      if (res.ok && data.success) {
+        showToast('🍳 Berhasil! ' + portions + ' porsi siap jual ditambahkan dan bahan baku telah dipotong.');
+        closeBMStockPrepareModal();
+        loadBMStock();
+      } else {
+        showToast('Gagal mencatat masak: ' + (data.message || data.error || 'Terjadi kesalahan'));
+      }
+    } catch (err) {
+      showToast('Kesalahan jaringan.');
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  }
+  window.submitBMStockPrepare = submitBMStockPrepare;
+
 })();
+

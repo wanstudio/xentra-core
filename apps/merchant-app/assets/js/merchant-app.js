@@ -42,6 +42,7 @@
     "menu":             { title: "Menu",             sub: "Ketersediaan produk dan operasional menu cabang",         tab: "bm-menu" },
     "promo":            { title: "Promo",            sub: "Promosi dan diskon operasional aktif cabang",             tab: "bm-promo" },
     "stok":             { title: "Stok",             sub: "Pemantauan stok dan peringatan inventaris cabang",        tab: "bm-stok" },
+    "belanja":          { title: "Belanja Pasar",    sub: "Catatan belanja pasar bahan baku dan hitung kasbon",      tab: "bm-belanja" },
     "staff":            { title: "Staff",            sub: "Daftar staf operasional dan kasir cabang",                tab: "bm-staff" },
     "reports":          { title: "Laporan",          sub: "Laporan penjualan dan operasional harian cabang",         tab: "bm-reports" },
     "jam-operasional":  { title: "Jam Operasional",  sub: "Jam operasional dan pengecualian libur cabang",           tab: "bm-jam-operasional" },
@@ -134,6 +135,7 @@
     if (tabId === 'bm-meja' && typeof loadBMTables === 'function') loadBMTables();
     if (tabId === 'bm-menu' && typeof loadBMMenu === 'function') loadBMMenu();
     if (tabId === 'bm-stok' && typeof loadBMStock === 'function') loadBMStock();
+    if (tabId === 'bm-belanja' && typeof loadPurchasingChecklist === 'function') loadPurchasingChecklist();
     if (tabId === 'bm-promo' && typeof loadBMPromotions === 'function') loadBMPromotions();
     if (tabId === 'hari-ini' && typeof loadHariIni === 'function') loadHariIni();
     if (tabId === 'bm-staff' && typeof loadBMStaff === 'function') loadBMStaff();
@@ -180,6 +182,11 @@
       "<button type=\"button\" class=\"x-nav-item\" data-route=\"stok\">" +
         "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z\"></path><polyline points=\"3.27 6.96 12 12.01 20.73 6.96\"></polyline><line x1=\"12\" y1=\"22.08\" x2=\"12\" y2=\"12\"></line></svg>" +
         "<span>Stok</span>" +
+      "</button>" +
+
+      "<button type=\"button\" class=\"x-nav-item\" data-route=\"belanja\">" +
+        "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"9\" cy=\"21\" r=\"1\"></circle><circle cx=\"20\" cy=\"21\" r=\"1\"></circle><path d=\"M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6\"></path></svg>" +
+        "<span>Belanja Pasar</span>" +
       "</button>" +
 
       "<div class=\"x-nav-group-label\" style=\"margin-top: 10px;\">TIM</div>" +
@@ -256,7 +263,24 @@
 
     if ($('dash-user-name')) $('dash-user-name').textContent = user.full_name || user.username || 'Branch Manager';
     if ($('dash-user-avatar')) $('dash-user-avatar').textContent = (user.full_name || user.username || 'B').charAt(0).toUpperCase();
-    if ($('dash-user-role')) $('dash-user-role').textContent = (user.role || 'branch_manager').toUpperCase();
+    var roleLabel = user.role === 'purchasing' ? 'Petugas Belanja' : (user.role || 'branch_manager').toUpperCase();
+    if ($('dash-user-role')) $('dash-user-role').textContent = roleLabel;
+
+    // Purchasing staff specific surface adjustments: clean, focus on Belanja & Stok
+    if (user.role === 'purchasing') {
+      var mobileNav = $('x-merchant-mobile-nav');
+      if (mobileNav) {
+        mobileNav.innerHTML =
+          '<button type="button" class="x-merchant-mobile-nav-item active" data-route="belanja" onclick="navigateTo(\'belanja\')">' +
+            '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>' +
+            '<span>Belanja Pasar</span>' +
+          '</button>' +
+          '<button type="button" class="x-merchant-mobile-nav-item" data-route="stok" onclick="navigateTo(\'stok\')">' +
+            '<svg viewBox="0 0 21 21" width="24" height="24" fill="currentColor"><path d="M7 7H8.75V5.24991C8.75 5.24991 8.75 4.19991 7.87432 4.19991C6.99863 4.19991 7 5.24991 7 5.24991V7ZM7 14.875C7 14.875 7 15.7499 7.87432 15.7499C8.74863 15.7499 8.75 14.875 8.75 14.875V10.5H7V14.875ZM5.25 19.25C4.76875 19.25 4.35692 19.0788 4.0145 18.7364C3.67208 18.394 3.50058 17.9818 3.5 17.5V9.625H17.5V17.5C17.5 17.9813 17.3288 18.3934 16.9864 18.7364C16.644 19.0794 16.2318 19.2506 15.75 19.25H5.25ZM3.5 7.875V3.5C3.5 3.01875 3.6715 2.60692 4.0145 2.2645C4.3575 1.92208 4.76933 1.75058 5.25 1.75H15.75C16.2313 1.75 16.6434 1.9215 16.9864 2.2645C17.3294 2.6075 17.5006 3.01933 17.5 3.5V7.875H3.5Z" fill="currentColor"/></svg>' +
+            '<span>Stok Gudang</span>' +
+          '</button>';
+      }
+    }
 
     var searchBtn = $('btn-global-search');
     if (searchBtn) searchBtn.style.display = 'none';
@@ -396,7 +420,12 @@
 
     applyRoleBasedUI();
     renderBranchManagerNavigation();
-    applyRoute(getCurrentRoute());
+
+    var currentRoute = getCurrentRoute();
+    if (user.role === 'purchasing' && (!window.location.hash || window.location.hash === '#hari-ini')) {
+      currentRoute = 'belanja';
+    }
+    applyRoute(currentRoute);
   }
 
   window.addEventListener('hashchange', function () { applyRoute(getCurrentRoute()); });

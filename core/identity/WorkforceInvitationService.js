@@ -5,7 +5,7 @@ const db = require('../../server/database/db');
 const { defaultEmailProvider } = require('./EmailProvider');
 
 const INVITATION_TTL_DAYS = 7;
-const ALLOWED_INVITATION_ROLES = ['brand_manager', 'branch_manager', 'cashier', 'kitchen', 'driver'];
+const ALLOWED_INVITATION_ROLES = ['brand_manager', 'branch_manager', 'cashier', 'kitchen', 'driver', 'purchasing'];
 
 function isValidEmail(email) {
   if (typeof email !== 'string') return false;
@@ -62,11 +62,11 @@ class WorkforceInvitationService {
     // Role ceiling: determine what roles this actor can invite
     let allowedRoles = [];
     if (actor.actor_role === 'owner') {
-      allowedRoles = ['brand_manager', 'branch_manager', 'cashier', 'kitchen', 'driver'];
+      allowedRoles = ['brand_manager', 'branch_manager', 'cashier', 'kitchen', 'driver', 'purchasing'];
     } else if (actor.actor_role === 'brand_manager') {
-      allowedRoles = ['branch_manager', 'cashier', 'kitchen'];
+      allowedRoles = ['branch_manager', 'cashier', 'kitchen', 'purchasing'];
     } else if (actor.actor_role === 'branch_manager') {
-      allowedRoles = ['cashier', 'kitchen'];
+      allowedRoles = ['cashier', 'kitchen', 'purchasing'];
     } else {
       throw { status: 403, code: 'FORBIDDEN_ROLE_CEILING', message: 'Actor cannot invite team members.' };
     }
@@ -112,9 +112,9 @@ class WorkforceInvitationService {
 
     // Scope requirement per role:
     // - branch_manager: MUST have a specific branch_id
-    // - cashier / kitchen: MUST have a specific branch_id
+    // - cashier / kitchen / driver / purchasing: MUST have a specific branch_id
     // - brand_manager: branch_id is null (brand-wide)
-    if (role === 'branch_manager' || role === 'cashier' || role === 'kitchen' || role === 'driver') {
+    if (role === 'branch_manager' || role === 'cashier' || role === 'kitchen' || role === 'driver' || role === 'purchasing') {
       if (!targetBranchId && actor.actor_role === 'branch_manager') {
         targetBranchId = actor.actor_branch_id;
       }

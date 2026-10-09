@@ -21,6 +21,7 @@ class RoleModel {
     CASHIER: 'cashier',
     KITCHEN: 'kitchen',
     DRIVER: 'driver',
+    PURCHASING: 'purchasing',
     CUSTOMER: 'customer'
   };
 

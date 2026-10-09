@@ -44,7 +44,7 @@ class WorkforceService {
     }
 
     // Validate role
-    const allowedRoles = ['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen', 'driver'];
+    const allowedRoles = ['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen', 'driver', 'purchasing'];
     if (!allowedRoles.includes(role)) {
       throw { status: 400, code: 'INVALID_ROLE', message: `Role must be one of: ${allowedRoles.join(', ')}` };
     }
@@ -60,9 +60,9 @@ class WorkforceService {
       throw { status: 409, code: 'USERNAME_EXISTS', message: 'Username already exists in this brand.' };
     }
 
-    // Driver accounts are always branch-scoped.
-    if (role === 'driver' && !branch_id) {
-      throw { status: 400, code: 'DRIVER_BRANCH_REQUIRED', message: 'Role Driver harus ditugaskan ke cabang tertentu.' };
+    // Driver and Purchasing accounts are always branch-scoped.
+    if ((role === 'driver' || role === 'purchasing') && !branch_id) {
+      throw { status: 400, code: 'BRANCH_REQUIRED', message: `Role ${role} harus ditugaskan ke cabang tertentu.` };
     }
 
     // Validate branch exists if provided
@@ -260,7 +260,7 @@ class WorkforceService {
     }
 
     // Validate new role
-    const allowedRoles = ['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen', 'driver'];
+    const allowedRoles = ['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen', 'driver', 'purchasing'];
     if (!allowedRoles.includes(newRole)) {
       throw { status: 400, code: 'INVALID_ROLE', message: `Role must be one of: ${allowedRoles.join(', ')}` };
     }
