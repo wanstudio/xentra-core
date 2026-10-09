@@ -146,9 +146,16 @@ function registerAdminInventoryWorkflowRoutes(router, deps = {}) {
 
   router.post('/admin/inventory-workflow/supplier-materials', authGate, (req, res) => {
     try {
+      const orgId = organizationId(req);
+      const supplierId = required(req.body && req.body.supplier_id, 'SUPPLIER_REQUIRED');
+      const materialId = required(req.body && req.body.material_id, 'MATERIAL_REQUIRED');
+      const supplier = procurementRepository.findSupplier(supplierId);
+      const material = materialRepository.findById(materialId);
+      if (!supplier || String(supplier.organization_id) !== orgId) throw fail('SUPPLIER_NOT_FOUND', 404);
+      if (!material || String(material.organization_id) !== orgId || material.status === 'ARCHIVED') throw fail('MATERIAL_NOT_FOUND', 404);
       const supplierMaterial = ProcurementService.createSupplierMaterial({
-        supplierId: required(req.body && req.body.supplier_id, 'SUPPLIER_REQUIRED'),
-        materialId: required(req.body && req.body.material_id, 'MATERIAL_REQUIRED'),
+        supplierId: supplierId,
+        materialId: materialId,
         supplierItemCode: req.body && req.body.supplier_item_code || null,
         repository: procurementRepository
       });
@@ -158,8 +165,12 @@ function registerAdminInventoryWorkflowRoutes(router, deps = {}) {
 
   router.post('/admin/inventory-workflow/supplier-packs', authGate, (req, res) => {
     try {
+      const orgId = organizationId(req);
+      const supplierMaterialId = required(req.body && req.body.supplier_material_id, 'SUPPLIER_MATERIAL_REQUIRED');
+      const supplierMaterial = procurementRepository.findSupplierMaterial(supplierMaterialId);
+      if (!supplierMaterial || String(supplierMaterial.organization_id) !== orgId || Number(supplierMaterial.is_active) !== 1) throw fail('SUPPLIER_MATERIAL_NOT_FOUND', 404);
       const supplierPack = ProcurementService.createSupplierMaterialPack({
-        supplierMaterialId: required(req.body && req.body.supplier_material_id, 'SUPPLIER_MATERIAL_REQUIRED'),
+        supplierMaterialId: supplierMaterialId,
         name: required(req.body && req.body.name, 'SUPPLIER_PACK_NAME_REQUIRED'),
         contentQuantityBase: positive(req.body && req.body.content_quantity, 'SUPPLIER_PACK_CONTENT_INVALID'),
         contentUomId: required(req.body && req.body.content_uom_id, 'SUPPLIER_PACK_UOM_REQUIRED'),
@@ -306,9 +317,12 @@ function registerAdminInventoryWorkflowRoutes(router, deps = {}) {
       if (requestedBatchId) {
         batch = productionRepository.findProductionBatch(requestedBatchId);
         if (!batch || String(batch.organization_id) !== orgId) throw fail('PRODUCTION_BATCH_NOT_FOUND', 404);
+        const batchItem = productionRepository.findProductionItem(batch.production_item_id);
         if (
+          !batchItem ||
+          String(batchItem.output_product_id) !== String(outputProductId) ||
           String(batch.production_stock_location_id) !== String(location.id) ||
-          String(batch.production_item_id) !== String((productionRepository.findProductionItemByProductAndLocation(outputProductId, location.id)[0] || {}).id)
+          Math.abs(Number(batch.planned_output_quantity) - plannedOutput) > 0.000001
         ) throw fail('PRODUCTION_BATCH_CONTEXT_MISMATCH');
         if (!['DRAFT', 'PLANNED', 'IN_PROGRESS', 'COMPLETED'].includes(batch.status)) throw fail('PRODUCTION_BATCH_STATUS_INVALID');
       } else {
