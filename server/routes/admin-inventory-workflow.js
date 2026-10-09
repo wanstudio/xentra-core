@@ -243,6 +243,26 @@ function registerAdminInventoryWorkflowRoutes(router, deps = {}) {
       if (!product || Number(product.is_active) !== 1 || String(product.organization_id) !== orgId || !String(product.sku || '').trim()) throw fail('PRODUCT_NOT_FOUND', 404);
       const components = req.body && req.body.components;
       if (!Array.isArray(components) || components.length === 0) throw fail('RECIPE_COMPONENTS_REQUIRED');
+      const existingRoute = productionRepository.findProductionItemByProductAndLocation(outputProductId, location.id);
+      if (existingRoute.length) throw fail('PRODUCTION_ROUTE_ALREADY_EXISTS');
+      const outputUomRow = db.queryOne('SELECT product_stock_uom_id FROM products WHERE id = ?', [outputProductId]);
+      const outputUom = outputUomRow && outputUomRow.product_stock_uom_id ? uomRepository.findById(outputUomRow.product_stock_uom_id) : null;
+      const yieldUomId = required(req.body && req.body.yield_uom_id, 'YIELD_UOM_REQUIRED');
+      const yieldUom = uomRepository.findById(yieldUomId);
+      if (!outputUom || Number(outputUom.is_active) !== 1) throw fail('PRODUCT_STOCK_UOM_UNRESOLVED');
+      if (!yieldUom || Number(yieldUom.is_active) !== 1 || String(yieldUom.category_id) !== String(outputUom.category_id)) throw fail('YIELD_UOM_CATEGORY_MISMATCH');
+      const seenMaterials = new Set();
+      components.forEach(function (line) {
+        const materialId = required(line.material_id, 'MATERIAL_REQUIRED');
+        if (seenMaterials.has(materialId)) throw fail('RECIPE_COMPONENT_DUPLICATE');
+        seenMaterials.add(materialId);
+        const material = materialRepository.findById(materialId);
+        const plannedUom = uomRepository.findById(required(line.planned_uom_id, 'RECIPE_COMPONENT_UOM_REQUIRED'));
+        const baseUom = material && uomRepository.findById(material.base_uom_id);
+        if (!material || material.status !== 'ACTIVE' || String(material.organization_id) !== orgId) throw fail('MATERIAL_NOT_FOUND');
+        if (!plannedUom || Number(plannedUom.is_active) !== 1 || !baseUom || String(plannedUom.category_id) !== String(baseUom.category_id)) throw fail('RECIPE_COMPONENT_UOM_CATEGORY_MISMATCH');
+        positive(line.planned_quantity, 'INVALID_RECIPE_COMPONENT_QUANTITY');
+      });
       const code = String(req.body.production_item_code || ('PRD-' + String(product.sku).replace(/[^A-Z0-9_-]/gi, '').toUpperCase() + '-' + Date.now().toString(36))).slice(0, 80);
       const recipeName = required(req.body && req.body.name, 'PRODUCTION_ITEM_NAME_REQUIRED');
       const item = ProductionService.createProductionItem({ organizationId: orgId, outputProductId: outputProductId, productionItemCode: code, name: recipeName, repository: productionRepository });
@@ -253,7 +273,7 @@ function registerAdminInventoryWorkflowRoutes(router, deps = {}) {
       const version = ProductionService.createRecipeVersion({
         recipeId: recipe.id,
         plannedYieldQuantity: positive(req.body.planned_yield_quantity, 'INVALID_YIELD_QUANTITY'),
-        yieldUomId: required(req.body && req.body.yield_uom_id, 'YIELD_UOM_REQUIRED'),
+        yieldUomId: yieldUomId,
         components: components.map(function (line, index) {
           return {
             material_id: required(line.material_id, 'MATERIAL_REQUIRED'),
