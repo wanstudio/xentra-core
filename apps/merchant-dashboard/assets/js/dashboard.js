@@ -7114,7 +7114,7 @@ async function loadMenusView() {
       });
       var quantity = balance ? Number(balance.quantity) : null;
       var minimum = policy ? Number(policy.minimum_quantity || 0) : (balance ? Number(balance.minimum_quantity || 0) : 0);
-      var target = policy ? Number(policy.target_quantity || 0) : (balance ? Number(balance.target_quantity || 0) : 0);
+      var target = policy ? Number(policy.target_quantity || 0) : (balance ? Math.max(Number(balance.target_quantity || 0), minimum) : minimum);
       var isBelowMinimum = policy ? (quantity === null ? 0 : quantity) <= minimum : (minimum > 0 && (quantity === null ? 0 : quantity) <= minimum);
       var status = isBelowMinimum ? (quantity === null ? 'Belum ada saldo · perlu restock/produksi' : 'Perlu restock/produksi') : (!balance ? 'Belum ada saldo' : 'Tercatat');
       var badge = isBelowMinimum ? 'x-badge-warning' : (!balance ? 'x-badge-muted' : 'x-badge-success');
@@ -7143,7 +7143,7 @@ async function loadMenusView() {
         return String(row.stock_location_id) === String(locationId) && row.identity_type === 'MATERIAL' && String(row.identity_id) === String(material.id);
       });
       var minimum = policy ? Number(policy.minimum_quantity || 0) : (balance ? Number(balance.minimum_quantity || 0) : 0);
-      var target = policy ? Number(policy.target_quantity || 0) : (balance ? Number(balance.target_quantity || 0) : 0);
+      var target = policy ? Number(policy.target_quantity || 0) : (balance ? Math.max(Number(balance.target_quantity || 0), minimum) : minimum);
       var quantity = balance ? Number(balance.quantity) : 0;
       var uom = balance ? balance.base_uom_name : (((state.uoms || []).find(function (item) { return String(item.id) === String(material.base_uom_id); }) || {}).name || '');
       if (locationId && (policy || minimum > 0) && quantity <= minimum) {
