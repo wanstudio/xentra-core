@@ -7152,7 +7152,8 @@ async function loadMenusView() {
     var html = alerts.length ? alerts.map(function (alert) {
       return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:10px 12px;margin:8px 0;border:1px solid #F3D28B;border-radius:8px;background:#FFFBEB;">' +
         '<div><strong>' + iwEsc(alert.name) + ' perlu diisi ulang</strong><div style="font-size:12px;color:#92400E;">Sisa ' + iwEsc(alert.quantity) + ' ' + iwEsc(alert.uom) + (alert.hasBalance ? '' : ' · saldo belum pernah diposting') + ' · minimum ' + iwEsc(alert.minimum) + ' · target ' + iwEsc(alert.target) + '</div></div>' +
-        '<span class="x-badge x-badge-warning">' + (alert.type === 'MATERIAL' ? 'Belanja bahan' : 'Produksi / restock') + '</span></div>';
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><span class="x-badge x-badge-warning">' + (alert.type === 'MATERIAL' ? 'Belanja bahan' : 'Produksi / restock') + '</span>' +
+        '<button type="button" class="x-btn-secondary" style="padding:6px 10px;" onclick="switchStockSubtab(\'' + (alert.type === 'MATERIAL' ? 'procurement' : 'production') + '\')">' + (alert.type === 'MATERIAL' ? 'Buka Pengadaan' : 'Buka Produksi') + '</button></div></div>';
     }).join('') : '<div class="x-owner-stock-empty">Tidak ada stok di bawah batas minimum pada lokasi ini. Atur minimum/target di tabel saldo untuk mengaktifkan peringatan.</div>';
     if (root) root.innerHTML = html;
     if (procurementRoot) procurementRoot.innerHTML = html;
