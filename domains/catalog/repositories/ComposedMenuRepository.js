@@ -361,14 +361,34 @@ class ComposedMenuRepository {
     const normalized = ids(productIds);
     if (!normalized.length) return [];
 
-    // Canonical Product Stock is authoritative when one unambiguous Branch
-    // Stock Location and a cost-bearing Product Stock Balance exist.
-    const locations = this.db.queryMany(
-      "SELECT id FROM stock_locations WHERE branch_id = ? AND location_type = 'BRANCH' AND is_active = 1 ORDER BY id",
-      [branchId]
-    );
-    const canonicalByProduct = new Map();
-    if (locations.length === 1) {
+    const legacyInventory = (idsToRead) => {
+      if (!idsToRead.length) return [];
+      return this.db.queryMany(
+        "SELECT bpi.branch_id, bpi.product_id, bpi.stock_qty, bpi.low_stock_threshold, p.sku " +
+        "FROM branch_product_inventory bpi JOIN products p ON p.id = bpi.product_id " +
+        "WHERE bpi.branch_id = ? AND bpi.product_id IN (" + placeholders(idsToRead.length) + ")",
+        [branchId, ...idsToRead]
+      );
+    };
+
+    // A branch with multiple active canonical stock locations is a configuration
+    // conflict. Fail closed so checkout cannot silently fall back to a competing
+    // legacy stock pool.
+    let locations;
+    try {
+      locations = this.db.queryMany(
+        "SELECT id FROM stock_locations WHERE branch_id = ? AND location_type = 'BRANCH' AND is_active = 1 ORDER BY id",
+        [branchId]
+      );
+    } catch (error) {
+      if (error && /no such table/i.test(error.message || '')) return legacyInventory(normalized);
+      throw error;
+    }
+
+    if (locations.length > 1) return [];
+    if (locations.length === 0) return legacyInventory(normalized);
+
+    try {
       const canonicalRows = this.db.queryMany(
         "SELECT sl.branch_id, psb.product_id, psb.quantity AS stock_qty, " +
         "COALESCE(rp.minimum_quantity, bpi.low_stock_threshold, 5) AS low_stock_threshold, p.sku " +
@@ -381,18 +401,15 @@ class ComposedMenuRepository {
         "WHERE sl.id = ? AND psb.product_id IN (" + placeholders(normalized.length) + ")",
         [locations[0].id, ...normalized]
       );
-      canonicalRows.forEach(row => canonicalByProduct.set(String(row.product_id), row));
+      const canonicalByProduct = new Map(canonicalRows.map(row => [String(row.product_id), row]));
+      const legacyIds = normalized.filter(productId => !canonicalByProduct.has(String(productId)));
+      const legacyRows = legacyInventory(legacyIds);
+      const legacyByProduct = new Map(legacyRows.map(row => [String(row.product_id), row]));
+      return normalized.map(productId => canonicalByProduct.get(String(productId)) || legacyByProduct.get(String(productId))).filter(Boolean);
+    } catch (error) {
+      if (error && /no such table/i.test(error.message || '')) return legacyInventory(normalized);
+      throw error;
     }
-
-    const legacyIds = normalized.filter(productId => !canonicalByProduct.has(String(productId)));
-    const legacyRows = legacyIds.length ? this.db.queryMany(
-      "SELECT bpi.branch_id, bpi.product_id, bpi.stock_qty, bpi.low_stock_threshold, p.sku " +
-      "FROM branch_product_inventory bpi JOIN products p ON p.id = bpi.product_id " +
-      "WHERE bpi.branch_id = ? AND bpi.product_id IN (" + placeholders(legacyIds.length) + ")",
-      [branchId, ...legacyIds]
-    ) : [];
-    const legacyByProduct = new Map(legacyRows.map(row => [String(row.product_id), row]));
-    return normalized.map(productId => canonicalByProduct.get(String(productId)) || legacyByProduct.get(String(productId))).filter(Boolean);
   }
 
   ensureInventoryRow({ branchId, productId, lowStockThreshold = 5 }) {
