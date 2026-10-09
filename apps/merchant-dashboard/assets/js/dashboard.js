@@ -6723,6 +6723,7 @@ async function loadMenusView() {
   }
 
   function loadOwnerStockOverview() {
+    if (!_inventoryWorkflowState) loadInventoryWorkflowContext();
     var root = $('tab-stock');
     var alertList = $('owner-stock-alerts-list');
     var branchList = $('owner-stock-branch-list');
@@ -6934,7 +6935,11 @@ async function loadMenusView() {
     if (options.body !== undefined) request.body = JSON.stringify(options.body);
     return adminFetch('/api/admin/inventory-workflow' + path, request).then(function (res) {
       return res.json().catch(function () { return {}; }).then(function (data) {
-        if (!res.ok || data.success === false) throw new Error(data.code || data.error || 'Permintaan inventory gagal.');
+        if (!res.ok || data.success === false) {
+          var requestError = new Error(data.code || data.error || 'Permintaan inventory gagal.');
+          if (data.batch_id) requestError.batchId = data.batch_id;
+          throw requestError;
+        }
         return data;
       });
     });
@@ -6994,6 +6999,8 @@ async function loadMenusView() {
     if ($('iw-po-lines') && !$('iw-po-lines').children.length) addIWPoLine();
     renderIWPoLines();
     if ($('iw-recipe-components') && !$('iw-recipe-components').children.length) addIWRecipeComponent();
+    onIWRecipeProductChange();
+    renderIWRecipeComponentOptions();
     renderIWMaterialStock();
     renderIWProductStock();
     renderIWLowStockAlerts();
@@ -7055,11 +7062,15 @@ async function loadMenusView() {
       var balance = (_inventoryWorkflowState.material_balances || []).find(function (item) {
         return String(item.stock_location_id) === String(locationId) && String(item.material_id) === String(material.id);
       });
+      var policy = (_inventoryWorkflowState.reorder_policies || []).find(function (item) {
+        return String(item.stock_location_id) === String(locationId) && item.identity_type === 'MATERIAL' && String(item.identity_id) === String(material.id);
+      });
       var quantity = balance ? Number(balance.quantity) : null;
-      var minimum = balance ? Number(balance.minimum_quantity || 0) : 0;
-      var target = balance ? Number(balance.target_quantity || 0) : 0;
-      var status = !balance ? 'Belum ada saldo' : (minimum > 0 && quantity <= minimum ? 'Perlu belanja' : 'Tercatat');
-      var badge = !balance ? 'x-badge-muted' : (minimum > 0 && quantity <= minimum ? 'x-badge-warning' : 'x-badge-success');
+      var minimum = policy ? Number(policy.minimum_quantity || 0) : (balance ? Number(balance.minimum_quantity || 0) : 0);
+      var target = policy ? Number(policy.target_quantity || 0) : (balance ? Number(balance.target_quantity || 0) : 0);
+      var isBelowMinimum = minimum > 0 && (quantity === null ? 0 : quantity) <= minimum;
+      var status = isBelowMinimum ? (quantity === null ? 'Belum ada saldo · perlu belanja' : 'Perlu belanja') : (!balance ? 'Belum ada saldo' : 'Tercatat');
+      var badge = isBelowMinimum ? 'x-badge-warning' : (!balance ? 'x-badge-muted' : 'x-badge-success');
       return '<tr><td><strong>' + iwEsc(material.name) + '</strong><div class="text-muted" style="font-size:11px;">' + iwEsc(material.material_code) + '</div></td>' +
         '<td>' + (quantity === null ? '—' : iwEsc(quantity)) + ' ' + iwEsc(balance ? balance.base_uom_name : (( _inventoryWorkflowState.uoms || []).find(function (u) { return u.id === material.base_uom_id; }) || {}).name || '') + '</td>' +
         '<td>' + (balance ? iwMoney(balance.carrying_value) : '—') + '</td>' +
@@ -7080,11 +7091,15 @@ async function loadMenusView() {
       var balance = (_inventoryWorkflowState.product_balances || []).find(function (item) {
         return String(item.stock_location_id) === String(locationId) && String(item.product_id) === String(product.id);
       });
+      var policy = (_inventoryWorkflowState.reorder_policies || []).find(function (item) {
+        return String(item.stock_location_id) === String(locationId) && item.identity_type === 'PRODUCT' && String(item.identity_id) === String(product.id);
+      });
       var quantity = balance ? Number(balance.quantity) : null;
-      var minimum = balance ? Number(balance.minimum_quantity || 0) : 0;
-      var target = balance ? Number(balance.target_quantity || 0) : 0;
-      var status = !balance ? 'Belum ada saldo' : (minimum > 0 && quantity <= minimum ? 'Perlu restock/produksi' : 'Tercatat');
-      var badge = !balance ? 'x-badge-muted' : (minimum > 0 && quantity <= minimum ? 'x-badge-warning' : 'x-badge-success');
+      var minimum = policy ? Number(policy.minimum_quantity || 0) : (balance ? Number(balance.minimum_quantity || 0) : 0);
+      var target = policy ? Number(policy.target_quantity || 0) : (balance ? Number(balance.target_quantity || 0) : 0);
+      var isBelowMinimum = minimum > 0 && (quantity === null ? 0 : quantity) <= minimum;
+      var status = isBelowMinimum ? (quantity === null ? 'Belum ada saldo · perlu restock/produksi' : 'Perlu restock/produksi') : (!balance ? 'Belum ada saldo' : 'Tercatat');
+      var badge = isBelowMinimum ? 'x-badge-warning' : (!balance ? 'x-badge-muted' : 'x-badge-success');
       return '<tr><td><strong>' + iwEsc(product.name) + '</strong><div class="text-muted" style="font-size:11px;">' + iwEsc(product.sku) + '</div></td>' +
         '<td>' + (quantity === null ? '—' : iwEsc(quantity)) + ' ' + iwEsc(product.stock_uom_name || '') + '</td>' +
         '<td>' + (balance ? iwMoney(balance.carrying_value) : '—') + '</td>' +
@@ -7101,20 +7116,42 @@ async function loadMenusView() {
     if (!state) return;
     var locationId = iwLocationId();
     var alerts = [];
-    (state.material_balances || []).forEach(function (row) {
-      if (String(row.stock_location_id) === String(locationId) && Number(row.minimum_quantity) > 0 && Number(row.quantity) <= Number(row.minimum_quantity)) {
-        alerts.push({ type: 'MATERIAL', name: row.material_name, quantity: row.quantity, uom: row.base_uom_name, target: row.target_quantity, minimum: row.minimum_quantity });
+
+    (state.materials || []).forEach(function (material) {
+      var balance = (state.material_balances || []).find(function (row) {
+        return String(row.stock_location_id) === String(locationId) && String(row.material_id) === String(material.id);
+      });
+      var policy = (state.reorder_policies || []).find(function (row) {
+        return String(row.stock_location_id) === String(locationId) && row.identity_type === 'MATERIAL' && String(row.identity_id) === String(material.id);
+      });
+      var minimum = policy ? Number(policy.minimum_quantity || 0) : (balance ? Number(balance.minimum_quantity || 0) : 0);
+      var target = policy ? Number(policy.target_quantity || 0) : (balance ? Number(balance.target_quantity || 0) : 0);
+      var quantity = balance ? Number(balance.quantity) : 0;
+      var uom = balance ? balance.base_uom_name : (((state.uoms || []).find(function (item) { return String(item.id) === String(material.base_uom_id); }) || {}).name || '');
+      if (locationId && minimum > 0 && quantity <= minimum) {
+        alerts.push({ type: 'MATERIAL', id: material.id, name: material.name, quantity: quantity, uom: uom, target: target, minimum: minimum, hasBalance: Boolean(balance) });
       }
     });
-    (state.product_balances || []).forEach(function (row) {
-      if (String(row.stock_location_id) === String(locationId) && Number(row.minimum_quantity) > 0 && Number(row.quantity) <= Number(row.minimum_quantity)) {
-        var product = (state.products || []).find(function (item) { return String(item.id) === String(row.product_id); }) || {};
-        alerts.push({ type: 'PRODUCT', name: row.product_name, quantity: row.quantity, uom: product.stock_uom_name || 'unit', target: row.target_quantity, minimum: row.minimum_quantity });
+
+    (state.products || []).forEach(function (product) {
+      if (!product.product_stock_uom_id) return;
+      var balance = (state.product_balances || []).find(function (row) {
+        return String(row.stock_location_id) === String(locationId) && String(row.product_id) === String(product.id);
+      });
+      var policy = (state.reorder_policies || []).find(function (row) {
+        return String(row.stock_location_id) === String(locationId) && row.identity_type === 'PRODUCT' && String(row.identity_id) === String(product.id);
+      });
+      var minimum = policy ? Number(policy.minimum_quantity || 0) : (balance ? Number(balance.minimum_quantity || 0) : 0);
+      var target = policy ? Number(policy.target_quantity || 0) : (balance ? Number(balance.target_quantity || 0) : 0);
+      var quantity = balance ? Number(balance.quantity) : 0;
+      if (locationId && minimum > 0 && quantity <= minimum) {
+        alerts.push({ type: 'PRODUCT', id: product.id, name: product.name, quantity: quantity, uom: product.stock_uom_name || 'unit', target: target, minimum: minimum, hasBalance: Boolean(balance) });
       }
     });
+
     var html = alerts.length ? alerts.map(function (alert) {
       return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:10px 12px;margin:8px 0;border:1px solid #F3D28B;border-radius:8px;background:#FFFBEB;">' +
-        '<div><strong>' + iwEsc(alert.name) + ' perlu diisi ulang</strong><div style="font-size:12px;color:#92400E;">Sisa ' + iwEsc(alert.quantity) + ' ' + iwEsc(alert.uom) + ' · minimum ' + iwEsc(alert.minimum) + ' · target ' + iwEsc(alert.target) + '</div></div>' +
+        '<div><strong>' + iwEsc(alert.name) + ' perlu diisi ulang</strong><div style="font-size:12px;color:#92400E;">Sisa ' + iwEsc(alert.quantity) + ' ' + iwEsc(alert.uom) + (alert.hasBalance ? '' : ' · saldo belum pernah diposting') + ' · minimum ' + iwEsc(alert.minimum) + ' · target ' + iwEsc(alert.target) + '</div></div>' +
         '<span class="x-badge x-badge-warning">' + (alert.type === 'MATERIAL' ? 'Belanja bahan' : 'Produksi / restock') + '</span></div>';
     }).join('') : '<div class="x-owner-stock-empty">Tidak ada stok di bawah batas minimum pada lokasi ini. Atur minimum/target di tabel saldo untuk mengaktifkan peringatan.</div>';
     if (root) root.innerHTML = html;
@@ -7353,29 +7390,81 @@ async function loadMenusView() {
       if (qty > 0) consumptions.push({ material_id: input.getAttribute('data-iw-batch-material'), source_uom_id: input.getAttribute('data-iw-batch-uom'), actual_quantity: qty });
     });
     if (!consumptions.length) return showToast('Masukkan pemakaian bahan aktual.', 'warning');
-    var postingId = (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : ('prod_' + Date.now() + '_' + Math.random().toString(36).slice(2));
-    iwRequest('/production-batches', { method: 'POST', body: {
+    var batchId = $('iw-batch-id') ? $('iw-batch-id').value.trim() : '';
+    var postingInput = $('iw-batch-posting-id');
+    var postingId = postingInput && postingInput.value.trim();
+    if (!postingId) {
+      postingId = (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : ('prod_' + Date.now() + '_' + Math.random().toString(36).slice(2));
+      if (postingInput) postingInput.value = postingId;
+    }
+    var payload = {
       stock_location_id: locationId, output_product_id: recipe.output_product_id,
       planned_output_quantity: Number($('iw-batch-planned-output').value),
       actual_output_quantity: Number($('iw-batch-actual-output').value),
       actual_consumptions: consumptions, production_posting_id: postingId, currency_code: 'IDR'
-    }}).then(function (result) {
+    };
+    if (batchId) payload.production_batch_id = batchId;
+    iwRequest('/production-batches', { method: 'POST', body: payload }).then(function (result) {
       var snapshot = result.posting && result.posting.snapshot || {};
       showToast('Produksi diposting: stok bahan berkurang dan stok produk bertambah. Biaya bahan aktual ' + iwMoney(snapshot.actual_material_cost) + '.', 'success');
       $('iw-form-batch').reset();
+      if ($('iw-batch-id')) $('iw-batch-id').value = '';
+      if ($('iw-batch-posting-id')) $('iw-batch-posting-id').value = '';
+      var note = $('iw-batch-resume-note');
+      if (note) { note.style.display = 'none'; note.textContent = ''; }
       return loadInventoryWorkflowContext();
-    }).catch(function (error) { showToast('Produksi gagal diposting: ' + error.message, 'error'); });
+    }).catch(function (error) {
+      if (error.batchId) {
+        if ($('iw-batch-id')) $('iw-batch-id').value = error.batchId;
+        var note = $('iw-batch-resume-note');
+        if (note) {
+          note.style.display = 'block';
+          note.textContent = 'Batch ' + error.batchId + ' belum selesai. Perbaiki penyebabnya lalu coba lagi; sistem akan melanjutkan batch yang sama, bukan membuat batch baru.';
+        }
+        showToast('Batch belum diposting: ' + error.message + '. Batch yang sama disimpan untuk dicoba ulang.', 'warning');
+        loadInventoryWorkflowContext();
+      } else {
+        showToast('Produksi gagal diposting: ' + error.message, 'error');
+      }
+    });
+  }
+  function resumeIWProductionBatch(batchId) {
+    var batch = (_inventoryWorkflowState && _inventoryWorkflowState.batches || []).find(function (item) { return String(item.id) === String(batchId); });
+    if (!batch || batch.status !== 'IN_PROGRESS') return showToast('Hanya batch yang sedang berjalan yang dapat dilanjutkan.', 'warning');
+    var recipe = (_inventoryWorkflowState.recipes || []).find(function (item) { return String(item.recipe_version_id) === String(batch.recipe_version_id); });
+    if (!recipe) return showToast('Resep versi batch ini tidak tersedia. Perlu pemeriksaan data.', 'error');
+    if (String(batch.production_stock_location_id) !== String(iwLocationId())) return showToast('Pilih lokasi stok tempat batch ini dibuat terlebih dahulu.', 'warning');
+    if ($('iw-batch-id')) $('iw-batch-id').value = batch.id;
+    if ($('iw-batch-posting-id')) $('iw-batch-posting-id').value = batch.production_posting_id || '';
+    if ($('iw-batch-recipe')) $('iw-batch-recipe').value = batch.recipe_version_id;
+    if ($('iw-batch-planned-output')) $('iw-batch-planned-output').value = batch.planned_output_quantity;
+    if ($('iw-batch-actual-output')) $('iw-batch-actual-output').value = batch.actual_output_quantity || batch.planned_output_quantity;
+    renderIWBatchComponents();
+    var note = $('iw-batch-resume-note');
+    if (note) {
+      note.style.display = 'block';
+      note.textContent = 'Melanjutkan batch ' + batch.id + '. Masukkan kembali pemakaian aktual jika belum tersimpan.';
+    }
+    switchStockSubtab('production');
+    showToast('Batch dipilih untuk dilanjutkan. Periksa pemakaian aktual sebelum memposting.', 'success');
   }
   function renderIWProductionBatches() {
     var root = $('iw-production-batch-list');
     if (!root || !_inventoryWorkflowState) return;
-    var rows = (_inventoryWorkflowState.batches || []).map(function (batch) {
+    var currentLocation = iwLocationId();
+    var batches = (_inventoryWorkflowState.batches || []).filter(function (batch) {
+      return !currentLocation || String(batch.production_stock_location_id) === String(currentLocation);
+    });
+    var rows = batches.map(function (batch) {
+      var action = batch.status === 'IN_PROGRESS'
+        ? '<button type="button" class="x-btn-primary" onclick="resumeIWProductionBatch(\'' + iwEsc(batch.id) + '\')">Lanjutkan</button>'
+        : '';
       return '<tr><td><strong>' + iwEsc(batch.production_item_name) + '</strong><div style="font-size:11px;color:#64748B;">' + iwEsc(batch.id) + '</div></td>' +
         '<td>' + iwEsc(batch.planned_output_quantity) + ' rencana / ' + (batch.actual_output_quantity == null ? '—' : iwEsc(batch.actual_output_quantity)) + ' aktual</td>' +
         '<td><span class="x-badge ' + (batch.status === 'COMPLETED' ? 'x-badge-success' : 'x-badge-warning') + '">' + iwEsc(batch.status) + '</span></td>' +
-        '<td>' + (batch.production_output_unit_cost == null ? '—' : iwMoney(batch.production_output_unit_cost) + ' per unit') + '</td></tr>';
+        '<td>' + (batch.production_output_unit_cost == null ? '—' : iwMoney(batch.production_output_unit_cost) + ' per unit') + '</td><td>' + action + '</td></tr>';
     }).join('');
-    root.innerHTML = rows ? '<table class="x-table"><thead><tr><th>Produksi</th><th>Jumlah hasil</th><th>Status</th><th>Biaya produk</th></tr></thead><tbody>' + rows + '</tbody></table>' : '<div class="x-owner-stock-empty">Belum ada batch produksi.</div>';
+    root.innerHTML = rows ? '<table class="x-table"><thead><tr><th>Produksi</th><th>Jumlah hasil</th><th>Status</th><th>Biaya produk</th><th>Aksi</th></tr></thead><tbody>' + rows + '</tbody></table>' : '<div class="x-owner-stock-empty">Belum ada batch produksi.</div>';
   }
 
   window.switchStockSubtab = switchStockSubtab;
@@ -7399,6 +7488,7 @@ async function loadMenusView() {
   window.submitIWRecipe = submitIWRecipe;
   window.renderIWBatchComponents = renderIWBatchComponents;
   window.submitIWProductionBatch = submitIWProductionBatch;
+  window.resumeIWProductionBatch = resumeIWProductionBatch;
 
   function loadOwnerUoms() {
     return adminFetch('/api/admin/uoms', { headers: getAuthHeaders() })
