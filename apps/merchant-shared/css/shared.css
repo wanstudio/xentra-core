@@ -754,3 +754,43 @@ a:focus:not(:focus-visible),
     border-top: 1px solid var(--border-color, #e2e8f0);
   }
 }
+
+/* ==========================================================================
+   PASSWORD INPUT WITH VISIBILITY TOGGLE (EYE ICON)
+   ========================================================================== */
+.x-password-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.x-password-wrap .x-input {
+  width: 100%;
+  padding-right: 44px !important;
+}
+
+.x-btn-toggle-pw {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-muted, #64748b);
+  cursor: pointer;
+  padding: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: color 0.15s ease, background 0.15s ease;
+  z-index: 2;
+  user-select: none;
+}
+
+.x-btn-toggle-pw:hover {
+  color: var(--text-main, #0f172a);
+  background: rgba(0, 0, 0, 0.04);
+}
+

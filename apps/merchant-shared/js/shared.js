@@ -347,6 +347,38 @@
     }
   }
 
+  /**
+   * Binds toggle eye functionality for password inputs with class .x-btn-toggle-pw.
+   * Can be invoked anytime or auto-initialized on DOMContentLoaded.
+   */
+  function setupPasswordToggle(container) {
+    var root = container || document;
+    root.querySelectorAll('.x-btn-toggle-pw').forEach(function (btn) {
+      if (btn.dataset.pwBound) return;
+      btn.dataset.pwBound = '1';
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        var targetId = btn.getAttribute('data-target');
+        var input = targetId ? document.getElementById(targetId) : btn.parentElement.querySelector('input');
+        if (!input) return;
+        var isPw = input.type === 'password';
+        input.type = isPw ? 'text' : 'password';
+        var openIcon = btn.querySelector('.x-icon-eye-open');
+        var closedIcon = btn.querySelector('.x-icon-eye-closed');
+        if (openIcon && closedIcon) {
+          openIcon.style.display = isPw ? 'none' : '';
+          closedIcon.style.display = isPw ? '' : 'none';
+        }
+      });
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { setupPasswordToggle(); });
+  } else {
+    setupPasswordToggle();
+  }
+
   /* =========================================================================
      EXPORTS
      ========================================================================= */
@@ -369,7 +401,8 @@
     $:                  $,
     formatMoney:        formatMoney,
     esc:                esc,
-    showToast:          showToast
+    showToast:          showToast,
+    setupPasswordToggle: setupPasswordToggle
   };
 
 

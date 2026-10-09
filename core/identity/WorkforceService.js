@@ -125,10 +125,11 @@ class WorkforceService {
   updateUser(userId, brandId, updates, { actor_id, actor_role } = {}) {
     const user = this.getUser(userId, brandId);
 
-    // Brand Manager can only update Cashier profiles
+    // Brand Manager can only update branch operational profiles (cashier, kitchen, driver, purchasing)
     if (actor_role === 'brand_manager') {
-      if (user.role !== 'cashier') {
-        throw { status: 403, code: 'FORBIDDEN_ROLE_CEILING', message: 'Managers can only update Cashier accounts.' };
+      const manageableRoles = ['cashier', 'kitchen', 'driver', 'purchasing'];
+      if (!manageableRoles.includes(user.role)) {
+        throw { status: 403, code: 'FORBIDDEN_ROLE_CEILING', message: 'Managers can only update operational staff accounts.' };
       }
     }
 
@@ -166,13 +167,14 @@ class WorkforceService {
       }
     }
 
-    // Authorization: Manager can only disable Cashier within own branch
+    // Authorization: Manager can only disable operational staff within own branch
     if (actor_role === 'branch_manager' || actor_role === 'brand_manager') {
-      if (target.role !== 'cashier') {
-        throw { status: 403, code: 'FORBIDDEN_ROLE_CEILING', message: 'Managers can only disable Cashier accounts.' };
+      const manageableRoles = ['cashier', 'kitchen', 'driver', 'purchasing'];
+      if (!manageableRoles.includes(target.role)) {
+        throw { status: 403, code: 'FORBIDDEN_ROLE_CEILING', message: 'Managers can only disable operational staff accounts.' };
       }
       if (actor_role === 'branch_manager' && target.branch_id !== actor_branch_id) {
-        throw { status: 403, code: 'FORBIDDEN_BRANCH_SCOPE', message: 'Managers can only disable Cashier accounts within their branch.' };
+        throw { status: 403, code: 'FORBIDDEN_BRANCH_SCOPE', message: 'Managers can only disable staff accounts within their branch.' };
       }
     }
 
@@ -185,13 +187,14 @@ class WorkforceService {
   enableUser(targetUserId, brandId, { actor_id, actor_role, actor_branch_id }) {
     const target = this.getUser(targetUserId, brandId);
 
-    // Authorization: Manager can only enable Cashier within own branch
+    // Authorization: Manager can only enable operational staff within own branch
     if (actor_role === 'branch_manager' || actor_role === 'brand_manager') {
-      if (target.role !== 'cashier') {
-        throw { status: 403, code: 'FORBIDDEN_ROLE_CEILING', message: 'Managers can only enable Cashier accounts.' };
+      const manageableRoles = ['cashier', 'kitchen', 'driver', 'purchasing'];
+      if (!manageableRoles.includes(target.role)) {
+        throw { status: 403, code: 'FORBIDDEN_ROLE_CEILING', message: 'Managers can only enable operational staff accounts.' };
       }
       if (actor_role === 'branch_manager' && target.branch_id !== actor_branch_id) {
-        throw { status: 403, code: 'FORBIDDEN_BRANCH_SCOPE', message: 'Managers can only enable Cashier accounts within their branch.' };
+        throw { status: 403, code: 'FORBIDDEN_BRANCH_SCOPE', message: 'Managers can only enable staff accounts within their branch.' };
       }
     }
 
@@ -290,24 +293,26 @@ class WorkforceService {
   changeUserScope(targetUserId, brandId, newBranchId, { actor_id, actor_role, actor_branch_id }) {
     const target = this.getUser(targetUserId, brandId);
 
-    // Brand Manager can only change scope of Cashier (not other managers/owner)
+    // Brand Manager can only change scope of operational staff (not other managers/owner)
     if (actor_role === 'brand_manager') {
-      if (target.role !== 'cashier') {
-        throw { status: 403, code: 'FORBIDDEN_ROLE_CEILING', message: 'Managers can only change scope of Cashier accounts.' };
+      const manageableRoles = ['cashier', 'kitchen', 'driver', 'purchasing'];
+      if (!manageableRoles.includes(target.role)) {
+        throw { status: 403, code: 'FORBIDDEN_ROLE_CEILING', message: 'Managers can only change scope of operational staff accounts.' };
       }
     }
 
-    // Branch Manager can only change scope of Cashier within own branch
+    // Branch Manager can only change scope of operational staff within own branch
     if (actor_role === 'branch_manager') {
-      if (target.role !== 'cashier') {
-        throw { status: 403, code: 'FORBIDDEN_ROLE_CEILING', message: 'Managers can only change scope of Cashier accounts.' };
+      const manageableRoles = ['cashier', 'kitchen', 'driver', 'purchasing'];
+      if (!manageableRoles.includes(target.role)) {
+        throw { status: 403, code: 'FORBIDDEN_ROLE_CEILING', message: 'Managers can only change scope of operational staff accounts.' };
       }
       if (target.branch_id !== actor_branch_id) {
-        throw { status: 403, code: 'FORBIDDEN_BRANCH_SCOPE', message: 'Managers can only change scope of Cashier accounts within their branch.' };
+        throw { status: 403, code: 'FORBIDDEN_BRANCH_SCOPE', message: 'Managers can only change scope of staff accounts within their branch.' };
       }
       // Manager cannot assign to a different branch
       if (newBranchId && newBranchId !== actor_branch_id) {
-        throw { status: 403, code: 'FORBIDDEN_SCOPE_ESCALATION', message: 'Managers cannot assign Cashier to a different branch.' };
+        throw { status: 403, code: 'FORBIDDEN_SCOPE_ESCALATION', message: 'Managers cannot assign staff to a different branch.' };
       }
     }
 
@@ -371,18 +376,19 @@ class WorkforceService {
     }
 
     // Authorization checks
+    const manageableRoles = ['cashier', 'kitchen', 'driver', 'purchasing'];
     if (actor_role === 'brand_manager') {
-      if (target.role !== 'cashier') {
-        throw { status: 403, code: 'FORBIDDEN_ROLE_CEILING', message: 'Managers can only reset Cashier passwords.' };
+      if (!manageableRoles.includes(target.role)) {
+        throw { status: 403, code: 'FORBIDDEN_ROLE_CEILING', message: 'Managers can only reset operational staff passwords.' };
       }
     }
 
     if (actor_role === 'branch_manager') {
-      if (target.role !== 'cashier') {
-        throw { status: 403, code: 'FORBIDDEN_ROLE_CEILING', message: 'Managers can only reset Cashier passwords.' };
+      if (!manageableRoles.includes(target.role)) {
+        throw { status: 403, code: 'FORBIDDEN_ROLE_CEILING', message: 'Managers can only reset operational staff passwords.' };
       }
       if (target.branch_id !== actor_branch_id) {
-        throw { status: 403, code: 'FORBIDDEN_BRANCH_SCOPE', message: 'Managers can only reset Cashier passwords within their branch.' };
+        throw { status: 403, code: 'FORBIDDEN_BRANCH_SCOPE', message: 'Managers can only reset staff passwords within their branch.' };
       }
     }
 
