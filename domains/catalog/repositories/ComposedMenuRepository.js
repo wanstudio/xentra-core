@@ -360,12 +360,39 @@ class ComposedMenuRepository {
   getInventory({ branchId, productIds }) {
     const normalized = ids(productIds);
     if (!normalized.length) return [];
-    return this.db.queryMany(
+
+    // Canonical Product Stock is authoritative when one unambiguous Branch
+    // Stock Location and a cost-bearing Product Stock Balance exist.
+    const locations = this.db.queryMany(
+      "SELECT id FROM stock_locations WHERE branch_id = ? AND location_type = 'BRANCH' AND is_active = 1 ORDER BY id",
+      [branchId]
+    );
+    const canonicalByProduct = new Map();
+    if (locations.length === 1) {
+      const canonicalRows = this.db.queryMany(
+        "SELECT sl.branch_id, psb.product_id, psb.quantity AS stock_qty, " +
+        "COALESCE(rp.minimum_quantity, bpi.low_stock_threshold, 5) AS low_stock_threshold, p.sku " +
+        "FROM product_stock_balances psb " +
+        "JOIN stock_locations sl ON sl.id = psb.stock_location_id " +
+        "JOIN products p ON p.id = psb.product_id " +
+        "LEFT JOIN inventory_reorder_policies rp ON rp.stock_location_id = sl.id " +
+        "AND rp.identity_type = 'PRODUCT' AND rp.identity_id = psb.product_id " +
+        "LEFT JOIN branch_product_inventory bpi ON bpi.branch_id = sl.branch_id AND bpi.product_id = psb.product_id " +
+        "WHERE sl.id = ? AND psb.product_id IN (" + placeholders(normalized.length) + ")",
+        [locations[0].id, ...normalized]
+      );
+      canonicalRows.forEach(row => canonicalByProduct.set(String(row.product_id), row));
+    }
+
+    const legacyIds = normalized.filter(productId => !canonicalByProduct.has(String(productId)));
+    const legacyRows = legacyIds.length ? this.db.queryMany(
       "SELECT bpi.branch_id, bpi.product_id, bpi.stock_qty, bpi.low_stock_threshold, p.sku " +
       "FROM branch_product_inventory bpi JOIN products p ON p.id = bpi.product_id " +
-      "WHERE bpi.branch_id = ? AND bpi.product_id IN (" + placeholders(normalized.length) + ")",
-      [branchId, ...normalized]
-    );
+      "WHERE bpi.branch_id = ? AND bpi.product_id IN (" + placeholders(legacyIds.length) + ")",
+      [branchId, ...legacyIds]
+    ) : [];
+    const legacyByProduct = new Map(legacyRows.map(row => [String(row.product_id), row]));
+    return normalized.map(productId => canonicalByProduct.get(String(productId)) || legacyByProduct.get(String(productId))).filter(Boolean);
   }
 
   ensureInventoryRow({ branchId, productId, lowStockThreshold = 5 }) {
