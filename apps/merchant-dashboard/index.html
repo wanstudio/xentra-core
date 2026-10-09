@@ -2568,8 +2568,27 @@
               Stok Cabang (Produk Jadi)
             </button>
             <button type="button" class="x-subnav-tab" id="btn-subtab-stock-materials" data-subtab="materials" onclick="switchStockSubtab('materials')">
-              Bahan Baku (Materials)
+              Bahan Baku & Saldo
             </button>
+            <button type="button" class="x-subnav-tab" id="btn-subtab-stock-procurement" data-subtab="procurement" onclick="switchStockSubtab('procurement')">
+              Pengadaan
+            </button>
+            <button type="button" class="x-subnav-tab" id="btn-subtab-stock-production" data-subtab="production" onclick="switchStockSubtab('production')">
+              Produksi
+            </button>
+          </div>
+
+          <div id="iw-stock-location-toolbar" class="x-owner-stock-panel" style="display:flex;flex-wrap:wrap;align-items:end;gap:12px;margin-bottom:16px;">
+            <div style="flex:1;min-width:180px;">
+              <label for="iw-stock-branch" style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:6px;">Cabang operasional</label>
+              <select id="iw-stock-branch" class="x-input" onchange="onIWBranchChange()" style="width:100%;"><option value="">Pilih cabang...</option></select>
+            </div>
+            <div style="flex:1;min-width:220px;">
+              <label for="iw-stock-location" style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:6px;">Lokasi stok</label>
+              <select id="iw-stock-location" class="x-input" onchange="onIWLocationChange()" style="width:100%;"><option value="">Pilih lokasi stok...</option></select>
+            </div>
+            <button type="button" class="x-btn-secondary" onclick="ensureIWStockLocation()">Siapkan Lokasi Cabang</button>
+            <button type="button" class="x-btn-secondary" onclick="loadInventoryWorkflowContext()">Segarkan Data</button>
           </div>
 
           <!-- SUBTAB CONTENT 1: STOK CABANG -->
@@ -2660,8 +2679,15 @@
             </div>
           </div>
 
-          <!-- SUBTAB CONTENT 2: BAHAN BAKU (MATERIALS) -->
+          <!-- SUBTAB CONTENT 2: BAHAN BAKU + SALDO MATERIAL CANONICAL -->
           <div id="subtab-content-stock-materials" style="display:none;">
+            <section class="x-owner-stock-panel" style="margin-bottom:16px;">
+              <div class="x-owner-stock-panel-head">
+                <div><h3>Saldo Bahan Baku</h3><p>Jumlah fisik tercatat, nilai persediaan, dan pengingat belanja berdasarkan batas minimum.</p></div>
+              </div>
+              <div id="iw-low-stock-alerts" aria-live="polite"></div>
+              <div id="iw-material-stock-table" class="x-table-responsive"><div class="x-owner-stock-loading">Memuat saldo bahan...</div></div>
+            </section>
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
               <div>
                 <h3 style="margin:0 0 4px 0; font-size:16px; font-weight:700; color:#0F172A;">Katalog Bahan Baku (Material Master)</h3>
@@ -2678,6 +2704,111 @@
                 <div class="x-owner-stock-loading">Memuat daftar bahan baku...</div>
               </div>
             </div>
+          </div>
+
+          <!-- SUBTAB CONTENT 3: PENGADAAN -->
+          <div id="subtab-content-stock-procurement" style="display:none;">
+            <section class="x-owner-stock-panel" style="margin-bottom:16px;">
+              <div class="x-owner-stock-panel-head"><div><h3>Perlu Ditindaklanjuti</h3><p>Stok di bawah batas minimum. Tentukan jumlah pengisian kembali lalu buat PO.</p></div></div>
+              <div id="iw-procurement-alerts"><div class="x-owner-stock-empty">Pilih cabang dan lokasi stok.</div></div>
+            </section>
+
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:16px;">
+              <section class="x-owner-stock-panel">
+                <div class="x-owner-stock-panel-head"><div><h3>1. Tambah Pemasok</h3><p>Daftarkan pihak tempat bahan dibeli.</p></div></div>
+                <form id="iw-form-supplier" onsubmit="submitIWSupplier(event)" style="display:grid;gap:10px;">
+                  <label>Kode pemasok<input class="x-input" id="iw-supplier-code" required placeholder="SUP-001"></label>
+                  <label>Nama pemasok<input class="x-input" id="iw-supplier-name" required placeholder="Supplier ayam"></label>
+                  <button type="submit" class="x-btn-primary">Simpan Pemasok</button>
+                </form>
+              </section>
+
+              <section class="x-owner-stock-panel">
+                <div class="x-owner-stock-panel-head"><div><h3>2. Hubungkan Bahan ke Pemasok</h3><p>Hubungan ini menyimpan kode barang dari pemasok.</p></div></div>
+                <form id="iw-form-supplier-material" onsubmit="submitIWSupplierMaterial(event)" style="display:grid;gap:10px;">
+                  <label>Pemasok<select class="x-input" id="iw-map-supplier" required></select></label>
+                  <label>Bahan baku<select class="x-input" id="iw-map-material" required></select></label>
+                  <label>Kode barang pemasok (opsional)<input class="x-input" id="iw-map-item-code" placeholder="Kode pada faktur"></label>
+                  <button type="submit" class="x-btn-primary">Hubungkan Bahan</button>
+                </form>
+              </section>
+
+              <section class="x-owner-stock-panel">
+                <div class="x-owner-stock-panel-head"><div><h3>3. Satuan Beli & Harga</h3><p>Contoh: 1 karung = 25 kg beras.</p></div></div>
+                <form id="iw-form-supplier-pack" onsubmit="submitIWSupplierPack(event)" style="display:grid;gap:10px;">
+                  <label>Bahan dari pemasok<select class="x-input" id="iw-pack-supplier-material" required></select></label>
+                  <label>Nama satuan/kemasan<input class="x-input" id="iw-pack-name" required placeholder="Karung 25 kg"></label>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                    <label>Isi kemasan<input type="number" min="0.000001" step="any" class="x-input" id="iw-pack-content" required value="1"></label>
+                    <label>Satuan isi<select class="x-input" id="iw-pack-uom" required></select></label>
+                  </div>
+                  <div style="display:grid;grid-template-columns:1fr 100px;gap:8px;">
+                    <label>Harga per kemasan (Rp)<input type="number" min="0" step="any" class="x-input" id="iw-pack-price" required placeholder="350000"></label>
+                    <label>Min. beli<input type="number" min="1" step="1" class="x-input" id="iw-pack-minimum" value="1" required></label>
+                  </div>
+                  <button type="submit" class="x-btn-primary">Simpan Satuan Beli</button>
+                </form>
+              </section>
+            </div>
+
+            <section class="x-owner-stock-panel" style="margin-bottom:16px;">
+              <div class="x-owner-stock-panel-head"><div><h3>4. Buat Purchase Order</h3><p>PO mencatat apa yang dipesan. Stok baru bertambah saat barang diterima dan penerimaan diposting.</p></div></div>
+              <form id="iw-form-po" onsubmit="submitIWPurchaseOrder(event)" style="display:grid;gap:12px;">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">
+                  <label>Pemasok<select class="x-input" id="iw-po-supplier" required onchange="renderIWPoLines()"></select></label>
+                  <label>Tanggal dibutuhkan<input type="date" class="x-input" id="iw-po-required-at"></label>
+                </div>
+                <div id="iw-po-lines" style="display:grid;gap:10px;"></div>
+                <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                  <button type="button" class="x-btn-secondary" onclick="addIWPoLine()">+ Tambah bahan ke PO</button>
+                  <button type="submit" class="x-btn-primary">Buat & Pesan ke Pemasok</button>
+                </div>
+              </form>
+            </section>
+
+            <section class="x-owner-stock-panel">
+              <div class="x-owner-stock-panel-head"><div><h3>Riwayat Pengadaan</h3><p>Terima barang dari sini saat pengiriman fisik tiba.</p></div></div>
+              <div id="iw-purchase-order-list" class="x-table-responsive"><div class="x-owner-stock-loading">Memuat Purchase Order...</div></div>
+            </section>
+          </div>
+
+          <!-- SUBTAB CONTENT 4: PRODUKSI -->
+          <div id="subtab-content-stock-production" style="display:none;">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:16px;">
+              <section class="x-owner-stock-panel">
+                <div class="x-owner-stock-panel-head"><div><h3>1. Daftarkan Resep Produksi</h3><p>Pilih Product hasil, hasil per batch, lalu bahan yang dikonsumsi.</p></div></div>
+                <form id="iw-form-recipe" onsubmit="submitIWRecipe(event)" style="display:grid;gap:10px;">
+                  <label>Nama hasil produksi<input class="x-input" id="iw-recipe-name" required placeholder="Ayam Geprek"></label>
+                  <label>Product/SKU hasil<select class="x-input" id="iw-recipe-output-product" required onchange="onIWRecipeProductChange()"></select></label>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                    <label>Hasil normal per batch<input type="number" min="0.000001" step="any" class="x-input" id="iw-recipe-yield" required value="20"></label>
+                    <label>Satuan hasil<select class="x-input" id="iw-recipe-yield-uom" required></select></label>
+                  </div>
+                  <div style="font-size:12px;color:#64748B;">Jumlah bahan di bawah ini adalah pemakaian untuk satu hasil normal per batch, menggunakan satuan dasar masing-masing bahan.</div>
+                  <div id="iw-recipe-components" style="display:grid;gap:8px;"></div>
+                  <button type="button" class="x-btn-secondary" onclick="addIWRecipeComponent()">+ Tambah bahan</button>
+                  <button type="submit" class="x-btn-primary">Simpan & Aktifkan Resep</button>
+                </form>
+              </section>
+
+              <section class="x-owner-stock-panel">
+                <div class="x-owner-stock-panel-head"><div><h3>2. Catat Hasil Produksi</h3><p>Masukkan hasil yang benar-benar jadi dan bahan yang benar-benar terpakai. Posting mengurangi bahan serta menambah stok produk dalam satu transaksi.</p></div></div>
+                <form id="iw-form-batch" onsubmit="submitIWProductionBatch(event)" style="display:grid;gap:10px;">
+                  <label>Resep aktif<select class="x-input" id="iw-batch-recipe" required onchange="renderIWBatchComponents()"></select></label>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                    <label>Rencana hasil<input type="number" min="0.000001" step="any" class="x-input" id="iw-batch-planned-output" required value="20" oninput="renderIWBatchComponents()"></label>
+                    <label>Hasil aktual<input type="number" min="0.000001" step="any" class="x-input" id="iw-batch-actual-output" required value="20"></label>
+                  </div>
+                  <div id="iw-batch-components" style="display:grid;gap:8px;"></div>
+                  <button type="submit" class="x-btn-primary">Posting Produksi Selesai</button>
+                </form>
+              </section>
+            </div>
+
+            <section class="x-owner-stock-panel">
+              <div class="x-owner-stock-panel-head"><div><h3>Riwayat Produksi</h3><p>Hanya batch yang selesai diposting yang menambah stok produk.</p></div></div>
+              <div id="iw-production-batch-list" class="x-table-responsive"><div class="x-owner-stock-loading">Memuat batch produksi...</div></div>
+            </section>
           </div>
         </div>
       </section>
