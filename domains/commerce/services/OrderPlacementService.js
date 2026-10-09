@@ -128,6 +128,13 @@ function deductComposedStock({
       postingTimestamp: now,
       repository: inventoryRepository
     });
+    if (
+      canonicalPosting.status === 'LEGACY_COMPATIBILITY_REQUIRED' &&
+      Number(canonicalPosting.canonical_balance_count || 0) > 0
+    ) {
+      throw new Error('[INVENTORY_MIGRATION_INCOMPLETE] Sebagian komponen Menu sudah memakai stok canonical dan sebagian masih legacy. Rekonsiliasi stok semua komponen sebelum menerima penjualan ini.');
+    }
+
     if (canonicalPosting.status === 'AVAILABLE') {
       CostOfSalesService.capture({
         sourceType: sourceType,
