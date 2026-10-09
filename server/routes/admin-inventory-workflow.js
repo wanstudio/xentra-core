@@ -72,7 +72,7 @@ function listContext(req, db) {
   const supplierPacks = db.queryMany("SELECT smp.id, smp.supplier_material_id, sm.supplier_id, s.name AS supplier_name, sm.material_id, m.name AS material_name, smp.name, smp.content_quantity, smp.content_uom_id, cu.name AS content_uom_name, smp.minimum_order_quantity, smp.unit_price, smp.currency_code, smp.is_active FROM supplier_material_packs smp JOIN supplier_materials sm ON sm.id = smp.supplier_material_id JOIN suppliers s ON s.id = sm.supplier_id JOIN materials m ON m.id = sm.material_id JOIN uoms cu ON cu.id = smp.content_uom_id WHERE s.organization_id = ? AND s.status <> 'ARCHIVED' AND sm.is_active = 1 AND smp.is_active = 1 ORDER BY s.name, m.name, smp.name", [orgId]);
   const purchaseOrders = db.queryMany("SELECT po.id, po.supplier_id, s.name AS supplier_name, po.destination_stock_location_id, sl.name AS destination_name, po.status, po.required_at, po.created_at, po.ordered_at, COUNT(pol.id) AS line_count, COALESCE(SUM(pol.ordered_purchase_quantity * pol.unit_price), 0) AS ordered_value FROM purchase_orders po JOIN suppliers s ON s.id = po.supplier_id JOIN stock_locations sl ON sl.id = po.destination_stock_location_id LEFT JOIN purchase_order_lines pol ON pol.purchase_order_id = po.id WHERE po.organization_id = ? GROUP BY po.id ORDER BY po.created_at DESC LIMIT 30", [orgId]);
   const purchaseOrderLines = db.queryMany("SELECT pol.*, sm.material_id, m.name AS material_name, m.base_uom_id, base_uom.name AS base_uom_name, smp.name AS supplier_pack_name, smp.content_quantity, smp.content_uom_id, cu.name AS purchase_uom_name FROM purchase_order_lines pol JOIN purchase_orders po ON po.id = pol.purchase_order_id JOIN supplier_materials sm ON sm.id = pol.supplier_material_id JOIN materials m ON m.id = sm.material_id JOIN uoms base_uom ON base_uom.id = m.base_uom_id LEFT JOIN supplier_material_packs smp ON smp.id = pol.supplier_pack_id LEFT JOIN uoms cu ON cu.id = pol.purchase_uom_id WHERE po.organization_id = ? ORDER BY po.created_at DESC, pol.id", [orgId]);
-  const recipes = db.queryMany("SELECT pi.id AS production_item_id, pi.output_product_id, pi.production_item_code, pi.name AS production_item_name, pi.status AS production_item_status, r.id AS recipe_id, r.name AS recipe_name, r.status AS recipe_status, rv.id AS recipe_version_id, rv.version_number, rv.status AS recipe_version_status, rv.planned_yield_quantity, rv.yield_uom_id, yu.name AS yield_uom_name, p.name AS output_product_name, p.sku AS output_product_sku, pil.stock_location_id FROM production_items pi JOIN products p ON p.id = pi.output_product_id JOIN brands br ON br.id = p.brand_id AND br.organization_id = pi.organization_id JOIN recipes r ON r.production_item_id = pi.id JOIN recipe_versions rv ON rv.recipe_id = r.id AND rv.status = 'PUBLISHED' JOIN uoms yu ON yu.id = rv.yield_uom_id JOIN production_item_locations pil ON pil.production_item_id = pi.id AND pil.is_active = 1 WHERE pi.organization_id = ? AND pi.status = 'ACTIVE' AND r.status = 'ACTIVE' ORDER BY pi.name, rv.version_number DESC", [orgId]);
+  const recipes = db.queryMany("SELECT pi.id AS production_item_id, pi.output_product_id, pi.production_item_code, pi.name AS production_item_name, pi.status AS production_item_status, r.id AS recipe_id, r.name AS recipe_name, r.status AS recipe_status, rv.id AS recipe_version_id, rv.version_number, rv.status AS recipe_version_status, rv.planned_yield_quantity, rv.yield_uom_id, yu.name AS yield_uom_name, p.name AS output_product_name, p.sku AS output_product_sku, pil.stock_location_id FROM production_items pi JOIN products p ON p.id = pi.output_product_id JOIN brands br ON br.id = p.brand_id AND br.organization_id = pi.organization_id JOIN recipes r ON r.production_item_id = pi.id JOIN recipe_versions rv ON rv.recipe_id = r.id JOIN uoms yu ON yu.id = rv.yield_uom_id JOIN production_item_locations pil ON pil.production_item_id = pi.id AND pil.is_active = 1 WHERE pi.organization_id = ? AND pi.status = 'ACTIVE' AND r.status = 'ACTIVE' ORDER BY pi.name, rv.version_number DESC", [orgId]);
   recipes.forEach(function (recipe) {
     recipe.components = db.queryMany("SELECT rc.material_id, m.material_code, m.name AS material_name, rc.planned_quantity, rc.planned_uom_id, u.name AS planned_uom_name, m.base_uom_id, bu.name AS base_uom_name FROM recipe_components rc JOIN materials m ON m.id = rc.material_id JOIN uoms u ON u.id = rc.planned_uom_id JOIN uoms bu ON bu.id = m.base_uom_id WHERE rc.recipe_version_id = ? ORDER BY rc.sort_order, m.name", [recipe.recipe_version_id]);
   });
@@ -96,10 +96,15 @@ function registerAdminInventoryWorkflowRoutes(router, deps = {}) {
       const branchId = required(req.body && req.body.branch_id, 'BRANCH_REQUIRED');
       const branch = getBranch(db, branchId, orgId);
       if (!branch) throw fail('BRANCH_NOT_FOUND', 404);
-      const existing = db.queryMany("SELECT id, organization_id, branch_id, code, name, location_type, is_active FROM stock_locations WHERE organization_id = ? AND branch_id = ? AND location_type = 'BRANCH' AND is_active = 1 ORDER BY id", [orgId, branchId]);
-      if (existing.length > 1) throw fail('BRANCH_STOCK_LOCATION_AMBIGUOUS', 409);
-      if (existing.length === 1) return res.json({ success: true, location: existing[0], idempotent: true });
+      const existing = db.queryMany("SELECT id, organization_id, branch_id, code, name, location_type, is_active FROM stock_locations WHERE organization_id = ? AND branch_id = ? AND location_type = 'BRANCH' ORDER BY is_active DESC, id", [orgId, branchId]);
+      const active = existing.filter(function (item) { return Number(item.is_active) === 1; });
+      if (active.length > 1) throw fail('BRANCH_STOCK_LOCATION_AMBIGUOUS', 409);
+      if (active.length === 1) return res.json({ success: true, location: active[0], idempotent: true });
       const now = new Date().toISOString();
+      if (existing.length) {
+        db.execute("UPDATE stock_locations SET is_active = 1, updated_at = ? WHERE id = ? AND organization_id = ?", [now, existing[0].id, orgId]);
+        return res.json({ success: true, location: Object.assign({}, existing[0], { is_active: 1, updated_at: now }), reactivated: true });
+      }
       const location = { id: makeId('sl_'), organization_id: orgId, branch_id: branchId, code: 'BRANCH-' + branchId, name: branch.name + ' — Persediaan', location_type: 'BRANCH', is_active: 1, created_at: now, updated_at: now };
       db.execute("INSERT INTO stock_locations (id, organization_id, branch_id, code, name, location_type, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'BRANCH', 1, ?, ?)", [location.id, orgId, branchId, location.code, location.name, now, now]);
       return res.status(201).json({ success: true, location: location });
@@ -275,16 +280,31 @@ function registerAdminInventoryWorkflowRoutes(router, deps = {}) {
         if (!plannedUom || Number(plannedUom.is_active) !== 1 || !baseUom || String(plannedUom.category_id) !== String(baseUom.category_id)) throw fail('RECIPE_COMPONENT_UOM_CATEGORY_MISMATCH');
         positive(line.planned_quantity, 'INVALID_RECIPE_COMPONENT_QUANTITY');
       });
+      const plannedYieldQuantity = positive(req.body.planned_yield_quantity, 'INVALID_YIELD_QUANTITY');
       const code = String(req.body.production_item_code || ('PRD-' + String(product.sku).replace(/[^A-Z0-9_-]/gi, '').toUpperCase() + '-' + Date.now().toString(36))).slice(0, 80);
       const recipeName = required(req.body && req.body.name, 'PRODUCTION_ITEM_NAME_REQUIRED');
-      const item = ProductionService.createProductionItem({ organizationId: orgId, outputProductId: outputProductId, productionItemCode: code, name: recipeName, repository: productionRepository });
-      ProductionService.activateProductionItem({ productionItemId: item.id, repository: productionRepository });
-      ProductionService.addProductionLocation({ productionItemId: item.id, stockLocationId: location.id, repository: productionRepository });
-      const recipe = ProductionService.createRecipe({ productionItemId: item.id, name: recipeName, repository: productionRepository });
-      ProductionService.activateRecipe({ recipeId: recipe.id, repository: productionRepository });
+      const existingRoutes = productionRepository.findProductionItemByProductAndLocation(outputProductId, location.id);
+      if (existingRoutes.length > 1) throw fail('PRODUCTION_ROUTE_AMBIGUOUS');
+      let item;
+      let recipe;
+      if (existingRoutes.length === 1) {
+        item = productionRepository.findProductionItem(existingRoutes[0].id);
+        if (!item || String(item.organization_id) !== orgId) throw fail('PRODUCTION_ITEM_NOT_FOUND', 404);
+        recipe = productionRepository.findRecipeByProductionItemId(item.id);
+        if (!recipe) {
+          recipe = ProductionService.createRecipe({ productionItemId: item.id, name: recipeName, repository: productionRepository });
+          ProductionService.activateRecipe({ recipeId: recipe.id, repository: productionRepository });
+        }
+      } else {
+        item = ProductionService.createProductionItem({ organizationId: orgId, outputProductId: outputProductId, productionItemCode: code, name: recipeName, repository: productionRepository });
+        ProductionService.activateProductionItem({ productionItemId: item.id, repository: productionRepository });
+        ProductionService.addProductionLocation({ productionItemId: item.id, stockLocationId: location.id, repository: productionRepository });
+        recipe = ProductionService.createRecipe({ productionItemId: item.id, name: recipeName, repository: productionRepository });
+        ProductionService.activateRecipe({ recipeId: recipe.id, repository: productionRepository });
+      }
       const version = ProductionService.createRecipeVersion({
         recipeId: recipe.id,
-        plannedYieldQuantity: positive(req.body.planned_yield_quantity, 'INVALID_YIELD_QUANTITY'),
+        plannedYieldQuantity: plannedYieldQuantity,
         yieldUomId: yieldUomId,
         components: components.map(function (line, index) {
           return {
