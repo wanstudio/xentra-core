@@ -7748,6 +7748,130 @@ input[type="file"].x-input,
 .x-merchant-list-tools select { width:170px; flex:0 0 170px; }
 .x-stock-adjust-btn { font-size:12px; padding:7px 11px; white-space:nowrap; }
 
+/* Fast Availability & Daily Portion Counter UI */
+.x-stock-quick-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.x-stock-item-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.x-stock-item-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, .04);
+}
+.x-stock-item-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.x-stock-item-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.x-stock-item-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1.3;
+}
+.x-stock-item-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.x-stock-item-controls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+}
+.x-stock-portion-counter {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #f8fafc;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 3px 6px;
+}
+.x-stock-step-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-main);
+  cursor: pointer;
+  user-select: none;
+  transition: all .1s ease;
+}
+.x-stock-step-btn:hover:not(:disabled) {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+.x-stock-step-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+.x-stock-step-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.x-stock-portion-display {
+  min-width: 44px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text-main);
+  padding: 0 4px;
+  cursor: pointer;
+  border-radius: 4px;
+  line-height: 1.2;
+}
+.x-stock-portion-display:hover {
+  background: #e2e8f0;
+}
+.x-stock-portion-unit {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  display: block;
+}
+.x-stock-toggle-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.x-stock-toggle-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+}
+.x-stock-toggle-label.is-avail { color: #16a34a; }
+.x-stock-toggle-label.is-out { color: #dc2626; }
+
+
 @media (max-width: 700px) {
   .x-merchant-screen-head { align-items:center; }
   .x-merchant-screen-head h3 { font-size:17px; }
@@ -7800,6 +7924,16 @@ input[type="file"].x-input,
   .x-merchant-mobile-table td[data-label="Produk"]::before { display:none; }
   .x-merchant-mobile-table td[data-label="Aksi"]::before { content:''; }
   .x-stock-adjust-btn { width:100%; min-height:40px; }
+  .x-stock-item-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .x-stock-item-controls {
+    justify-content: space-between;
+    padding-top: 10px;
+    border-top: 1px solid #f1f5f9;
+  }
 }
 
 

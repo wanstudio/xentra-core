@@ -20,7 +20,7 @@
   <!-- Shared merchant infrastructure — tokens, toast, action-menu, crop editor, shell styles -->
   <link rel="stylesheet" href="/merchant-shared/fonts/plus-jakarta-sans.css?v=1.0.0">
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.0">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.0.26">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.0.27">
   <link rel="stylesheet" href="/merchant-shared/css/presentation-shells.css?v=1.0.3">
   <link rel="stylesheet" href="/merchant-app/assets/css/home.css?v=1.0.3">
 </head>
@@ -759,16 +759,16 @@
         <div class="x-card-panel x-merchant-op-panel">
           <div class="x-merchant-screen-head">
             <div>
-              <h3>Stock</h3>
-              <p>Kelola stok fisik cabang. <strong>Belum dilacak</strong> berbeda dari stok habis.</p>
+              <h3>Ketersediaan & Stok Porsi Cabang</h3>
+              <p>Atur ketersediaan menu dan sisa porsi harian secara langsung untuk pesanan online & kasir.</p>
             </div>
           </div>
 
-          <div class="x-stock-summary" aria-label="Ringkasan stok">
-            <div class="x-stock-summary-item"><span>Dilacak</span><strong id="bm-stock-stat-tracked">0</strong></div>
-            <div class="x-stock-summary-item"><span>Menipis</span><strong id="bm-stock-stat-low">0</strong></div>
-            <div class="x-stock-summary-item"><span>Habis</span><strong id="bm-stock-stat-out">0</strong></div>
-            <div class="x-stock-summary-item"><span>Belum dilacak</span><strong id="bm-stock-stat-untracked">0</strong></div>
+          <div class="x-stock-summary" aria-label="Ringkasan ketersediaan menu">
+            <div class="x-stock-summary-item"><span>Tersedia</span><strong id="bm-stock-stat-tracked" style="color:#16a34a;">0</strong></div>
+            <div class="x-stock-summary-item"><span>Porsi Menipis</span><strong id="bm-stock-stat-low" style="color:#f59e0b;">0</strong></div>
+            <div class="x-stock-summary-item"><span>Habis / Nonaktif</span><strong id="bm-stock-stat-out" style="color:#dc2626;">0</strong></div>
+            <div class="x-stock-summary-item"><span>Tanpa Batas Porsi</span><strong id="bm-stock-stat-untracked">0</strong></div>
           </div>
           <span id="bm-stock-stat-total" hidden>0</span>
           <span id="bm-stock-stat-safe" hidden>0</span>
@@ -776,16 +776,23 @@
 
         <div class="x-card-panel x-merchant-list-panel">
           <div class="x-merchant-list-tools">
-            <input type="search" id="bm-stock-search" class="x-input" placeholder="Cari produk..." oninput="onBMStockFilterChange()" aria-label="Cari produk stok">
+            <input type="search" id="bm-stock-search" class="x-input" placeholder="Cari nama menu / item..." oninput="onBMStockFilterChange()" aria-label="Cari menu stok">
             <select id="bm-stock-filter-status" class="x-input" onchange="onBMStockFilterChange()" aria-label="Filter status stok">
-              <option value="all">Semua</option>
-              <option value="low">Menipis</option>
-              <option value="out">Habis</option>
-              <option value="untracked">Belum dilacak</option>
+              <option value="all">Semua Menu</option>
+              <option value="safe">Tersedia (Aman)</option>
+              <option value="low">Porsi Menipis (≤5)</option>
+              <option value="out">Habis / Tidak Aktif</option>
+              <option value="untracked">Tanpa Batas Porsi</option>
             </select>
           </div>
 
-          <div class="table-responsive x-merchant-mobile-list">
+          <!-- Quick Stock Item Cards Container -->
+          <div id="bm-stock-quick-container" class="x-stock-quick-grid" style="margin-bottom:14px;">
+            <div class="text-center py-6 text-muted">Memuat ketersediaan stok cabang...</div>
+          </div>
+
+          <!-- Legacy / Fallback table container (hidden by default or kept accessible for screen readers / tests) -->
+          <div class="table-responsive x-merchant-mobile-list" style="display:none;" id="bm-stock-table-wrap">
             <table class="x-table x-merchant-mobile-table">
               <thead>
                 <tr>
@@ -804,39 +811,60 @@
         </div>
       </section>
 
-      <!-- MODAL: BM Stock Adjustment -->
+      <!-- MODAL: BM Fast Portion & Stock Adjustment -->
       <div id="modal-bm-stock-adjust" class="x-modal" style="display:none; position:fixed; z-index:9999; inset:0; background:rgba(0,0,0,0.5); align-items:center; justify-content:center;">
-        <div class="x-card-panel" style="max-width:440px; width:90%; padding:24px; border-radius:12px; background:#ffffff; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-            <h4 style="font-size:16px; font-weight:800; margin:0;">Sesuaikan Stok Operasional</h4>
-            <button type="button" onclick="closeBMStockAdjustModal()" style="background:none; border:none; font-size:20px; cursor:pointer; color:var(--text-muted);">&times;</button>
+        <div class="x-card-panel" style="max-width:440px; width:92%; padding:22px; border-radius:16px; background:#ffffff; box-shadow:0 12px 30px rgba(0,0,0,0.18);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <h4 style="font-size:16px; font-weight:800; margin:0;" id="bm-adjust-modal-title">Atur Porsi Menu</h4>
+            <button type="button" onclick="closeBMStockAdjustModal()" style="background:none; border:none; font-size:22px; cursor:pointer; color:var(--text-muted); line-height:1;">&times;</button>
           </div>
           <form id="form-bm-stock-adjust" onsubmit="submitBMStockAdjustment(event)">
             <input type="hidden" id="bm-adjust-product-id">
+            <div style="margin-bottom:14px; background:#f8fafc; padding:12px; border-radius:10px; border:1px solid #e2e8f0;">
+              <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-muted); margin-bottom:2px;">Item / Menu Cabang</div>
+              <div id="bm-adjust-product-name" style="font-size:15px; font-weight:800; color:var(--text-main);">-</div>
+              <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">
+                Sisa saat ini: <strong id="bm-adjust-current-stock" style="color:var(--text-main);">0</strong>
+              </div>
+            </div>
+
             <div style="margin-bottom:14px;">
-              <label style="display:block; font-size:12px; font-weight:700; margin-bottom:4px; color:var(--text-muted);">Nama Produk</label>
-              <div id="bm-adjust-product-name" style="font-size:14px; font-weight:700; color:var(--text-main);">-</div>
-              <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Stok Cabang Saat Ini: <strong id="bm-adjust-current-stock">0</strong></div>
+              <label for="bm-adjust-target-qty" style="display:block; font-size:12px; font-weight:700; margin-bottom:6px; color:var(--text-main);">Set Sisa Porsi Baru Langsung</label>
+              <div style="display:flex; gap:8px;">
+                <input type="number" id="bm-adjust-target-qty" min="0" class="x-input" style="flex:1; font-size:16px; font-weight:700; padding:10px;" placeholder="Contoh: 20">
+                <button type="button" class="x-btn-secondary" style="font-size:12px; font-weight:700;" onclick="setBMAdjustTargetQuick(0)">Set Habis (0)</button>
+              </div>
+              <div style="display:flex; gap:6px; margin-top:8px;">
+                <button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="addBMAdjustDelta(5)">+5 porsi</button>
+                <button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="addBMAdjustDelta(10)">+10 porsi</button>
+                <button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="addBMAdjustDelta(20)">+20 porsi</button>
+                <button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="addBMAdjustDelta(-1)">-1</button>
+              </div>
             </div>
-            <div style="margin-bottom:14px;">
-              <label for="bm-adjust-movement-type" style="display:block; font-size:12px; font-weight:700; margin-bottom:4px; color:var(--text-muted);">Jenis Mutasi Manual</label>
-              <select id="bm-adjust-movement-type" class="x-input" style="width:100%; font-size:13px;" required onchange="onBMAdjustTypeChange()">
-                <option value="audit_adjustment">Audit Stok Fisik (Opname Penyesuaian: +/-)</option>
-                <option value="waste_spoilage">Barang Rusak / Basi / Spoilage (Pengurangan: -)</option>
-              </select>
-            </div>
-            <div style="margin-bottom:14px;">
-              <label for="bm-adjust-quantity" style="display:block; font-size:12px; font-weight:700; margin-bottom:4px; color:var(--text-muted);">Jumlah Penyesuaian (Quantity)</label>
-              <input type="number" id="bm-adjust-quantity" class="x-input" style="width:100%; font-size:14px;" placeholder="Mis. +5 atau -2" required>
-              <small id="bm-adjust-qty-hint" style="font-size:11px; color:var(--text-muted); display:block; margin-top:4px;">Gunakan angka positif untuk menambah, negatif untuk mengurangi.</small>
-            </div>
-            <div style="margin-bottom:18px;">
-              <label for="bm-adjust-notes" style="display:block; font-size:12px; font-weight:700; margin-bottom:4px; color:var(--text-muted);">Catatan / Alasan Mutasi</label>
-              <textarea id="bm-adjust-notes" class="x-input" style="width:100%; font-size:13px; min-height:60px;" placeholder="Contoh: Stok opname shift pagi, telur pecah saat persiapan..."></textarea>
-            </div>
+
+            <!-- Detail Lanjutan (Collapsible / Optional) -->
+            <details style="margin-bottom:16px; font-size:12px; color:var(--text-muted);">
+              <summary style="cursor:pointer; font-weight:700; color:var(--text-main); margin-bottom:8px;">Opsi Lanjutan & Alasan (Opsional)</summary>
+              <div style="padding-top:6px;">
+                <div style="margin-bottom:10px;">
+                  <label for="bm-adjust-movement-type" style="display:block; font-size:11px; font-weight:700; margin-bottom:4px;">Tipe Mutasi</label>
+                  <select id="bm-adjust-movement-type" class="x-input" style="width:100%; font-size:12px;" onchange="onBMAdjustTypeChange()">
+                    <option value="audit_adjustment">Penyesuaian Fisik / Porsi (Opname)</option>
+                    <option value="waste_spoilage">Barang Rusak / Basi / Tumpah (Waste)</option>
+                  </select>
+                </div>
+                <div style="margin-bottom:8px;">
+                  <label for="bm-adjust-notes" style="display:block; font-size:11px; font-weight:700; margin-bottom:4px;">Catatan Singkat</label>
+                  <input type="text" id="bm-adjust-notes" class="x-input" style="width:100%; font-size:12px;" placeholder="Mis. Sisa shift sore, telur pecah">
+                </div>
+                <input type="hidden" id="bm-adjust-quantity">
+                <small id="bm-adjust-qty-hint" style="display:none;"></small>
+              </div>
+            </details>
+
             <div style="display:flex; justify-content:flex-end; gap:10px;">
-              <button type="button" class="x-btn-secondary" onclick="closeBMStockAdjustModal()" style="font-size:13px; padding:8px 14px;">Batal</button>
-              <button type="submit" class="x-btn-primary" id="btn-bm-submit-adjust" style="font-size:13px; padding:8px 18px;">Simpan Penyesuaian</button>
+              <button type="button" class="x-btn-secondary" onclick="closeBMStockAdjustModal()" style="font-size:13px; padding:9px 15px;">Batal</button>
+              <button type="submit" class="x-btn-primary" id="btn-bm-submit-adjust" style="font-size:13px; padding:9px 20px; font-weight:700;">Simpan Porsi</button>
             </div>
           </form>
         </div>
@@ -1669,7 +1697,7 @@
   <script src="/merchant-app/assets/js/jam-operasional.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/reports.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/tables.js?v=1.0.0"></script>
-  <script src="/merchant-app/assets/js/stock.js?v=1.0.0"></script>
+  <script src="/merchant-app/assets/js/stock.js?v=1.1.0"></script>
   <script src="/merchant-app/assets/js/promotions.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/staff.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/orders.js?v=1.0.1"></script>
