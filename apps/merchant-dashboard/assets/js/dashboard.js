@@ -7227,7 +7227,7 @@ async function loadMenusView() {
               '</span>' +
             '</div>' +
             '<div style="margin-top:12px; background:#FAFAFA; border:1px solid #F1F5F9; border-radius:8px; padding:10px 12px;">' +
-              '<div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:#64748B; margin-bottom:6px;">Komposisi Bahan Masak (BOM)</div>' +
+              '<div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:#64748B; margin-bottom:6px;">Komposisi Bahan Masak</div>' +
               componentsHtml +
             '</div>' +
           '</div>' +
