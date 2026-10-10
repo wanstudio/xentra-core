@@ -494,7 +494,23 @@
   /* =========================================================================
      VIEW SWITCHER (PASAR, PO SUPPLIER, RIWAYAT, KALKULATOR)
      ========================================================================= */
+  var _currentPurchasingView = 'tasks';
+
+  function refreshPurchasingActiveView() {
+    if (_currentPurchasingView === 'po') {
+      loadPurchasingOrders();
+    } else if (_currentPurchasingView === 'history') {
+      loadPurchasingHistory();
+    } else if (_currentPurchasingView === 'calc') {
+      if (typeof resetPurchasingCalc === 'function') resetPurchasingCalc();
+    } else {
+      loadPurchasingChecklist();
+    }
+  }
+  window.refreshPurchasingActiveView = refreshPurchasingActiveView;
+
   function switchPurchasingView(viewId) {
+    _currentPurchasingView = viewId;
     var vTasks = $('purchasing-view-tasks');
     var vPo = $('purchasing-view-po');
     var vHistory = $('purchasing-view-history');
@@ -514,6 +530,18 @@
     if (btnPo) btnPo.classList.toggle('active', viewId === 'po');
     if (btnHistory) btnHistory.classList.toggle('active', viewId === 'history');
     if (btnCalc) btnCalc.classList.toggle('active', viewId === 'calc');
+
+    // Update dynamic topbar title to match active menu
+    var titles = {
+      tasks: 'Belanja',
+      po: 'PO Supplier',
+      history: 'Riwayat',
+      calc: 'Kalkulator'
+    };
+    var titleEl = $('purchasing-topbar-title');
+    if (titleEl) {
+      titleEl.textContent = titles[viewId] || 'Belanja';
+    }
 
     // Hide or show bottom settlement bar only on Tasks view
     var bottomBar = $('purchasing-bottom-bar');
@@ -949,6 +977,21 @@
   }
   window.calculatePurchasingCalcChange = calculatePurchasingCalcChange;
 
+  async function loadBrandLogoForPurchasing() {
+    try {
+      var logoEl = $('purchasing-topbar-logo');
+      if (!logoEl) return;
+      var res = await fetch('/api/v1/brand/info');
+      if (res.ok) {
+        var data = await res.json();
+        if (data && data.brand && data.brand.logo_url) {
+          logoEl.src = data.brand.logo_url;
+        }
+      }
+    } catch (_) {}
+  }
+  window.loadBrandLogoForPurchasing = loadBrandLogoForPurchasing;
+
   function initPurchasingInputs() {
     var cashAdvInput = $('input-purchasing-cash-advance');
     if (cashAdvInput) {
@@ -961,6 +1004,8 @@
     if (modalPriceInput) {
       setupCurrencyInputAutoDot(modalPriceInput);
     }
+
+    loadBrandLogoForPurchasing();
   }
 
   if (document.readyState === 'loading') {

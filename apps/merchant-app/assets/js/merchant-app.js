@@ -275,7 +275,16 @@
       if (mobileTopbar) mobileTopbar.style.display = 'none';
       var purchasingBranchEl = $('purchasing-topbar-branch-name');
       if (purchasingBranchEl) {
-        purchasingBranchEl.textContent = user.branch_name || user.brand_name || 'Cabang Bangjo';
+        var bName = user.branch_name || '';
+        var brName = user.brand_name || '';
+        if (bName && brName && !bName.toLowerCase().includes(brName.toLowerCase())) {
+          purchasingBranchEl.textContent = brName + ' ' + bName;
+        } else {
+          purchasingBranchEl.textContent = bName || brName || 'MyBangjo Pringsewu';
+        }
+      }
+      if (typeof window.loadBrandLogoForPurchasing === 'function') {
+        window.loadBrandLogoForPurchasing();
       }
       var mobileNav = $('x-merchant-mobile-nav');
       if (mobileNav) {
