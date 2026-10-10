@@ -660,15 +660,25 @@
         var remainingQty = Math.max(0, orderedQty - (Number(line.received_base_quantity || 0) / (Number(line.base_quantity_per_purchase_unit) || 1)));
         if (remainingQty <= 0) remainingQty = orderedQty;
 
-        return '<div class="purchasing-receive-line" data-pol-id="' + esc(line.purchase_order_line_id) + '" data-ordered-qty="' + orderedQty + '">' +
+        // Cek apakah satuan timbangan (weighable/fractional) yang berhak atas toleransi timbangan wajar +10%
+        var uomStr = ((line.base_uom_code || '') + ' ' + (line.base_uom_name || '') + ' ' + (line.supplier_pack_name || '')).toLowerCase();
+        var isWeighable = line.allows_fraction === 1 ||
+                          /^(kg|kilogram|g|gram|gr|l|liter|ml|ons)$/i.test(String(line.base_uom_code || line.base_uom_name || '').trim()) ||
+                          /\b(kg|kilogram|gram|liter)\b/i.test(uomStr);
+        var maxAllowedQty = isWeighable ? Math.round(orderedQty * 1.10 * 100) / 100 : orderedQty;
+
+        return '<div class="purchasing-receive-line" data-pol-id="' + esc(line.purchase_order_line_id) + '" data-ordered-qty="' + orderedQty + '" data-max-qty="' + maxAllowedQty + '" data-is-weighable="' + (isWeighable ? '1' : '0') + '" data-pack-desc="' + esc(packDesc) + '">' +
           '<div class="purchasing-receive-line-head">' +
             '<div class="purchasing-receive-line-name">' + esc(line.material_name) + '</div>' +
-            '<span class="x-badge purchasing-receive-line-badge">Dipesan: ' + esc(orderedQty) + ' ' + esc(packDesc) + '</span>' +
+            '<div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">' +
+              (isWeighable ? '<span class="x-badge" style="background:#f0fdf4; border:1px solid #bbf7d0; color:#15803d; font-size:10.5px; font-weight:700;">Toleransi +10%</span>' : '') +
+              '<span class="x-badge purchasing-receive-line-badge">Dipesan: ' + esc(orderedQty) + ' ' + esc(packDesc) + '</span>' +
+            '</div>' +
           '</div>' +
           '<div class="purchasing-receive-grid">' +
             '<div class="purchasing-receive-field">' +
               '<label class="purchasing-receive-label label-accepted">Layak Terima</label>' +
-              '<input type="number" step="any" min="0" max="' + orderedQty + '" class="x-input input-receive-accepted purchasing-receive-input" value="' + esc(remainingQty) + '" oninput="onPurchasingReceiveQtyChange(this, \'accepted\')">' +
+              '<input type="number" step="any" min="0" max="' + maxAllowedQty + '" class="x-input input-receive-accepted purchasing-receive-input" value="' + esc(remainingQty) + '" oninput="onPurchasingReceiveQtyChange(this, \'accepted\')">' +
             '</div>' +
             '<div class="purchasing-receive-field">' +
               '<label class="purchasing-receive-label label-rejected">Ditolak / Rusak</label>' +
@@ -704,14 +714,22 @@
     var totalAccepted = 0;
     var totalRejected = 0;
     var totalOrdered = 0;
+    var hasOverReceived = false;
+    var surplusQty = 0;
 
     lineEls.forEach(function (el) {
       var ord = Number(el.getAttribute('data-ordered-qty')) || 0;
       var accIn = el.querySelector('.input-receive-accepted');
       var rejIn = el.querySelector('.input-receive-rejected');
+      var acc = Number(accIn ? accIn.value : 0) || 0;
+      var rej = Number(rejIn ? rejIn.value : 0) || 0;
       totalOrdered += ord;
-      totalAccepted += Number(accIn ? accIn.value : 0) || 0;
-      totalRejected += Number(rejIn ? rejIn.value : 0) || 0;
+      totalAccepted += acc;
+      totalRejected += rej;
+      if (acc > ord) {
+        hasOverReceived = true;
+        surplusQty += (acc - ord);
+      }
     });
 
     if (totalAccepted === 0 && totalRejected > 0) {
@@ -719,6 +737,12 @@
       btn.style.background = '#dc2626';
       btn.style.borderColor = '#dc2626';
       btn.setAttribute('data-cta-mode', 'reject_all');
+    } else if (hasOverReceived) {
+      var diffFormatted = surplusQty % 1 === 0 ? surplusQty : surplusQty.toFixed(2).replace(/\.?0+$/, '');
+      btn.textContent = '✓ Terima (Berlebih +' + diffFormatted + ')';
+      btn.style.background = '#0284c7';
+      btn.style.borderColor = '#0284c7';
+      btn.setAttribute('data-cta-mode', 'over_received');
     } else if (totalRejected > 0) {
       btn.textContent = '⚠️ Terima Sebagian';
       btn.style.background = '#d97706';
@@ -738,6 +762,10 @@
     if (!lineCard) return;
 
     var orderedQty = Number(lineCard.getAttribute('data-ordered-qty')) || 0;
+    var maxAllowedQty = Number(lineCard.getAttribute('data-max-qty')) || orderedQty;
+    var isWeighable = lineCard.getAttribute('data-is-weighable') === '1';
+    var packDesc = lineCard.getAttribute('data-pack-desc') || 'unit';
+
     var acceptedInput = lineCard.querySelector('.input-receive-accepted');
     var rejectedInput = lineCard.querySelector('.input-receive-rejected');
     var statusPill = lineCard.querySelector('.receive-status-pill');
@@ -747,13 +775,25 @@
 
     if (changedField === 'accepted') {
       if (accepted < 0) { accepted = 0; if (acceptedInput) acceptedInput.value = 0; }
-      if (accepted > orderedQty) {
-        accepted = orderedQty;
-        if (acceptedInput) acceptedInput.value = orderedQty;
+      if (accepted > maxAllowedQty) {
+        accepted = maxAllowedQty;
+        if (acceptedInput) acceptedInput.value = maxAllowedQty;
+        if (isWeighable && typeof showToast === 'function') {
+          showToast('⚠️ Batas toleransi timbangan basah maksimal +10% (' + maxAllowedQty + ' ' + packDesc + ')');
+        } else if (!isWeighable && typeof showToast === 'function') {
+          showToast('⚠️ Barang kemasan pasti tidak dapat melebihi pesanan (' + orderedQty + ' ' + packDesc + ')');
+        }
       }
-      // Pola hitung: Ditolak/Rusak = Dipesan - Layak Diterima
-      rejected = Math.max(0, orderedQty - accepted);
-      if (rejectedInput) rejectedInput.value = rejected;
+
+      if (accepted > orderedQty) {
+        // Kasus over-received
+        rejected = 0;
+        if (rejectedInput) rejectedInput.value = 0;
+      } else {
+        // Pola hitung normal: Ditolak/Rusak = Dipesan - Layak Diterima
+        rejected = Math.max(0, orderedQty - accepted);
+        if (rejectedInput) rejectedInput.value = rejected;
+      }
     } else if (changedField === 'rejected') {
       if (rejected < 0) { rejected = 0; if (rejectedInput) rejectedInput.value = 0; }
       if (rejected > orderedQty) {
@@ -767,14 +807,19 @@
 
     // Update status hint
     if (statusPill) {
-      if (rejected > 0 && accepted > 0) {
+      if (accepted > orderedQty) {
+        var surplus = (accepted - orderedQty);
+        var surplusStr = surplus % 1 === 0 ? surplus : surplus.toFixed(2).replace(/\.?0+$/, '');
+        statusPill.textContent = '📦 Diterima Berlebih: +' + surplusStr + ' ' + packDesc + ' (Toleransi Timbangan)';
+        statusPill.style.color = '#0284c7';
+      } else if (rejected > 0 && accepted > 0) {
         statusPill.textContent = '⚠️ ' + accepted + ' Layak, ' + rejected + ' Rusak/Retur';
         statusPill.style.color = '#b45309';
       } else if (rejected === orderedQty) {
         statusPill.textContent = '❌ Seluruh Barang Ditolak (' + rejected + ')';
         statusPill.style.color = '#dc2626';
       } else if (accepted === orderedQty && rejected === 0) {
-        statusPill.textContent = '✓ Lengkap & Baik (' + accepted + ')';
+        statusPill.textContent = '✓ Lengkap & Baik (' + accepted + ' ' + packDesc + ')';
         statusPill.style.color = '#059669';
       } else {
         var shortage = Math.max(0, orderedQty - (accepted + rejected));
@@ -783,10 +828,16 @@
       }
     }
 
-    // Auto-update placeholder catatan bila ada barang rusak
+    // Auto-update placeholder catatan bila ada barang rusak / berlebih
     var notesEl = $('input-purchasing-receive-notes');
-    if (notesEl && rejected > 0 && !notesEl.value) {
-      notesEl.placeholder = 'Catatan: ' + rejected + ' barang ditolak (tulis alasan cacat/segel rusak untuk retur supplier)';
+    if (notesEl && !notesEl.value) {
+      if (accepted > orderedQty) {
+        var diff = (accepted - orderedQty);
+        var diffStr = diff % 1 === 0 ? diff : diff.toFixed(2).replace(/\.?0+$/, '');
+        notesEl.placeholder = 'Catatan: Diterima berlebih +' + diffStr + ' ' + packDesc + ' (tulis keterangan timbangan basah/kelebihan supir)';
+      } else if (rejected > 0) {
+        notesEl.placeholder = 'Catatan: ' + rejected + ' barang ditolak (tulis alasan cacat/segel rusak untuk retur supplier)';
+      }
     }
 
     // Update CTA button dynamically based on entire order's accepted/rejected totals
@@ -815,16 +866,19 @@
 
     var totalAccepted = 0;
     var totalRejected = 0;
+    var hasOverReceived = false;
     var lines = [];
     var lineEls = container.querySelectorAll('.purchasing-receive-line');
     lineEls.forEach(function (el) {
       var polId = el.getAttribute('data-pol-id');
+      var ord = Number(el.getAttribute('data-ordered-qty')) || 0;
       var accIn = el.querySelector('.input-receive-accepted');
       var rejIn = el.querySelector('.input-receive-rejected');
       var accepted = Number(accIn ? accIn.value : 0);
       var rejected = Number(rejIn ? rejIn.value : 0);
       totalAccepted += accepted;
       totalRejected += rejected;
+      if (accepted > ord) hasOverReceived = true;
       lines.push({
         purchase_order_line_id: polId,
         accepted_purchase_quantity: accepted,
@@ -843,6 +897,21 @@
       if (notesEl) {
         notesEl.focus();
         notesEl.style.borderColor = '#dc2626';
+        setTimeout(function () { notesEl.style.borderColor = ''; }, 3000);
+      }
+      return;
+    }
+
+    // Validasi barang berlebih: wajib isi alasan
+    if (hasOverReceived && !notes) {
+      if (typeof showToast === 'function') {
+        showToast('⚠️ Catatan wajib diisi jika ada barang diterima berlebih (tulis alasan timbangan/kelebihan supir).');
+      } else {
+        alert('Catatan wajib diisi jika ada barang diterima berlebih (tulis alasan timbangan/kelebihan supir).');
+      }
+      if (notesEl) {
+        notesEl.focus();
+        notesEl.style.borderColor = '#0284c7';
         setTimeout(function () { notesEl.style.borderColor = ''; }, 3000);
       }
       return;
@@ -868,6 +937,8 @@
       if (res.ok && data.success) {
         if (totalAccepted === 0 && totalRejected > 0) {
           showToast('✓ Penolakan barang dicatat. Seluruh barang diretur ke supplier.');
+        } else if (hasOverReceived) {
+          showToast('✓ Penerimaan barang berlebih berhasil dicatat. Stok diperbarui sesuai fisik aktual!');
         } else if (totalRejected > 0) {
           showToast('✓ Penerimaan sebagian berhasil dicatat. Stok bertambah sesuai barang layak.');
         } else {

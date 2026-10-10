@@ -1068,6 +1068,7 @@ router.get('/admin/branches/:id/purchasing/orders', requireAuth(['owner', 'brand
           m.material_code,
           u.name AS base_uom_name,
           u.code AS base_uom_code,
+          u.allows_fraction,
           smp.name AS supplier_pack_name,
           pol.ordered_purchase_quantity,
           pol.resolved_base_quantity,

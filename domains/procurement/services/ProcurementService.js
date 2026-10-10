@@ -367,8 +367,11 @@ class ProcurementService {
       const poLine = repository.findPurchaseOrderLine(poLineId);
       if (!poLine || String(poLine.purchase_order_id) !== String(po.id)) throw fail('PURCHASE_ORDER_LINE_NOT_FOUND');
 
-      const acceptedPurchaseQuantity = positive(input.accepted_purchase_quantity, 'INVALID_QUANTITY');
+      const acceptedPurchaseQuantity = nonNegative(input.accepted_purchase_quantity || 0, 'INVALID_QUANTITY');
       const rejectedPurchaseQuantity = nonNegative(input.rejected_purchase_quantity || 0, 'INVALID_QUANTITY');
+      if (acceptedPurchaseQuantity === 0 && rejectedPurchaseQuantity === 0) {
+        throw fail('INVALID_QUANTITY');
+      }
 
       const remainingBase = Number(poLine.resolved_base_quantity) - Number(poLine.received_base_quantity || 0);
       const rawAcceptedBase = acceptedPurchaseQuantity * Number(poLine.base_quantity_per_purchase_unit);
@@ -379,7 +382,14 @@ class ProcurementService {
       if (!base || Number(base.is_active) !== 1) throw fail('BASE_UOM_UNRESOLVED');
 
       const acceptedBaseQuantity = roundHalfUp(rawAcceptedBase, Number(base.quantity_precision));
-      if (acceptedBaseQuantity <= 0 || acceptedBaseQuantity > remainingBase + 0.000001) {
+
+      // Over-receipt tolerance:
+      // Weighable / fractional materials (e.g. kg, gram, liter) get up to +10% tolerance (1.10)
+      const isWeighable = Boolean(base && (base.allows_fraction === 1 || /^(kg|kilogram|g|gram|gr|l|liter|ml|ons)$/i.test(String(base.code || base.name || ''))));
+      const toleranceFactor = isWeighable ? 1.10 : 1.00;
+      const maxAllowedBase = remainingBase * toleranceFactor;
+
+      if (acceptedBaseQuantity < 0 || acceptedBaseQuantity > maxAllowedBase + 0.000001) {
         throw fail('GOODS_RECEIPT_OVER_QUANTITY');
       }
 
@@ -387,7 +397,7 @@ class ProcurementService {
         rejectedPurchaseQuantity * Number(poLine.base_quantity_per_purchase_unit),
         Number(base.quantity_precision)
       );
-      if (acceptedBaseQuantity + rejectedBaseQuantity > remainingBase + 0.000001) {
+      if (acceptedBaseQuantity + rejectedBaseQuantity > maxAllowedBase + 0.000001) {
         throw fail('GOODS_RECEIPT_OVER_QUANTITY');
       }
 
@@ -408,7 +418,7 @@ class ProcurementService {
       });
     }
 
-    if (!normalized.some(line => line.acceptedBaseQuantity > 0)) {
+    if (!normalized.some(line => line.acceptedBaseQuantity > 0 || line.rejectedPurchaseQuantity > 0)) {
       throw fail('GOODS_RECEIPT_ACCEPTED_LINES_REQUIRED');
     }
 
@@ -441,15 +451,18 @@ class ProcurementService {
           source_line_reference: line.receiptLineId
         }));
 
-      const inventoryResult = GoodsReceiptCostPostingService.postGoodsReceipt({
-        goodsReceiptId: receiptId,
-        goodsReceiptPostingId: postingId,
-        stockLocationId: po.destination_stock_location_id,
-        postingTimestamp,
-        actorId: actor,
-        lines: inventoryLines,
-        manageTransaction: false
-      });
+      let inventoryResult = null;
+      if (inventoryLines.length > 0) {
+        inventoryResult = GoodsReceiptCostPostingService.postGoodsReceipt({
+          goodsReceiptId: receiptId,
+          goodsReceiptPostingId: postingId,
+          stockLocationId: po.destination_stock_location_id,
+          postingTimestamp,
+          actorId: actor,
+          lines: inventoryLines,
+          manageTransaction: false
+        });
+      }
 
       for (const line of normalized) {
         repository.insertGoodsReceiptLine({
@@ -482,9 +495,10 @@ class ProcurementService {
       const fullyReceived = refreshedLines.every(line =>
         Number(line.received_base_quantity || 0) >= Number(line.resolved_base_quantity) - 0.000001
       );
+      const allRejected = refreshedLines.every(line => Number(line.received_base_quantity || 0) === 0);
       repository.updatePurchaseOrderStatus({
         id: po.id,
-        status: fullyReceived ? 'RECEIVED' : 'PARTIALLY_RECEIVED',
+        status: fullyReceived ? 'RECEIVED' : (allRejected && normalized.every(l => l.rejectedPurchaseQuantity > 0) ? 'CANCELLED' : 'PARTIALLY_RECEIVED'),
         updatedAt: postingTimestamp
       });
 
