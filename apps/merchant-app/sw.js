@@ -13,7 +13,7 @@
  */
 
 var APP_CACHE_PREFIX = "xentra-merchant-";
-var APP_VERSION = "v1.2.0";
+var APP_VERSION = "v1.2.1";
 var FALLBACK_CACHE_NAME = "xentra-merchant-live";
 
 var STATIC_ASSETS = [
@@ -38,7 +38,7 @@ var STATIC_ASSETS = [
   "/merchant-app/assets/js/reports.js?v=1.0.0",
   "/merchant-app/assets/js/tables.js?v=1.0.0",
   "/merchant-app/assets/js/stock.js?v=1.1.0",
-  "/merchant-app/assets/js/purchasing.js?v=1.0.1",
+  "/merchant-app/assets/js/purchasing.js?v=1.0.3",
   "/merchant-app/assets/js/promotions.js?v=1.0.0",
   "/merchant-app/assets/js/staff.js?v=1.0.0",
   "/merchant-app/assets/js/orders.js?v=1.0.1",

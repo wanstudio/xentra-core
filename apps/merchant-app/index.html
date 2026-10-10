@@ -1058,7 +1058,7 @@
           <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px;">
             <div style="position:relative; display:flex; align-items:center;">
               <span style="position:absolute; left:12px; color:#94a3b8; pointer-events:none; font-size:14px;">🔍</span>
-              <input type="text" id="purchasing-history-search" class="x-input" placeholder="Cari bahan atau nota belanja..." style="padding-left:36px; padding-right:32px; height:42px; border-radius:12px; font-size:13px; width:100%; border:1px solid #cbd5e1;" oninput="onPurchasingHistorySearch(this.value)">
+              <input type="text" id="purchasing-history-search" class="x-input" placeholder="Cari bahan (bawang, telur...), nota STL, petugas..." autocomplete="off" style="padding-left:36px; padding-right:32px; height:42px; border-radius:12px; font-size:13px; width:100%; border:1px solid #cbd5e1;" oninput="onPurchasingHistorySearch(this.value)" onkeyup="onPurchasingHistorySearch(this.value)">
               <button type="button" id="btn-clear-history-search" onclick="clearPurchasingHistorySearch()" style="display:none; position:absolute; right:10px; background:none; border:none; color:#94a3b8; font-size:16px; cursor:pointer; padding:4px;" aria-label="Hapus Pencarian">✕</button>
             </div>
             <div style="display:flex; gap:6px; overflow-x:auto; padding-bottom:2px; -webkit-overflow-scrolling:touch;" id="purchasing-history-filter-chips">
@@ -2093,7 +2093,7 @@
   <script src="/merchant-app/assets/js/reports.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/tables.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/stock.js?v=1.1.0"></script>
-  <script src="/merchant-app/assets/js/purchasing.js?v=1.0.1"></script>
+  <script src="/merchant-app/assets/js/purchasing.js?v=1.0.3"></script>
   <script src="/merchant-app/assets/js/promotions.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/staff.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/orders.js?v=1.0.1"></script>

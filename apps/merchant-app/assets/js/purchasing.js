@@ -1126,6 +1126,23 @@
   }
   window.loadPurchasingHistory = loadPurchasingHistory;
 
+  function highlightMatch(text, query) {
+    if (!query || !text) return esc(text || '');
+    var escapedText = esc(text);
+    var q = esc(query);
+    var safeQ = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    var regex = new RegExp('(' + safeQ + ')', 'gi');
+    return escapedText.replace(regex, '<mark style="background:#fef08a; color:#854d0e; padding:1px 3px; border-radius:4px; font-weight:800;">$1</mark>');
+  }
+
+  function formatLocalDate(d) {
+    if (!(d instanceof Date) || isNaN(d)) return '';
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+  }
+
   function onPurchasingHistorySearch(val) {
     _activeHistorySearchQuery = (val || '').trim().toLowerCase();
     var clearBtn = $('btn-clear-history-search');
@@ -1136,7 +1153,10 @@
 
   function clearPurchasingHistorySearch() {
     var input = $('purchasing-history-search');
-    if (input) input.value = '';
+    if (input) {
+      input.value = '';
+      input.focus();
+    }
     onPurchasingHistorySearch('');
   }
   window.clearPurchasingHistorySearch = clearPurchasingHistorySearch;
@@ -1158,6 +1178,15 @@
     var container = $('purchasing-history-container');
     if (!container) return;
 
+    // Pastikan event listener search bound
+    var sInput = $('purchasing-history-search');
+    if (sInput && !sInput._searchBound) {
+      sInput._searchBound = true;
+      sInput.addEventListener('input', function () { onPurchasingHistorySearch(this.value); });
+      sInput.addEventListener('keyup', function () { onPurchasingHistorySearch(this.value); });
+      sInput.addEventListener('search', function () { onPurchasingHistorySearch(this.value); });
+    }
+
     if (!_purchasingHistorySessions || !_purchasingHistorySessions.length) {
       container.innerHTML =
         '<div style="text-align:center; padding:40px 20px; background:#fff; border-radius:16px; border:1px dashed #cbd5e1;">' +
@@ -1169,22 +1198,26 @@
     }
 
     var now = new Date();
-    var todayStr = now.toISOString().slice(0, 10);
-    var yesterday = new Date(Date.now() - 86400000);
-    var yesterdayStr = yesterday.toISOString().slice(0, 10);
+    var todayLocal = formatLocalDate(now);
+    var yesterdayLocal = formatLocalDate(new Date(Date.now() - 86400000));
 
     // Apply Filter
     var filtered = _purchasingHistorySessions.filter(function (sess) {
-      // Date filter
-      var sessDate = '';
-      try {
-        sessDate = new Date(sess.timestamp).toISOString().slice(0, 10);
-      } catch (_) {}
+      var d = new Date(sess.timestamp);
+      var sessLocal = formatLocalDate(d);
 
-      if (_activeHistoryDateFilter === 'today' && sessDate !== todayStr) return false;
-      if (_activeHistoryDateFilter === 'yesterday' && sessDate !== yesterdayStr) return false;
+      var dateStr = '';
+      try {
+        dateStr = d.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      } catch (_) {
+        dateStr = sess.timestamp;
+      }
+
+      // Date filter
+      if (_activeHistoryDateFilter === 'today' && sessLocal !== todayLocal) return false;
+      if (_activeHistoryDateFilter === 'yesterday' && sessLocal !== yesterdayLocal) return false;
       if (_activeHistoryDateFilter === 'week') {
-        var diffDays = (now.getTime() - new Date(sess.timestamp).getTime()) / (1000 * 3600 * 24);
+        var diffDays = (now.getTime() - d.getTime()) / (1000 * 3600 * 24);
         if (diffDays > 7) return false;
       }
 
@@ -1193,10 +1226,14 @@
         var query = _activeHistorySearchQuery;
         var matchSessionId = (sess.posting_id || '').toLowerCase().includes(query);
         var matchActor = (sess.actor_name || '').toLowerCase().includes(query);
+        var matchDate = dateStr.toLowerCase().includes(query);
         var matchItems = (sess.items || []).some(function (itm) {
-          return (itm.material_name || '').toLowerCase().includes(query);
+          return (itm.material_name || '').toLowerCase().includes(query) ||
+                 (itm.uom || '').toLowerCase().includes(query) ||
+                 String(itm.unit_price).includes(query) ||
+                 String(itm.total_price).includes(query);
         });
-        if (!matchSessionId && !matchActor && !matchItems) return false;
+        if (!matchSessionId && !matchActor && !matchDate && !matchItems) return false;
       }
 
       return true;
@@ -1206,8 +1243,9 @@
       container.innerHTML =
         '<div style="text-align:center; padding:32px 20px; background:#fff; border-radius:16px; border:1px dashed #cbd5e1;">' +
           '<div style="font-size:28px; margin-bottom:6px;">🔍</div>' +
-          '<div style="font-size:14.5px; font-weight:700; color:#334155;">Tidak Ada Hasil Ditemukan</div>' +
-          '<div style="font-size:12px; color:#64748b; margin-top:4px;">Coba ubah kata kunci pencarian atau ganti filter tanggal.</div>' +
+          '<div style="font-size:14.5px; font-weight:700; color:#334155;">Tidak Ada Hasil untuk "' + esc(_activeHistorySearchQuery || _activeHistoryDateFilter) + '"</div>' +
+          '<div style="font-size:12px; color:#64748b; margin-top:4px;">Coba ubah kata kunci (nama bahan, nomor nota STL, nama petugas).</div>' +
+          '<button type="button" class="x-btn-secondary" onclick="clearPurchasingHistorySearch(); setPurchasingHistoryFilter(\'all\');" style="margin-top:12px; font-size:12px; padding:6px 14px; border-radius:8px;">Reset Pencarian</button>' +
         '</div>';
       return;
     }
@@ -1222,24 +1260,44 @@
         dateStr = sess.timestamp;
       }
 
+      // Saring item di dalam card jika user mencari kata kunci nama bahan tertentu
+      var displayItems = sess.items;
+      var isItemFiltered = false;
+      if (_activeHistorySearchQuery) {
+        var q = _activeHistorySearchQuery;
+        var matchedItems = sess.items.filter(function (itm) {
+          return (itm.material_name || '').toLowerCase().includes(q) ||
+                 (itm.uom || '').toLowerCase().includes(q);
+        });
+        if (matchedItems.length > 0) {
+          displayItems = matchedItems;
+          isItemFiltered = (matchedItems.length < sess.items.length);
+        }
+      }
+
+      var matchFilterBadge = isItemFiltered
+        ? '<div style="font-size:11px; font-weight:700; color:#0369a1; background:#f0f9ff; padding:2px 8px; border-radius:6px; border:1px solid #bae6fd; display:inline-block; margin-top:4px;">Cocok: ' + displayItems.length + ' dari ' + sess.items.length + ' item</div>'
+        : '';
+
       html +=
         '<div class="purchasing-history-card">' +
           '<div class="purchasing-history-head">' +
             '<div>' +
-              '<div class="purchasing-history-date">' + esc(dateStr) + '</div>' +
-              '<div class="purchasing-history-actor">Petugas: ' + esc(sess.actor_name) + (sess.posting_id ? ' • <span style="font-weight:700; color:#0284c7;">' + esc(sess.posting_id) + '</span>' : '') + '</div>' +
+              '<div class="purchasing-history-date">' + highlightMatch(dateStr, _activeHistorySearchQuery) + '</div>' +
+              '<div class="purchasing-history-actor">Petugas: ' + highlightMatch(sess.actor_name, _activeHistorySearchQuery) + (sess.posting_id ? ' • <span style="font-weight:700; color:#0284c7;">' + highlightMatch(sess.posting_id, _activeHistorySearchQuery) + '</span>' : '') + '</div>' +
+              matchFilterBadge +
             '</div>' +
             '<div class="purchasing-history-total">' + formatMoney(sess.total_spend) + '</div>' +
           '</div>' +
           '<div class="purchasing-history-items-list">';
 
-      sess.items.forEach(function (itm) {
+      displayItems.forEach(function (itm) {
         var qtyFormatted = itm.quantity % 1 === 0 ? itm.quantity : Number(itm.quantity).toFixed(1);
         html +=
           '<div class="purchasing-history-item-row">' +
             '<div style="flex:1; min-width:0;">' +
-              '<div style="font-size:13.5px; font-weight:700; color:#0f172a;">' + esc(itm.material_name) + '</div>' +
-              '<div style="font-size:11.5px; color:#64748b;">' + qtyFormatted + ' ' + esc(itm.uom) + ' @ ' + formatMoney(itm.unit_price) + '</div>' +
+              '<div style="font-size:13.5px; font-weight:700; color:#0f172a;">' + highlightMatch(itm.material_name, _activeHistorySearchQuery) + '</div>' +
+              '<div style="font-size:11.5px; color:#64748b;">' + qtyFormatted + ' ' + highlightMatch(itm.uom, _activeHistorySearchQuery) + ' @ ' + formatMoney(itm.unit_price) + '</div>' +
             '</div>' +
             '<div style="font-size:13px; font-weight:800; color:#334155;">' + formatMoney(itm.total_price) + '</div>' +
           '</div>';
