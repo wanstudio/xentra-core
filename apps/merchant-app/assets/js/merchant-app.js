@@ -290,10 +290,14 @@
       if (mobileNav) {
         mobileNav.style.display = 'none';
       }
+      var bottomBar = $('purchasing-bottom-bar');
+      if (bottomBar) bottomBar.style.display = 'flex';
     } else {
       document.body.classList.remove('is-purchasing-mode');
       if (purchasingTopbar) purchasingTopbar.style.display = 'none';
       if (mobileTopbar) mobileTopbar.style.display = '';
+      var bottomBar = $('purchasing-bottom-bar');
+      if (bottomBar) bottomBar.style.display = 'none';
     }
 
     // Show Mandat tab button for Branch Manager / Manager

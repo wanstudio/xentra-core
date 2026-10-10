@@ -947,14 +947,23 @@ body.is-purchasing-mode .icon-btn.icon-btn-exit:hover {
   border-color: #fecaca;
 }
 
-/* Hide purchasing-bottom-nav by default when not in purchasing mode */
-#purchasing-bottom-nav {
+/* Hide purchasing-bottom-nav and purchasing-bottom-bar by default when not in purchasing mode */
+#purchasing-bottom-nav,
+#purchasing-bottom-bar {
   display: none !important;
+}
+
+/* Ensure tab-content has no animations or transforms that trap position:fixed */
+body.is-purchasing-mode .x-tab-content,
+body.is-purchasing-mode #tab-bm-belanja,
+#tab-bm-belanja {
+  animation: none !important;
+  transform: none !important;
 }
 
 /* 1:1 .content padding: ensure last item is fully visible and not blocked by floating settlement bar + bottom nav */
 body.is-purchasing-mode #tab-bm-belanja {
-  padding: 18px 16px 200px !important;
+  padding: 16px 14px 220px !important;
   box-sizing: border-box !important;
 }
 
@@ -977,12 +986,6 @@ body.is-purchasing-mode #purchasing-bottom-nav {
   z-index: 50 !important;
   box-shadow: 0 -8px 25px rgba(0, 0, 0, 0.35) !important;
   box-sizing: border-box !important;
-}
-
-@media (min-width: 700px) {
-  body.is-purchasing-mode .bottom-nav {
-    position: absolute !important;
-  }
 }
 
 /* 1:1 .nav-item */
@@ -1545,12 +1548,6 @@ body.is-purchasing-mode #purchasing-bottom-bar {
   body.is-purchasing-mode .nav-icon {
     width: 22px !important;
     height: 22px !important;
-  }
-}
-
-@media (min-width: 700px) {
-  body.is-purchasing-mode #purchasing-bottom-bar {
-    position: absolute !important;
   }
 }
 

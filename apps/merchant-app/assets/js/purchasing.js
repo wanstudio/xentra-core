@@ -82,7 +82,7 @@
 
         var badgeEl = $('badge-purchasing-low-count');
         if (badgeEl) {
-          badgeEl.textContent = 'Mandat #' + activeMandate.mandate_number;
+          badgeEl.textContent = '#' + activeMandate.mandate_number;
           badgeEl.className = 'x-badge x-badge-primary';
         }
 
@@ -171,19 +171,15 @@
 
     var titleEl = $('purchasing-list-title');
     if (titleEl) {
-      if (_purchasingState.activeMandateId) {
-        titleEl.textContent = 'Daftar Belanja (Mandat Aktif)';
-      } else {
-        titleEl.textContent = 'Daftar Belanja Pasar';
-      }
+      titleEl.textContent = 'Daftar Belanja';
     }
 
     if (!items.length) {
       container.innerHTML =
         '<div style="text-align:center; padding:40px 20px; background:#f8fafc; border-radius:12px; border:1px dashed #cbd5e1;">' +
           '<div style="font-size:36px; margin-bottom:8px;">🥬</div>' +
-          '<div style="font-size:15px; font-weight:700; color:#334155;">Belum Ada Tugas Belanja Pasar</div>' +
-          '<div style="font-size:12px; color:#64748b; margin-top:4px;">Mandat belanja belum dirilis oleh Branch Manager atau semua bahan masih tercukupi.</div>' +
+          '<div style="font-size:15px; font-weight:700; color:#334155;">Belum Ada Tugas Belanja</div>' +
+          '<div style="font-size:12px; color:#64748b; margin-top:4px;">Daftar belanja belum dibuat atau semua bahan masih tercukupi.</div>' +
         '</div>';
       return;
     }
