@@ -1014,7 +1014,7 @@
             </div>
             <div class="purchasing-kasbon-input-wrap">
               <span class="purchasing-kasbon-currency">Rp</span>
-              <input type="number" id="input-purchasing-cash-advance" class="purchasing-kasbon-input" placeholder="0" min="0" step="1000" inputmode="numeric" oninput="recalculatePurchasingSummary()">
+              <input type="tel" id="input-purchasing-cash-advance" class="purchasing-kasbon-input" placeholder="0" inputmode="numeric" pattern="[0-9]*" oninput="recalculatePurchasingSummary()">
             </div>
             <div class="purchasing-kasbon-footer">
               <span class="purchasing-kasbon-caption">Estimasi kebutuhan belanja:</span>
@@ -1678,7 +1678,7 @@
           <label for="input-purchasing-modal-price" style="display:block; font-size:12px; font-weight:700; color:#1e293b; margin-bottom:4px;">Harga Baru di Pasar (Rp):</label>
           <div class="purchasing-modal-input-wrap">
             <span style="font-size:15px; font-weight:800; color:#059669; margin-right:6px;">Rp</span>
-            <input type="number" id="input-purchasing-modal-price" class="purchasing-modal-input-price" placeholder="0" min="0" step="500" inputmode="numeric" onkeydown="if(event.key === 'Enter') confirmPurchasingPriceUpdate()">
+            <input type="tel" id="input-purchasing-modal-price" class="purchasing-modal-input-price" placeholder="0" inputmode="numeric" pattern="[0-9]*" autocomplete="off" onkeydown="if(event.key === 'Enter') confirmPurchasingPriceUpdate()">
           </div>
         </div>
         <div style="display:flex; gap:10px;">
