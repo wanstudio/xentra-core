@@ -143,55 +143,66 @@
   window.loadPurchasingChecklist = loadPurchasingChecklist;
 
   function filterPurchasingList(mode) {
-    _purchasingState.filterMode = mode;
-    var btnLow = $('btn-purchasing-filter-low');
-    var btnAll = $('btn-purchasing-filter-all');
-    if (btnLow) btnLow.classList.toggle('active', mode === 'low');
-    if (btnAll) btnAll.classList.toggle('active', mode === 'all');
+    // Kept for backward compatibility if called, but now renders all items
     renderPurchasingList();
   }
   window.filterPurchasingList = filterPurchasingList;
+
+  function onPurchasingCardClick(event, materialId) {
+    if (event.target.tagName === 'INPUT' || event.target.tagName === 'BUTTON' || event.target.closest('button')) {
+      return;
+    }
+    var itm = _purchasingState.items.find(function (i) { return i.material_id === materialId; });
+    if (itm) {
+      itm.checked = !itm.checked;
+      renderPurchasingList();
+      recalculatePurchasingSummary();
+    }
+  }
+  window.onPurchasingCardClick = onPurchasingCardClick;
 
   function renderPurchasingList() {
     var container = $('purchasing-checklist-container');
     if (!container) return;
 
-    var filtered = _purchasingState.items.filter(function (item) {
-      if (_purchasingState.filterMode === 'low') {
-        return item.is_low;
-      }
-      return true;
-    });
-
+    var items = _purchasingState.items || [];
     var countEl = $('purchasing-item-count');
-    if (countEl) countEl.textContent = filtered.length;
+    if (countEl) countEl.textContent = items.length;
 
-    if (!filtered.length) {
+    var titleEl = $('purchasing-list-title');
+    if (titleEl) {
+      if (_purchasingState.activeMandateId) {
+        titleEl.textContent = 'Daftar Belanja (Mandat Aktif)';
+      } else {
+        titleEl.textContent = 'Daftar Belanja Pasar';
+      }
+    }
+
+    if (!items.length) {
       container.innerHTML =
         '<div style="text-align:center; padding:40px 20px; background:#f8fafc; border-radius:12px; border:1px dashed #cbd5e1;">' +
           '<div style="font-size:36px; margin-bottom:8px;">🥬</div>' +
-          '<div style="font-size:15px; font-weight:700; color:#334155;">Semua Bahan Masih Aman</div>' +
-          '<div style="font-size:12px; color:#64748b; margin-top:4px;">Tidak ada bahan yang berada di bawah batas minimum stok.</div>' +
-          '<button type="button" class="x-btn-secondary" onclick="filterPurchasingList(\'all\')" style="margin-top:12px; font-size:12px; padding:6px 14px;">Lihat Semua Bahan</button>' +
+          '<div style="font-size:15px; font-weight:700; color:#334155;">Belum Ada Tugas Belanja Pasar</div>' +
+          '<div style="font-size:12px; color:#64748b; margin-top:4px;">Mandat belanja belum dirilis oleh Branch Manager atau semua bahan masih tercukupi.</div>' +
         '</div>';
       return;
     }
 
     var html = '';
-    filtered.forEach(function (item) {
+    items.forEach(function (item) {
       var isChecked = item.checked;
       var subtotal = Math.round(item.buyQty * item.actualUnitPrice);
       var uomCode = item.base_uom_code || item.base_uom_name || 'Unit';
 
       html +=
-        '<div id="card-item-' + esc(item.material_id) + '" class="purchasing-item-card ' + (isChecked ? 'is-checked' : 'is-unchecked') + '" style="border-radius:14px; padding:12px 14px; margin-bottom:8px; background:#ffffff; border:1.5px solid ' + (isChecked ? '#059669' : '#e2e8f0') + '; box-shadow:0 1px 3px rgba(0,0,0,0.03);">' +
+        '<div id="card-item-' + esc(item.material_id) + '" class="purchasing-item-card ' + (isChecked ? 'is-checked' : 'is-unchecked') + '" style="border-radius:14px; padding:12px 14px; margin-bottom:8px; background:#ffffff; border:1.5px solid ' + (isChecked ? '#059669' : '#e2e8f0') + '; box-shadow:0 1px 3px rgba(0,0,0,0.03); cursor:pointer;" onclick="onPurchasingCardClick(event, \'' + esc(item.material_id) + '\')">' +
           '<div class="purchasing-item-main" style="display:flex; align-items:center; gap:12px;">' +
-            '<div class="purchasing-item-check-col">' +
-              '<input type="checkbox" id="chk-' + esc(item.material_id) + '" class="purchasing-check-box" style="width:22px; height:22px; cursor:pointer; accent-color:#059669;" ' + (isChecked ? 'checked' : '') + ' onchange="togglePurchasingItemCheck(\'' + esc(item.material_id) + '\', this.checked)">' +
+            '<div class="purchasing-item-check-col" style="display:flex; align-items:center; justify-content:center; flex-shrink:0;">' +
+              '<input type="checkbox" id="chk-' + esc(item.material_id) + '" class="purchasing-check-box" style="width:24px; height:24px; cursor:pointer; accent-color:#059669;" ' + (isChecked ? 'checked' : '') + ' onclick="event.stopPropagation()" onchange="togglePurchasingItemCheck(\'' + esc(item.material_id) + '\', this.checked)">' +
             '</div>' +
             '<div class="purchasing-item-info-col" style="flex:1; min-width:0;">' +
               '<div style="display:flex; justify-content:space-between; align-items:baseline;">' +
-                '<label for="chk-' + esc(item.material_id) + '" style="font-size:14.5px; font-weight:800; color:#0f172a; cursor:pointer; margin:0;">' +
+                '<label for="chk-' + esc(item.material_id) + '" style="font-size:14.5px; font-weight:800; color:#0f172a; cursor:pointer; margin:0;' + (isChecked ? 'text-decoration:line-through; color:#64748b;' : '') + '" onclick="event.stopPropagation()">' +
                   esc(item.material_name) +
                 '</label>' +
                 '<div class="purchasing-item-subtotal-val" style="font-size:14px; font-weight:800; color:' + (isChecked ? '#059669' : '#475569') + ';">' +
@@ -203,7 +214,7 @@
                   'Beli: <strong style="color:#0f172a; font-size:13px;">' + item.buyQty + ' ' + esc(uomCode) + '</strong>' +
                   ' <span style="color:#94a3b8; font-size:11px;">(kuota terkunci)</span>' +
                 '</div>' +
-                '<button type="button" onclick="openPurchasingUpdatePriceModal(\'' + esc(item.material_id) + '\')" style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:8px; padding:3px 8px; font-size:11.5px; font-weight:700; color:#1e293b; cursor:pointer; display:flex; align-items:center; gap:4px;">' +
+                '<button type="button" onclick="event.stopPropagation(); openPurchasingUpdatePriceModal(\'' + esc(item.material_id) + '\')" style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:8px; padding:3px 8px; font-size:11.5px; font-weight:700; color:#1e293b; cursor:pointer; display:flex; align-items:center; gap:4px;">' +
                   '<span>@ ' + formatMoney(item.actualUnitPrice) + '</span>' +
                   (item.has_price_update ? '<span class="x-badge" style="background:#dbeafe; color:#1e40af; font-size:9.5px; padding:1px 4px;">harga_update</span>' : '<span style="color:#64748b; font-size:11px;">✎</span>') +
                 '</button>' +
@@ -384,31 +395,27 @@
   window.submitPurchasingSettle = submitPurchasingSettle;
 
   /* =========================================================================
-     VIEW SWITCHER (PASAR, PO SUPPLIER, RIWAYAT, MANDAT, KALKULATOR)
+     VIEW SWITCHER (PASAR, PO SUPPLIER, RIWAYAT, KALKULATOR)
      ========================================================================= */
   function switchPurchasingView(viewId) {
     var vTasks = $('purchasing-view-tasks');
     var vPo = $('purchasing-view-po');
     var vHistory = $('purchasing-view-history');
-    var vMandates = $('purchasing-view-mandates');
     var vCalc = $('purchasing-view-calc');
 
     var btnTasks = $('btn-purchasing-nav-tasks');
     var btnPo = $('btn-purchasing-nav-po');
     var btnHistory = $('btn-purchasing-nav-history');
-    var btnMandates = $('btn-purchasing-nav-mandates');
     var btnCalc = $('btn-purchasing-nav-calc');
 
     if (vTasks) vTasks.style.display = viewId === 'tasks' ? 'block' : 'none';
     if (vPo) vPo.style.display = viewId === 'po' ? 'block' : 'none';
     if (vHistory) vHistory.style.display = viewId === 'history' ? 'block' : 'none';
-    if (vMandates) vMandates.style.display = viewId === 'mandates' ? 'block' : 'none';
     if (vCalc) vCalc.style.display = viewId === 'calc' ? 'block' : 'none';
 
     if (btnTasks) btnTasks.classList.toggle('active', viewId === 'tasks');
     if (btnPo) btnPo.classList.toggle('active', viewId === 'po');
     if (btnHistory) btnHistory.classList.toggle('active', viewId === 'history');
-    if (btnMandates) btnMandates.classList.toggle('active', viewId === 'mandates');
     if (btnCalc) btnCalc.classList.toggle('active', viewId === 'calc');
 
     // Hide or show bottom settlement bar only on Tasks view
@@ -421,171 +428,9 @@
       loadPurchasingOrders();
     } else if (viewId === 'history') {
       loadPurchasingHistory();
-    } else if (viewId === 'mandates') {
-      loadPurchasingMandatesManager();
     }
   }
   window.switchPurchasingView = switchPurchasingView;
-
-  // Manager Mandates view loader
-  var _managerMandatesList = [];
-  async function loadPurchasingMandatesManager() {
-    var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
-    if (!branchId) return;
-
-    var container = $('purchasing-mandates-manager-container');
-    if (container) {
-      container.innerHTML = '<div class="text-center py-6 text-muted">Memuat daftar mandat belanja...</div>';
-    }
-
-    try {
-      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/mandates', {
-        headers: getAuthHeaders()
-      });
-      var data = await res.json();
-      if (res.ok && data.success) {
-        _managerMandatesList = data.mandates || [];
-        renderPurchasingMandatesManager(_managerMandatesList);
-      } else {
-        if (container) {
-          container.innerHTML = '<div class="text-center py-6 text-danger">Gagal memuat mandat: ' + esc(data.message || 'Terjadi kesalahan') + '</div>';
-        }
-      }
-    } catch (err) {
-      if (container) {
-        container.innerHTML = '<div class="text-center py-6 text-danger">Gangguan jaringan saat memuat mandat.</div>';
-      }
-    }
-  }
-  window.loadPurchasingMandatesManager = loadPurchasingMandatesManager;
-
-  function renderPurchasingMandatesManager(mandates) {
-    var container = $('purchasing-mandates-manager-container');
-    if (!container) return;
-
-    if (!mandates || !mandates.length) {
-      container.innerHTML = '<div class="text-center py-6 text-muted">' +
-        '<div style="font-size:32px; margin-bottom:8px;">📋</div>' +
-        '<strong>Belum ada mandat belanja</strong>' +
-        '<p style="font-size:12px; margin:4px 0 0;">Mandat belanja dapat dirilis dari Rekomendasi Sistem di Dashboard atau tombol Rilis Mandat.</p>' +
-      '</div>';
-      return;
-    }
-
-    container.innerHTML = mandates.map(function (m) {
-      var statusColor = m.status === 'RELEASED' ? '#b45309' : (m.status === 'COMPLETED' ? '#047857' : '#64748b');
-      var statusBg = m.status === 'RELEASED' ? '#fef3c7' : (m.status === 'COMPLETED' ? '#d1fae5' : '#f1f5f9');
-
-      var itemsHtml = (m.items || []).map(function (itm) {
-        return '<div style="display:flex; justify-content:space-between; font-size:12px; padding:3px 0; border-bottom:1px dashed #e2e8f0;">' +
-          '<span>• ' + esc(itm.material_name) + ' (' + itm.target_quantity + ' ' + esc(itm.base_uom_code || '') + ')</span>' +
-          '<span>' + (itm.is_purchased ? '✓ Terbeli' : 'Belum') + '</span>' +
-        '</div>';
-      }).join('');
-
-      var canEdit = m.status === 'RELEASED';
-      var actions = '<div style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;">';
-      if (canEdit) {
-        actions += '<button type="button" class="purchasing-filter-btn" onclick="promptEditMandateCash(\'' + m.id + '\', ' + (m.cash_advance || 0) + ')" style="padding:4px 8px; font-size:11.5px;">✏️ Ubah Kasbon</button>';
-      }
-      if (m.status !== 'ARCHIVED') {
-        actions += '<button type="button" class="purchasing-filter-btn" onclick="archiveMandateApp(\'' + m.id + '\')" style="padding:4px 8px; font-size:11.5px;">📁 Arsipkan</button>';
-      }
-      actions += '<button type="button" class="purchasing-filter-btn" onclick="deleteMandateApp(\'' + m.id + '\')" style="padding:4px 8px; font-size:11.5px; color:#dc2626; border-color:#fca5a5;">🗑️ Hapus</button>';
-      actions += '</div>';
-
-      return '<div class="purchasing-item-card" style="padding:14px; flex-direction:column; align-items:stretch;">' +
-        '<div style="display:flex; justify-content:space-between; align-items:start;">' +
-          '<div>' +
-            '<strong style="font-size:14px; color:#0f172a;">Mandat #' + esc(m.mandate_number) + '</strong>' +
-            '<div style="font-size:11px; color:#64748b; margin-top:2px;">' + (m.notes ? esc(m.notes) : 'Mandat belanja cabang') + '</div>' +
-          '</div>' +
-          '<span class="x-badge" style="background:' + statusBg + '; color:' + statusColor + '; font-weight:700;">' + esc(m.status) + '</span>' +
-        '</div>' +
-        '<div style="display:flex; justify-content:space-between; margin-top:8px; font-size:12px; background:#f8fafc; padding:6px 10px; border-radius:6px;">' +
-          '<span>Kasbon: <strong style="color:#059669;">' + formatMoney(m.cash_advance || 0) + '</strong></span>' +
-          '<span>Total Target: <strong>' + formatMoney(m.total_planned_budget || 0) + '</strong></span>' +
-        '</div>' +
-        '<div style="margin-top:8px;">' + itemsHtml + '</div>' +
-        actions +
-      '</div>';
-    }).join('');
-  }
-
-  async function promptEditMandateCash(mandateId, currentCash) {
-    var val = prompt('Ubah jumlah uang kasbon (Rp):', currentCash);
-    if (val === null) return;
-    var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
-    if (!branchId) return;
-
-    try {
-      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/mandates/' + encodeURIComponent(mandateId), {
-        method: 'PUT',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ cash_advance: Number(val) || 0 })
-      });
-      var data = await res.json();
-      if (res.ok && data.success) {
-        showToast('✓ Kasbon mandat belanja berhasil diubah.');
-        loadPurchasingMandatesManager();
-      } else {
-        showToast('Gagal update: ' + (data.message || data.error || 'Terjadi kesalahan'));
-      }
-    } catch (err) {
-      showToast('Gangguan jaringan saat mengubah kasbon.');
-    }
-  }
-  window.promptEditMandateCash = promptEditMandateCash;
-
-  async function archiveMandateApp(mandateId) {
-    if (!confirm('Arsipkan mandat belanja ini?')) return;
-    var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
-    if (!branchId) return;
-
-    try {
-      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/mandates/' + encodeURIComponent(mandateId) + '/archive', {
-        method: 'PATCH',
-        headers: getAuthHeaders()
-      });
-      var data = await res.json();
-      if (res.ok && data.success) {
-        showToast('📁 Mandat berhasil diarsipkan.');
-        loadPurchasingMandatesManager();
-      } else {
-        showToast('Gagal arsip: ' + (data.message || data.error || 'Terjadi kesalahan'));
-      }
-    } catch (err) {
-      showToast('Gangguan jaringan saat mengarsipkan mandat.');
-    }
-  }
-  window.archiveMandateApp = archiveMandateApp;
-
-  async function deleteMandateApp(mandateId) {
-    if (!confirm('Hapus permanen mandat belanja ini?')) return;
-    var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
-    if (!branchId) return;
-
-    try {
-      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/mandates/' + encodeURIComponent(mandateId), {
-        method: 'DELETE',
-        headers: getAuthHeaders()
-      });
-      var data = await res.json();
-      if (res.ok && data.success) {
-        showToast('🗑️ Mandat belanja berhasil dihapus permanen.');
-        loadPurchasingMandatesManager();
-      } else {
-        showToast('Gagal hapus: ' + (data.message || data.error || 'Terjadi kesalahan'));
-      }
-    } catch (err) {
-      showToast('Gangguan jaringan saat menghapus mandat.');
-    }
-  }
-  window.deleteMandateApp = deleteMandateApp;
 
   /* =========================================================================
      PO SUPPLIER & GOODS RECEIPT (PENERIMAAN BARANG CABANG)
@@ -734,6 +579,9 @@
     var container = $('purchasing-receive-body');
     if (!container) return;
 
+    var notesEl = $('input-purchasing-receive-notes');
+    var notes = notesEl ? notesEl.value.trim() : '';
+
     var lines = [];
     var lineEls = container.querySelectorAll('.purchasing-receive-line');
     lineEls.forEach(function (el) {
@@ -745,7 +593,8 @@
       lines.push({
         purchase_order_line_id: polId,
         accepted_purchase_quantity: accepted,
-        rejected_purchase_quantity: rejected
+        rejected_purchase_quantity: rejected,
+        rejection_reason: rejected > 0 ? (notes || 'Barang ditolak saat penerimaan') : null
       });
     });
 

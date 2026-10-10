@@ -7201,12 +7201,19 @@ async function loadMenusView() {
       }
 
       var itemsListHtml = (m.items || []).map(function (itm) {
-        var purchaseStatus = itm.is_purchased
-          ? '<span style="color:#059669; font-weight:700;">✓ Terbeli (' + itm.purchased_quantity + ' ' + escapeHtml(itm.base_uom_code || '') + ')</span>'
-          : '<span style="color:#D97706; font-weight:600;">Belum Dibeli (Target ' + itm.target_quantity + ' ' + escapeHtml(itm.base_uom_code || '') + ')</span>';
-        return '<div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:4px 0; border-bottom:1px dashed #E2E8F0;">' +
-          '<span>• <strong>' + escapeHtml(itm.material_name) + '</strong> (' + itm.target_quantity + ' ' + escapeHtml(itm.base_uom_code || '') + ')</span>' +
-          purchaseStatus +
+        return '<div style="display:flex; align-items:center; gap:8px; font-size:12.5px; padding:6px 0; border-bottom:1px dashed #E2E8F0;">' +
+          (itm.is_purchased
+            ? '<span style="color:#059669; font-weight:800; font-size:15px; width:20px; text-align:center; flex-shrink:0;">✓</span>'
+            : '<span style="color:#94A3B8; font-weight:700; font-size:15px; width:20px; text-align:center; flex-shrink:0;">○</span>') +
+          '<div style="flex:1; min-width:0;">' +
+            '<strong>' + escapeHtml(itm.material_name) + '</strong>' +
+            ' <span style="color:#64748B;">(' + itm.target_quantity + ' ' + escapeHtml(itm.base_uom_code || '') + ')</span>' +
+          '</div>' +
+          '<div style="flex-shrink:0;">' +
+            (itm.is_purchased
+              ? '<span style="color:#059669; font-weight:700; font-size:11.5px;">Terbeli (' + itm.purchased_quantity + ' ' + escapeHtml(itm.base_uom_code || '') + ')</span>'
+              : '<span style="color:#D97706; font-weight:600; font-size:11.5px;">Belum Dibeli</span>') +
+          '</div>' +
         '</div>';
       }).join('');
 
