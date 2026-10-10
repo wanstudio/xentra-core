@@ -2270,8 +2270,8 @@ body.is-purchasing-mode #tab-bm-belanja.is-calc-view {
 .purchasing-calc-card {
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 10px;
+  border-radius: 18px;
+  padding: 12px;
   box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
   display: flex;
   flex-direction: column;
@@ -2281,32 +2281,40 @@ body.is-purchasing-mode #tab-bm-belanja.is-calc-view {
   box-sizing: border-box;
 }
 
+/* Layar Kalkulator Gede & Tinggi */
 .purchasing-calc-display-box {
   background: #0f172a;
   color: #ffffff;
-  border-radius: 12px;
-  padding: 8px 14px;
+  border-radius: 16px;
+  padding: 14px 18px;
   text-align: right;
-  margin-bottom: 8px;
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.35);
-  flex-shrink: 0;
+  margin-bottom: 10px;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.45);
+  flex: 1;
+  min-height: 80px;
+  max-height: 140px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 .purchasing-calc-display-formula {
-  font-size: 11.5px;
+  font-size: 13.5px;
   color: #94a3b8;
   font-family: monospace;
-  min-height: 15px;
+  min-height: 18px;
   word-break: break-all;
 }
 
+/* Angka Layar Kalkulator Gede & Jelas */
 .purchasing-calc-display-result {
-  font-size: clamp(20px, 5.5vw, 26px);
+  font-size: clamp(30px, 8vw, 38px);
   font-weight: 800;
-  color: #34d399; /* Green accent */
+  color: #34d399; /* Vibrant green accent */
   letter-spacing: -0.02em;
-  margin-top: 2px;
-  line-height: 1.1;
+  line-height: 1.15;
+  margin-top: 4px;
+  text-shadow: 0 2px 10px rgba(52, 211, 153, 0.2);
 }
 
 .purchasing-calc-kembalian-box {
@@ -2314,7 +2322,7 @@ body.is-purchasing-mode #tab-bm-belanja.is-calc-view {
   border: 1px solid #bbf7d0;
   border-radius: 12px;
   padding: 8px 10px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   flex-shrink: 0;
 }
 
@@ -2324,7 +2332,7 @@ body.is-purchasing-mode #tab-bm-belanja.is-calc-view {
   background: #ffffff;
   border: 1.5px solid #cbd5e1;
   border-radius: 8px;
-  height: 34px;
+  height: 36px;
   padding: 0 8px;
   margin-top: 3px;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -2346,7 +2354,7 @@ body.is-purchasing-mode #tab-bm-belanja.is-calc-view {
   width: 100%;
   height: 100%;
   border: none !important;
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 800;
   padding: 0;
   text-align: right;
@@ -2365,7 +2373,7 @@ body.is-purchasing-mode #tab-bm-belanja.is-calc-view {
 }
 
 .purchasing-btn-quick-cash {
-  padding: 4px 2px;
+  padding: 5px 2px;
   border: 1.5px solid #cbd5e1;
   background: #ffffff;
   border-radius: 8px;
@@ -2391,23 +2399,22 @@ body.is-purchasing-mode #tab-bm-belanja.is-calc-view {
   box-shadow: 0 2px 6px rgba(6, 95, 70, 0.25);
 }
 
+/* Keypad Grid Ukuran Normal */
 .purchasing-calc-keypad {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  grid-template-rows: repeat(5, 1fr);
-  gap: 6px;
-  flex: 1;
-  min-height: 0;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
+/* Tombol Angka Inputan & Tanda Matematik Ukuran Normal */
 .purchasing-key {
-  height: 100%;
-  min-height: 38px;
-  border-radius: 10px;
+  height: 48px;
+  border-radius: 12px;
   border: 1px solid #e2e8f0;
   background: #f8fafc;
   color: #0f172a;
-  font-size: clamp(16px, 4.5vw, 20px);
+  font-size: 18px;
   font-weight: 800;
   cursor: pointer;
   display: flex;
@@ -2418,7 +2425,7 @@ body.is-purchasing-mode #tab-bm-belanja.is-calc-view {
 }
 
 .purchasing-key:active {
-  transform: scale(0.96);
+  transform: scale(0.95);
   background: #e2e8f0;
 }
 
@@ -2426,7 +2433,7 @@ body.is-purchasing-mode #tab-bm-belanja.is-calc-view {
   background: #ecfdf5;
   color: #059669;
   border-color: #a7f3d0;
-  font-size: clamp(18px, 5vw, 22px);
+  font-size: 20px;
 }
 
 .purchasing-key.clear {
