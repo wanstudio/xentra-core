@@ -656,23 +656,28 @@
     if (body) {
       var linesHtml = (po.lines || []).map(function (line, idx) {
         var packDesc = line.supplier_pack_name || (line.base_uom_name || 'unit');
-        var remainingQty = Math.max(0, Number(line.ordered_purchase_quantity) - (Number(line.received_base_quantity || 0) / (Number(line.base_quantity_per_purchase_unit) || 1)));
-        if (remainingQty <= 0) remainingQty = Number(line.ordered_purchase_quantity);
+        var orderedQty = Number(line.ordered_purchase_quantity) || 0;
+        var remainingQty = Math.max(0, orderedQty - (Number(line.received_base_quantity || 0) / (Number(line.base_quantity_per_purchase_unit) || 1)));
+        if (remainingQty <= 0) remainingQty = orderedQty;
 
-        return '<div class="purchasing-receive-line" data-pol-id="' + esc(line.purchase_order_line_id) + '" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:8px;">' +
+        return '<div class="purchasing-receive-line" data-pol-id="' + esc(line.purchase_order_line_id) + '" data-ordered-qty="' + orderedQty + '" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:8px;">' +
           '<div style="display:flex; justify-content:space-between; align-items:center;">' +
             '<div style="font-size:13.5px; font-weight:700; color:#0f172a;">' + esc(line.material_name) + '</div>' +
-            '<span class="x-badge" style="background:#ffffff; border:1px solid #cbd5e1; font-size:11px; color:#475569;">Pesan: ' + esc(line.ordered_purchase_quantity) + ' ' + esc(packDesc) + '</span>' +
+            '<span class="x-badge" style="background:#ffffff; border:1px solid #cbd5e1; font-size:11.5px; color:#475569; font-weight:700;">Dipesan: ' + esc(orderedQty) + ' ' + esc(packDesc) + '</span>' +
           '</div>' +
           '<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">' +
             '<div>' +
               '<label style="font-size:11px; font-weight:700; color:#166534; display:block; margin-bottom:3px;">Layak Terima (' + esc(packDesc) + ')</label>' +
-              '<input type="number" step="any" min="0" class="x-input input-receive-accepted" value="' + esc(remainingQty) + '" style="width:100%; height:38px; border-radius:8px; font-weight:700; color:#0f172a; text-align:center;">' +
+              '<input type="number" step="any" min="0" max="' + orderedQty + '" class="x-input input-receive-accepted" value="' + esc(remainingQty) + '" oninput="onPurchasingReceiveQtyChange(this, \'accepted\')" style="width:100%; height:38px; border-radius:8px; font-weight:800; color:#0f172a; text-align:center;">' +
             '</div>' +
             '<div>' +
-              '<label style="font-size:11px; font-weight:700; color:#991b1b; display:block; margin-bottom:3px;">Ditolak/Rusak</label>' +
-              '<input type="number" step="any" min="0" class="x-input input-receive-rejected" value="0" style="width:100%; height:38px; border-radius:8px; font-weight:700; color:#991b1b; text-align:center;">' +
+              '<label style="font-size:11px; font-weight:700; color:#991b1b; display:block; margin-bottom:3px;">Ditolak / Rusak (' + esc(packDesc) + ')</label>' +
+              '<input type="number" step="any" min="0" max="' + orderedQty + '" class="x-input input-receive-rejected" value="0" oninput="onPurchasingReceiveQtyChange(this, \'rejected\')" style="width:100%; height:38px; border-radius:8px; font-weight:800; color:#991b1b; text-align:center;">' +
             '</div>' +
+          '</div>' +
+          '<div class="purchasing-receive-status-hint" style="font-size:11px; color:#64748b; font-weight:600; display:flex; justify-content:space-between; align-items:center; padding-top:4px; border-top:1px dashed #e2e8f0;">' +
+            '<span>Status fisik:</span>' +
+            '<span class="receive-status-pill" style="font-weight:700; color:#059669;">✓ Lengkap & Baik (' + orderedQty + ' ' + esc(packDesc) + ')</span>' +
           '</div>' +
         '</div>';
       }).join('');
@@ -683,6 +688,64 @@
     if (modal) modal.style.display = 'flex';
   }
   window.openPurchasingReceiveModal = openPurchasingReceiveModal;
+
+  function onPurchasingReceiveQtyChange(inputEl, changedField) {
+    var lineCard = inputEl.closest('.purchasing-receive-line');
+    if (!lineCard) return;
+
+    var orderedQty = Number(lineCard.getAttribute('data-ordered-qty')) || 0;
+    var acceptedInput = lineCard.querySelector('.input-receive-accepted');
+    var rejectedInput = lineCard.querySelector('.input-receive-rejected');
+    var statusPill = lineCard.querySelector('.receive-status-pill');
+
+    var accepted = parseFloat(acceptedInput ? acceptedInput.value : 0) || 0;
+    var rejected = parseFloat(rejectedInput ? rejectedInput.value : 0) || 0;
+
+    if (changedField === 'accepted') {
+      if (accepted < 0) { accepted = 0; if (acceptedInput) acceptedInput.value = 0; }
+      if (accepted > orderedQty) {
+        accepted = orderedQty;
+        if (acceptedInput) acceptedInput.value = orderedQty;
+      }
+      // Pola hitung: Ditolak/Rusak = Dipesan - Layak Diterima
+      rejected = Math.max(0, orderedQty - accepted);
+      if (rejectedInput) rejectedInput.value = rejected;
+    } else if (changedField === 'rejected') {
+      if (rejected < 0) { rejected = 0; if (rejectedInput) rejectedInput.value = 0; }
+      if (rejected > orderedQty) {
+        rejected = orderedQty;
+        if (rejectedInput) rejectedInput.value = orderedQty;
+      }
+      // Pola hitung: Layak Diterima = Dipesan - Ditolak/Rusak
+      accepted = Math.max(0, orderedQty - rejected);
+      if (acceptedInput) acceptedInput.value = accepted;
+    }
+
+    // Update status hint
+    if (statusPill) {
+      if (rejected > 0 && accepted > 0) {
+        statusPill.textContent = '⚠️ ' + accepted + ' Layak, ' + rejected + ' Rusak/Retur';
+        statusPill.style.color = '#b45309';
+      } else if (rejected === orderedQty) {
+        statusPill.textContent = '❌ Seluruh Barang Ditolak (' + rejected + ')';
+        statusPill.style.color = '#dc2626';
+      } else if (accepted === orderedQty && rejected === 0) {
+        statusPill.textContent = '✓ Lengkap & Baik (' + accepted + ')';
+        statusPill.style.color = '#059669';
+      } else {
+        var shortage = Math.max(0, orderedQty - (accepted + rejected));
+        statusPill.textContent = '⚠️ Kurang Kirim: ' + shortage;
+        statusPill.style.color = '#b45309';
+      }
+    }
+
+    // Auto-update placeholder catatan bila ada barang rusak
+    var notesEl = $('input-purchasing-receive-notes');
+    if (notesEl && rejected > 0 && !notesEl.value) {
+      notesEl.placeholder = 'Catatan: ' + rejected + ' barang ditolak (tulis alasan cacat/segel rusak untuk retur supplier)';
+    }
+  }
+  window.onPurchasingReceiveQtyChange = onPurchasingReceiveQtyChange;
 
   function closePurchasingReceiveModal() {
     var modal = $('modal-purchasing-receive');
