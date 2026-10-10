@@ -1049,6 +1049,7 @@ router.get('/admin/branches/:id/purchasing/orders', requireAuth(['owner', 'brand
     const orders = db.prepare(`
       SELECT 
         po.id,
+        po.po_number,
         po.supplier_id,
         s.name AS supplier_name,
         po.destination_stock_location_id,

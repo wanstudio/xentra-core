@@ -290,11 +290,22 @@ class ProcurementService {
 
     const poId = 'po_' + crypto.randomBytes(8).toString('hex');
     const now = new Date().toISOString();
+    const today = now.slice(2, 10).replace(/-/g, '');
+    let dailySeq = 1;
+    try {
+      const countRow = repository.db.queryOne(
+        "SELECT COUNT(*) AS count FROM purchase_orders WHERE organization_id = ? AND date(created_at) = date('now')",
+        [orgId]
+      );
+      dailySeq = ((countRow && countRow.count) || 0) + 1;
+    } catch (_) {}
+    const poNumber = 'PO-' + today + '-' + String(dailySeq).padStart(4, '0');
 
     repository.beginTransaction();
     try {
       repository.insertPurchaseOrder({
         id: poId,
+        poNumber,
         organizationId: orgId,
         supplierId,
         destinationStockLocationId,
@@ -472,11 +483,21 @@ class ProcurementService {
     const receivedTimestamp = receivedAt ? text(receivedAt, 'RECEIVED_AT_INVALID') : null;
     const postingTimestamp = new Date().toISOString();
     const actor = receivedBy || null;
+    const today = postingTimestamp.slice(2, 10).replace(/-/g, '');
+    let grSeq = 1;
+    try {
+      const grCountRow = repository.db.queryOne(
+        "SELECT COUNT(*) AS count FROM goods_receipts WHERE date(created_at) = date('now')"
+      );
+      grSeq = ((grCountRow && grCountRow.count) || 0) + 1;
+    } catch (_) {}
+    const receiptNumber = 'GR-' + today + '-' + String(grSeq).padStart(4, '0');
 
     repository.beginTransaction();
     try {
       repository.insertGoodsReceipt({
         id: receiptId,
+        receiptNumber,
         purchaseOrderId: po.id,
         destinationStockLocationId: po.destination_stock_location_id,
         goodsReceiptPostingId: postingId,

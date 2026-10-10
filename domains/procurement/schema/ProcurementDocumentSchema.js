@@ -282,6 +282,35 @@ function ensureProcurementDocumentSchema(db) {
     try { db.exec("ALTER TABLE suppliers ADD COLUMN notes TEXT;"); } catch (_) {}
   }
 
+  // Ensure standard document numbering columns
+  const poCols = db.prepare('PRAGMA table_info(purchase_orders)').all();
+  if (!poCols.some(row => row && row.name === 'po_number')) {
+    try { db.exec("ALTER TABLE purchase_orders ADD COLUMN po_number TEXT;"); } catch (_) {}
+  }
+  try {
+    const unnumberedPOs = db.prepare("SELECT id, created_at FROM purchase_orders WHERE po_number IS NULL OR po_number = '' ORDER BY created_at ASC").all();
+    let poSeq = 1;
+    for (const p of unnumberedPOs) {
+      const dt = (p.created_at || new Date().toISOString()).slice(2, 10).replace(/-/g, '');
+      const code = 'PO-' + dt + '-' + String(poSeq++).padStart(4, '0');
+      db.prepare("UPDATE purchase_orders SET po_number = ? WHERE id = ?").run(code, p.id);
+    }
+  } catch (_) {}
+
+  const grCols = db.prepare('PRAGMA table_info(goods_receipts)').all();
+  if (!grCols.some(row => row && row.name === 'receipt_number')) {
+    try { db.exec("ALTER TABLE goods_receipts ADD COLUMN receipt_number TEXT;"); } catch (_) {}
+  }
+  try {
+    const unnumberedGRs = db.prepare("SELECT id, created_at FROM goods_receipts WHERE receipt_number IS NULL OR receipt_number = '' ORDER BY created_at ASC").all();
+    let grSeq = 1;
+    for (const g of unnumberedGRs) {
+      const dt = (g.created_at || new Date().toISOString()).slice(2, 10).replace(/-/g, '');
+      const code = 'GR-' + dt + '-' + String(grSeq++).padStart(4, '0');
+      db.prepare("UPDATE goods_receipts SET receipt_number = ? WHERE id = ?").run(code, g.id);
+    }
+  } catch (_) {}
+
   ensuredDbs.add(db);
 }
 

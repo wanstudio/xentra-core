@@ -56,7 +56,7 @@ class ProcurementRepository {
 
   findPurchaseOrder(id) {
     return this.db.queryOne(
-      'SELECT id, organization_id, supplier_id, destination_stock_location_id, status, required_at, created_by, approved_by, approved_at, ordered_at, created_at, updated_at FROM purchase_orders WHERE id = ?',
+      'SELECT id, po_number, organization_id, supplier_id, destination_stock_location_id, status, required_at, created_by, approved_by, approved_at, ordered_at, created_at, updated_at FROM purchase_orders WHERE id = ?',
       [id]
     );
   }
@@ -151,10 +151,10 @@ class ProcurementRepository {
     );
   }
 
-  insertPurchaseOrder({ id, organizationId, supplierId, destinationStockLocationId, status = 'DRAFT', requiredAt = null, createdBy = null, createdAt, updatedAt }) {
+  insertPurchaseOrder({ id, poNumber = null, organizationId, supplierId, destinationStockLocationId, status = 'DRAFT', requiredAt = null, createdBy = null, createdAt, updatedAt }) {
     return this.db.execute(
-      'INSERT INTO purchase_orders (id, organization_id, supplier_id, destination_stock_location_id, status, required_at, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [id, organizationId, supplierId, destinationStockLocationId, status, requiredAt, createdBy, createdAt, updatedAt]
+      'INSERT INTO purchase_orders (id, po_number, organization_id, supplier_id, destination_stock_location_id, status, required_at, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, poNumber, organizationId, supplierId, destinationStockLocationId, status, requiredAt, createdBy, createdAt, updatedAt]
     );
   }
 
@@ -192,10 +192,10 @@ class ProcurementRepository {
     );
   }
 
-  insertGoodsReceipt({ id, purchaseOrderId, destinationStockLocationId, goodsReceiptPostingId, receivedBy = null, receivedAt, createdAt, updatedAt }) {
+  insertGoodsReceipt({ id, receiptNumber = null, purchaseOrderId, destinationStockLocationId, goodsReceiptPostingId, receivedBy = null, receivedAt, createdAt, updatedAt }) {
     return this.db.execute(
-      'INSERT INTO goods_receipts (id, purchase_order_id, destination_stock_location_id, status, goods_receipt_posting_id, received_by, received_at, created_at, updated_at) VALUES (?, ?, ?, \'DRAFT\', ?, ?, ?, ?, ?)',
-      [id, purchaseOrderId, destinationStockLocationId, goodsReceiptPostingId, receivedBy, receivedAt, createdAt, updatedAt]
+      'INSERT INTO goods_receipts (id, receipt_number, purchase_order_id, destination_stock_location_id, status, goods_receipt_posting_id, received_by, received_at, created_at, updated_at) VALUES (?, ?, ?, ?, \'DRAFT\', ?, ?, ?, ?, ?)',
+      [id, receiptNumber, purchaseOrderId, destinationStockLocationId, goodsReceiptPostingId, receivedBy, receivedAt, createdAt, updatedAt]
     );
   }
 

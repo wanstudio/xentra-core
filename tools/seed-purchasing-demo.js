@@ -96,9 +96,9 @@ function seedPurchasingDemo() {
 
   db.prepare(`
     INSERT INTO purchase_orders (
-      id, organization_id, supplier_id, destination_stock_location_id,
+      id, po_number, organization_id, supplier_id, destination_stock_location_id,
       status, required_at, ordered_at, created_by, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, 'ORDERED', ?, ?, 'usr_747961ecffd5c9dcd350f218', ?, ?)
+    ) VALUES (?, 'PO-261010-0001', ?, ?, ?, 'ORDERED', ?, ?, 'usr_747961ecffd5c9dcd350f218', ?, ?)
   `).run(poId, orgId, supplierId, loc.id, now, now, now, now);
 
   db.prepare(`
