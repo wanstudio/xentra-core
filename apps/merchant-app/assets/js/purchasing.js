@@ -229,7 +229,7 @@
                   priceHtml +
                 '</div>' +
                 '<button type="button" class="purchasing-btn-price-update" onclick="event.stopPropagation(); openPurchasingUpdatePriceModal(\'' + esc(item.material_id) + '\')">' +
-                  '<span style="color:#64748b; font-size:12px;">✎</span> <span>Harga Baru</span>' +
+                  '<img src="/assets/icons/write.svg" alt="" class="purchasing-btn-price-icon" aria-hidden="true"> <span>Harga Baru</span>' +
                 '</button>' +
               '</div>' +
             '</div>' +
