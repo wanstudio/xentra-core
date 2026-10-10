@@ -653,11 +653,15 @@
     _activeReceivePo = po;
 
     var modal = $('modal-purchasing-receive');
-    var subtitle = $('purchasing-receive-subtitle');
+    var codeEl = $('purchasing-receive-code');
+    var supplierEl = $('purchasing-receive-supplier');
     var body = $('purchasing-receive-body');
 
-    if (subtitle) {
-      subtitle.textContent = (po.po_number || ('PO #' + po.id.slice(-6))) + ' dari ' + po.supplier_name;
+    if (codeEl) {
+      codeEl.textContent = po.po_number || ('PO #' + po.id.slice(-6));
+    }
+    if (supplierEl) {
+      supplierEl.textContent = po.supplier_name;
     }
 
     if (body) {
@@ -673,27 +677,31 @@
                           /^(kg|kilogram|g|gram|gr|l|liter|ml|ons)$/i.test(String(line.base_uom_code || line.base_uom_name || '').trim()) ||
                           /\b(kg|kilogram|gram|liter)\b/i.test(uomStr);
         var maxAllowedQty = isWeighable ? Math.round(orderedQty * 1.10 * 100) / 100 : orderedQty;
+        var toleransiDesc = isWeighable
+          ? 'Maksimal toleransi wajar +10% (hingga ' + maxAllowedQty + ' ' + esc(packDesc) + ')'
+          : '0% (kemasan segel pasti)';
 
         return '<div class="purchasing-receive-line" data-pol-id="' + esc(line.purchase_order_line_id) + '" data-ordered-qty="' + orderedQty + '" data-max-qty="' + maxAllowedQty + '" data-is-weighable="' + (isWeighable ? '1' : '0') + '" data-pack-desc="' + esc(packDesc) + '">' +
-          '<div class="purchasing-receive-line-head">' +
-            '<div class="purchasing-receive-line-name">' + esc(line.material_name) + '</div>' +
-            '<div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">' +
-              (isWeighable ? '<span class="x-badge" style="background:#f0fdf4; border:1px solid #bbf7d0; color:#15803d; font-size:10.5px; font-weight:700;">Toleransi +10%</span>' : '') +
-              '<span class="x-badge purchasing-receive-line-badge">Dipesan: ' + esc(orderedQty) + ' ' + esc(packDesc) + '</span>' +
-            '</div>' +
-          '</div>' +
+          '<!-- 1. Item -->' +
+          '<div class="purchasing-receive-line-name" style="font-size:14.5px; font-weight:800; color:#0f172a; margin-bottom:4px;">' + esc(line.material_name) + '</div>' +
+          '<!-- 2. Dipesan -->' +
+          '<div style="font-size:12px; font-weight:600; color:#475569; margin-bottom:3px;">Dipesan: <strong style="color:#0f172a;">' + esc(orderedQty) + ' ' + esc(packDesc) + '</strong></div>' +
+          '<!-- 3. Toleransi -->' +
+          '<div style="font-size:12px; font-weight:600; color:#64748b; margin-bottom:12px;">Toleransi: <span style="font-weight:700; color:' + (isWeighable ? '#15803d' : '#64748b') + ';">' + toleransiDesc + '</span></div>' +
+          '<!-- 4. 2 Kolom: Layak Terima & Ditolak/Rusak -->' +
           '<div class="purchasing-receive-grid">' +
             '<div class="purchasing-receive-field">' +
               '<label class="purchasing-receive-label label-accepted">Layak Terima</label>' +
-              '<input type="number" step="any" min="0" max="' + maxAllowedQty + '" class="x-input input-receive-accepted purchasing-receive-input" value="' + esc(remainingQty) + '" oninput="onPurchasingReceiveQtyChange(this, \'accepted\')">' +
+              '<input type="number" inputmode="decimal" step="any" min="0" max="' + maxAllowedQty + '" class="x-input input-receive-accepted purchasing-receive-input" value="' + esc(remainingQty) + '" oninput="onPurchasingReceiveQtyChange(this, \'accepted\')">' +
             '</div>' +
             '<div class="purchasing-receive-field">' +
               '<label class="purchasing-receive-label label-rejected">Ditolak / Rusak</label>' +
-              '<input type="number" step="any" min="0" max="' + orderedQty + '" class="x-input input-receive-rejected purchasing-receive-input input-rejected" value="0" oninput="onPurchasingReceiveQtyChange(this, \'rejected\')">' +
+              '<input type="number" inputmode="decimal" step="any" min="0" max="' + orderedQty + '" class="x-input input-receive-rejected purchasing-receive-input input-rejected" value="0" oninput="onPurchasingReceiveQtyChange(this, \'rejected\')">' +
             '</div>' +
           '</div>' +
+          '<!-- 5. Kondisi: -->' +
           '<div class="purchasing-receive-status-hint">' +
-            '<span>Status fisik:</span>' +
+            '<span style="font-weight:700; color:#475569;">Kondisi:</span>' +
             '<span class="receive-status-pill">✓ Lengkap & Baik</span>' +
           '</div>' +
         '</div>';
@@ -706,7 +714,7 @@
     var notesEl = $('input-purchasing-receive-notes');
     if (notesEl) {
       notesEl.value = '';
-      notesEl.placeholder = 'Contoh: 1 kemasan bocor di jalan, sisanya diterima baik.';
+      notesEl.placeholder = 'Tuliskan keterangan jika ada selisih timbangan, kemasan rusak, atau cacat...';
     }
     updatePurchasingReceiveModalCta();
   }
