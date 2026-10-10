@@ -687,7 +687,7 @@
           '</div>' +
           '<div class="purchasing-receive-status-hint">' +
             '<span>Status fisik:</span>' +
-            '<span class="receive-status-pill">✓ Lengkap & Baik (' + orderedQty + ' ' + esc(packDesc) + ')</span>' +
+            '<span class="receive-status-pill">✓ Lengkap & Baik</span>' +
           '</div>' +
         '</div>';
       }).join('');
@@ -819,7 +819,7 @@
         statusPill.textContent = '❌ Seluruh Barang Ditolak (' + rejected + ')';
         statusPill.style.color = '#dc2626';
       } else if (accepted === orderedQty && rejected === 0) {
-        statusPill.textContent = '✓ Lengkap & Baik (' + accepted + ' ' + packDesc + ')';
+        statusPill.textContent = '✓ Lengkap & Baik';
         statusPill.style.color = '#059669';
       } else {
         var shortage = Math.max(0, orderedQty - (accepted + rejected));
