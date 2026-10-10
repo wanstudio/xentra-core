@@ -2371,29 +2371,40 @@ body.is-purchasing-mode #tab-bm-belanja.is-calc-view {
 .purchasing-calc-quick-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 4px;
-  margin-top: 5px;
-  margin-bottom: 5px;
+  gap: 5px;
+  margin-top: 6px;
+  margin-bottom: 6px;
 }
 
 .purchasing-btn-quick-cash {
-  padding: 5px 2px;
+  height: 38px;
+  min-height: 38px;
+  padding: 0 2px;
   border: 1.5px solid #cbd5e1;
   background: #ffffff;
-  border-radius: 8px;
-  font-size: 11px;
+  border-radius: 9px;
+  font-size: clamp(10.5px, 2.9vw, 12px);
   font-weight: 800;
   color: #0f172a;
   cursor: pointer;
   transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   user-select: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .purchasing-btn-quick-cash:hover {
   background: #065f46;
   color: #ffffff;
   border-color: #065f46;
+}
+
+.purchasing-btn-quick-cash:active {
+  transform: scale(0.96);
 }
 
 .purchasing-btn-quick-cash.active {
