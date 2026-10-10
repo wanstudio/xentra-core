@@ -6908,10 +6908,8 @@ async function loadMenusView() {
 
   function switchStockSubtab(subtab) {
     if (!subtab) subtab = 'branches';
-    var branchBtn = $('btn-subtab-stock-branches');
-    var recipesBtn = $('btn-subtab-stock-recipes');
-    var matBtn = $('btn-subtab-stock-materials');
     var branchContent = $('subtab-content-stock-branches');
+    var replContent = $('subtab-content-stock-replenishment');
     var recipesContent = $('subtab-content-stock-recipes');
     var matContent = $('subtab-content-stock-materials');
 
@@ -6919,23 +6917,157 @@ async function loadMenusView() {
       tab.classList.toggle('active', tab.dataset.subtab === subtab);
     });
 
-    if (subtab === 'recipes') {
+    if (subtab === 'replenishment') {
       if (branchContent) branchContent.style.display = 'none';
+      if (replContent) replContent.style.display = 'block';
+      if (recipesContent) recipesContent.style.display = 'none';
+      if (matContent) matContent.style.display = 'none';
+      loadOwnerReplenishmentSuggestions();
+    } else if (subtab === 'recipes') {
+      if (branchContent) branchContent.style.display = 'none';
+      if (replContent) replContent.style.display = 'none';
       if (recipesContent) recipesContent.style.display = 'block';
       if (matContent) matContent.style.display = 'none';
       loadOwnerRecipes();
     } else if (subtab === 'materials') {
       if (branchContent) branchContent.style.display = 'none';
+      if (replContent) replContent.style.display = 'none';
       if (recipesContent) recipesContent.style.display = 'none';
       if (matContent) matContent.style.display = 'block';
       loadOwnerMaterials();
       loadOwnerUoms();
     } else {
       if (branchContent) branchContent.style.display = 'block';
+      if (replContent) replContent.style.display = 'none';
       if (recipesContent) recipesContent.style.display = 'none';
       if (matContent) matContent.style.display = 'none';
       loadOwnerStockOverview();
     }
+  }
+
+  /* =========================================================================
+     MODUL: AUTOMATED REPLENISHMENT / SARAN BELANJA BERBASIS RESEP & MOQ
+     ========================================================================= */
+  var _ownerReplenishmentData = null;
+
+  async function loadOwnerReplenishmentSuggestions() {
+    var container = $('owner-replenishment-suggestions-container');
+    if (container) {
+      container.innerHTML = '<div class="x-owner-stock-loading">Menghitung defisit menu, kebutuhan resep, dan MOQ supplier...</div>';
+    }
+
+    var branchId = getEffectiveBranchId();
+    var query = branchId ? '?branch_id=' + encodeURIComponent(branchId) : '';
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/inventory-workflow/replenishment-suggestions' + query, {
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+
+      if (res.ok && data.success) {
+        _ownerReplenishmentData = data.data || {};
+        renderOwnerReplenishmentSuggestions(_ownerReplenishmentData);
+      } else {
+        if (container) {
+          container.innerHTML = '<div class="x-owner-stock-error" style="color:#DC2626; padding:16px;">Gagal memuat saran belanja: ' + escapeHtml(data.error || 'Server error') + '</div>';
+        }
+      }
+    } catch (e) {
+      if (container) {
+        container.innerHTML = '<div class="x-owner-stock-error" style="color:#DC2626; padding:16px;">Gagal menghubungi server untuk saran belanja.</div>';
+      }
+    }
+  }
+  window.loadOwnerReplenishmentSuggestions = loadOwnerReplenishmentSuggestions;
+
+  function renderOwnerReplenishmentSuggestions(data) {
+    var container = $('owner-replenishment-suggestions-container');
+    if (!container) return;
+
+    var suggestions = data.suggestions || [];
+    if (!suggestions.length) {
+      container.innerHTML = '<div class="text-center py-10 text-muted" style="padding:32px 16px;">' +
+        '<div style="font-size:36px; margin-bottom:8px;">✨</div>' +
+        '<div style="font-size:15px; font-weight:700; color:#1E293B;">Semua Bahan Baku Aman</div>' +
+        '<p style="font-size:13px; max-width:440px; margin:4px auto 0 auto; color:#64748B; line-height:1.5;">' +
+          'Tidak ada menu siap saji atau bahan baku yang berada di bawah batas minimum pada lokasi ini.' +
+        '</p>' +
+      '</div>';
+      return;
+    }
+
+    var cardsHtml = suggestions.map(function (s) {
+      var reasonsHtml = (s.reasons || []).map(function (r) {
+        if (r.type === 'DIRECT_MATERIAL_POLICY') {
+          return '<span>• Batas minimum bahan mentah (sisa ' + r.current_stock + ', target ' + r.target_stock + ')</span>';
+        }
+        return '<span>• Defisit menu <strong>' + escapeHtml(r.product_name) + '</strong> (-' + r.deficit_portions + ' porsi) butuh ' + r.material_portion_needed + ' ' + escapeHtml(s.base_uom_name) + '</span>';
+      }).join('<br>');
+
+      var sup = s.supplier;
+      var purchaseBox = '';
+      if (sup) {
+        purchaseBox = '<div style="background:#F0FDF4; border:1px solid #BBF7D0; border-radius:10px; padding:10px 12px; margin-top:10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">' +
+          '<div>' +
+            '<div style="font-size:11px; font-weight:700; color:#166534; text-transform:uppercase;">Rekomendasi Supplier: ' + escapeHtml(sup.supplier_name) + '</div>' +
+            '<div style="font-size:14px; font-weight:800; color:#0F172A; margin-top:2px;">' +
+              s.recommended_purchase_packs + ' Pack (' + s.recommended_purchase_base_quantity + ' ' + escapeHtml(s.base_uom_name) + ')' +
+              ' <small style="font-weight:600; color:#64748B;">@ ' + formatMoney(sup.unit_price) + '</small>' +
+            '</div>' +
+            '<div style="font-size:11.5px; color:#166534; margin-top:2px;">(Isi 1 pack = ' + sup.pack_size + ' ' + escapeHtml(sup.pack_uom_name) + ', Min. Beli = ' + sup.minimum_order_quantity + ' pack)</div>' +
+          '</div>' +
+          '<div style="text-align:right;">' +
+            '<div style="font-size:11px; color:#64748B;">Estimasi Biaya:</div>' +
+            '<strong style="font-size:15px; color:#0F172A;">' + formatMoney(s.estimated_cost) + '</strong>' +
+          '</div>' +
+        '</div>';
+      } else {
+        purchaseBox = '<div style="background:#FFFBEB; border:1px solid #FDE68A; border-radius:10px; padding:10px 12px; margin-top:10px; display:flex; justify-content:space-between; align-items:center;">' +
+          '<div>' +
+            '<div style="font-size:11px; font-weight:700; color:#92400E; text-transform:uppercase;">Belanja Pasar / Eceran</div>' +
+            '<div style="font-size:14px; font-weight:800; color:#0F172A; margin-top:2px;">' +
+              s.recommended_purchase_packs + ' ' + escapeHtml(s.base_uom_name) +
+            '</div>' +
+            '<div style="font-size:11.5px; color:#92400E;">Belum ada supplier resmi dengan kemasan terdaftar.</div>' +
+          '</div>' +
+        '</div>';
+      }
+
+      return '<div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:14px; padding:16px; margin-bottom:12px; box-shadow:0 1px 3px rgba(0,0,0,0.03);">' +
+        '<div style="display:flex; justify-content:space-between; align-items:start; flex-wrap:wrap; gap:8px;">' +
+          '<div>' +
+            '<div style="font-size:16px; font-weight:800; color:#0F172A;">' + escapeHtml(s.material_name) + '</div>' +
+            '<div style="font-size:12px; color:#64748B; margin-top:2px;">Kode: ' + escapeHtml(s.material_code) + '</div>' +
+          '</div>' +
+          '<div style="text-align:right;">' +
+            '<div style="font-size:11px; color:#64748B;">Kebutuhan Bersih:</div>' +
+            '<strong style="font-size:15px; color:#DC2626;">' + s.net_deficit_quantity + ' ' + escapeHtml(s.base_uom_name) + '</strong>' +
+          '</div>' +
+        '</div>' +
+        '<div style="font-size:12px; color:#475569; background:#F8FAFC; border-radius:8px; padding:8px 10px; margin-top:10px; border-left:3px solid #3B82F6;">' +
+          '<div style="font-weight:700; color:#1E293B; margin-bottom:2px;">Faktor Perhitungan:</div>' +
+          'Kebutuhan Resep: <strong>' + s.gross_quantity_needed + ' ' + escapeHtml(s.base_uom_name) + '</strong> | Stok Dapur: <strong>' + s.current_stock + ' ' + escapeHtml(s.base_uom_name) + '</strong>' +
+          (s.on_order_stock > 0 ? ' | Dalam Pengiriman PO: <strong>' + s.on_order_stock + ' ' + escapeHtml(s.base_uom_name) + '</strong>' : '') +
+          '<div style="margin-top:4px; font-size:11.5px; color:#64748B;">' + reasonsHtml + '</div>' +
+        '</div>' +
+        purchaseBox +
+      '</div>';
+    }).join('');
+
+    var summaryHeader = '<div style="background:#F1F5F9; border-radius:12px; padding:12px 16px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">' +
+      '<div>' +
+        '<div style="font-size:12px; color:#64748B;">Total ' + suggestions.length + ' Bahan Baku Perlu Dibeli</div>' +
+        '<div style="font-size:16px; font-weight:800; color:#0F172A;">Estimasi Total Anggaran: ' + formatMoney(data.total_estimated_cost || 0) + '</div>' +
+      '</div>' +
+      '<div style="display:flex; gap:8px;">' +
+        '<button type="button" class="x-btn-primary" onclick="showToast(\'✓ Rekomendasi belanja siap diproses oleh Petugas Belanja di cabang.\', \'success\')" style="padding:8px 14px; font-size:13px; font-weight:700; border-radius:10px; background:#059669; border-color:#059669;">' +
+          '✓ Konfirmasi Kebutuhan Belanja' +
+        '</button>' +
+      '</div>' +
+    '</div>';
+
+    container.innerHTML = summaryHeader + cardsHtml;
   }
 
   function loadOwnerUoms() {

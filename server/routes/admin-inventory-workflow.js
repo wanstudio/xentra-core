@@ -6,7 +6,7 @@ const MaterialRepository = require('../../core/data/repositories/MaterialReposit
 const UomRepository = require('../../core/data/repositories/UomRepository');
 const ProcurementRepository = require('../../core/data/repositories/ProcurementRepository');
 const ProductionRepository = require('../../core/data/repositories/ProductionRepository');
-const { ProcurementService } = require('../../domains/procurement');
+const { ProcurementService, ReplenishmentService } = require('../../domains/procurement');
 const { ProductionService } = require('../../domains/production');
 
 const inventoryRepository = new InventoryRepository();
@@ -95,6 +95,21 @@ function registerAdminInventoryWorkflowRoutes(router, deps = {}) {
   router.get('/admin/inventory-workflow/context', authGate, (req, res) => {
     try { return res.json({ success: true, data: listContext(req, db) }); }
     catch (error) { return respondError(res, error); }
+  });
+
+  router.get('/admin/inventory-workflow/replenishment-suggestions', authGate, (req, res) => {
+    try {
+      const orgId = organizationId(req);
+      const stockLocationId = req.query && req.query.stock_location_id || null;
+      const branchId = req.query && req.query.branch_id || null;
+      const result = ReplenishmentService.calculateReplenishment({
+        organizationId: orgId,
+        stockLocationId,
+        branchId,
+        dbInstance: db
+      });
+      return res.json({ success: true, data: result });
+    } catch (error) { return respondError(res, error); }
   });
 
   router.post('/admin/inventory-workflow/locations/branch', authGate, (req, res) => {

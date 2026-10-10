@@ -351,22 +351,26 @@
   window.submitPurchasingSettle = submitPurchasingSettle;
 
   /* =========================================================================
-     VIEW SWITCHER (TUGAS, RIWAYAT, KALKULATOR)
+     VIEW SWITCHER (PASAR, PO SUPPLIER, RIWAYAT, KALKULATOR)
      ========================================================================= */
   function switchPurchasingView(viewId) {
     var vTasks = $('purchasing-view-tasks');
+    var vPo = $('purchasing-view-po');
     var vHistory = $('purchasing-view-history');
     var vCalc = $('purchasing-view-calc');
 
     var btnTasks = $('btn-purchasing-nav-tasks');
+    var btnPo = $('btn-purchasing-nav-po');
     var btnHistory = $('btn-purchasing-nav-history');
     var btnCalc = $('btn-purchasing-nav-calc');
 
     if (vTasks) vTasks.style.display = viewId === 'tasks' ? 'block' : 'none';
+    if (vPo) vPo.style.display = viewId === 'po' ? 'block' : 'none';
     if (vHistory) vHistory.style.display = viewId === 'history' ? 'block' : 'none';
     if (vCalc) vCalc.style.display = viewId === 'calc' ? 'block' : 'none';
 
     if (btnTasks) btnTasks.classList.toggle('active', viewId === 'tasks');
+    if (btnPo) btnPo.classList.toggle('active', viewId === 'po');
     if (btnHistory) btnHistory.classList.toggle('active', viewId === 'history');
     if (btnCalc) btnCalc.classList.toggle('active', viewId === 'calc');
 
@@ -376,11 +380,210 @@
       bottomBar.style.display = viewId === 'tasks' ? 'flex' : 'none';
     }
 
-    if (viewId === 'history') {
+    if (viewId === 'po') {
+      loadPurchasingOrders();
+    } else if (viewId === 'history') {
       loadPurchasingHistory();
     }
   }
   window.switchPurchasingView = switchPurchasingView;
+
+  /* =========================================================================
+     PO SUPPLIER & GOODS RECEIPT (PENERIMAAN BARANG CABANG)
+     ========================================================================= */
+  var _activePoOrders = [];
+  var _activeReceivePo = null;
+
+  async function loadPurchasingOrders() {
+    var user = getStoredUser();
+    var branchId = user ? (user.branch_id || user.branchId) : null;
+    if (!branchId) return;
+
+    var container = $('purchasing-orders-container');
+    if (container) {
+      container.innerHTML = '<div class="text-center py-6 text-muted">Memuat daftar pesanan supplier...</div>';
+    }
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/orders', {
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+
+      if (res.ok && data.success) {
+        _activePoOrders = data.orders || [];
+        renderPurchasingOrdersList();
+      } else {
+        if (container) container.innerHTML = '<div class="text-center py-6 text-muted">Gagal memuat pesanan: ' + esc(data.error || 'Unknown error') + '</div>';
+      }
+    } catch (e) {
+      if (container) container.innerHTML = '<div class="text-center py-6 text-muted">Gagal terhubung ke server.</div>';
+    }
+  }
+  window.loadPurchasingOrders = loadPurchasingOrders;
+
+  function renderPurchasingOrdersList() {
+    var container = $('purchasing-orders-container');
+    if (!container) return;
+
+    if (!_activePoOrders.length) {
+      container.innerHTML = '<div class="text-center py-8 text-muted" style="background:#ffffff; border:1px dashed #cbd5e1; border-radius:14px; padding:24px 16px;">' +
+        '<div style="font-size:32px; margin-bottom:8px;">📦</div>' +
+        '<div style="font-size:14px; font-weight:700; color:#1e293b;">Belum Ada Pesanan PO Aktif</div>' +
+        '<p style="font-size:12px; color:#64748b; margin:4px 0 0;">Semua barang yang dipesan ke supplier sudah selesai diterima atau belum ada PO baru dari Owner.</p>' +
+      '</div>';
+      return;
+    }
+
+    var html = _activePoOrders.map(function (po) {
+      var linesCount = (po.lines || []).length;
+      var statusBadge = po.status === 'ORDERED'
+        ? '<span class="x-badge" style="background:#dbeafe; color:#1e40af; border:none; font-weight:700;">Sedang Dikirim</span>'
+        : (po.status === 'PARTIALLY_RECEIVED'
+          ? '<span class="x-badge" style="background:#fef3c7; color:#92400e; border:none; font-weight:700;">Diterima Sebagian</span>'
+          : '<span class="x-badge" style="background:#f1f5f9; color:#475569; border:none; font-weight:700;">Disetujui</span>');
+
+      var linesSummary = (po.lines || []).map(function (line) {
+        var qty = line.ordered_purchase_quantity;
+        var packName = line.supplier_pack_name || (line.base_uom_name || 'unit');
+        return '<div style="font-size:12.5px; color:#334155; display:flex; justify-content:space-between; padding:3px 0;">' +
+          '<span>' + esc(line.material_name) + '</span>' +
+          '<strong>' + esc(qty) + ' ' + esc(packName) + '</strong>' +
+        '</div>';
+      }).join('');
+
+      return '<div class="purchasing-item-card" style="display:flex; flex-direction:column; gap:10px; padding:14px; border-radius:14px; border:1px solid #e2e8f0; background:#ffffff;">' +
+        '<div style="display:flex; justify-content:space-between; align-items:start;">' +
+          '<div>' +
+            '<div style="font-size:11px; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">PO #' + esc(po.id.slice(-6)) + '</div>' +
+            '<div style="font-size:15px; font-weight:800; color:#0f172a; margin-top:2px;">' + esc(po.supplier_name) + '</div>' +
+          '</div>' +
+          statusBadge +
+        '</div>' +
+        '<div style="background:#f8fafc; border-radius:10px; padding:8px 10px; border:1px solid #f1f5f9;">' +
+          linesSummary +
+        '</div>' +
+        '<div style="display:flex; justify-content:space-between; align-items:center; border-top:1px dashed #e2e8f0; padding-top:10px;">' +
+          '<div style="font-size:12px; color:#64748b;">Total: <strong style="color:#0f172a; font-size:13.5px;">' + formatMoney(po.total_amount) + '</strong></div>' +
+          '<button type="button" class="x-btn-primary" onclick="openPurchasingReceiveModal(\'' + esc(po.id) + '\')" style="padding:8px 14px; font-size:12.5px; font-weight:700; border-radius:10px; background:#059669; border-color:#059669;">' +
+            '📦 Terima Barang' +
+          '</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    container.innerHTML = html;
+  }
+
+  function openPurchasingReceiveModal(poId) {
+    var po = _activePoOrders.find(function (o) { return o.id === poId; });
+    if (!po) return;
+    _activeReceivePo = po;
+
+    var modal = $('modal-purchasing-receive');
+    var subtitle = $('purchasing-receive-subtitle');
+    var body = $('purchasing-receive-body');
+
+    if (subtitle) {
+      subtitle.textContent = 'PO #' + po.id.slice(-6) + ' dari ' + po.supplier_name;
+    }
+
+    if (body) {
+      var linesHtml = (po.lines || []).map(function (line, idx) {
+        var packDesc = line.supplier_pack_name || (line.base_uom_name || 'unit');
+        var remainingQty = Math.max(0, Number(line.ordered_purchase_quantity) - (Number(line.received_base_quantity || 0) / (Number(line.base_quantity_per_purchase_unit) || 1)));
+        if (remainingQty <= 0) remainingQty = Number(line.ordered_purchase_quantity);
+
+        return '<div class="purchasing-receive-line" data-pol-id="' + esc(line.purchase_order_line_id) + '" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:8px;">' +
+          '<div style="display:flex; justify-content:space-between; align-items:center;">' +
+            '<div style="font-size:13.5px; font-weight:700; color:#0f172a;">' + esc(line.material_name) + '</div>' +
+            '<span class="x-badge" style="background:#ffffff; border:1px solid #cbd5e1; font-size:11px; color:#475569;">Pesan: ' + esc(line.ordered_purchase_quantity) + ' ' + esc(packDesc) + '</span>' +
+          '</div>' +
+          '<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">' +
+            '<div>' +
+              '<label style="font-size:11px; font-weight:700; color:#166534; display:block; margin-bottom:3px;">Layak Terima (' + esc(packDesc) + ')</label>' +
+              '<input type="number" step="any" min="0" class="x-input input-receive-accepted" value="' + esc(remainingQty) + '" style="width:100%; height:38px; border-radius:8px; font-weight:700; color:#0f172a; text-align:center;">' +
+            '</div>' +
+            '<div>' +
+              '<label style="font-size:11px; font-weight:700; color:#991b1b; display:block; margin-bottom:3px;">Ditolak/Rusak</label>' +
+              '<input type="number" step="any" min="0" class="x-input input-receive-rejected" value="0" style="width:100%; height:38px; border-radius:8px; font-weight:700; color:#991b1b; text-align:center;">' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+
+      body.innerHTML = linesHtml;
+    }
+
+    if (modal) modal.style.display = 'flex';
+  }
+  window.openPurchasingReceiveModal = openPurchasingReceiveModal;
+
+  function closePurchasingReceiveModal() {
+    var modal = $('modal-purchasing-receive');
+    if (modal) modal.style.display = 'none';
+    _activeReceivePo = null;
+  }
+  window.closePurchasingReceiveModal = closePurchasingReceiveModal;
+
+  async function submitPurchasingReceive() {
+    if (!_activeReceivePo) return;
+    var user = getStoredUser();
+    var branchId = user ? (user.branch_id || user.branchId) : null;
+    if (!branchId) return;
+
+    var container = $('purchasing-receive-body');
+    if (!container) return;
+
+    var lines = [];
+    var lineEls = container.querySelectorAll('.purchasing-receive-line');
+    lineEls.forEach(function (el) {
+      var polId = el.getAttribute('data-pol-id');
+      var accIn = el.querySelector('.input-receive-accepted');
+      var rejIn = el.querySelector('.input-receive-rejected');
+      var accepted = Number(accIn ? accIn.value : 0);
+      var rejected = Number(rejIn ? rejIn.value : 0);
+      lines.push({
+        purchase_order_line_id: polId,
+        accepted_purchase_quantity: accepted,
+        rejected_purchase_quantity: rejected
+      });
+    });
+
+    var btn = $('btn-submit-purchasing-receive');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Menyimpan...';
+    }
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/orders/' + encodeURIComponent(_activeReceivePo.id) + '/receive', {
+        method: 'POST',
+        headers: {
+          ...getAuthHeaders(),
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ lines: lines })
+      });
+      var data = await res.json();
+
+      if (res.ok && data.success) {
+        showToast('✓ Barang berhasil diterima! Stok bahan baku telah bertambah.');
+        closePurchasingReceiveModal();
+        loadPurchasingOrders();
+      } else {
+        showToast('⚠️ Gagal konfirmasi: ' + (data.message || data.error || 'Periksa input barang'));
+      }
+    } catch (e) {
+      showToast('⚠️ Gangguan jaringan saat konfirmasi penerimaan.');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '✓ Terima Barang';
+      }
+    }
+  }
+  window.submitPurchasingReceive = submitPurchasingReceive;
 
   /* =========================================================================
      PURCHASING HISTORY (7 HARI TERAKHIR)

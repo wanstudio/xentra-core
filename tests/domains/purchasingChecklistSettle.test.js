@@ -90,6 +90,7 @@ test.describe('Purchasing / Belanja Pasar Operational Workflow', () => {
     // 4. Seed initial stock balance: Cabai has 2 kg (LOW! last cost 40,000/kg), Bawang has 15 kg (NORMAL, last cost 30,000/kg)
     db.prepare(`INSERT OR REPLACE INTO material_stock_balances (stock_location_id, material_id, quantity_base, carrying_value, moving_average_unit_cost, cost_availability_status, valuation_version, created_at, updated_at) VALUES (?, ?, 2, 80000, 40000, 'AVAILABLE', 1, ?, ?)`).run(locationId, materialId1, new Date().toISOString(), new Date().toISOString());
     db.prepare(`INSERT OR REPLACE INTO material_stock_balances (stock_location_id, material_id, quantity_base, carrying_value, moving_average_unit_cost, cost_availability_status, valuation_version, created_at, updated_at) VALUES (?, ?, 15, 450000, 30000, 'AVAILABLE', 1, ?, ?)`).run(locationId, materialId2, new Date().toISOString(), new Date().toISOString());
+    db.prepare(`INSERT OR REPLACE INTO material_stock_movements (id, stock_location_id, material_id, movement_type, quantity_base, previous_quantity, current_quantity, unit_cost, total_cost, cost_basis_type, source_type, source_reference, posting_mutation_id, currency_code, valuation_version, posting_timestamp, created_at) VALUES ('mov_bawang_init', ?, ?, 'OPENING_STOCK', 15, 0, 15, 30000, 450000, 'OPENING_ACTUAL', 'OPENING_BALANCE', 'INIT-BAWANG-01', 'pm_init_bawang_01', 'IDR', 1, datetime('now', '-1 day'), datetime('now', '-1 day'))`).run(locationId, materialId2);
 
     // 5. Create user and session for purchasing staff
     db.prepare(`INSERT OR IGNORE INTO users (id, brand_id, branch_id, username, role, full_name, password_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, 'hash', ?)`).run(
@@ -234,5 +235,85 @@ test.describe('Purchasing / Belanja Pasar Operational Workflow', () => {
     assert.equal(body.sessions[0].total_spend, 450000);
     assert.equal(body.sessions[0].items[0].material_id, materialId1);
     assert.equal(body.sessions[0].items[0].unit_price, 45000);
+  });
+
+  test('5. GET orders and POST receive allow purchasing staff to confirm Goods Receipt for own branch PO', async () => {
+    const { ProcurementService } = require('../../domains/procurement');
+    const sup = ProcurementService.createSupplier({
+      organizationId: orgId,
+      supplierCode: 'SUP-TEST-GR',
+      name: 'Supplier GR Test',
+      status: 'ACTIVE'
+    });
+    const supMat = ProcurementService.createSupplierMaterial({
+      supplierId: sup.id,
+      materialId: materialId2
+    });
+    const pack = ProcurementService.createSupplierMaterialPack({
+      supplierMaterialId: supMat.id,
+      name: 'Pack Bawang 5kg',
+      contentQuantityBase: 5,
+      contentUomId: 'uom_kg',
+      unitPrice: 150000,
+      currencyCode: 'IDR',
+      minimumOrderQuantity: 1
+    });
+
+    const po = ProcurementService.createPurchaseOrder({
+      organizationId: orgId,
+      supplierId: sup.id,
+      destinationStockLocationId: locationId,
+      lines: [{
+        supplier_material_id: supMat.id,
+        supplier_pack_id: pack.id,
+        ordered_purchase_quantity: 2
+      }],
+      createdBy: 'owner'
+    });
+
+    ProcurementService.approvePurchaseOrder({ purchaseOrderId: po.id });
+    ProcurementService.orderPurchaseOrder({ purchaseOrderId: po.id });
+
+    // Purchasing staff fetch orders
+    const getRes = await fetch(`${baseUrl}/admin/branches/${branchId}/purchasing/orders`, {
+      headers: {
+        'Authorization': `Bearer ${purchasingToken}`,
+        'X-Brand-Id': brandId
+      }
+    });
+    assert.equal(getRes.status, 200);
+    const getBody = await getRes.json();
+    assert.equal(getBody.success, true);
+    const targetPo = getBody.orders.find(o => o.id === po.id);
+    assert.ok(targetPo);
+    assert.equal(targetPo.lines.length, 1);
+
+    // Purchasing staff receive goods
+    const polId = targetPo.lines[0].purchase_order_line_id;
+    const receiveRes = await fetch(`${baseUrl}/admin/branches/${branchId}/purchasing/orders/${po.id}/receive`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${purchasingToken}`,
+        'X-Brand-Id': brandId,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        lines: [{
+          purchase_order_line_id: polId,
+          accepted_purchase_quantity: 2,
+          rejected_purchase_quantity: 0
+        }]
+      })
+    });
+
+    assert.equal(receiveRes.status, 200);
+    const receiveBody = await receiveRes.json();
+    assert.equal(receiveBody.success, true);
+    assert.ok(receiveBody.goods_receipt);
+
+    // Verify stock is updated in location
+    const balance = db.prepare('SELECT quantity_base FROM material_stock_balances WHERE stock_location_id = ? AND material_id = ?').get(locationId, materialId2);
+    // Initial 15 kg + (2 packs * 5 kg = 10 kg) = 25 kg
+    assert.equal(Number(balance.quantity_base), 25);
   });
 });

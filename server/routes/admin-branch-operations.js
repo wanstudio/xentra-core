@@ -740,4 +740,136 @@ router.get('/admin/branches/:id/purchasing/history', requireAuth(['owner', 'bran
   }
 });
 
+// GET /admin/branches/:id/purchasing/orders
+// Returns active POs destined for this branch (ORDERED, PARTIALLY_RECEIVED, APPROVED)
+router.get('/admin/branches/:id/purchasing/orders', requireAuth(['owner', 'brand_manager', 'branch_manager', 'purchasing']), (req, res) => {
+  try {
+    if (['branch_manager', 'purchasing'].includes(req.user.role)) {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (assignedBranchId && assignedBranchId !== req.params.id) {
+        return res.status(403).json({
+          success: false,
+          error: 'FORBIDDEN_BRANCH_SCOPE',
+          message: 'Akses hanya diizinkan untuk cabang yang ditugaskan.'
+        });
+      }
+    }
+
+    const branch = db.prepare('SELECT b.id, b.name, b.brand_id FROM branches b WHERE b.id = ? AND b.brand_id = ?').get(req.params.id, req.brand_id);
+    if (!branch) return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan.' });
+
+    const location = db.prepare("SELECT id FROM stock_locations WHERE branch_id = ? AND is_active = 1 LIMIT 1").get(req.params.id);
+    if (!location) return res.json({ success: true, orders: [] });
+
+    const orders = db.prepare(`
+      SELECT 
+        po.id,
+        po.supplier_id,
+        s.name AS supplier_name,
+        po.destination_stock_location_id,
+        sl.name AS destination_name,
+        po.status,
+        po.required_at,
+        po.ordered_at,
+        po.created_at,
+        COUNT(pol.id) AS total_items,
+        COALESCE(SUM(pol.ordered_purchase_quantity * pol.unit_price), 0) AS total_amount
+      FROM purchase_orders po
+      JOIN suppliers s ON s.id = po.supplier_id
+      JOIN stock_locations sl ON sl.id = po.destination_stock_location_id
+      LEFT JOIN purchase_order_lines pol ON pol.purchase_order_id = po.id
+      WHERE po.destination_stock_location_id = ?
+        AND po.status IN ('APPROVED', 'ORDERED', 'PARTIALLY_RECEIVED')
+      GROUP BY po.id
+      ORDER BY po.created_at DESC
+    `).all(location.id);
+
+    // Fetch lines for each order
+    for (const order of orders) {
+      order.lines = db.prepare(`
+        SELECT 
+          pol.id AS purchase_order_line_id,
+          pol.supplier_material_id,
+          m.id AS material_id,
+          m.name AS material_name,
+          m.material_code,
+          u.name AS base_uom_name,
+          u.code AS base_uom_code,
+          smp.name AS supplier_pack_name,
+          pol.ordered_purchase_quantity,
+          pol.resolved_base_quantity,
+          pol.received_base_quantity,
+          pol.base_quantity_per_purchase_unit,
+          pol.unit_price
+        FROM purchase_order_lines pol
+        JOIN supplier_materials sm ON sm.id = pol.supplier_material_id
+        JOIN materials m ON m.id = sm.material_id
+        JOIN uoms u ON u.id = m.base_uom_id
+        LEFT JOIN supplier_material_packs smp ON smp.id = pol.supplier_pack_id
+        WHERE pol.purchase_order_id = ?
+      `).all(order.id);
+    }
+
+    res.json({ success: true, branch_id: req.params.id, orders });
+  } catch (err) {
+    console.error('[API Error GET /admin/branches/:id/purchasing/orders]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /admin/branches/:id/purchasing/orders/:poId/receive
+// Confirm goods receipt from supplier for a PO delivered to this branch
+router.post('/admin/branches/:id/purchasing/orders/:poId/receive', requireAuth(['owner', 'brand_manager', 'branch_manager', 'purchasing']), (req, res) => {
+  try {
+    if (['branch_manager', 'purchasing'].includes(req.user.role)) {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (assignedBranchId && assignedBranchId !== req.params.id) {
+        return res.status(403).json({
+          success: false,
+          error: 'FORBIDDEN_BRANCH_SCOPE',
+          message: 'Akses hanya diizinkan untuk cabang yang ditugaskan.'
+        });
+      }
+    }
+
+    const branch = db.prepare('SELECT b.id, b.name, b.brand_id FROM branches b WHERE b.id = ? AND b.brand_id = ?').get(req.params.id, req.brand_id);
+    if (!branch) return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan.' });
+
+    const location = db.prepare("SELECT id FROM stock_locations WHERE branch_id = ? AND is_active = 1 LIMIT 1").get(req.params.id);
+    if (!location) return res.status(400).json({ success: false, error: 'Lokasi persediaan cabang belum disiapkan.' });
+
+    const { ProcurementService } = require('../../domains/procurement');
+    const po = db.prepare('SELECT * FROM purchase_orders WHERE id = ? AND destination_stock_location_id = ?').get(req.params.poId, location.id);
+    if (!po) return res.status(404).json({ success: false, error: 'PURCHASE_ORDER_NOT_FOUND', message: 'PO tidak ditemukan untuk cabang ini.' });
+
+    const lines = req.body && req.body.lines;
+    if (!Array.isArray(lines) || lines.length === 0) {
+      return res.status(400).json({ success: false, error: 'LINES_REQUIRED', message: 'Rincian barang yang diterima wajib diisi.' });
+    }
+
+    const postingId = 'grp_' + crypto.randomBytes(8).toString('hex');
+    const receipt = ProcurementService.postGoodsReceipt({
+      purchaseOrderId: po.id,
+      goodsReceiptPostingId: postingId,
+      receivedBy: req.user.id || null,
+      receivedAt: new Date().toISOString(),
+      lines: lines.map(line => ({
+        purchase_order_line_id: line.purchase_order_line_id,
+        accepted_purchase_quantity: Number(line.accepted_purchase_quantity || 0),
+        rejected_purchase_quantity: Number(line.rejected_purchase_quantity || 0),
+        rejection_reason: line.rejection_reason || null
+      }))
+    });
+
+    res.json({
+      success: true,
+      goods_receipt: receipt,
+      message: 'Penerimaan barang dari supplier berhasil dikonfirmasi dan saldo persediaan telah diperbarui.'
+    });
+  } catch (err) {
+    console.error('[API Error POST /admin/branches/:id/purchasing/orders/:poId/receive]:', err);
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 };

@@ -2569,6 +2569,9 @@
             <button type="button" class="x-subnav-tab active" id="btn-subtab-stock-branches" data-subtab="branches" onclick="switchStockSubtab('branches')">
               Stok Cabang (Produk Jadi)
             </button>
+            <button type="button" class="x-subnav-tab" id="btn-subtab-stock-replenishment" data-subtab="replenishment" onclick="switchStockSubtab('replenishment')">
+              ⚡ Saran Belanja (Pengadaan)
+            </button>
             <button type="button" class="x-subnav-tab" id="btn-subtab-stock-recipes" data-subtab="recipes" onclick="switchStockSubtab('recipes')">
               Resep Masakan
             </button>
@@ -2662,6 +2665,26 @@
             <div class="x-owner-stock-note">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 10v6"></path><circle cx="12" cy="7" r="1"></circle></svg>
               <span>Owner hanya memantau kondisi stok. Penyesuaian stok dilakukan dari surface operasional cabang sesuai hak akses.</span>
+            </div>
+          </div>
+
+          <!-- SUBTAB CONTENT: SARAN BELANJA (PENGADAAN OTOMATIS BERBASIS RESEP) -->
+          <div id="subtab-content-stock-replenishment" style="display:none;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+              <div>
+                <h3 style="margin:0 0 4px 0; font-size:16px; font-weight:700; color:#0F172A;">Rekomendasi Pembelian Bahan Baku</h3>
+                <p style="margin:0; font-size:13px; color:#64748B;">Dihitung otomatis dari defisit target menu & resep dapur, dikurangi sisa stok fisik, dan dibulatkan sesuai MOQ supplier.</p>
+              </div>
+              <button type="button" class="x-btn-secondary" onclick="loadOwnerReplenishmentSuggestions()" style="display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:8px; font-weight:600; font-size:13px; cursor:pointer;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                <span>Hitung Ulang</span>
+              </button>
+            </div>
+
+            <div class="x-owner-stock-panel" style="background:#FFFFFF; border-radius:12px; border:1px solid #E2E8F0; padding:16px;">
+              <div id="owner-replenishment-suggestions-container">
+                <div class="x-owner-stock-loading">Memuat rekomendasi belanja...</div>
+              </div>
             </div>
           </div>
 
@@ -5553,7 +5576,7 @@
   <script src="/merchant-dashboard/assets/js/owner-bottom-nav.js?v=1.0.0"></script>
   <script src="/merchant-shared/js/presentation-shells.js?v=1.0.2"></script>
   <script src="/merchant-dashboard/assets/js/owner-navigation.js?v=1.0.0"></script>
-  <script src="/dashboard/assets/js/dashboard.js?v=3.0.86"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=3.0.87"></script>
   <script src="/merchant-dashboard/assets/js/owner-master-menu-inline.js?v=1.0.2"></script>
 </body>
 </html>  

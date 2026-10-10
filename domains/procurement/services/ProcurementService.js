@@ -118,6 +118,11 @@ function buildPurchaseLine({ supplierMaterial, quantity, purchaseUomId, supplier
     const rawBaseQuantity = Number(quantity) * baseQuantityPerPurchaseUnit;
     resolvedBaseQuantity = roundHalfUp(rawBaseQuantity, Number(base.quantity_precision));
 
+    const packMinQty = Number(representation.pack.minimum_order_quantity || 1);
+    if (Number(quantity) < packMinQty) {
+      throw fail('SUPPLIER_PACK_MOQ_NOT_MET');
+    }
+
     if (agreedPrice === undefined || agreedPrice === null) agreedPrice = Number(representation.pack.unit_price);
     if (agreedCurrency === undefined || agreedCurrency === null) agreedCurrency = representation.pack.currency_code;
   }
