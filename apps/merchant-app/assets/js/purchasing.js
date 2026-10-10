@@ -857,6 +857,7 @@
     if (modal) modal.style.display = 'none';
     _activeReceivePo = null;
   }
+  window.closePurchasingReceiveModal = closePurchasingReceiveModal;
   var _pendingReceiveData = null;
 
   function closePurchasingReceiveConfirmModal() {
