@@ -291,13 +291,19 @@
         mobileNav.style.display = 'none';
       }
       var bottomBar = $('purchasing-bottom-bar');
-      if (bottomBar) bottomBar.style.display = 'flex';
+      if (bottomBar) {
+        bottomBar.classList.remove('is-hidden');
+        bottomBar.style.setProperty('display', 'flex', 'important');
+      }
     } else {
       document.body.classList.remove('is-purchasing-mode');
       if (purchasingTopbar) purchasingTopbar.style.display = 'none';
       if (mobileTopbar) mobileTopbar.style.display = '';
       var bottomBar = $('purchasing-bottom-bar');
-      if (bottomBar) bottomBar.style.display = 'none';
+      if (bottomBar) {
+        bottomBar.classList.add('is-hidden');
+        bottomBar.style.setProperty('display', 'none', 'important');
+      }
     }
 
     // Show Mandat tab button for Branch Manager / Manager

@@ -539,10 +539,17 @@
       titleEl.textContent = titles[viewId] || 'Belanja';
     }
 
-    // Hide or show bottom settlement bar only on Tasks view
+    // Hide or show bottom settlement bar only on Tasks view (Belanja Pasar)
+    // PO Supplier, Riwayat, and Kalkulator do not involve cash advance settlement!
     var bottomBar = $('purchasing-bottom-bar');
     if (bottomBar) {
-      bottomBar.style.display = viewId === 'tasks' ? 'flex' : 'none';
+      if (viewId === 'tasks') {
+        bottomBar.classList.remove('is-hidden');
+        bottomBar.style.setProperty('display', 'flex', 'important');
+      } else {
+        bottomBar.classList.add('is-hidden');
+        bottomBar.style.setProperty('display', 'none', 'important');
+      }
     }
 
     if (viewId === 'po') {

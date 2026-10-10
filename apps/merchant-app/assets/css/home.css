@@ -1492,10 +1492,15 @@ body.is-purchasing-mode #purchasing-bottom-bar {
   padding: 12px 16px !important;
   box-shadow: 0 -6px 24px rgba(15, 23, 42, 0.12) !important;
   z-index: 50 !important;
-  display: flex !important;
+  display: flex;
   justify-content: space-between !important;
   align-items: center !important;
   box-sizing: border-box !important;
+}
+
+body.is-purchasing-mode #purchasing-bottom-bar.is-hidden,
+#purchasing-bottom-bar.is-hidden {
+  display: none !important;
 }
 
 /* Responsiveness on small phone screens (< 420px) */
