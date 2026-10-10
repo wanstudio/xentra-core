@@ -2248,48 +2248,74 @@ body.is-purchasing-mode #purchasing-bottom-bar.is-hidden,
   border-radius: 12px;
 }
 
-/* Calculator Card */
+/* Calculator Card & Dynamic Mobile Height */
+body.is-purchasing-mode #tab-bm-belanja.is-calc-view {
+  padding: 8px 10px 72px !important;
+  height: calc(100dvh - 52px) !important;
+  max-height: calc(100dvh - 52px) !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+#purchasing-view-calc {
+  height: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .purchasing-calc-card {
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 18px;
-  padding: 18px;
+  border-radius: 16px;
+  padding: 10px;
   box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  flex: 1;
+  min-height: 0;
+  box-sizing: border-box;
 }
 
 .purchasing-calc-display-box {
   background: #0f172a;
   color: #ffffff;
-  border-radius: 16px;
-  padding: 16px 18px;
+  border-radius: 12px;
+  padding: 8px 14px;
   text-align: right;
-  margin-bottom: 14px;
+  margin-bottom: 8px;
   box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.35);
+  flex-shrink: 0;
 }
 
 .purchasing-calc-display-formula {
-  font-size: 13.5px;
+  font-size: 11.5px;
   color: #94a3b8;
   font-family: monospace;
-  min-height: 20px;
+  min-height: 15px;
   word-break: break-all;
 }
 
 .purchasing-calc-display-result {
-  font-size: 28px;
+  font-size: clamp(20px, 5.5vw, 26px);
   font-weight: 800;
   color: #34d399; /* Green accent */
   letter-spacing: -0.02em;
-  margin-top: 4px;
+  margin-top: 2px;
   line-height: 1.1;
 }
 
 .purchasing-calc-kembalian-box {
   background: #f0fdf4;
   border: 1px solid #bbf7d0;
-  border-radius: 14px;
-  padding: 14px;
-  margin-bottom: 16px;
+  border-radius: 12px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
 }
 
 .purchasing-calc-cash-input-wrap {
@@ -2297,10 +2323,10 @@ body.is-purchasing-mode #purchasing-bottom-bar.is-hidden,
   align-items: center;
   background: #ffffff;
   border: 1.5px solid #cbd5e1;
-  border-radius: 10px;
-  height: 42px;
-  padding: 0 10px;
-  margin-top: 6px;
+  border-radius: 8px;
+  height: 34px;
+  padding: 0 8px;
+  margin-top: 3px;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -2310,17 +2336,17 @@ body.is-purchasing-mode #purchasing-bottom-bar.is-hidden,
 }
 
 .purchasing-calc-cash-rp {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
   color: #059669;
-  margin-right: 6px;
+  margin-right: 4px;
 }
 
 .purchasing-calc-cash-input {
   width: 100%;
   height: 100%;
   border: none !important;
-  font-size: 16px;
+  font-size: 14.5px;
   font-weight: 800;
   padding: 0;
   text-align: right;
@@ -2333,17 +2359,17 @@ body.is-purchasing-mode #purchasing-bottom-bar.is-hidden,
 .purchasing-calc-quick-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 6px;
-  margin-top: 8px;
-  margin-bottom: 10px;
+  gap: 4px;
+  margin-top: 5px;
+  margin-bottom: 5px;
 }
 
 .purchasing-btn-quick-cash {
-  padding: 8px 4px;
+  padding: 4px 2px;
   border: 1.5px solid #cbd5e1;
   background: #ffffff;
-  border-radius: 10px;
-  font-size: 12px;
+  border-radius: 8px;
+  font-size: 11px;
   font-weight: 800;
   color: #0f172a;
   cursor: pointer;
@@ -2368,26 +2394,31 @@ body.is-purchasing-mode #purchasing-bottom-bar.is-hidden,
 .purchasing-calc-keypad {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
+  grid-template-rows: repeat(5, 1fr);
+  gap: 6px;
+  flex: 1;
+  min-height: 0;
 }
 
 .purchasing-key {
-  height: 52px;
-  border-radius: 14px;
+  height: 100%;
+  min-height: 38px;
+  border-radius: 10px;
   border: 1px solid #e2e8f0;
   background: #f8fafc;
   color: #0f172a;
-  font-size: 18px;
+  font-size: clamp(16px, 4.5vw, 20px);
   font-weight: 800;
   cursor: pointer;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   user-select: none;
   transition: all 0.12s ease;
 }
 
 .purchasing-key:active {
-  transform: scale(0.95);
+  transform: scale(0.96);
   background: #e2e8f0;
 }
 
@@ -2395,7 +2426,7 @@ body.is-purchasing-mode #purchasing-bottom-bar.is-hidden,
   background: #ecfdf5;
   color: #059669;
   border-color: #a7f3d0;
-  font-size: 20px;
+  font-size: clamp(18px, 5vw, 22px);
 }
 
 .purchasing-key.clear {

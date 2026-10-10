@@ -527,6 +527,11 @@
     if (btnHistory) btnHistory.classList.toggle('active', viewId === 'history');
     if (btnCalc) btnCalc.classList.toggle('active', viewId === 'calc');
 
+    var belanjaSec = $('tab-bm-belanja');
+    if (belanjaSec) {
+      belanjaSec.classList.toggle('is-calc-view', viewId === 'calc');
+    }
+
     // Update dynamic topbar title to match active menu
     var titles = {
       tasks: 'Belanja',
