@@ -1090,10 +1090,13 @@
      PURCHASING HISTORY
      ========================================================================= */
   var _purchasingHistorySessions = [];
-  var _activeHistoryDateFilter = 'all';
+  var _activeHistoryDateFilter = 'today';
   var _activeHistorySearchQuery = '';
+  var _customHistoryDateFrom = '';
+  var _customHistoryDateTo = '';
+  var _hasUserManuallyChangedHistoryFilter = false;
 
-  async function loadPurchasingHistory() {
+  async function loadPurchasingHistory(startDate, endDate) {
     var user = getStoredUser();
     var branchId = user ? (user.branch_id || user.branchId) : null;
     if (!branchId) return;
@@ -1104,13 +1107,66 @@
     }
 
     try {
-      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/history', {
+      var url = API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/history';
+      var params = [];
+      if (startDate) params.push('start_date=' + encodeURIComponent(startDate));
+      if (endDate) params.push('end_date=' + encodeURIComponent(endDate));
+      if (params.length) url += '?' + params.join('&');
+
+      var res = await adminFetch(url, {
         headers: getAuthHeaders()
       });
       var data = await res.json();
 
       if (res.ok && data.success) {
         _purchasingHistorySessions = data.sessions || [];
+
+        // Jika user belum manual memilih filter, otomatis tentukan tanggal berdasarkan transaksi terakhir yang masuk
+        if (!_hasUserManuallyChangedHistoryFilter) {
+          var todayWIB = formatLocalDateWIB(new Date());
+          var yesterdayWIB = formatLocalDateWIB(new Date(Date.now() - 86400000));
+
+          if (_purchasingHistorySessions.length > 0) {
+            // Urutan dari server DESC (paling baru ada di indeks 0)
+            var latestTimestamp = _purchasingHistorySessions[0].timestamp;
+            var latestDateWIB = formatLocalDateWIB(latestTimestamp);
+
+            if (latestDateWIB === todayWIB) {
+              _activeHistoryDateFilter = 'today';
+              _customHistoryDateFrom = todayWIB;
+              _customHistoryDateTo = todayWIB;
+            } else if (latestDateWIB === yesterdayWIB) {
+              _activeHistoryDateFilter = 'yesterday';
+              _customHistoryDateFrom = yesterdayWIB;
+              _customHistoryDateTo = yesterdayWIB;
+            } else {
+              _activeHistoryDateFilter = 'custom';
+              _customHistoryDateFrom = latestDateWIB;
+              _customHistoryDateTo = latestDateWIB;
+            }
+          } else {
+            // Belum ada riwayat belanja, default ke Hari Ini
+            _activeHistoryDateFilter = 'today';
+            _customHistoryDateFrom = todayWIB;
+            _customHistoryDateTo = todayWIB;
+          }
+
+          // Sinkronkan chip filter aktif
+          var chipsContainer = $('purchasing-history-filter-chips');
+          if (chipsContainer) {
+            var allChips = chipsContainer.querySelectorAll('.purchasing-history-chip');
+            allChips.forEach(function (c) {
+              c.classList.toggle('active', c.getAttribute('data-filter') === _activeHistoryDateFilter);
+            });
+          }
+
+          // Sinkronkan input tanggal
+          var fromIn = $('purchasing-history-date-from');
+          var toIn = $('purchasing-history-date-to');
+          if (fromIn) fromIn.value = _customHistoryDateFrom;
+          if (toIn) toIn.value = _customHistoryDateTo;
+        }
+
         renderPurchasingHistoryList();
       } else {
         if (container) {
@@ -1135,13 +1191,21 @@
     return escapedText.replace(regex, '<mark style="background:#fef08a; color:#854d0e; padding:1px 3px; border-radius:4px; font-weight:800;">$1</mark>');
   }
 
-  function formatLocalDate(d) {
+  function formatLocalDateWIB(d) {
+    if (!d) return '';
+    if (typeof d === 'string') d = new Date(d);
     if (!(d instanceof Date) || isNaN(d)) return '';
-    var y = d.getFullYear();
-    var m = String(d.getMonth() + 1).padStart(2, '0');
-    var day = String(d.getDate()).padStart(2, '0');
-    return y + '-' + m + '-' + day;
+    try {
+      // Standar ISO YYYY-MM-DD dalam zona waktu WIB (Asia/Jakarta, UTC+7)
+      return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+    } catch (_) {
+      var y = d.getFullYear();
+      var m = String(d.getMonth() + 1).padStart(2, '0');
+      var day = String(d.getDate()).padStart(2, '0');
+      return y + '-' + m + '-' + day;
+    }
   }
+  window.formatLocalDateWIB = formatLocalDateWIB;
 
   function onPurchasingHistorySearch(val) {
     _activeHistorySearchQuery = (val || '').trim().toLowerCase();
@@ -1162,6 +1226,7 @@
   window.clearPurchasingHistorySearch = clearPurchasingHistorySearch;
 
   function setPurchasingHistoryFilter(filterKey, btnEl) {
+    _hasUserManuallyChangedHistoryFilter = true;
     _activeHistoryDateFilter = filterKey;
     var container = $('purchasing-history-filter-chips');
     if (container) {
@@ -1170,9 +1235,75 @@
         c.classList.toggle('active', c.getAttribute('data-filter') === filterKey);
       });
     }
-    renderPurchasingHistoryList();
+
+    var now = new Date();
+    var todayLocal = formatLocalDateWIB(now);
+    var yesterdayLocal = formatLocalDateWIB(new Date(Date.now() - 86400000));
+    var d7 = new Date();
+    d7.setDate(d7.getDate() - 6);
+    var d7Local = formatLocalDateWIB(d7);
+    var d30 = new Date();
+    d30.setDate(d30.getDate() - 29);
+    var d30Local = formatLocalDateWIB(d30);
+
+    var fromIn = $('purchasing-history-date-from');
+    var toIn = $('purchasing-history-date-to');
+
+    var targetFrom = todayLocal;
+    var targetTo = todayLocal;
+
+    if (filterKey === 'today') {
+      targetFrom = todayLocal;
+      targetTo = todayLocal;
+    } else if (filterKey === 'yesterday') {
+      targetFrom = yesterdayLocal;
+      targetTo = yesterdayLocal;
+    } else if (filterKey === '7days') {
+      targetFrom = d7Local;
+      targetTo = todayLocal;
+    } else if (filterKey === '30days') {
+      targetFrom = d30Local;
+      targetTo = todayLocal;
+    }
+
+    if (fromIn) fromIn.value = targetFrom;
+    if (toIn) toIn.value = targetTo;
+    _customHistoryDateFrom = targetFrom;
+    _customHistoryDateTo = targetTo;
+
+    loadPurchasingHistory(targetFrom, targetTo);
   }
   window.setPurchasingHistoryFilter = setPurchasingHistoryFilter;
+
+  function searchPurchasingHistoryCustomRange() {
+    _hasUserManuallyChangedHistoryFilter = true;
+    var fromIn = $('purchasing-history-date-from');
+    var toIn = $('purchasing-history-date-to');
+    var from = fromIn ? fromIn.value : '';
+    var to = toIn ? toIn.value : '';
+
+    if (!from && !to) {
+      if (typeof showToast === 'function') showToast('⚠️ Pilih tanggal awal atau akhir terlebih dahulu');
+      return;
+    }
+
+    _customHistoryDateFrom = from;
+    _customHistoryDateTo = to;
+    _activeHistoryDateFilter = 'custom';
+
+    // Deselect all quick chips because custom date range is used
+    var container = $('purchasing-history-filter-chips');
+    if (container) {
+      var chips = container.querySelectorAll('.purchasing-history-chip');
+      chips.forEach(function (c) {
+        c.classList.remove('active');
+      });
+    }
+
+    // Ambil data dari server untuk rentang tanggal kustom tanpa batas
+    loadPurchasingHistory(from, to);
+  }
+  window.searchPurchasingHistoryCustomRange = searchPurchasingHistoryCustomRange;
 
   function renderPurchasingHistoryList() {
     var container = $('purchasing-history-container');
@@ -1187,6 +1318,14 @@
       sInput.addEventListener('search', function () { onPurchasingHistorySearch(this.value); });
     }
 
+    // Set initial date inputs jika masih kosong
+    var now = new Date();
+    var todayLocal = formatLocalDateWIB(now);
+    var fromIn = $('purchasing-history-date-from');
+    var toIn = $('purchasing-history-date-to');
+    if (fromIn && !fromIn.value) fromIn.value = _customHistoryDateFrom || todayLocal;
+    if (toIn && !toIn.value) toIn.value = _customHistoryDateTo || todayLocal;
+
     if (!_purchasingHistorySessions || !_purchasingHistorySessions.length) {
       container.innerHTML =
         '<div style="text-align:center; padding:40px 20px; background:#fff; border-radius:16px; border:1px dashed #cbd5e1;">' +
@@ -1197,29 +1336,21 @@
       return;
     }
 
-    var now = new Date();
-    var todayLocal = formatLocalDate(now);
-    var yesterdayLocal = formatLocalDate(new Date(Date.now() - 86400000));
-
     // Apply Filter
     var filtered = _purchasingHistorySessions.filter(function (sess) {
       var d = new Date(sess.timestamp);
-      var sessLocal = formatLocalDate(d);
+      var sessLocal = formatLocalDateWIB(d);
 
       var dateStr = '';
       try {
-        dateStr = d.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        dateStr = d.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta', weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
       } catch (_) {
         dateStr = sess.timestamp;
       }
 
       // Date filter
-      if (_activeHistoryDateFilter === 'today' && sessLocal !== todayLocal) return false;
-      if (_activeHistoryDateFilter === 'yesterday' && sessLocal !== yesterdayLocal) return false;
-      if (_activeHistoryDateFilter === 'week') {
-        var diffDays = (now.getTime() - d.getTime()) / (1000 * 3600 * 24);
-        if (diffDays > 7) return false;
-      }
+      if (_customHistoryDateFrom && sessLocal < _customHistoryDateFrom) return false;
+      if (_customHistoryDateTo && sessLocal > _customHistoryDateTo) return false;
 
       // Search Query
       if (_activeHistorySearchQuery) {
@@ -1240,12 +1371,24 @@
     });
 
     if (!filtered.length) {
+      var filterDesc = 'Periode Ini';
+      if (_activeHistoryDateFilter === 'today') filterDesc = 'Hari Ini';
+      else if (_activeHistoryDateFilter === 'yesterday') filterDesc = 'Kemarin';
+      else if (_activeHistoryDateFilter === '7days') filterDesc = '7 Hari Terakhir';
+      else if (_activeHistoryDateFilter === '30days') filterDesc = '30 Hari Terakhir';
+      else if (_activeHistoryDateFilter === 'custom') {
+        if (_customHistoryDateFrom && _customHistoryDateTo) {
+          filterDesc = _customHistoryDateFrom + ' s/d ' + _customHistoryDateTo;
+        } else {
+          filterDesc = 'Rentang Tanggal Ini';
+        }
+      }
       container.innerHTML =
         '<div style="text-align:center; padding:32px 20px; background:#fff; border-radius:16px; border:1px dashed #cbd5e1;">' +
           '<div style="font-size:28px; margin-bottom:6px;">🔍</div>' +
-          '<div style="font-size:14.5px; font-weight:700; color:#334155;">Tidak Ada Hasil untuk "' + esc(_activeHistorySearchQuery || _activeHistoryDateFilter) + '"</div>' +
-          '<div style="font-size:12px; color:#64748b; margin-top:4px;">Coba ubah kata kunci (nama bahan, nomor nota STL, nama petugas).</div>' +
-          '<button type="button" class="x-btn-secondary" onclick="clearPurchasingHistorySearch(); setPurchasingHistoryFilter(\'all\');" style="margin-top:12px; font-size:12px; padding:6px 14px; border-radius:8px;">Reset Pencarian</button>' +
+          '<div style="font-size:14.5px; font-weight:700; color:#334155;">Tidak Ada Hasil untuk ' + esc(filterDesc) + '</div>' +
+          '<div style="font-size:12px; color:#64748b; margin-top:4px;">Coba ubah tanggal atau kata kunci pencarian.</div>' +
+          '<button type="button" class="x-btn-secondary" onclick="clearPurchasingHistorySearch(); setPurchasingHistoryFilter(\'today\');" style="margin-top:12px; font-size:12px; padding:6px 14px; border-radius:8px;">Reset ke Hari Ini</button>' +
         '</div>';
       return;
     }
@@ -1255,7 +1398,7 @@
       var dateStr = '';
       try {
         var d = new Date(sess.timestamp);
-        dateStr = d.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        dateStr = d.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta', weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
       } catch (_) {
         dateStr = sess.timestamp;
       }

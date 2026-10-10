@@ -963,7 +963,21 @@ router.get('/admin/branches/:id/purchasing/history', requireAuth(['owner', 'bran
       return res.json({ success: true, history: [] });
     }
 
-    // Fetch movements from the last 7 days
+    let dateFilterClause = "AND sm.posting_timestamp >= datetime('now', '-30 days')";
+    const queryParams = [location.id];
+
+    if (req.query.start_date && req.query.end_date) {
+      dateFilterClause = "AND date(sm.posting_timestamp, '+7 hours') >= date(?) AND date(sm.posting_timestamp, '+7 hours') <= date(?)";
+      queryParams.push(req.query.start_date, req.query.end_date);
+    } else if (req.query.start_date) {
+      dateFilterClause = "AND date(sm.posting_timestamp, '+7 hours') >= date(?)";
+      queryParams.push(req.query.start_date);
+    } else if (req.query.end_date) {
+      dateFilterClause = "AND date(sm.posting_timestamp, '+7 hours') <= date(?)";
+      queryParams.push(req.query.end_date);
+    }
+
+    // Fetch movements with optional date filtering
     const rows = db.prepare(`
       SELECT
         sm.id,
@@ -985,9 +999,9 @@ router.get('/admin/branches/:id/purchasing/history', requireAuth(['owner', 'bran
       LEFT JOIN users usr ON usr.id = sm.actor_id
       WHERE sm.stock_location_id = ?
         AND sm.movement_type = 'PURCHASE_RECEIPT'
-        AND sm.posting_timestamp >= datetime('now', '-7 days')
+        ${dateFilterClause}
       ORDER BY sm.posting_timestamp DESC
-    `).all(location.id);
+    `).all(...queryParams);
 
     // Group items by session (source_reference atau posting_mutation_id) for clean session grouping
     const sessionMap = new Map();

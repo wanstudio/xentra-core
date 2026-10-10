@@ -1061,11 +1061,22 @@
               <input type="text" id="purchasing-history-search" class="x-input" placeholder="Cari bahan (bawang, telur...), nota STL, petugas..." autocomplete="off" style="padding-left:36px; padding-right:32px; height:42px; border-radius:12px; font-size:13px; width:100%; border:1px solid #cbd5e1;" oninput="onPurchasingHistorySearch(this.value)" onkeyup="onPurchasingHistorySearch(this.value)">
               <button type="button" id="btn-clear-history-search" onclick="clearPurchasingHistorySearch()" style="display:none; position:absolute; right:10px; background:none; border:none; color:#94a3b8; font-size:16px; cursor:pointer; padding:4px;" aria-label="Hapus Pencarian">✕</button>
             </div>
-            <div style="display:flex; gap:6px; overflow-x:auto; padding-bottom:2px; -webkit-overflow-scrolling:touch;" id="purchasing-history-filter-chips">
-              <button type="button" class="purchasing-history-chip active" data-filter="all" onclick="setPurchasingHistoryFilter('all', this)">Semua</button>
-              <button type="button" class="purchasing-history-chip" data-filter="today" onclick="setPurchasingHistoryFilter('today', this)">Hari Ini</button>
-              <button type="button" class="purchasing-history-chip" data-filter="yesterday" onclick="setPurchasingHistoryFilter('yesterday', this)">Kemarin</button>
-              <button type="button" class="purchasing-history-chip" data-filter="week" onclick="setPurchasingHistoryFilter('week', this)">7 Hari</button>
+            <!-- Date Selection: "Hari Ini", "Kemarin", "7 Hari", "30 Hari", [ pilih_tgl ] s/d [ pilih_tgl ] [ Cari ] -->
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <div style="display:flex; gap:6px; overflow-x:auto; padding-bottom:2px; -webkit-overflow-scrolling:touch;" id="purchasing-history-filter-chips">
+                <button type="button" class="purchasing-history-chip active" data-filter="today" onclick="setPurchasingHistoryFilter('today', this)">Hari Ini</button>
+                <button type="button" class="purchasing-history-chip" data-filter="yesterday" onclick="setPurchasingHistoryFilter('yesterday', this)">Kemarin</button>
+                <button type="button" class="purchasing-history-chip" data-filter="7days" onclick="setPurchasingHistoryFilter('7days', this)">7 Hari</button>
+                <button type="button" class="purchasing-history-chip" data-filter="30days" onclick="setPurchasingHistoryFilter('30days', this)">30 Hari</button>
+              </div>
+
+              <!-- [ pilih_tgl ] s/d [ pilih_tgl_maksimal_gk usah di batasin ] [ Cari ] -->
+              <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:8px 10px;">
+                <input type="date" id="purchasing-history-date-from" class="x-input" style="height:36px; border-radius:8px; font-size:12.5px; padding:4px 8px; flex:1; min-width:120px; border:1px solid #cbd5e1; background:#ffffff;" aria-label="Pilih Tanggal Awal">
+                <span style="font-size:12px; font-weight:700; color:#64748b; white-space:nowrap;">s/d</span>
+                <input type="date" id="purchasing-history-date-to" class="x-input" style="height:36px; border-radius:8px; font-size:12.5px; padding:4px 8px; flex:1; min-width:120px; border:1px solid #cbd5e1; background:#ffffff;" aria-label="Pilih Tanggal Akhir">
+                <button type="button" class="x-btn-primary" onclick="searchPurchasingHistoryCustomRange()" style="height:36px; padding:0 14px; border-radius:8px; font-size:12.5px; font-weight:700; white-space:nowrap; background:#0f172a; border-color:#0f172a;">Cari</button>
+              </div>
             </div>
           </div>
 
@@ -2093,7 +2104,7 @@
   <script src="/merchant-app/assets/js/reports.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/tables.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/stock.js?v=1.1.0"></script>
-  <script src="/merchant-app/assets/js/purchasing.js?v=1.0.3"></script>
+  <script src="/merchant-app/assets/js/purchasing.js?v=1.0.5"></script>
   <script src="/merchant-app/assets/js/promotions.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/staff.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/orders.js?v=1.0.1"></script>
