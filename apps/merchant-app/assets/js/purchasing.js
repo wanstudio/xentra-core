@@ -660,24 +660,24 @@
         var remainingQty = Math.max(0, orderedQty - (Number(line.received_base_quantity || 0) / (Number(line.base_quantity_per_purchase_unit) || 1)));
         if (remainingQty <= 0) remainingQty = orderedQty;
 
-        return '<div class="purchasing-receive-line" data-pol-id="' + esc(line.purchase_order_line_id) + '" data-ordered-qty="' + orderedQty + '" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:8px;">' +
-          '<div style="display:flex; justify-content:space-between; align-items:center;">' +
-            '<div style="font-size:13.5px; font-weight:700; color:#0f172a;">' + esc(line.material_name) + '</div>' +
-            '<span class="x-badge" style="background:#ffffff; border:1px solid #cbd5e1; font-size:11.5px; color:#475569; font-weight:700;">Dipesan: ' + esc(orderedQty) + ' ' + esc(packDesc) + '</span>' +
+        return '<div class="purchasing-receive-line" data-pol-id="' + esc(line.purchase_order_line_id) + '" data-ordered-qty="' + orderedQty + '">' +
+          '<div class="purchasing-receive-line-head">' +
+            '<div class="purchasing-receive-line-name">' + esc(line.material_name) + '</div>' +
+            '<span class="x-badge purchasing-receive-line-badge">Dipesan: ' + esc(orderedQty) + ' ' + esc(packDesc) + '</span>' +
           '</div>' +
-          '<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">' +
-            '<div>' +
-              '<label style="font-size:11px; font-weight:700; color:#166534; display:block; margin-bottom:3px;">Layak Terima (' + esc(packDesc) + ')</label>' +
-              '<input type="number" step="any" min="0" max="' + orderedQty + '" class="x-input input-receive-accepted" value="' + esc(remainingQty) + '" oninput="onPurchasingReceiveQtyChange(this, \'accepted\')" style="width:100%; height:38px; border-radius:8px; font-weight:800; color:#0f172a; text-align:center;">' +
+          '<div class="purchasing-receive-grid">' +
+            '<div class="purchasing-receive-field">' +
+              '<label class="purchasing-receive-label label-accepted">Layak Terima (' + esc(packDesc) + ')</label>' +
+              '<input type="number" step="any" min="0" max="' + orderedQty + '" class="x-input input-receive-accepted purchasing-receive-input" value="' + esc(remainingQty) + '" oninput="onPurchasingReceiveQtyChange(this, \'accepted\')">' +
             '</div>' +
-            '<div>' +
-              '<label style="font-size:11px; font-weight:700; color:#991b1b; display:block; margin-bottom:3px;">Ditolak / Rusak (' + esc(packDesc) + ')</label>' +
-              '<input type="number" step="any" min="0" max="' + orderedQty + '" class="x-input input-receive-rejected" value="0" oninput="onPurchasingReceiveQtyChange(this, \'rejected\')" style="width:100%; height:38px; border-radius:8px; font-weight:800; color:#991b1b; text-align:center;">' +
+            '<div class="purchasing-receive-field">' +
+              '<label class="purchasing-receive-label label-rejected">Ditolak / Rusak (' + esc(packDesc) + ')</label>' +
+              '<input type="number" step="any" min="0" max="' + orderedQty + '" class="x-input input-receive-rejected purchasing-receive-input input-rejected" value="0" oninput="onPurchasingReceiveQtyChange(this, \'rejected\')">' +
             '</div>' +
           '</div>' +
-          '<div class="purchasing-receive-status-hint" style="font-size:11px; color:#64748b; font-weight:600; display:flex; justify-content:space-between; align-items:center; padding-top:4px; border-top:1px dashed #e2e8f0;">' +
+          '<div class="purchasing-receive-status-hint">' +
             '<span>Status fisik:</span>' +
-            '<span class="receive-status-pill" style="font-weight:700; color:#059669;">✓ Lengkap & Baik (' + orderedQty + ' ' + esc(packDesc) + ')</span>' +
+            '<span class="receive-status-pill">✓ Lengkap & Baik (' + orderedQty + ' ' + esc(packDesc) + ')</span>' +
           '</div>' +
         '</div>';
       }).join('');

@@ -1549,6 +1549,158 @@ body.is-purchasing-mode #purchasing-bottom-bar {
     width: 22px !important;
     height: 22px !important;
   }
+
+  /* Modal Responsiveness on Small Screens (< 420px) */
+  .purchasing-receive-modal-card {
+    width: 95% !important;
+    max-height: 90vh !important;
+    border-radius: 14px !important;
+  }
+
+  .purchasing-receive-modal-header {
+    padding: 10px 12px !important;
+  }
+
+  .purchasing-receive-modal-title {
+    font-size: 13.5px !important;
+  }
+
+  .purchasing-receive-modal-subtitle {
+    font-size: 10.5px !important;
+  }
+
+  .purchasing-receive-modal-body {
+    padding: 8px 10px !important;
+    gap: 8px !important;
+  }
+
+  .purchasing-receive-line {
+    padding: 8px 10px !important;
+    gap: 6px !important;
+    border-radius: 10px !important;
+  }
+
+  .purchasing-receive-line-head {
+    gap: 4px !important;
+  }
+
+  .purchasing-receive-line-name {
+    font-size: 12px !important;
+    line-height: 1.25 !important;
+  }
+
+  .purchasing-receive-line-badge {
+    font-size: 10px !important;
+    padding: 1.5px 6px !important;
+  }
+
+  .purchasing-receive-grid {
+    gap: 6px !important;
+  }
+
+  .purchasing-receive-label {
+    font-size: 10px !important;
+    margin-bottom: 2px !important;
+  }
+
+  .purchasing-receive-input {
+    height: 34px !important;
+    font-size: 13px !important;
+    padding: 4px 6px !important;
+  }
+
+  .purchasing-receive-status-hint {
+    font-size: 10px !important;
+    padding-top: 3px !important;
+  }
+
+  .receive-status-pill {
+    font-size: 10px !important;
+  }
+
+  .purchasing-receive-notes-box {
+    padding: 0 10px 8px 10px !important;
+  }
+
+  .purchasing-receive-notes-label {
+    font-size: 10px !important;
+    margin-bottom: 2px !important;
+  }
+
+  .purchasing-receive-notes-input {
+    font-size: 11px !important;
+    padding: 5px 8px !important;
+  }
+
+  .purchasing-receive-modal-footer {
+    padding: 8px 10px !important;
+    gap: 6px !important;
+  }
+
+  .purchasing-receive-btn-cancel,
+  .purchasing-receive-btn-submit {
+    height: 36px !important;
+    font-size: 11.5px !important;
+    border-radius: 10px !important;
+  }
+
+  /* Price Update Modal Small Screen */
+  .purchasing-modal-card {
+    width: 95% !important;
+    border-radius: 14px !important;
+  }
+
+  .purchasing-modal-header {
+    padding: 10px 12px !important;
+  }
+
+  .purchasing-modal-title {
+    font-size: 13.5px !important;
+  }
+
+  .purchasing-modal-subtitle {
+    font-size: 10.5px !important;
+  }
+
+  .purchasing-modal-body {
+    padding: 10px 12px !important;
+  }
+
+  .purchasing-modal-ref-box {
+    padding: 8px 10px !important;
+    margin-bottom: 10px !important;
+  }
+
+  .purchasing-modal-ref-name {
+    font-size: 13px !important;
+  }
+
+  .purchasing-modal-ref-price-val {
+    font-size: 12px !important;
+  }
+
+  .purchasing-modal-input-label {
+    font-size: 11px !important;
+  }
+
+  .purchasing-modal-input-wrap {
+    height: 40px !important;
+    padding: 0 10px !important;
+  }
+
+  .purchasing-modal-input-price {
+    font-size: 15px !important;
+  }
+
+  .purchasing-modal-btn-row {
+    gap: 8px !important;
+  }
+
+  .purchasing-modal-btn-cancel,
+  .purchasing-modal-btn-save {
+    height: 36px !important;
+    font-size: 11.5px !important;
+  }
 }
 
 /* 1:1 .primary-btn and .primary-btn.green */
@@ -1585,12 +1737,59 @@ body.is-purchasing-mode #purchasing-bottom-bar {
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 }
 
+.purchasing-modal-header {
+  padding: 14px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  margin: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.purchasing-modal-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.purchasing-modal-subtitle {
+  font-size: 12px;
+  margin: 2px 0 0;
+  color: #64748b;
+}
+
+.purchasing-modal-body {
+  padding: 16px;
+}
+
 .purchasing-modal-ref-box {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 10px 14px;
   margin-bottom: 14px;
+}
+
+.purchasing-modal-ref-name {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-top: 2px;
+}
+
+.purchasing-modal-ref-price-val {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #475569;
+}
+
+.purchasing-modal-input-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 4px;
 }
 
 .purchasing-modal-input-wrap {
@@ -1609,6 +1808,13 @@ body.is-purchasing-mode #purchasing-bottom-bar {
   box-shadow: 0 0 0 4px rgba(5, 150, 105, 0.18);
 }
 
+.purchasing-modal-currency-prefix {
+  font-size: 15px;
+  font-weight: 800;
+  color: #059669;
+  margin-right: 6px;
+}
+
 .purchasing-modal-input-price {
   border: none;
   background: transparent;
@@ -1617,6 +1823,208 @@ body.is-purchasing-mode #purchasing-bottom-bar {
   font-weight: 800;
   color: #0f172a;
   outline: none;
+}
+
+.purchasing-modal-btn-row {
+  display: flex;
+  gap: 10px;
+}
+
+.purchasing-modal-btn-cancel {
+  flex: 1;
+  height: 42px;
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.purchasing-modal-btn-save {
+  flex: 1;
+  height: 42px;
+  border-radius: 10px;
+  background: #059669;
+  border-color: #059669;
+  font-weight: 700;
+}
+
+/* Goods Receipt Modal Styling */
+.purchasing-receive-modal-card {
+  max-width: 500px;
+  width: 92%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 18px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.purchasing-receive-modal-header {
+  padding: 14px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  margin: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.purchasing-receive-modal-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.purchasing-receive-modal-subtitle {
+  font-size: 12px;
+  margin: 3px 0 0;
+  color: #64748b;
+}
+
+.purchasing-receive-modal-body {
+  padding: 14px 16px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.purchasing-receive-line {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.purchasing-receive-line-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.purchasing-receive-line-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.purchasing-receive-line-badge {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  font-size: 11px;
+  color: #475569;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.purchasing-receive-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.purchasing-receive-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.purchasing-receive-label {
+  font-size: 11px;
+  font-weight: 700;
+  display: block;
+  margin-bottom: 3px;
+  line-height: 1.2;
+}
+
+.purchasing-receive-label.label-accepted {
+  color: #166534;
+}
+
+.purchasing-receive-label.label-rejected {
+  color: #991b1b;
+}
+
+.purchasing-receive-input {
+  width: 100%;
+  height: 38px;
+  border-radius: 8px;
+  font-weight: 800;
+  color: #0f172a;
+  text-align: center;
+  font-size: 14px;
+}
+
+.purchasing-receive-input.input-rejected {
+  color: #991b1b;
+}
+
+.purchasing-receive-status-hint {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 4px;
+  border-top: 1px dashed #e2e8f0;
+  gap: 4px;
+}
+
+.receive-status-pill {
+  font-weight: 700;
+  color: #059669;
+}
+
+.purchasing-receive-notes-box {
+  padding: 0 16px 12px 16px;
+}
+
+.purchasing-receive-notes-label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #475569;
+  margin-bottom: 4px;
+}
+
+.purchasing-receive-notes-input {
+  width: 100%;
+  font-size: 12px;
+  resize: none;
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+.purchasing-receive-modal-footer {
+  padding: 12px 16px;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  gap: 10px;
+  background: #ffffff;
+}
+
+.purchasing-receive-btn-cancel {
+  flex: 1;
+  height: 42px;
+  border-radius: 12px;
+  font-weight: 700;
+}
+
+.purchasing-receive-btn-submit {
+  flex: 2;
+  height: 42px;
+  border-radius: 12px;
+  background: #059669;
+  border-color: #059669;
+  font-weight: 800;
 }
 
 /* History Card */
