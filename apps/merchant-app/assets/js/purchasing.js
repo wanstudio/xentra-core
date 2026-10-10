@@ -411,14 +411,16 @@
   }
   window.recalculatePurchasingSummary = recalculatePurchasingSummary;
 
-  async function submitPurchasingSettle() {
+  var _pendingSettlePayload = null;
+
+  function submitPurchasingSettle() {
     var user = getStoredUser();
     var branchId = user ? (user.branch_id || user.branchId) : null;
     if (!branchId) return;
 
     var checkedItems = _purchasingState.items.filter(function (i) { return i.checked && i.buyQty > 0; });
     if (!checkedItems.length) {
-      showToast('Pilih minimal satu barang yang dibeli.');
+      if (typeof showToast === 'function') showToast('⚠️ Pilih minimal satu barang yang dibeli.');
       return;
     }
 
@@ -438,54 +440,128 @@
     var totalItemsCount = _purchasingState.items.length;
     var unboughtCount = totalItemsCount - checkedItems.length;
 
-    var confirmMsg = 'Selesaikan aktivitas belanja pasar ini?\n\n' +
-      '• Terbeli: ' + checkedItems.length + ' item\n' +
-      (unboughtCount > 0 ? '• Belum Terbeli: ' + unboughtCount + ' item (tetap berstatus butuh belanja)\n' : '') +
-      '• Total Belanja: ' + formatMoney(totalReal) + '\n' +
-      '• Uang Modal: ' + formatMoney(cashAdvance) + '\n' +
-      '• Sisa Kembalian: ' + (changeDue >= 0 ? formatMoney(changeDue) : 'Kurang ' + formatMoney(Math.abs(changeDue))) + '\n\n' +
-      'Stok barang yang terbeli akan langsung masuk ke persediaan cabang.';
+    _pendingSettlePayload = {
+      branchId: branchId,
+      mandate_id: _purchasingState.activeMandateId,
+      cash_advance: cashAdvance,
+      items: lines,
+      notes: 'Belanja Pasar'
+    };
 
-    if (!confirm(confirmMsg)) return;
+    var modal = $('modal-purchasing-settle-confirm');
+    if (!modal) {
+      executePurchasingSettle();
+      return;
+    }
 
+    var totalEl = $('settle-confirm-total-real');
+    var cashEl = $('settle-confirm-cash-advance');
+    var changeLabel = $('settle-confirm-change-label');
+    var changeEl = $('settle-confirm-change-due');
+    var sumEl = $('settle-confirm-items-summary');
+    var listEl = $('settle-confirm-items-list');
+
+    if (totalEl) totalEl.textContent = formatMoney(totalReal);
+    if (cashEl) cashEl.textContent = formatMoney(cashAdvance);
+    if (changeLabel) changeLabel.textContent = changeDue >= 0 ? 'Sisa Kembalian:' : 'Uang Kurang:';
+    if (changeEl) {
+      changeEl.textContent = changeDue >= 0 ? formatMoney(changeDue) : '- ' + formatMoney(Math.abs(changeDue));
+      changeEl.style.color = changeDue >= 0 ? '#059669' : '#dc2626';
+    }
+
+    if (sumEl) {
+      var sumHtml = '<strong>• Terbeli: ' + checkedItems.length + ' item</strong>';
+      if (unboughtCount > 0) {
+        sumHtml += '<br><span style="color:#b45309;">• Belum Terbeli: ' + unboughtCount + ' item (tetap butuh belanja)</span>';
+      }
+      sumEl.innerHTML = sumHtml;
+    }
+
+    if (listEl) {
+      listEl.innerHTML = checkedItems.map(function (itm) {
+        var subTot = Math.round(itm.buyQty * itm.actualUnitPrice);
+        return (
+          '<div style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; border:1px solid #f1f5f9; padding:7px 10px; border-radius:8px; font-size:12px;">' +
+            '<div>' +
+              '<strong style="color:#0f172a;">' + esc(itm.name) + '</strong>' +
+              '<div style="font-size:11px; color:#64748b;">' + formatNominal(itm.buyQty) + ' ' + esc(itm.uom || '') + ' @ ' + formatMoney(itm.actualUnitPrice) + '</div>' +
+            '</div>' +
+            '<strong style="color:#0f172a; font-size:12px;">' + formatMoney(subTot) + '</strong>' +
+          '</div>'
+        );
+      }).join('');
+    }
+
+    modal.style.display = 'flex';
+  }
+  window.submitPurchasingSettle = submitPurchasingSettle;
+
+  function closePurchasingSettleConfirmModal() {
+    var modal = $('modal-purchasing-settle-confirm');
+    if (modal) modal.style.display = 'none';
+    _pendingSettlePayload = null;
+  }
+  window.closePurchasingSettleConfirmModal = closePurchasingSettleConfirmModal;
+
+  async function executePurchasingSettle() {
+    if (!_pendingSettlePayload) return;
+
+    var confirmBtn = $('btn-purchasing-confirm-settle-ok');
     var submitBtn = $('btn-purchasing-submit-settle');
+    if (confirmBtn) {
+      confirmBtn.disabled = true;
+      confirmBtn.innerHTML = '<span>⏳</span> Menyimpan ke Stok...';
+    }
     if (submitBtn) {
       submitBtn.disabled = true;
       submitBtn.textContent = 'Menyimpan ke Stok...';
     }
 
+    var payload = _pendingSettlePayload;
+
     try {
-      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/settle', {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(payload.branchId) + '/purchasing/settle', {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          mandate_id: _purchasingState.activeMandateId,
-          cash_advance: cashAdvance,
-          items: lines,
-          notes: 'Belanja Pasar'
+          mandate_id: payload.mandate_id,
+          cash_advance: payload.cash_advance,
+          items: payload.items,
+          notes: payload.notes || 'Belanja Pasar'
         })
       });
       var data = await res.json();
 
       if (res.ok && data.success) {
-        showToast('🛒 Belanja berhasil dicatat! Stok bahan baku telah ditambahkan.');
+        closePurchasingSettleConfirmModal();
+        if (typeof showToast === 'function') {
+          showToast('🛒 Belanja berhasil dicatat! Stok bahan baku telah ditambahkan.');
+        }
         var cashInput = $('input-purchasing-cash-advance');
         if (cashInput) cashInput.value = '';
         _purchasingState.cashAdvance = 0;
         loadPurchasingChecklist();
       } else {
-        showToast('Gagal mencatat belanja: ' + (data.message || data.error || 'Terjadi kesalahan'));
+        if (typeof showToast === 'function') {
+          showToast('Gagal mencatat belanja: ' + (data.message || data.error || 'Terjadi kesalahan'));
+        }
       }
     } catch (err) {
-      showToast('Gangguan jaringan saat menyelesaikan belanja.');
+      if (typeof showToast === 'function') {
+        showToast('Gangguan jaringan saat menyelesaikan belanja.');
+      }
     } finally {
+      if (confirmBtn) {
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = '<span>✓</span> Ya, Selesai Belanja';
+      }
       if (submitBtn) {
         submitBtn.disabled = false;
         submitBtn.textContent = '✓ Selesai Belanja';
       }
     }
   }
-  window.submitPurchasingSettle = submitPurchasingSettle;
+  window.executePurchasingSettle = executePurchasingSettle;
 
   /* =========================================================================
      VIEW SWITCHER (PASAR, PO SUPPLIER, RIWAYAT, KALKULATOR)
