@@ -120,6 +120,13 @@ Never take lazy shortcuts or leave half-baked wiring. When adding or updating us
 3. **Never Confuse YAGNI With Incomplete Work**:
    - YAGNI means avoiding speculative architecture and unneeded dependencies; it does **not** mean taking shortcuts that deliver broken UX, bypassing existing platform engines, or leaving unmounted routes.
 
+## Currency & Number Formatting Rule (Absolute Invariant)
+
+- **Indonesian Rupiah Standard**: Semua representasi mata uang Rupiah dan angka kuantitas/harga di seluruh surface (Customer PWA, Merchant App, Merchant Dashboard, POS, Driver App) **WAJIB** menggunakan tanda titik (`.`) sebagai pemisah ribuan, jutaan, dan seterusnya (`Rp 1.000`, `Rp 25.000`, `Rp 1.500.000`).
+- Dilarang keras menampilkan nominal mentah tanpa pemisah (`Rp25000`), menggunakan pemisah koma khas format US (`Rp25,000`), atau desimal sen yang tidak relevan (`Rp25.000,00`) untuk harga Rupiah Indonesia.
+- Gunakan canonical helper platform: `formatMoney(val)` / `window.XentraShared.formatMoney` / `window.Xentra.UI.money` yang menjamin format titik ribuan deterministik `id-ID`.
+
 ## Completion
 
 A coding task is complete only when the implementation matches the relevant contract, the correct runtime path is wired, affected callers remain coherent, and the changes are committed. Update durable documentation when the contract or architecture changes.
+
