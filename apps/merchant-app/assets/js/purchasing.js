@@ -686,8 +686,52 @@
     }
 
     if (modal) modal.style.display = 'flex';
+    var notesEl = $('input-purchasing-receive-notes');
+    if (notesEl) {
+      notesEl.value = '';
+      notesEl.placeholder = 'Contoh: 1 kemasan bocor di jalan, sisanya diterima baik.';
+    }
+    updatePurchasingReceiveModalCta();
   }
   window.openPurchasingReceiveModal = openPurchasingReceiveModal;
+
+  function updatePurchasingReceiveModalCta() {
+    var btn = $('btn-submit-purchasing-receive');
+    var container = $('purchasing-receive-body');
+    if (!btn || !container) return;
+
+    var lineEls = container.querySelectorAll('.purchasing-receive-line');
+    var totalAccepted = 0;
+    var totalRejected = 0;
+    var totalOrdered = 0;
+
+    lineEls.forEach(function (el) {
+      var ord = Number(el.getAttribute('data-ordered-qty')) || 0;
+      var accIn = el.querySelector('.input-receive-accepted');
+      var rejIn = el.querySelector('.input-receive-rejected');
+      totalOrdered += ord;
+      totalAccepted += Number(accIn ? accIn.value : 0) || 0;
+      totalRejected += Number(rejIn ? rejIn.value : 0) || 0;
+    });
+
+    if (totalAccepted === 0 && totalRejected > 0) {
+      btn.textContent = '✕ Tolak Semua Barang';
+      btn.style.background = '#dc2626';
+      btn.style.borderColor = '#dc2626';
+      btn.setAttribute('data-cta-mode', 'reject_all');
+    } else if (totalRejected > 0) {
+      btn.textContent = '⚠️ Terima Sebagian';
+      btn.style.background = '#d97706';
+      btn.style.borderColor = '#d97706';
+      btn.setAttribute('data-cta-mode', 'partial');
+    } else {
+      btn.textContent = '✓ Terima Barang';
+      btn.style.background = '#059669';
+      btn.style.borderColor = '#059669';
+      btn.setAttribute('data-cta-mode', 'accept_all');
+    }
+  }
+  window.updatePurchasingReceiveModalCta = updatePurchasingReceiveModalCta;
 
   function onPurchasingReceiveQtyChange(inputEl, changedField) {
     var lineCard = inputEl.closest('.purchasing-receive-line');
@@ -744,6 +788,9 @@
     if (notesEl && rejected > 0 && !notesEl.value) {
       notesEl.placeholder = 'Catatan: ' + rejected + ' barang ditolak (tulis alasan cacat/segel rusak untuk retur supplier)';
     }
+
+    // Update CTA button dynamically based on entire order's accepted/rejected totals
+    updatePurchasingReceiveModalCta();
   }
   window.onPurchasingReceiveQtyChange = onPurchasingReceiveQtyChange;
 
@@ -766,6 +813,8 @@
     var notesEl = $('input-purchasing-receive-notes');
     var notes = notesEl ? notesEl.value.trim() : '';
 
+    var totalAccepted = 0;
+    var totalRejected = 0;
     var lines = [];
     var lineEls = container.querySelectorAll('.purchasing-receive-line');
     lineEls.forEach(function (el) {
@@ -774,6 +823,8 @@
       var rejIn = el.querySelector('.input-receive-rejected');
       var accepted = Number(accIn ? accIn.value : 0);
       var rejected = Number(rejIn ? rejIn.value : 0);
+      totalAccepted += accepted;
+      totalRejected += rejected;
       lines.push({
         purchase_order_line_id: polId,
         accepted_purchase_quantity: accepted,
@@ -781,6 +832,21 @@
         rejection_reason: rejected > 0 ? (notes || 'Barang ditolak saat penerimaan') : null
       });
     });
+
+    // Validasi penolakan total: wajib isi alasan
+    if (totalAccepted === 0 && totalRejected > 0 && !notes) {
+      if (typeof showToast === 'function') {
+        showToast('⚠️ Catatan fisik wajib diisi jika seluruh barang ditolak (tulis alasan cacat/retur).');
+      } else {
+        alert('Catatan fisik wajib diisi jika seluruh barang ditolak (tulis alasan cacat/retur).');
+      }
+      if (notesEl) {
+        notesEl.focus();
+        notesEl.style.borderColor = '#dc2626';
+        setTimeout(function () { notesEl.style.borderColor = ''; }, 3000);
+      }
+      return;
+    }
 
     var btn = $('btn-submit-purchasing-receive');
     if (btn) {
@@ -800,7 +866,13 @@
       var data = await res.json();
 
       if (res.ok && data.success) {
-        showToast('✓ Barang berhasil diterima! Stok bahan baku telah bertambah.');
+        if (totalAccepted === 0 && totalRejected > 0) {
+          showToast('✓ Penolakan barang dicatat. Seluruh barang diretur ke supplier.');
+        } else if (totalRejected > 0) {
+          showToast('✓ Penerimaan sebagian berhasil dicatat. Stok bertambah sesuai barang layak.');
+        } else {
+          showToast('✓ Seluruh barang berhasil diterima! Stok bahan baku telah bertambah.');
+        }
         closePurchasingReceiveModal();
         loadPurchasingOrders();
       } else {
@@ -811,7 +883,7 @@
     } finally {
       if (btn) {
         btn.disabled = false;
-        btn.textContent = '✓ Terima Barang';
+        updatePurchasingReceiveModalCta();
       }
     }
   }
