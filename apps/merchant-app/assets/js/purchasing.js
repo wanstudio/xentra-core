@@ -54,7 +54,7 @@
         _purchasingState.cashAdvance = Number(activeMandate.cash_advance || 0);
         var cashAdvanceInput = $('input-purchasing-cash-advance');
         if (cashAdvanceInput) {
-          cashAdvanceInput.value = _purchasingState.cashAdvance;
+          cashAdvanceInput.value = _purchasingState.cashAdvance > 0 ? formatNumberWithDots(_purchasingState.cashAdvance) : '';
           cashAdvanceInput.readOnly = true; // Staf melihat uang modal dari manager
         }
 
@@ -93,6 +93,11 @@
 
       // 2. Fallback jika belum ada mandat khusus: ambil checklist bahan menipis dari sistem
       _purchasingState.activeMandateId = null;
+      var cashAdvanceInput = $('input-purchasing-cash-advance');
+      if (cashAdvanceInput) {
+        cashAdvanceInput.readOnly = false;
+        cashAdvanceInput.value = _purchasingState.cashAdvance > 0 ? formatNumberWithDots(_purchasingState.cashAdvance) : '';
+      }
       var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/checklist', {
         headers: getAuthHeaders()
       });
@@ -352,6 +357,16 @@
       if (typeof onValueChange === 'function') onValueChange(num);
     });
   }
+
+  function onPurchasingCashAdvanceInput(inputEl) {
+    if (!inputEl) return;
+    var rawDigits = String(inputEl.value || '').replace(/\D/g, '');
+    var num = parseInt(rawDigits, 10) || 0;
+    _purchasingState.cashAdvance = num;
+    inputEl.value = num > 0 ? formatNumberWithDots(num) : '';
+    recalculatePurchasingSummary();
+  }
+  window.onPurchasingCashAdvanceInput = onPurchasingCashAdvanceInput;
 
   function confirmPurchasingPriceUpdate() {
     if (!_purchasingState.activeEditItem) return;

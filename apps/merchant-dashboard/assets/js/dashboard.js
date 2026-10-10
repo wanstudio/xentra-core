@@ -7272,7 +7272,8 @@ async function loadMenusView() {
     if (!modal) return;
 
     $('edit-mandate-id').value = mandate.id;
-    $('edit-mandate-cash-advance').value = mandate.cash_advance || 0;
+    var rawCash = Number(mandate.cash_advance || 0);
+    $('edit-mandate-cash-advance').value = rawCash > 0 ? (window.XentraShared && window.XentraShared.formatNumber ? window.XentraShared.formatNumber(rawCash) : String(rawCash).replace(/\B(?=(\d{3})+(?!\d))/g, '.')) : '';
     $('edit-mandate-notes').value = mandate.notes || '';
     $('modal-edit-mandate-title').textContent = 'Edit Mandat #' + mandate.mandate_number;
 
