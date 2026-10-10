@@ -1653,7 +1653,7 @@
 
   <!-- MODAL: PURCHASING UPDATE HARGA PASAR -->
   <div id="modal-purchasing-update-price" class="x-modal-backdrop" style="display:none; z-index: 12006;" role="dialog" aria-modal="true" aria-labelledby="purchasing-update-price-title" onclick="if(event.target === this) closePurchasingUpdatePriceModal()">
-    <div class="x-modal-card" style="max-width:380px; width:90%; border-radius:18px; padding:0; overflow:hidden;">
+    <div class="x-modal-card purchasing-modal-card">
       <div class="x-modal-header" style="padding:16px; border-bottom:1px solid #f1f5f9; margin:0;">
         <div>
           <h3 id="purchasing-update-price-title" style="margin:0; font-size:15px; font-weight:800; color:#0f172a;">Update Harga Pasar</h3>
@@ -1662,7 +1662,7 @@
         <button type="button" class="x-modal-close" onclick="closePurchasingUpdatePriceModal()" aria-label="Tutup">✕</button>
       </div>
       <div style="padding:16px;">
-        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:10px 12px; margin-bottom:14px;">
+        <div class="purchasing-modal-ref-box">
           <div style="display:flex; justify-content:space-between; align-items:baseline;">
             <span style="font-size:11.5px; color:#64748b;">Nama Bahan:</span>
             <span style="font-size:11px; font-weight:700; color:#64748b;" id="purchasing-update-price-item-uom">per Unit</span>
@@ -1676,9 +1676,9 @@
 
         <div style="margin-bottom:16px;">
           <label for="input-purchasing-modal-price" style="display:block; font-size:12px; font-weight:700; color:#1e293b; margin-bottom:4px;">Harga Baru di Pasar (Rp):</label>
-          <div style="display:flex; align-items:center; background:#ffffff; border:2px solid #059669; border-radius:10px; padding:0 12px; height:46px; box-shadow:0 0 0 3px rgba(5,150,105,0.1);">
+          <div class="purchasing-modal-input-wrap">
             <span style="font-size:15px; font-weight:800; color:#059669; margin-right:6px;">Rp</span>
-            <input type="number" id="input-purchasing-modal-price" style="border:none; background:transparent; width:100%; font-size:18px; font-weight:800; color:#0f172a; outline:none;" placeholder="0" min="0" step="500" inputmode="numeric" onkeydown="if(event.key === 'Enter') confirmPurchasingPriceUpdate()">
+            <input type="number" id="input-purchasing-modal-price" class="purchasing-modal-input-price" placeholder="0" min="0" step="500" inputmode="numeric" onkeydown="if(event.key === 'Enter') confirmPurchasingPriceUpdate()">
           </div>
         </div>
         <div style="display:flex; gap:10px;">

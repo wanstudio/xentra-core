@@ -198,33 +198,37 @@
       if (item.has_price_update) {
         priceHtml =
           '<span style="color:#0f172a; font-weight:700;">@ ' + formatMoney(item.actualUnitPrice) + '</span>' +
-          '<s style="color:#94a3b8; font-size:11.5px; margin-left:4px;">' + formatMoney(item.estimated_price) + '</s>' +
-          '<span class="x-badge" style="background:#dbeafe; color:#1e40af; font-size:9.5px; padding:1px 5px; font-weight:700; margin-left:5px; border-radius:4px;">harga update</span>';
+          '<s class="purchasing-price-strikethrough">' + formatMoney(item.estimated_price) + '</s>' +
+          '<span class="purchasing-price-badge">harga update</span>';
       } else {
         priceHtml = '<span style="color:#64748b; font-size:12px;">(@ ' + formatMoney(item.actualUnitPrice) + ')</span>';
       }
 
       html +=
-        '<div id="card-item-' + esc(item.material_id) + '" class="purchasing-item-card ' + (isChecked ? 'is-checked' : 'is-unchecked') + '" style="border-radius:14px; padding:14px 16px; margin-bottom:10px; background:#ffffff; border:1.5px solid ' + (isChecked ? '#059669' : '#e2e8f0') + '; box-shadow:0 1px 3px rgba(0,0,0,0.03); cursor:pointer;" onclick="onPurchasingCardClick(event, \'' + esc(item.material_id) + '\')">' +
-          '<div class="purchasing-item-main" style="display:flex; align-items:flex-start; gap:12px;">' +
-            '<div class="purchasing-item-check-col" style="display:flex; align-items:center; justify-content:center; flex-shrink:0; padding-top:2px;">' +
-              '<input type="checkbox" id="chk-' + esc(item.material_id) + '" class="purchasing-check-box" style="width:24px; height:24px; cursor:pointer; accent-color:#059669;" ' + (isChecked ? 'checked' : '') + ' onclick="event.stopPropagation()" onchange="togglePurchasingItemCheck(\'' + esc(item.material_id) + '\', this.checked)">' +
+        '<div id="card-item-' + esc(item.material_id) + '" class="purchasing-item-card ' + (isChecked ? 'is-checked' : 'is-unchecked') + '" onclick="onPurchasingCardClick(event, \'' + esc(item.material_id) + '\')">' +
+          '<div class="purchasing-item-main">' +
+            '<div class="purchasing-item-check-col">' +
+              '<div class="purchasing-custom-check" aria-hidden="true">' +
+                '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
+                  '<polyline points="2 6 4.5 9 10 3"></polyline>' +
+                '</svg>' +
+              '</div>' +
             '</div>' +
-            '<div class="purchasing-item-info-col" style="flex:1; min-width:0;">' +
-              '<div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px;">' +
-                '<label for="chk-' + esc(item.material_id) + '" style="font-size:15px; font-weight:800; color:#0f172a; cursor:pointer; margin:0;' + (isChecked ? 'text-decoration:line-through; color:#64748b;' : '') + '" onclick="event.stopPropagation()">' +
+            '<div class="purchasing-item-info-col">' +
+              '<div class="purchasing-item-header">' +
+                '<span class="purchasing-item-name">' +
                   esc(item.material_name) +
-                '</label>' +
-                '<div class="purchasing-item-subtotal-val" style="font-size:15px; font-weight:800; color:' + (isChecked ? '#059669' : '#0f172a') + '; flex-shrink:0;">' +
+                '</span>' +
+                '<div class="purchasing-item-subtotal-val">' +
                   formatMoney(subtotal) +
                 '</div>' +
               '</div>' +
-              '<div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; gap:8px; flex-wrap:wrap;">' +
-                '<div style="font-size:12.5px; color:#475569; min-width:0; display:flex; align-items:center; flex-wrap:wrap;">' +
+              '<div class="purchasing-item-meta-row">' +
+                '<div class="purchasing-item-meta-qty">' +
                   '<span>Beli:</span>&nbsp;<strong style="color:#0f172a; font-size:13.5px;">' + item.buyQty + ' ' + esc(uomCode) + '</strong>&nbsp;' +
                   priceHtml +
                 '</div>' +
-                '<button type="button" onclick="event.stopPropagation(); openPurchasingUpdatePriceModal(\'' + esc(item.material_id) + '\')" style="background:#f8fafc; border:1.5px solid #cbd5e1; border-radius:9px; padding:6px 14px; font-size:12.5px; font-weight:800; color:#0f172a; cursor:pointer; flex-shrink:0; display:inline-flex; align-items:center; gap:5px; box-shadow:0 1px 2px rgba(0,0,0,0.04);">' +
+                '<button type="button" class="purchasing-btn-price-update" onclick="event.stopPropagation(); openPurchasingUpdatePriceModal(\'' + esc(item.material_id) + '\')">' +
                   '<span style="color:#64748b; font-size:12px;">✎</span> <span>Harga Baru</span>' +
                 '</button>' +
               '</div>' +
