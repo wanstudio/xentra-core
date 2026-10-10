@@ -194,6 +194,16 @@
       var subtotal = Math.round(item.buyQty * item.actualUnitPrice);
       var uomCode = item.base_uom_code || item.base_uom_name || 'Unit';
 
+      var priceHtml = '';
+      if (item.has_price_update) {
+        priceHtml =
+          '<span style="color:#0f172a; font-weight:700;">@ ' + formatMoney(item.actualUnitPrice) + '</span>' +
+          '<s style="color:#94a3b8; font-size:11.5px; margin-left:4px;">' + formatMoney(item.estimated_price) + '</s>' +
+          '<span class="x-badge" style="background:#dbeafe; color:#1e40af; font-size:9.5px; padding:1px 5px; font-weight:700; margin-left:5px; border-radius:4px;">harga update</span>';
+      } else {
+        priceHtml = '<span style="color:#64748b; font-size:12px;">(@ ' + formatMoney(item.actualUnitPrice) + ')</span>';
+      }
+
       html +=
         '<div id="card-item-' + esc(item.material_id) + '" class="purchasing-item-card ' + (isChecked ? 'is-checked' : 'is-unchecked') + '" style="border-radius:14px; padding:14px 16px; margin-bottom:10px; background:#ffffff; border:1.5px solid ' + (isChecked ? '#059669' : '#e2e8f0') + '; box-shadow:0 1px 3px rgba(0,0,0,0.03); cursor:pointer;" onclick="onPurchasingCardClick(event, \'' + esc(item.material_id) + '\')">' +
           '<div class="purchasing-item-main" style="display:flex; align-items:flex-start; gap:12px;">' +
@@ -210,10 +220,9 @@
                 '</div>' +
               '</div>' +
               '<div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; gap:8px; flex-wrap:wrap;">' +
-                '<div style="font-size:12.5px; color:#475569; min-width:0;">' +
-                  'Beli: <strong style="color:#0f172a; font-size:13.5px;">' + item.buyQty + ' ' + esc(uomCode) + '</strong>' +
-                  ' <span style="color:#64748b; font-size:12px;">(@ ' + formatMoney(item.actualUnitPrice) + ')</span>' +
-                  (item.has_price_update ? ' <span class="x-badge" style="background:#dbeafe; color:#1e40af; font-size:10px; padding:1px 5px; font-weight:700;">harga_update</span>' : '') +
+                '<div style="font-size:12.5px; color:#475569; min-width:0; display:flex; align-items:center; flex-wrap:wrap;">' +
+                  '<span>Beli:</span>&nbsp;<strong style="color:#0f172a; font-size:13.5px;">' + item.buyQty + ' ' + esc(uomCode) + '</strong>&nbsp;' +
+                  priceHtml +
                 '</div>' +
                 '<button type="button" onclick="event.stopPropagation(); openPurchasingUpdatePriceModal(\'' + esc(item.material_id) + '\')" style="background:#f8fafc; border:1.5px solid #cbd5e1; border-radius:9px; padding:6px 14px; font-size:12.5px; font-weight:800; color:#0f172a; cursor:pointer; flex-shrink:0; display:inline-flex; align-items:center; gap:5px; box-shadow:0 1px 2px rgba(0,0,0,0.04);">' +
                   '<span style="color:#64748b; font-size:12px;">✎</span> <span>Harga Baru</span>' +
@@ -243,10 +252,15 @@
     _purchasingState.activeEditItem = itm;
 
     var nameEl = $('purchasing-update-price-item-name');
+    var uomEl = $('purchasing-update-price-item-uom');
+    var oldPriceEl = $('purchasing-update-price-old-price');
     var priceIn = $('input-purchasing-modal-price');
     var modal = $('modal-purchasing-update-price');
 
-    if (nameEl) nameEl.textContent = itm.material_name + ' (per ' + (itm.base_uom_code || itm.base_uom_name || 'unit') + ')';
+    var uomText = itm.base_uom_code || itm.base_uom_name || 'unit';
+    if (nameEl) nameEl.textContent = itm.material_name;
+    if (uomEl) uomEl.textContent = 'per ' + uomText;
+    if (oldPriceEl) oldPriceEl.textContent = formatMoney(itm.estimated_price || itm.actualUnitPrice || 0) + ' / ' + uomText;
     if (priceIn) {
       priceIn.value = itm.actualUnitPrice || '';
       setTimeout(function () { priceIn.focus(); priceIn.select(); }, 60);
