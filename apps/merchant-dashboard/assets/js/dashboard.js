@@ -12466,11 +12466,15 @@ async function loadMenusView() {
       setTimeout(function () {
         sheet.classList.add('open');
         if (extClose) {
-          var sheetH = sheet.offsetHeight || 380;
-          extClose.style.bottom = (sheetH + 12) + 'px';
-          extClose.classList.add('open');
+          if (window.innerWidth >= 769) {
+            extClose.classList.remove('open');
+          } else {
+            var sheetH = sheet.offsetHeight || 380;
+            extClose.style.bottom = (sheetH + 12) + 'px';
+            extClose.classList.add('open');
+          }
         }
-      }, 10);
+      }, 20);
     }
   }
 
@@ -12638,15 +12642,19 @@ async function loadMenusView() {
       var qty = Math.max(1, parseInt(item.quantity, 10) || 1);
 
       return '<div class="x-composed-menu-component-row" data-cm-item-index="' + index + '" style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:12px;">' +
-        '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">' +
-          '<div style="font-size:14px;font-weight:700;color:#0F172A;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">' +
+          '<div style="font-size:14px;font-weight:700;color:#0F172A;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;">' +
             esc(displayText) +
           '</div>' +
           '<div style="display:flex;align-items:center;gap:8px;">' +
             '<div style="display:inline-flex;align-items:center;border:1px solid #CBD5E1;border-radius:8px;overflow:hidden;background:#FFFFFF;">' +
-              '<button type="button" class="x-stepper-btn-minus" data-cm-stepper-minus="' + index + '" style="width:30px;height:30px;border:none;background:#F8FAFC;color:#0F172A;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;">-</button>' +
+              '<button type="button" class="x-stepper-btn-minus" data-cm-stepper-minus="' + index + '" aria-label="Kurangi Jumlah" title="Kurangi Jumlah" style="width:30px;height:30px;border:none;background:#F8FAFC;color:#0F172A;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;">' +
+                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
+              '</button>' +
               '<input type="number" class="x-input" min="1" step="1" inputmode="numeric" value="' + esc(qty) + '" data-cm-item-qty style="width:40px;height:30px;border:none;border-left:1px solid #CBD5E1;border-right:1px solid #CBD5E1;text-align:center;padding:0;font-size:13px;font-weight:600;border-radius:0;">' +
-              '<button type="button" class="x-stepper-btn-plus" data-cm-stepper-plus="' + index + '" style="width:30px;height:30px;border:none;background:#F8FAFC;color:#0F172A;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;">+</button>' +
+              '<button type="button" class="x-stepper-btn-plus" data-cm-stepper-plus="' + index + '" aria-label="Tambah Jumlah" title="Tambah Jumlah" style="width:30px;height:30px;border:none;background:#F8FAFC;color:#0F172A;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;">' +
+                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
+              '</button>' +
             '</div>' +
             '<button type="button" class="x-btn-secondary x-composed-menu-component-remove" data-cm-item-remove="' + index + '" aria-label="Hapus Item" title="Hapus Item" style="width:30px;height:30px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid #CBD5E1;color:#EF4444;background:#FFFFFF;cursor:pointer;">' +
               '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +

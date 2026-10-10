@@ -13,7 +13,7 @@
  */
 
 var APP_CACHE_PREFIX = "xentra-merchant-";
-var APP_VERSION = "v1.1.1";
+var APP_VERSION = "v1.2.0";
 var FALLBACK_CACHE_NAME = "xentra-merchant-live";
 
 var STATIC_ASSETS = [
@@ -22,26 +22,27 @@ var STATIC_ASSETS = [
   "/merchant-app/assets/icons/icon-192.png",
   "/merchant-app/assets/icons/icon-512.png",
   "/merchant-shared/css/shared.css?v=1.0.0",
-  "/merchant-shared/css/dashboard.css?v=1.0.16",
-  "/merchant-app/assets/css/home.css?v=1.0.3",
+  "/merchant-shared/css/dashboard.css?v=1.0.28",
+  "/merchant-app/assets/css/home.css?v=1.0.4",
   "/merchant-shared/js/shared.js?v=1.0.0",
   "/merchant-shared/js/action-menu.js?v=1.0.0",
-  "/merchant-shared/js/crop-editor.js?v=1.0.0",
+  "/merchant-shared/js/crop-editor.js?v=1.0.2",
   "/merchant-shared/js/catalog-client.js?v=1.0.0",
   "/assets/js/core/fulfillment-environments.js?v=1.0.0",
-  "/merchant-app/assets/js/branch-catalog-ui.js?v=1.0.0",
+  "/merchant-app/assets/js/branch-catalog-ui.js?v=1.0.1",
   "/merchant-app/assets/js/context.js?v=1.0.0",
-  "/merchant-app/assets/js/menu.js?v=1.0.5",
+  "/merchant-app/assets/js/menu.js?v=1.0.6",
   "/merchant-app/assets/js/hari-ini.js?v=1.0.0",
   "/merchant-app/assets/js/home.js?v=1.0.2",
   "/merchant-app/assets/js/jam-operasional.js?v=1.0.0",
   "/merchant-app/assets/js/reports.js?v=1.0.0",
   "/merchant-app/assets/js/tables.js?v=1.0.0",
-  "/merchant-app/assets/js/stock.js?v=1.0.0",
+  "/merchant-app/assets/js/stock.js?v=1.1.0",
+  "/merchant-app/assets/js/purchasing.js?v=1.0.1",
   "/merchant-app/assets/js/promotions.js?v=1.0.0",
   "/merchant-app/assets/js/staff.js?v=1.0.0",
   "/merchant-app/assets/js/orders.js?v=1.0.1",
-  "/merchant-app/assets/js/merchant-app.js?v=1.0.2"
+  "/merchant-app/assets/js/merchant-app.js?v=1.0.4"
 ];
 
 var _cacheNamePromise = null;

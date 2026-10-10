@@ -130,57 +130,50 @@
       var uomCode = item.base_uom_code || item.base_uom_name || 'Unit';
 
       html +=
-        '<div class="purchasing-item-card ' + (isChecked ? 'is-checked' : 'is-unchecked') + '">' +
-          '<div class="purchasing-item-header">' +
-            // Large touch-friendly Checkbox
-            '<div>' +
+        '<div id="card-item-' + esc(item.material_id) + '" class="purchasing-item-card ' + (isChecked ? 'is-checked' : 'is-unchecked') + '">' +
+          '<div class="purchasing-item-main">' +
+            '<div class="purchasing-item-check-col">' +
               '<input type="checkbox" id="chk-' + esc(item.material_id) + '" class="purchasing-check-box" ' + (isChecked ? 'checked' : '') + ' onchange="togglePurchasingItemCheck(\'' + esc(item.material_id) + '\', this.checked)">' +
             '</div>' +
-
-            // Content body
-            '<div style="flex:1; min-width:0;">' +
-              '<div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">' +
-                '<div>' +
-                  '<label for="chk-' + esc(item.material_id) + '" class="purchasing-item-name" style="cursor:pointer; display:block;">' +
-                    esc(item.material_name) +
-                  '</label>' +
-                  '<div class="purchasing-item-stock">' +
-                    'Stok saat ini: <strong>' + Number(item.current_stock).toFixed(1) + ' ' + esc(uomCode) + '</strong> ' +
-                    (item.is_low ? '<span style="color:#dc2626; font-weight:800;">(Min ' + item.minimum_quantity + ')</span>' : '') +
-                  '</div>' +
-                '</div>' +
-                '<div style="text-align:right;">' +
-                  '<div class="purchasing-item-subtotal">' +
-                    formatMoney(subtotal) +
-                  '</div>' +
-                  '<small style="font-size:10px; color:#64748b; font-weight:600;">Subtotal</small>' +
+            '<div class="purchasing-item-info-col">' +
+              '<div class="purchasing-item-top-row">' +
+                '<label for="chk-' + esc(item.material_id) + '" class="purchasing-item-name">' +
+                  esc(item.material_name) +
+                '</label>' +
+                '<div class="purchasing-item-subtotal-val">' +
+                  formatMoney(subtotal) +
                 '</div>' +
               '</div>' +
-
-              // Input row (Stepper Qty & Harga Pasar)
-              '<div class="purchasing-item-control-grid">' +
-                // Qty Belanja
-                '<div>' +
-                  '<label style="display:block; font-size:11px; font-weight:700; color:#334155;">' +
-                    'Beli (' + esc(uomCode) + ')' +
-                  '</label>' +
-                  '<div class="purchasing-qty-stepper">' +
-                    '<button type="button" class="purchasing-step-btn" onclick="stepPurchasingQty(\'' + esc(item.material_id) + '\', -1)">−</button>' +
-                    '<input type="number" min="0.1" step="any" value="' + item.buyQty + '" oninput="updatePurchasingItemQty(\'' + esc(item.material_id) + '\', this.value)" class="purchasing-qty-input">' +
-                    '<button type="button" class="purchasing-step-btn" onclick="stepPurchasingQty(\'' + esc(item.material_id) + '\', 1)">＋</button>' +
-                  '</div>' +
-                '</div>' +
-
-                // Harga Pasar Riil per Unit
-                '<div>' +
-                  '<label style="display:block; font-size:11px; font-weight:700; color:#334155;">' +
-                    'Harga / ' + esc(uomCode) + ' (Rp)' +
-                  '</label>' +
-                  '<input type="number" min="0" step="500" value="' + item.actualUnitPrice + '" oninput="updatePurchasingItemPrice(\'' + esc(item.material_id) + '\', this.value)" class="purchasing-price-input" placeholder="0">' +
-                '</div>' +
+              '<div class="purchasing-item-stock-row">' +
+                '<span>Stok: <strong>' + Number(item.current_stock).toFixed(1) + ' ' + esc(uomCode) + '</strong></span>' +
+                (item.is_low ? '<span class="purchasing-low-tag">Min ' + item.minimum_quantity + '</span>' : '') +
               '</div>' +
             '</div>' +
           '</div>' +
+
+          (isChecked ? (
+            '<div class="purchasing-item-inputs-box">' +
+              '<div class="purchasing-input-field">' +
+                '<label class="purchasing-input-lbl">Jumlah Beli (' + esc(uomCode) + ')</label>' +
+                '<div class="purchasing-stepper">' +
+                  '<button type="button" class="purchasing-btn-step" onclick="stepPurchasingQty(\'' + esc(item.material_id) + '\', -1)" aria-label="Kurangi Jumlah" title="Kurangi Jumlah">' +
+                    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
+                  '</button>' +
+                  '<input type="number" min="0.1" step="any" inputmode="decimal" value="' + item.buyQty + '" oninput="updatePurchasingItemQty(\'' + esc(item.material_id) + '\', this.value)" class="purchasing-stepper-input">' +
+                  '<button type="button" class="purchasing-btn-step" onclick="stepPurchasingQty(\'' + esc(item.material_id) + '\', 1)" aria-label="Tambah Jumlah" title="Tambah Jumlah">' +
+                    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
+                  '</button>' +
+                '</div>' +
+              '</div>' +
+              '<div class="purchasing-input-field">' +
+                '<label class="purchasing-input-lbl">Harga / ' + esc(uomCode) + ' (Rp)</label>' +
+                '<div class="purchasing-price-box">' +
+                  '<span class="purchasing-price-rp">Rp</span>' +
+                  '<input type="number" min="0" step="500" inputmode="numeric" value="' + item.actualUnitPrice + '" oninput="updatePurchasingItemPrice(\'' + esc(item.material_id) + '\', this.value)" class="purchasing-price-field" placeholder="0">' +
+                '</div>' +
+              '</div>' +
+            '</div>'
+          ) : '') +
         '</div>';
     });
 
@@ -202,7 +195,12 @@
     var itm = _purchasingState.items.find(function (i) { return i.material_id === materialId; });
     if (itm && !isNaN(num) && num >= 0) {
       itm.buyQty = num;
-      renderPurchasingList();
+      // Update subtotal display in place without re-rendering to prevent losing input focus
+      var card = document.getElementById('card-item-' + materialId);
+      if (card) {
+        var subEl = card.querySelector('.purchasing-item-subtotal-val');
+        if (subEl) subEl.textContent = formatMoney(Math.round(itm.buyQty * itm.actualUnitPrice));
+      }
       recalculatePurchasingSummary();
     }
   }
@@ -213,7 +211,13 @@
     if (itm) {
       var next = Math.max(0.5, (itm.buyQty || 0) + delta);
       itm.buyQty = Math.round(next * 10) / 10;
-      renderPurchasingList();
+      var card = document.getElementById('card-item-' + materialId);
+      if (card) {
+        var inp = card.querySelector('.purchasing-stepper-input');
+        if (inp) inp.value = itm.buyQty;
+        var subEl = card.querySelector('.purchasing-item-subtotal-val');
+        if (subEl) subEl.textContent = formatMoney(Math.round(itm.buyQty * itm.actualUnitPrice));
+      }
       recalculatePurchasingSummary();
     }
   }
@@ -224,7 +228,12 @@
     var itm = _purchasingState.items.find(function (i) { return i.material_id === materialId; });
     if (itm && !isNaN(num) && num >= 0) {
       itm.actualUnitPrice = num;
-      renderPurchasingList();
+      // Update subtotal display in place without re-rendering to prevent losing input focus
+      var card = document.getElementById('card-item-' + materialId);
+      if (card) {
+        var subEl = card.querySelector('.purchasing-item-subtotal-val');
+        if (subEl) subEl.textContent = formatMoney(Math.round(itm.buyQty * itm.actualUnitPrice));
+      }
       recalculatePurchasingSummary();
     }
   }
@@ -341,4 +350,256 @@
   }
   window.submitPurchasingSettle = submitPurchasingSettle;
 
+  /* =========================================================================
+     VIEW SWITCHER (TUGAS, RIWAYAT, KALKULATOR)
+     ========================================================================= */
+  function switchPurchasingView(viewId) {
+    var vTasks = $('purchasing-view-tasks');
+    var vHistory = $('purchasing-view-history');
+    var vCalc = $('purchasing-view-calc');
+
+    var btnTasks = $('btn-purchasing-nav-tasks');
+    var btnHistory = $('btn-purchasing-nav-history');
+    var btnCalc = $('btn-purchasing-nav-calc');
+
+    if (vTasks) vTasks.style.display = viewId === 'tasks' ? 'block' : 'none';
+    if (vHistory) vHistory.style.display = viewId === 'history' ? 'block' : 'none';
+    if (vCalc) vCalc.style.display = viewId === 'calc' ? 'block' : 'none';
+
+    if (btnTasks) btnTasks.classList.toggle('active', viewId === 'tasks');
+    if (btnHistory) btnHistory.classList.toggle('active', viewId === 'history');
+    if (btnCalc) btnCalc.classList.toggle('active', viewId === 'calc');
+
+    // Hide or show bottom settlement bar only on Tasks view
+    var bottomBar = $('purchasing-bottom-bar');
+    if (bottomBar) {
+      bottomBar.style.display = viewId === 'tasks' ? 'flex' : 'none';
+    }
+
+    if (viewId === 'history') {
+      loadPurchasingHistory();
+    }
+  }
+  window.switchPurchasingView = switchPurchasingView;
+
+  /* =========================================================================
+     PURCHASING HISTORY (7 HARI TERAKHIR)
+     ========================================================================= */
+  async function loadPurchasingHistory() {
+    var user = getStoredUser();
+    var branchId = user ? (user.branch_id || user.branchId) : null;
+    if (!branchId) return;
+
+    var container = $('purchasing-history-container');
+    if (container) {
+      container.innerHTML = '<div class="text-center py-6 text-muted">Memuat riwayat belanja seminggu terakhir...</div>';
+    }
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/history', {
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+
+      if (res.ok && data.success) {
+        var sessions = data.sessions || [];
+        if (!sessions.length) {
+          if (container) {
+            container.innerHTML =
+              '<div style="text-align:center; padding:40px 20px; background:#fff; border-radius:16px; border:1px dashed #cbd5e1;">' +
+                '<div style="font-size:36px; margin-bottom:8px;">🛒</div>' +
+                '<div style="font-size:15px; font-weight:700; color:#334155;">Belum Ada Riwayat Belanja</div>' +
+                '<div style="font-size:12px; color:#64748b; margin-top:4px;">Belanjaan yang dicatat dalam 7 hari terakhir akan muncul di sini.</div>' +
+              '</div>';
+          }
+          return;
+        }
+
+        var html = '';
+        sessions.forEach(function (sess) {
+          var dateStr = '';
+          try {
+            var d = new Date(sess.timestamp);
+            dateStr = d.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+          } catch (_) {
+            dateStr = sess.timestamp;
+          }
+
+          html +=
+            '<div class="purchasing-history-card">' +
+              '<div class="purchasing-history-head">' +
+                '<div>' +
+                  '<div class="purchasing-history-date">' + esc(dateStr) + '</div>' +
+                  '<div class="purchasing-history-actor">Petugas: ' + esc(sess.actor_name) + '</div>' +
+                '</div>' +
+                '<div class="purchasing-history-total">' + formatMoney(sess.total_spend) + '</div>' +
+              '</div>' +
+              '<div class="purchasing-history-items-list">';
+
+          sess.items.forEach(function (itm) {
+            html +=
+              '<div class="purchasing-history-item-row">' +
+                '<div style="flex:1; min-width:0;">' +
+                  '<div style="font-size:13.5px; font-weight:700; color:#0f172a;">' + esc(itm.material_name) + '</div>' +
+                  '<div style="font-size:11.5px; color:#64748b;">' + Number(itm.quantity).toFixed(1) + ' ' + esc(itm.uom) + ' @ ' + formatMoney(itm.unit_price) + '</div>' +
+                '</div>' +
+                '<div style="font-size:13px; font-weight:800; color:#334155;">' + formatMoney(itm.total_price) + '</div>' +
+              '</div>';
+          });
+
+          html += '</div></div>';
+        });
+
+        if (container) container.innerHTML = html;
+      } else {
+        if (container) {
+          container.innerHTML = '<div class="text-center py-6 text-danger">Gagal memuat riwayat: ' + esc(data.message || 'Terjadi kesalahan') + '</div>';
+        }
+      }
+    } catch (err) {
+      console.error('[Purchasing] History fetch error:', err);
+      if (container) {
+        container.innerHTML = '<div class="text-center py-6 text-danger">Kesalahan jaringan saat memuat riwayat.</div>';
+      }
+    }
+  }
+  window.loadPurchasingHistory = loadPurchasingHistory;
+
+  /* =========================================================================
+     QUICK MARKET CALCULATOR
+     ========================================================================= */
+  var _calcFormula = '';
+  var _calcLastResult = 0;
+
+  function pressPurchasingCalc(char) {
+    if (_calcFormula === '0' && !isNaN(char)) {
+      _calcFormula = char;
+    } else {
+      _calcFormula += char;
+    }
+    updatePurchasingCalcDisplay();
+  }
+  window.pressPurchasingCalc = pressPurchasingCalc;
+
+  function backspacePurchasingCalc() {
+    if (_calcFormula.length > 0) {
+      _calcFormula = _calcFormula.slice(0, -1);
+    }
+    if (_calcFormula === '') {
+      _calcFormula = '0';
+    }
+    updatePurchasingCalcDisplay();
+  }
+  window.backspacePurchasingCalc = backspacePurchasingCalc;
+
+  function resetPurchasingCalc() {
+    _calcFormula = '0';
+    _calcLastResult = 0;
+    updatePurchasingCalcDisplay();
+    var cashIn = $('input-purchasing-calc-cash');
+    if (cashIn) cashIn.value = '';
+    highlightMatchingQuickCash(null);
+    calculatePurchasingCalcChange();
+  }
+  window.resetPurchasingCalc = resetPurchasingCalc;
+
+  function evaluatePurchasingCalc() {
+    if (!_calcFormula) return;
+    try {
+      // Safe sanitized arithmetic evaluation without arbitrary code execution
+      var sanitized = _calcFormula.replace(/[^0-9+\-*/.]/g, '');
+      if (!sanitized) return;
+      var fn = new Function('return (' + sanitized + ')');
+      var res = fn();
+      if (!isNaN(res) && isFinite(res)) {
+        _calcLastResult = Math.round(res * 100) / 100;
+        _calcFormula = String(_calcLastResult);
+      }
+    } catch (_) {
+      // Ignore evaluation syntax error
+    }
+    updatePurchasingCalcDisplay();
+    calculatePurchasingCalcChange();
+  }
+  window.evaluatePurchasingCalc = evaluatePurchasingCalc;
+
+  function updatePurchasingCalcDisplay() {
+    var formulaEl = $('purchasing-calc-formula');
+    var resultEl = $('purchasing-calc-result');
+    if (formulaEl) formulaEl.textContent = _calcFormula || '0';
+    if (resultEl) resultEl.textContent = formatMoney(_calcLastResult);
+  }
+
+  function getPurchasingCashInputValue() {
+    var cashIn = $('input-purchasing-calc-cash');
+    if (!cashIn) return 0;
+    var raw = String(cashIn.value || '').replace(/[^0-9]/g, '');
+    return parseInt(raw, 10) || 0;
+  }
+
+  function formatNominal(num) {
+    return Number(num || 0).toLocaleString('id-ID');
+  }
+
+  function onPurchasingCalcCashInput(val) {
+    var num = parseInt(String(val || '').replace(/[^0-9]/g, ''), 10) || 0;
+    var cashIn = $('input-purchasing-calc-cash');
+    if (cashIn) {
+      cashIn.value = num > 0 ? formatNominal(num) : '';
+    }
+    highlightMatchingQuickCash(num);
+    calculatePurchasingCalcChange();
+  }
+  window.onPurchasingCalcCashInput = onPurchasingCalcCashInput;
+
+  function selectPurchasingQuickCash(val) {
+    var cashIn = $('input-purchasing-calc-cash');
+    var amount = 0;
+    if (val === 'exact') {
+      amount = _calcLastResult > 0 ? _calcLastResult : 0;
+    } else {
+      amount = parseInt(val, 10) || 0;
+    }
+    if (cashIn) {
+      cashIn.value = amount > 0 ? formatNominal(amount) : '';
+    }
+    highlightMatchingQuickCash(val);
+    calculatePurchasingCalcChange();
+  }
+  window.selectPurchasingQuickCash = selectPurchasingQuickCash;
+
+  function highlightMatchingQuickCash(val) {
+    var grid = $('purchasing-calc-quick-grid');
+    if (!grid) return;
+    var btns = grid.querySelectorAll('.purchasing-btn-quick-cash');
+    btns.forEach(function (btn) {
+      var btnVal = btn.getAttribute('data-cash-val');
+      if (val === 'exact' && btnVal === 'exact') {
+        btn.classList.add('active');
+      } else if (String(btnVal) === String(val)) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+  }
+
+  function calculatePurchasingCalcChange() {
+    var cash = getPurchasingCashInputValue();
+    var change = cash - _calcLastResult;
+
+    var changeEl = $('label-purchasing-calc-change');
+    if (changeEl) {
+      if (change >= 0) {
+        changeEl.textContent = formatMoney(change);
+        changeEl.style.color = '#059669';
+      } else {
+        changeEl.textContent = 'Kurang ' + formatMoney(Math.abs(change));
+        changeEl.style.color = '#dc2626';
+      }
+    }
+  }
+  window.calculatePurchasingCalcChange = calculatePurchasingCalcChange;
+
 })();
+

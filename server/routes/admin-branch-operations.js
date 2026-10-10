@@ -654,4 +654,90 @@ router.post('/admin/branches/:id/purchasing/settle', requireAuth(['owner', 'bran
   }
 });
 
+// GET /admin/branches/:id/purchasing/history
+// Returns purchasing receipt history for the last 7 days with price comparisons
+router.get('/admin/branches/:id/purchasing/history', requireAuth(['owner', 'brand_manager', 'branch_manager', 'purchasing']), (req, res) => {
+  try {
+    if (['branch_manager', 'purchasing'].includes(req.user.role)) {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (assignedBranchId && assignedBranchId !== req.params.id) {
+        return res.status(403).json({
+          success: false,
+          error: 'FORBIDDEN_BRANCH_SCOPE',
+          message: 'Akses hanya diizinkan untuk cabang yang ditugaskan.'
+        });
+      }
+    }
+
+    const branch = db.prepare('SELECT b.id, b.name, b.brand_id FROM branches b WHERE b.id = ? AND b.brand_id = ?').get(req.params.id, req.brand_id);
+    if (!branch) {
+      return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
+    }
+
+    const location = db.prepare("SELECT id FROM stock_locations WHERE branch_id = ? AND is_active = 1 LIMIT 1").get(req.params.id);
+    if (!location) {
+      return res.json({ success: true, history: [] });
+    }
+
+    // Fetch movements from the last 7 days
+    const rows = db.prepare(`
+      SELECT
+        sm.id,
+        sm.posting_mutation_id,
+        sm.material_id,
+        m.name AS material_name,
+        u.code AS base_uom_code,
+        u.name AS base_uom_name,
+        sm.quantity_base AS quantity,
+        sm.unit_cost,
+        sm.total_cost,
+        sm.posting_timestamp,
+        sm.actor_id,
+        usr.full_name AS actor_name
+      FROM material_stock_movements sm
+      JOIN materials m ON m.id = sm.material_id
+      LEFT JOIN uoms u ON u.id = m.base_uom_id
+      LEFT JOIN users usr ON usr.id = sm.actor_id
+      WHERE sm.stock_location_id = ?
+        AND sm.movement_type = 'PURCHASE_RECEIPT'
+        AND sm.posting_timestamp >= datetime('now', '-7 days')
+      ORDER BY sm.posting_timestamp DESC
+    `).all(location.id);
+
+    // Group items by posting_mutation_id for clean session grouping
+    const sessionMap = new Map();
+    for (const r of rows) {
+      const pId = r.posting_mutation_id || r.id;
+      if (!sessionMap.has(pId)) {
+        sessionMap.set(pId, {
+          posting_id: pId,
+          timestamp: r.posting_timestamp,
+          actor_name: r.actor_name || 'Petugas Belanja',
+          total_spend: 0,
+          items: []
+        });
+      }
+      const session = sessionMap.get(pId);
+      session.total_spend += Number(r.total_cost || 0);
+      session.items.push({
+        material_id: r.material_id,
+        material_name: r.material_name,
+        uom: r.base_uom_code || r.base_uom_name || 'Unit',
+        quantity: Number(r.quantity || 0),
+        unit_price: Number(r.unit_cost || 0),
+        total_price: Number(r.total_cost || 0)
+      });
+    }
+
+    res.json({
+      success: true,
+      branch_id: req.params.id,
+      sessions: Array.from(sessionMap.values())
+    });
+  } catch (err) {
+    console.error('[API Error GET /admin/branches/:id/purchasing/history]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 };

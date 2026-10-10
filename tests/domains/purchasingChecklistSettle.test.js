@@ -217,4 +217,22 @@ test.describe('Purchasing / Belanja Pasar Operational Workflow', () => {
     const body = await res.json();
     assert.equal(body.error, 'FORBIDDEN_BRANCH_SCOPE');
   });
+
+  test('4. GET /admin/branches/:id/purchasing/history returns grouped history sessions from last 7 days', async () => {
+    const res = await fetch(`${baseUrl}/admin/branches/${branchId}/purchasing/history`, {
+      headers: {
+        'Authorization': `Bearer ${purchasingToken}`,
+        'X-Brand-Id': brandId
+      }
+    });
+
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.success, true);
+    assert.ok(Array.isArray(body.sessions));
+    assert.ok(body.sessions.length >= 1);
+    assert.equal(body.sessions[0].total_spend, 450000);
+    assert.equal(body.sessions[0].items[0].material_id, materialId1);
+    assert.equal(body.sessions[0].items[0].unit_price, 45000);
+  });
 });

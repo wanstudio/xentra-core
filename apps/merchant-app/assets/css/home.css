@@ -756,166 +756,329 @@
 }
 
 /* ==========================================================================
-   PETUGAS BELANJA — 100% PURE MOBILE VIEW (DRIVER APP / GOJEK STYLE)
+   PETUGAS BELANJA — 100% PURE DRIVER APP REPLICA
+   Directly matched 1:1 with apps/driver-app/assets/css/driver.css
    ========================================================================== */
 body.is-purchasing-mode {
-  background: #f8fafc !important;
-  color: #0f172a !important;
+  margin: 0 !important;
+  min-height: 100% !important;
+  background: #f8fafc !important; /* var(--surface-2) */
+  color: #0f172a !important;      /* var(--ink) */
+  font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  letter-spacing: -0.011em !important;
+  -webkit-font-smoothing: antialiased !important;
+  -webkit-tap-highlight-color: transparent !important;
 }
 
-/* Hide desktop elements completely */
+/* Hide desktop elements and manager widgets */
 body.is-purchasing-mode .x-dash-sidebar,
 body.is-purchasing-mode .x-sidebar-overlay,
 body.is-purchasing-mode .x-topbar-desktop,
 body.is-purchasing-mode .x-mobile-operational-row,
-body.is-purchasing-mode .x-btn-hamburger {
+body.is-purchasing-mode .x-btn-hamburger,
+body.is-purchasing-mode .x-merchant-mobile-nav {
   display: none !important;
 }
 
-/* Make layout 100% centered mobile container up to 540px like driver app */
+/* 1:1 .driver-app */
 body.is-purchasing-mode .x-dash-layout {
+  min-height: 100dvh !important;
   display: flex !important;
   justify-content: center !important;
-  background: #f1f5f9 !important;
-  min-height: 100dvh !important;
-  height: auto !important;
-  overflow-x: hidden !important;
-  overflow-y: auto !important;
+  background: #f8fafc !important;
+  padding: 0 !important;
+  margin: 0 !important;
 }
 
+/* 1:1 .driver-shell */
 body.is-purchasing-mode .x-dash-main {
   width: 100% !important;
   max-width: 520px !important;
   min-height: 100dvh !important;
   background: #f8fafc !important;
-  box-shadow: 0 4px 25px rgba(15, 23, 42, 0.08) !important;
   position: relative !important;
   display: flex !important;
   flex-direction: column !important;
-  overflow-y: visible !important;
   padding: 0 !important;
-  margin: 0 auto !important;
+  margin: 0 !important;
+  box-shadow: none !important;
 }
 
-/* Sticky Mobile App Header like Driver App */
+@media (min-width: 700px) {
+  body.is-purchasing-mode .x-dash-main {
+    margin: 18px 0 !important;
+    min-height: calc(100dvh - 36px) !important;
+    border-radius: 28px !important;
+    overflow: hidden !important;
+    box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12) !important;
+  }
+}
+
+/* Reset tab-content container */
+body.is-purchasing-mode .x-tab-content {
+  background: transparent !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+body.is-purchasing-mode .x-tab-content.active::after {
+  display: none !important;
+  height: 0 !important;
+}
+
+/* Completely hide default merchant topbar when in purchasing mode */
 body.is-purchasing-mode .x-dash-topbar {
+  display: none !important;
+}
+
+/* 1:1 .driver-header (Exact Driver App) */
+body.is-purchasing-mode .driver-header,
+#purchasing-mobile-topbar {
   position: sticky !important;
   top: 0 !important;
-  z-index: 40 !important;
-  background: rgba(255, 255, 255, 0.95) !important;
-  backdrop-filter: blur(16px) !important;
-  -webkit-backdrop-filter: blur(16px) !important;
-  border-bottom: 1px solid rgba(226, 232, 240, 0.9) !important;
-  padding: 0 !important;
-  width: 100% !important;
-}
-
-body.is-purchasing-mode .x-mobile-topbar {
-  display: block !important;
-  padding: max(10px, env(safe-area-inset-top)) 16px 10px !important;
-}
-
-body.is-purchasing-mode .x-mobile-topbar-main {
+  z-index: 20 !important;
+  min-height: 68px !important;
   display: flex !important;
-  justify-content: space-between !important;
   align-items: center !important;
-}
-
-/* Clean mobile screen container for belanja */
-body.is-purchasing-mode #tab-bm-belanja {
-  padding: 16px 16px 120px !important;
-  width: 100% !important;
+  justify-content: space-between !important;
+  padding: max(12px, env(safe-area-inset-top)) 18px 12px !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  backdrop-filter: blur(18px) !important;
+  -webkit-backdrop-filter: blur(18px) !important;
+  border-bottom: 1px solid rgba(231, 234, 240, 0.8) !important;
   box-sizing: border-box !important;
+  width: 100% !important;
 }
 
-/* Native modern card styles */
-.purchasing-mobile-hero {
-  background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
-  color: #ffffff;
-  border-radius: 18px;
-  padding: 16px 18px;
-  box-shadow: 0 6px 20px -2px rgba(6, 78, 59, 0.25);
-  margin-bottom: 14px;
+/* Hide purchasing-mobile-topbar by default if not in purchasing mode */
+body:not(.is-purchasing-mode) #purchasing-mobile-topbar {
+  display: none !important;
 }
 
-.purchasing-hero-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-}
-
-.purchasing-hero-brand {
+/* 1:1 .brand */
+body.is-purchasing-mode .brand {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.purchasing-hero-icon {
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.16);
-  display: grid;
-  place-items: center;
-  font-size: 20px;
-}
-
-.purchasing-hero-title {
-  font-size: 16px;
   font-weight: 800;
   letter-spacing: -0.02em;
-  margin: 0;
-  color: #ffffff;
 }
 
-.purchasing-hero-desc {
-  font-size: 11.5px;
-  color: #a7f3d0;
-  margin: 2px 0 0;
+/* 1:1 .brand-mark */
+body.is-purchasing-mode .brand-mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: #0f172a;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 15px;
 }
 
-/* Kasbon Box inside mobile */
-.purchasing-kasbon-card {
-  background: #ffffff;
-  border-radius: 16px;
-  padding: 14px 16px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
-  margin-bottom: 14px;
-}
-
-.purchasing-kasbon-input-group {
+/* 1:1 .header-meta & .header-branch */
+body.is-purchasing-mode .header-meta {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #f8fafc;
-  border: 1.5px solid #cbd5e1;
-  border-radius: 12px;
-  padding: 8px 12px;
-  margin-top: 6px;
-  transition: all 0.15s ease;
 }
 
-.purchasing-kasbon-input-group:focus-within {
+body.is-purchasing-mode .header-branch {
+  font-size: 12px;
+  color: #64748b;
+  max-width: 180px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 1:1 .icon-btn */
+body.is-purchasing-mode .icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #0f172a;
+  display: grid;
+  place-items: center;
+  border: 0;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+body.is-purchasing-mode .icon-btn:active {
+  background: #e2e8f0;
+}
+
+/* Hide purchasing-bottom-nav by default when not in purchasing mode */
+#purchasing-bottom-nav {
+  display: none !important;
+}
+
+/* 1:1 .content padding: padding: 18px 16px calc(var(--nav-h) + 28px); where --nav-h is 70px -> 98px */
+body.is-purchasing-mode #tab-bm-belanja {
+  padding: 18px 16px 140px !important;
+  box-sizing: border-box !important;
+}
+
+/* 1:1 .bottom-nav (Exact Driver App) */
+body.is-purchasing-mode .bottom-nav,
+body.is-purchasing-mode #purchasing-bottom-nav {
+  position: fixed !important;
+  left: 50% !important;
+  bottom: 0 !important;
+  transform: translateX(-50%) !important;
+  width: min(520px, 100%) !important;
+  height: 70px !important; /* exact --nav-h: 70px */
+  padding: 6px 16px max(8px, env(safe-area-inset-bottom)) !important;
+  background: rgba(15, 23, 42, 0.94) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-top: 1px solid rgba(51, 65, 85, 0.8) !important;
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  z-index: 50 !important;
+  box-shadow: 0 -8px 25px rgba(0, 0, 0, 0.35) !important;
+  box-sizing: border-box !important;
+}
+
+@media (min-width: 700px) {
+  body.is-purchasing-mode .bottom-nav {
+    position: absolute !important;
+  }
+}
+
+/* 1:1 .nav-item */
+body.is-purchasing-mode .nav-item {
+  background: transparent !important;
+  color: #94a3b8 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  border-radius: 14px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  transition: all 0.18s ease !important;
+  padding: 5px 0 !important;
+  margin: 0 4px !important;
+  border: 0 !important;
+  cursor: pointer !important;
+}
+
+body.is-purchasing-mode .nav-item:hover {
+  color: #cbd5e1 !important;
+}
+
+body.is-purchasing-mode .nav-item:active {
+  transform: scale(0.94) !important;
+}
+
+body.is-purchasing-mode .nav-item.active {
+  color: #ffffff !important;
+  background: rgba(30, 41, 59, 0.85) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* 1:1 .nav-icon */
+body.is-purchasing-mode .nav-icon {
+  width: 24px !important;
+  height: 24px !important;
+  display: grid !important;
+  place-items: center !important;
+}
+
+body.is-purchasing-mode .nav-icon svg {
+  transition: transform 0.18s ease !important;
+}
+
+body.is-purchasing-mode .nav-item.active .nav-icon svg {
+  transform: translateY(-1px) scale(1.08) !important;
+}
+
+/* 1:1 .money-card for Kasbon */
+.purchasing-kasbon-card {
+  border-radius: 16px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+.purchasing-kasbon-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.purchasing-kasbon-title {
+  color: #166534;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.purchasing-kasbon-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   background: #ffffff;
+  border: 1px solid #86efac;
+  border-radius: 13px;
+  height: 52px;
+  padding: 0 14px;
+  margin-top: 8px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.purchasing-kasbon-input-wrap:focus-within {
   border-color: #059669;
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15);
+}
+
+.purchasing-kasbon-currency {
+  font-size: 20px;
+  font-weight: 800;
+  color: #059669;
 }
 
 .purchasing-kasbon-input {
   border: none !important;
   background: transparent !important;
-  font-size: 18px !important;
-  font-weight: 800 !important;
-  color: #065f46 !important;
+  font-size: 22px !important;
+  font-weight: 900 !important;
+  color: #0f172a !important;
+  letter-spacing: -0.03em !important;
   width: 100% !important;
   padding: 0 !important;
   outline: none !important;
   font-family: inherit;
 }
 
-/* Quick Filter Pills */
+.purchasing-kasbon-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+.purchasing-kasbon-caption {
+  color: #166534;
+  font-weight: 600;
+}
+
+.purchasing-kasbon-est {
+  color: #0f172a;
+  font-weight: 800;
+  font-size: 13px;
+}
+
+/* 1:1 .pill */
 .purchasing-filter-wrap {
   display: flex;
   justify-content: space-between;
@@ -925,168 +1088,485 @@ body.is-purchasing-mode #tab-bm-belanja {
 }
 
 .purchasing-filter-btn {
-  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
   border-radius: 99px;
-  padding: 7px 14px;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 800;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #64748b;
   cursor: pointer;
-  background: #e2e8f0;
-  color: #475569;
   transition: all 0.15s ease;
 }
 
 .purchasing-filter-btn.active {
-  background: #0f172a;
-  color: #ffffff;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
+  color: #065f46;
+  background: #ecfdf5;
+  border-color: #a7f3d0;
 }
 
-/* Item Shopping Card (Mobile Native List) */
+/* 1:1 .card & .task-card */
 .purchasing-item-card {
   background: #ffffff;
-  border-radius: 16px;
   border: 1px solid #e2e8f0;
-  padding: 14px;
-  margin-bottom: 10px;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03);
-  transition: all 0.15s ease;
+  border-radius: 18px; /* var(--radius) */
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
+  padding: 16px 18px;
+  margin-bottom: 12px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .purchasing-item-card.is-checked {
-  border-color: #86efac;
-  background: #ffffff;
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.08);
+  border-color: #a7f3d0;
 }
 
 .purchasing-item-card.is-unchecked {
-  opacity: 0.8;
-  background: #f8fafc;
+  opacity: 0.6;
 }
 
-.purchasing-item-header {
+.purchasing-item-main {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
 }
 
+.purchasing-item-check-col {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
 .purchasing-check-box {
-  width: 24px;
-  height: 24px;
-  border-radius: 8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
   accent-color: #059669;
   cursor: pointer;
-  margin-top: 2px;
+}
+
+.purchasing-item-info-col {
+  flex: 1;
+  min-width: 0;
+}
+
+.purchasing-item-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
 }
 
 .purchasing-item-name {
   font-size: 15px;
   font-weight: 800;
   color: #0f172a;
-  margin: 0;
   line-height: 1.3;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.purchasing-item-stock {
-  font-size: 11.5px;
+.purchasing-item-subtotal-val {
+  font-size: 15px;
+  font-weight: 800;
+  color: #059669;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.purchasing-item-stock-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
   color: #64748b;
   margin-top: 3px;
 }
 
-.purchasing-item-subtotal {
-  font-size: 15px;
+.purchasing-low-tag {
+  color: #b4232b;
+  background: #fef2f2;
   font-weight: 800;
-  color: #065f46;
-  text-align: right;
-  white-space: nowrap;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 99px;
 }
 
-.purchasing-item-control-grid {
+.purchasing-item-inputs-box {
   display: grid;
-  grid-template-columns: 1fr 1.3fr;
+  grid-template-columns: 1fr 1.35fr;
   gap: 10px;
-  margin-top: 12px;
-  background: #f8fafc;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid #f1f5f9;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
 }
 
-.purchasing-qty-stepper {
+.purchasing-input-field {
+  min-width: 0;
+}
+
+.purchasing-input-lbl {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  color: #475467;
+  margin-bottom: 5px;
+}
+
+.purchasing-stepper {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-top: 4px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #ffffff;
+  height: 42px;
 }
 
-.purchasing-step-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
+.purchasing-btn-step {
+  width: 40px;
+  height: 100%;
+  border: none;
+  background: #f8fafc;
   color: #0f172a;
   font-size: 16px;
   font-weight: 800;
   display: grid;
   place-items: center;
   cursor: pointer;
+  flex-shrink: 0;
   user-select: none;
+  transition: background 0.12s ease;
 }
 
-.purchasing-step-btn:active {
-  transform: scale(0.92);
+.purchasing-btn-step:active {
   background: #e2e8f0;
 }
 
-.purchasing-qty-input {
+.purchasing-stepper-input {
   flex: 1;
-  width: 100%;
   min-width: 0;
+  height: 100%;
+  border: none;
   text-align: center;
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
   font-size: 14px;
   font-weight: 800;
-  padding: 6px 4px;
+  color: #0f172a;
   outline: none;
+  padding: 0;
+  background: transparent;
 }
 
-.purchasing-price-input {
-  width: 100%;
+.purchasing-price-box {
+  display: flex;
+  align-items: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
   background: #ffffff;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  font-size: 13.5px;
-  font-weight: 700;
-  padding: 7px 10px;
-  margin-top: 4px;
-  outline: none;
-  box-sizing: border-box;
+  height: 42px;
+  padding: 0 12px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-/* Floating / Sticky Mobile Bottom Action Bar (Grab / Driver App Style) */
+.purchasing-price-box:focus-within {
+  border-color: #059669;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15);
+}
+
+.purchasing-price-rp {
+  font-size: 12px;
+  font-weight: 800;
+  color: #64748b;
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+
+.purchasing-price-field {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  outline: none;
+  padding: 0;
+  background: transparent;
+}
+
+/* Floating Sticky Settlement Bar above Bottom Nav */
 body.is-purchasing-mode #purchasing-bottom-bar {
   position: fixed !important;
   left: 50% !important;
   transform: translateX(-50%) !important;
-  bottom: 0 !important;
+  bottom: 70px !important; /* exactly --nav-h: 70px */
   width: min(520px, 100%) !important;
   background: rgba(255, 255, 255, 0.96) !important;
   backdrop-filter: blur(18px) !important;
   -webkit-backdrop-filter: blur(18px) !important;
-  border-top: 1px solid rgba(226, 232, 240, 0.8) !important;
-  padding: 12px 18px max(14px, env(safe-area-inset-bottom)) !important;
-  box-shadow: 0 -8px 25px rgba(15, 23, 42, 0.12) !important;
-  z-index: 100 !important;
+  border-top: 1px solid rgba(231, 234, 240, 0.8) !important;
+  padding: 12px 18px !important;
+  box-shadow: 0 -4px 20px rgba(15, 23, 42, 0.08) !important;
+  z-index: 40 !important;
   display: flex !important;
   justify-content: space-between !important;
   align-items: center !important;
   box-sizing: border-box !important;
 }
 
-body.is-purchasing-mode .x-merchant-mobile-nav {
-  display: none !important;
+@media (min-width: 700px) {
+  body.is-purchasing-mode #purchasing-bottom-bar {
+    position: absolute !important;
+  }
 }
+
+/* 1:1 .primary-btn and .primary-btn.green */
+#btn-purchasing-submit-settle {
+  min-height: 48px;
+  border-radius: 14px;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 18px;
+  color: #ffffff;
+  background: linear-gradient(145deg, #064e3b 0%, #065f46 100%);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  box-shadow: 0 4px 16px rgba(6, 78, 59, 0.35);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+#btn-purchasing-submit-settle:active {
+  transform: scale(0.98);
+}
+
+/* History Card */
+.purchasing-history-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+  padding: 16px 18px;
+  margin-bottom: 12px;
+}
+
+.purchasing-history-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.purchasing-history-date {
+  font-size: 14px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.purchasing-history-actor {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 3px;
+}
+
+.purchasing-history-total {
+  font-size: 16px;
+  font-weight: 900;
+  color: #065f46;
+}
+
+.purchasing-history-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.purchasing-history-item-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8fafc;
+  padding: 10px 12px;
+  border-radius: 12px;
+}
+
+/* Calculator Card */
+.purchasing-calc-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+}
+
+.purchasing-calc-display-box {
+  background: #0f172a;
+  color: #ffffff;
+  border-radius: 16px;
+  padding: 16px 18px;
+  text-align: right;
+  margin-bottom: 14px;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.purchasing-calc-display-formula {
+  font-size: 13.5px;
+  color: #94a3b8;
+  font-family: monospace;
+  min-height: 20px;
+  word-break: break-all;
+}
+
+.purchasing-calc-display-result {
+  font-size: 28px;
+  font-weight: 800;
+  color: #34d399; /* Green accent */
+  letter-spacing: -0.02em;
+  margin-top: 4px;
+  line-height: 1.1;
+}
+
+.purchasing-calc-kembalian-box {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+.purchasing-calc-cash-input-wrap {
+  display: flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 10px;
+  height: 42px;
+  padding: 0 10px;
+  margin-top: 6px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.purchasing-calc-cash-input-wrap:focus-within {
+  border-color: #059669;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15);
+}
+
+.purchasing-calc-cash-rp {
+  font-size: 14px;
+  font-weight: 800;
+  color: #059669;
+  margin-right: 6px;
+}
+
+.purchasing-calc-cash-input {
+  width: 100%;
+  height: 100%;
+  border: none !important;
+  font-size: 16px;
+  font-weight: 800;
+  padding: 0;
+  text-align: right;
+  color: #0f172a;
+  outline: none !important;
+  background: transparent !important;
+}
+
+/* Quick Cash Presets (100k, 50k, 20k, 10k, Pas) identical to POS */
+.purchasing-calc-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin-top: 8px;
+  margin-bottom: 10px;
+}
+
+.purchasing-btn-quick-cash {
+  padding: 8px 4px;
+  border: 1.5px solid #cbd5e1;
+  background: #ffffff;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #0f172a;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+  user-select: none;
+}
+
+.purchasing-btn-quick-cash:hover {
+  background: #065f46;
+  color: #ffffff;
+  border-color: #065f46;
+}
+
+.purchasing-btn-quick-cash.active {
+  background: #065f46;
+  color: #ffffff;
+  border-color: #065f46;
+  box-shadow: 0 2px 6px rgba(6, 95, 70, 0.25);
+}
+
+.purchasing-calc-keypad {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.purchasing-key {
+  height: 52px;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 18px;
+  font-weight: 800;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  user-select: none;
+  transition: all 0.12s ease;
+}
+
+.purchasing-key:active {
+  transform: scale(0.95);
+  background: #e2e8f0;
+}
+
+.purchasing-key.op {
+  background: #ecfdf5;
+  color: #059669;
+  border-color: #a7f3d0;
+  font-size: 20px;
+}
+
+.purchasing-key.clear {
+  background: #fef2f2;
+  color: #ef4444;
+}
+
+.purchasing-key.back {
+  background: #fffbeb;
+  color: #f59e0b;
+}
+
+.purchasing-key.equals {
+  background: #059669;
+  color: #ffffff;
+  border-color: #047857;
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.35);
+}
+
+
 

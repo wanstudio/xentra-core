@@ -10474,6 +10474,33 @@ body:not(.x-merchant-app) .x-owner-mobile-page-sub {
   }
 }
 
+/* =========================================================================
+   BOTTOM SHEET: PILIH ITEM (#sheet-pick-item) & COMPONENT SELECTION MODALS
+   ========================================================================= */
+#sheet-pick-item {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 85vh !important;
+  max-height: 85vh !important;
+  box-sizing: border-box !important;
+  padding: 12px 16px calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+  z-index: 1060 !important;
+}
+
+#sheet-pick-item:not(.open) {
+  transform: translateY(100%) !important;
+  display: none !important;
+}
+
+#sheet-pick-item.open {
+  transform: translateY(0) !important;
+  display: flex !important;
+}
+
+#sheet-pick-item-overlay {
+  z-index: 1055 !important;
+}
+
 @media (min-width: 769px) {
   /* Di semua layar tablet landscape & desktop (>= 769px), sheet-pick-item, sheet-menu-type, occ-date-sheet tampil sebagai dialog modal tengah */
   #sheet-pick-item,
@@ -10487,6 +10514,7 @@ body:not(.x-merchant-app) .x-owner-mobile-page-sub {
     max-width: 520px !important;
     width: 90% !important;
     border-radius: 20px !important;
+    height: auto !important;
     max-height: 85vh !important;
     padding: 24px !important;
     box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25) !important;

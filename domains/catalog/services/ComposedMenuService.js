@@ -367,11 +367,18 @@ class ComposedMenuService {
       ? currentItems.map(item => ({ productId: item.product_id, quantity: Number(item.quantity) }))
       : ComposedMenuService.normalizeMenuItems(items);
 
+    const currentProductIds = new Set(currentItems.map(it => String(it.product_id)));
     for (const item of normalizedItems) {
       const product = repository.findProduct({ brandId, productId: item.productId });
       if (!product) throw new Error('MASTER_PRODUCT_NOT_FOUND');
+      // Invariant: Only block if changing to ACTIVE from DRAFT or adding a newly inactive product.
+      // If the menu was already ACTIVE with this product existing in its composition, allow category/price updates.
+      const isExistingItemInCurrentMenu = currentProductIds.has(String(item.productId));
+      const isTransitioningToActive = current.status === 'DRAFT' && nextStatus === 'ACTIVE';
       if (product.is_active === 0 && nextStatus !== 'DRAFT') {
-        throw new Error('MASTER_PRODUCT_INACTIVE');
+        if (!isExistingItemInCurrentMenu || isTransitioningToActive) {
+          throw new Error('MASTER_PRODUCT_INACTIVE');
+        }
       }
     }
 

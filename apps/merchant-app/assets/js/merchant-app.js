@@ -267,14 +267,24 @@
     if ($('dash-user-role')) $('dash-user-role').textContent = roleLabel;
 
     // Purchasing staff specific surface adjustments: clean 100% mobile view (like Driver App)
+    var purchasingTopbar = $('purchasing-mobile-topbar');
+    var mobileTopbar = document.querySelector('.x-mobile-topbar');
     if (user.role === 'purchasing') {
       document.body.classList.add('is-purchasing-mode');
+      if (purchasingTopbar) purchasingTopbar.style.display = 'flex';
+      if (mobileTopbar) mobileTopbar.style.display = 'none';
+      var purchasingBranchEl = $('purchasing-topbar-branch-name');
+      if (purchasingBranchEl) {
+        purchasingBranchEl.textContent = user.branch_name || user.brand_name || 'Cabang Bangjo';
+      }
       var mobileNav = $('x-merchant-mobile-nav');
       if (mobileNav) {
         mobileNav.style.display = 'none';
       }
     } else {
       document.body.classList.remove('is-purchasing-mode');
+      if (purchasingTopbar) purchasingTopbar.style.display = 'none';
+      if (mobileTopbar) mobileTopbar.style.display = '';
     }
 
     var searchBtn = $('btn-global-search');
@@ -387,12 +397,21 @@
   function initAuthListeners() {
     initMobileAccount();
     var btnLogout = $('btn-logout');
-    if (!btnLogout) return;
-    btnLogout.addEventListener('click', function () {
-      if (!confirm('Apakah Anda ingin keluar dari Merchant App?')) return;
-      clearStoredSession();
-      redirectToLogin();
-    });
+    if (btnLogout) {
+      btnLogout.addEventListener('click', function () {
+        if (!confirm('Apakah Anda ingin keluar dari Merchant App?')) return;
+        clearStoredSession();
+        redirectToLogin();
+      });
+    }
+    var btnPurchasingLogout = $('btn-purchasing-logout');
+    if (btnPurchasingLogout) {
+      btnPurchasingLogout.addEventListener('click', function () {
+        if (!confirm('Apakah Anda ingin keluar dari aplikasi belanja?')) return;
+        clearStoredSession();
+        redirectToLogin();
+      });
+    }
   }
 
   async function boot() {
