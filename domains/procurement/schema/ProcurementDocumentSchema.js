@@ -251,6 +251,37 @@ function ensureProcurementDocumentSchema(db) {
     }
   }
 
+  // Ensure extended supplier profile columns (Vendor Bank / Contact details)
+  const supColumns = db.prepare('PRAGMA table_info(suppliers)').all();
+  const hasColumn = (name) => supColumns.some(row => row && row.name === name);
+  if (!hasColumn('category')) {
+    try { db.exec("ALTER TABLE suppliers ADD COLUMN category TEXT;"); } catch (_) {}
+  }
+  if (!hasColumn('contact_person')) {
+    try { db.exec("ALTER TABLE suppliers ADD COLUMN contact_person TEXT;"); } catch (_) {}
+  }
+  if (!hasColumn('phone')) {
+    try { db.exec("ALTER TABLE suppliers ADD COLUMN phone TEXT;"); } catch (_) {}
+  }
+  if (!hasColumn('address')) {
+    try { db.exec("ALTER TABLE suppliers ADD COLUMN address TEXT;"); } catch (_) {}
+  }
+  if (!hasColumn('payment_terms')) {
+    try { db.exec("ALTER TABLE suppliers ADD COLUMN payment_terms TEXT;"); } catch (_) {}
+  }
+  if (!hasColumn('bank_name')) {
+    try { db.exec("ALTER TABLE suppliers ADD COLUMN bank_name TEXT;"); } catch (_) {}
+  }
+  if (!hasColumn('bank_account_number')) {
+    try { db.exec("ALTER TABLE suppliers ADD COLUMN bank_account_number TEXT;"); } catch (_) {}
+  }
+  if (!hasColumn('bank_account_name')) {
+    try { db.exec("ALTER TABLE suppliers ADD COLUMN bank_account_name TEXT;"); } catch (_) {}
+  }
+  if (!hasColumn('notes')) {
+    try { db.exec("ALTER TABLE suppliers ADD COLUMN notes TEXT;"); } catch (_) {}
+  }
+
   ensuredDbs.add(db);
 }
 

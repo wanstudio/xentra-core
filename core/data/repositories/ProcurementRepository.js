@@ -21,7 +21,7 @@ class ProcurementRepository {
 
   findSupplierByCode(organizationId, supplierCode) {
     return this.db.queryOne(
-      'SELECT id, organization_id, supplier_code, name, status FROM suppliers WHERE organization_id = ? AND lower(trim(supplier_code)) = lower(trim(?))',
+      'SELECT id, organization_id, supplier_code, name, status, category, contact_person, phone, address, payment_terms, bank_name, bank_account_number, bank_account_name, notes, created_at, updated_at FROM suppliers WHERE organization_id = ? AND lower(trim(supplier_code)) = lower(trim(?))',
       [organizationId, supplierCode]
     );
   }
@@ -35,7 +35,7 @@ class ProcurementRepository {
 
   findSupplier(id) {
     return this.db.queryOne(
-      'SELECT id, organization_id, supplier_code, name, status FROM suppliers WHERE id = ?',
+      'SELECT id, organization_id, supplier_code, name, status, category, contact_person, phone, address, payment_terms, bank_name, bank_account_number, bank_account_name, notes, created_at, updated_at FROM suppliers WHERE id = ?',
       [id]
     );
   }
@@ -96,10 +96,27 @@ class ProcurementRepository {
     );
   }
 
-  insertSupplier({ id, organizationId, supplierCode, name, status = 'DRAFT', createdAt, updatedAt }) {
+  insertSupplier({
+    id,
+    organizationId,
+    supplierCode,
+    name,
+    status = 'DRAFT',
+    category = null,
+    contactPerson = null,
+    phone = null,
+    address = null,
+    paymentTerms = null,
+    bankName = null,
+    bankAccountNumber = null,
+    bankAccountName = null,
+    notes = null,
+    createdAt,
+    updatedAt
+  }) {
     return this.db.execute(
-      'INSERT INTO suppliers (id, organization_id, supplier_code, name, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [id, organizationId, supplierCode, name, status, createdAt, updatedAt]
+      'INSERT INTO suppliers (id, organization_id, supplier_code, name, status, category, contact_person, phone, address, payment_terms, bank_name, bank_account_number, bank_account_name, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, organizationId, supplierCode, name, status, category, contactPerson, phone, address, paymentTerms, bankName, bankAccountNumber, bankAccountName, notes, createdAt, updatedAt]
     );
   }
 

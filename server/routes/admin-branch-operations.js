@@ -588,7 +588,12 @@ router.post('/admin/branches/:id/purchasing/mandates', requireAuth(['owner', 'br
     }
 
     const mandateId = 'pm_' + crypto.randomBytes(8).toString('hex');
-    const mandateNum = 'BLJ-' + Date.now().toString().slice(-6);
+    const today = new Date().toISOString().slice(2, 10).replace(/-/g, ''); // YYMMDD
+    const todayCountRow = db.prepare(
+      "SELECT COUNT(*) AS count FROM purchasing_mandates WHERE branch_id = ? AND date(created_at) = date('now')"
+    ).get(req.params.id);
+    const dailySeq = ((todayCountRow && todayCountRow.count) || 0) + 1;
+    const mandateNum = 'BLP-' + today + '-' + String(dailySeq).padStart(4, '0');
     const now = new Date().toISOString();
     const userId = req.user.id || req.user.userId || 'system';
 
@@ -825,6 +830,12 @@ router.post('/admin/branches/:id/purchasing/settle', requireAuth(['owner', 'bran
     }
 
     const changeDue = Math.round(cashAdvance - totalRealExpenditure);
+    const today = new Date().toISOString().slice(2, 10).replace(/-/g, ''); // YYMMDD
+    const todaySettleRow = db.prepare(
+      "SELECT COUNT(DISTINCT source_reference) AS count FROM material_stock_movements WHERE stock_location_id = ? AND source_type = 'PURCHASING_CHECKLIST' AND date(posting_timestamp) = date('now')"
+    ).get(location.id);
+    const dailySeq = ((todaySettleRow && todaySettleRow.count) || 0) + 1;
+    const settleCode = 'STL-' + today + '-' + String(dailySeq).padStart(4, '0');
     const postingId = 'shop_' + crypto.randomBytes(8).toString('hex');
     const now = new Date().toISOString();
     const actorId = req.user.id || req.user.userId || 'system';
@@ -913,6 +924,7 @@ router.post('/admin/branches/:id/purchasing/settle', requireAuth(['owner', 'bran
     res.json({
       success: true,
       posting_id: postingId,
+      settle_number: settleCode,
       branch_id: req.params.id,
       cash_advance: cashAdvance,
       total_real_expenditure: totalRealExpenditure,
@@ -1143,6 +1155,38 @@ router.post('/admin/branches/:id/purchasing/orders/:poId/receive', requireAuth([
   } catch (err) {
     console.error('[API Error POST /admin/branches/:id/purchasing/orders/:poId/receive]:', err);
     res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// GET /admin/branches/:id/purchasing/suppliers
+// Provides branch purchasing staff with official supplier contact book (Phone, WA, address, terms)
+router.get('/admin/branches/:id/purchasing/suppliers', requireAuth(['owner', 'brand_manager', 'branch_manager', 'purchasing']), (req, res) => {
+  try {
+    if (['branch_manager', 'purchasing'].includes(req.user.role)) {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (assignedBranchId && assignedBranchId !== req.params.id) {
+        return res.status(403).json({ success: false, error: 'FORBIDDEN_BRANCH_SCOPE' });
+      }
+    }
+
+    const orgRow = db.prepare('SELECT organization_id FROM brands WHERE id = ?').get(req.brand_id);
+    const orgId = orgRow ? orgRow.organization_id : null;
+    if (!orgId) return res.status(400).json({ success: false, error: 'ORG_NOT_FOUND' });
+
+    const suppliers = db.prepare(`
+      SELECT 
+        s.id, s.supplier_code, s.name, s.category, s.contact_person, s.phone, s.address,
+        s.payment_terms, s.bank_name, s.bank_account_number, s.bank_account_name, s.notes,
+        (SELECT COUNT(*) FROM supplier_materials sm WHERE sm.supplier_id = s.id AND sm.is_active = 1) AS items_supplied_count
+      FROM suppliers s
+      WHERE s.organization_id = ? AND s.status = 'ACTIVE'
+      ORDER BY s.name ASC
+    `).all(orgId);
+
+    res.json({ success: true, branch_id: req.params.id, suppliers });
+  } catch (err) {
+    console.error('[API Error GET /admin/branches/:id/purchasing/suppliers]:', err);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

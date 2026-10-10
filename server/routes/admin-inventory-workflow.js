@@ -67,7 +67,7 @@ function listContext(req, db) {
   const reorderPolicies = db.queryMany("SELECT rp.stock_location_id, sl.branch_id, rp.identity_type, rp.identity_id, rp.minimum_quantity, rp.target_quantity, rp.updated_at FROM inventory_reorder_policies rp JOIN stock_locations sl ON sl.id = rp.stock_location_id WHERE sl.organization_id = ? ORDER BY sl.name, rp.identity_type, rp.identity_id", [orgId]);
   const products = db.queryMany("SELECT p.id, p.name, p.sku, p.brand_id, br.organization_id, p.product_stock_uom_id, u.name AS stock_uom_name, u.code AS stock_uom_code FROM products p JOIN brands br ON br.id = p.brand_id LEFT JOIN uoms u ON u.id = p.product_stock_uom_id WHERE br.organization_id = ? AND p.is_active = 1 AND p.sku IS NOT NULL AND trim(p.sku) <> '' ORDER BY p.name", [orgId]);
   const productBalances = db.queryMany("SELECT psb.stock_location_id, sl.name AS stock_location_name, sl.branch_id, psb.product_id, p.name AS product_name, p.sku, psb.quantity, psb.carrying_value, psb.moving_average_unit_cost, psb.cost_availability_status, COALESCE(rp.minimum_quantity, bpi.low_stock_threshold, 0) AS minimum_quantity, COALESCE(rp.target_quantity, bpi.low_stock_threshold, 0) AS target_quantity FROM product_stock_balances psb JOIN stock_locations sl ON sl.id = psb.stock_location_id JOIN products p ON p.id = psb.product_id LEFT JOIN inventory_reorder_policies rp ON rp.stock_location_id = psb.stock_location_id AND rp.identity_type = 'PRODUCT' AND rp.identity_id = psb.product_id LEFT JOIN branch_product_inventory bpi ON bpi.branch_id = sl.branch_id AND bpi.product_id = psb.product_id WHERE sl.organization_id = ? ORDER BY sl.name, p.name", [orgId]);
-  const suppliers = db.queryMany("SELECT id, organization_id, supplier_code, name, status FROM suppliers WHERE organization_id = ? AND status <> 'ARCHIVED' ORDER BY name", [orgId]);
+  const suppliers = db.queryMany("SELECT id, organization_id, supplier_code, name, status, category, contact_person, phone, address, payment_terms, bank_name, bank_account_number, bank_account_name, notes, created_at, updated_at FROM suppliers WHERE organization_id = ? AND status <> 'ARCHIVED' ORDER BY name", [orgId]);
   const supplierItems = db.queryMany("SELECT sm.id AS supplier_material_id, sm.supplier_id, s.name AS supplier_name, sm.material_id, m.material_code, m.name AS material_name, m.base_uom_id, u.name AS base_uom_name, sm.supplier_item_code, sm.is_active FROM supplier_materials sm JOIN suppliers s ON s.id = sm.supplier_id JOIN materials m ON m.id = sm.material_id JOIN uoms u ON u.id = m.base_uom_id WHERE s.organization_id = ? AND s.status <> 'ARCHIVED' AND sm.is_active = 1 ORDER BY s.name, m.name", [orgId]);
   const supplierPacks = db.queryMany("SELECT smp.id, smp.supplier_material_id, sm.supplier_id, s.name AS supplier_name, sm.material_id, m.name AS material_name, smp.name, smp.content_quantity, smp.content_uom_id, cu.name AS content_uom_name, smp.minimum_order_quantity, smp.unit_price, smp.currency_code, smp.is_active FROM supplier_material_packs smp JOIN supplier_materials sm ON sm.id = smp.supplier_material_id JOIN suppliers s ON s.id = sm.supplier_id JOIN materials m ON m.id = sm.material_id JOIN uoms cu ON cu.id = smp.content_uom_id WHERE s.organization_id = ? AND s.status <> 'ARCHIVED' AND sm.is_active = 1 AND smp.is_active = 1 ORDER BY s.name, m.name, smp.name", [orgId]);
   const purchaseOrders = db.queryMany("SELECT po.id, po.supplier_id, s.name AS supplier_name, po.destination_stock_location_id, sl.name AS destination_name, po.status, po.required_at, po.created_at, po.ordered_at, COUNT(pol.id) AS line_count, COALESCE(SUM(pol.ordered_purchase_quantity * pol.unit_price), 0) AS ordered_value FROM purchase_orders po JOIN suppliers s ON s.id = po.supplier_id JOIN stock_locations sl ON sl.id = po.destination_stock_location_id LEFT JOIN purchase_order_lines pol ON pol.purchase_order_id = po.id WHERE po.organization_id = ? GROUP BY po.id ORDER BY po.created_at DESC LIMIT 30", [orgId]);
@@ -162,12 +162,64 @@ function registerAdminInventoryWorkflowRoutes(router, deps = {}) {
     try {
       const supplier = ProcurementService.createSupplier({
         organizationId: organizationId(req),
-        supplierCode: required(req.body && req.body.supplier_code, 'SUPPLIER_CODE_REQUIRED').toUpperCase(),
+        supplierCode: req.body && req.body.supplier_code ? String(req.body.supplier_code).toUpperCase() : null,
         name: required(req.body && req.body.name, 'SUPPLIER_NAME_REQUIRED'),
+        category: req.body && req.body.category || null,
+        contactPerson: req.body && req.body.contact_person || null,
+        phone: req.body && req.body.phone || null,
+        address: req.body && req.body.address || null,
+        paymentTerms: req.body && req.body.payment_terms || null,
+        bankName: req.body && req.body.bank_name || null,
+        bankAccountNumber: req.body && req.body.bank_account_number || null,
+        bankAccountName: req.body && req.body.bank_account_name || null,
+        notes: req.body && req.body.notes || null,
         status: 'ACTIVE',
         repository: procurementRepository
       });
       return res.status(201).json({ success: true, supplier: supplier });
+    } catch (error) { return respondError(res, error); }
+  });
+
+  router.put('/admin/inventory-workflow/suppliers/:id', authGate, (req, res) => {
+    try {
+      const orgId = organizationId(req);
+      const supplier = procurementRepository.findSupplier(req.params.id);
+      if (!supplier || String(supplier.organization_id) !== orgId) throw fail('SUPPLIER_NOT_FOUND', 404);
+
+      const name = req.body && req.body.name ? String(req.body.name).trim() : supplier.name;
+      const category = req.body && req.body.category !== undefined ? req.body.category : supplier.category;
+      const contactPerson = req.body && req.body.contact_person !== undefined ? req.body.contact_person : supplier.contact_person;
+      const phone = req.body && req.body.phone !== undefined ? req.body.phone : supplier.phone;
+      const address = req.body && req.body.address !== undefined ? req.body.address : supplier.address;
+      const paymentTerms = req.body && req.body.payment_terms !== undefined ? req.body.payment_terms : supplier.payment_terms;
+      const bankName = req.body && req.body.bank_name !== undefined ? req.body.bank_name : supplier.bank_name;
+      const bankAccountNumber = req.body && req.body.bank_account_number !== undefined ? req.body.bank_account_number : supplier.bank_account_number;
+      const bankAccountName = req.body && req.body.bank_account_name !== undefined ? req.body.bank_account_name : supplier.bank_account_name;
+      const notes = req.body && req.body.notes !== undefined ? req.body.notes : supplier.notes;
+      const now = new Date().toISOString();
+
+      db.execute(
+        `UPDATE suppliers 
+         SET name = ?, category = ?, contact_person = ?, phone = ?, address = ?,
+             payment_terms = ?, bank_name = ?, bank_account_number = ?, bank_account_name = ?,
+             notes = ?, updated_at = ?
+         WHERE id = ? AND organization_id = ?`,
+        [name, category, contactPerson, phone, address, paymentTerms, bankName, bankAccountNumber, bankAccountName, notes, now, supplier.id, orgId]
+      );
+
+      return res.json({ success: true, supplier: procurementRepository.findSupplier(supplier.id) });
+    } catch (error) { return respondError(res, error); }
+  });
+
+  router.delete('/admin/inventory-workflow/suppliers/:id', authGate, (req, res) => {
+    try {
+      const orgId = organizationId(req);
+      const supplier = procurementRepository.findSupplier(req.params.id);
+      if (!supplier || String(supplier.organization_id) !== orgId) throw fail('SUPPLIER_NOT_FOUND', 404);
+
+      const now = new Date().toISOString();
+      db.execute("UPDATE suppliers SET status = 'ARCHIVED', updated_at = ? WHERE id = ? AND organization_id = ?", [now, supplier.id, orgId]);
+      return res.json({ success: true, message: 'Supplier berhasil diarsipkan.' });
     } catch (error) { return respondError(res, error); }
   });
 

@@ -499,6 +499,8 @@
       loadPurchasingHistory();
     } else if (_currentPurchasingView === 'calc') {
       if (typeof resetPurchasingCalc === 'function') resetPurchasingCalc();
+    } else if (_currentPurchasingView === 'suppliers') {
+      loadPurchasingSuppliers();
     } else {
       loadPurchasingChecklist();
     }
@@ -511,28 +513,33 @@
     var vPo = $('purchasing-view-po');
     var vHistory = $('purchasing-view-history');
     var vCalc = $('purchasing-view-calc');
+    var vSuppliers = $('purchasing-view-suppliers');
 
     var btnTasks = $('btn-purchasing-nav-tasks');
     var btnPo = $('btn-purchasing-nav-po');
     var btnHistory = $('btn-purchasing-nav-history');
     var btnCalc = $('btn-purchasing-nav-calc');
+    var btnSuppliers = $('btn-purchasing-nav-suppliers');
 
     if (vTasks) vTasks.style.display = viewId === 'tasks' ? 'block' : 'none';
     if (vPo) vPo.style.display = viewId === 'po' ? 'block' : 'none';
     if (vHistory) vHistory.style.display = viewId === 'history' ? 'block' : 'none';
     if (vCalc) vCalc.style.display = viewId === 'calc' ? 'block' : 'none';
+    if (vSuppliers) vSuppliers.style.display = viewId === 'suppliers' ? 'block' : 'none';
 
     if (btnTasks) btnTasks.classList.toggle('active', viewId === 'tasks');
     if (btnPo) btnPo.classList.toggle('active', viewId === 'po');
     if (btnHistory) btnHistory.classList.toggle('active', viewId === 'history');
     if (btnCalc) btnCalc.classList.toggle('active', viewId === 'calc');
+    if (btnSuppliers) btnSuppliers.classList.toggle('active', viewId === 'suppliers');
 
     // Update dynamic topbar title to match active menu
     var titles = {
       tasks: 'Belanja',
       po: 'PO Supplier',
       history: 'Riwayat',
-      calc: 'Kalkulator'
+      calc: 'Kalkulator',
+      suppliers: 'Kontak Supplier'
     };
     var titleEl = $('purchasing-topbar-title');
     if (titleEl) {
@@ -556,9 +563,102 @@
       loadPurchasingOrders();
     } else if (viewId === 'history') {
       loadPurchasingHistory();
+    } else if (viewId === 'suppliers') {
+      loadPurchasingSuppliers();
     }
   }
   window.switchPurchasingView = switchPurchasingView;
+
+  var _purchasingSuppliers = [];
+
+  async function loadPurchasingSuppliers() {
+    var user = getStoredUser();
+    var branchId = user ? (user.branch_id || user.branchId) : null;
+    if (!branchId) return;
+
+    var container = $('purchasing-suppliers-container');
+    if (container) {
+      container.innerHTML = '<div class="text-center py-6 text-muted">Memuat kontak supplier cabang...</div>';
+    }
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/suppliers', {
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+
+      if (res.ok && data.success) {
+        _purchasingSuppliers = data.suppliers || [];
+        renderPurchasingSuppliersList();
+      } else {
+        if (container) container.innerHTML = '<div class="text-center py-6 text-muted">Gagal memuat supplier: ' + (data.message || data.error || '') + '</div>';
+      }
+    } catch (e) {
+      if (container) container.innerHTML = '<div class="text-center py-6 text-muted">Gagal terhubung ke server.</div>';
+    }
+  }
+  window.loadPurchasingSuppliers = loadPurchasingSuppliers;
+
+  function renderPurchasingSuppliersList() {
+    var container = $('purchasing-suppliers-container');
+    if (!container) return;
+
+    if (!_purchasingSuppliers.length) {
+      container.innerHTML = '<div class="text-center py-8 text-muted" style="background:#ffffff; border:1px dashed #cbd5e1; border-radius:14px; padding:24px 16px;">' +
+        '<div style="font-size:32px; margin-bottom:8px;">🏢</div>' +
+        '<div style="font-size:14px; font-weight:700; color:#1e293b;">Belum Ada Data Supplier</div>' +
+        '<p style="font-size:12px; color:#64748b; margin:4px 0 0;">Owner belum mendaftarkan vendor rekanan resmi untuk cabang ini.</p>' +
+      '</div>';
+      return;
+    }
+
+    var termsLabels = {
+      CASH: 'Tunai / COD',
+      NET_7: 'Tempo 7 Hari',
+      NET_14: 'Tempo 14 Hari',
+      NET_30: 'Tempo 30 Hari',
+      TRANSFER: 'Transfer'
+    };
+
+    var html = _purchasingSuppliers.map(function (s) {
+      var waBtn = '';
+      if (s.phone) {
+        var cleanPhone = s.phone.replace(/[^0-9]/g, '');
+        if (cleanPhone.startsWith('0')) cleanPhone = '62' + cleanPhone.slice(1);
+        waBtn = '<a href="https://wa.me/' + encodeURIComponent(cleanPhone) + '" target="_blank" class="x-btn-secondary" style="padding:6px 12px; font-size:11.5px; font-weight:700; border-radius:8px; color:#047857; border-color:#a7f3d0; background:#ecfdf5; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">' +
+          '<span>💬 Chat WA</span>' +
+        '</a>';
+      }
+
+      var bankInfo = '';
+      if (s.bank_name || s.bank_account_number) {
+        bankInfo = '<div style="background:#f8fafc; border-radius:8px; padding:6px 10px; font-size:11.5px; color:#334155; margin-top:6px; border:1px solid #f1f5f9;">' +
+          '<strong>' + esc(s.bank_name || 'Bank') + '</strong> ' + esc(s.bank_account_number || '') +
+          (s.bank_account_name ? ' &bull; a.n ' + esc(s.bank_account_name) : '') +
+        '</div>';
+      }
+
+      return '<div class="purchasing-item-card" style="display:flex; flex-direction:column; gap:8px; padding:12px 14px; border-radius:14px; border:1px solid #e2e8f0; background:#ffffff;">' +
+        '<div style="display:flex; justify-content:space-between; align-items:start;">' +
+          '<div>' +
+            '<div style="font-size:11px; font-weight:800; color:#0284c7; text-transform:uppercase;">' + esc(s.supplier_code) + '</div>' +
+            '<div style="font-size:14.5px; font-weight:800; color:#0f172a; margin-top:2px;">' + esc(s.name) + '</div>' +
+            (s.category ? '<div style="font-size:11.5px; color:#64748b; margin-top:2px;">Kategori: ' + esc(s.category) + '</div>' : '') +
+          '</div>' +
+          '<span class="x-badge" style="background:#f1f5f9; color:#475569; font-size:11px; font-weight:700;">' + esc(termsLabels[s.payment_terms] || s.payment_terms || 'Tunai') + '</span>' +
+        '</div>' +
+        (s.contact_person || s.phone ? '<div style="font-size:12px; color:#475569; display:flex; justify-content:space-between; align-items:center; margin-top:2px;">' +
+          '<span>PIC: <strong>' + esc(s.contact_person || '-') + '</strong> (' + esc(s.phone || '-') + ')</span>' +
+          waBtn +
+        '</div>' : '') +
+        (s.address ? '<div style="font-size:11.5px; color:#64748b; line-height:1.35;">📍 ' + esc(s.address) + '</div>' : '') +
+        bankInfo +
+      '</div>';
+    }).join('');
+
+    container.innerHTML = html;
+  }
+  window.renderPurchasingSuppliersList = renderPurchasingSuppliersList;
 
   /* =========================================================================
      PO SUPPLIER & GOODS RECEIPT (PENERIMAAN BARANG CABANG)

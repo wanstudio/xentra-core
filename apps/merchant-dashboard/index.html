@@ -2581,6 +2581,9 @@
             <button type="button" class="x-subnav-tab" id="btn-subtab-stock-materials" data-subtab="materials" onclick="switchStockSubtab('materials')">
               Bahan Baku (Materials)
             </button>
+            <button type="button" class="x-subnav-tab" id="btn-subtab-stock-suppliers" data-subtab="suppliers" onclick="switchStockSubtab('suppliers')">
+              🏢 Bank Data Supplier
+            </button>
           </div>
 
           <!-- SUBTAB CONTENT 1: STOK CABANG -->
@@ -2752,8 +2755,102 @@
               </div>
             </div>
           </div>
+
+          <!-- SUBTAB CONTENT: BANK DATA SUPPLIER / VENDOR MASTER -->
+          <div id="subtab-content-stock-suppliers" style="display:none;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+              <div>
+                <h3 style="margin:0 0 4px 0; font-size:16px; font-weight:700; color:#0F172A;">Bank Data Supplier & Vendor</h3>
+                <p style="margin:0; font-size:13px; color:#64748B;">Pusat data vendor resmi, kontak PIC/WA, nomor rekening bank, dan daftar barang yang dipasok ke cabang.</p>
+              </div>
+              <div style="display:flex; gap:8px;">
+                <button type="button" class="x-btn-secondary" onclick="loadOwnerSuppliers()" style="display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:8px; font-weight:600; font-size:13px; cursor:pointer;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                  <span>Segarkan</span>
+                </button>
+                <button type="button" class="x-btn-primary" onclick="openAddSupplierModal()" style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:8px; font-weight:600; font-size:13px; background:#0F172A; color:#FFFFFF; border:none; cursor:pointer;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                  <span>+ Tambah Supplier</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="x-owner-stock-panel" style="background:#FFFFFF; border-radius:12px; border:1px solid #E2E8F0; padding:16px;">
+              <div id="owner-suppliers-table-container">
+                <div class="x-owner-stock-loading">Memuat daftar supplier...</div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
+
+      <!-- MODAL: TAMBAH / EDIT SUPPLIER (VENDOR MASTER MODAL) -->
+      <div id="modal-add-supplier" class="x-modal-backdrop" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.6); z-index:9999; justify-content:center; align-items:center;">
+        <div class="x-modal-card" style="background:#FFFFFF; border-radius:16px; width:92%; max-width:520px; max-height:90vh; overflow-y:auto; padding:24px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.1);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <div>
+              <h3 id="modal-supplier-title" style="margin:0; font-size:16px; font-weight:700; color:#0F172A;">Tambah Supplier Baru</h3>
+              <p style="margin:2px 0 0; font-size:12px; color:#64748B;">Kode supplier akan diterbitkan otomatis (SUP-XXXX)</p>
+            </div>
+            <button type="button" onclick="closeAddSupplierModal()" style="background:none; border:none; cursor:pointer; color:#64748B;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </div>
+          <form id="form-add-supplier" onsubmit="submitAddSupplierForm(event)">
+            <input type="hidden" id="sup-input-id" value="">
+            <div style="margin-bottom:12px;">
+              <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:4px;">Nama Perusahaan / Supplier *</label>
+              <input type="text" id="sup-input-name" required placeholder="Contoh: PT Berkah Daging Sejahtera / Toko Bumbu Barokah" style="width:100%; box-sizing:border-box; padding:9px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px;">
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+              <div>
+                <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:4px;">Kategori Pasokan</label>
+                <input type="text" id="sup-input-category" placeholder="Contoh: Daging & Unggas" style="width:100%; box-sizing:border-box; padding:9px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px;">
+              </div>
+              <div>
+                <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:4px;">Nama Kontak / Sales (PIC)</label>
+                <input type="text" id="sup-input-pic" placeholder="Contoh: Pak Budi" style="width:100%; box-sizing:border-box; padding:9px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px;">
+              </div>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+              <div>
+                <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:4px;">No. Telepon / WhatsApp</label>
+                <input type="text" id="sup-input-phone" placeholder="Contoh: 08123456789" style="width:100%; box-sizing:border-box; padding:9px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px;">
+              </div>
+              <div>
+                <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:4px;">Syarat Pembayaran (TOP)</label>
+                <select id="sup-input-payment-terms" style="width:100%; box-sizing:border-box; padding:9px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px; background:#FFFFFF;">
+                  <option value="CASH">Tunai / COD</option>
+                  <option value="NET_7">Tempo 7 Hari (NET 7)</option>
+                  <option value="NET_14">Tempo 14 Hari (NET 14)</option>
+                  <option value="NET_30">Tempo 30 Hari (NET 30)</option>
+                  <option value="TRANSFER">Transfer Langsung</option>
+                </select>
+              </div>
+            </div>
+            <div style="margin-bottom:12px;">
+              <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:4px;">Alamat Kantor / Toko / Gudang</label>
+              <textarea id="sup-input-address" rows="2" placeholder="Alamat lengkap supplier..." style="width:100%; box-sizing:border-box; padding:9px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px;"></textarea>
+            </div>
+            <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:10px 12px; margin-bottom:12px;">
+              <div style="font-size:11.5px; font-weight:700; color:#334155; margin-bottom:6px;">Info Rekening Bank (Untuk Pembayaran Kasir/Finance):</div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:6px;">
+                <input type="text" id="sup-input-bank-name" placeholder="Nama Bank (misal: BCA, Mandiri)" style="width:100%; box-sizing:border-box; padding:8px 10px; border:1px solid #CBD5E1; border-radius:6px; font-size:12px;">
+                <input type="text" id="sup-input-bank-acc-no" placeholder="No. Rekening" style="width:100%; box-sizing:border-box; padding:8px 10px; border:1px solid #CBD5E1; border-radius:6px; font-size:12px;">
+              </div>
+              <input type="text" id="sup-input-bank-acc-name" placeholder="Atas Nama Pemilik Rekening" style="width:100%; box-sizing:border-box; padding:8px 10px; border:1px solid #CBD5E1; border-radius:6px; font-size:12px;">
+            </div>
+            <div style="margin-bottom:18px;">
+              <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:4px;">Catatan Khusus (Opsional)</label>
+              <input type="text" id="sup-input-notes" placeholder="Catatan jam kirim, minimal order, dll." style="width:100%; box-sizing:border-box; padding:9px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px;">
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:8px;">
+              <button type="button" class="x-btn-secondary" onclick="closeAddSupplierModal()" style="font-size:13px; padding:8px 16px;">Batal</button>
+              <button type="submit" class="x-btn-primary" id="btn-save-supplier" style="font-size:13px; padding:8px 20px; background:#0F172A; color:#FFFFFF;">Simpan Supplier</button>
+            </div>
+          </form>
+        </div>
+      </div>
 
       <!-- MODAL: TAMBAH BAHAN BAKU (MATERIAL MODAL) -->
       <div id="modal-add-material" class="x-modal-backdrop" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.6); z-index:9999; justify-content:center; align-items:center;">

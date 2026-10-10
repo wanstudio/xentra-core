@@ -497,5 +497,60 @@ test.describe('Purchasing / Belanja Pasar Operational Workflow', () => {
     const deletedItems = db.prepare('SELECT id FROM purchasing_mandate_items WHERE mandate_id = ?').all(mandateId);
     assert.equal(deletedItems.length, 0);
   });
+
+  test('7. Standardized Auto Codes & Supplier Bank Data API', async () => {
+    const { ProcurementService } = require('../../domains/procurement');
+
+    // 1. Auto code generation for supplier (SUP-0001, etc.)
+    const supAuto = ProcurementService.createSupplier({
+      organizationId: orgId,
+      name: 'Supplier Auto Code PT',
+      category: 'Daging Segar',
+      contactPerson: 'Pak Budi',
+      phone: '081234567890',
+      bankName: 'BCA',
+      bankAccountNumber: '1234567890',
+      bankAccountName: 'PT Supplier Auto Code'
+    });
+    assert.ok(supAuto.supplier_code.startsWith('SUP-'), 'supplier_code should start with SUP-');
+    assert.equal(supAuto.category, 'Daging Segar');
+    assert.equal(supAuto.bank_name, 'BCA');
+
+    // 2. Fetch suppliers from branch purchasing endpoint
+    const supRes = await fetch(`${baseUrl}/admin/branches/${branchId}/purchasing/suppliers`, {
+      headers: {
+        'Authorization': `Bearer ${purchasingToken}`,
+        'X-Brand-Id': brandId
+      }
+    });
+    assert.equal(supRes.status, 200);
+    const supBody = await supRes.json();
+    assert.equal(supBody.success, true);
+    assert.ok(Array.isArray(supBody.suppliers));
+    const targetSup = supBody.suppliers.find(s => s.id === supAuto.id);
+    assert.ok(targetSup);
+    assert.equal(targetSup.name, 'Supplier Auto Code PT');
+    assert.equal(targetSup.phone, '081234567890');
+
+    // 3. Create mandate check BLP-YYMMDD-NNNN format
+    const mandRes = await fetch(`${baseUrl}/admin/branches/${branchId}/purchasing/mandates`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${managerToken}`,
+        'X-Brand-Id': brandId,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        cash_advance: 100000,
+        notes: 'Test Standardized Code Mandate',
+        items: [
+          { material_id: materialId1, target_quantity: 1, estimated_unit_price: 40000 }
+        ]
+      })
+    });
+    assert.equal(mandRes.status, 201);
+    const mandBody = await mandRes.json();
+    assert.ok(mandBody.mandate.mandate_number.startsWith('BLP-'), 'mandate_number must start with BLP-');
+  });
 });
 

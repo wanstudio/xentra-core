@@ -6944,14 +6944,24 @@ async function loadMenusView() {
       if ($('subtab-content-stock-mandates')) $('subtab-content-stock-mandates').style.display = 'none';
       if (recipesContent) recipesContent.style.display = 'none';
       if (matContent) matContent.style.display = 'block';
+      if ($('subtab-content-stock-suppliers')) $('subtab-content-stock-suppliers').style.display = 'none';
       loadOwnerMaterials();
       loadOwnerUoms();
+    } else if (subtab === 'suppliers') {
+      if (branchContent) branchContent.style.display = 'none';
+      if (replContent) replContent.style.display = 'none';
+      if ($('subtab-content-stock-mandates')) $('subtab-content-stock-mandates').style.display = 'none';
+      if (recipesContent) recipesContent.style.display = 'none';
+      if (matContent) matContent.style.display = 'none';
+      if ($('subtab-content-stock-suppliers')) $('subtab-content-stock-suppliers').style.display = 'block';
+      loadOwnerSuppliers();
     } else {
       if (branchContent) branchContent.style.display = 'block';
       if (replContent) replContent.style.display = 'none';
       if ($('subtab-content-stock-mandates')) $('subtab-content-stock-mandates').style.display = 'none';
       if (recipesContent) recipesContent.style.display = 'none';
       if (matContent) matContent.style.display = 'none';
+      if ($('subtab-content-stock-suppliers')) $('subtab-content-stock-suppliers').style.display = 'none';
       loadOwnerStockOverview();
     }
   }
@@ -7954,6 +7964,262 @@ async function loadMenusView() {
       });
   }
 
+  /* =========================================================================
+     BANK DATA SUPPLIER / VENDOR MASTER
+     ========================================================================= */
+  var _ownerSuppliers = [];
+
+  function loadOwnerSuppliers() {
+    var container = $('owner-suppliers-table-container');
+    if (container) {
+      container.innerHTML = '<div class="x-owner-stock-loading">Memuat daftar supplier resmi...</div>';
+    }
+
+    return adminFetch('/admin/inventory-workflow/context', { credentials: 'omit', headers: getAuthHeaders() })
+      .then(function (res) {
+        if (!res.ok) {
+          return adminFetch('/api/v1/admin/inventory-workflow/context', { credentials: 'omit', headers: getAuthHeaders() });
+        }
+        return res;
+      })
+      .then(function (res) {
+        if (!res.ok) throw new Error('Gagal memuat bank data supplier (HTTP ' + res.status + ')');
+        return res.json();
+      })
+      .then(function (resData) {
+        var data = resData.data || resData;
+        _ownerSuppliers = data.suppliers || [];
+        renderOwnerSuppliersTable(_ownerSuppliers);
+      })
+      .catch(function (err) {
+        if (container) {
+          container.innerHTML = '<div class="x-owner-stock-error" style="color:#DC2626; padding:16px;">' + escapeHtml(err.message) + '</div>';
+        }
+      });
+  }
+
+  function renderOwnerSuppliersTable(suppliers) {
+    var container = $('owner-suppliers-table-container');
+    if (!container) return;
+
+    if (!suppliers || suppliers.length === 0) {
+      container.innerHTML = (
+        '<div style="text-align:center; padding:36px 16px; color:#64748B;">' +
+          '<div style="font-size:36px; margin-bottom:8px;">🏢</div>' +
+          '<div style="font-size:15px; font-weight:700; color:#1E293B; margin-bottom:6px;">Belum Ada Data Supplier</div>' +
+          '<p style="font-size:13px; max-width:440px; margin:0 auto 16px auto; color:#64748B; line-height:1.5;">' +
+            'Daftarkan vendor rekanan, pedagang pasar, atau distributor bahan baku untuk memudahkan pembuatan PO dan monitoring pengiriman ke cabang.' +
+          '</p>' +
+          '<button type="button" onclick="openAddSupplierModal()" style="display:inline-flex; align-items:center; gap:6px; padding:9px 18px; border-radius:8px; font-weight:600; font-size:13px; background:#0F172A; color:#FFFFFF; border:none; cursor:pointer;">' +
+            '<span>+ Tambah Supplier Pertama</span>' +
+          '</button>' +
+        '</div>'
+      );
+      return;
+    }
+
+    var termsLabels = {
+      CASH: 'Tunai / COD',
+      NET_7: 'Tempo 7 Hari',
+      NET_14: 'Tempo 14 Hari',
+      NET_30: 'Tempo 30 Hari',
+      TRANSFER: 'Transfer'
+    };
+
+    var rows = suppliers.map(function (s) {
+      var contactHtml = '-';
+      if (s.phone || s.contact_person) {
+        var waBtn = s.phone
+          ? '<a href="https://wa.me/' + escapeHtml(s.phone.replace(/[^0-9]/g, '')) + '" target="_blank" style="display:inline-flex; align-items:center; gap:4px; font-size:11.5px; color:#059669; font-weight:700; text-decoration:none; margin-top:2px;">📱 ' + escapeHtml(s.phone) + '</a>'
+          : '';
+        contactHtml = '<div>' + (s.contact_person ? '<strong>' + escapeHtml(s.contact_person) + '</strong><br>' : '') + waBtn + '</div>';
+      }
+
+      var bankHtml = '-';
+      if (s.bank_name || s.bank_account_number) {
+        bankHtml = '<div style="font-size:12px;">' +
+          '<strong>' + escapeHtml(s.bank_name || 'Bank') + '</strong> ' + escapeHtml(s.bank_account_number || '') +
+          (s.bank_account_name ? '<div style="font-size:11px; color:#64748b;">a.n ' + escapeHtml(s.bank_account_name) + '</div>' : '') +
+        '</div>';
+      }
+
+      var termsBadge = '<span class="x-badge" style="background:#F1F5F9; color:#475569; font-size:11px; font-weight:700;">' + escapeHtml(termsLabels[s.payment_terms] || s.payment_terms || 'Tunai') + '</span>';
+
+      return (
+        '<tr style="border-bottom:1px solid #F1F5F9;">' +
+          '<td style="padding:12px 14px; font-weight:700; color:#0F172A; font-size:13px;">' +
+            '<div>' + escapeHtml(s.name) + '</div>' +
+            '<div style="font-size:11px; font-weight:700; color:#0284c7; margin-top:2px;">' + escapeHtml(s.supplier_code) + '</div>' +
+          '</td>' +
+          '<td style="padding:12px 14px; font-size:12.5px; color:#475569;">' + escapeHtml(s.category || 'Umum') + '</td>' +
+          '<td style="padding:12px 14px; font-size:12.5px;">' + contactHtml + '</td>' +
+          '<td style="padding:12px 14px; font-size:12.5px;">' + termsBadge + '</td>' +
+          '<td style="padding:12px 14px; font-size:12.5px;">' + bankHtml + '</td>' +
+          '<td style="padding:12px 14px; text-align:right; font-size:13px; white-space:nowrap;">' +
+            '<button type="button" onclick="editOwnerSupplier(\'' + escapeHtml(s.id) + '\')" style="padding:5px 10px; font-size:11.5px; font-weight:600; border-radius:6px; border:1px solid #CBD5E1; background:#FFFFFF; color:#334155; cursor:pointer; margin-right:6px;">Ubah</button>' +
+            '<button type="button" onclick="archiveOwnerSupplier(\'' + escapeHtml(s.id) + '\', \'' + escapeHtml(s.name) + '\')" style="padding:5px 10px; font-size:11.5px; font-weight:600; border-radius:6px; border:1px solid #FECACA; background:#FEF2F2; color:#DC2626; cursor:pointer;">Arsipkan</button>' +
+          '</td>' +
+        '</tr>'
+      );
+    }).join('');
+
+    container.innerHTML = (
+      '<div style="overflow-x:auto;">' +
+        '<table style="width:100%; border-collapse:collapse; text-align:left;">' +
+          '<thead>' +
+            '<tr style="background:#F8FAFC; border-bottom:1px solid #E2E8F0; color:#64748B; font-size:12px; text-transform:uppercase; letter-spacing:0.025em;">' +
+              '<th style="padding:10px 14px; font-weight:600;">Supplier</th>' +
+              '<th style="padding:10px 14px; font-weight:600;">Kategori</th>' +
+              '<th style="padding:10px 14px; font-weight:600;">Kontak / WA</th>' +
+              '<th style="padding:10px 14px; font-weight:600;">Syarat Bayar</th>' +
+              '<th style="padding:10px 14px; font-weight:600;">Rekening Bank</th>' +
+              '<th style="padding:10px 14px; font-weight:600; text-align:right;">Aksi</th>' +
+            '</tr>' +
+          '</thead>' +
+          '<tbody>' + rows + '</tbody>' +
+        '</table>' +
+      '</div>'
+    );
+  }
+
+  function openAddSupplierModal() {
+    var modal = $('modal-add-supplier');
+    if (!modal) return;
+    var title = $('modal-supplier-title');
+    if (title) title.textContent = 'Tambah Supplier Baru';
+    var form = $('form-add-supplier');
+    if (form) form.reset();
+    var idInput = $('sup-input-id');
+    if (idInput) idInput.value = '';
+    modal.style.display = 'flex';
+  }
+
+  function closeAddSupplierModal() {
+    var modal = $('modal-add-supplier');
+    if (modal) modal.style.display = 'none';
+    var form = $('form-add-supplier');
+    if (form) form.reset();
+  }
+
+  function editOwnerSupplier(supplierId) {
+    var s = _ownerSuppliers.find(function (item) { return item.id === supplierId; });
+    if (!s) return;
+    var modal = $('modal-add-supplier');
+    if (!modal) return;
+
+    var title = $('modal-supplier-title');
+    if (title) title.textContent = 'Ubah Data Supplier (' + s.supplier_code + ')';
+
+    if ($('sup-input-id')) $('sup-input-id').value = s.id;
+    if ($('sup-input-name')) $('sup-input-name').value = s.name || '';
+    if ($('sup-input-category')) $('sup-input-category').value = s.category || '';
+    if ($('sup-input-pic')) $('sup-input-pic').value = s.contact_person || '';
+    if ($('sup-input-phone')) $('sup-input-phone').value = s.phone || '';
+    if ($('sup-input-payment-terms')) $('sup-input-payment-terms').value = s.payment_terms || 'CASH';
+    if ($('sup-input-address')) $('sup-input-address').value = s.address || '';
+    if ($('sup-input-bank-name')) $('sup-input-bank-name').value = s.bank_name || '';
+    if ($('sup-input-bank-acc-no')) $('sup-input-bank-acc-no').value = s.bank_account_number || '';
+    if ($('sup-input-bank-acc-name')) $('sup-input-bank-acc-name').value = s.bank_account_name || '';
+    if ($('sup-input-notes')) $('sup-input-notes').value = s.notes || '';
+
+    modal.style.display = 'flex';
+  }
+
+  function submitAddSupplierForm(event) {
+    if (event && event.preventDefault) event.preventDefault();
+
+    var supId = ($('sup-input-id') ? $('sup-input-id').value : '').trim();
+    var name = ($('sup-input-name') ? $('sup-input-name').value : '').trim();
+    var category = ($('sup-input-category') ? $('sup-input-category').value : '').trim();
+    var pic = ($('sup-input-pic') ? $('sup-input-pic').value : '').trim();
+    var phone = ($('sup-input-phone') ? $('sup-input-phone').value : '').trim();
+    var paymentTerms = ($('sup-input-payment-terms') ? $('sup-input-payment-terms').value : 'CASH').trim();
+    var address = ($('sup-input-address') ? $('sup-input-address').value : '').trim();
+    var bankName = ($('sup-input-bank-name') ? $('sup-input-bank-name').value : '').trim();
+    var bankAccNo = ($('sup-input-bank-acc-no') ? $('sup-input-bank-acc-no').value : '').trim();
+    var bankAccName = ($('sup-input-bank-acc-name') ? $('sup-input-bank-acc-name').value : '').trim();
+    var notes = ($('sup-input-notes') ? $('sup-input-notes').value : '').trim();
+    var btn = $('btn-save-supplier');
+
+    if (!name) {
+      showToast('Harap isi nama perusahaan atau toko supplier.', 'warning');
+      return;
+    }
+
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Menyimpan...';
+    }
+
+    var payload = {
+      name: name,
+      category: category || null,
+      contact_person: pic || null,
+      phone: phone || null,
+      payment_terms: paymentTerms || 'CASH',
+      address: address || null,
+      bank_name: bankName || null,
+      bank_account_number: bankAccNo || null,
+      bank_account_name: bankAccName || null,
+      notes: notes || null
+    };
+
+    var url = supId
+      ? '/admin/inventory-workflow/suppliers/' + encodeURIComponent(supId)
+      : '/admin/inventory-workflow/suppliers';
+    var method = supId ? 'PUT' : 'POST';
+
+    adminFetch(url, {
+      method: method,
+      headers: {
+        ...getAuthHeaders(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    })
+      .then(function (res) {
+        if (!res.ok) {
+          return res.json().then(function (err) { throw new Error(err.message || 'Gagal menyimpan supplier'); });
+        }
+        return res.json();
+      })
+      .then(function (data) {
+        showToast(supId ? '✅ Data supplier berhasil diperbarui.' : '✅ Supplier baru berhasil ditambahkan.', 'success');
+        closeAddSupplierModal();
+        loadOwnerSuppliers();
+      })
+      .catch(function (err) {
+        showToast('❌ Gagal: ' + err.message, 'error');
+      })
+      .finally(function () {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Simpan Supplier';
+        }
+      });
+  }
+
+  async function archiveOwnerSupplier(id, name) {
+    var confirmed = await confirmFeatureAction('archive-supplier', 'Arsipkan Supplier', 'Apakah Anda yakin ingin mengarsipkan supplier "' + name + '"?', 'Arsipkan');
+    if (!confirmed) return;
+
+    adminFetch('/admin/inventory-workflow/suppliers/' + encodeURIComponent(id), {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    })
+      .then(function (res) {
+        if (!res.ok) throw new Error('Gagal mengarsipkan supplier');
+        return res.json();
+      })
+      .then(function () {
+        showToast('✅ Supplier berhasil diarsipkan.', 'success');
+        loadOwnerSuppliers();
+      })
+      .catch(function (err) {
+        showToast('❌ ' + err.message, 'error');
+      });
+  }
+
   // Export to window for inline HTML onclick handlers
   window.switchStockSubtab = switchStockSubtab;
   window.openAddMaterialModal = openAddMaterialModal;
@@ -7968,6 +8234,12 @@ async function loadMenusView() {
   window.handleRecipeMaterialChange = handleRecipeMaterialChange;
   window.removeRecipeIngredientRow = removeRecipeIngredientRow;
   window.submitAddRecipeForm = submitAddRecipeForm;
+  window.loadOwnerSuppliers = loadOwnerSuppliers;
+  window.openAddSupplierModal = openAddSupplierModal;
+  window.closeAddSupplierModal = closeAddSupplierModal;
+  window.editOwnerSupplier = editOwnerSupplier;
+  window.submitAddSupplierForm = submitAddSupplierForm;
+  window.archiveOwnerSupplier = archiveOwnerSupplier;
 
   /* =========================================================================
      MODUL 6: REPORTS ENGINE (PHASE 4)

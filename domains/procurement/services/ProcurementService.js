@@ -148,17 +148,64 @@ function buildPurchaseLine({ supplierMaterial, quantity, purchaseUomId, supplier
 }
 
 class ProcurementService {
-  static createSupplier({ organizationId, supplierCode, name, status = 'DRAFT', repository = procurementRepository }) {
+  static createSupplier({
+    organizationId,
+    supplierCode = null,
+    name,
+    status = 'ACTIVE',
+    category = null,
+    contactPerson = null,
+    phone = null,
+    address = null,
+    paymentTerms = null,
+    bankName = null,
+    bankAccountNumber = null,
+    bankAccountName = null,
+    notes = null,
+    repository = procurementRepository
+  }) {
     const orgId = text(organizationId, 'ORGANIZATION_REQUIRED');
-    const code = text(supplierCode, 'SUPPLIER_CODE_REQUIRED');
     const supplierName = text(name, 'SUPPLIER_NAME_REQUIRED');
-    const lifecycle = String(status || 'DRAFT').toUpperCase();
+    const lifecycle = String(status || 'ACTIVE').toUpperCase();
     if (!['DRAFT', 'ACTIVE', 'ARCHIVED'].includes(lifecycle)) throw fail('SUPPLIER_STATUS_INVALID');
+
+    let code = supplierCode ? String(supplierCode).trim().toUpperCase() : null;
+    if (!code) {
+      // Auto-generate standardized sequential code: SUP-0001, SUP-0002, etc.
+      const row = repository.db.queryOne(
+        "SELECT COUNT(*) AS total FROM suppliers WHERE organization_id = ?",
+        [orgId]
+      );
+      const nextSeq = ((row && row.total) || 0) + 1;
+      code = 'SUP-' + String(nextSeq).padStart(4, '0');
+      // If collision occurs (e.g. from custom inserted codes), bump sequence
+      while (repository.findSupplierByCode(orgId, code)) {
+        const rand = crypto.randomBytes(2).toString('hex').toUpperCase();
+        code = 'SUP-' + rand;
+      }
+    }
 
     if (repository.findSupplierByCode(orgId, code)) throw fail('SUPPLIER_CODE_ALREADY_EXISTS');
     const id = 'sup_' + crypto.randomBytes(8).toString('hex');
     const now = new Date().toISOString();
-    repository.insertSupplier({ id, organizationId: orgId, supplierCode: code, name: supplierName, status: lifecycle, createdAt: now, updatedAt: now });
+    repository.insertSupplier({
+      id,
+      organizationId: orgId,
+      supplierCode: code,
+      name: supplierName,
+      status: lifecycle,
+      category: category ? String(category).trim() : null,
+      contactPerson: contactPerson ? String(contactPerson).trim() : null,
+      phone: phone ? String(phone).trim() : null,
+      address: address ? String(address).trim() : null,
+      paymentTerms: paymentTerms ? String(paymentTerms).trim() : null,
+      bankName: bankName ? String(bankName).trim() : null,
+      bankAccountNumber: bankAccountNumber ? String(bankAccountNumber).trim() : null,
+      bankAccountName: bankAccountName ? String(bankAccountName).trim() : null,
+      notes: notes ? String(notes).trim() : null,
+      createdAt: now,
+      updatedAt: now
+    });
     return repository.findSupplier(id);
   }
 
