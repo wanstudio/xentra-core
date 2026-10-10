@@ -1001,11 +1001,11 @@ body.is-purchasing-mode .nav-item.active .nav-icon svg {
 
 /* 1:1 .money-card for Kasbon */
 .purchasing-kasbon-card {
-  border-radius: 16px;
+  border-radius: 14px;
   background: #f0fdf4;
   border: 1px solid #bbf7d0;
-  padding: 16px;
-  margin-bottom: 14px;
+  padding: 14px;
+  margin-bottom: 12px;
 }
 
 .purchasing-kasbon-header {
@@ -1016,7 +1016,7 @@ body.is-purchasing-mode .nav-item.active .nav-icon svg {
 
 .purchasing-kasbon-title {
   color: #166534;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.02em;
@@ -1028,9 +1028,9 @@ body.is-purchasing-mode .nav-item.active .nav-icon svg {
   gap: 8px;
   background: #ffffff;
   border: 1px solid #86efac;
-  border-radius: 13px;
-  height: 52px;
-  padding: 0 14px;
+  border-radius: 12px;
+  height: 44px;
+  padding: 0 12px;
   margin-top: 8px;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -1041,7 +1041,7 @@ body.is-purchasing-mode .nav-item.active .nav-icon svg {
 }
 
 .purchasing-kasbon-currency {
-  font-size: 20px;
+  font-size: 17px;
   font-weight: 800;
   color: #059669;
 }
@@ -1049,10 +1049,10 @@ body.is-purchasing-mode .nav-item.active .nav-icon svg {
 .purchasing-kasbon-input {
   border: none !important;
   background: transparent !important;
-  font-size: 22px !important;
-  font-weight: 900 !important;
+  font-size: 18px !important;
+  font-weight: 800 !important;
   color: #0f172a !important;
-  letter-spacing: -0.03em !important;
+  letter-spacing: -0.02em !important;
   width: 100% !important;
   padding: 0 !important;
   outline: none !important;
@@ -1063,8 +1063,8 @@ body.is-purchasing-mode .nav-item.active .nav-icon svg {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 10px;
-  font-size: 12px;
+  margin-top: 9px;
+  font-size: 11.5px;
 }
 
 .purchasing-kasbon-caption {
@@ -1075,7 +1075,7 @@ body.is-purchasing-mode .nav-item.active .nav-icon svg {
 .purchasing-kasbon-est {
   color: #0f172a;
   font-weight: 800;
-  font-size: 13px;
+  font-size: 12.5px;
 }
 
 /* 1:1 .pill */
@@ -1112,10 +1112,10 @@ body.is-purchasing-mode .nav-item.active .nav-icon svg {
 .purchasing-item-card {
   background: #ffffff;
   border: 1.5px solid #e2e8f0;
-  border-radius: 16px;
+  border-radius: 14px;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.02);
-  padding: 14px 16px;
-  margin-bottom: 10px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
   cursor: pointer;
   transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
@@ -1139,7 +1139,7 @@ body.is-purchasing-mode .nav-item.active .nav-icon svg {
 .purchasing-item-main {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 }
 
 .purchasing-item-check-col {
@@ -1200,7 +1200,7 @@ body.is-purchasing-mode .nav-item.active .nav-icon svg {
 
 .purchasing-item-name {
   font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 14.5px;
+  font-size: 14px;
   font-weight: 700;
   color: #0f172a;
   cursor: pointer;
@@ -1217,7 +1217,7 @@ body.is-purchasing-mode .nav-item.active .nav-icon svg {
 
 .purchasing-item-subtotal-val {
   font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 14.5px;
+  font-size: 14px;
   font-weight: 800;
   color: #0f172a;
   flex-shrink: 0;
@@ -1227,6 +1227,12 @@ body.is-purchasing-mode .nav-item.active .nav-icon svg {
 
 .purchasing-item-card.is-checked .purchasing-item-subtotal-val {
   color: #059669;
+}
+
+.purchasing-item-qty-val {
+  color: #0f172a;
+  font-size: 12.5px;
+  font-weight: 800;
 }
 
 .purchasing-item-meta-row {

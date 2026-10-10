@@ -225,7 +225,7 @@
               '</div>' +
               '<div class="purchasing-item-meta-row">' +
                 '<div class="purchasing-item-meta-qty">' +
-                  '<span>Beli:</span>&nbsp;<strong style="color:#0f172a; font-size:13.5px;">' + item.buyQty + ' ' + esc(uomCode) + '</strong>&nbsp;' +
+                  '<span>Beli:</span>&nbsp;<strong class="purchasing-item-qty-val">' + item.buyQty + ' ' + esc(uomCode) + '</strong>&nbsp;' +
                   priceHtml +
                 '</div>' +
                 '<button type="button" class="purchasing-btn-price-update" onclick="event.stopPropagation(); openPurchasingUpdatePriceModal(\'' + esc(item.material_id) + '\')">' +
