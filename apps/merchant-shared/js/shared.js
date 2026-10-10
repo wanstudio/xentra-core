@@ -174,6 +174,85 @@
     return 'Rp' + Number(amount || 0).toLocaleString('id-ID');
   }
 
+  /** Formats a number with dot thousands separator: "123.456" */
+  function formatNumber(val) {
+    var n = Math.floor(Number(val) || 0);
+    if (n <= 0) return '';
+    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+
+  /**
+   * Binds auto thousand-dot separator with numeric keypad and seamless cursor positioning.
+   * Enforces Xentra currency input invariant across all mobile & web surfaces.
+   */
+  function setupCurrencyInputAutoDot(inputEl, onValueChange) {
+    if (!inputEl) return;
+
+    inputEl.setAttribute('type', 'text');
+    inputEl.setAttribute('inputmode', 'numeric');
+    inputEl.setAttribute('pattern', '[0-9]*');
+    inputEl.setAttribute('autocomplete', 'off');
+
+    inputEl.addEventListener('keydown', function (e) {
+      if (e.key === 'Backspace' && inputEl.selectionStart === inputEl.selectionEnd) {
+        var pos = inputEl.selectionStart;
+        var val = inputEl.value;
+        if (pos > 1 && val.charAt(pos - 1) === '.') {
+          e.preventDefault();
+          var newVal = val.slice(0, pos - 2) + val.slice(pos);
+          inputEl.value = newVal;
+          inputEl.setSelectionRange(pos - 2, pos - 2);
+          inputEl.dispatchEvent(new Event('input'));
+        }
+      }
+    });
+
+    inputEl.addEventListener('input', function () {
+      var rawVal = inputEl.value || '';
+      var rawCursor = typeof inputEl.selectionEnd === 'number' ? inputEl.selectionEnd : rawVal.length;
+      var digitsBeforeCursor = rawVal.slice(0, rawCursor).replace(/\D/g, '').length;
+
+      var digits = rawVal.replace(/\D/g, '');
+      if (!digits) {
+        inputEl.value = '';
+        if (typeof onValueChange === 'function') onValueChange(0);
+        return;
+      }
+
+      var num = parseInt(digits, 10);
+      if (isNaN(num) || num <= 0) {
+        inputEl.value = '';
+        if (typeof onValueChange === 'function') onValueChange(0);
+        return;
+      }
+
+      var formatted = formatNumber(num);
+      inputEl.value = formatted;
+
+      if (typeof inputEl.setSelectionRange === 'function') {
+        var targetCursor = 0;
+        if (digitsBeforeCursor === 0) {
+          targetCursor = 0;
+        } else {
+          var count = 0;
+          for (var idx = 0; idx < formatted.length; idx++) {
+            if (/\d/.test(formatted.charAt(idx))) {
+              count++;
+            }
+            if (count === digitsBeforeCursor) {
+              targetCursor = idx + 1;
+              break;
+            }
+          }
+          if (targetCursor === 0) targetCursor = formatted.length;
+        }
+        inputEl.setSelectionRange(targetCursor, targetCursor);
+      }
+
+      if (typeof onValueChange === 'function') onValueChange(num);
+    });
+  }
+
   /**
    * HTML-safe string escaping — prevents XSS in rendered content.
    * Returns '' for null/undefined.
@@ -400,6 +479,8 @@
     enforceSurface:     enforceSurface,
     $:                  $,
     formatMoney:        formatMoney,
+    formatNumber:       formatNumber,
+    setupCurrencyInputAutoDot: setupCurrencyInputAutoDot,
     esc:                esc,
     showToast:          showToast,
     setupPasswordToggle: setupPasswordToggle

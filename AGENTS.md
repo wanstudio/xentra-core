@@ -122,9 +122,17 @@ Never take lazy shortcuts or leave half-baked wiring. When adding or updating us
 
 ## Currency & Number Formatting Rule (Absolute Invariant)
 
-- **Indonesian Rupiah Standard**: Semua representasi mata uang Rupiah dan angka kuantitas/harga di seluruh surface (Customer PWA, Merchant App, Merchant Dashboard, POS, Driver App) **WAJIB** menggunakan tanda titik (`.`) sebagai pemisah ribuan, jutaan, dan seterusnya (`Rp 1.000`, `Rp 25.000`, `Rp 1.500.000`).
-- Dilarang keras menampilkan nominal mentah tanpa pemisah (`Rp25000`), menggunakan pemisah koma khas format US (`Rp25,000`), atau desimal sen yang tidak relevan (`Rp25.000,00`) untuk harga Rupiah Indonesia.
-- Gunakan canonical helper platform: `formatMoney(val)` / `window.XentraShared.formatMoney` / `window.Xentra.UI.money` yang menjamin format titik ribuan deterministik `id-ID`.
+- **Indonesian Rupiah Display Standard**: Semua representasi mata uang Rupiah dan angka kuantitas/harga di seluruh surface (Customer PWA, Merchant App, Merchant Dashboard, POS, Driver App) **WAJIB** menggunakan tanda titik (`.`) sebagai pemisah ribuan, jutaan, dan seterusnya (`Rp 1.000`, `Rp 25.000`, `Rp 1.500.000`).
+- **Dilarang Keras**: Menampilkan nominal mentah tanpa pemisah (`Rp25000`), pemisah koma khas US (`Rp25,000`), atau desimal sen yang tidak relevan (`Rp25.000,00`).
+- **Currency Input Fields Invariant (Mobile Keypad & Auto-Dot Masking)**:
+  - Setiap input field nominal uang di seluruh antarmuka (mobile & desktop) **WAJIB** langsung memanggil keyboard angka murni (numpad/dialpad) di perangkat HP:
+    ```html
+    <input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ...>
+    ```
+  - Input uang **WAJIB** memformat titik pemisah ribuan secara otomatis dan real-time saat diketik (`Auto-Dot Formatting`), mendukung penghapusan backspace yang mulus, dan mempertahankan posisi kursor (tidak melompat ke ujung kanan).
+  - Gunakan canonical helper platform:
+    - Display: `formatMoney(val)` / `window.XentraShared.formatMoney` / `window.Xentra.UI.money`
+    - Input Binding: `window.XentraShared.setupCurrencyInputAutoDot(inputEl, onChange)` / `formatNumber(val)`.
 
 ## Completion
 
