@@ -233,6 +233,7 @@ class ComposedMenuService {
     brandId,
     categoryId,
     titleId,
+    menuType = null,
     rasaId = null,
     spiceEnabled = false,
     spiceLevel = null,
@@ -276,13 +277,14 @@ class ComposedMenuService {
       }
     }
 
+    const resolvedMenuType = menuType || (normalizedItems.length === 1 && Number(normalizedItems[0].quantity) === 1 ? 'SINGLE' : 'PACKAGE');
     const id = makeId('menu');
     repository.begin();
     try {
       repository.createMenu({
         id,
         brandId,
-        menuType: null,
+        menuType: resolvedMenuType,
         categoryId: category.id,
         titleId: title.id,
         rasaId: resolvedRasa ? resolvedRasa.id : null,
@@ -395,6 +397,7 @@ class ComposedMenuService {
           cost_price: nextCost,
           spice_enabled: nextSpice.enabled,
           spice_level: nextSpice.level,
+          menu_type: normalizedItems.length === 1 && Number(normalizedItems[0].quantity) === 1 ? 'SINGLE' : 'PACKAGE',
           status: nextStatus
         }
       });
@@ -448,6 +451,141 @@ class ComposedMenuService {
 
     repository.deleteMenu({ brandId, menuId });
     return { id: menuId, status: 'DELETED', deleted: true, menu };
+  }
+
+  // ── Backward-compatible Menu Creation Wrappers ──────────────────────────────
+  static createSingleMenu({
+    brandId,
+    productId,
+    subCategoryId = null,
+    categoryId = null,
+    titleId = null,
+    rasaId = null,
+    levelId = null,
+    sellingPrice,
+    costPrice = 0,
+    status = 'DRAFT'
+  }) {
+    ensureSchema();
+    if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
+
+    let effCategoryId = categoryId;
+    let effTitleId = titleId;
+
+    if (subCategoryId) {
+      const sub = repository.db.queryOne('SELECT id, category_id, name FROM sub_categories WHERE id = ?', [subCategoryId]);
+      if (sub) {
+        if (!effCategoryId) effCategoryId = sub.category_id;
+        if (!effTitleId) {
+          const title = ComposedMenuService.createMenuTitle({ brandId, name: sub.name });
+          effTitleId = title.id;
+        }
+      }
+    }
+
+    if (!effCategoryId) {
+      const cat = repository.db.queryOne('SELECT id FROM categories WHERE brand_id = ? AND is_active = 1 LIMIT 1', [brandId]);
+      if (cat) effCategoryId = cat.id;
+    }
+    if (!effTitleId) {
+      const prod = repository.findProduct({ brandId, productId });
+      const titleName = prod ? prod.name : 'Menu Satuan';
+      const title = ComposedMenuService.createMenuTitle({ brandId, name: titleName });
+      effTitleId = title.id;
+    }
+
+    return ComposedMenuService.createMenu({
+      brandId,
+      categoryId: effCategoryId,
+      titleId: effTitleId,
+      rasaId,
+      sellingPrice,
+      costPrice,
+      status,
+      items: [{ productId, quantity: 1 }]
+    });
+  }
+
+  static updateSingleMenu({
+    brandId,
+    menuId,
+    productId,
+    subCategoryId,
+    rasaId = undefined,
+    sellingPrice,
+    costPrice = undefined,
+    status = undefined
+  }) {
+    ensureSchema();
+    const current = repository.findMenu({ brandId, menuId });
+    if (!current) throw new Error('MENU_NOT_FOUND');
+
+    let effCategoryId = current.category_id;
+    let effTitleId = current.title_id;
+    if (subCategoryId) {
+      const sub = repository.db.queryOne('SELECT id, category_id, name FROM sub_categories WHERE id = ?', [subCategoryId]);
+      if (sub) {
+        effCategoryId = sub.category_id || effCategoryId;
+        const title = ComposedMenuService.createMenuTitle({ brandId, name: sub.name });
+        effTitleId = title.id;
+      }
+    }
+
+    const items = productId ? [{ productId, quantity: 1 }] : undefined;
+    return ComposedMenuService.updateMenu({
+      brandId,
+      menuId,
+      categoryId: effCategoryId,
+      titleId: effTitleId,
+      rasaId: rasaId === undefined ? current.rasa_id : rasaId,
+      sellingPrice: sellingPrice === undefined ? current.selling_price : sellingPrice,
+      costPrice: costPrice === undefined ? current.cost_price : costPrice,
+      status: status === undefined ? current.status : status,
+      items
+    });
+  }
+
+  static createPackageMenu({
+    brandId,
+    packageName,
+    categoryId = null,
+    titleId = null,
+    rasaId = null,
+    sellingPrice,
+    costPrice = 0,
+    status = 'DRAFT',
+    components = []
+  }) {
+    ensureSchema();
+    if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
+
+    let effCategoryId = categoryId;
+    let effTitleId = titleId;
+
+    if (!effCategoryId) {
+      const cat = repository.db.queryOne('SELECT id FROM categories WHERE brand_id = ? AND is_active = 1 LIMIT 1', [brandId]);
+      if (cat) effCategoryId = cat.id;
+    }
+    if (!effTitleId) {
+      const title = ComposedMenuService.createMenuTitle({ brandId, name: packageName || 'Menu Paket' });
+      effTitleId = title.id;
+    }
+
+    const items = components.map(c => ({
+      productId: c.productId || c.product_id,
+      quantity: Number(c.quantity || 1)
+    }));
+
+    return ComposedMenuService.createMenu({
+      brandId,
+      categoryId: effCategoryId,
+      titleId: effTitleId,
+      rasaId,
+      sellingPrice,
+      costPrice,
+      status,
+      items
+    });
   }
 
   static adoptMenuToBranch({
