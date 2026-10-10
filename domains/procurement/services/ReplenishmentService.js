@@ -254,11 +254,11 @@ class ReplenishmentService {
       };
     }
 
-    // 5. Cek PO yang sedang In-Transit / Ordered ke lokasi ini untuk menghitung Effective Stock
+    // 5. Cek PO yang sedang In-Transit / Ordered ke lokasi ini untuk menghitung Effective Stock (sisa yang belum diterima)
     const onOrderRows = dbInstance.prepare(`
       SELECT 
         sm.material_id,
-        COALESCE(SUM(pol.resolved_base_quantity), 0) AS on_order_base_qty
+        COALESCE(SUM(MAX(0, pol.resolved_base_quantity - pol.received_base_quantity)), 0) AS on_order_base_qty
       FROM purchase_order_lines pol
       JOIN purchase_orders po ON po.id = pol.purchase_order_id
       JOIN supplier_materials sm ON sm.id = pol.supplier_material_id
@@ -335,6 +335,7 @@ class ReplenishmentService {
       let purchasePacks = 0;
       let purchaseTotalBaseQty = 0;
       let packSize = 1;
+      let baseQtyPerPack = 1;
       let moq = 1;
       let unitPrice = 0;
       let estCost = 0;
@@ -342,14 +343,31 @@ class ReplenishmentService {
 
       if (pack) {
         packSize = Number(pack.content_quantity) || 1;
+        baseQtyPerPack = packSize;
+
+        // Jika satuan kemasan pack berbeda dengan base UOM material, konversi ke base UOM
+        if (pack.content_uom_id && pack.content_uom_id !== grossInfo.base_uom_id) {
+          try {
+            const convertedPack = UomConversionService.convertQuantity({
+              quantity: packSize,
+              sourceUomId: pack.content_uom_id,
+              targetUomId: grossInfo.base_uom_id,
+              repository: uomRepository
+            });
+            baseQtyPerPack = Number(convertedPack.target_quantity);
+          } catch (_) {
+            baseQtyPerPack = packSize;
+          }
+        }
+
         moq = Math.max(1, Number(pack.minimum_order_quantity) || 1);
         unitPrice = Number(pack.unit_price) || 0;
 
-        // Hitung packs needed dengan pembulatan ke atas (ceiling)
-        const rawPacks = Math.ceil(netDeficit / packSize);
+        // Hitung packs needed dengan pembulatan ke atas (ceiling) terhadap isi per pack dalam base UOM
+        const rawPacks = Math.ceil(netDeficit / baseQtyPerPack);
         // Terapkan batas MOQ supplier
         purchasePacks = Math.max(rawPacks, moq);
-        purchaseTotalBaseQty = purchasePacks * packSize;
+        purchaseTotalBaseQty = purchasePacks * baseQtyPerPack;
         estCost = purchasePacks * unitPrice;
 
         supplierInfo = {
@@ -360,6 +378,7 @@ class ReplenishmentService {
           supplier_pack_name: pack.supplier_pack_name,
           pack_size: packSize,
           pack_uom_name: pack.content_uom_name || pack.content_uom_code || grossInfo.base_uom_name,
+          base_quantity_per_pack: baseQtyPerPack,
           minimum_order_quantity: moq,
           unit_price: unitPrice,
           currency_code: pack.currency_code || 'IDR'

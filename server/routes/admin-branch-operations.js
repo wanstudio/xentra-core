@@ -618,8 +618,9 @@ router.post('/admin/branches/:id/purchasing/settle', requireAuth(['owner', 'bran
           `).run(location.id, line.material_id, newQty, newVal, newAvgCost, now, now);
         }
 
-        // Ledger entry in material_stock_movements
+        // Ledger entry in material_stock_movements (posting_mutation_id must be globally unique per movement)
         const movId = 'mov_' + crypto.randomBytes(8).toString('hex');
+        const movMutationId = postingId + '_' + line.material_id;
         db.prepare(`
           INSERT INTO material_stock_movements (
             id, stock_location_id, material_id, movement_type, quantity_base,
@@ -629,7 +630,7 @@ router.post('/admin/branches/:id/purchasing/settle', requireAuth(['owner', 'bran
           ) VALUES (?, ?, ?, 'PURCHASE_RECEIPT', ?, ?, ?, ?, ?, 'IDR', 'MOVING_AVERAGE', 'PURCHASE_RECEIPT', 'PURCHASING_CHECKLIST', ?, ?, ?, ?, ?, 'v1')
         `).run(
           movId, location.id, line.material_id, line.quantity, prevQty, newQty,
-          line.unit_price, line.total_price, postingId, postingId, newVer, now, actorId
+          line.unit_price, line.total_price, postingId, movMutationId, newVer, now, actorId
         );
       }
       db.exec('COMMIT;');
@@ -683,6 +684,7 @@ router.get('/admin/branches/:id/purchasing/history', requireAuth(['owner', 'bran
     const rows = db.prepare(`
       SELECT
         sm.id,
+        sm.source_reference,
         sm.posting_mutation_id,
         sm.material_id,
         m.name AS material_name,
@@ -704,10 +706,10 @@ router.get('/admin/branches/:id/purchasing/history', requireAuth(['owner', 'bran
       ORDER BY sm.posting_timestamp DESC
     `).all(location.id);
 
-    // Group items by posting_mutation_id for clean session grouping
+    // Group items by session (source_reference atau posting_mutation_id) for clean session grouping
     const sessionMap = new Map();
     for (const r of rows) {
-      const pId = r.posting_mutation_id || r.id;
+      const pId = r.source_reference || r.posting_mutation_id || r.id;
       if (!sessionMap.has(pId)) {
         sessionMap.set(pId, {
           posting_id: pId,

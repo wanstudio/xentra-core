@@ -196,7 +196,7 @@ test.describe('Purchasing / Belanja Pasar Operational Workflow', () => {
     assert.ok(Math.abs(balance.moving_average_unit_cost - (530000 / 12)) < 0.001);
 
     // Verify ledger movement
-    const movement = db.prepare(`SELECT * FROM material_stock_movements WHERE posting_mutation_id = ? AND material_id = ?`).get(body.posting_id, materialId1);
+    const movement = db.prepare(`SELECT * FROM material_stock_movements WHERE source_reference = ? AND material_id = ?`).get(body.posting_id, materialId1);
     assert.ok(movement);
     assert.equal(movement.movement_type, 'PURCHASE_RECEIPT');
     assert.equal(movement.quantity_base, 10);
