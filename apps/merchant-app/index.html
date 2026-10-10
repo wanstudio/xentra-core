@@ -1649,31 +1649,33 @@
         </div>
       </div>
     </div>
+  </div>
+
   <!-- MODAL: PURCHASING UPDATE HARGA PASAR -->
-  <div id="modal-purchasing-update-price" class="x-modal-backdrop" style="display:none; z-index: 12006;" role="dialog" aria-modal="true" aria-labelledby="purchasing-update-price-title">
+  <div id="modal-purchasing-update-price" class="x-modal-backdrop" style="display:none; z-index: 12006;" role="dialog" aria-modal="true" aria-labelledby="purchasing-update-price-title" onclick="if(event.target === this) closePurchasingUpdatePriceModal()">
     <div class="x-modal-card" style="max-width:380px; width:90%; border-radius:18px; padding:0; overflow:hidden;">
       <div class="x-modal-header" style="padding:16px; border-bottom:1px solid #f1f5f9; margin:0;">
         <div>
           <h3 id="purchasing-update-price-title" style="margin:0; font-size:15px; font-weight:800; color:#0f172a;">Update Harga Pasar</h3>
-          <p id="purchasing-update-price-subtitle" class="text-muted" style="font-size:12px; margin:2px 0 0;">Masukkan harga beli aktual yang baru</p>
+          <p id="purchasing-update-price-subtitle" class="text-muted" style="font-size:12px; margin:2px 0 0;">Masukkan harga beli aktual yang baru dari pedagang</p>
         </div>
         <button type="button" class="x-modal-close" onclick="closePurchasingUpdatePriceModal()" aria-label="Tutup">✕</button>
       </div>
       <div style="padding:16px;">
         <div style="margin-bottom:12px;">
           <span style="font-size:11.5px; color:#64748b;">Nama Bahan:</span>
-          <div id="purchasing-update-price-item-name" style="font-size:14.5px; font-weight:800; color:#0f172a; margin-top:2px;">-</div>
+          <div id="purchasing-update-price-item-name" style="font-size:15px; font-weight:800; color:#0f172a; margin-top:2px;">-</div>
         </div>
         <div style="margin-bottom:16px;">
           <label for="input-purchasing-modal-price" style="display:block; font-size:12px; font-weight:700; color:#334155; margin-bottom:4px;">Harga per Satuan (Rp):</label>
-          <div style="display:flex; align-items:center; background:#f8fafc; border:1.5px solid #cbd5e1; border-radius:10px; padding:0 12px; height:44px;">
-            <span style="font-size:14px; font-weight:700; color:#64748b; margin-right:6px;">Rp</span>
-            <input type="number" id="input-purchasing-modal-price" style="border:none; background:transparent; width:100%; font-size:16px; font-weight:800; color:#0f172a; outline:none;" placeholder="0" min="0" step="500">
+          <div style="display:flex; align-items:center; background:#f8fafc; border:1.5px solid #cbd5e1; border-radius:10px; padding:0 12px; height:46px;">
+            <span style="font-size:15px; font-weight:700; color:#64748b; margin-right:6px;">Rp</span>
+            <input type="number" id="input-purchasing-modal-price" style="border:none; background:transparent; width:100%; font-size:17px; font-weight:800; color:#0f172a; outline:none;" placeholder="0" min="0" step="500" inputmode="numeric" onkeydown="if(event.key === 'Enter') confirmPurchasingPriceUpdate()">
           </div>
         </div>
         <div style="display:flex; gap:10px;">
-          <button type="button" class="x-btn-secondary" onclick="closePurchasingUpdatePriceModal()" style="flex:1; height:40px; border-radius:10px;">Batal</button>
-          <button type="button" class="x-btn-primary" onclick="confirmPurchasingPriceUpdate()" style="flex:1; height:40px; border-radius:10px; background:#059669; border-color:#059669; font-weight:700;">Simpan Harga</button>
+          <button type="button" class="x-btn-secondary" onclick="closePurchasingUpdatePriceModal()" style="flex:1; height:42px; border-radius:10px; font-weight:700;">Batal</button>
+          <button type="button" class="x-btn-primary" onclick="confirmPurchasingPriceUpdate()" style="flex:1; height:42px; border-radius:10px; background:#059669; border-color:#059669; font-weight:700;">Simpan Harga</button>
         </div>
       </div>
     </div>

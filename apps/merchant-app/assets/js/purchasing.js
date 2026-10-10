@@ -195,28 +195,28 @@
       var uomCode = item.base_uom_code || item.base_uom_name || 'Unit';
 
       html +=
-        '<div id="card-item-' + esc(item.material_id) + '" class="purchasing-item-card ' + (isChecked ? 'is-checked' : 'is-unchecked') + '" style="border-radius:14px; padding:12px 14px; margin-bottom:8px; background:#ffffff; border:1.5px solid ' + (isChecked ? '#059669' : '#e2e8f0') + '; box-shadow:0 1px 3px rgba(0,0,0,0.03); cursor:pointer;" onclick="onPurchasingCardClick(event, \'' + esc(item.material_id) + '\')">' +
-          '<div class="purchasing-item-main" style="display:flex; align-items:center; gap:12px;">' +
-            '<div class="purchasing-item-check-col" style="display:flex; align-items:center; justify-content:center; flex-shrink:0;">' +
+        '<div id="card-item-' + esc(item.material_id) + '" class="purchasing-item-card ' + (isChecked ? 'is-checked' : 'is-unchecked') + '" style="border-radius:14px; padding:14px 16px; margin-bottom:10px; background:#ffffff; border:1.5px solid ' + (isChecked ? '#059669' : '#e2e8f0') + '; box-shadow:0 1px 3px rgba(0,0,0,0.03); cursor:pointer;" onclick="onPurchasingCardClick(event, \'' + esc(item.material_id) + '\')">' +
+          '<div class="purchasing-item-main" style="display:flex; align-items:flex-start; gap:12px;">' +
+            '<div class="purchasing-item-check-col" style="display:flex; align-items:center; justify-content:center; flex-shrink:0; padding-top:2px;">' +
               '<input type="checkbox" id="chk-' + esc(item.material_id) + '" class="purchasing-check-box" style="width:24px; height:24px; cursor:pointer; accent-color:#059669;" ' + (isChecked ? 'checked' : '') + ' onclick="event.stopPropagation()" onchange="togglePurchasingItemCheck(\'' + esc(item.material_id) + '\', this.checked)">' +
             '</div>' +
             '<div class="purchasing-item-info-col" style="flex:1; min-width:0;">' +
-              '<div style="display:flex; justify-content:space-between; align-items:baseline;">' +
-                '<label for="chk-' + esc(item.material_id) + '" style="font-size:14.5px; font-weight:800; color:#0f172a; cursor:pointer; margin:0;' + (isChecked ? 'text-decoration:line-through; color:#64748b;' : '') + '" onclick="event.stopPropagation()">' +
+              '<div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px;">' +
+                '<label for="chk-' + esc(item.material_id) + '" style="font-size:15px; font-weight:800; color:#0f172a; cursor:pointer; margin:0;' + (isChecked ? 'text-decoration:line-through; color:#64748b;' : '') + '" onclick="event.stopPropagation()">' +
                   esc(item.material_name) +
                 '</label>' +
-                '<div class="purchasing-item-subtotal-val" style="font-size:14px; font-weight:800; color:' + (isChecked ? '#059669' : '#475569') + ';">' +
+                '<div class="purchasing-item-subtotal-val" style="font-size:15px; font-weight:800; color:' + (isChecked ? '#059669' : '#0f172a') + '; flex-shrink:0;">' +
                   formatMoney(subtotal) +
                 '</div>' +
               '</div>' +
-              '<div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; flex-wrap:wrap; gap:6px;">' +
-                '<div style="font-size:12px; color:#475569;">' +
-                  'Beli: <strong style="color:#0f172a; font-size:13px;">' + item.buyQty + ' ' + esc(uomCode) + '</strong>' +
-                  ' <span style="color:#94a3b8; font-size:11px;">(kuota terkunci)</span>' +
+              '<div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; gap:8px; flex-wrap:wrap;">' +
+                '<div style="font-size:12.5px; color:#475569; min-width:0;">' +
+                  'Beli: <strong style="color:#0f172a; font-size:13.5px;">' + item.buyQty + ' ' + esc(uomCode) + '</strong>' +
+                  ' <span style="color:#64748b; font-size:12px;">(@ ' + formatMoney(item.actualUnitPrice) + ')</span>' +
+                  (item.has_price_update ? ' <span class="x-badge" style="background:#dbeafe; color:#1e40af; font-size:10px; padding:1px 5px; font-weight:700;">harga_update</span>' : '') +
                 '</div>' +
-                '<button type="button" onclick="event.stopPropagation(); openPurchasingUpdatePriceModal(\'' + esc(item.material_id) + '\')" style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:8px; padding:3px 8px; font-size:11.5px; font-weight:700; color:#1e293b; cursor:pointer; display:flex; align-items:center; gap:4px;">' +
-                  '<span>@ ' + formatMoney(item.actualUnitPrice) + '</span>' +
-                  (item.has_price_update ? '<span class="x-badge" style="background:#dbeafe; color:#1e40af; font-size:9.5px; padding:1px 4px;">harga_update</span>' : '<span style="color:#64748b; font-size:11px;">✎</span>') +
+                '<button type="button" onclick="event.stopPropagation(); openPurchasingUpdatePriceModal(\'' + esc(item.material_id) + '\')" style="background:#f8fafc; border:1.5px solid #cbd5e1; border-radius:9px; padding:6px 14px; font-size:12.5px; font-weight:800; color:#0f172a; cursor:pointer; flex-shrink:0; display:inline-flex; align-items:center; gap:5px; box-shadow:0 1px 2px rgba(0,0,0,0.04);">' +
+                  '<span style="color:#64748b; font-size:12px;">✎</span> <span>Harga Baru</span>' +
                 '</button>' +
               '</div>' +
             '</div>' +
@@ -249,15 +249,21 @@
     if (nameEl) nameEl.textContent = itm.material_name + ' (per ' + (itm.base_uom_code || itm.base_uom_name || 'unit') + ')';
     if (priceIn) {
       priceIn.value = itm.actualUnitPrice || '';
-      setTimeout(function () { priceIn.focus(); priceIn.select(); }, 50);
+      setTimeout(function () { priceIn.focus(); priceIn.select(); }, 60);
     }
-    if (modal) modal.style.display = 'flex';
+    if (modal) {
+      modal.style.display = 'flex';
+      modal.style.opacity = '1';
+      modal.style.visibility = 'visible';
+    }
   }
   window.openPurchasingUpdatePriceModal = openPurchasingUpdatePriceModal;
 
   function closePurchasingUpdatePriceModal() {
     var modal = $('modal-purchasing-update-price');
-    if (modal) modal.style.display = 'none';
+    if (modal) {
+      modal.style.display = 'none';
+    }
     _purchasingState.activeEditItem = null;
   }
   window.closePurchasingUpdatePriceModal = closePurchasingUpdatePriceModal;
