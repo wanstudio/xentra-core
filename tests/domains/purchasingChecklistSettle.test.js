@@ -330,6 +330,80 @@ test.describe('Purchasing / Belanja Pasar Operational Workflow', () => {
     const balance = db.prepare('SELECT quantity_base FROM material_stock_balances WHERE stock_location_id = ? AND material_id = ?').get(locationId, materialId2);
     // Initial 15 kg + (2 packs * 5 kg = 10 kg) = 25 kg
     assert.equal(Number(balance.quantity_base), 25);
+
+    // 5b. Purchasing staff rejects an entire order (accepted: 0, rejected: 1)
+    const poReject = ProcurementService.createPurchaseOrder({
+      organizationId: orgId,
+      supplierId: sup.id,
+      destinationStockLocationId: locationId,
+      lines: [{
+        supplier_material_id: supMat.id,
+        supplier_pack_id: pack.id,
+        ordered_purchase_quantity: 1
+      }],
+      createdBy: 'owner'
+    });
+    ProcurementService.approvePurchaseOrder({ purchaseOrderId: poReject.id });
+    ProcurementService.orderPurchaseOrder({ purchaseOrderId: poReject.id });
+
+    const rejectLine = db.prepare('SELECT id FROM purchase_order_lines WHERE purchase_order_id = ?').get(poReject.id);
+    const rejectRes = await fetch(`${baseUrl}/admin/branches/${branchId}/purchasing/orders/${poReject.id}/receive`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${purchasingToken}`,
+        'X-Brand-Id': brandId,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        lines: [{
+          purchase_order_line_id: rejectLine.id,
+          accepted_purchase_quantity: 0,
+          rejected_purchase_quantity: 1
+        }],
+        notes: 'Barang busuk dan kemasan pecah'
+      })
+    });
+    assert.equal(rejectRes.status, 200);
+    const rejectBody = await rejectRes.json();
+    assert.equal(rejectBody.success, true);
+    // Stock balance remains 25 kg (no stock mutation on full rejection)
+    const balanceAfterReject = db.prepare('SELECT quantity_base FROM material_stock_balances WHERE stock_location_id = ? AND material_id = ?').get(locationId, materialId2);
+    assert.equal(Number(balanceAfterReject.quantity_base), 25);
+
+    // 5c. Over-receipt validation: non-weighable or >10% over ordered qty fails with 400
+    const poOver = ProcurementService.createPurchaseOrder({
+      organizationId: orgId,
+      supplierId: sup.id,
+      destinationStockLocationId: locationId,
+      lines: [{
+        supplier_material_id: supMat.id,
+        supplier_pack_id: pack.id,
+        ordered_purchase_quantity: 1
+      }],
+      createdBy: 'owner'
+    });
+    ProcurementService.approvePurchaseOrder({ purchaseOrderId: poOver.id });
+    ProcurementService.orderPurchaseOrder({ purchaseOrderId: poOver.id });
+
+    const overLine = db.prepare('SELECT id FROM purchase_order_lines WHERE purchase_order_id = ?').get(poOver.id);
+    const overRes = await fetch(`${baseUrl}/admin/branches/${branchId}/purchasing/orders/${poOver.id}/receive`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${purchasingToken}`,
+        'X-Brand-Id': brandId,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        lines: [{
+          purchase_order_line_id: overLine.id,
+          accepted_purchase_quantity: 5, // 500% over-delivery, exceeding tolerance
+          rejected_purchase_quantity: 0
+        }]
+      })
+    });
+    assert.equal(overRes.status, 400);
+    const overBody = await overRes.json();
+    assert.equal(overBody.error, 'GOODS_RECEIPT_OVER_QUANTITY');
   });
 
   test('6. Branch Manager Purchasing Mandate Lifecycle: Create, Edit, Archive, and Delete', async () => {

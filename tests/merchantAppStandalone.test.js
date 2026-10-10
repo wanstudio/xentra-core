@@ -138,6 +138,8 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
     assert.ok(html.includes('/merchant-app/assets/js/staff.js'), 'must load staff.js');
     assert.ok(html.includes('/merchant-app/assets/js/orders.js'), 'must load orders.js');
     assert.ok(html.includes('/merchant-app/assets/js/merchant-app.js'), 'must load merchant-app.js');
+    assert.ok(html.includes('id="modal-purchasing-receive-confirm"'), 'must include purchasing receive confirmation modal');
+    assert.ok(html.includes('id="btn-execute-purchasing-receive"'), 'must include confirm execution button');
   });
 
   await t.test('2i. Staff module is the canonical implementation', () => {

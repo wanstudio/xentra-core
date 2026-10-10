@@ -1718,6 +1718,50 @@
     </div>
   </div>
 
+  <!-- MODAL: PURCHASING GOODS RECEIPT CONFIRMATION (DIALOG PERINGATAN KEPUTUSAN TERKUNCI) -->
+  <div id="modal-purchasing-receive-confirm" class="x-modal-backdrop" style="display:none; z-index: 12015;" role="dialog" aria-modal="true" aria-labelledby="purchasing-confirm-title" onclick="if(event.target === this) closePurchasingReceiveConfirmModal()">
+    <div class="x-modal-card purchasing-confirm-modal-card">
+      <div class="x-modal-header purchasing-confirm-modal-header">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span id="purchasing-confirm-icon" style="font-size:20px; line-height:1;">✓</span>
+          <div>
+            <h3 id="purchasing-confirm-title" class="purchasing-confirm-modal-title">Konfirmasi Penerimaan Barang</h3>
+            <p id="purchasing-confirm-subtitle" class="purchasing-confirm-modal-subtitle text-muted">Keputusan fisik akan disimpan permanen</p>
+          </div>
+        </div>
+        <button type="button" class="x-modal-close" onclick="closePurchasingReceiveConfirmModal()" aria-label="Batal">✕</button>
+      </div>
+
+      <div class="purchasing-confirm-modal-body">
+        <div class="purchasing-confirm-warning-box">
+          <div style="font-size:12px; font-weight:800; color:#991b1b; display:flex; align-items:center; gap:6px;">
+            <span>⚠️</span> Data Terkunci Permanen
+          </div>
+          <p style="font-size:11.5px; color:#475569; margin:4px 0 0; line-height:1.4;">
+            Setelah dikonfirmasi, mutasi kartu stok akan langsung diposting dan <strong>tidak dapat diubah kembali</strong> oleh staff.
+          </p>
+        </div>
+
+        <div style="font-size:11.5px; font-weight:700; color:#334155; margin-bottom:2px;">Ringkasan Pemeriksaan Fisik:</div>
+        <div id="purchasing-confirm-summary-list" class="purchasing-confirm-summary-list">
+          <!-- Filled dynamically -->
+        </div>
+
+        <div id="purchasing-confirm-notes-preview" class="purchasing-confirm-notes-preview" style="display:none;">
+          <span style="font-weight:700; color:#475569;">Catatan: </span>
+          <span id="purchasing-confirm-notes-text" style="color:#0f172a;">-</span>
+        </div>
+      </div>
+
+      <div class="x-modal-footer purchasing-confirm-modal-footer">
+        <button type="button" class="x-btn-secondary purchasing-confirm-btn-cancel" onclick="closePurchasingReceiveConfirmModal()">Periksa Lagi</button>
+        <button type="button" class="x-btn-primary purchasing-confirm-btn-submit" id="btn-execute-purchasing-receive" onclick="executePurchasingReceiveSubmit()">
+          Ya, Simpan Keputusan
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL: STOREFRONT BANNER CONTENT / PUBLISH -->
   <div id="modal-crop-editor" class="x-modal-backdrop" style="display:none; z-index: 12010;" role="dialog" aria-modal="true" aria-labelledby="crop-editor-title">
     <div class="x-crop-modal-card">

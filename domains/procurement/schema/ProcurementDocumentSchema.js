@@ -150,11 +150,11 @@ function ensureProcurementDocumentSchema(db) {
       goods_receipt_id TEXT NOT NULL,
       purchase_order_line_id TEXT NOT NULL,
       accepted_purchase_quantity REAL NOT NULL
-        CHECK (accepted_purchase_quantity > 0),
+        CHECK (accepted_purchase_quantity >= 0),
       rejected_purchase_quantity REAL NOT NULL DEFAULT 0
         CHECK (rejected_purchase_quantity >= 0),
       accepted_base_quantity REAL NOT NULL
-        CHECK (accepted_base_quantity > 0),
+        CHECK (accepted_base_quantity >= 0),
       purchase_uom_id TEXT,
       supplier_pack_id TEXT,
       conversion_factor_snapshot REAL NOT NULL

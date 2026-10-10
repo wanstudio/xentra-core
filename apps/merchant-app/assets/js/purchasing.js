@@ -857,9 +857,15 @@
     if (modal) modal.style.display = 'none';
     _activeReceivePo = null;
   }
-  window.closePurchasingReceiveModal = closePurchasingReceiveModal;
+  var _pendingReceiveData = null;
 
-  async function submitPurchasingReceive() {
+  function closePurchasingReceiveConfirmModal() {
+    var modal = $('modal-purchasing-receive-confirm');
+    if (modal) modal.style.display = 'none';
+  }
+  window.closePurchasingReceiveConfirmModal = closePurchasingReceiveConfirmModal;
+
+  function submitPurchasingReceive() {
     if (!_activeReceivePo) return;
     var user = getStoredUser();
     var branchId = user ? (user.branch_id || user.branchId) : null;
@@ -875,10 +881,15 @@
     var totalRejected = 0;
     var hasOverReceived = false;
     var lines = [];
+    var summaryItems = [];
     var lineEls = container.querySelectorAll('.purchasing-receive-line');
+
     lineEls.forEach(function (el) {
       var polId = el.getAttribute('data-pol-id');
       var ord = Number(el.getAttribute('data-ordered-qty')) || 0;
+      var nameEl = el.querySelector('.purchasing-receive-line-name');
+      var name = nameEl ? nameEl.textContent : 'Bahan';
+      var packDesc = el.getAttribute('data-pack-desc') || 'unit';
       var accIn = el.querySelector('.input-receive-accepted');
       var rejIn = el.querySelector('.input-receive-rejected');
       var accepted = Number(accIn ? accIn.value : 0);
@@ -892,6 +903,26 @@
         rejected_purchase_quantity: rejected,
         rejection_reason: rejected > 0 ? (notes || 'Barang ditolak saat penerimaan') : null
       });
+
+      var statusText = '';
+      if (accepted > ord) {
+        var diff = (accepted - ord);
+        var diffStr = diff % 1 === 0 ? diff : diff.toFixed(2).replace(/\.?0+$/, '');
+        statusText = '<span style="color:#0284c7; font-weight:700;">' + accepted + ' ' + esc(packDesc) + ' (+' + diffStr + ' Lebih)</span>';
+      } else if (accepted > 0 && rejected > 0) {
+        statusText = '<span style="color:#b45309; font-weight:700;">' + accepted + ' Layak, ' + rejected + ' Rusak</span>';
+      } else if (rejected === ord) {
+        statusText = '<span style="color:#dc2626; font-weight:700;">Ditolak Semua (' + rejected + ' ' + esc(packDesc) + ')</span>';
+      } else {
+        statusText = '<span style="color:#059669; font-weight:700;">' + accepted + ' ' + esc(packDesc) + ' Baik</span>';
+      }
+
+      summaryItems.push(
+        '<div class="purchasing-confirm-summary-item">' +
+          '<div style="font-weight:700; color:#0f172a;">' + esc(name) + '</div>' +
+          '<div>' + statusText + '</div>' +
+        '</div>'
+      );
     });
 
     // Validasi penolakan total: wajib isi alasan
@@ -924,48 +955,127 @@
       return;
     }
 
-    var btn = $('btn-submit-purchasing-receive');
-    if (btn) {
-      btn.disabled = true;
-      btn.textContent = 'Menyimpan...';
+    // Siapkan data pending untuk dialog konfirmasi
+    _pendingReceiveData = {
+      branchId: branchId,
+      poId: _activeReceivePo.id,
+      lines: lines,
+      totalAccepted: totalAccepted,
+      totalRejected: totalRejected,
+      hasOverReceived: hasOverReceived
+    };
+
+    // Tampilkan modal konfirmasi dengan data ringkasan
+    var confirmModal = $('modal-purchasing-receive-confirm');
+    var iconEl = $('purchasing-confirm-icon');
+    var titleEl = $('purchasing-confirm-title');
+    var subtitleEl = $('purchasing-confirm-subtitle');
+    var listEl = $('purchasing-confirm-summary-list');
+    var notesBoxEl = $('purchasing-confirm-notes-preview');
+    var notesTextEl = $('purchasing-confirm-notes-text');
+    var execBtn = $('btn-execute-purchasing-receive');
+
+    if (subtitleEl) {
+      subtitleEl.textContent = 'PO #' + _activeReceivePo.id.slice(-6) + ' dari ' + _activeReceivePo.supplier_name;
+    }
+
+    if (listEl) {
+      listEl.innerHTML = summaryItems.join('');
+    }
+
+    if (notesBoxEl && notesTextEl) {
+      if (notes) {
+        notesTextEl.textContent = notes;
+        notesBoxEl.style.display = 'block';
+      } else {
+        notesBoxEl.style.display = 'none';
+      }
+    }
+
+    if (execBtn) {
+      execBtn.disabled = false;
+      if (totalAccepted === 0 && totalRejected > 0) {
+        if (iconEl) iconEl.textContent = '❌';
+        if (titleEl) titleEl.textContent = 'Konfirmasi Penolakan Barang';
+        execBtn.textContent = '✕ Ya, Tolak Barang';
+        execBtn.style.background = '#dc2626';
+        execBtn.style.borderColor = '#dc2626';
+      } else if (hasOverReceived) {
+        if (iconEl) iconEl.textContent = '📦';
+        if (titleEl) titleEl.textContent = 'Konfirmasi Penerimaan Berlebih';
+        execBtn.textContent = '✓ Ya, Terima Berlebih';
+        execBtn.style.background = '#0284c7';
+        execBtn.style.borderColor = '#0284c7';
+      } else if (totalRejected > 0) {
+        if (iconEl) iconEl.textContent = '⚠️';
+        if (titleEl) titleEl.textContent = 'Konfirmasi Penerimaan Sebagian';
+        execBtn.textContent = '⚠️ Ya, Terima Sebagian';
+        execBtn.style.background = '#d97706';
+        execBtn.style.borderColor = '#d97706';
+      } else {
+        if (iconEl) iconEl.textContent = '✓';
+        if (titleEl) titleEl.textContent = 'Konfirmasi Penerimaan Barang';
+        execBtn.textContent = '✓ Ya, Terima Barang';
+        execBtn.style.background = '#059669';
+        execBtn.style.borderColor = '#059669';
+      }
+    }
+
+    if (confirmModal) confirmModal.style.display = 'flex';
+  }
+  window.submitPurchasingReceive = submitPurchasingReceive;
+
+  async function executePurchasingReceiveSubmit() {
+    if (!_pendingReceiveData) return;
+    var dataPayload = _pendingReceiveData;
+
+    var execBtn = $('btn-execute-purchasing-receive');
+    if (execBtn) {
+      execBtn.disabled = true;
+      execBtn.textContent = 'Menyimpan ke Stok...';
     }
 
     try {
-      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/orders/' + encodeURIComponent(_activeReceivePo.id) + '/receive', {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(dataPayload.branchId) + '/purchasing/orders/' + encodeURIComponent(dataPayload.poId) + '/receive', {
         method: 'POST',
         headers: {
           ...getAuthHeaders(),
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ lines: lines })
+        body: JSON.stringify({ lines: dataPayload.lines })
       });
       var data = await res.json();
 
       if (res.ok && data.success) {
-        if (totalAccepted === 0 && totalRejected > 0) {
+        if (dataPayload.totalAccepted === 0 && dataPayload.totalRejected > 0) {
           showToast('✓ Penolakan barang dicatat. Seluruh barang diretur ke supplier.');
-        } else if (hasOverReceived) {
-          showToast('✓ Penerimaan barang berlebih berhasil dicatat. Stok diperbarui sesuai fisik aktual!');
-        } else if (totalRejected > 0) {
+        } else if (dataPayload.hasOverReceived) {
+          showToast('✓ Penerimaan barang berlebih berhasil dicatat. Saldo stok telah diperbarui!');
+        } else if (dataPayload.totalRejected > 0) {
           showToast('✓ Penerimaan sebagian berhasil dicatat. Stok bertambah sesuai barang layak.');
         } else {
           showToast('✓ Seluruh barang berhasil diterima! Stok bahan baku telah bertambah.');
         }
+        closePurchasingReceiveConfirmModal();
         closePurchasingReceiveModal();
         loadPurchasingOrders();
+        _pendingReceiveData = null;
       } else {
         showToast('⚠️ Gagal konfirmasi: ' + (data.message || data.error || 'Periksa input barang'));
+        if (execBtn) {
+          execBtn.disabled = false;
+          execBtn.textContent = 'Coba Lagi';
+        }
       }
     } catch (e) {
       showToast('⚠️ Gangguan jaringan saat konfirmasi penerimaan.');
-    } finally {
-      if (btn) {
-        btn.disabled = false;
-        updatePurchasingReceiveModalCta();
+      if (execBtn) {
+        execBtn.disabled = false;
+        execBtn.textContent = 'Coba Lagi';
       }
     }
   }
-  window.submitPurchasingReceive = submitPurchasingReceive;
+  window.executePurchasingReceiveSubmit = executePurchasingReceiveSubmit;
 
   /* =========================================================================
      PURCHASING HISTORY (7 HARI TERAKHIR)
