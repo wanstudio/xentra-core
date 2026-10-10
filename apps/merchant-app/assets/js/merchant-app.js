@@ -465,7 +465,17 @@
       currentRoute = 'belanja';
     }
     applyRoute(currentRoute);
+
+    if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
+      window.Xentra.hideSplash();
+    }
   }
+
+  window.addEventListener('merchant:home-ready', function () {
+    if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
+      window.Xentra.hideSplash();
+    }
+  });
 
   window.addEventListener('hashchange', function () { applyRoute(getCurrentRoute()); });
 

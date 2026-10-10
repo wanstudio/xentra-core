@@ -483,7 +483,9 @@
     setupCurrencyInputAutoDot: setupCurrencyInputAutoDot,
     esc:                esc,
     showToast:          showToast,
-    setupPasswordToggle: setupPasswordToggle
+    setupPasswordToggle: setupPasswordToggle,
+    showSplash:         function (message) { if (window.Xentra && typeof window.Xentra.showSplash === 'function') window.Xentra.showSplash(message); },
+    hideSplash:         function () { if (window.Xentra && typeof window.Xentra.hideSplash === 'function') window.Xentra.hideSplash(); }
   };
 
 

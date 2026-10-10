@@ -15786,6 +15786,10 @@ async function loadMenusView() {
 
     // Standardize all filter selects into floating dropdown templates
     initOwnerFloatingDropdowns();
+
+    if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
+      window.Xentra.hideSplash();
+    }
   }
 
   /* =========================================================================

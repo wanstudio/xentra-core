@@ -4263,7 +4263,15 @@
       if(state.branchReadinessRefreshTimer) clearInterval(state.branchReadinessRefreshTimer);
       state.branchReadinessRefreshTimer=setInterval(refreshBranchOperationalState,30000);
       window.addEventListener('focus',function(){ refreshBranchOperationalState(); });
-    }catch(e){toast(e.message||'Gagal memuat POS.');}
+      if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
+        window.Xentra.hideSplash();
+      }
+    }catch(e){
+      toast(e.message||'Gagal memuat POS.');
+      if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
+        window.Xentra.hideSplash();
+      }
+    }
   }
 
   boot();

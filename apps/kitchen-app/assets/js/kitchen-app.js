@@ -244,6 +244,10 @@
     startPolling();
     tickTimers();
     state.elapsedTimer = setInterval(tickTimers, 15000);
+
+    if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
+      window.Xentra.hideSplash();
+    }
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

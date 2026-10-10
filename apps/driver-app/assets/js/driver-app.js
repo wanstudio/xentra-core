@@ -1264,12 +1264,18 @@
       state.loading = false;
       state.error = err.message || 'Profil Driver tidak dapat dimuat.';
       renderTasks();
+      if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
+        window.Xentra.hideSplash();
+      }
       return;
     }
 
     await refreshTasks(false);
     state.loading = false;
     render();
+    if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
+      window.Xentra.hideSplash();
+    }
   }
 
   async function go(page) {
