@@ -287,6 +287,12 @@
       if (mobileTopbar) mobileTopbar.style.display = '';
     }
 
+    // Show Mandat tab button for Branch Manager / Manager
+    var btnMandatesNav = $('btn-purchasing-nav-mandates');
+    if (btnMandatesNav) {
+      btnMandatesNav.style.display = (user.role === 'branch_manager' || user.role === 'manager' || user.role === 'owner') ? 'flex' : 'none';
+    }
+
     var searchBtn = $('btn-global-search');
     if (searchBtn) searchBtn.style.display = 'none';
     var topbarBrandBadge = $('topbar-brand-badge');

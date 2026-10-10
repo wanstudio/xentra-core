@@ -2572,6 +2572,9 @@
             <button type="button" class="x-subnav-tab" id="btn-subtab-stock-replenishment" data-subtab="replenishment" onclick="switchStockSubtab('replenishment')">
               ⚡ Saran Belanja (Pengadaan)
             </button>
+            <button type="button" class="x-subnav-tab" id="btn-subtab-stock-mandates" data-subtab="mandates" onclick="switchStockSubtab('mandates')">
+              📋 Mandat Belanja
+            </button>
             <button type="button" class="x-subnav-tab" id="btn-subtab-stock-recipes" data-subtab="recipes" onclick="switchStockSubtab('recipes')">
               Resep Masakan
             </button>
@@ -2684,6 +2687,28 @@
             <div class="x-owner-stock-panel" style="background:#FFFFFF; border-radius:12px; border:1px solid #E2E8F0; padding:16px;">
               <div id="owner-replenishment-suggestions-container">
                 <div class="x-owner-stock-loading">Memuat rekomendasi belanja...</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SUBTAB CONTENT: MANDAT BELANJA (PENGADAAN PASAR CABANG) -->
+          <div id="subtab-content-stock-mandates" style="display:none;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+              <div>
+                <h3 style="margin:0 0 4px 0; font-size:16px; font-weight:700; color:#0F172A;">Daftar Mandat Belanja Pasar</h3>
+                <p style="margin:0; font-size:13px; color:#64748B;">Kelola mandat belanja cabang, sesuaikan jumlah yang harus dibeli, atur uang kasbon, edit, arsipkan, atau hapus mandat.</p>
+              </div>
+              <div style="display:flex; gap:8px;">
+                <button type="button" class="x-btn-secondary" onclick="loadOwnerMandates()" style="display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:8px; font-weight:600; font-size:13px; cursor:pointer;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                  <span>Segarkan</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="x-owner-stock-panel" style="background:#FFFFFF; border-radius:12px; border:1px solid #E2E8F0; padding:16px;">
+              <div id="owner-mandates-list-container">
+                <div class="x-owner-stock-loading">Memuat daftar mandat belanja...</div>
               </div>
             </div>
           </div>
@@ -2818,6 +2843,40 @@
             <div style="display:flex; justify-content:flex-end; gap:8px; border-top:1px solid #F1F5F9; padding-top:16px;">
               <button type="button" onclick="closeAddRecipeModal()" style="padding:10px 16px; border:1px solid #CBD5E1; background:#FFFFFF; border-radius:8px; font-weight:600; font-size:13px; color:#475569; cursor:pointer;">Batal</button>
               <button type="submit" id="btn-save-recipe" style="padding:10px 16px; border:none; background:#0F172A; border-radius:8px; font-weight:600; font-size:13px; color:#FFFFFF; cursor:pointer;">Simpan Resep Masakan</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- MODAL: EDIT MANDAT BELANJA (MANAGER & OWNER) -->
+      <div id="modal-edit-mandate" class="x-modal-backdrop" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.6); z-index:9999; justify-content:center; align-items:center;">
+        <div class="x-modal-card" style="background:#FFFFFF; border-radius:16px; width:92%; max-width:540px; max-height:90vh; overflow-y:auto; padding:24px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.1);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <div>
+              <h3 style="margin:0; font-size:16px; font-weight:700; color:#0F172A;" id="modal-edit-mandate-title">Edit Mandat Belanja</h3>
+              <p style="margin:2px 0 0 0; font-size:12px; color:#64748B;">Ubah rincian target belanja dan uang kasbon sebelum diselesaikan petugas.</p>
+            </div>
+            <button type="button" onclick="closeEditMandateModal()" style="background:none; border:none; cursor:pointer; color:#64748B;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </div>
+          <form id="form-edit-mandate" onsubmit="submitEditMandateForm(event)">
+            <input type="hidden" id="edit-mandate-id">
+            <div style="margin-bottom:14px;">
+              <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">Uang Kasbon (Diserahkan ke Staf)</label>
+              <input type="number" id="edit-mandate-cash-advance" required min="0" step="1000" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px; font-weight:700;">
+            </div>
+            <div style="margin-bottom:14px;">
+              <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">Catatan Mandat Belanja</label>
+              <textarea id="edit-mandate-notes" rows="2" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px;"></textarea>
+            </div>
+            <div style="margin-bottom:16px;">
+              <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">Daftar Item Belanjaan &amp; Target Qty</label>
+              <div id="edit-mandate-items-container" style="display:flex; flex-direction:column; gap:8px;"></div>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:8px; border-top:1px solid #F1F5F9; padding-top:16px;">
+              <button type="button" onclick="closeEditMandateModal()" style="padding:10px 16px; border:1px solid #CBD5E1; background:#FFFFFF; border-radius:8px; font-weight:600; font-size:13px; color:#475569; cursor:pointer;">Batal</button>
+              <button type="submit" id="btn-submit-edit-mandate" style="padding:10px 16px; border:none; background:#0F172A; border-radius:8px; font-weight:600; font-size:13px; color:#FFFFFF; cursor:pointer;">Simpan Perubahan</button>
             </div>
           </form>
         </div>

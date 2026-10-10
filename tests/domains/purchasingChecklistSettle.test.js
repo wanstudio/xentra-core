@@ -51,6 +51,7 @@ test.describe('Purchasing / Belanja Pasar Operational Workflow', () => {
   let server;
   let baseUrl;
   let purchasingToken;
+  let managerToken;
 
   test.before(async () => {
     await db.readyPromise;
@@ -92,9 +93,12 @@ test.describe('Purchasing / Belanja Pasar Operational Workflow', () => {
     db.prepare(`INSERT OR REPLACE INTO material_stock_balances (stock_location_id, material_id, quantity_base, carrying_value, moving_average_unit_cost, cost_availability_status, valuation_version, created_at, updated_at) VALUES (?, ?, 15, 450000, 30000, 'AVAILABLE', 1, ?, ?)`).run(locationId, materialId2, new Date().toISOString(), new Date().toISOString());
     db.prepare(`INSERT OR REPLACE INTO material_stock_movements (id, stock_location_id, material_id, movement_type, quantity_base, previous_quantity, current_quantity, unit_cost, total_cost, cost_basis_type, source_type, source_reference, posting_mutation_id, currency_code, valuation_version, posting_timestamp, created_at) VALUES ('mov_bawang_init', ?, ?, 'OPENING_STOCK', 15, 0, 15, 30000, 450000, 'OPENING_ACTUAL', 'OPENING_BALANCE', 'INIT-BAWANG-01', 'pm_init_bawang_01', 'IDR', 1, datetime('now', '-1 day'), datetime('now', '-1 day'))`).run(locationId, materialId2);
 
-    // 5. Create user and session for purchasing staff
+    // 5. Create user and session for purchasing staff and branch manager
     db.prepare(`INSERT OR IGNORE INTO users (id, brand_id, branch_id, username, role, full_name, password_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, 'hash', ?)`).run(
       'user_purchasing_1', brandId, branchId, 'budi_belanja', 'purchasing', 'Budi Petugas Belanja', new Date().toISOString()
+    );
+    db.prepare(`INSERT OR IGNORE INTO users (id, brand_id, branch_id, username, role, full_name, password_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, 'hash', ?)`).run(
+      'user_manager_1', brandId, branchId, 'manager_andi', 'branch_manager', 'Andi Branch Manager', new Date().toISOString()
     );
 
     const purchasingUser = {
@@ -107,6 +111,17 @@ test.describe('Purchasing / Belanja Pasar Operational Workflow', () => {
     };
     const session = global.TokenSessionStore.createSession(purchasingUser, brandId);
     purchasingToken = session.token;
+
+    const managerUser = {
+      id: 'user_manager_1',
+      username: 'manager_andi',
+      role: 'branch_manager',
+      brand_id: brandId,
+      branch_id: branchId,
+      full_name: 'Andi Branch Manager'
+    };
+    const mgrSession = global.TokenSessionStore.createSession(managerUser, brandId);
+    managerToken = mgrSession.token;
 
     server = buildApp().listen(0);
     await new Promise((resolve) => server.once('listening', resolve));
@@ -316,4 +331,97 @@ test.describe('Purchasing / Belanja Pasar Operational Workflow', () => {
     // Initial 15 kg + (2 packs * 5 kg = 10 kg) = 25 kg
     assert.equal(Number(balance.quantity_base), 25);
   });
+
+  test('6. Branch Manager Purchasing Mandate Lifecycle: Create, Edit, Archive, and Delete', async () => {
+    // 1. Manager creates a mandate
+    const createRes = await fetch(`${baseUrl}/admin/branches/${branchId}/purchasing/mandates`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${managerToken}`,
+        'X-Brand-Id': brandId,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        cash_advance: 200000,
+        notes: 'Belanja Sayur dan Bumbu Segar',
+        items: [
+          { material_id: materialId1, target_quantity: 4, estimated_unit_price: 40000 },
+          { material_id: materialId2, target_quantity: 3, estimated_unit_price: 30000 }
+        ]
+      })
+    });
+
+    assert.equal(createRes.status, 201);
+    const createBody = await createRes.json();
+    assert.equal(createBody.success, true);
+    assert.ok(createBody.mandate.id);
+    assert.equal(createBody.mandate.status, 'RELEASED');
+    assert.equal(createBody.mandate.total_planned_budget, 250000); // 4*40k + 3*30k = 160k + 90k = 250k
+    const mandateId = createBody.mandate.id;
+
+    // 2. Fetch mandates list (accessible by purchasing staff and manager)
+    const listRes = await fetch(`${baseUrl}/admin/branches/${branchId}/purchasing/mandates`, {
+      headers: {
+        'Authorization': `Bearer ${purchasingToken}`,
+        'X-Brand-Id': brandId
+      }
+    });
+    assert.equal(listRes.status, 200);
+    const listBody = await listRes.json();
+    assert.equal(listBody.success, true);
+    const foundMandate = listBody.mandates.find(m => m.id === mandateId);
+    assert.ok(foundMandate);
+    assert.equal(foundMandate.items.length, 2);
+
+    // 3. Manager edits mandate: adjust cash_advance and quantities
+    const editRes = await fetch(`${baseUrl}/admin/branches/${branchId}/purchasing/mandates/${mandateId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${managerToken}`,
+        'X-Brand-Id': brandId,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        cash_advance: 220000,
+        notes: 'Updated: Belanja Tambahan Cabai',
+        items: [
+          { material_id: materialId1, target_quantity: 5, estimated_unit_price: 40000 }
+        ]
+      })
+    });
+    assert.equal(editRes.status, 200);
+    const editBody = await editRes.json();
+    assert.equal(editBody.success, true);
+
+    const updatedMandate = db.prepare('SELECT * FROM purchasing_mandates WHERE id = ?').get(mandateId);
+    assert.equal(updatedMandate.cash_advance, 220000);
+    assert.equal(updatedMandate.total_planned_budget, 200000); // 5 * 40k = 200k
+
+    // 4. Archive mandate
+    const archiveRes = await fetch(`${baseUrl}/admin/branches/${branchId}/purchasing/mandates/${mandateId}/archive`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${managerToken}`,
+        'X-Brand-Id': brandId
+      }
+    });
+    assert.equal(archiveRes.status, 200);
+    const archivedMandate = db.prepare('SELECT status FROM purchasing_mandates WHERE id = ?').get(mandateId);
+    assert.equal(archivedMandate.status, 'ARCHIVED');
+
+    // 5. Delete mandate
+    const deleteRes = await fetch(`${baseUrl}/admin/branches/${branchId}/purchasing/mandates/${mandateId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${managerToken}`,
+        'X-Brand-Id': brandId
+      }
+    });
+    assert.equal(deleteRes.status, 200);
+    const deletedMandate = db.prepare('SELECT id FROM purchasing_mandates WHERE id = ?').get(mandateId);
+    assert.equal(deletedMandate, undefined);
+    const deletedItems = db.prepare('SELECT id FROM purchasing_mandate_items WHERE mandate_id = ?').all(mandateId);
+    assert.equal(deletedItems.length, 0);
+  });
 });
+

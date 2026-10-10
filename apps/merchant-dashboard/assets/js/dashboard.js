@@ -6920,18 +6920,28 @@ async function loadMenusView() {
     if (subtab === 'replenishment') {
       if (branchContent) branchContent.style.display = 'none';
       if (replContent) replContent.style.display = 'block';
+      if ($('subtab-content-stock-mandates')) $('subtab-content-stock-mandates').style.display = 'none';
       if (recipesContent) recipesContent.style.display = 'none';
       if (matContent) matContent.style.display = 'none';
       loadOwnerReplenishmentSuggestions();
+    } else if (subtab === 'mandates') {
+      if (branchContent) branchContent.style.display = 'none';
+      if (replContent) replContent.style.display = 'none';
+      if ($('subtab-content-stock-mandates')) $('subtab-content-stock-mandates').style.display = 'block';
+      if (recipesContent) recipesContent.style.display = 'none';
+      if (matContent) matContent.style.display = 'none';
+      loadOwnerMandates();
     } else if (subtab === 'recipes') {
       if (branchContent) branchContent.style.display = 'none';
       if (replContent) replContent.style.display = 'none';
+      if ($('subtab-content-stock-mandates')) $('subtab-content-stock-mandates').style.display = 'none';
       if (recipesContent) recipesContent.style.display = 'block';
       if (matContent) matContent.style.display = 'none';
       loadOwnerRecipes();
     } else if (subtab === 'materials') {
       if (branchContent) branchContent.style.display = 'none';
       if (replContent) replContent.style.display = 'none';
+      if ($('subtab-content-stock-mandates')) $('subtab-content-stock-mandates').style.display = 'none';
       if (recipesContent) recipesContent.style.display = 'none';
       if (matContent) matContent.style.display = 'block';
       loadOwnerMaterials();
@@ -6939,6 +6949,7 @@ async function loadMenusView() {
     } else {
       if (branchContent) branchContent.style.display = 'block';
       if (replContent) replContent.style.display = 'none';
+      if ($('subtab-content-stock-mandates')) $('subtab-content-stock-mandates').style.display = 'none';
       if (recipesContent) recipesContent.style.display = 'none';
       if (matContent) matContent.style.display = 'none';
       loadOwnerStockOverview();
@@ -7061,14 +7072,313 @@ async function loadMenusView() {
         '<div style="font-size:16px; font-weight:800; color:#0F172A;">Estimasi Total Anggaran: ' + formatMoney(data.total_estimated_cost || 0) + '</div>' +
       '</div>' +
       '<div style="display:flex; gap:8px;">' +
-        '<button type="button" class="x-btn-primary" onclick="showToast(\'✓ Rekomendasi belanja siap diproses oleh Petugas Belanja di cabang.\', \'success\')" style="padding:8px 14px; font-size:13px; font-weight:700; border-radius:10px; background:#059669; border-color:#059669;">' +
-          '✓ Konfirmasi Kebutuhan Belanja' +
+        '<button type="button" class="x-btn-primary" onclick="releaseMandateFromSuggestions()" style="padding:8px 14px; font-size:13px; font-weight:700; border-radius:10px; background:#059669; border-color:#059669; cursor:pointer;">' +
+          '📋 Rilis Mandat Belanja ke Staf' +
         '</button>' +
       '</div>' +
     '</div>';
 
     container.innerHTML = summaryHeader + cardsHtml;
   }
+
+  // Release mandate from replenishment suggestions
+  async function releaseMandateFromSuggestions() {
+    if (!_ownerReplenishmentData || !_ownerReplenishmentData.suggestions || !_ownerReplenishmentData.suggestions.length) {
+      showToast('Tidak ada item saran belanja untuk dirilis.', 'warning');
+      return;
+    }
+
+    var branchId = getEffectiveBranchId();
+    if (!branchId || branchId === 'all') {
+      showToast('Pilih cabang tertentu terlebih dahulu.', 'warning');
+      return;
+    }
+
+    var estCost = _ownerReplenishmentData.total_estimated_cost || 0;
+    var cashPrompt = await requestTextInputSheet({
+      title: 'Uang Kasbon Belanja',
+      label: 'Masukkan uang kasbon belanja (handover money):',
+      value: estCost > 0 ? String(estCost) : '100000',
+      placeholder: '0'
+    });
+    if (cashPrompt === null || cashPrompt === undefined) return;
+    var cashAdvance = Number(cashPrompt) || 0;
+
+    var items = _ownerReplenishmentData.suggestions.map(function (s) {
+      return {
+        material_id: s.material_id,
+        target_quantity: s.recommended_purchase_packs || s.net_deficit_quantity || 1,
+        estimated_unit_price: s.supplier ? s.supplier.unit_price : 0
+      };
+    });
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/mandates', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          cash_advance: cashAdvance,
+          notes: 'Mandat Belanja Otomatis dari Rekomendasi Sistem',
+          items: items
+        })
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        showToast('✅ Mandat belanja #' + data.mandate.mandate_number + ' berhasil dirilis ke staf!', 'success');
+        switchStockSubtab('mandates');
+      } else {
+        showToast('Gagal rilis mandat: ' + (data.message || data.error || 'Terjadi kesalahan'), 'error');
+      }
+    } catch (err) {
+      showToast('Gangguan jaringan saat merilis mandat.', 'error');
+    }
+  }
+  window.releaseMandateFromSuggestions = releaseMandateFromSuggestions;
+
+  /* =========================================================================
+     MANDAT BELANJA (PURCHASING MANDATES): LIST, EDIT, ARCHIVE, DELETE
+     ========================================================================= */
+  var _ownerMandatesList = [];
+
+  async function loadOwnerMandates() {
+    var container = $('owner-mandates-list-container');
+    if (container) {
+      container.innerHTML = '<div class="x-owner-stock-loading">Memuat daftar mandat belanja...</div>';
+    }
+
+    var branchId = getEffectiveBranchId();
+    if (!branchId || branchId === 'all') {
+      branchId = 'branch_1789606246242_08knv';
+    }
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/mandates', {
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+
+      if (res.ok && data.success) {
+        _ownerMandatesList = data.mandates || [];
+        renderOwnerMandatesList(_ownerMandatesList);
+      } else {
+        if (container) {
+          container.innerHTML = '<div class="x-owner-stock-error" style="color:#DC2626; padding:16px;">Gagal memuat mandat: ' + escapeHtml(data.error || 'Server error') + '</div>';
+        }
+      }
+    } catch (err) {
+      if (container) {
+        container.innerHTML = '<div class="x-owner-stock-error" style="color:#DC2626; padding:16px;">Gangguan jaringan saat memuat mandat belanja.</div>';
+      }
+    }
+  }
+  window.loadOwnerMandates = loadOwnerMandates;
+
+  function renderOwnerMandatesList(mandates) {
+    var container = $('owner-mandates-list-container');
+    if (!container) return;
+
+    if (!mandates || !mandates.length) {
+      container.innerHTML = '<div class="text-center py-10 text-muted" style="padding:32px 16px;">' +
+        '<div style="font-size:36px; margin-bottom:8px;">📋</div>' +
+        '<div style="font-size:15px; font-weight:700; color:#1E293B;">Belum Ada Mandat Belanja</div>' +
+        '<p style="font-size:13px; max-width:440px; margin:4px auto 0 auto; color:#64748B; line-height:1.5;">' +
+          'Buka tab "Saran Belanja" dan klik "Rilis Mandat Belanja ke Staf" untuk menugaskan belanja pasar.' +
+        '</p>' +
+      '</div>';
+      return;
+    }
+
+    var html = mandates.map(function (m) {
+      var statusBadge = '';
+      if (m.status === 'RELEASED') {
+        statusBadge = '<span class="x-badge" style="background:#FEF3C7; color:#92400E; font-weight:700;">AKTIF (DI PASAR)</span>';
+      } else if (m.status === 'COMPLETED') {
+        statusBadge = '<span class="x-badge" style="background:#D1FAE5; color:#065F46; font-weight:700;">SELESAI BELANJA</span>';
+      } else if (m.status === 'ARCHIVED') {
+        statusBadge = '<span class="x-badge" style="background:#F1F5F9; color:#64748B; font-weight:700;">DIARSIPKAN</span>';
+      } else {
+        statusBadge = '<span class="x-badge" style="background:#E2E8F0; color:#334155; font-weight:700;">' + escapeHtml(m.status) + '</span>';
+      }
+
+      var itemsListHtml = (m.items || []).map(function (itm) {
+        var purchaseStatus = itm.is_purchased
+          ? '<span style="color:#059669; font-weight:700;">✓ Terbeli (' + itm.purchased_quantity + ' ' + escapeHtml(itm.base_uom_code || '') + ')</span>'
+          : '<span style="color:#D97706; font-weight:600;">Belum Dibeli (Target ' + itm.target_quantity + ' ' + escapeHtml(itm.base_uom_code || '') + ')</span>';
+        return '<div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:4px 0; border-bottom:1px dashed #E2E8F0;">' +
+          '<span>• <strong>' + escapeHtml(itm.material_name) + '</strong> (' + itm.target_quantity + ' ' + escapeHtml(itm.base_uom_code || '') + ')</span>' +
+          purchaseStatus +
+        '</div>';
+      }).join('');
+
+      var canEdit = m.status === 'RELEASED';
+      var actionButtons = '<div style="display:flex; gap:6px; margin-top:12px; flex-wrap:wrap;">';
+      if (canEdit) {
+        actionButtons += '<button type="button" class="x-btn-secondary" onclick="openEditMandateModal(\'' + m.id + '\')" style="padding:5px 10px; font-size:12px; font-weight:600; border-radius:6px; cursor:pointer;">✏️ Edit Mandat</button>';
+      }
+      if (m.status !== 'ARCHIVED') {
+        actionButtons += '<button type="button" class="x-btn-secondary" onclick="archiveMandate(\'' + m.id + '\')" style="padding:5px 10px; font-size:12px; font-weight:600; border-radius:6px; cursor:pointer;">📁 Arsipkan</button>';
+      }
+      actionButtons += '<button type="button" class="x-btn-secondary" onclick="deleteMandate(\'' + m.id + '\')" style="padding:5px 10px; font-size:12px; font-weight:600; border-radius:6px; color:#DC2626; border-color:#FCA5A5; cursor:pointer;">🗑️ Hapus Permanen</button>';
+      actionButtons += '</div>';
+
+      return '<div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:12px; padding:16px; margin-bottom:12px;">' +
+        '<div style="display:flex; justify-content:space-between; align-items:start; flex-wrap:wrap; gap:8px;">' +
+          '<div>' +
+            '<div style="display:flex; align-items:center; gap:8px;">' +
+              '<strong style="font-size:15px; color:#0F172A;">Mandat #' + escapeHtml(m.mandate_number) + '</strong>' +
+              statusBadge +
+            '</div>' +
+            '<div style="font-size:12px; color:#64748B; margin-top:4px;">Dibuat: ' + (m.created_at ? new Date(m.created_at).toLocaleString('id-ID') : '—') + (m.notes ? ' | ' + escapeHtml(m.notes) : '') + '</div>' +
+          '</div>' +
+          '<div style="text-align:right;">' +
+            '<div style="font-size:11px; color:#64748B;">Kasbon Handover:</div>' +
+            '<strong style="font-size:15px; color:#059669;">' + formatMoney(m.cash_advance || 0) + '</strong>' +
+          '</div>' +
+        '</div>' +
+        '<div style="margin-top:10px; background:#F8FAFC; border-radius:8px; padding:8px 12px;">' +
+          '<div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase; margin-bottom:4px;">Rincian Bahan Baku Ditugaskan:</div>' +
+          itemsListHtml +
+        '</div>' +
+        actionButtons +
+      '</div>';
+    }).join('');
+
+    container.innerHTML = html;
+  }
+
+  // Open Edit Mandate Modal
+  function openEditMandateModal(mandateId) {
+    var mandate = _ownerMandatesList.find(function (m) { return m.id === mandateId; });
+    if (!mandate) return;
+
+    var modal = $('modal-edit-mandate');
+    if (!modal) return;
+
+    $('edit-mandate-id').value = mandate.id;
+    $('edit-mandate-cash-advance').value = mandate.cash_advance || 0;
+    $('edit-mandate-notes').value = mandate.notes || '';
+    $('modal-edit-mandate-title').textContent = 'Edit Mandat #' + mandate.mandate_number;
+
+    var container = $('edit-mandate-items-container');
+    if (container) {
+      container.innerHTML = (mandate.items || []).map(function (itm) {
+        return '<div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:8px 10px; background:#F8FAFC; border-radius:8px; border:1px solid #E2E8F0;">' +
+          '<div style="flex:1; min-width:0;">' +
+            '<strong style="font-size:13px; color:#0F172A; display:block;">' + escapeHtml(itm.material_name) + '</strong>' +
+            '<small style="font-size:11px; color:#64748B;">@ ' + formatMoney(itm.estimated_unit_price) + '</small>' +
+          '</div>' +
+          '<div style="width:110px;">' +
+            '<input type="number" class="edit-mandate-item-qty" data-material-id="' + itm.material_id + '" data-unit-price="' + itm.estimated_unit_price + '" min="1" step="1" value="' + itm.target_quantity + '" style="width:100%; box-sizing:border-box; padding:6px 8px; border:1px solid #CBD5E1; border-radius:6px; font-size:13px; font-weight:700; text-align:right;">' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    modal.style.display = 'flex';
+  }
+  window.openEditMandateModal = openEditMandateModal;
+
+  function closeEditMandateModal() {
+    var modal = $('modal-edit-mandate');
+    if (modal) modal.style.display = 'none';
+  }
+  window.closeEditMandateModal = closeEditMandateModal;
+
+  // Submit Edit Mandate
+  async function submitEditMandateForm(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    var mandateId = $('edit-mandate-id').value;
+    var cashAdvance = Number($('edit-mandate-cash-advance').value) || 0;
+    var notes = $('edit-mandate-notes').value.trim();
+
+    var branchId = getEffectiveBranchId();
+    if (!branchId || branchId === 'all') branchId = 'branch_1789606246242_08knv';
+
+    var qtyInputs = document.querySelectorAll('.edit-mandate-item-qty');
+    var items = [];
+    qtyInputs.forEach(function (inp) {
+      items.push({
+        material_id: inp.dataset.materialId,
+        target_quantity: Number(inp.value) || 1,
+        estimated_unit_price: Number(inp.dataset.unitPrice) || 0
+      });
+    });
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/mandates/' + encodeURIComponent(mandateId), {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          cash_advance: cashAdvance,
+          notes: notes,
+          items: items
+        })
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        showToast('✅ Mandat belanja berhasil diperbarui.', 'success');
+        closeEditMandateModal();
+        loadOwnerMandates();
+      } else {
+        showToast('Gagal update mandat: ' + (data.message || data.error || 'Terjadi kesalahan'), 'error');
+      }
+    } catch (err) {
+      showToast('Gangguan jaringan saat memperbarui mandat.', 'error');
+    }
+  }
+  window.submitEditMandateForm = submitEditMandateForm;
+
+  // Archive Mandate
+  async function archiveMandate(mandateId) {
+    var ok = await confirmFeatureAction('archive-mandate-confirm', 'Arsipkan Mandat', 'Arsipkan mandat belanja ini? Mandat yang diarsipkan tidak akan muncul lagi di daftar aktif staf.', 'Arsipkan');
+    if (!ok) return;
+
+    var branchId = getEffectiveBranchId();
+    if (!branchId || branchId === 'all') branchId = 'branch_1789606246242_08knv';
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/mandates/' + encodeURIComponent(mandateId) + '/archive', {
+        method: 'PATCH',
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        showToast('📁 Mandat belanja berhasil diarsipkan.', 'success');
+        loadOwnerMandates();
+      } else {
+        showToast('Gagal arsip mandat: ' + (data.message || data.error || 'Terjadi kesalahan'), 'error');
+      }
+    } catch (err) {
+      showToast('Gangguan jaringan saat mengarsipkan mandat.', 'error');
+    }
+  }
+  window.archiveMandate = archiveMandate;
+
+  // Delete Mandate Permanently
+  async function deleteMandate(mandateId) {
+    var ok = await confirmFeatureAction('delete-mandate-confirm', 'Hapus Mandat', 'Hapus permanen mandat belanja ini? Tindakan ini tidak dapat dibatalkan.', 'Hapus Permanen');
+    if (!ok) return;
+
+    var branchId = getEffectiveBranchId();
+    if (!branchId || branchId === 'all') branchId = 'branch_1789606246242_08knv';
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/mandates/' + encodeURIComponent(mandateId), {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        showToast('🗑️ Mandat belanja berhasil dihapus secara permanen.', 'success');
+        loadOwnerMandates();
+      } else {
+        showToast('Gagal menghapus mandat: ' + (data.message || data.error || 'Terjadi kesalahan'), 'error');
+      }
+    } catch (err) {
+      showToast('Gangguan jaringan saat menghapus mandat.', 'error');
+    }
+  }
+  window.deleteMandate = deleteMandate;
 
   function loadOwnerUoms() {
     return adminFetch('/api/admin/uoms', { headers: getAuthHeaders() })

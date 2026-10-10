@@ -1837,6 +1837,37 @@ function initSchema(targetDb) {
       FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS purchasing_mandates (
+      id TEXT PRIMARY KEY,
+      mandate_number TEXT NOT NULL UNIQUE,
+      branch_id TEXT NOT NULL,
+      cash_advance REAL NOT NULL DEFAULT 0,
+      total_planned_budget REAL NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'RELEASED' CHECK (status IN ('DRAFT', 'RELEASED', 'COMPLETED', 'ARCHIVED')),
+      notes TEXT,
+      created_by TEXT,
+      completed_by TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      completed_at TEXT,
+      updated_at TEXT DEFAULT (datetime('now')),
+      is_deleted INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS purchasing_mandate_items (
+      id TEXT PRIMARY KEY,
+      mandate_id TEXT NOT NULL,
+      material_id TEXT NOT NULL,
+      target_quantity REAL NOT NULL,
+      estimated_unit_price REAL NOT NULL DEFAULT 0,
+      actual_unit_price REAL,
+      is_purchased INTEGER NOT NULL DEFAULT 0,
+      purchased_quantity REAL DEFAULT 0,
+      notes TEXT,
+      FOREIGN KEY (mandate_id) REFERENCES purchasing_mandates(id) ON DELETE CASCADE,
+      FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS inventory_movements (
       id TEXT PRIMARY KEY,
       branch_id TEXT NOT NULL,

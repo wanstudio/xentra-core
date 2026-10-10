@@ -25,7 +25,8 @@
     items: [],
     filterMode: 'low', // 'low' or 'all'
     cashAdvance: 0,
-    activeEditItemId: null
+    activeEditItem: null,
+    activeMandateId: null
   };
 
   async function loadPurchasingChecklist() {
@@ -35,10 +36,63 @@
 
     var container = $('purchasing-checklist-container');
     if (container) {
-      container.innerHTML = '<div class="text-center py-6 text-muted">Memuat catatan belanja pasar...</div>';
+      container.innerHTML = '<div class="text-center py-6 text-muted">Memuat daftar belanja pasar...</div>';
     }
 
     try {
+      // 1. Cek apakah ada mandat belanja resmi yang dirilis oleh Branch Manager
+      var mandateRes = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/mandates?status=RELEASED', {
+        headers: getAuthHeaders()
+      });
+      var mandateData = await mandateRes.json();
+      var activeMandate = (mandateData.success && mandateData.mandates && mandateData.mandates.length > 0)
+        ? mandateData.mandates[0]
+        : null;
+
+      if (activeMandate && activeMandate.items && activeMandate.items.length > 0) {
+        _purchasingState.activeMandateId = activeMandate.id;
+        _purchasingState.cashAdvance = Number(activeMandate.cash_advance || 0);
+        var cashAdvanceInput = $('input-purchasing-cash-advance');
+        if (cashAdvanceInput) {
+          cashAdvanceInput.value = _purchasingState.cashAdvance;
+          cashAdvanceInput.readOnly = true; // Staf melihat uang modal dari manager
+        }
+
+        _purchasingState.items = activeMandate.items.map(function (itm) {
+          return {
+            material_id: itm.material_id,
+            material_name: itm.material_name,
+            material_code: itm.material_code,
+            base_uom_name: itm.base_uom_name,
+            base_uom_code: itm.base_uom_code,
+            current_stock: 0,
+            minimum_quantity: 0,
+            is_low: true,
+            suggested_qty: itm.target_quantity,
+            buyQty: itm.target_quantity, // Fixed kuota dari manager!
+            estimated_price: itm.estimated_unit_price,
+            actualUnitPrice: itm.actual_unit_price || itm.estimated_unit_price,
+            has_price_update: Boolean(itm.actual_unit_price && itm.actual_unit_price !== itm.estimated_unit_price),
+            checked: false
+          };
+        });
+
+        var estBudgetEl = $('label-purchasing-est-budget');
+        if (estBudgetEl) estBudgetEl.textContent = formatMoney(activeMandate.total_planned_budget || 0);
+
+        var badgeEl = $('badge-purchasing-low-count');
+        if (badgeEl) {
+          badgeEl.textContent = 'Mandat #' + activeMandate.mandate_number;
+          badgeEl.className = 'x-badge x-badge-primary';
+        }
+
+        renderPurchasingList();
+        recalculatePurchasingSummary();
+        return;
+      }
+
+      // 2. Fallback jika belum ada mandat khusus: ambil checklist bahan menipis dari sistem
+      _purchasingState.activeMandateId = null;
       var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/checklist', {
         headers: getAuthHeaders()
       });
@@ -46,30 +100,30 @@
 
       if (res.ok && data.success) {
         var rawItems = data.items || [];
-        // Map items with interactive state
         _purchasingState.items = rawItems.map(function (item) {
-          var initialChecked = item.is_low;
+          var initialChecked = false;
           var initialQty = item.is_low ? (item.suggested_qty || 1) : 1;
           var initialPrice = item.last_unit_cost || 0;
           return {
             ...item,
             checked: initialChecked,
             buyQty: initialQty,
-            actualUnitPrice: initialPrice
+            estimated_price: initialPrice,
+            actualUnitPrice: initialPrice,
+            has_price_update: false
           };
         });
 
-        // Set estimated budget label
-        var estBudgetEl = $('label-purchasing-est-budget');
-        if (estBudgetEl) {
-          estBudgetEl.textContent = formatMoney(data.total_estimated_budget || 0);
+        var estBudgetEl2 = $('label-purchasing-est-budget');
+        if (estBudgetEl2) {
+          estBudgetEl2.textContent = formatMoney(data.total_estimated_budget || 0);
         }
 
         var lowCount = rawItems.filter(function (i) { return i.is_low; }).length;
-        var badgeEl = $('badge-purchasing-low-count');
-        if (badgeEl) {
-          badgeEl.textContent = lowCount + ' bahan menipis';
-          badgeEl.className = lowCount > 0 ? 'x-badge x-badge-warning' : 'x-badge x-badge-success';
+        var badgeEl2 = $('badge-purchasing-low-count');
+        if (badgeEl2) {
+          badgeEl2.textContent = lowCount + ' bahan menipis';
+          badgeEl2.className = lowCount > 0 ? 'x-badge x-badge-warning' : 'x-badge x-badge-success';
         }
 
         renderPurchasingList();
@@ -130,50 +184,32 @@
       var uomCode = item.base_uom_code || item.base_uom_name || 'Unit';
 
       html +=
-        '<div id="card-item-' + esc(item.material_id) + '" class="purchasing-item-card ' + (isChecked ? 'is-checked' : 'is-unchecked') + '">' +
-          '<div class="purchasing-item-main">' +
+        '<div id="card-item-' + esc(item.material_id) + '" class="purchasing-item-card ' + (isChecked ? 'is-checked' : 'is-unchecked') + '" style="border-radius:14px; padding:12px 14px; margin-bottom:8px; background:#ffffff; border:1.5px solid ' + (isChecked ? '#059669' : '#e2e8f0') + '; box-shadow:0 1px 3px rgba(0,0,0,0.03);">' +
+          '<div class="purchasing-item-main" style="display:flex; align-items:center; gap:12px;">' +
             '<div class="purchasing-item-check-col">' +
-              '<input type="checkbox" id="chk-' + esc(item.material_id) + '" class="purchasing-check-box" ' + (isChecked ? 'checked' : '') + ' onchange="togglePurchasingItemCheck(\'' + esc(item.material_id) + '\', this.checked)">' +
+              '<input type="checkbox" id="chk-' + esc(item.material_id) + '" class="purchasing-check-box" style="width:22px; height:22px; cursor:pointer; accent-color:#059669;" ' + (isChecked ? 'checked' : '') + ' onchange="togglePurchasingItemCheck(\'' + esc(item.material_id) + '\', this.checked)">' +
             '</div>' +
-            '<div class="purchasing-item-info-col">' +
-              '<div class="purchasing-item-top-row">' +
-                '<label for="chk-' + esc(item.material_id) + '" class="purchasing-item-name">' +
+            '<div class="purchasing-item-info-col" style="flex:1; min-width:0;">' +
+              '<div style="display:flex; justify-content:space-between; align-items:baseline;">' +
+                '<label for="chk-' + esc(item.material_id) + '" style="font-size:14.5px; font-weight:800; color:#0f172a; cursor:pointer; margin:0;">' +
                   esc(item.material_name) +
                 '</label>' +
-                '<div class="purchasing-item-subtotal-val">' +
+                '<div class="purchasing-item-subtotal-val" style="font-size:14px; font-weight:800; color:' + (isChecked ? '#059669' : '#475569') + ';">' +
                   formatMoney(subtotal) +
                 '</div>' +
               '</div>' +
-              '<div class="purchasing-item-stock-row">' +
-                '<span>Stok: <strong>' + Number(item.current_stock).toFixed(1) + ' ' + esc(uomCode) + '</strong></span>' +
-                (item.is_low ? '<span class="purchasing-low-tag">Min ' + item.minimum_quantity + '</span>' : '') +
+              '<div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; flex-wrap:wrap; gap:6px;">' +
+                '<div style="font-size:12px; color:#475569;">' +
+                  'Beli: <strong style="color:#0f172a; font-size:13px;">' + item.buyQty + ' ' + esc(uomCode) + '</strong>' +
+                  ' <span style="color:#94a3b8; font-size:11px;">(kuota terkunci)</span>' +
+                '</div>' +
+                '<button type="button" onclick="openPurchasingUpdatePriceModal(\'' + esc(item.material_id) + '\')" style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:8px; padding:3px 8px; font-size:11.5px; font-weight:700; color:#1e293b; cursor:pointer; display:flex; align-items:center; gap:4px;">' +
+                  '<span>@ ' + formatMoney(item.actualUnitPrice) + '</span>' +
+                  (item.has_price_update ? '<span class="x-badge" style="background:#dbeafe; color:#1e40af; font-size:9.5px; padding:1px 4px;">harga_update</span>' : '<span style="color:#64748b; font-size:11px;">✎</span>') +
+                '</button>' +
               '</div>' +
             '</div>' +
           '</div>' +
-
-          (isChecked ? (
-            '<div class="purchasing-item-inputs-box">' +
-              '<div class="purchasing-input-field">' +
-                '<label class="purchasing-input-lbl">Jumlah Beli (' + esc(uomCode) + ')</label>' +
-                '<div class="purchasing-stepper">' +
-                  '<button type="button" class="purchasing-btn-step" onclick="stepPurchasingQty(\'' + esc(item.material_id) + '\', -1)" aria-label="Kurangi Jumlah" title="Kurangi Jumlah">' +
-                    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
-                  '</button>' +
-                  '<input type="number" min="0.1" step="any" inputmode="decimal" value="' + item.buyQty + '" oninput="updatePurchasingItemQty(\'' + esc(item.material_id) + '\', this.value)" class="purchasing-stepper-input">' +
-                  '<button type="button" class="purchasing-btn-step" onclick="stepPurchasingQty(\'' + esc(item.material_id) + '\', 1)" aria-label="Tambah Jumlah" title="Tambah Jumlah">' +
-                    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
-                  '</button>' +
-                '</div>' +
-              '</div>' +
-              '<div class="purchasing-input-field">' +
-                '<label class="purchasing-input-lbl">Harga / ' + esc(uomCode) + ' (Rp)</label>' +
-                '<div class="purchasing-price-box">' +
-                  '<span class="purchasing-price-rp">Rp</span>' +
-                  '<input type="number" min="0" step="500" inputmode="numeric" value="' + item.actualUnitPrice + '" oninput="updatePurchasingItemPrice(\'' + esc(item.material_id) + '\', this.value)" class="purchasing-price-field" placeholder="0">' +
-                '</div>' +
-              '</div>' +
-            '</div>'
-          ) : '') +
         '</div>';
     });
 
@@ -190,54 +226,49 @@
   }
   window.togglePurchasingItemCheck = togglePurchasingItemCheck;
 
-  function updatePurchasingItemQty(materialId, val) {
-    var num = parseFloat(val);
+  function openPurchasingUpdatePriceModal(materialId) {
     var itm = _purchasingState.items.find(function (i) { return i.material_id === materialId; });
-    if (itm && !isNaN(num) && num >= 0) {
-      itm.buyQty = num;
-      // Update subtotal display in place without re-rendering to prevent losing input focus
-      var card = document.getElementById('card-item-' + materialId);
-      if (card) {
-        var subEl = card.querySelector('.purchasing-item-subtotal-val');
-        if (subEl) subEl.textContent = formatMoney(Math.round(itm.buyQty * itm.actualUnitPrice));
-      }
-      recalculatePurchasingSummary();
-    }
-  }
-  window.updatePurchasingItemQty = updatePurchasingItemQty;
+    if (!itm) return;
+    _purchasingState.activeEditItem = itm;
 
-  function stepPurchasingQty(materialId, delta) {
-    var itm = _purchasingState.items.find(function (i) { return i.material_id === materialId; });
-    if (itm) {
-      var next = Math.max(0.5, (itm.buyQty || 0) + delta);
-      itm.buyQty = Math.round(next * 10) / 10;
-      var card = document.getElementById('card-item-' + materialId);
-      if (card) {
-        var inp = card.querySelector('.purchasing-stepper-input');
-        if (inp) inp.value = itm.buyQty;
-        var subEl = card.querySelector('.purchasing-item-subtotal-val');
-        if (subEl) subEl.textContent = formatMoney(Math.round(itm.buyQty * itm.actualUnitPrice));
-      }
-      recalculatePurchasingSummary();
-    }
-  }
-  window.stepPurchasingQty = stepPurchasingQty;
+    var nameEl = $('purchasing-update-price-item-name');
+    var priceIn = $('input-purchasing-modal-price');
+    var modal = $('modal-purchasing-update-price');
 
-  function updatePurchasingItemPrice(materialId, val) {
-    var num = parseFloat(val);
-    var itm = _purchasingState.items.find(function (i) { return i.material_id === materialId; });
-    if (itm && !isNaN(num) && num >= 0) {
-      itm.actualUnitPrice = num;
-      // Update subtotal display in place without re-rendering to prevent losing input focus
-      var card = document.getElementById('card-item-' + materialId);
-      if (card) {
-        var subEl = card.querySelector('.purchasing-item-subtotal-val');
-        if (subEl) subEl.textContent = formatMoney(Math.round(itm.buyQty * itm.actualUnitPrice));
-      }
-      recalculatePurchasingSummary();
+    if (nameEl) nameEl.textContent = itm.material_name + ' (per ' + (itm.base_uom_code || itm.base_uom_name || 'unit') + ')';
+    if (priceIn) {
+      priceIn.value = itm.actualUnitPrice || '';
+      setTimeout(function () { priceIn.focus(); priceIn.select(); }, 50);
     }
+    if (modal) modal.style.display = 'flex';
   }
-  window.updatePurchasingItemPrice = updatePurchasingItemPrice;
+  window.openPurchasingUpdatePriceModal = openPurchasingUpdatePriceModal;
+
+  function closePurchasingUpdatePriceModal() {
+    var modal = $('modal-purchasing-update-price');
+    if (modal) modal.style.display = 'none';
+    _purchasingState.activeEditItem = null;
+  }
+  window.closePurchasingUpdatePriceModal = closePurchasingUpdatePriceModal;
+
+  function confirmPurchasingPriceUpdate() {
+    if (!_purchasingState.activeEditItem) return;
+    var priceIn = $('input-purchasing-modal-price');
+    var newPrice = parseFloat(priceIn ? priceIn.value : 0);
+
+    if (isNaN(newPrice) || newPrice < 0) {
+      showToast('⚠️ Masukkan nominal harga yang valid.');
+      return;
+    }
+
+    _purchasingState.activeEditItem.actualUnitPrice = newPrice;
+    _purchasingState.activeEditItem.has_price_update = true;
+    closePurchasingUpdatePriceModal();
+    renderPurchasingList();
+    recalculatePurchasingSummary();
+    showToast('✓ Harga pasar diperbarui.');
+  }
+  window.confirmPurchasingPriceUpdate = confirmPurchasingPriceUpdate;
 
   function recalculatePurchasingSummary() {
     var cashAdvanceInput = $('input-purchasing-cash-advance');
@@ -300,12 +331,16 @@
     });
 
     var changeDue = cashAdvance - totalReal;
-    var confirmMsg = 'Selesaikan catatan belanja ini?\n\n' +
-      '• Jumlah Barang: ' + checkedItems.length + ' macam\n' +
+    var totalItemsCount = _purchasingState.items.length;
+    var unboughtCount = totalItemsCount - checkedItems.length;
+
+    var confirmMsg = 'Selesaikan aktivitas belanja pasar ini?\n\n' +
+      '• Terbeli: ' + checkedItems.length + ' item\n' +
+      (unboughtCount > 0 ? '• Belum Terbeli: ' + unboughtCount + ' item (tetap berstatus butuh belanja)\n' : '') +
       '• Total Belanja: ' + formatMoney(totalReal) + '\n' +
-      '• Uang Kasbon: ' + formatMoney(cashAdvance) + '\n' +
+      '• Uang Modal: ' + formatMoney(cashAdvance) + '\n' +
       '• Sisa Kembalian: ' + (changeDue >= 0 ? formatMoney(changeDue) : 'Kurang ' + formatMoney(Math.abs(changeDue))) + '\n\n' +
-      'Stok bahan baku di gudang cabang akan otomatis bertambah.';
+      'Stok barang yang terbeli akan langsung masuk ke persediaan cabang.';
 
     if (!confirm(confirmMsg)) return;
 
@@ -320,6 +355,7 @@
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
+          mandate_id: _purchasingState.activeMandateId,
           cash_advance: cashAdvance,
           items: lines,
           notes: 'Belanja Pasar'
@@ -329,49 +365,50 @@
 
       if (res.ok && data.success) {
         showToast('🛒 Belanja berhasil dicatat! Stok bahan baku telah ditambahkan.');
-        // Reset input kasbon
         var cashInput = $('input-purchasing-cash-advance');
         if (cashInput) cashInput.value = '';
         _purchasingState.cashAdvance = 0;
-        // Reload checklist
         loadPurchasingChecklist();
       } else {
         showToast('Gagal mencatat belanja: ' + (data.message || data.error || 'Terjadi kesalahan'));
       }
     } catch (err) {
-      console.error('[Purchasing] Settle error:', err);
-      showToast('Kesalahan jaringan saat menyimpan belanja.');
+      showToast('Gangguan jaringan saat menyelesaikan belanja.');
     } finally {
       if (submitBtn) {
         submitBtn.disabled = false;
-        submitBtn.innerHTML = '<span>✓</span> Selesai & Masukkan Stok';
+        submitBtn.textContent = '✓ Selesai Belanja';
       }
     }
   }
   window.submitPurchasingSettle = submitPurchasingSettle;
 
   /* =========================================================================
-     VIEW SWITCHER (PASAR, PO SUPPLIER, RIWAYAT, KALKULATOR)
+     VIEW SWITCHER (PASAR, PO SUPPLIER, RIWAYAT, MANDAT, KALKULATOR)
      ========================================================================= */
   function switchPurchasingView(viewId) {
     var vTasks = $('purchasing-view-tasks');
     var vPo = $('purchasing-view-po');
     var vHistory = $('purchasing-view-history');
+    var vMandates = $('purchasing-view-mandates');
     var vCalc = $('purchasing-view-calc');
 
     var btnTasks = $('btn-purchasing-nav-tasks');
     var btnPo = $('btn-purchasing-nav-po');
     var btnHistory = $('btn-purchasing-nav-history');
+    var btnMandates = $('btn-purchasing-nav-mandates');
     var btnCalc = $('btn-purchasing-nav-calc');
 
     if (vTasks) vTasks.style.display = viewId === 'tasks' ? 'block' : 'none';
     if (vPo) vPo.style.display = viewId === 'po' ? 'block' : 'none';
     if (vHistory) vHistory.style.display = viewId === 'history' ? 'block' : 'none';
+    if (vMandates) vMandates.style.display = viewId === 'mandates' ? 'block' : 'none';
     if (vCalc) vCalc.style.display = viewId === 'calc' ? 'block' : 'none';
 
     if (btnTasks) btnTasks.classList.toggle('active', viewId === 'tasks');
     if (btnPo) btnPo.classList.toggle('active', viewId === 'po');
     if (btnHistory) btnHistory.classList.toggle('active', viewId === 'history');
+    if (btnMandates) btnMandates.classList.toggle('active', viewId === 'mandates');
     if (btnCalc) btnCalc.classList.toggle('active', viewId === 'calc');
 
     // Hide or show bottom settlement bar only on Tasks view
@@ -384,9 +421,171 @@
       loadPurchasingOrders();
     } else if (viewId === 'history') {
       loadPurchasingHistory();
+    } else if (viewId === 'mandates') {
+      loadPurchasingMandatesManager();
     }
   }
   window.switchPurchasingView = switchPurchasingView;
+
+  // Manager Mandates view loader
+  var _managerMandatesList = [];
+  async function loadPurchasingMandatesManager() {
+    var user = getStoredUser();
+    var branchId = user ? (user.branch_id || user.branchId) : null;
+    if (!branchId) return;
+
+    var container = $('purchasing-mandates-manager-container');
+    if (container) {
+      container.innerHTML = '<div class="text-center py-6 text-muted">Memuat daftar mandat belanja...</div>';
+    }
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/mandates', {
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        _managerMandatesList = data.mandates || [];
+        renderPurchasingMandatesManager(_managerMandatesList);
+      } else {
+        if (container) {
+          container.innerHTML = '<div class="text-center py-6 text-danger">Gagal memuat mandat: ' + esc(data.message || 'Terjadi kesalahan') + '</div>';
+        }
+      }
+    } catch (err) {
+      if (container) {
+        container.innerHTML = '<div class="text-center py-6 text-danger">Gangguan jaringan saat memuat mandat.</div>';
+      }
+    }
+  }
+  window.loadPurchasingMandatesManager = loadPurchasingMandatesManager;
+
+  function renderPurchasingMandatesManager(mandates) {
+    var container = $('purchasing-mandates-manager-container');
+    if (!container) return;
+
+    if (!mandates || !mandates.length) {
+      container.innerHTML = '<div class="text-center py-6 text-muted">' +
+        '<div style="font-size:32px; margin-bottom:8px;">📋</div>' +
+        '<strong>Belum ada mandat belanja</strong>' +
+        '<p style="font-size:12px; margin:4px 0 0;">Mandat belanja dapat dirilis dari Rekomendasi Sistem di Dashboard atau tombol Rilis Mandat.</p>' +
+      '</div>';
+      return;
+    }
+
+    container.innerHTML = mandates.map(function (m) {
+      var statusColor = m.status === 'RELEASED' ? '#b45309' : (m.status === 'COMPLETED' ? '#047857' : '#64748b');
+      var statusBg = m.status === 'RELEASED' ? '#fef3c7' : (m.status === 'COMPLETED' ? '#d1fae5' : '#f1f5f9');
+
+      var itemsHtml = (m.items || []).map(function (itm) {
+        return '<div style="display:flex; justify-content:space-between; font-size:12px; padding:3px 0; border-bottom:1px dashed #e2e8f0;">' +
+          '<span>• ' + esc(itm.material_name) + ' (' + itm.target_quantity + ' ' + esc(itm.base_uom_code || '') + ')</span>' +
+          '<span>' + (itm.is_purchased ? '✓ Terbeli' : 'Belum') + '</span>' +
+        '</div>';
+      }).join('');
+
+      var canEdit = m.status === 'RELEASED';
+      var actions = '<div style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;">';
+      if (canEdit) {
+        actions += '<button type="button" class="purchasing-filter-btn" onclick="promptEditMandateCash(\'' + m.id + '\', ' + (m.cash_advance || 0) + ')" style="padding:4px 8px; font-size:11.5px;">✏️ Ubah Kasbon</button>';
+      }
+      if (m.status !== 'ARCHIVED') {
+        actions += '<button type="button" class="purchasing-filter-btn" onclick="archiveMandateApp(\'' + m.id + '\')" style="padding:4px 8px; font-size:11.5px;">📁 Arsipkan</button>';
+      }
+      actions += '<button type="button" class="purchasing-filter-btn" onclick="deleteMandateApp(\'' + m.id + '\')" style="padding:4px 8px; font-size:11.5px; color:#dc2626; border-color:#fca5a5;">🗑️ Hapus</button>';
+      actions += '</div>';
+
+      return '<div class="purchasing-item-card" style="padding:14px; flex-direction:column; align-items:stretch;">' +
+        '<div style="display:flex; justify-content:space-between; align-items:start;">' +
+          '<div>' +
+            '<strong style="font-size:14px; color:#0f172a;">Mandat #' + esc(m.mandate_number) + '</strong>' +
+            '<div style="font-size:11px; color:#64748b; margin-top:2px;">' + (m.notes ? esc(m.notes) : 'Mandat belanja cabang') + '</div>' +
+          '</div>' +
+          '<span class="x-badge" style="background:' + statusBg + '; color:' + statusColor + '; font-weight:700;">' + esc(m.status) + '</span>' +
+        '</div>' +
+        '<div style="display:flex; justify-content:space-between; margin-top:8px; font-size:12px; background:#f8fafc; padding:6px 10px; border-radius:6px;">' +
+          '<span>Kasbon: <strong style="color:#059669;">' + formatMoney(m.cash_advance || 0) + '</strong></span>' +
+          '<span>Total Target: <strong>' + formatMoney(m.total_planned_budget || 0) + '</strong></span>' +
+        '</div>' +
+        '<div style="margin-top:8px;">' + itemsHtml + '</div>' +
+        actions +
+      '</div>';
+    }).join('');
+  }
+
+  async function promptEditMandateCash(mandateId, currentCash) {
+    var val = prompt('Ubah jumlah uang kasbon (Rp):', currentCash);
+    if (val === null) return;
+    var user = getStoredUser();
+    var branchId = user ? (user.branch_id || user.branchId) : null;
+    if (!branchId) return;
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/mandates/' + encodeURIComponent(mandateId), {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ cash_advance: Number(val) || 0 })
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        showToast('✓ Kasbon mandat belanja berhasil diubah.');
+        loadPurchasingMandatesManager();
+      } else {
+        showToast('Gagal update: ' + (data.message || data.error || 'Terjadi kesalahan'));
+      }
+    } catch (err) {
+      showToast('Gangguan jaringan saat mengubah kasbon.');
+    }
+  }
+  window.promptEditMandateCash = promptEditMandateCash;
+
+  async function archiveMandateApp(mandateId) {
+    if (!confirm('Arsipkan mandat belanja ini?')) return;
+    var user = getStoredUser();
+    var branchId = user ? (user.branch_id || user.branchId) : null;
+    if (!branchId) return;
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/mandates/' + encodeURIComponent(mandateId) + '/archive', {
+        method: 'PATCH',
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        showToast('📁 Mandat berhasil diarsipkan.');
+        loadPurchasingMandatesManager();
+      } else {
+        showToast('Gagal arsip: ' + (data.message || data.error || 'Terjadi kesalahan'));
+      }
+    } catch (err) {
+      showToast('Gangguan jaringan saat mengarsipkan mandat.');
+    }
+  }
+  window.archiveMandateApp = archiveMandateApp;
+
+  async function deleteMandateApp(mandateId) {
+    if (!confirm('Hapus permanen mandat belanja ini?')) return;
+    var user = getStoredUser();
+    var branchId = user ? (user.branch_id || user.branchId) : null;
+    if (!branchId) return;
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/mandates/' + encodeURIComponent(mandateId), {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        showToast('🗑️ Mandat belanja berhasil dihapus permanen.');
+        loadPurchasingMandatesManager();
+      } else {
+        showToast('Gagal hapus: ' + (data.message || data.error || 'Terjadi kesalahan'));
+      }
+    } catch (err) {
+      showToast('Gangguan jaringan saat menghapus mandat.');
+    }
+  }
+  window.deleteMandateApp = deleteMandateApp;
 
   /* =========================================================================
      PO SUPPLIER & GOODS RECEIPT (PENERIMAAN BARANG CABANG)

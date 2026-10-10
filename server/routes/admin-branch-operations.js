@@ -518,6 +518,257 @@ router.get('/admin/branches/:id/purchasing/checklist', requireAuth(['owner', 'br
   }
 });
 
+// GET /admin/branches/:id/purchasing/mandates
+// Lists purchasing mandates for this branch with their items
+router.get('/admin/branches/:id/purchasing/mandates', requireAuth(['owner', 'brand_manager', 'branch_manager', 'purchasing']), (req, res) => {
+  try {
+    if (['branch_manager', 'purchasing'].includes(req.user.role)) {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (assignedBranchId && assignedBranchId !== req.params.id) {
+        return res.status(403).json({ success: false, error: 'FORBIDDEN_BRANCH_SCOPE' });
+      }
+    }
+
+    const branch = db.prepare('SELECT b.id, b.name, b.brand_id FROM branches b WHERE b.id = ? AND b.brand_id = ?').get(req.params.id, req.brand_id);
+    if (!branch) return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan.' });
+
+    const statusFilter = req.query && req.query.status ? String(req.query.status).toUpperCase() : null;
+    let query = `
+      SELECT pm.*, u.full_name AS creator_name
+      FROM purchasing_mandates pm
+      LEFT JOIN users u ON u.id = pm.created_by
+      WHERE pm.branch_id = ? AND pm.is_deleted = 0
+    `;
+    const params = [req.params.id];
+    if (statusFilter) {
+      query += ' AND pm.status = ?';
+      params.push(statusFilter);
+    }
+    query += ' ORDER BY pm.created_at DESC';
+
+    const mandates = db.prepare(query).all(...params);
+    for (const m of mandates) {
+      m.items = db.prepare(`
+        SELECT pmi.*, m.name AS material_name, m.material_code, u.code AS base_uom_code, u.name AS base_uom_name
+        FROM purchasing_mandate_items pmi
+        JOIN materials m ON m.id = pmi.material_id
+        JOIN uoms u ON u.id = m.base_uom_id
+        WHERE pmi.mandate_id = ?
+        ORDER BY m.name ASC
+      `).all(m.id);
+    }
+
+    res.json({ success: true, branch_id: req.params.id, mandates });
+  } catch (err) {
+    console.error('[API Error GET /admin/branches/:id/purchasing/mandates]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /admin/branches/:id/purchasing/mandates
+// Creates / releases a new official purchasing mandate from Branch Manager
+router.post('/admin/branches/:id/purchasing/mandates', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    if (req.user.role === 'branch_manager') {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (assignedBranchId && assignedBranchId !== req.params.id) {
+        return res.status(403).json({ success: false, error: 'FORBIDDEN_BRANCH_SCOPE' });
+      }
+    }
+
+    const branch = db.prepare('SELECT b.id, b.name, b.brand_id FROM branches b WHERE b.id = ? AND b.brand_id = ?').get(req.params.id, req.brand_id);
+    if (!branch) return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan.' });
+
+    const cashAdvance = Number(req.body && req.body.cash_advance || 0);
+    const notes = (req.body && req.body.notes) ? String(req.body.notes).trim() : '';
+    const items = req.body && req.body.items;
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ success: false, error: 'ITEMS_REQUIRED', message: 'Daftar barang mandat belanja tidak boleh kosong.' });
+    }
+
+    const mandateId = 'pm_' + crypto.randomBytes(8).toString('hex');
+    const mandateNum = 'BLJ-' + Date.now().toString().slice(-6);
+    const now = new Date().toISOString();
+    const userId = req.user.id || req.user.userId || 'system';
+
+    let totalPlanned = 0;
+    const parsedItems = [];
+    for (const itm of items) {
+      const matId = itm.material_id;
+      const targetQty = Number(itm.target_quantity || itm.quantity || 0);
+      const estPrice = Number(itm.estimated_unit_price || itm.unit_price || 0);
+      if (!matId || targetQty <= 0) continue;
+      totalPlanned += Math.round(targetQty * estPrice);
+      parsedItems.push({
+        id: 'pmi_' + crypto.randomBytes(8).toString('hex'),
+        mandate_id: mandateId,
+        material_id: matId,
+        target_quantity: targetQty,
+        estimated_unit_price: estPrice
+      });
+    }
+
+    if (!parsedItems.length) {
+      return res.status(400).json({ success: false, error: 'INVALID_ITEMS', message: 'Tidak ada item dengan jumlah valid.' });
+    }
+
+    db.exec('BEGIN TRANSACTION;');
+    try {
+      db.prepare(`
+        INSERT INTO purchasing_mandates (
+          id, mandate_number, branch_id, cash_advance, total_planned_budget,
+          status, notes, created_by, created_at, updated_at, is_deleted
+        ) VALUES (?, ?, ?, ?, ?, 'RELEASED', ?, ?, ?, ?, 0)
+      `).run(mandateId, mandateNum, req.params.id, cashAdvance, totalPlanned, notes, userId, now, now);
+
+      const insertItem = db.prepare(`
+        INSERT INTO purchasing_mandate_items (
+          id, mandate_id, material_id, target_quantity, estimated_unit_price, is_purchased
+        ) VALUES (?, ?, ?, ?, ?, 0)
+      `);
+      for (const pi of parsedItems) {
+        insertItem.run(pi.id, pi.mandate_id, pi.material_id, pi.target_quantity, pi.estimated_unit_price);
+      }
+      db.exec('COMMIT;');
+    } catch (e) {
+      db.exec('ROLLBACK;');
+      throw e;
+    }
+
+    res.status(201).json({
+      success: true,
+      mandate: {
+        id: mandateId,
+        mandate_number: mandateNum,
+        branch_id: req.params.id,
+        cash_advance: cashAdvance,
+        total_planned_budget: totalPlanned,
+        status: 'RELEASED',
+        items_count: parsedItems.length
+      }
+    });
+  } catch (err) {
+    console.error('[API Error POST /admin/branches/:id/purchasing/mandates]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// PUT /admin/branches/:id/purchasing/mandates/:mandateId
+// Edit an existing mandate (e.g. adjust cash advance, notes, or items if not yet completed)
+router.put('/admin/branches/:id/purchasing/mandates/:mandateId', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    if (req.user.role === 'branch_manager') {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (assignedBranchId && assignedBranchId !== req.params.id) {
+        return res.status(403).json({ success: false, error: 'FORBIDDEN_BRANCH_SCOPE' });
+      }
+    }
+
+    const mandate = db.prepare('SELECT * FROM purchasing_mandates WHERE id = ? AND branch_id = ? AND is_deleted = 0').get(req.params.mandateId, req.params.id);
+    if (!mandate) return res.status(404).json({ success: false, error: 'MANDATE_NOT_FOUND' });
+    if (mandate.status === 'COMPLETED') {
+      return res.status(400).json({ success: false, error: 'MANDATE_ALREADY_COMPLETED', message: 'Mandat belanja yang sudah selesai tidak dapat diedit.' });
+    }
+
+    const cashAdvance = req.body && req.body.cash_advance !== undefined ? Number(req.body.cash_advance) : mandate.cash_advance;
+    const notes = req.body && req.body.notes !== undefined ? String(req.body.notes).trim() : mandate.notes;
+    const items = req.body && req.body.items;
+    const now = new Date().toISOString();
+
+    db.exec('BEGIN TRANSACTION;');
+    try {
+      let totalPlanned = mandate.total_planned_budget;
+      if (Array.isArray(items)) {
+        db.prepare('DELETE FROM purchasing_mandate_items WHERE mandate_id = ?').run(mandate.id);
+        totalPlanned = 0;
+        const insertItem = db.prepare(`
+          INSERT INTO purchasing_mandate_items (
+            id, mandate_id, material_id, target_quantity, estimated_unit_price, is_purchased
+          ) VALUES (?, ?, ?, ?, ?, 0)
+        `);
+        for (const itm of items) {
+          const matId = itm.material_id;
+          const targetQty = Number(itm.target_quantity || itm.quantity || 0);
+          const estPrice = Number(itm.estimated_unit_price || itm.unit_price || 0);
+          if (!matId || targetQty <= 0) continue;
+          totalPlanned += Math.round(targetQty * estPrice);
+          insertItem.run('pmi_' + crypto.randomBytes(8).toString('hex'), mandate.id, matId, targetQty, estPrice);
+        }
+      }
+
+      db.prepare(`
+        UPDATE purchasing_mandates
+        SET cash_advance = ?, total_planned_budget = ?, notes = ?, updated_at = ?
+        WHERE id = ?
+      `).run(cashAdvance, totalPlanned, notes, now, mandate.id);
+      db.exec('COMMIT;');
+    } catch (e) {
+      db.exec('ROLLBACK;');
+      throw e;
+    }
+
+    res.json({ success: true, message: 'Mandat belanja berhasil diperbarui.' });
+  } catch (err) {
+    console.error('[API Error PUT /admin/branches/:id/purchasing/mandates/:mandateId]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// PATCH /admin/branches/:id/purchasing/mandates/:mandateId/archive
+// Archives a mandate
+router.patch('/admin/branches/:id/purchasing/mandates/:mandateId/archive', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    if (req.user.role === 'branch_manager') {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (assignedBranchId && assignedBranchId !== req.params.id) {
+        return res.status(403).json({ success: false, error: 'FORBIDDEN_BRANCH_SCOPE' });
+      }
+    }
+
+    const mandate = db.prepare('SELECT id, status FROM purchasing_mandates WHERE id = ? AND branch_id = ? AND is_deleted = 0').get(req.params.mandateId, req.params.id);
+    if (!mandate) return res.status(404).json({ success: false, error: 'MANDATE_NOT_FOUND' });
+
+    const now = new Date().toISOString();
+    db.prepare("UPDATE purchasing_mandates SET status = 'ARCHIVED', updated_at = ? WHERE id = ?").run(now, mandate.id);
+    res.json({ success: true, message: 'Mandat belanja berhasil diarsipkan.' });
+  } catch (err) {
+    console.error('[API Error PATCH /admin/branches/:id/purchasing/mandates/:mandateId/archive]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /admin/branches/:id/purchasing/mandates/:mandateId
+// Hard deletes or soft deletes a mandate
+router.delete('/admin/branches/:id/purchasing/mandates/:mandateId', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    if (req.user.role === 'branch_manager') {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (assignedBranchId && assignedBranchId !== req.params.id) {
+        return res.status(403).json({ success: false, error: 'FORBIDDEN_BRANCH_SCOPE' });
+      }
+    }
+
+    const mandate = db.prepare('SELECT id, status FROM purchasing_mandates WHERE id = ? AND branch_id = ?').get(req.params.mandateId, req.params.id);
+    if (!mandate) return res.status(404).json({ success: false, error: 'MANDATE_NOT_FOUND' });
+
+    db.exec('BEGIN TRANSACTION;');
+    try {
+      db.prepare('DELETE FROM purchasing_mandate_items WHERE mandate_id = ?').run(mandate.id);
+      db.prepare('DELETE FROM purchasing_mandates WHERE id = ?').run(mandate.id);
+      db.exec('COMMIT;');
+    } catch (e) {
+      db.exec('ROLLBACK;');
+      throw e;
+    }
+
+    res.json({ success: true, message: 'Mandat belanja berhasil dihapus secara permanen.' });
+  } catch (err) {
+    console.error('[API Error DELETE /admin/branches/:id/purchasing/mandates/:mandateId]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // POST /admin/branches/:id/purchasing/settle
 // Submits real shopping expenditures: records goods receipt/opening in stock ledger, updates cost, logs cash balance.
 router.post('/admin/branches/:id/purchasing/settle', requireAuth(['owner', 'brand_manager', 'branch_manager', 'purchasing']), (req, res) => {
@@ -633,6 +884,26 @@ router.post('/admin/branches/:id/purchasing/settle', requireAuth(['owner', 'bran
           line.unit_price, line.total_price, postingId, movMutationId, newVer, now, actorId
         );
       }
+
+      // If tied to an official mandate, update mandate status and record items
+      const mandateId = req.body && req.body.mandate_id ? String(req.body.mandate_id) : null;
+      if (mandateId) {
+        db.prepare(`
+          UPDATE purchasing_mandates
+          SET status = 'COMPLETED', completed_by = ?, completed_at = ?, updated_at = ?
+          WHERE id = ? AND branch_id = ?
+        `).run(actorId, now, now, mandateId, req.params.id);
+
+        const updateMandateItem = db.prepare(`
+          UPDATE purchasing_mandate_items
+          SET is_purchased = 1, purchased_quantity = ?, actual_unit_price = ?
+          WHERE mandate_id = ? AND material_id = ?
+        `);
+        for (const line of parsedLines) {
+          updateMandateItem.run(line.quantity, line.unit_price, mandateId, line.material_id);
+        }
+      }
+
       db.exec('COMMIT;');
     } catch (txErr) {
       db.exec('ROLLBACK;');
