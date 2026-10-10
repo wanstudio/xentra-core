@@ -266,7 +266,8 @@
     if (uomEl) uomEl.textContent = 'per ' + uomText;
     if (oldPriceEl) oldPriceEl.textContent = formatMoney(itm.estimated_price || itm.actualUnitPrice || 0) + ' / ' + uomText;
     if (priceIn) {
-      priceIn.value = itm.actualUnitPrice || '';
+      var initialNum = itm.actualUnitPrice || 0;
+      priceIn.value = initialNum > 0 ? formatNumberWithDots(initialNum) : '';
       setTimeout(function () { priceIn.focus(); priceIn.select(); }, 60);
     }
     if (modal) {
@@ -286,10 +287,81 @@
   }
   window.closePurchasingUpdatePriceModal = closePurchasingUpdatePriceModal;
 
+  function formatNumberWithDots(val) {
+    var n = Math.floor(Number(val) || 0);
+    if (n <= 0) return '';
+    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+
+  function setupCurrencyInputAutoDot(inputEl, onValueChange) {
+    if (!inputEl) return;
+
+    inputEl.addEventListener('keydown', function (e) {
+      if (e.key === 'Backspace' && inputEl.selectionStart === inputEl.selectionEnd) {
+        var pos = inputEl.selectionStart;
+        var val = inputEl.value;
+        if (pos > 1 && val.charAt(pos - 1) === '.') {
+          e.preventDefault();
+          var newVal = val.slice(0, pos - 2) + val.slice(pos);
+          inputEl.value = newVal;
+          inputEl.setSelectionRange(pos - 2, pos - 2);
+          inputEl.dispatchEvent(new Event('input'));
+        }
+      }
+    });
+
+    inputEl.addEventListener('input', function () {
+      var rawVal = inputEl.value || '';
+      var rawCursor = typeof inputEl.selectionEnd === 'number' ? inputEl.selectionEnd : rawVal.length;
+      var digitsBeforeCursor = rawVal.slice(0, rawCursor).replace(/\D/g, '').length;
+
+      var digits = rawVal.replace(/\D/g, '');
+      if (!digits) {
+        inputEl.value = '';
+        if (typeof onValueChange === 'function') onValueChange(0);
+        return;
+      }
+
+      var num = parseInt(digits, 10);
+      if (isNaN(num) || num <= 0) {
+        inputEl.value = '';
+        if (typeof onValueChange === 'function') onValueChange(0);
+        return;
+      }
+
+      var formatted = formatNumberWithDots(num);
+      inputEl.value = formatted;
+
+      // Restore cursor position smoothly
+      if (typeof inputEl.setSelectionRange === 'function') {
+        var targetCursor = 0;
+        if (digitsBeforeCursor === 0) {
+          targetCursor = 0;
+        } else {
+          var count = 0;
+          for (var idx = 0; idx < formatted.length; idx++) {
+            if (/\d/.test(formatted.charAt(idx))) {
+              count++;
+            }
+            if (count === digitsBeforeCursor) {
+              targetCursor = idx + 1;
+              break;
+            }
+          }
+          if (targetCursor === 0) targetCursor = formatted.length;
+        }
+        inputEl.setSelectionRange(targetCursor, targetCursor);
+      }
+
+      if (typeof onValueChange === 'function') onValueChange(num);
+    });
+  }
+
   function confirmPurchasingPriceUpdate() {
     if (!_purchasingState.activeEditItem) return;
     var priceIn = $('input-purchasing-modal-price');
-    var newPrice = parseFloat(priceIn ? priceIn.value : 0);
+    var rawDigits = priceIn ? String(priceIn.value || '').replace(/\D/g, '') : '';
+    var newPrice = parseFloat(rawDigits || 0);
 
     if (isNaN(newPrice) || newPrice < 0) {
       showToast('⚠️ Masukkan nominal harga yang valid.');
@@ -307,7 +379,8 @@
 
   function recalculatePurchasingSummary() {
     var cashAdvanceInput = $('input-purchasing-cash-advance');
-    var cashAdvance = cashAdvanceInput ? (parseFloat(cashAdvanceInput.value) || 0) : 0;
+    var rawCashDigits = cashAdvanceInput ? String(cashAdvanceInput.value || '').replace(/\D/g, '') : '';
+    var cashAdvance = parseFloat(rawCashDigits || 0);
     _purchasingState.cashAdvance = cashAdvance;
 
     var totalReal = 0;
@@ -875,6 +948,26 @@
     }
   }
   window.calculatePurchasingCalcChange = calculatePurchasingCalcChange;
+
+  function initPurchasingInputs() {
+    var cashAdvInput = $('input-purchasing-cash-advance');
+    if (cashAdvInput) {
+      setupCurrencyInputAutoDot(cashAdvInput, function () {
+        recalculatePurchasingSummary();
+      });
+    }
+
+    var modalPriceInput = $('input-purchasing-modal-price');
+    if (modalPriceInput) {
+      setupCurrencyInputAutoDot(modalPriceInput);
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initPurchasingInputs);
+  } else {
+    initPurchasingInputs();
+  }
 
 })();
 
