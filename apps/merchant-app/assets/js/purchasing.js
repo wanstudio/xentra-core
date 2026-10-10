@@ -667,11 +667,11 @@
           '</div>' +
           '<div class="purchasing-receive-grid">' +
             '<div class="purchasing-receive-field">' +
-              '<label class="purchasing-receive-label label-accepted">Layak Terima (' + esc(packDesc) + ')</label>' +
+              '<label class="purchasing-receive-label label-accepted">Layak Terima</label>' +
               '<input type="number" step="any" min="0" max="' + orderedQty + '" class="x-input input-receive-accepted purchasing-receive-input" value="' + esc(remainingQty) + '" oninput="onPurchasingReceiveQtyChange(this, \'accepted\')">' +
             '</div>' +
             '<div class="purchasing-receive-field">' +
-              '<label class="purchasing-receive-label label-rejected">Ditolak / Rusak (' + esc(packDesc) + ')</label>' +
+              '<label class="purchasing-receive-label label-rejected">Ditolak / Rusak</label>' +
               '<input type="number" step="any" min="0" max="' + orderedQty + '" class="x-input input-receive-rejected purchasing-receive-input input-rejected" value="0" oninput="onPurchasingReceiveQtyChange(this, \'rejected\')">' +
             '</div>' +
           '</div>' +
