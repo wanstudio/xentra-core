@@ -1052,17 +1052,23 @@
           </div>
         </div>
 
-        <!-- Tab View 2: Riwayat Belanja Seminggu Terakhir -->
+        <!-- Tab View 2: Riwayat Belanja -->
         <div id="purchasing-view-history" class="purchasing-subview" style="display:none;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-            <div>
-              <h3 style="font-size:16px; font-weight:800; margin:0; color:#0f172a;">Riwayat Belanja</h3>
-              <p style="font-size:11.5px; color:#64748b; margin:2px 0 0;">7 hari terakhir — pantau perbandingan harga pasar</p>
+          <!-- Controls: Live Search & Date Filters -->
+          <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px;">
+            <div style="position:relative; display:flex; align-items:center;">
+              <span style="position:absolute; left:12px; color:#94a3b8; pointer-events:none; font-size:14px;">🔍</span>
+              <input type="text" id="purchasing-history-search" class="x-input" placeholder="Cari bahan atau nota belanja..." style="padding-left:36px; padding-right:32px; height:42px; border-radius:12px; font-size:13px; width:100%; border:1px solid #cbd5e1;" oninput="onPurchasingHistorySearch(this.value)">
+              <button type="button" id="btn-clear-history-search" onclick="clearPurchasingHistorySearch()" style="display:none; position:absolute; right:10px; background:none; border:none; color:#94a3b8; font-size:16px; cursor:pointer; padding:4px;" aria-label="Hapus Pencarian">✕</button>
             </div>
-            <button type="button" class="purchasing-header-btn-refresh" onclick="loadPurchasingHistory()" title="Segarkan Riwayat">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-            </button>
+            <div style="display:flex; gap:6px; overflow-x:auto; padding-bottom:2px; -webkit-overflow-scrolling:touch;" id="purchasing-history-filter-chips">
+              <button type="button" class="purchasing-history-chip active" data-filter="all" onclick="setPurchasingHistoryFilter('all', this)">Semua</button>
+              <button type="button" class="purchasing-history-chip" data-filter="today" onclick="setPurchasingHistoryFilter('today', this)">Hari Ini</button>
+              <button type="button" class="purchasing-history-chip" data-filter="yesterday" onclick="setPurchasingHistoryFilter('yesterday', this)">Kemarin</button>
+              <button type="button" class="purchasing-history-chip" data-filter="week" onclick="setPurchasingHistoryFilter('week', this)">7 Hari</button>
+            </div>
           </div>
+
           <div id="purchasing-history-container" style="display:flex; flex-direction:column; gap:10px;">
             <div class="text-center py-6 text-muted">Memuat riwayat belanja...</div>
           </div>

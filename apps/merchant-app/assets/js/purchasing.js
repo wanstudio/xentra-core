@@ -1087,16 +1087,20 @@
   window.executePurchasingReceiveSubmit = executePurchasingReceiveSubmit;
 
   /* =========================================================================
-     PURCHASING HISTORY (7 HARI TERAKHIR)
+     PURCHASING HISTORY
      ========================================================================= */
+  var _purchasingHistorySessions = [];
+  var _activeHistoryDateFilter = 'all';
+  var _activeHistorySearchQuery = '';
+
   async function loadPurchasingHistory() {
     var user = getStoredUser();
     var branchId = user ? (user.branch_id || user.branchId) : null;
     if (!branchId) return;
 
     var container = $('purchasing-history-container');
-    if (container) {
-      container.innerHTML = '<div class="text-center py-6 text-muted">Memuat riwayat belanja seminggu terakhir...</div>';
+    if (container && !_purchasingHistorySessions.length) {
+      container.innerHTML = '<div class="text-center py-6 text-muted">Memuat riwayat belanja...</div>';
     }
 
     try {
@@ -1106,55 +1110,8 @@
       var data = await res.json();
 
       if (res.ok && data.success) {
-        var sessions = data.sessions || [];
-        if (!sessions.length) {
-          if (container) {
-            container.innerHTML =
-              '<div style="text-align:center; padding:40px 20px; background:#fff; border-radius:16px; border:1px dashed #cbd5e1;">' +
-                '<div style="font-size:36px; margin-bottom:8px;">🛒</div>' +
-                '<div style="font-size:15px; font-weight:700; color:#334155;">Belum Ada Riwayat Belanja</div>' +
-                '<div style="font-size:12px; color:#64748b; margin-top:4px;">Belanjaan yang dicatat dalam 7 hari terakhir akan muncul di sini.</div>' +
-              '</div>';
-          }
-          return;
-        }
-
-        var html = '';
-        sessions.forEach(function (sess) {
-          var dateStr = '';
-          try {
-            var d = new Date(sess.timestamp);
-            dateStr = d.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-          } catch (_) {
-            dateStr = sess.timestamp;
-          }
-
-          html +=
-            '<div class="purchasing-history-card">' +
-              '<div class="purchasing-history-head">' +
-                '<div>' +
-                  '<div class="purchasing-history-date">' + esc(dateStr) + '</div>' +
-                  '<div class="purchasing-history-actor">Petugas: ' + esc(sess.actor_name) + '</div>' +
-                '</div>' +
-                '<div class="purchasing-history-total">' + formatMoney(sess.total_spend) + '</div>' +
-              '</div>' +
-              '<div class="purchasing-history-items-list">';
-
-          sess.items.forEach(function (itm) {
-            html +=
-              '<div class="purchasing-history-item-row">' +
-                '<div style="flex:1; min-width:0;">' +
-                  '<div style="font-size:13.5px; font-weight:700; color:#0f172a;">' + esc(itm.material_name) + '</div>' +
-                  '<div style="font-size:11.5px; color:#64748b;">' + Number(itm.quantity).toFixed(1) + ' ' + esc(itm.uom) + ' @ ' + formatMoney(itm.unit_price) + '</div>' +
-                '</div>' +
-                '<div style="font-size:13px; font-weight:800; color:#334155;">' + formatMoney(itm.total_price) + '</div>' +
-              '</div>';
-          });
-
-          html += '</div></div>';
-        });
-
-        if (container) container.innerHTML = html;
+        _purchasingHistorySessions = data.sessions || [];
+        renderPurchasingHistoryList();
       } else {
         if (container) {
           container.innerHTML = '<div class="text-center py-6 text-danger">Gagal memuat riwayat: ' + esc(data.message || 'Terjadi kesalahan') + '</div>';
@@ -1168,6 +1125,132 @@
     }
   }
   window.loadPurchasingHistory = loadPurchasingHistory;
+
+  function onPurchasingHistorySearch(val) {
+    _activeHistorySearchQuery = (val || '').trim().toLowerCase();
+    var clearBtn = $('btn-clear-history-search');
+    if (clearBtn) clearBtn.style.display = _activeHistorySearchQuery ? 'block' : 'none';
+    renderPurchasingHistoryList();
+  }
+  window.onPurchasingHistorySearch = onPurchasingHistorySearch;
+
+  function clearPurchasingHistorySearch() {
+    var input = $('purchasing-history-search');
+    if (input) input.value = '';
+    onPurchasingHistorySearch('');
+  }
+  window.clearPurchasingHistorySearch = clearPurchasingHistorySearch;
+
+  function setPurchasingHistoryFilter(filterKey, btnEl) {
+    _activeHistoryDateFilter = filterKey;
+    var container = $('purchasing-history-filter-chips');
+    if (container) {
+      var chips = container.querySelectorAll('.purchasing-history-chip');
+      chips.forEach(function (c) {
+        c.classList.toggle('active', c.getAttribute('data-filter') === filterKey);
+      });
+    }
+    renderPurchasingHistoryList();
+  }
+  window.setPurchasingHistoryFilter = setPurchasingHistoryFilter;
+
+  function renderPurchasingHistoryList() {
+    var container = $('purchasing-history-container');
+    if (!container) return;
+
+    if (!_purchasingHistorySessions || !_purchasingHistorySessions.length) {
+      container.innerHTML =
+        '<div style="text-align:center; padding:40px 20px; background:#fff; border-radius:16px; border:1px dashed #cbd5e1;">' +
+          '<div style="font-size:36px; margin-bottom:8px;">🛒</div>' +
+          '<div style="font-size:15px; font-weight:700; color:#334155;">Belum Ada Riwayat Belanja</div>' +
+          '<div style="font-size:12px; color:#64748b; margin-top:4px;">Belanjaan yang diselesaikan akan otomatis tercatat di sini.</div>' +
+        '</div>';
+      return;
+    }
+
+    var now = new Date();
+    var todayStr = now.toISOString().slice(0, 10);
+    var yesterday = new Date(Date.now() - 86400000);
+    var yesterdayStr = yesterday.toISOString().slice(0, 10);
+
+    // Apply Filter
+    var filtered = _purchasingHistorySessions.filter(function (sess) {
+      // Date filter
+      var sessDate = '';
+      try {
+        sessDate = new Date(sess.timestamp).toISOString().slice(0, 10);
+      } catch (_) {}
+
+      if (_activeHistoryDateFilter === 'today' && sessDate !== todayStr) return false;
+      if (_activeHistoryDateFilter === 'yesterday' && sessDate !== yesterdayStr) return false;
+      if (_activeHistoryDateFilter === 'week') {
+        var diffDays = (now.getTime() - new Date(sess.timestamp).getTime()) / (1000 * 3600 * 24);
+        if (diffDays > 7) return false;
+      }
+
+      // Search Query
+      if (_activeHistorySearchQuery) {
+        var query = _activeHistorySearchQuery;
+        var matchSessionId = (sess.posting_id || '').toLowerCase().includes(query);
+        var matchActor = (sess.actor_name || '').toLowerCase().includes(query);
+        var matchItems = (sess.items || []).some(function (itm) {
+          return (itm.material_name || '').toLowerCase().includes(query);
+        });
+        if (!matchSessionId && !matchActor && !matchItems) return false;
+      }
+
+      return true;
+    });
+
+    if (!filtered.length) {
+      container.innerHTML =
+        '<div style="text-align:center; padding:32px 20px; background:#fff; border-radius:16px; border:1px dashed #cbd5e1;">' +
+          '<div style="font-size:28px; margin-bottom:6px;">🔍</div>' +
+          '<div style="font-size:14.5px; font-weight:700; color:#334155;">Tidak Ada Hasil Ditemukan</div>' +
+          '<div style="font-size:12px; color:#64748b; margin-top:4px;">Coba ubah kata kunci pencarian atau ganti filter tanggal.</div>' +
+        '</div>';
+      return;
+    }
+
+    var html = '';
+    filtered.forEach(function (sess) {
+      var dateStr = '';
+      try {
+        var d = new Date(sess.timestamp);
+        dateStr = d.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      } catch (_) {
+        dateStr = sess.timestamp;
+      }
+
+      html +=
+        '<div class="purchasing-history-card">' +
+          '<div class="purchasing-history-head">' +
+            '<div>' +
+              '<div class="purchasing-history-date">' + esc(dateStr) + '</div>' +
+              '<div class="purchasing-history-actor">Petugas: ' + esc(sess.actor_name) + (sess.posting_id ? ' • <span style="font-weight:700; color:#0284c7;">' + esc(sess.posting_id) + '</span>' : '') + '</div>' +
+            '</div>' +
+            '<div class="purchasing-history-total">' + formatMoney(sess.total_spend) + '</div>' +
+          '</div>' +
+          '<div class="purchasing-history-items-list">';
+
+      sess.items.forEach(function (itm) {
+        var qtyFormatted = itm.quantity % 1 === 0 ? itm.quantity : Number(itm.quantity).toFixed(1);
+        html +=
+          '<div class="purchasing-history-item-row">' +
+            '<div style="flex:1; min-width:0;">' +
+              '<div style="font-size:13.5px; font-weight:700; color:#0f172a;">' + esc(itm.material_name) + '</div>' +
+              '<div style="font-size:11.5px; color:#64748b;">' + qtyFormatted + ' ' + esc(itm.uom) + ' @ ' + formatMoney(itm.unit_price) + '</div>' +
+            '</div>' +
+            '<div style="font-size:13px; font-weight:800; color:#334155;">' + formatMoney(itm.total_price) + '</div>' +
+          '</div>';
+      });
+
+      html += '</div></div>';
+    });
+
+    container.innerHTML = html;
+  }
+  window.renderPurchasingHistoryList = renderPurchasingHistoryList;
 
   /* =========================================================================
      QUICK MARKET CALCULATOR
