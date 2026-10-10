@@ -1779,7 +1779,7 @@
           <span style="font-size:22px; line-height:1;">🛒</span>
           <div>
             <h3 id="settle-confirm-title" style="font-size:16px; font-weight:800; margin:0; color:#0f172a;">Konfirmasi Selesai Belanja</h3>
-            <p style="font-size:11.5px; color:#64748b; margin:2px 0 0;">Periksa kembali sebelum stok dicatat ke cabang</p>
+            <p style="font-size:11.5px; color:#64748b; margin:2px 0 0;">Periksa kembali belanjaanmu</p>
           </div>
         </div>
         <button type="button" class="x-modal-close" onclick="closePurchasingSettleConfirmModal()" aria-label="Batal">✕</button>
@@ -1815,16 +1815,16 @@
           </div>
         </div>
 
-        <div style="font-size:11px; color:#64748b; line-height:1.4;">
-          ℹ️ Stok bahan baku yang terbeli akan langsung masuk ke kartu stok cabang dan riwayat belanja akan tersimpan permanen.
+        <div style="font-size:11.5px; color:#64748b; line-height:1.4; text-align:center;">
+          ℹ️ Pastikan belanjaanmu benar, laporan ini akan masuk ke sistem dan tidak bisa di ubah
         </div>
       </div>
 
-      <div class="x-modal-footer" style="padding:14px 18px; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:8px;">
-        <button type="button" class="x-btn-secondary" onclick="closePurchasingSettleConfirmModal()" style="font-size:13px; font-weight:700; padding:10px 14px; border-radius:12px;">
+      <div class="x-modal-footer" style="padding:14px 18px; border-top:1px solid #e2e8f0; display:flex; justify-content:center; align-items:center; gap:10px; width:100%;">
+        <button type="button" class="x-btn-secondary" onclick="closePurchasingSettleConfirmModal()" style="font-size:13px; font-weight:700; padding:10px 16px; border-radius:12px; text-align:center;">
           Belum, Lanjut Belanja
         </button>
-        <button type="button" class="x-btn-primary" id="btn-purchasing-confirm-settle-ok" onclick="executePurchasingSettle()" style="background:#059669; border-color:#059669; font-size:13px; font-weight:800; padding:10px 18px; border-radius:12px; display:flex; align-items:center; gap:6px; box-shadow:0 4px 12px rgba(5,150,105,0.3);">
+        <button type="button" class="x-btn-primary" id="btn-purchasing-confirm-settle-ok" onclick="executePurchasingSettle()" style="background:#059669; border-color:#059669; font-size:13px; font-weight:800; padding:10px 18px; border-radius:12px; display:flex; align-items:center; justify-content:center; gap:6px; box-shadow:0 4px 12px rgba(5,150,105,0.3); text-align:center;">
           <span>✓</span> Ya, Selesai Belanja
         </button>
       </div>
@@ -2156,7 +2156,7 @@
   <script src="/merchant-app/assets/js/reports.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/tables.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/stock.js?v=1.1.0"></script>
-  <script src="/merchant-app/assets/js/purchasing.js?v=1.0.8"></script>
+  <script src="/merchant-app/assets/js/purchasing.js?v=1.0.9"></script>
   <script src="/merchant-app/assets/js/promotions.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/staff.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/orders.js?v=1.0.1"></script>

@@ -525,11 +525,11 @@
     var submitBtn = $('btn-purchasing-submit-settle');
     if (confirmBtn) {
       confirmBtn.disabled = true;
-      confirmBtn.innerHTML = '<span>⏳</span> Menyimpan ke Stok...';
+      confirmBtn.innerHTML = '<span>⏳</span> Menyimpan...';
     }
     if (submitBtn) {
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Menyimpan ke Stok...';
+      submitBtn.textContent = 'Menyimpan...';
     }
 
     var payload = _pendingSettlePayload;
