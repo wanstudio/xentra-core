@@ -19,6 +19,18 @@
   var formatMoney = S.formatMoney;
   var showToast = S.showToast;
 
+  // Nominal uang memakai shared currency input (merchant-shared/js/currency-input.js)
+  // supaya format/parse-nya satu sumber, bukan formatter lokal.
+  function setCurrency(el, value) {
+    if (!el) return;
+    if (window.XentraCurrencyInput) window.XentraCurrencyInput.setValue(el, value);
+    else el.value = (value === null || value === undefined) ? '' : value;
+  }
+  function currencyOf(el) {
+    if (!el) return 0;
+    return window.XentraCurrencyInput ? window.XentraCurrencyInput.getValue(el) : Number(el.value || 0);
+  }
+
   var hooks = { getBranches: null };
   var currentManagingBranchId = null;
   var currentBranchCatalogData = null;

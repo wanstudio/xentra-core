@@ -85,9 +85,7 @@ const uniqueName = (label) => label + ' ' + Math.random().toString(36).slice(2, 
 
 // ── Markup + wiring ─────────────────────────────────────────────────────────
 
-test('JUDUL-UI-01: dashboard punya tab Judul, panel, list, dan tombol tambah', () => {
-  assert.match(INDEX_HTML, /data-master-reference-tab="title"[^>]*>\s*Judul\s*</,
-    'tab Judul harus ada di #master-reference-tabs');
+test('JUDUL-UI-01: dashboard punya panel Judul, list, dan tombol tambah (auxiliary)', () => {
   assert.match(INDEX_HTML, /id="master-reference-title-panel"/, 'panel Judul harus ada');
   assert.match(INDEX_HTML, /id="master-titles-page-list"/, 'list Judul harus ada');
   assert.match(INDEX_HTML, /id="btn-add-master-title-page"/, 'tombol + Judul harus ada');
@@ -135,11 +133,11 @@ test('JUDUL-UI-02c: bingkai card panel master reference berbasis kelas, bukan da
   );
 });
 
-// ── Tab Item (menggantikan Kelengkapan) ────────────────────────────────────
+// ── Tab Item (menggantikan Kelengkapan & menyederhanakan tabs) ─────────────
 
-test('ITEM-01: deret tab Master Category = Kategori | Judul | Rasa | Item (tanpa Kelengkapan)', () => {
+test('ITEM-01: deret tab Master Category = Kategori | Item (tanpa Kelengkapan, Judul & Rasa disederhanakan)', () => {
   const tabs = [...INDEX_HTML.matchAll(/data-master-reference-tab="([a-z]+)"/g)].map((m) => m[1]);
-  assert.deepStrictEqual(tabs, ['category', 'title', 'flavor', 'item'], 'urutan & isi tab harus sesuai contract v1');
+  assert.deepStrictEqual(tabs, ['category', 'item'], 'urutan & isi tab harus sesuai contract: Kategori dan Item');
   assert.ok(!INDEX_HTML.includes('data-master-reference-tab="complement"'), 'Kelengkapan tidak boleh tampil lagi');
   assert.match(INDEX_HTML, /id="master-reference-item-panel"/, 'panel Item harus ada');
   assert.match(INDEX_HTML, /id="master-items-page-list"/, 'list Item harus ada');

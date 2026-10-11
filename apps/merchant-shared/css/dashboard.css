@@ -9262,80 +9262,238 @@ input[type="file"].x-input,
     color: #fff;
   }
 
-  /* Orders: dense 9-column desktop table becomes one order card per row. */
+  /* Orders: modern mobile card feed for incoming orders queue */
   #orders-list-view {
     background: transparent !important;
     border: 0 !important;
     box-shadow: none !important;
     padding: 0 !important;
   }
-  #orders-list-view > .x-panel-header-flex {
-    margin-bottom: 12px;
-  }
-  #orders-list-view > div[style*="display:flex"][style*="flex-wrap"] {
+  body:not(.x-merchant-app) .x-tab-content > #orders-list-view > div[style*="display:flex"][style*="flex-wrap"] {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 14px !important;
+    padding: 12px !important;
+    margin-top: 8px !important;
+    margin-bottom: 12px !important;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04) !important;
     display: grid !important;
-    grid-template-columns: 1fr !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
     gap: 8px !important;
-    margin-top: 0 !important;
   }
-  #orders-list-view .x-table-responsive {
+  body:not(.x-merchant-app) .x-tab-content > #orders-list-view > div[style*="display:flex"][style*="flex-wrap"] > div:first-child {
+    grid-column: 1 / -1 !important;
+    min-width: 0 !important;
+  }
+  body:not(.x-merchant-app) .x-tab-content > #orders-list-view > div[style*="display:flex"][style*="flex-wrap"] > div {
+    min-width: 0 !important;
+    flex: unset !important;
+  }
+  body:not(.x-merchant-app) .x-tab-content > #orders-list-view > div[style*="display:flex"][style*="flex-wrap"] .x-input {
+    font-size: 13px !important;
+    padding: 8px 10px !important;
+    height: 38px !important;
+    box-sizing: border-box !important;
+  }
+  body:not(.x-merchant-app) .x-tab-content > #orders-list-view > div[style*="display:flex"][style*="flex-wrap"] > div:first-child .x-input {
+    padding-left: 34px !important;
+  }
+  body:not(.x-merchant-app) .x-tab-content > #orders-list-view > .x-table-responsive {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
     overflow: visible !important;
-    margin-top: 12px;
+    margin-top: 4px !important;
   }
   #orders-list-view .x-table {
     display: block;
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
   }
   #orders-list-view .x-table thead {
     display: none;
   }
-  #orders-list-view .x-table tbody,
-  #orders-list-view .x-table tr {
+  #orders-list-view .x-table tbody {
     display: block;
     width: 100%;
   }
-  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) {
-    margin-bottom: 10px;
-    padding: 13px;
-    border: 1px solid #e5e7eb;
-    border-radius: 16px;
-    background: #fff;
-    box-shadow: 0 1px 3px rgba(15,23,42,.04);
-  }
-  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
+  #orders-list-view .x-table tbody tr {
+    display: block;
     width: 100%;
+  }
+  #orders-list-view .x-table tbody tr:has(td[colspan]) td {
+    display: block !important;
+    width: 100% !important;
+    background: #ffffff;
+    border: 1px dashed #cbd5e1;
+    border-radius: 14px;
+    padding: 32px 16px !important;
+    text-align: center !important;
+    color: #64748b;
+    font-size: 13px;
+    box-sizing: border-box;
+  }
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) {
+    display: grid !important;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "header status"
+      "meta meta"
+      "customer customer"
+      "badges badges"
+      "total total"
+      "actions actions";
+    gap: 8px 12px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+    box-sizing: border-box;
+  }
+  /* Reset general table cells in card */
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td {
+    border: 0 !important;
+    padding: 0 !important;
+    font-size: 13px;
+    line-height: 1.4;
     min-width: 0;
-    padding: 5px 0;
-    border: 0;
-    font-size: 12px;
-    text-align: right;
     box-sizing: border-box;
   }
   #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td::before {
-    flex: 0 0 auto;
-    color: #64748b;
-    font-size: 10px;
+    display: none !important;
+  }
+  /* Cell 1: Order Number link */
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(1) {
+    grid-area: header;
+    font-size: 15px;
     font-weight: 700;
-    text-align: left;
+    align-self: center;
   }
-  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(1)::before { content:"Order"; }
-  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(2)::before { content:"Waktu"; }
-  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(3)::before { content:"Cabang"; }
-  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(4)::before { content:"Pemesan"; }
-  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(5)::before { content:"Channel"; }
-  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(6)::before { content:"Fulfillment"; }
-  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(7)::before { content:"Total"; }
-  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(8)::before { content:"Status"; }
-  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(9) {
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(1) a {
+    color: #0f172a !important;
+    font-size: 15px;
+    font-weight: 700;
+    text-decoration: none;
+  }
+  /* Cell 8: Status Badge */
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(8) {
+    grid-area: status;
+    justify-self: end;
+    align-self: center;
+  }
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(8) .x-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 6px;
+    letter-spacing: 0.02em;
+  }
+  /* Cell 2 & 3: Time & Branch info */
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(2) {
+    grid-area: meta;
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    color: #64748b;
+    font-size: 12px;
+  }
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(3) {
+    grid-area: meta;
+    display: flex !important;
     justify-content: flex-end;
-    padding-top: 10px;
-    margin-top: 5px;
-    border-top: 1px solid #f1f5f9;
+    align-items: center;
+    color: #334155;
+    font-size: 12px;
+    font-weight: 600;
   }
-  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(9)::before { content:""; }
+  /* Cell 4: Customer */
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(4) {
+    grid-area: customer;
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 8px 10px !important;
+    color: #1e293b;
+    font-size: 12px;
+  }
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(4) strong {
+    color: #0f172a;
+    font-weight: 600;
+  }
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(4) .text-muted {
+    color: #64748b !important;
+    margin-left: 4px;
+  }
+  /* Cell 5 & 6: Channel & Fulfillment badges */
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(5) {
+    grid-area: badges;
+    display: inline-flex !important;
+    align-items: center;
+    gap: 6px;
+  }
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(6) {
+    grid-area: badges;
+    display: inline-flex !important;
+    align-items: center;
+    justify-self: end;
+  }
+  /* Cell 7: Total */
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(7) {
+    grid-area: total;
+    display: flex !important;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 8px !important;
+    margin-top: 4px;
+    border-top: 1px dashed #e2e8f0 !important;
+    font-size: 14px;
+    color: #0f172a;
+  }
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(7)::before {
+    display: inline-block !important;
+    content: "Total Tagihan";
+    font-size: 12px;
+    font-weight: 500;
+    color: #64748b;
+  }
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(7) strong {
+    font-size: 15px;
+    font-weight: 700;
+    color: #0f172a;
+  }
+  /* Cell 9: Action Buttons (Only visible when pending order can be accepted) */
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(9) {
+    grid-area: actions;
+    width: 100%;
+  }
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(9):empty {
+    display: none !important;
+  }
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(9) .x-item-actions {
+    display: flex !important;
+    width: 100% !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding-top: 6px !important;
+  }
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(9) .x-item-actions:empty {
+    display: none !important;
+  }
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(9) .x-btn-primary {
+    width: 100% !important;
+    flex: 1 1 100% !important;
+    height: 38px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+  }
 
   /* Customers: same transformation, but preserve the richer customer identity row. */
   #customers-list-view .x-table-responsive {
