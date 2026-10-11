@@ -43,6 +43,26 @@
   var state = window.state || { products: [], categories: [], branches: [] };
   window.state = state;
 
+  var _branchContextState = window._branchContextState || { selected: 'all', branches: [] };
+  window._branchContextState = _branchContextState;
+
+  function bindLiveSearch(inputOrId, onChange, options) {
+    if (window.XentraLiveSearch && typeof window.XentraLiveSearch.bind === 'function') {
+      var el = typeof inputOrId === 'string' ? $(inputOrId) : inputOrId;
+      return window.XentraLiveSearch.bind(el, onChange, options);
+    }
+    if (typeof window.bindLiveSearch === 'function') {
+      return window.bindLiveSearch(inputOrId, onChange, options);
+    }
+    var target = typeof inputOrId === 'string' ? $(inputOrId) : inputOrId;
+    if (!target || typeof onChange !== 'function') return function () {};
+    var onInput = function () {
+      onChange({ query: String(target.value || '').trim().toLowerCase(), raw: target.value || '', empty: !String(target.value || '').trim() });
+    };
+    target.addEventListener('input', onInput);
+    return function () { target.removeEventListener('input', onInput); };
+  }
+
   async function confirmFeatureAction(id, title, message, okLabel) {
     if (window.XentraUI && window.XentraUI.Modal && typeof window.XentraUI.Modal.confirm === 'function') {
       return window.XentraUI.Modal.confirm({ title: title, message: message, confirmText: okLabel });

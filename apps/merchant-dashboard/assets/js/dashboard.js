@@ -103,6 +103,7 @@
     target.addEventListener('input', onInput);
     return function () { target.removeEventListener('input', onInput); };
   }
+  window.bindLiveSearch = bindLiveSearch;
 
   function formatMoney(amount) {
     return 'Rp' + Number(amount || 0).toLocaleString('id-ID');
@@ -1006,10 +1007,11 @@
      ========================================================================= */
 
   // State for currently selected branch context
-  var _branchContextState = {
+  var _branchContextState = window._branchContextState || {
     selected: 'all',   // 'all' or a branch id string
     branches: []       // loaded branch objects [{id, name}]
   };
+  window._branchContextState = _branchContextState;
 
   // Populate branch selector from branches list
   function populateBranchSelector(branches) {
