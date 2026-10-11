@@ -304,6 +304,41 @@ class ReportingRepository {
     `, params);
   }
 
+  getAllStockItems(filter = {}) {
+    const whereClauses = [];
+    const params = [];
+
+    if (filter.brand_id) {
+      whereClauses.push('p.brand_id = ? AND b.brand_id = ?');
+      params.push(filter.brand_id, filter.brand_id);
+    }
+    if (filter.branch_id) {
+      whereClauses.push('b.id = ?');
+      params.push(filter.branch_id);
+    }
+
+    const whereSql = whereClauses.length > 0 ? 'WHERE ' + whereClauses.join(' AND ') : '';
+
+    return this.db.queryMany(`
+      SELECT
+        b.id AS branch_id,
+        b.name AS branch_name,
+        p.id AS product_id,
+        p.name AS product_name,
+        c.name AS category_name,
+        COALESCE(bpi.stock_qty, 0) AS current_stock,
+        COALESCE(bpi.low_stock_threshold, 5) AS low_stock_threshold,
+        p.sku,
+        p.is_active
+      FROM products p
+      JOIN branches b ON b.brand_id = p.brand_id
+      LEFT JOIN branch_product_inventory bpi ON bpi.branch_id = b.id AND bpi.product_id = p.id
+      LEFT JOIN categories c ON p.category_id = c.id
+      ${whereSql}
+      ORDER BY bpi.stock_qty ASC, p.name ASC
+    `, params);
+  }
+
   getTopProducts(filter = {}) {
     const { whereSql, params } = this._buildOrderFilter(filter, 'o');
     return this.db.queryMany(`

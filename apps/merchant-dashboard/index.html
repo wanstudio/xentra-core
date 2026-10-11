@@ -2798,6 +2798,27 @@
               </div>
             </section>
 
+            <section class="x-owner-stock-panel">
+              <div class="x-owner-stock-panel-head">
+                <div>
+                  <h3>Daftar Stok Seluruh Menu & Produk</h3>
+                  <p>Semua produk aktif cabang beserta sisa stok fisik dan batas minimum.</p>
+                </div>
+                <div style="display:flex; gap:8px; align-items:center;">
+                  <input type="search" id="input-search-owner-stock-items" class="x-input" placeholder="🔍 Cari nama produk / SKU..." oninput="onOwnerStockItemsSearch(this.value)" autocomplete="off" style="font-size:12px; padding:6px 12px; width:200px; border-radius:8px;">
+                  <select id="select-filter-owner-stock-status" class="x-input" onchange="onOwnerStockStatusFilter(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px;">
+                    <option value="all">Semua Status</option>
+                    <option value="safe">🟢 Stok Aman</option>
+                    <option value="low">🟡 Stok Menipis</option>
+                    <option value="out">🔴 Stok Habis</option>
+                  </select>
+                </div>
+              </div>
+              <div id="owner-stock-all-items-container" style="padding:12px 16px;">
+                <div class="x-owner-stock-loading">Memuat seluruh data stok...</div>
+              </div>
+            </section>
+
             <div class="x-owner-stock-note">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 10v6"></path><circle cx="12" cy="7" r="1"></circle></svg>
               <span>Owner hanya memantau kondisi stok. Penyesuaian stok dilakukan dari surface operasional cabang sesuai hak akses.</span>

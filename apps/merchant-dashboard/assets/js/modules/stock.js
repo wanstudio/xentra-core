@@ -37,6 +37,7 @@
      ========================================================================= */
 
   var _ownerStockLoadedOnce = false;
+  var _ownerStockShowAllAlerts = false;
 
   function formatUnitCount(value) {
     return Number(value || 0).toLocaleString('id-ID');
@@ -133,7 +134,8 @@
           '</div>';
       } else {
         var alertHtml = '';
-        alerts.slice(0, 8).forEach(function (a) {
+        var maxInitial = _ownerStockShowAllAlerts ? alerts.length : 8;
+        alerts.slice(0, maxInitial).forEach(function (a) {
           var current = Number(a.current_stock);
           var threshold = Number(a.low_stock_threshold);
           var isOut = current <= 0;
@@ -153,14 +155,24 @@
               '<span class="x-owner-stock-alert-arrow" aria-hidden="true">›</span>' +
             '</div>';
         });
-        if (alerts.length > 8) {
-          alertHtml += '<button type="button" class="x-owner-stock-more" id="btn-owner-stock-more-alerts">Lihat ' + formatUnitCount(alerts.length - 8) + ' perhatian lainnya</button>';
+        if (alerts.length > 8 && !_ownerStockShowAllAlerts) {
+          alertHtml += '<button type="button" class="x-owner-stock-more" id="btn-owner-stock-more-alerts">Tampilkan seluruh ' + formatUnitCount(alerts.length) + ' item perhatian</button>';
+        } else if (_ownerStockShowAllAlerts && alerts.length > 8) {
+          alertHtml += '<button type="button" class="x-owner-stock-more" id="btn-owner-stock-collapse-alerts" style="background:#F1F5F9; color:#475569;">▲ Ciutkan daftar (tampilkan 8)</button>';
         }
         alertList.innerHTML = alertHtml;
         var moreBtn = $('btn-owner-stock-more-alerts');
         if (moreBtn) {
           moreBtn.addEventListener('click', function () {
-            navigateTo('reports/operations');
+            _ownerStockShowAllAlerts = true;
+            renderOwnerStockOverview(data);
+          });
+        }
+        var collapseBtn = $('btn-owner-stock-collapse-alerts');
+        if (collapseBtn) {
+          collapseBtn.addEventListener('click', function () {
+            _ownerStockShowAllAlerts = false;
+            renderOwnerStockOverview(data);
           });
         }
       }
@@ -217,6 +229,111 @@
         }).join('');
       }
     }
+
+    var allItems = Array.isArray(data.all_stock_items) ? data.all_stock_items : [];
+    _allStockItemsCache = allItems;
+    renderOwnerStockAllItems();
+  }
+
+  var _allStockItemsCache = [];
+  var _allStockItemsSearchQuery = '';
+  var _allStockItemsStatusFilter = 'all';
+
+  function onOwnerStockItemsSearch(val) {
+    _allStockItemsSearchQuery = (val || '').trim().toLowerCase();
+    renderOwnerStockAllItems();
+  }
+  window.onOwnerStockItemsSearch = onOwnerStockItemsSearch;
+
+  function onOwnerStockStatusFilter(val) {
+    _allStockItemsStatusFilter = val || 'all';
+    renderOwnerStockAllItems();
+  }
+  window.onOwnerStockStatusFilter = onOwnerStockStatusFilter;
+
+  function renderOwnerStockAllItems() {
+    var container = $('owner-stock-all-items-container');
+    if (!container) return;
+
+    var items = _allStockItemsCache || [];
+
+    if (_allStockItemsSearchQuery) {
+      items = items.filter(function (it) {
+        var name = (it.product_name || '').toLowerCase();
+        var sku = (it.sku || '').toLowerCase();
+        var branch = (it.branch_name || '').toLowerCase();
+        var cat = (it.category_name || '').toLowerCase();
+        return name.includes(_allStockItemsSearchQuery) ||
+               sku.includes(_allStockItemsSearchQuery) ||
+               branch.includes(_allStockItemsSearchQuery) ||
+               cat.includes(_allStockItemsSearchQuery);
+      });
+    }
+
+    if (_allStockItemsStatusFilter !== 'all') {
+      items = items.filter(function (it) {
+        var cur = Number(it.current_stock || 0);
+        var th = Number(it.low_stock_threshold || 5);
+        if (_allStockItemsStatusFilter === 'out') return cur <= 0;
+        if (_allStockItemsStatusFilter === 'low') return cur > 0 && cur <= th;
+        if (_allStockItemsStatusFilter === 'safe') return cur > th;
+        return true;
+      });
+    }
+
+    if (!items.length) {
+      container.innerHTML = '<div class="x-owner-stock-empty-compact">Tidak ada data produk yang sesuai filter.</div>';
+      return;
+    }
+
+    var rows = items.map(function (it) {
+      var cur = Number(it.current_stock || 0);
+      var th = Number(it.low_stock_threshold || 5);
+      var isOut = cur <= 0;
+      var isLow = cur > 0 && cur <= th;
+
+      var statusBadge = '';
+      if (isOut) {
+        statusBadge = '<span style="background:#FEE2E2; color:#991B1B; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700;">🔴 Habis</span>';
+      } else if (isLow) {
+        statusBadge = '<span style="background:#FEF3C7; color:#92400E; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700;">🟡 Menipis</span>';
+      } else {
+        statusBadge = '<span style="background:#ECFDF5; color:#065F46; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700;">🟢 Aman</span>';
+      }
+
+      return (
+        '<tr style="border-bottom:1px solid #F1F5F9;">' +
+          '<td style="padding:10px 12px; font-size:13px;">' +
+            '<div style="font-weight:700; color:#0F172A;">' + escapeHtml(it.product_name || '-') + '</div>' +
+            '<div style="font-size:11px; color:#64748B;">' + (it.sku ? 'SKU: ' + escapeHtml(it.sku) : '') + (it.category_name ? ' • ' + escapeHtml(it.category_name) : '') + '</div>' +
+          '</td>' +
+          '<td style="padding:10px 12px; font-size:12px; color:#475569;">' + escapeHtml(it.branch_name || '-') + '</td>' +
+          '<td style="padding:10px 12px; font-size:13px; text-align:center;">' +
+            '<strong style="font-size:14px; color:' + (isOut ? '#DC2626' : (isLow ? '#B45309' : '#0F172A')) + ';">' + formatUnitCount(cur) + '</strong>' +
+            ' <small style="color:#64748B;">unit</small>' +
+          '</td>' +
+          '<td style="padding:10px 12px; font-size:12px; color:#64748B; text-align:center;">' + formatUnitCount(th) + ' unit</td>' +
+          '<td style="padding:10px 12px; text-align:right;">' + statusBadge + '</td>' +
+        '</tr>'
+      );
+    }).join('');
+
+    container.innerHTML = (
+      '<div style="overflow-x:auto;">' +
+        '<table style="width:100%; border-collapse:collapse; min-width:480px;">' +
+          '<thead>' +
+            '<tr style="background:#F8FAFC; border-bottom:1px solid #E2E8F0; font-size:11px; font-weight:700; color:#475569; text-transform:uppercase;">' +
+              '<th style="padding:8px 12px; text-align:left;">Menu / Produk</th>' +
+              '<th style="padding:8px 12px; text-align:left;">Cabang</th>' +
+              '<th style="padding:8px 12px; text-align:center;">Sisa Stok</th>' +
+              '<th style="padding:8px 12px; text-align:center;">Batas Min.</th>' +
+              '<th style="padding:8px 12px; text-align:right;">Status</th>' +
+            '</tr>' +
+          '</thead>' +
+          '<tbody>' + rows + '</tbody>' +
+        '</table>' +
+      '</div>'
+    );
   }
 
   function initOwnerStockControls() {
@@ -764,13 +881,21 @@
       }).join('');
     }
 
-    modal.style.display = 'flex';
+    if (window.XentraUI && window.XentraUI.Modal) {
+      window.XentraUI.Modal.open('modal-edit-mandate');
+    } else {
+      modal.style.display = 'flex';
+    }
   }
   window.openEditMandateModal = openEditMandateModal;
 
   function closeEditMandateModal() {
-    var modal = $('modal-edit-mandate');
-    if (modal) modal.style.display = 'none';
+    if (window.XentraUI && window.XentraUI.Modal) {
+      window.XentraUI.Modal.close('modal-edit-mandate');
+    } else {
+      var modal = $('modal-edit-mandate');
+      if (modal) modal.style.display = 'none';
+    }
   }
   window.closeEditMandateModal = closeEditMandateModal;
 
@@ -1037,7 +1162,11 @@
 
     var modal = $('modal-edit-material');
     if (!modal) return;
-    modal.style.display = 'flex';
+    if (window.XentraUI && window.XentraUI.Modal) {
+      window.XentraUI.Modal.open('modal-edit-material');
+    } else {
+      modal.style.display = 'flex';
+    }
 
     if ($('edit-mat-id')) $('edit-mat-id').value = material.id;
     if ($('edit-mat-name')) $('edit-mat-name').value = material.name || '';
@@ -1057,8 +1186,12 @@
   };
 
   window.closeEditMaterialModal = function() {
-    var modal = $('modal-edit-material');
-    if (modal) modal.style.display = 'none';
+    if (window.XentraUI && window.XentraUI.Modal) {
+      window.XentraUI.Modal.close('modal-edit-material');
+    } else {
+      var modal = $('modal-edit-material');
+      if (modal) modal.style.display = 'none';
+    }
     var form = $('form-edit-material');
     if (form) form.reset();
   };
@@ -1123,14 +1256,22 @@
   function openAddMaterialModal() {
     var modal = $('modal-add-material');
     if (modal) {
-      modal.style.display = 'flex';
+      if (window.XentraUI && window.XentraUI.Modal) {
+        window.XentraUI.Modal.open('modal-add-material');
+      } else {
+        modal.style.display = 'flex';
+      }
       loadOwnerUoms();
     }
   }
 
   function closeAddMaterialModal() {
-    var modal = $('modal-add-material');
-    if (modal) modal.style.display = 'none';
+    if (window.XentraUI && window.XentraUI.Modal) {
+      window.XentraUI.Modal.close('modal-add-material');
+    } else {
+      var modal = $('modal-add-material');
+      if (modal) modal.style.display = 'none';
+    }
     var form = $('form-add-material');
     if (form) form.reset();
   }
@@ -1388,7 +1529,11 @@
   function openAddRecipeModal() {
     var modal = $('modal-add-recipe');
     if (!modal) return;
-    modal.style.display = 'flex';
+    if (window.XentraUI && window.XentraUI.Modal) {
+      window.XentraUI.Modal.open('modal-add-recipe');
+    } else {
+      modal.style.display = 'flex';
+    }
 
     var form = $('form-add-recipe');
     if (form) {
@@ -1445,7 +1590,11 @@
 
     var modal = $('modal-add-recipe');
     if (!modal) return;
-    modal.style.display = 'flex';
+    if (window.XentraUI && window.XentraUI.Modal) {
+      window.XentraUI.Modal.open('modal-add-recipe');
+    } else {
+      modal.style.display = 'flex';
+    }
 
     var modalTitleEl = modal.querySelector('h3');
     var modalSubtitleEl = modal.querySelector('p');
@@ -1530,8 +1679,12 @@
   }
 
   function closeAddRecipeModal() {
-    var modal = $('modal-add-recipe');
-    if (modal) modal.style.display = 'none';
+    if (window.XentraUI && window.XentraUI.Modal) {
+      window.XentraUI.Modal.close('modal-add-recipe');
+    } else {
+      var modal = $('modal-add-recipe');
+      if (modal) modal.style.display = 'none';
+    }
     var form = $('form-add-recipe');
     if (form) {
       form.reset();
@@ -1886,12 +2039,20 @@
     if (form) form.reset();
     var idInput = $('sup-input-id');
     if (idInput) idInput.value = '';
-    modal.style.display = 'flex';
+    if (window.XentraUI && window.XentraUI.Modal) {
+      window.XentraUI.Modal.open('modal-add-supplier');
+    } else {
+      modal.style.display = 'flex';
+    }
   }
 
   function closeAddSupplierModal() {
-    var modal = $('modal-add-supplier');
-    if (modal) modal.style.display = 'none';
+    if (window.XentraUI && window.XentraUI.Modal) {
+      window.XentraUI.Modal.close('modal-add-supplier');
+    } else {
+      var modal = $('modal-add-supplier');
+      if (modal) modal.style.display = 'none';
+    }
     var form = $('form-add-supplier');
     if (form) form.reset();
   }
@@ -1917,7 +2078,11 @@
     if ($('sup-input-bank-acc-name')) $('sup-input-bank-acc-name').value = s.bank_account_name || '';
     if ($('sup-input-notes')) $('sup-input-notes').value = s.notes || '';
 
-    modal.style.display = 'flex';
+    if (window.XentraUI && window.XentraUI.Modal) {
+      window.XentraUI.Modal.open('modal-add-supplier');
+    } else {
+      modal.style.display = 'flex';
+    }
   }
 
   function submitAddSupplierForm(event) {

@@ -21,12 +21,14 @@ class InventoryReportService {
     const lowStockItems = reportingRepository.getLowStockItems(filter);
     const stockSummary = reportingRepository.getInventoryStockSummary(filter);
     const stockByBranch = reportingRepository.getInventoryStockBranchSummary(filter);
+    const allStockItems = reportingRepository.getAllStockItems(filter);
 
     return {
       report_type: 'inventory',
       filter,
       movement_breakdown: movementBreakdown,
       low_stock_alerts: lowStockItems,
+      all_stock_items: allStockItems || [],
       stock_summary: stockSummary || { tracked_item_count: 0, low_stock_count: 0, out_of_stock_count: 0, total_units: 0 },
       stock_by_branch: stockByBranch || []
     };
