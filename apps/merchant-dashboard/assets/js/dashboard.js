@@ -3867,6 +3867,11 @@
       lblDirect.style.background = isDirect ? '#f8fafc' : '#ffffff';
     }
 
+    var costGroup = $('group-prod-cost-price');
+    if (costGroup) {
+      costGroup.style.display = isDirect ? 'block' : 'none';
+    }
+
     var stockNote = $('prod-stock-note');
     if (stockNote) {
       if (isDirect) {
@@ -4996,12 +5001,12 @@ async function loadMenusView() {
           return;
         }
         var sku = manageStock ? rawSku : null;
+        var invType = ($('prod-type-direct') && $('prod-type-direct').checked) ? 'DIRECT' : 'COOKED';
         var costPrice = null;
-        if ($('prod-cost-price')) {
+        if (invType === 'DIRECT' && $('prod-cost-price')) {
           var rawCost = window.XentraCurrencyInput ? window.XentraCurrencyInput.getValue($('prod-cost-price')) : $('prod-cost-price').value.replace(/\D/g, '');
           costPrice = rawCost !== '' && !isNaN(Number(rawCost)) ? Number(rawCost) : null;
         }
-        var invType = ($('prod-type-direct') && $('prod-type-direct').checked) ? 'DIRECT' : 'COOKED';
         var payload = {
           name: $('prod-name').value.trim(),
           sku: sku || null,
