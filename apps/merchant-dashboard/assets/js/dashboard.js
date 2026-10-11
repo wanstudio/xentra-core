@@ -77,14 +77,13 @@
     });
   }
 
-  var state = {
-    brand: null,
-    categories: [],
-    products: [],
-    branches: [],
-    orders: [],
-    activeCategoryFilter: 'all'
-  };
+  var state = window.state || {};
+  if (!state.categories) state.categories = [];
+  if (!state.products) state.products = [];
+  if (!state.branches) state.branches = [];
+  if (!state.orders) state.orders = [];
+  if (!state.activeCategoryFilter) state.activeCategoryFilter = 'all';
+  window.state = state;
 
   function $(id) {
     return document.getElementById(id);
@@ -171,6 +170,7 @@
       }
     });
   }
+  window.requestTextInputSheet = requestTextInputSheet;
 
   function openExistingCardInPresentation(modalId, shellId, type) {
     var backdrop = $(modalId);
@@ -2145,7 +2145,8 @@
   var _masterReferenceTab = 'category';
   var _masterReferenceLoadSeq = 0;
   var _masterMenuComponents = { title: [], flavor: [], complement: [], level: [] };
-  var _ownerMasterMenuState = { menus: [] };
+  var _ownerMasterMenuState = window._ownerMasterMenuState || { menus: [] };
+  window._ownerMasterMenuState = _ownerMasterMenuState;
 
   function showCategoryEditorSection() {
     if (window.XentraCatalogModule && window.XentraCatalogModule.showCategoryEditorSection) {
@@ -2160,6 +2161,9 @@
   }
 
   function setMasterReferenceTab(type) {
+    if (window.XentraCatalogModule && window.XentraCatalogModule.setMasterReferenceTab) {
+      return window.XentraCatalogModule.setMasterReferenceTab(type);
+    }
     var allowed = ['category', 'title', 'flavor', 'item'];
     _masterReferenceTab = allowed.indexOf(type) !== -1 ? type : 'category';
 

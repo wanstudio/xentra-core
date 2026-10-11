@@ -58,7 +58,7 @@
      directly to /admin/menus/* and never uses the legacy customer catalog route.
      ========================================================================= */
 
-  var _ownerMasterMenuState = {
+  var _ownerMasterMenuState = window._ownerMasterMenuState || {
     menus: [],
     products: [],
     categories: [],
@@ -73,6 +73,7 @@
     packageComponents: [],
     menuItems: []
   };
+  window._ownerMasterMenuState = _ownerMasterMenuState;
 
   function upsertOwnerMasterMenuDependency(type, row, options) {
     options = options || {};
@@ -135,6 +136,7 @@
     }
     return menu.title_name || menu.sub_category_name || 'Menu';
   }
+  window.ownerMasterMenuTitle = ownerMasterMenuTitle;
 
   function ownerMasterMenuRasaLabel(name) {
     var value = String(name || '').trim();

@@ -46,6 +46,26 @@
   var _branchContextState = window._branchContextState || { selected: 'all', branches: [] };
   window._branchContextState = _branchContextState;
 
+  var _ownerMasterMenuState = window._ownerMasterMenuState || { menus: [] };
+  window._ownerMasterMenuState = _ownerMasterMenuState;
+
+  function ownerMasterMenuTitle(menu) {
+    if (!menu) return 'Menu';
+    if (String(menu.menu_type).toUpperCase() === 'PACKAGE') {
+      return menu.package_name || menu.sub_category_name || 'Paket';
+    }
+    return menu.title_name || menu.sub_category_name || 'Menu';
+  }
+  window.ownerMasterMenuTitle = ownerMasterMenuTitle;
+
+  function requestTextInputSheet(options) {
+    if (typeof window.requestTextInputSheet === 'function') {
+      return window.requestTextInputSheet(options);
+    }
+    options = options || {};
+    return Promise.resolve(window.prompt(options.title || 'Input', options.value || ''));
+  }
+
   function bindLiveSearch(inputOrId, onChange, options) {
     if (window.XentraLiveSearch && typeof window.XentraLiveSearch.bind === 'function') {
       var el = typeof inputOrId === 'string' ? $(inputOrId) : inputOrId;
@@ -3214,6 +3234,14 @@ async function loadMenusView() {
   window.showProductListSection = showProductListSection;
   window.showProductDetailSection = showProductDetailSection;
   window.showProductEditorSection = showProductEditorSection;
+  window.showMasterCategoriesPage = showMasterCategoriesPage;
+  window.showCategoryEditorSection = showCategoryEditorSection;
+  window.setMasterReferenceTab = setMasterReferenceTab;
+  window.renderMasterReferenceList = renderMasterReferenceList;
+  window.renderMasterItemsList = renderMasterItemsList;
+  window.renderMasterCategoriesPage = renderMasterCategoriesPage;
+  window.renderMasterFlavorsPage = renderMasterFlavorsPage;
+  window.referenceRows = referenceRows;
 
   window.XentraCatalogModule = {
     loadMasterProducts: loadMasterProducts,
@@ -3224,7 +3252,15 @@ async function loadMenusView() {
     loadProductEditorPage: loadProductEditorPage,
     loadMenusView: loadMenusView,
     loadSingleBranchMenuView: loadSingleBranchMenuView,
-    initCatalogListeners: initCatalogListeners
+    initCatalogListeners: initCatalogListeners,
+    showMasterCategoriesPage: showMasterCategoriesPage,
+    showCategoryEditorSection: showCategoryEditorSection,
+    setMasterReferenceTab: setMasterReferenceTab,
+    renderMasterReferenceList: renderMasterReferenceList,
+    renderMasterItemsList: renderMasterItemsList,
+    renderMasterCategoriesPage: renderMasterCategoriesPage,
+    renderMasterFlavorsPage: renderMasterFlavorsPage,
+    referenceRows: referenceRows
   };
 
 })(window, document);
