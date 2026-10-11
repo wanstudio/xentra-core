@@ -190,8 +190,8 @@ app.use(cors({
 app.use(express.json({ limit: '30mb' }));
 app.use(express.urlencoded({ extended: true, limit: '30mb' }));
 
-// REST API with Tenant Resolution (Support /api/v1, /api, and root /auth)
-app.use(['/api/v1', '/api', '/auth'], (req, res, next) => {
+// REST API with Tenant Resolution (Support /api/v1, /api, root /auth, and root /admin)
+app.use(['/api/v1', '/api', '/auth', '/admin'], (req, res, next) => {
   // Allow /auth/broker HTML view to pass through to its designated UI route
   if (req.baseUrl === '/auth' && (req.path === '/broker' || req.path === '/broker/')) {
     return next();
@@ -199,6 +199,10 @@ app.use(['/api/v1', '/api', '/auth'], (req, res, next) => {
   // If requested at root /auth/..., normalize req.url so apiRoutes matches /auth/...
   if (req.baseUrl === '/auth') {
     req.url = '/auth' + (req.url === '/' ? '' : req.url);
+  }
+  // If requested at root /admin/..., normalize req.url so apiRoutes matches /admin/...
+  if (req.baseUrl === '/admin') {
+    req.url = '/admin' + (req.url === '/' ? '' : req.url);
   }
   tenantResolver(req, res, () => {
     apiRoutes(req, res, next);

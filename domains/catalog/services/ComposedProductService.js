@@ -49,6 +49,8 @@ class ComposedProductService {
     sku = null,
     costPrice = null,
     cost_price = null,
+    inventoryType = 'COOKED',
+    inventory_type = null,
     description = '',
     imageUrl = null,
     image = null,
@@ -64,6 +66,7 @@ class ComposedProductService {
     const normalizedCostPrice = costPrice !== null && costPrice !== undefined
       ? Number(costPrice) || 0
       : (cost_price !== null && cost_price !== undefined ? Number(cost_price) || 0 : 0);
+    const resolvedInventoryType = String(inventory_type || inventoryType || 'COOKED').toUpperCase() === 'DIRECT' ? 'DIRECT' : 'COOKED';
     const id = makeId('prd');
     const baseSlug = slugify(normalizedName) || id;
     const slug = baseSlug + '-' + id.slice(-8);
@@ -72,9 +75,9 @@ class ComposedProductService {
     try {
       repository.db.execute(
         "INSERT INTO products " +
-        "(id, brand_id, category_id, name, slug, description, price, regular_price, image_url, image, is_active, sku, cost_price) " +
-        "VALUES (?, ?, NULL, ?, ?, ?, 0, NULL, ?, ?, ?, ?, ?)",
-        [id, brandId, normalizedName, slug, description == null ? '' : String(description), imageUrl, image, normalizeBoolean(isActive) ? 1 : 0, normalizedSku, normalizedCostPrice]
+        "(id, brand_id, category_id, name, slug, description, price, regular_price, image_url, image, is_active, sku, cost_price, inventory_type) " +
+        "VALUES (?, ?, NULL, ?, ?, ?, 0, NULL, ?, ?, ?, ?, ?, ?)",
+        [id, brandId, normalizedName, slug, description == null ? '' : String(description), imageUrl, image, normalizeBoolean(isActive) ? 1 : 0, normalizedSku, normalizedCostPrice, resolvedInventoryType]
       );
 
       if (normalizedSku) {
@@ -112,6 +115,8 @@ class ComposedProductService {
     description,
     costPrice,
     cost_price,
+    inventoryType,
+    inventory_type,
     imageUrl,
     image,
     isActive,
@@ -144,6 +149,9 @@ class ComposedProductService {
     const nextCostPrice = (costPrice !== undefined || cost_price !== undefined)
       ? Number(costPrice !== undefined ? costPrice : cost_price) || 0
       : null;
+    const nextInventoryType = (inventory_type !== undefined || inventoryType !== undefined)
+      ? (String(inventory_type !== undefined ? inventory_type : inventoryType).toUpperCase() === 'DIRECT' ? 'DIRECT' : 'COOKED')
+      : null;
     const nextImageUrl = imageUrl === undefined ? null : imageUrl;
     const nextImage = image === undefined ? null : image;
     const nextActive = isActive === undefined ? null : (normalizeBoolean(isActive) ? 1 : 0);
@@ -166,6 +174,12 @@ class ComposedProductService {
         repository.db.execute(
           "UPDATE products SET cost_price = ?, updated_at = datetime('now') WHERE id = ? AND brand_id = ?",
           [nextCostPrice, productId, brandId]
+        );
+      }
+      if (nextInventoryType !== null) {
+        repository.db.execute(
+          "UPDATE products SET inventory_type = ?, updated_at = datetime('now') WHERE id = ? AND brand_id = ?",
+          [nextInventoryType, productId, brandId]
         );
       }
       if (imageUrl !== undefined || image !== undefined) {

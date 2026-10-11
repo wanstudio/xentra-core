@@ -482,8 +482,32 @@ router.get('/admin/branches/:id/purchasing/checklist', requireAuth(['owner', 'br
       ORDER BY m.name ASC
     `).all(locationId, locationId, branch.organization_id);
 
+    const directProductRows = db.prepare(`
+      SELECT
+        p.id AS material_id,
+        COALESCE(p.sku, p.id) AS material_code,
+        p.name AS material_name,
+        COALESCE(p.product_stock_uom_id, 'pcs') AS base_uom_id,
+        COALESCE(u.name, 'Pcs') AS base_uom_name,
+        COALESCE(u.code, 'pcs') AS base_uom_code,
+        COALESCE(bpi.stock_qty, 0) AS current_stock,
+        COALESCE(p.cost_price, 0) AS last_unit_cost,
+        COALESCE(rp.minimum_quantity, bpi.low_stock_threshold, 5) AS minimum_quantity,
+        COALESCE(rp.target_quantity, 15) AS target_quantity,
+        1 AS is_direct_product
+      FROM products p
+      LEFT JOIN branch_product_inventory bpi
+        ON bpi.product_id = p.id AND bpi.branch_id = ?
+      LEFT JOIN inventory_reorder_policies rp
+        ON rp.identity_id = p.id AND rp.stock_location_id = ? AND rp.identity_type = 'PRODUCT'
+      LEFT JOIN uoms u
+        ON u.id = p.product_stock_uom_id
+      WHERE p.brand_id = ? AND p.is_active = 1 AND p.inventory_type = 'DIRECT'
+      ORDER BY p.name ASC
+    `).all(branch.id, locationId, branch.brand_id);
+
     let totalEstimatedBudget = 0;
-    const items = rows.map(item => {
+    const materialItems = rows.map(item => {
       const current = Number(item.current_stock);
       const min = Number(item.minimum_quantity);
       const target = Number(item.target_quantity);
@@ -503,6 +527,29 @@ router.get('/admin/branches/:id/purchasing/checklist', requireAuth(['owner', 'br
         estimated_subtotal: estimatedSubtotal
       };
     });
+
+    const directItems = directProductRows.map(item => {
+      const current = Number(item.current_stock);
+      const min = Number(item.minimum_quantity);
+      const target = Number(item.target_quantity);
+      const isLow = current <= min;
+      const suggestedQty = isLow ? Math.max(1, target - current) : 0;
+      const lastCost = Number(item.last_unit_cost);
+      const estimatedSubtotal = suggestedQty * lastCost;
+
+      if (isLow) {
+        totalEstimatedBudget += estimatedSubtotal;
+      }
+
+      return {
+        ...item,
+        is_low: isLow,
+        suggested_qty: suggestedQty,
+        estimated_subtotal: estimatedSubtotal
+      };
+    });
+
+    const items = [...materialItems, ...directItems];
 
     res.json({
       success: true,

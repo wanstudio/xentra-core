@@ -73,7 +73,7 @@ class ComposedMenuRepository {
 
   findProduct({ brandId, productId }) {
     return this.db.queryOne(
-      "SELECT id, brand_id, name, sku, cost_price, description, image_url, image, is_active FROM products " +
+      "SELECT id, brand_id, name, sku, cost_price, description, image_url, image, is_active, COALESCE(inventory_type, 'COOKED') AS inventory_type FROM products " +
       "WHERE id = ? AND brand_id = ?",
       [productId, brandId]
     );
@@ -96,7 +96,7 @@ class ComposedMenuRepository {
       params.push(needle, needle);
     }
     const products = this.db.queryMany(
-      "SELECT p.id, p.brand_id, p.name, p.sku, p.cost_price, p.description, p.image_url, p.image, p.is_active " +
+      "SELECT p.id, p.brand_id, p.name, p.sku, p.cost_price, p.description, p.image_url, p.image, p.is_active, COALESCE(p.inventory_type, 'COOKED') AS inventory_type " +
       "FROM products p WHERE " + clauses.join(' AND ') +
       " ORDER BY p.name ASC, p.id ASC",
       params

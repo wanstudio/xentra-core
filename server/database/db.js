@@ -967,6 +967,7 @@ function initSchema(targetDb) {
       options_config TEXT DEFAULT NULL,
       menu_schema_version INTEGER NOT NULL DEFAULT 1,
       menu_migration_status TEXT NOT NULL DEFAULT 'legacy',
+      inventory_type TEXT DEFAULT 'COOKED',
       FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
       FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
     );
@@ -2174,6 +2175,7 @@ function initSchema(targetDb) {
   // these fields store state only, not duplicate business content.
   try { targetDb.exec("ALTER TABLE products ADD COLUMN menu_schema_version INTEGER NOT NULL DEFAULT 1;"); } catch (e) {}
   try { targetDb.exec("ALTER TABLE products ADD COLUMN menu_migration_status TEXT NOT NULL DEFAULT 'legacy';"); } catch (e) {}
+  try { targetDb.exec("ALTER TABLE products ADD COLUMN inventory_type TEXT DEFAULT 'COOKED';"); } catch (e) {}
   try { targetDb.exec('ALTER TABLE brands ADD COLUMN tagline TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE brands ADD COLUMN banners TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN order_channel TEXT DEFAULT "customer_app";'); } catch (e) {}

@@ -3849,6 +3849,34 @@
     }
   }
 
+  function updateProductInventoryTypeUI(type) {
+    var isDirect = String(type).toUpperCase() === 'DIRECT';
+    var radioCooked = $('prod-type-cooked');
+    var radioDirect = $('prod-type-direct');
+    if (radioCooked) radioCooked.checked = !isDirect;
+    if (radioDirect) radioDirect.checked = isDirect;
+
+    var lblCooked = $('label-prod-type-cooked');
+    var lblDirect = $('label-prod-type-direct');
+    if (lblCooked) {
+      lblCooked.style.borderColor = !isDirect ? 'var(--primary-color, #10b981)' : '#cbd5e1';
+      lblCooked.style.background = !isDirect ? '#f8fafc' : '#ffffff';
+    }
+    if (lblDirect) {
+      lblDirect.style.borderColor = isDirect ? 'var(--primary-color, #10b981)' : '#cbd5e1';
+      lblDirect.style.background = isDirect ? '#f8fafc' : '#ffffff';
+    }
+
+    var stockNote = $('prod-stock-note');
+    if (stockNote) {
+      if (isDirect) {
+        stockNote.textContent = 'Barang dagang siap jual dipantau stok fisiknya dan otomatis masuk Ceklist Belanja saat menipis.';
+      } else {
+        stockNote.textContent = 'Item olahan dikurangi otomatis lewat formula resep di tab Resep Makanan.';
+      }
+    }
+  }
+
   function resetProductEditorForAdd() {
     $('product-editor-title').textContent = 'Tambah Item';
     $('prod-editor-breadcrumb').textContent = 'Tambah Item';
@@ -3863,6 +3891,7 @@
       if (window.XentraCurrencyInput) window.XentraCurrencyInput.setValue($('prod-cost-price'), '');
       else $('prod-cost-price').value = '';
     }
+    updateProductInventoryTypeUI('COOKED');
     updateProductStockManageUI(false);
     _productEditorActiveState = 1;
     _productImageFile = null;
@@ -3881,6 +3910,7 @@
     if ($('product-editor-mobile-subtitle')) $('product-editor-mobile-subtitle').textContent = 'Perbarui item tanpa mengubah identitas komersial Menu.';
     $('prod-id').value = prod.id;
     $('prod-name').value = prod.name || '';
+    updateProductInventoryTypeUI(prod.inventory_type || 'COOKED');
     var hasSku = prod.sku != null && String(prod.sku).trim() !== '';
     $('prod-sku').value = hasSku ? String(prod.sku).trim() : '';
     updateProductStockManageUI(hasSku);
@@ -4315,13 +4345,34 @@ async function loadMenusView() {
   function renderMenusBranchAvailableProducts(available) {
     var container = $('menus-branch-available-container');
     if (!container) return;
+    available = available || [];
+    XentraOwnerBranchCatalog.state.availableMenus = available;
+
+    var searchEl = $('menus-branch-available-search');
+    if (searchEl && !searchEl.dataset.bound) {
+      searchEl.dataset.bound = '1';
+      searchEl.addEventListener('input', function () {
+        renderMenusBranchAvailableProducts(XentraOwnerBranchCatalog.state.availableMenus || []);
+      });
+    }
 
     if (!available.length) {
       container.innerHTML = '<div style="grid-column:1/-1;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:24px;text-align:center;color:#64748b;font-size:13px;">Semua Master Menu telah diadopsi oleh cabang ini.</div>';
       return;
     }
 
-    container.innerHTML = available.map(function (p) {
+    var query = String((searchEl && searchEl.value) || '').trim().toLowerCase();
+    var filtered = !query ? available : available.filter(function (p) {
+      return [p.name, p.title, p.title_name, p.category_name, p.rasa_name, p.sku]
+        .filter(Boolean).join(' ').toLowerCase().indexOf(query) !== -1;
+    });
+
+    if (!filtered.length) {
+      container.innerHTML = '<div style="grid-column:1/-1;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:24px;text-align:center;color:#64748b;font-size:13px;">Tidak ada menu yang cocok dengan "' + esc(query) + '".</div>';
+      return;
+    }
+
+    container.innerHTML = filtered.map(function (p) {
       var menuId = p.menu_id || p.id;
       var img = p.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100';
       var isRange = p.pricing_mode === 'range';
@@ -4739,6 +4790,27 @@ async function loadMenusView() {
       });
     }
 
+    var radioCooked = $('prod-type-cooked');
+    if (radioCooked && !radioCooked.dataset.bound) {
+      radioCooked.dataset.bound = 'true';
+      radioCooked.addEventListener('change', function () {
+        updateProductInventoryTypeUI('COOKED');
+      });
+    }
+
+    var radioDirect = $('prod-type-direct');
+    if (radioDirect && !radioDirect.dataset.bound) {
+      radioDirect.dataset.bound = 'true';
+      radioDirect.addEventListener('change', function () {
+        updateProductInventoryTypeUI('DIRECT');
+        var stockToggle = $('prod-manage-stock-toggle');
+        if (stockToggle && !stockToggle.checked) {
+          stockToggle.checked = true;
+          updateProductStockManageUI(true);
+        }
+      });
+    }
+
     // Master Products Add buttons
     var btnAddProd = $('btn-add-product');
     if (btnAddProd) btnAddProd.addEventListener('click', window.openAddProduct);
@@ -4929,10 +5001,12 @@ async function loadMenusView() {
           var rawCost = window.XentraCurrencyInput ? window.XentraCurrencyInput.getValue($('prod-cost-price')) : $('prod-cost-price').value.replace(/\D/g, '');
           costPrice = rawCost !== '' && !isNaN(Number(rawCost)) ? Number(rawCost) : null;
         }
+        var invType = ($('prod-type-direct') && $('prod-type-direct').checked) ? 'DIRECT' : 'COOKED';
         var payload = {
           name: $('prod-name').value.trim(),
           sku: sku || null,
           cost_price: costPrice,
+          inventory_type: invType,
           description: $('prod-desc').value,
           is_active: id ? _productEditorActiveState : 1
         };
@@ -7609,15 +7683,15 @@ async function loadMenusView() {
       container.innerHTML = '<div class="x-owner-stock-loading">Memuat resep masakan & komposisi bahan...</div>';
     }
 
-    return adminFetch('/api/v1/admin/inventory-workflow/context', { credentials: 'omit', headers: getAuthHeaders() })
+    return adminFetch(API_BASE + '/admin/inventory-workflow/context', { headers: getAuthHeaders() })
       .then(function (res) {
         if (!res.ok) {
-          return adminFetch('/admin/inventory-workflow/context', { credentials: 'omit', headers: getAuthHeaders() });
+          return res.json().then(function (err) {
+            throw new Error(err.message || err.error || ('Gagal memuat konteks resep masakan (HTTP ' + res.status + ')'));
+          }).catch(function (e) {
+            throw new Error(e.message || ('Gagal memuat konteks resep masakan (HTTP ' + res.status + ')'));
+          });
         }
-        return res;
-      })
-      .then(function (res) {
-        if (!res.ok) throw new Error('Gagal memuat konteks resep masakan (HTTP ' + res.status + ')');
         return res.json();
       })
       .then(function (resData) {
@@ -7744,7 +7818,7 @@ async function loadMenusView() {
       if (products.length > 0) {
         populateRecipeProducts(products);
       } else {
-        adminFetch('/api/v1/admin/inventory-workflow/context', { credentials: 'omit', headers: getAuthHeaders() })
+        adminFetch(API_BASE + '/admin/inventory-workflow/context', { headers: getAuthHeaders() })
           .then(function (res) { return res.json(); })
           .then(function (resData) {
             var data = resData.data || resData;
@@ -7767,13 +7841,19 @@ async function loadMenusView() {
   function populateRecipeProducts(products) {
     var prodSelect = $('recipe-input-product');
     if (!prodSelect) return;
-    if (!products || products.length === 0) {
-      prodSelect.innerHTML = '<option value="">Tidak ada menu aktif dengan SKU</option>';
+
+    // Filter: hanya produk bertipe olahan dapur (bukan DIRECT / barang dagang tanpa resep)
+    var cookableProducts = (products || []).filter(function (p) {
+      return (p.inventory_type || 'COOKED').toUpperCase() !== 'DIRECT';
+    });
+
+    if (cookableProducts.length === 0) {
+      prodSelect.innerHTML = '<option value="">Tidak ada menu olahan yang perlu dibuatkan resep</option>';
       return;
     }
-    var html = '<option value="">Pilih Menu Makanan / Minuman...</option>';
-    products.forEach(function (p) {
-      html += '<option value="' + escapeHtml(p.id) + '">' + escapeHtml(p.name) + ' (' + escapeHtml(p.sku || 'No SKU') + ')</option>';
+    var html = '<option value="">Pilih Menu Makanan / Minuman Olahan...</option>';
+    cookableProducts.forEach(function (p) {
+      html += '<option value="' + escapeHtml(p.id) + '">' + escapeHtml(p.name) + '</option>';
     });
     prodSelect.innerHTML = html;
   }
@@ -7925,26 +8005,18 @@ async function loadMenusView() {
       components: components
     };
 
-    var targetUrl = '/admin/inventory-workflow/recipes';
-    adminFetch('/api/v1' + targetUrl, {
+    var targetUrl = API_BASE + '/admin/inventory-workflow/recipes';
+    adminFetch(targetUrl, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(payload)
     })
       .then(function (res) {
         if (!res.ok) {
-          return adminFetch(targetUrl, {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify(payload)
-          });
-        }
-        return res;
-      })
-      .then(function (res) {
-        if (!res.ok) {
           return res.json().then(function (err) {
             throw new Error(err.message || 'Gagal menyimpan resep masakan');
+          }).catch(function (e) {
+            throw new Error(e.message || 'Gagal menyimpan resep masakan');
           });
         }
         return res.json();
@@ -7976,15 +8048,15 @@ async function loadMenusView() {
       container.innerHTML = '<div class="x-owner-stock-loading">Memuat daftar supplier resmi...</div>';
     }
 
-    return adminFetch('/admin/inventory-workflow/context', { credentials: 'omit', headers: getAuthHeaders() })
+    return adminFetch(API_BASE + '/admin/inventory-workflow/context', { headers: getAuthHeaders() })
       .then(function (res) {
         if (!res.ok) {
-          return adminFetch('/api/v1/admin/inventory-workflow/context', { credentials: 'omit', headers: getAuthHeaders() });
+          return res.json().then(function (err) {
+            throw new Error(err.message || err.error || ('Gagal memuat bank data supplier (HTTP ' + res.status + ')'));
+          }).catch(function (e) {
+            throw new Error(e.message || ('Gagal memuat bank data supplier (HTTP ' + res.status + ')'));
+          });
         }
-        return res;
-      })
-      .then(function (res) {
-        if (!res.ok) throw new Error('Gagal memuat bank data supplier (HTTP ' + res.status + ')');
         return res.json();
       })
       .then(function (resData) {
@@ -8166,8 +8238,8 @@ async function loadMenusView() {
     };
 
     var url = supId
-      ? '/admin/inventory-workflow/suppliers/' + encodeURIComponent(supId)
-      : '/admin/inventory-workflow/suppliers';
+      ? (API_BASE + '/admin/inventory-workflow/suppliers/' + encodeURIComponent(supId))
+      : (API_BASE + '/admin/inventory-workflow/suppliers');
     var method = supId ? 'PUT' : 'POST';
 
     adminFetch(url, {
@@ -8204,7 +8276,7 @@ async function loadMenusView() {
     var confirmed = await confirmFeatureAction('archive-supplier', 'Arsipkan Supplier', 'Apakah Anda yakin ingin mengarsipkan supplier "' + name + '"?', 'Arsipkan');
     if (!confirmed) return;
 
-    adminFetch('/admin/inventory-workflow/suppliers/' + encodeURIComponent(id), {
+    adminFetch(API_BASE + '/admin/inventory-workflow/suppliers/' + encodeURIComponent(id), {
       method: 'DELETE',
       headers: getAuthHeaders()
     })

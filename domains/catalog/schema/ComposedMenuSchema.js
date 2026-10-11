@@ -215,6 +215,9 @@ function ensureComposedMenuSchema(db) {
   if (!hasColumn(db, 'products', 'sku')) {
     db.exec('ALTER TABLE products ADD COLUMN sku TEXT;');
   }
+  if (!hasColumn(db, 'products', 'inventory_type')) {
+    db.exec("ALTER TABLE products ADD COLUMN inventory_type TEXT DEFAULT 'COOKED';");
+  }
 
   // Contract v1: longgarkan bentuk legacy menus SEBELUM batch schema, supaya index/trigger
   // di batch itu terpasang pada tabel hasil rebuild.
