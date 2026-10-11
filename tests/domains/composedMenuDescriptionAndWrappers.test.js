@@ -138,6 +138,27 @@ test('Menu Description Auto-Composition and Package/SubCat Service Contracts', a
     });
     assert.equal(delSub.status, 'ARCHIVED');
 
+    // 6. Test Product Cost Behavior: Cooked (null/0 cost) vs Direct (has purchase cost)
+    const cookedWithoutCost = ComposedProductService.createProduct({
+      brandId,
+      name: 'Item Olahan Tanpa Cost ' + suffix,
+      sku: 'OTC-' + suffix,
+      inventoryType: 'COOKED'
+    });
+    assert.equal(Number(cookedWithoutCost.cost_price || 0), 0, 'Cooked item should have no manual cost');
+
+    const directWithCost = ComposedProductService.createProduct({
+      brandId,
+      name: 'Aqua Resale Direct ' + suffix,
+      sku: 'ARD-' + suffix,
+      costPrice: 2500,
+      inventoryType: 'DIRECT'
+    });
+    assert.equal(Number(directWithCost.cost_price), 2500, 'Direct resale item preserves purchase cost');
+
+    // Clean up temporary products
+    try { repo.db.execute('DELETE FROM products WHERE id IN (?, ?)', [cookedWithoutCost.id, directWithCost.id]); } catch (_) {}
+
   } finally {
     // Cleanup
     if (createdMenu) {
