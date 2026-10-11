@@ -1184,7 +1184,7 @@
         menu_indicator_level: menu.level && menu.level.value != null ? menu.level.value : null,
         price: Number(menu.price || 0),
         regular_price: Number(menu.price || 0),
-        description: componentSnapshot.length === 1 ? (componentSnapshot[0].description || '') : '',
+        description: menu.description || (componentSnapshot.length === 1 ? (componentSnapshot[0].description || '') : ''),
         // Foto customer-facing adalah milik Menu (Satuan maupun Paket), bukan komponen Product.
         // Kosong berarti placeholder netral — bukan foto salah satu Product.
         image_url: menu.image_url || menu.image || '',
@@ -1486,7 +1486,7 @@
         (menuSubtitle ? '  <div class="x-product-subtitle">' + UI.escape(menuSubtitle) + '</div>' : '') +
         (menuDetail.length ? '  <div class="x-product-description">' + UI.escape(menuDetail.join(' · ')) + '</div>' : '') +
         renderCustomerSpiceIndicator(product.menu_indicator_level) +
-        (!menuSubtitle && !menuDetail.length && legacyDesc ? '  <div class="x-product-description">' + UI.escape(legacyDesc) + '</div>' : '') +
+        (!menuDetail.length && legacyDesc ? '  <div class="x-product-description">' + UI.escape(legacyDesc) + '</div>' : '') +
         unavailableTag +
         '  <div class="x-price">' + oldPriceHtml +
         '    <div class="x-current-price">' + UI.money(price) + '</div>' +

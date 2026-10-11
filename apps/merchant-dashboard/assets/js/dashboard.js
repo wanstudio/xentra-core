@@ -13964,7 +13964,7 @@ async function loadMenusView() {
     var menus = (_ownerMasterMenuState.menus || []).filter(function(menu) {
       var hay = [
         ownerMasterMenuTitle(menu),
-        menu.sub_category_name || '',
+        menu.description || '',
         menu.category_name || '',
         menu.rasa_name || ''
       ].join(' ').toLowerCase();
@@ -13991,7 +13991,7 @@ async function loadMenusView() {
         ? '<img class="x-master-menu-card-thumb" src="' + esc(thumb) + '" alt="' + esc(title) + '" loading="lazy" decoding="async">'
         : '<span class="x-master-menu-card-thumb x-master-menu-card-thumb-empty" aria-hidden="true"></span>';
       var isActive = status === 'ACTIVE';
-      var itemsList = (menu.components || []).map(function(c) {
+      var itemsList = menu.description || (menu.components || []).map(function(c) {
         var pName = c.product_name;
         if (!pName) {
           var p = ownerMasterMenuFindProduct(c.product_id);
@@ -14000,7 +14000,7 @@ async function loadMenusView() {
         if (!pName) return '';
         var q = Number(c.quantity || 1);
         return pName + (q > 1 ? ' × ' + q : '');
-      }).filter(Boolean).join(', ');
+      }).filter(Boolean).join(' + ');
 
       return '<article class="x-master-menu-card" tabindex="0" role="button" aria-label="Buka editor menu ' + esc(title) + '" onclick="if (!event.target.closest(\'.x-toggle, .x-action-menu-trigger, .x-action-menu\')) { openEditOwnerMasterMenu(\'' + esc(menu.id) + '\'); }" onkeydown="if ((event.key === \'Enter\' || event.key === \' \') && !event.target.closest(\'.x-toggle, .x-action-menu-trigger, .x-action-menu\')) { event.preventDefault(); openEditOwnerMasterMenu(\'' + esc(menu.id) + '\'); }">' +
         '<div class="x-master-menu-card-left">' +

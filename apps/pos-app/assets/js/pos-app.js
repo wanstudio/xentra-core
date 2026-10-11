@@ -1679,6 +1679,7 @@
               badgeHtml+
             '</div>'+
             '<div class="pos-product-name">'+esc(pName)+'</div>'+
+            (p.description ? '<div class="pos-product-desc" style="font-size:11px;color:#64748B;line-height:1.2;margin:2px 0 4px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+esc(p.description)+'">'+esc(p.description)+'</div>' : '')+
             '<div class="pos-product-footer">'+
               '<div class="pos-product-price">'+money(p.price||p.sale_price||p.regular_price)+'</div>'+
               stepperHtml+
