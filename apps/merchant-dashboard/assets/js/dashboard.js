@@ -13125,6 +13125,9 @@ async function loadMenusView() {
     if (titleInput) titleInput.value = '';
     var charCount = $('cm-title-char-count');
     if (charCount) charCount.textContent = '0';
+    var descInput = $('cm-description-input');
+    if (descInput) descInput.value = '';
+    _ownerMasterMenuState.descriptionCustomEdited = false;
     var priceMin = $('cm-price-min');
     if (priceMin) setOwnerMasterMenuMoney('cm-price-min', '');
     var priceMax = $('cm-price-max');
@@ -13561,6 +13564,28 @@ async function loadMenusView() {
       });
     });
 
+    // Auto-compose description jika belum diedit manual oleh user
+    var descInput = $('cm-description-input');
+    if (descInput) {
+      if (!descInput._hasListener) {
+        descInput._hasListener = true;
+        descInput.addEventListener('input', function() {
+          _ownerMasterMenuState.descriptionCustomEdited = true;
+          renderOwnerMasterMenuPreview();
+        });
+      }
+      if (!_ownerMasterMenuState.descriptionCustomEdited) {
+        var autoParts = [];
+        (_ownerMasterMenuState.menuItems || []).forEach(function(it) {
+          var prod = ownerMasterMenuFindProduct(it.product_id);
+          if (!prod) return;
+          var q = Math.max(1, parseInt(it.quantity, 10) || 1);
+          autoParts.push((q > 1 ? q + ' ' : '') + prod.name);
+        });
+        descInput.value = autoParts.join(' + ');
+      }
+    }
+
     if (window.XentraDropdown && typeof window.XentraDropdown.refresh === 'function') {
       window.XentraDropdown.refresh();
     }
@@ -13864,7 +13889,12 @@ async function loadMenusView() {
 
     var previewItemsEl = $('cm-preview-items-list');
     if (previewItemsEl) {
-      previewItemsEl.textContent = previewItemsArr.length > 0 ? previewItemsArr.join(' · ') : 'list item dalam menu';
+      var descVal = ($('cm-description-input') && $('cm-description-input').value.trim()) || '';
+      if (descVal) {
+        previewItemsEl.textContent = descVal;
+      } else {
+        previewItemsEl.textContent = previewItemsArr.length > 0 ? previewItemsArr.join(' + ') : 'list item dalam menu';
+      }
     }
 
     if (indicatorEl) {
@@ -14083,6 +14113,11 @@ async function loadMenusView() {
         var countEl = $('cm-title-char-count');
         if (countEl) countEl.textContent = titleName.length;
       }
+      var descInputEl = $('cm-description-input');
+      if (descInputEl) {
+        descInputEl.value = menu.description || '';
+        _ownerMasterMenuState.descriptionCustomEdited = !!menu.description;
+      }
       if ($('cm-rasa')) $('cm-rasa').value = String(rasaVal);
       setOwnerMasterMenuMoney('cm-price', priceVal);
       setOwnerMasterMenuMoney('cm-cost', costVal);
@@ -14241,6 +14276,7 @@ async function loadMenusView() {
         category_id: categoryId,
         title_id: titleId,
         rasa_id: rasaId,
+        description: ($('cm-description-input') && $('cm-description-input').value.trim()) || null,
         spice_enabled: spiceEnabled,
         spice_level: spiceLevel,
         selling_price: price,

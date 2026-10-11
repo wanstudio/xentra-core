@@ -165,6 +165,7 @@ function migrateLegacyMenuShape(db) {
         rasa_id TEXT,
         menu_type TEXT,
         package_name TEXT,
+        description TEXT,
         level_id TEXT,
         selling_price REAL NOT NULL CHECK (selling_price >= 0),
         cost_price REAL NOT NULL DEFAULT 0 CHECK (cost_price >= 0),
@@ -295,6 +296,7 @@ function ensureComposedMenuSchema(db) {
       rasa_id TEXT,
       menu_type TEXT,
       package_name TEXT,
+      description TEXT,
       level_id TEXT,
       selling_price REAL NOT NULL CHECK (selling_price >= 0),
       cost_price REAL NOT NULL DEFAULT 0 CHECK (cost_price >= 0),
@@ -588,6 +590,7 @@ function ensureComposedMenuSchema(db) {
   // Menu kini mereferensikan Category (pengelompokan) dan Judul (judul customer).
   try { db.exec('ALTER TABLE menus ADD COLUMN category_id TEXT;'); } catch (_) {}
   try { db.exec('ALTER TABLE menus ADD COLUMN title_id TEXT;'); } catch (_) {}
+  try { db.exec('ALTER TABLE menus ADD COLUMN description TEXT;'); } catch (_) {}
 
   // Contract v4 (§3, §8, §21):
   // Menu adalah entitas dengan ID stabil sendiri (MENU-001). Tidak ada formula identitas

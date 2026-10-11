@@ -53,6 +53,7 @@ function resolveMenuBase(menu, branchState = null) {
     menu_type: menu.menu_type,
     title: displayNameOverride || resolveCustomerTitle(menu),
     subtitle: menu.rasa_name && !rasaIsOriginal ? menu.rasa_name : null,
+    description: menu.description || null,
     price: Number(menu.selling_price),
     selling_price: Number(menu.selling_price),
     cost_price: Number(menu.cost_price || 0),

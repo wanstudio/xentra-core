@@ -2176,6 +2176,7 @@ function initSchema(targetDb) {
   try { targetDb.exec("ALTER TABLE products ADD COLUMN menu_schema_version INTEGER NOT NULL DEFAULT 1;"); } catch (e) {}
   try { targetDb.exec("ALTER TABLE products ADD COLUMN menu_migration_status TEXT NOT NULL DEFAULT 'legacy';"); } catch (e) {}
   try { targetDb.exec("ALTER TABLE products ADD COLUMN inventory_type TEXT DEFAULT 'COOKED';"); } catch (e) {}
+  try { targetDb.exec("ALTER TABLE menus ADD COLUMN description TEXT;"); } catch (e) {}
   try { targetDb.exec('ALTER TABLE brands ADD COLUMN tagline TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE brands ADD COLUMN banners TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN order_channel TEXT DEFAULT "customer_app";'); } catch (e) {}
