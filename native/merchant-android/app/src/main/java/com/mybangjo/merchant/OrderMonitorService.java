@@ -209,7 +209,7 @@ public class OrderMonitorService extends Service {
                     // 3. Post High Priority Native Notification
                     showNativeOrderNotification(pendingCount, latestOrder);
 
-                    // 4. Show Floating GoBiz-style Overlay widget over other apps
+                    // 4. Show Floating Overlay widget over other apps
                     if (latestOrder != null) {
                         String orderId = latestOrder.optString("id", "");
                         String orderNum = latestOrder.optString("order_number", "");

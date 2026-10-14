@@ -26,7 +26,7 @@ public class XentraNativeBridge {
 
     @JavascriptInterface
     public String getAppVersion() {
-        return "1.1.0-gobiz";
+        return "1.1.0-release";
     }
 
     // ── Authentication Synchronization for Native Background Worker ──
@@ -40,7 +40,7 @@ public class XentraNativeBridge {
         OrderMonitorService.clearAuthContext(context);
     }
 
-    // ── Floating Order Widget (System Overlay / GoBiz-style) ──
+    // ── Floating Order Widget (System Overlay) ──
     @JavascriptInterface
     public boolean hasOverlayPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {

@@ -85,7 +85,7 @@ public class MainActivity extends AppCompatActivity {
             if (!alreadyAsked) {
                 prefs.edit().putBoolean("overlay_prompt_shown", true).apply();
                 new androidx.appcompat.app.AlertDialog.Builder(this)
-                    .setTitle("🔔 Izin Balon Pesanan (Ala GoBiz)")
+                    .setTitle("🔔 Izin Notifikasi Layar Melayang")
                     .setMessage("Agar pesanan baru otomatis muncul melayang di layar saat kasir sedang membuka WhatsApp atau aplikasi lain, mohon aktifkan izin 'Tampilkan di atas aplikasi lain'.")
                     .setPositiveButton("Aktifkan Izin", (dialog, which) -> {
                         android.content.Intent intent = new android.content.Intent(
