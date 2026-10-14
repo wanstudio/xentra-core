@@ -116,7 +116,7 @@
   function startBMOrdersPolling() {
     stopBMOrdersPolling();
     _bmOrdersState.pollTimer = setInterval(function () {
-      if (document.visibilityState === 'hidden') return;
+      if (document.visibilityState === 'hidden' && !window.IS_NATIVE_APP) return;
       loadBMOrders({ background: true });
     }, 10000);
   }
@@ -271,6 +271,13 @@
       _bmOrdersState.newPendingOrderIds = {};
       _bmOrdersState.seenPendingOrderIds = currentPendingIds;
       window.__xentraSeenPendingOrderIds = currentPendingIds;
+      // If there are unconfirmed pending orders already waiting on startup, alert immediately
+      if (currentPendingOrders.length > 0) {
+        currentPendingOrders.forEach(function (o) {
+          _bmOrdersState.newPendingOrderIds[o.id] = true;
+        });
+        playNewOrderAudibleChime();
+      }
     }
 
     Object.keys(_bmOrdersState.newPendingOrderIds).forEach(function (id) {

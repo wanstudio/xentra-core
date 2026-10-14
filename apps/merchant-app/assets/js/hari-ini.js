@@ -350,7 +350,7 @@
   function startHariIniPolling() {
     stopHariIniPolling();
     _hariIniPollTimer = setInterval(function () {
-      if (document.visibilityState === 'hidden') return;
+      if (document.visibilityState === 'hidden' && !window.IS_NATIVE_APP) return;
       var activeTab = document.querySelector('.x-tab-content.active');
       if (activeTab && activeTab.id === 'tab-hari-ini') {
         loadHariIniOrders({ background: true });

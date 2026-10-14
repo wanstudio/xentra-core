@@ -723,7 +723,7 @@
   function scheduleActionableOrdersCheck(delayMs) {
     if (_actionableOrdersTimeout) clearTimeout(_actionableOrdersTimeout);
     _actionableOrdersTimeout = setTimeout(async function () {
-      if (document.visibilityState === 'hidden') {
+      if (document.visibilityState === 'hidden' && !window.IS_NATIVE_APP) {
         scheduleActionableOrdersCheck(10000);
         return;
       }
@@ -934,7 +934,7 @@
     fetchActionableOrdersCount();
     if (_notificationsState.pollTimer) clearInterval(_notificationsState.pollTimer);
     _notificationsState.pollTimer = setInterval(function () {
-      if (document.visibilityState === 'hidden') return;
+      if (document.visibilityState === 'hidden' && !window.IS_NATIVE_APP) return;
       fetchUnreadNotificationCount();
       var activeTab = document.querySelector('.x-tab-content.active');
       if (!activeTab || activeTab.id !== 'tab-bm-pesanan') {

@@ -1503,6 +1503,24 @@
             <button type="button" class="x-btn-secondary" onclick="window.print()" style="width:100%; justify-content:center; height:42px; font-size:14px; font-weight:700; border-radius:10px;">Tes Cetak Struk</button>
           </div>
 
+          <!-- Order Alarm Sound Test Panel -->
+          <div class="x-card-panel" style="padding:18px 20px; border-radius:14px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.04); margin-bottom:14px;">
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+              <span style="display:flex; align-items:center; justify-content:center; width:38px; height:38px; border-radius:10px; background:#fef3c7; color:#d97706; flex-shrink:0;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/></svg>
+              </span>
+              <div>
+                <h4 style="margin:0; font-size:15px; font-weight:800; color:#0f172a;">Alarm Pesanan Baru</h4>
+                <p style="margin:2px 0 0; color:#64748b; font-size:12px; font-weight:700;">Uji coba sirine &amp; suara pesanan</p>
+              </div>
+            </div>
+            <p style="margin:0 0 14px; color:#64748b; font-size:13px; line-height:1.5;">Saat pesanan baru masuk, alarm berdering keras berulang kali sampai kasir/manager menekan Terima Pesanan.</p>
+            <div style="display:flex; gap:10px;">
+              <button type="button" class="x-btn-primary" onclick="if(window.XentraAudio)window.XentraAudio.orderIncoming({force:true});else if(window.XentraNative)window.XentraNative.playOrderAlarm();" style="flex:1; justify-content:center; height:42px; font-size:13.5px; font-weight:700; border-radius:10px;">🔔 Tes Bunyikan Alarm</button>
+              <button type="button" class="x-btn-secondary" onclick="if(window.XentraAudio)window.XentraAudio.stopOrderAlert();else if(window.XentraNative)window.XentraNative.stopOrderAlarm();" style="flex:1; justify-content:center; height:42px; font-size:13.5px; font-weight:700; border-radius:10px;">⏹️ Hentikan Alarm</button>
+            </div>
+          </div>
+
           <div class="x-card-panel" style="padding:18px 20px; border-radius:14px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
             <h4 style="margin:0 0 10px; font-size:15px; font-weight:800; color:#0f172a;">Format Struk Kasir</h4>
             <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-top:1px solid #f1f5f9; font-size:13px;">

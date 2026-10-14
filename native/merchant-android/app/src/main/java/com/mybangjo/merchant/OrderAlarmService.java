@@ -82,20 +82,57 @@ public class OrderAlarmService extends Service {
         try {
             if (mediaPlayer != null) {
                 if (mediaPlayer.isPlaying()) return;
+                try {
+                    mediaPlayer.stop();
+                } catch (Exception ignored) {}
                 mediaPlayer.release();
+                mediaPlayer = null;
             }
 
-            mediaPlayer = MediaPlayer.create(this, R.raw.ada_pesanan_baru);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                AudioAttributes audioAttributes = new AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .build();
+                try {
+                    mediaPlayer = MediaPlayer.create(this, R.raw.ada_pesanan_baru, audioAttributes, 0);
+                } catch (Exception e) {
+                    mediaPlayer = null;
+                }
+            }
+
+            if (mediaPlayer == null) {
+                mediaPlayer = MediaPlayer.create(this, R.raw.ada_pesanan_baru);
+            }
+
+            if (mediaPlayer == null) {
+                android.net.Uri alarmUri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM);
+                if (alarmUri == null) {
+                    alarmUri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION);
+                }
+                if (alarmUri != null) {
+                    mediaPlayer = MediaPlayer.create(this, alarmUri);
+                }
+            }
+
             if (mediaPlayer != null) {
-                mediaPlayer.setAudioAttributes(
-                    new AudioAttributes.Builder()
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .setUsage(AudioAttributes.USAGE_ALARM)
-                        .build()
-                );
                 mediaPlayer.setLooping(true);
                 mediaPlayer.setVolume(1.0f, 1.0f);
                 mediaPlayer.start();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        try {
+            android.os.Vibrator v = (android.os.Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+            if (v != null && v.hasVibrator()) {
+                long[] pattern = new long[]{0, 800, 400, 800, 400, 1200};
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    v.vibrate(android.os.VibrationEffect.createWaveform(pattern, 0));
+                } else {
+                    v.vibrate(pattern, 0);
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -110,6 +147,15 @@ public class OrderAlarmService extends Service {
                 }
                 mediaPlayer.release();
                 mediaPlayer = null;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        try {
+            android.os.Vibrator v = (android.os.Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+            if (v != null) {
+                v.cancel();
             }
         } catch (Exception e) {
             e.printStackTrace();
