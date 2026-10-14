@@ -78,6 +78,30 @@
     if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
   }
 
+  function formatPWAOrderCode(order) {
+    if (!order) return '#—';
+    var raw = (typeof order === 'string') ? order : (order.order_number || order.orderNumber || order.code || order.id || '');
+    raw = String(raw).trim();
+    if (!raw) return '#—';
+
+    var match = raw.match(/^(?:#)?(OD|DI|TK|RS|POS)-(\d{3,4})\b/i);
+    if (match) {
+      var prefix = match[1].toUpperCase();
+      if (prefix === 'POS') prefix = 'TK';
+      return '#' + prefix + '-' + match[2];
+    }
+
+    var type = (typeof order === 'object' && order !== null) ? (order.order_type || order.fulfillment_type || '') : '';
+    var pfx = 'TK';
+    if (type === 'delivery') pfx = 'OD';
+    else if (type === 'dine_in') pfx = 'DI';
+    else if (type === 'reservation') pfx = 'RS';
+
+    var digits = raw.replace(/\D/g, '');
+    var num = digits.length >= 3 ? digits.slice(-3) : ((digits + '100').slice(0, 3));
+    return '#' + pfx + '-' + num;
+  }
+
   function renderLoading() {
     if (!targetContainer) return;
     targetContainer.style.display = 'block';
@@ -200,7 +224,7 @@
     if (!targetContainer) return;
     var order = data.order || {};
     var branchName = order.branch_name || 'Restoran';
-    var orderNumber = order.order_number || ('XTR-' + order.id);
+    var orderNumber = formatPWAOrderCode(order);
     var date = order.reservation_date || '';
     var time = order.reservation_time || '';
     var guests = Number(order.guest_count || 0);
@@ -258,7 +282,7 @@
     var payStatus = (payment.payment_status || order.payment_status || 'pending').toLowerCase();
     var payMethod = (payment.payment_method || order.payment_method || 'cash').toLowerCase();
     var branchName = order.branch_name || 'Cabang';
-    var orderNumber = order.order_number || ('XTR-' + order.id);
+    var orderNumber = formatPWAOrderCode(order);
     var snapToken = payment.snap_token || order.snap_token || null;
     // DOKU tidak memakai Snap: ia memberi halaman pembayarannya sendiri.
     var gatewayRedirectUrl = payment.redirect_url || order.redirect_url || null;
@@ -343,7 +367,7 @@
     if (!targetContainer) return;
     stopTimers();
     var order = data.order;
-    var orderNumber = order.order_number || ('XTR-' + order.id);
+    var orderNumber = formatPWAOrderCode(order);
     var branchName = order.branch_name || 'Cabang';
 
     var failTitle = 'Pembayaran Gagal';
@@ -642,7 +666,7 @@
     var order = data.order;
     var payment = data.payment || {};
     var branchName = order.branch_name || 'Cabang';
-    var orderNumber = order.order_number || ('XTR-' + order.id);
+    var orderNumber = formatPWAOrderCode(order);
     var deadlineAt = order.acceptance_deadline_at || null;
     var payMethod = (order.payment_method || payment.payment_method || 'cash').toLowerCase();
     var isOnline = isOnlineMethod(payMethod);
@@ -758,7 +782,7 @@
   // ─── P7.6 REJECTED STATE ─────────────────────────────────────────────────
   function renderRejected(order, logs) {
     if (!targetContainer) return;
-    var orderNumber = order.order_number || ('XTR-' + order.id);
+    var orderNumber = formatPWAOrderCode(order);
     var branchName = order.branch_name || 'Cabang';
 
     // Extract rejection reason from audit log (server-provided, never fabricated)
@@ -794,7 +818,7 @@
   // ─── P7.7 TIMEOUT STATE ──────────────────────────────────────────────────
   function renderTimeout(order) {
     if (!targetContainer) return;
-    var orderNumber = order.order_number || ('XTR-' + order.id);
+    var orderNumber = formatPWAOrderCode(order);
     var branchName = order.branch_name || 'Cabang';
 
     targetContainer.style.display = 'block';
@@ -927,7 +951,7 @@
     var delivery = data.delivery || {};
     var payment = data.payment || {};
 
-    var orderNumber = order.order_number || ('XTR-' + order.id);
+    var orderNumber = formatPWAOrderCode(order);
     var orderType = order.order_type || 'delivery';
     var status = order.status;
     var isCash = (payment.payment_method || order.payment_method || 'cash') === 'cash';

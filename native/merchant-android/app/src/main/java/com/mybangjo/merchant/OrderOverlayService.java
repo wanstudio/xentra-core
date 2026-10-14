@@ -386,7 +386,17 @@ public class OrderOverlayService extends Service {
 
         // Body: Customer + Total
         TextView bodyTv = new TextView(this);
-        String displayNum = (orderNumber != null && !orderNumber.isEmpty()) ? ("#" + orderNumber) : ("#" + (orderId != null ? orderId.substring(Math.max(0, orderId.length() - 6)) : ""));
+        String displayNum;
+        if (orderNumber != null && !orderNumber.trim().isEmpty()) {
+            String trimmed = orderNumber.trim();
+            displayNum = trimmed.startsWith("#") ? trimmed : ("#" + trimmed);
+        } else if (orderId != null && !orderId.trim().isEmpty()) {
+            String digits = orderId.replaceAll("\\D", "");
+            String num = digits.length() >= 3 ? digits.substring(digits.length() - 3) : "100";
+            displayNum = "#OD-" + num;
+        } else {
+            displayNum = "#OD-100";
+        }
         String displayCust = (customer != null && !customer.isEmpty()) ? customer : "Pelanggan";
         String displayTot = (total != null && !total.isEmpty()) ? total : "";
         bodyTv.setText(displayNum + " · " + displayCust + (displayTot.isEmpty() ? "" : ("\n" + displayTot)));

@@ -294,11 +294,18 @@ public class OrderMonitorService extends Service {
 
         String body = "Ketuk untuk membuka pesanan dan mengonfirmasi.";
         if (order != null) {
-            String cust = order.optString("customer_name", "Pelanggan");
-            String num = order.optString("order_number", order.optString("id", "").substring(Math.max(0, order.optString("id", "").length() - 6)));
+            String rawNum = order.optString("order_number", "");
+            String num;
+            if (!rawNum.isEmpty()) {
+                num = rawNum.startsWith("#") ? rawNum : ("#" + rawNum);
+            } else {
+                String oid = order.optString("id", "");
+                String digits = oid.replaceAll("\\D", "");
+                num = "#OD-" + (digits.length() >= 3 ? digits.substring(digits.length() - 3) : "100");
+            }
             double amount = order.optDouble("total_amount", 0);
             String amtStr = amount > 0 ? (" · Rp " + String.format("%,.0f", amount).replace(',', '.')) : "";
-            body = "Pesanan #" + num + " dari " + cust + amtStr;
+            body = "Pesanan " + num + " dari " + cust + amtStr;
         }
 
         // Tap notification directly launches MainActivity (NOT Chrome!)
