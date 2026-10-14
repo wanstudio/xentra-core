@@ -85,16 +85,16 @@ public class MainActivity extends AppCompatActivity {
             if (!alreadyAsked) {
                 prefs.edit().putBoolean("overlay_prompt_shown", true).apply();
                 new androidx.appcompat.app.AlertDialog.Builder(this)
-                    .setTitle("🔔 Izin Notifikasi Layar Melayang")
-                    .setMessage("Agar pesanan baru otomatis muncul melayang di layar saat kasir sedang membuka WhatsApp atau aplikasi lain, mohon aktifkan izin 'Tampilkan di atas aplikasi lain'.")
-                    .setPositiveButton("Aktifkan Izin", (dialog, which) -> {
+                    .setTitle("🔔 Peringatan Pesanan Baru")
+                    .setMessage("Tampilkan pop-up pesanan di layar agar orderan tidak terlewat saat membuka aplikasi lain.")
+                    .setPositiveButton("Aktifkan", (dialog, which) -> {
                         android.content.Intent intent = new android.content.Intent(
                             android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                             android.net.Uri.parse("package:" + getPackageName())
                         );
                         startActivity(intent);
                     })
-                    .setNegativeButton("Nanti Saja", null)
+                    .setNegativeButton("Nanti", null)
                     .show();
             }
         }
