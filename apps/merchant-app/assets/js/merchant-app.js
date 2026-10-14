@@ -182,7 +182,12 @@
       }
     }
     if (tabId === 'bm-promo' && typeof loadBMPromotions === 'function') loadBMPromotions();
-    if (tabId === 'hari-ini' && typeof loadHariIni === 'function') loadHariIni();
+    if (tabId === 'hari-ini') {
+      if (typeof loadHariIni === 'function') loadHariIni();
+      if (typeof startHariIniPolling === 'function') startHariIniPolling();
+    } else {
+      if (typeof stopHariIniPolling === 'function') stopHariIniPolling();
+    }
     if (tabId === 'bm-staff' && typeof loadBMStaff === 'function') loadBMStaff();
     if (tabId === 'bm-jam-operasional' && typeof loadBMJamOperasional === 'function') loadBMJamOperasional();
     if (tabId === 'bm-reports' && typeof loadBMReports === 'function') loadBMReports();
@@ -678,6 +683,17 @@
         if (typeof checkAndNotifyNewPendingOrders === 'function') {
           checkAndNotifyNewPendingOrders(data.orders);
         }
+        var activeTab = document.querySelector('.x-tab-content.active');
+        if (activeTab && activeTab.id === 'tab-hari-ini') {
+          if (typeof window.renderHariIniPendingOrders === 'function') {
+            var pendingOnly = data.orders.filter(function (o) { return o.status === 'pending'; });
+            window.renderHariIniPendingOrders(pendingOnly);
+          }
+          var pendingStatEl = $('bm-stat-pending-orders');
+          if (pendingStatEl) {
+            pendingStatEl.textContent = count;
+          }
+        }
       }
     } catch (_) {}
   }
@@ -688,15 +704,15 @@
     if (_actionableOrdersTimeout) clearTimeout(_actionableOrdersTimeout);
     _actionableOrdersTimeout = setTimeout(async function () {
       if (document.visibilityState === 'hidden') {
-        scheduleActionableOrdersCheck(15000);
+        scheduleActionableOrdersCheck(10000);
         return;
       }
       var activeTab = document.querySelector('.x-tab-content.active');
-      if (!activeTab || activeTab.id !== 'tab-bm-pesanan') {
+      if (!activeTab || (activeTab.id !== 'tab-bm-pesanan' && activeTab.id !== 'tab-hari-ini')) {
         await fetchActionableOrdersCount();
       }
-      scheduleActionableOrdersCheck(15000);
-    }, delayMs || 15000);
+      scheduleActionableOrdersCheck(10000);
+    }, delayMs || 10000);
   }
 
   async function openNotificationsSheet() {

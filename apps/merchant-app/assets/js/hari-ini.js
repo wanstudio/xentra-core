@@ -133,42 +133,7 @@
       try {
         var oData = await results[1].value.json();
         if (oData.success && Array.isArray(oData.orders)) {
-          var orders = oData.orders;
-          _hariIniState.orders = orders;
-
-          var pendingList = orders.filter(function (o) { return o.status === "pending"; });
-          var actionableList = orders.filter(function (o) {
-            return o.status === "pending" || Number(o.pending_additions_count || 0) > 0;
-          });
-          if (typeof updateMobileOrdersBadge === "function") {
-            updateMobileOrdersBadge(actionableList.length);
-          }
-          if (typeof checkAndNotifyNewPendingOrders === "function") {
-            checkAndNotifyNewPendingOrders(orders);
-          }
-          var activeList = orders.filter(function (o) { return ["confirmed", "preparing"].indexOf(o.status) !== -1; });
-          var readyList = orders.filter(function (o) { return o.status === "ready"; });
-
-          var todayStr = new Date().toISOString().substring(0, 10);
-          var completedToday = orders.filter(function (o) {
-            return o.status === "completed" && (o.created_at || "").substring(0, 10) === todayStr;
-          });
-
-          var completedSales = completedToday.reduce(function (acc, o) {
-            return acc + (Number(o.grand_total) || 0);
-          }, 0);
-
-          if ($("bm-stat-pending-orders")) $("bm-stat-pending-orders").textContent = pendingList.length;
-          if ($("bm-stat-active-orders")) $("bm-stat-active-orders").textContent = activeList.length;
-          if ($("bm-stat-ready-orders")) $("bm-stat-ready-orders").textContent = readyList.length;
-          if ($("bm-stat-completed-orders")) $("bm-stat-completed-orders").textContent = completedToday.length;
-           if ($("bm-stat-completed-orders-snapshot")) $("bm-stat-completed-orders-snapshot").textContent = completedToday.length;
-          if ($("bm-stat-net-sales-today")) $("bm-stat-net-sales-today").textContent = formatMoney(completedSales);
-
-           var avgOrderEl = $("bm-stat-average-order");
-           if (avgOrderEl) avgOrderEl.textContent = completedToday.length ? formatMoney(Math.round(completedSales / completedToday.length)) : "Rp0";
-
-          renderHariIniPendingOrders(pendingList);
+          applyHariIniOrders(oData.orders);
         }
       } catch (e) {
         console.warn("[BM Hari Ini Orders Parse Error]:", e);
@@ -323,6 +288,85 @@
     }
   }
 
+  function applyHariIniOrders(orders) {
+    if (!Array.isArray(orders)) return;
+    _hariIniState.orders = orders;
+
+    var pendingList = orders.filter(function (o) { return o.status === "pending"; });
+    var actionableList = orders.filter(function (o) {
+      return o.status === "pending" || Number(o.pending_additions_count || 0) > 0;
+    });
+    if (typeof updateMobileOrdersBadge === "function") {
+      updateMobileOrdersBadge(actionableList.length);
+    }
+    if (typeof checkAndNotifyNewPendingOrders === "function") {
+      checkAndNotifyNewPendingOrders(orders);
+    }
+    var activeList = orders.filter(function (o) { return ["confirmed", "preparing"].indexOf(o.status) !== -1; });
+    var readyList = orders.filter(function (o) { return o.status === "ready"; });
+
+    var todayStr = new Date().toISOString().substring(0, 10);
+    var completedToday = orders.filter(function (o) {
+      return o.status === "completed" && (o.created_at || "").substring(0, 10) === todayStr;
+    });
+
+    var completedSales = completedToday.reduce(function (acc, o) {
+      return acc + (Number(o.grand_total) || 0);
+    }, 0);
+
+    if ($("bm-stat-pending-orders")) $("bm-stat-pending-orders").textContent = pendingList.length;
+    if ($("bm-stat-active-orders")) $("bm-stat-active-orders").textContent = activeList.length;
+    if ($("bm-stat-ready-orders")) $("bm-stat-ready-orders").textContent = readyList.length;
+    if ($("bm-stat-completed-orders")) $("bm-stat-completed-orders").textContent = completedToday.length;
+    if ($("bm-stat-completed-orders-snapshot")) $("bm-stat-completed-orders-snapshot").textContent = completedToday.length;
+    if ($("bm-stat-net-sales-today")) $("bm-stat-net-sales-today").textContent = formatMoney(completedSales);
+
+    var avgOrderEl = $("bm-stat-average-order");
+    if (avgOrderEl) avgOrderEl.textContent = completedToday.length ? formatMoney(Math.round(completedSales / completedToday.length)) : "Rp0";
+
+    renderHariIniPendingOrders(pendingList);
+  }
+
+  async function loadHariIniOrders(opts) {
+    opts = opts || {};
+    var user = getStoredUser();
+    if (!user || !user.branch_id) return;
+    try {
+      var res = await adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(user.branch_id) + "/orders?status=all", {
+        headers: getAuthHeaders()
+      });
+      if (res && res.ok) {
+        var oData = await res.json();
+        if (oData && oData.success && Array.isArray(oData.orders)) {
+          applyHariIniOrders(oData.orders);
+        }
+      }
+    } catch (e) {
+      console.warn("[BM Hari Ini Orders Refresh Error]:", e);
+    }
+  }
+
+  var _hariIniPollTimer = null;
+  function startHariIniPolling() {
+    stopHariIniPolling();
+    _hariIniPollTimer = setInterval(function () {
+      if (document.visibilityState === 'hidden') return;
+      var activeTab = document.querySelector('.x-tab-content.active');
+      if (activeTab && activeTab.id === 'tab-hari-ini') {
+        loadHariIniOrders({ background: true });
+      } else {
+        stopHariIniPolling();
+      }
+    }, 5000);
+  }
+
+  function stopHariIniPolling() {
+    if (_hariIniPollTimer) {
+      clearInterval(_hariIniPollTimer);
+      _hariIniPollTimer = null;
+    }
+  }
+
   function renderHariIniPendingOrders(orders) {
     var list = $("bm-pending-orders-list");
     var countBadge = $("bm-badge-pending-count");
@@ -371,6 +415,11 @@
       "</article>";
     }).join("");
   }
+  window.renderHariIniPendingOrders = renderHariIniPendingOrders;
+  window.applyHariIniOrders = applyHariIniOrders;
+  window.loadHariIniOrders = loadHariIniOrders;
+  window.startHariIniPolling = startHariIniPolling;
+  window.stopHariIniPolling = stopHariIniPolling;
 
   function renderHariIniAttention(lowItems, unavailItems) {
     var hasLow = lowItems && lowItems.length > 0;

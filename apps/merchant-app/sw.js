@@ -13,7 +13,7 @@
  */
 
 var APP_CACHE_PREFIX = "xentra-merchant-";
-var APP_VERSION = "v1.4.11";
+var APP_VERSION = "v1.4.12";
 var FALLBACK_CACHE_NAME = "xentra-merchant-live";
 
 var STATIC_ASSETS = [
@@ -25,7 +25,7 @@ var STATIC_ASSETS = [
   "/merchant-shared/css/dashboard.css?v=1.0.39",
   "/merchant-app/assets/css/home.css?v=1.0.18",
   "/merchant-shared/js/shared.js?v=1.0.1",
-  "/merchant-shared/js/audio-alerts.js?v=1.0.3",
+  "/merchant-shared/js/audio-alerts.js?v=1.0.4",
   "/merchant-shared/audio/ada-pesanan-baru.mp3",
   "/merchant-shared/js/action-menu.js?v=1.0.0",
   "/merchant-shared/js/crop-editor.js?v=1.0.2",
@@ -34,7 +34,7 @@ var STATIC_ASSETS = [
   "/merchant-app/assets/js/branch-catalog-ui.js?v=1.0.1",
   "/merchant-app/assets/js/context.js?v=1.0.0",
   "/merchant-app/assets/js/menu.js?v=1.1.0",
-  "/merchant-app/assets/js/hari-ini.js?v=1.0.6",
+  "/merchant-app/assets/js/hari-ini.js?v=1.0.7",
   "/merchant-app/assets/js/home.js?v=1.0.2",
   "/merchant-app/assets/js/jam-operasional.js?v=1.0.0",
   "/merchant-app/assets/js/reports.js?v=1.0.0",
@@ -43,8 +43,8 @@ var STATIC_ASSETS = [
   "/merchant-app/assets/js/purchasing.js?v=1.1.4",
   "/merchant-app/assets/js/promotions.js?v=1.0.2",
   "/merchant-app/assets/js/staff.js?v=1.0.0",
-  "/merchant-app/assets/js/orders.js?v=1.0.8",
-  "/merchant-app/assets/js/merchant-app.js?v=1.1.6"
+  "/merchant-app/assets/js/orders.js?v=1.0.9",
+  "/merchant-app/assets/js/merchant-app.js?v=1.1.7"
 ];
 
 var _cacheNamePromise = null;

@@ -13,12 +13,23 @@
   var _audioCtx = null;
   var _unlocked = false;
   var _orderAudio = null;
+  var _orderAlertActive = false;
+  var _orderAlertRepeatCount = 0;
+  var _orderAlertMaxRepeats = 5;
+  var _orderAlertPauseMs = 1000;
+  var _orderAlertTimer = null;
 
   function getOrderAudio() {
     if (!_orderAudio && typeof Audio !== 'undefined') {
       try {
         _orderAudio = new Audio('/merchant-shared/audio/ada-pesanan-baru.mp3');
         _orderAudio.preload = 'auto';
+        _orderAudio.onerror = function () {
+          if (_orderAudio && _orderAudio.src && _orderAudio.src.indexOf('/merchant-shared/') !== -1) {
+            _orderAudio.src = '/merchant-app/assets/audio/ada-pesanan-baru.mp3';
+            _orderAudio.load();
+          }
+        };
       } catch (_) {}
     }
     return _orderAudio;
@@ -131,31 +142,90 @@
   }
 
   /**
-   * Play the genuine recorded MP3 "Ada pesanan baru.mp3"
+   * Stop any recurring order alert immediately (e.g. order accepted or rejected)
    */
-  function playOrderAlertAudio(options) {
-    options = options || {};
+  function stopOrderAlert() {
+    _orderAlertActive = false;
+    if (_orderAlertTimer) {
+      clearTimeout(_orderAlertTimer);
+      _orderAlertTimer = null;
+    }
+    if (_orderAudio) {
+      try {
+        _orderAudio.pause();
+        _orderAudio.currentTime = 0;
+        _orderAudio.onended = null;
+      } catch (_) {}
+    }
+  }
+
+  function scheduleNextOrderAlert(options) {
+    if (!_orderAlertActive) return;
+    if (_orderAlertRepeatCount >= _orderAlertMaxRepeats) {
+      _orderAlertActive = false;
+      return;
+    }
+    if (_orderAlertTimer) clearTimeout(_orderAlertTimer);
+    _orderAlertTimer = setTimeout(function () {
+      _orderAlertTimer = null;
+      if (_orderAlertActive) {
+        playOrderAlertStep(options);
+      }
+    }, _orderAlertPauseMs);
+  }
+
+  function playOrderAlertStep(options) {
+    if (!_orderAlertActive) return;
+    if (_orderAlertRepeatCount >= _orderAlertMaxRepeats) {
+      _orderAlertActive = false;
+      return;
+    }
+    _orderAlertRepeatCount++;
+
     var audio = getOrderAudio();
     if (audio) {
       try {
         audio.currentTime = 0;
+        audio.onended = function () {
+          scheduleNextOrderAlert(options);
+        };
         var playPromise = audio.play();
         if (playPromise !== undefined && typeof playPromise.then === 'function') {
           playPromise.then(function () {
-            // Audio played successfully!
+            // Audio played successfully
           }).catch(function () {
             // Fallback to Web Audio chime + Speech if browser blocks MP3 autoplay
             fallbackOrderAlert(options);
+            scheduleNextOrderAlert(options);
           });
           return;
         }
         return;
       } catch (_) {
         fallbackOrderAlert(options);
+        scheduleNextOrderAlert(options);
         return;
       }
     }
     fallbackOrderAlert(options);
+    scheduleNextOrderAlert(options);
+  }
+
+  /**
+   * Play the genuine recorded MP3 "Ada pesanan baru.mp3"
+   * Repeats with 1s pause between loops up to max 5x, or stops when accepted/rejected.
+   */
+  function playOrderAlertAudio(options) {
+    options = options || {};
+    stopOrderAlert();
+    _orderAlertActive = true;
+    _orderAlertRepeatCount = 0;
+    _orderAlertMaxRepeats = (options.maxRepeats !== undefined)
+      ? Number(options.maxRepeats)
+      : (options.single ? 1 : 5);
+    _orderAlertPauseMs = (options.pauseMs !== undefined) ? Number(options.pauseMs) : 1000;
+
+    playOrderAlertStep(options);
   }
 
   function fallbackOrderAlert(options) {
@@ -172,14 +242,22 @@
    */
   var XentraAudio = {
     unlock: unlockAudio,
+    stopOrderAlert: stopOrderAlert,
 
-    // 1. Order Baru Masuk (Merchant App / POS) — Audio asli "Ada pesanan baru.mp3"
+    // 1. Order Baru Masuk (Merchant App / POS) — Audio asli "Ada pesanan baru.mp3" (Repeat 1s up to 5x)
     orderReceived: playOrderAlertAudio,
     orderIncoming: playOrderAlertAudio,
 
-    // 2. Konfirmasi Kasir Terima Pesanan — Fast pleasant ascending ding (E5, C6) ~0.2 detik, tanpa suara robot
+    // 2. Konfirmasi Kasir Terima Pesanan — Fast pleasant ascending ding (E5, C6) ~0.2 detik, hentikan alarm
     orderAccepted: function () {
+      stopOrderAlert();
       playChime([659.25, 1046.50], 0.10, 'sine');
+    },
+
+    // 2b. Tolak Pesanan — Hentikan alarm pesanan baru & bunyikan konfirmasi tolak
+    orderRejected: function () {
+      stopOrderAlert();
+      playChime([440, 349.23], 0.15, 'triangle');
     },
 
     // 3. Pembayaran Berhasil / Kas Masuk (POS / Kasir) — Double Ding Cash Register

@@ -246,6 +246,12 @@
       }
     });
 
+    if (currentPendingOrders.length === 0) {
+      if (window.XentraAudio && typeof window.XentraAudio.stopOrderAlert === 'function') {
+        window.XentraAudio.stopOrderAlert();
+      }
+    }
+
     _bmOrdersState.seenPendingOrderIds = currentPendingIds;
     window.__xentraSeenPendingOrderIds = currentPendingIds;
   }
@@ -867,6 +873,11 @@
       });
       var data = await res.json();
       if (res.ok && data.success) {
+        if (window.XentraAudio && typeof window.XentraAudio.orderRejected === 'function') {
+          window.XentraAudio.orderRejected();
+        } else if (window.XentraAudio && typeof window.XentraAudio.stopOrderAlert === 'function') {
+          window.XentraAudio.stopOrderAlert();
+        }
         showToast('Pesanan #' + orderId + ' telah ditolak.');
         closeBMRejectModal();
         if (_bmRejectOrigin === 'hari-ini' && typeof loadHariIni === 'function') {
