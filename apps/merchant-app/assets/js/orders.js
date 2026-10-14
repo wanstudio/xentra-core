@@ -202,7 +202,7 @@
         tag: 'order-pending-' + ord.id,
         renotify: true,
         requireInteraction: true,
-        silent: false,
+        silent: true, // Keep notification silent so device ringtone does not clash with MP3 voice alert
         vibrate: aggressiveVibratePattern,
         timestamp: Date.now(),
         actions: [
@@ -221,6 +221,8 @@
     });
   }
 
+  var _lastOrderAlertTriggerTime = 0;
+
   function checkAndNotifyNewPendingOrders(orders) {
     if (!Array.isArray(orders)) return;
     var currentPendingOrders = orders.filter(function (o) { return o.status === 'pending'; });
@@ -236,6 +238,13 @@
         }
       });
 
+      // Commit to seen set immediately to prevent concurrent polling races from double-alerting
+      currentPendingOrders.forEach(function (o) {
+        seen[o.id] = true;
+      });
+      _bmOrdersState.seenPendingOrderIds = currentPendingIds;
+      window.__xentraSeenPendingOrderIds = currentPendingIds;
+
       if (newlyAppeared.length > 0) {
         newlyAppeared.forEach(function (id) {
           _bmOrdersState.newPendingOrderIds[id] = true;
@@ -244,10 +253,17 @@
             showSystemOrderNotification(matchedOrder);
           }
         });
-        playNewOrderAudibleChime();
+
+        var now = Date.now();
+        if (now - _lastOrderAlertTriggerTime > 2500) {
+          _lastOrderAlertTriggerTime = now;
+          playNewOrderAudibleChime();
+        }
       }
     } else {
       _bmOrdersState.newPendingOrderIds = {};
+      _bmOrdersState.seenPendingOrderIds = currentPendingIds;
+      window.__xentraSeenPendingOrderIds = currentPendingIds;
     }
 
     Object.keys(_bmOrdersState.newPendingOrderIds).forEach(function (id) {

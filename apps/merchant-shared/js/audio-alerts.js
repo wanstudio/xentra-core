@@ -157,6 +157,11 @@
         _orderAudio.onended = null;
       } catch (_) {}
     }
+    if ('speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch (_) {}
+    }
   }
 
   function scheduleNextOrderAlert(options) {
@@ -193,20 +198,27 @@
         if (playPromise !== undefined && typeof playPromise.then === 'function') {
           playPromise.then(function () {
             // Audio played successfully
-          }).catch(function () {
-            // Fallback to Web Audio chime + Speech if browser blocks MP3 autoplay
+          }).catch(function (err) {
+            // If play was stopped or interrupted by pause, never trigger fallback
+            if (err && (err.name === 'AbortError' || err.code === 20)) {
+              return;
+            }
+            if (!_orderAlertActive) return;
             fallbackOrderAlert(options);
             scheduleNextOrderAlert(options);
           });
           return;
         }
         return;
-      } catch (_) {
+      } catch (err) {
+        if (err && (err.name === 'AbortError' || err.code === 20)) return;
+        if (!_orderAlertActive) return;
         fallbackOrderAlert(options);
         scheduleNextOrderAlert(options);
         return;
       }
     }
+    if (!_orderAlertActive) return;
     fallbackOrderAlert(options);
     scheduleNextOrderAlert(options);
   }
@@ -217,6 +229,10 @@
    */
   function playOrderAlertAudio(options) {
     options = options || {};
+    // If an alert is already actively playing and not finished, do not double-trigger or overlap
+    if (_orderAlertActive && !options.force) {
+      return;
+    }
     stopOrderAlert();
     _orderAlertActive = true;
     _orderAlertRepeatCount = 0;
@@ -229,12 +245,8 @@
   }
 
   function fallbackOrderAlert(options) {
+    // Only synthesize chime if MP3 fails to load; NEVER speak robot voice to avoid messy overlap
     playChime([523.25, 659.25, 783.99, 1046.50], 0.12, 'sine');
-    if (options && options.voice !== false) {
-      setTimeout(function () {
-        speakIndonesian(options.text || 'Ada pesanan baru masuk!');
-      }, 500);
-    }
   }
 
   /**
