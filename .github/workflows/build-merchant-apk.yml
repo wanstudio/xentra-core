@@ -34,12 +34,11 @@ jobs:
       - name: Rename APK Output
         run: |
           mkdir -p build-output
-          cp native/merchant-android/app/build/outputs/apk/release/app-release.apk build-output/mybangjo-merchant-release.apk
           cp native/merchant-android/app/build/outputs/apk/release/app-release.apk build-output/mybangjo-merchant.apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: mybangjo-merchant-apk
-          path: build-output/*.apk
+          path: build-output/mybangjo-merchant.apk
           retention-days: 30
