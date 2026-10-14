@@ -182,6 +182,7 @@ public class OrderAlarmService extends Service {
             channel.enableVibration(true);
             channel.setVibrationPattern(new long[]{0, 500, 250, 500, 250, 1000, 250, 1000});
             channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+            channel.setShowBadge(false);
 
             NotificationManager nm = getSystemService(NotificationManager.class);
             if (nm != null) {

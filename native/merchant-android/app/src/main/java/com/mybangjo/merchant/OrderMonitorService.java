@@ -284,6 +284,8 @@ public class OrderMonitorService extends Service {
             .setContentTitle(title)
             .setContentText(body)
             .setSmallIcon(R.mipmap.ic_launcher)
+            .setNumber(pendingCount)
+            .setBadgeIconType(NotificationCompat.BADGE_ICON_SMALL)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
