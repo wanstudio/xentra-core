@@ -13,7 +13,7 @@
  */
 
 var APP_CACHE_PREFIX = "xentra-merchant-";
-var APP_VERSION = "v1.4.10";
+var APP_VERSION = "v1.4.11";
 var FALLBACK_CACHE_NAME = "xentra-merchant-live";
 
 var STATIC_ASSETS = [
@@ -25,6 +25,8 @@ var STATIC_ASSETS = [
   "/merchant-shared/css/dashboard.css?v=1.0.39",
   "/merchant-app/assets/css/home.css?v=1.0.18",
   "/merchant-shared/js/shared.js?v=1.0.1",
+  "/merchant-shared/js/audio-alerts.js?v=1.0.3",
+  "/merchant-shared/audio/ada-pesanan-baru.mp3",
   "/merchant-shared/js/action-menu.js?v=1.0.0",
   "/merchant-shared/js/crop-editor.js?v=1.0.2",
   "/merchant-shared/js/catalog-client.js?v=1.0.0",
