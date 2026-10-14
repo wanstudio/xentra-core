@@ -26,6 +26,7 @@
     layout: null,
     inventory: []
   };
+  window._hariIniState = _hariIniState;
 
   async function loadHariIni() {
     var user = getStoredUser();
@@ -294,6 +295,9 @@
   function applyHariIniOrders(orders) {
     if (!Array.isArray(orders)) return;
     _hariIniState.orders = orders;
+    if (window._bmOrdersState) {
+      window._bmOrdersState.orders = orders;
+    }
 
     var pendingList = orders.filter(function (o) { return o.status === "pending"; });
     var actionableList = orders.filter(function (o) {

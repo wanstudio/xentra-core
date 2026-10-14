@@ -54,11 +54,15 @@
 
   var _bmAcceptContext = null;
 
+  window._bmOrdersState = _bmOrdersState;
+
   function findBMOrderById(orderId) {
     if (!orderId) return null;
-    var found = (_bmOrdersState.orders || []).find(function (o) { return String(o.id) === String(orderId); });
+    var strId = String(orderId).trim();
+    var list = (_bmOrdersState.orders || []);
+    var found = list.find(function (o) { return String(o.id) === strId || String(o.order_number) === strId; });
     if (!found && window._hariIniState && Array.isArray(window._hariIniState.orders)) {
-      found = window._hariIniState.orders.find(function (o) { return String(o.id) === String(orderId); });
+      found = window._hariIniState.orders.find(function (o) { return String(o.id) === strId || String(o.order_number) === strId; });
     }
     return found || null;
   }
@@ -121,14 +125,9 @@
     return (typeof raw === 'string' && raw.length < 80) ? raw : '';
   }
 
-  function openBMAcceptOrderModal(orderId, btnEl, origin) {
-    _bmAcceptContext = {
-      orderId: orderId,
-      btnEl: btnEl || null,
-      origin: origin || 'orders'
-    };
+  function populateBMAcceptOrderUI(ord) {
+    if (!ord) return;
 
-    var modal = $('modal-bm-accept-order');
     var numEl = $('bm-accept-order-number');
     var badgeEl = $('bm-accept-order-type-badge');
     var custEl = $('bm-accept-order-customer');
@@ -142,24 +141,20 @@
     var delivFeeEl = $('bm-accept-order-delivery-fee');
     var discRow = $('bm-accept-order-discount-row');
     var discEl = $('bm-accept-order-discount');
-    var btnConfirm = $('btn-bm-accept-confirm');
-    var btnText = $('btn-bm-accept-text');
-
-    var ord = findBMOrderById(orderId);
 
     if (numEl) {
       numEl.textContent = formatBMOrderCode(ord);
     }
 
     if (badgeEl) {
-      var ordType = (ord && (ord.order_type || ord.fulfillment_type)) || 'delivery';
+      var ordType = (ord.order_type || ord.fulfillment_type) || 'delivery';
       var typeLabel = 'Pesanan Masuk';
       var badgeCls = 'background:#e0f2fe; color:#0369a1;';
       if (ordType === 'delivery') {
         typeLabel = '🛵 Delivery';
         badgeCls = 'background:#e0f2fe; color:#0369a1;';
       } else if (ordType === 'dine_in') {
-        typeLabel = '🍽️ Dine-in' + (ord && ord.table_number ? (' (Meja ' + ord.table_number + ')') : '');
+        typeLabel = '🍽️ Dine-in' + (ord.table_number ? (' (Meja ' + ord.table_number + ')') : '');
         badgeCls = 'background:#fef3c7; color:#b45309;';
       } else if (ordType === 'pickup' || ordType === 'takeaway') {
         typeLabel = '🛍️ Takeaway';
@@ -173,18 +168,18 @@
     }
 
     if (custEl) {
-      var custText = (ord && ord.customer_name) ? ord.customer_name : 'Pelanggan';
-      if (ord && ord.customer_phone) {
+      var custText = ord.customer_name ? ord.customer_name : 'Pelanggan';
+      if (ord.customer_phone) {
         custText += ' (' + ord.customer_phone + ')';
       }
-      if (ord && ord.table_number && ord.order_type !== 'dine_in') {
+      if (ord.table_number && ord.order_type !== 'dine_in') {
         custText += ' • Meja ' + ord.table_number;
       }
       custEl.textContent = custText;
     }
 
     // Detail Daftar Menu & Isinya
-    var items = (ord && Array.isArray(ord.items)) ? ord.items : [];
+    var items = Array.isArray(ord.items) ? ord.items : [];
     if (itemsCountEl) itemsCountEl.textContent = items.length + ' menu';
 
     if (itemsEl) {
@@ -225,13 +220,13 @@
         }).join('');
         itemsEl.style.display = 'flex';
       } else {
-        itemsEl.innerHTML = '<div style="color:#94a3b8; font-size:12px; text-align:center; padding:10px 0;">Tidak ada item detail</div>';
+        itemsEl.innerHTML = '<div style="color:#94a3b8; font-size:12px; text-align:center; padding:10px 0;">Tidak ada rincian item menu</div>';
         itemsEl.style.display = 'block';
       }
     }
 
     // Catatan Keseluruhan Pemesan
-    var ordNote = String(ord && (ord.order_note || ord.notes || ord.order_notes || '')).trim();
+    var ordNote = String(ord.order_note || ord.notes || ord.order_notes || '').trim();
     if (noteBox && noteTextEl) {
       if (ordNote) {
         noteTextEl.textContent = ordNote;
@@ -242,11 +237,11 @@
     }
 
     // Subtotal, Ongkir, Diskon & Total Bersih
-    var subtotalVal = (ord && ord.subtotal != null) ? Number(ord.subtotal) :
+    var subtotalVal = (ord.subtotal != null) ? Number(ord.subtotal) :
                       items.reduce(function (s, it) { return s + (Number(it.item_subtotal || it.subtotal || 0) || (Number(it.unit_price || 0) * Number(it.quantity || 1))); }, 0);
     if (subtotalEl) subtotalEl.textContent = formatMoney(subtotalVal);
 
-    var delivFee = (ord && ord.delivery_fee != null) ? Number(ord.delivery_fee) : 0;
+    var delivFee = (ord.delivery_fee != null) ? Number(ord.delivery_fee) : 0;
     if (delivRow && delivFeeEl) {
       if (delivFee > 0) {
         delivFeeEl.textContent = formatMoney(delivFee);
@@ -256,7 +251,7 @@
       }
     }
 
-    var discountVal = (ord && ord.discount_amount != null) ? Number(ord.discount_amount) : 0;
+    var discountVal = (ord.discount_amount != null) ? Number(ord.discount_amount) : 0;
     if (discRow && discEl) {
       if (discountVal > 0) {
         discEl.textContent = '-' + formatMoney(discountVal);
@@ -267,15 +262,65 @@
     }
 
     if (totalEl) {
-      totalEl.textContent = (ord && ord.grand_total != null) ? formatMoney(ord.grand_total) : formatMoney(subtotalVal + delivFee - discountVal);
+      totalEl.textContent = (ord.grand_total != null) ? formatMoney(ord.grand_total) : formatMoney(subtotalVal + delivFee - discountVal);
     }
+  }
+
+  async function openBMAcceptOrderModal(orderId, btnEl, origin) {
+    _bmAcceptContext = {
+      orderId: orderId,
+      btnEl: btnEl || null,
+      origin: origin || 'orders'
+    };
+
+    var modal = $('modal-bm-accept-order');
+    var btnConfirm = $('btn-bm-accept-confirm');
+    var btnText = $('btn-bm-accept-text');
+    var itemsEl = $('bm-accept-order-items-preview');
 
     if (btnConfirm) btnConfirm.disabled = false;
     if (btnText) btnText.textContent = 'Terima Pesanan';
 
+    var ord = findBMOrderById(orderId);
+
+    if (ord) {
+      populateBMAcceptOrderUI(ord);
+    } else {
+      if (itemsEl) {
+        itemsEl.innerHTML = '<div style="color:#64748b; font-size:12px; text-align:center; padding:12px 0;">Memuat rincian pesanan...</div>';
+      }
+    }
+
     if (modal) modal.style.display = 'flex';
     if (window.XentraNav && typeof window.XentraNav.push === 'function') {
       window.XentraNav.push(function () { closeBMAcceptOrderModal({ fromNav: true }); }, 'modal-bm-accept-order');
+    }
+
+    // Always fetch fresh authoritative items from API if missing or items array empty
+    if (!ord || !Array.isArray(ord.items) || !ord.items.length) {
+      try {
+        var res = await adminFetch(API_BASE + '/admin/orders/' + encodeURIComponent(orderId), {
+          headers: getAuthHeaders()
+        });
+        if (res && res.ok) {
+          var data = await res.json();
+          if (data && data.success && data.order) {
+            var freshOrder = data.order;
+            if (!_bmOrdersState.orders) _bmOrdersState.orders = [];
+            var exIdx = _bmOrdersState.orders.findIndex(function (o) { return String(o.id) === String(orderId); });
+            if (exIdx >= 0) {
+              _bmOrdersState.orders[exIdx] = freshOrder;
+            } else {
+              _bmOrdersState.orders.push(freshOrder);
+            }
+            if (_bmAcceptContext && String(_bmAcceptContext.orderId) === String(orderId)) {
+              populateBMAcceptOrderUI(freshOrder);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[BM Accept Modal] Fetch order detail error:', err);
+      }
     }
   }
   window.openBMAcceptOrderModal = openBMAcceptOrderModal;

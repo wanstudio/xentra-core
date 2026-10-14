@@ -37,11 +37,11 @@ public class OrderOverlayService extends Service {
     private static final String PREFS_NAME = "xentra_merchant_prefs";
     private static final String KEY_ASSISTIVE_BALL_ENABLED = "assistive_ball_enabled";
 
-    private WindowManager windowManager;
-    private View currentOverlayView;
-    private WindowManager.LayoutParams params;
-    private int currentMode = 0; // 0 = none, 1 = ball, 2 = card
-    private int lastPendingCount = 0;
+    private static WindowManager windowManager;
+    private static View currentOverlayView;
+    private static WindowManager.LayoutParams params;
+    private static int currentMode = 0; // 0 = none, 1 = ball, 2 = card
+    private static int lastPendingCount = 0;
 
     public static boolean isAssistiveBallEnabled(Context context) {
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
@@ -152,9 +152,20 @@ public class OrderOverlayService extends Service {
     // ── 1. ASSISTIVE BALL (Floating Icon Melayang) ──
 
     @SuppressLint("ClickableViewAccessibility")
-    private void displayAssistiveBall(int pendingCount) {
-        removeOverlayView();
+    private synchronized void displayAssistiveBall(int pendingCount) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) return;
+
+        // If assistive ball is already attached to WindowManager, DO NOT add another view! Just update badge.
+        if (currentOverlayView != null && currentMode == 1) {
+            try {
+                if (currentOverlayView.isAttachedToWindow()) {
+                    updateBallBadge(pendingCount);
+                    return;
+                }
+            } catch (Exception ignored) {}
+        }
+
+        removeOverlayView();
 
         currentMode = 1;
         int layoutType = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
@@ -474,10 +485,10 @@ public class OrderOverlayService extends Service {
         startActivity(intent);
     }
 
-    private void removeOverlayView() {
+    private static synchronized void removeOverlayView() {
         if (currentOverlayView != null) {
             try {
-                if (currentOverlayView.isAttachedToWindow()) {
+                if (windowManager != null && currentOverlayView.isAttachedToWindow()) {
                     windowManager.removeView(currentOverlayView);
                 }
             } catch (Exception ignored) {}
