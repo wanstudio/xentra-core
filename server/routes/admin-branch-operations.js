@@ -36,7 +36,10 @@ router.get('/admin/branches/:id/inventory', requireAuth(['owner', 'brand_manager
         p.id AS product_id,
         p.name AS product_name,
         p.sku,
+        p.category_id,
+        COALESCE(p.fulfillment_type, 'BY_STOCK') AS fulfillment_type,
         CASE
+          WHEN COALESCE(p.fulfillment_type, 'BY_STOCK') = 'BY_ORDER' THEN NULL
           WHEN p.sku IS NOT NULL AND trim(p.sku) <> ''
             THEN COALESCE(bpi.stock_qty, 0)
           ELSE COALESCE(bp.stock, 0)
@@ -47,11 +50,13 @@ router.get('/admin/branches/:id/inventory', requireAuth(['owner', 'brand_manager
           ELSE COALESCE(bp.low_stock_threshold, 5)
         END AS low_stock_threshold,
         CASE
+          WHEN COALESCE(p.fulfillment_type, 'BY_STOCK') = 'BY_ORDER' THEN 'by_order'
           WHEN p.sku IS NOT NULL AND trim(p.sku) <> '' THEN 'canonical'
           WHEN bp.product_id IS NOT NULL THEN 'legacy'
           ELSE 'none'
         END AS stock_source,
         CASE
+          WHEN COALESCE(p.fulfillment_type, 'BY_STOCK') = 'BY_ORDER' THEN COALESCE(bp.is_available, 1)
           WHEN p.sku IS NOT NULL AND trim(p.sku) <> '' THEN NULL
           ELSE bp.is_available
         END AS is_available
@@ -113,17 +118,20 @@ router.patch('/admin/branches/:id/inventory/:productId', requireAuth(['owner', '
       });
     }
 
-    // C2.9 Quantity validation (finite integer; never silently coerced)
-    const quantity = Number(rawQuantity);
-    if (rawQuantity === null || rawQuantity === undefined || rawQuantity === '' ||
-        !Number.isFinite(Number(rawQuantity)) || !Number.isInteger(quantity) || quantity === 0) {
+    // C2.9 Quantity & Threshold validation
+    const hasThreshold = req.body.low_stock_threshold !== undefined && req.body.low_stock_threshold !== null && req.body.low_stock_threshold !== '';
+    const rawQuantityNum = Number(rawQuantity);
+    const hasQuantity = rawQuantity !== null && rawQuantity !== undefined && rawQuantity !== '' &&
+      Number.isFinite(rawQuantityNum) && Number.isInteger(rawQuantityNum) && rawQuantityNum !== 0;
+
+    if (!hasThreshold && !hasQuantity) {
       return res.status(400).json({
         success: false,
         error: 'INVALID_QUANTITY',
-        message: 'Quantity harus berupa bilangan bulat bukan-nol (mis. +5 atau -3).'
+        message: 'Quantity harus berupa bilangan bulat bukan-nol (mis. +5 atau -3) atau tentukan low_stock_threshold.'
       });
     }
-    if (movement_type === 'waste_spoilage' && quantity > 0) {
+    if (hasQuantity && movement_type === 'waste_spoilage' && rawQuantityNum > 0) {
       return res.status(400).json({
         success: false,
         error: 'INVALID_QUANTITY',
@@ -158,17 +166,39 @@ router.patch('/admin/branches/:id/inventory/:productId', requireAuth(['owner', '
     }
 
     try {
-      const movement = InventoryStockService.recordMovement({
-        branch_id: req.params.id,
-        product_id: req.params.productId,
-        movement_type,
-        quantity,
-        mutation_id,
-        reference_id: null,
-        actor_id: req.user.userId || req.user.id || req.user.username || 'system',
-        actor_role: req.user.role || 'system',
-        notes
-      });
+      if (hasThreshold) {
+        const threshold = Math.max(0, parseInt(req.body.low_stock_threshold, 10) || 0);
+        if (canonicalStock) {
+          db.prepare(`
+            INSERT INTO branch_product_inventory (branch_id, product_id, stock_qty, low_stock_threshold)
+            VALUES (?, ?, 0, ?)
+            ON CONFLICT(branch_id, product_id) DO UPDATE SET
+              low_stock_threshold = excluded.low_stock_threshold,
+              updated_at = datetime('now')
+          `).run(req.params.id, req.params.productId, threshold);
+        } else {
+          db.prepare(`
+            UPDATE branch_products
+            SET low_stock_threshold = ?, updated_at = datetime('now')
+            WHERE branch_id = ? AND product_id = ?
+          `).run(threshold, req.params.id, req.params.productId);
+        }
+      }
+
+      let movement = null;
+      if (hasQuantity) {
+        movement = InventoryStockService.recordMovement({
+          branch_id: req.params.id,
+          product_id: req.params.productId,
+          movement_type,
+          quantity: rawQuantityNum,
+          mutation_id,
+          reference_id: null,
+          actor_id: req.user.userId || req.user.id || req.user.username || 'system',
+          actor_role: req.user.role || 'system',
+          notes
+        });
+      }
 
       const stock = InventoryStockService.getStock(req.params.id, req.params.productId);
       res.json({
@@ -249,11 +279,15 @@ router.get('/admin/branches/:id/inventory/recipes', requireAuth(['owner', 'brand
           rc.planned_quantity,
           rc.planned_uom_id,
           u.name AS planned_uom_name,
-          COALESCE(msb.quantity_base, 0) AS branch_material_stock,
+          u.code AS planned_uom_code,
+          bu.code AS base_uom_code,
+          COALESCE(msb.quantity_base, 0) AS branch_material_stock_base,
+          ROUND(COALESCE(msb.quantity_base, 0) * bu.conversion_factor / u.conversion_factor, 4) AS branch_material_stock,
           COALESCE(msb.cost_availability_status, 'UNAVAILABLE') AS cost_status
         FROM recipe_components rc
         JOIN materials m ON m.id = rc.material_id
         JOIN uoms u ON u.id = rc.planned_uom_id
+        JOIN uoms bu ON bu.id = m.base_uom_id
         LEFT JOIN material_stock_balances msb
           ON msb.material_id = rc.material_id AND msb.stock_location_id = ?
         WHERE rc.recipe_version_id = ?
@@ -335,9 +369,14 @@ router.post('/admin/branches/:id/inventory/prepare', requireAuth(['owner', 'bran
 
     const components = db.prepare(`
       SELECT rc.material_id, rc.planned_quantity, rc.planned_uom_id, m.name AS material_name,
+             u.conversion_factor AS planned_cf, bu.conversion_factor AS base_cf,
+             u.name AS planned_uom_name, bu.name AS base_uom_name,
+             u.quantity_precision AS planned_precision, u.allows_fraction AS planned_allows_fraction,
              COALESCE(msb.quantity_base, 0) AS current_stock
       FROM recipe_components rc
       JOIN materials m ON m.id = rc.material_id
+      JOIN uoms u ON u.id = rc.planned_uom_id
+      JOIN uoms bu ON bu.id = m.base_uom_id
       LEFT JOIN material_stock_balances msb ON msb.material_id = rc.material_id AND msb.stock_location_id = ?
       WHERE rc.recipe_version_id = ?
     `).all(location.id, recipe.recipe_version_id);
@@ -352,22 +391,31 @@ router.post('/admin/branches/:id/inventory/prepare', requireAuth(['owner', 'bran
     const requiredMaterials = [];
 
     for (const comp of components) {
-      const needed = Number(comp.planned_quantity) * factor;
+      const precision = Math.min(6, Math.max(0, Number(comp.planned_precision != null ? comp.planned_precision : 6)));
+      const rawNeeded = Number(comp.planned_quantity) * factor;
+      let neededInPlanned;
+      if (Number(comp.planned_allows_fraction) !== 1) {
+        neededInPlanned = Math.ceil(rawNeeded);
+      } else {
+        const factorMultiplier = 10 ** precision;
+        neededInPlanned = Math.round((rawNeeded + Number.EPSILON) * factorMultiplier) / factorMultiplier;
+      }
+      const neededInBase = Math.round((neededInPlanned * Number(comp.planned_cf) / Number(comp.base_cf) + Number.EPSILON) * 1e6) / 1e6;
       const currentStock = Number(comp.current_stock);
-      if (currentStock < needed) {
+      if (currentStock + 1e-9 < neededInBase) {
         return res.status(400).json({
           success: false,
           error: 'INSUFFICIENT_MATERIAL_STOCK',
-          message: `Stok bahan baku "${comp.material_name}" tidak mencukupi (dibutuhkan: ${needed.toFixed(2)}, tersedia: ${currentStock.toFixed(2)}).`,
+          message: `Stok bahan baku "${comp.material_name}" tidak mencukupi (dibutuhkan: ${neededInPlanned.toFixed(2)} ${comp.planned_uom_name}, tersedia: ${(currentStock * Number(comp.base_cf) / Number(comp.planned_cf)).toFixed(2)} ${comp.planned_uom_name}).`,
           material_id: comp.material_id,
-          needed,
-          available: currentStock
+          needed: neededInPlanned,
+          available: currentStock * Number(comp.base_cf) / Number(comp.planned_cf)
         });
       }
       requiredMaterials.push({
         material_id: comp.material_id,
         source_uom_id: comp.planned_uom_id,
-        actual_quantity: needed
+        actual_quantity: neededInPlanned
       });
     }
 
@@ -432,6 +480,97 @@ router.post('/admin/branches/:id/inventory/prepare', requireAuth(['owner', 'bran
     });
   } catch (err) {
     console.error('[API Error POST /admin/branches/:id/inventory/prepare]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /admin/branches/:id/inventory/notify-shortage
+// Notifies owner and system about material shortage encountered during kitchen preparation
+// and sets / bumps target reorder policy so materials immediately appear in owner replenishment recommendations
+router.post('/admin/branches/:id/inventory/notify-shortage', requireAuth(['owner', 'brand_manager', 'branch_manager']), async (req, res) => {
+  try {
+    if (req.user.role === 'branch_manager') {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (assignedBranchId && assignedBranchId !== req.params.id) {
+        return res.status(403).json({
+          success: false,
+          error: 'FORBIDDEN_BRANCH_SCOPE',
+          message: 'Branch Manager hanya memiliki kewenangan pada cabang yang ditugaskan.'
+        });
+      }
+    }
+
+    const branch = db.prepare('SELECT b.id, b.name, b.brand_id, br.organization_id FROM branches b JOIN brands br ON br.id = b.brand_id WHERE b.id = ? AND b.brand_id = ?').get(req.params.id, req.brand_id);
+    if (!branch) {
+      return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
+    }
+
+    const location = db.prepare("SELECT id FROM stock_locations WHERE branch_id = ? AND is_active = 1 LIMIT 1").get(req.params.id);
+    const locationId = location ? location.id : null;
+
+    const { product_id, product_name, portions = 1, short_materials = [] } = req.body;
+    if (!Array.isArray(short_materials) || short_materials.length === 0) {
+      return res.status(400).json({ success: false, error: 'Daftar bahan yang kurang (short_materials) wajib diisi.' });
+    }
+
+    const now = new Date().toISOString();
+    const actor = req.user.id || req.user.userId || 'kitchen';
+
+    // 1. Ensure inventory_reorder_policies for each short material has a target_quantity > current_stock
+    // so it immediately appears in ReplenishmentService suggestions and checklist
+    if (locationId) {
+      const upsertPolicy = db.prepare(`
+        INSERT INTO inventory_reorder_policies (
+          stock_location_id, identity_type, identity_id, minimum_quantity, target_quantity, updated_by, created_at, updated_at
+        ) VALUES (?, 'MATERIAL', ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(stock_location_id, identity_type, identity_id) DO UPDATE SET
+          minimum_quantity = CASE WHEN excluded.minimum_quantity > inventory_reorder_policies.minimum_quantity THEN excluded.minimum_quantity ELSE inventory_reorder_policies.minimum_quantity END,
+          target_quantity = CASE WHEN excluded.target_quantity > inventory_reorder_policies.target_quantity THEN excluded.target_quantity ELSE inventory_reorder_policies.target_quantity END,
+          updated_by = excluded.updated_by,
+          updated_at = excluded.updated_at
+      `);
+
+      for (const sm of short_materials) {
+        if (!sm.material_id) continue;
+        const curBal = db.prepare('SELECT quantity_base FROM material_stock_balances WHERE material_id = ? AND stock_location_id = ?').get(sm.material_id, locationId);
+        const currentStock = curBal ? Number(curBal.quantity_base || 0) : 0;
+        const neededQty = Number(sm.needed_quantity || 1);
+        const minReq = Math.max(1, neededQty);
+        const targetReq = Math.max(currentStock + neededQty, minReq * 2, 5);
+
+        upsertPolicy.run(locationId, sm.material_id, minReq, targetReq, actor, now, now);
+      }
+    }
+
+    // 2. Create authoritative notification targeted to Owner
+    const { NotificationService } = require('../../core');
+    const notifService = new NotificationService(db);
+
+    const materialsSummary = short_materials.map(m => `- ${m.material_name}: butuh ${m.needed_quantity} ${m.uom_name || ''} (sisa: ${m.available_quantity} ${m.uom_name || ''})`).join('\n');
+    const menuTitle = product_name ? `menu "${product_name}" (${portions} porsi)` : `${portions} porsi menu`;
+
+    const notifResult = notifService.createNotification({
+      brand_id: req.brand_id,
+      branch_id: req.params.id,
+      source_type: 'system',
+      source_actor_id: actor,
+      title: `⚠️ Bahan Baku Kurang di Dapur Cabang ${branch.name}`,
+      body: `Dapur gagal memasak ${menuTitle} karena bahan baku tidak mencukupi:\n${materialsSummary}\n\nItem telah otomatis dimasukkan ke Rekomendasi Belanja Owner.`,
+      priority: 'high',
+      target_role: 'owner',
+      target_scope: 'organization',
+      action_url: '/merchant-dashboard/#stock?tab=replenishment'
+    });
+
+    res.json({
+      success: true,
+      message: 'Peringatan kekurangan bahan berhasil dikirim ke Owner dan dimasukkan ke Rekomendasi Belanja.',
+      notification_id: notifResult.id,
+      recipient_count: notifResult.recipient_count,
+      short_materials_count: short_materials.length
+    });
+  } catch (err) {
+    console.error('[API Error POST /admin/branches/:id/inventory/notify-shortage]:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -506,13 +645,31 @@ router.get('/admin/branches/:id/purchasing/checklist', requireAuth(['owner', 'br
       ORDER BY p.name ASC
     `).all(branch.id, locationId, branch.brand_id);
 
+    const recipeUsages = db.prepare(`
+      SELECT
+        rc.material_id,
+        MAX(rc.planned_quantity / rv.planned_yield_quantity) AS max_unit_usage
+      FROM recipe_components rc
+      JOIN recipe_versions rv ON rv.id = rc.recipe_version_id AND rv.status = 'PUBLISHED'
+      JOIN recipes r ON r.id = rv.recipe_id AND r.status = 'ACTIVE'
+      GROUP BY rc.material_id
+    `).all();
+
+    const recipeUsageMap = new Map();
+    for (const u of recipeUsages) {
+      recipeUsageMap.set(String(u.material_id), Number(u.max_unit_usage || 0));
+    }
+
     let totalEstimatedBudget = 0;
     const materialItems = rows.map(item => {
       const current = Number(item.current_stock);
       const min = Number(item.minimum_quantity);
       const target = Number(item.target_quantity);
-      const isLow = current <= min;
-      const suggestedQty = isLow ? Math.max(1, target - current) : 0;
+      const worstUnitUsage = recipeUsageMap.get(String(item.material_id)) || 0;
+      const effectiveThreshold = Math.max(min, worstUnitUsage * 2);
+      const isLow = current <= effectiveThreshold || current <= 0;
+      const effectiveTarget = target > 0 ? target : Math.max(effectiveThreshold * 2, 1);
+      const suggestedQty = isLow ? Math.max(1, Math.round(effectiveTarget - current)) : 0;
       const lastCost = Number(item.last_unit_cost);
       const estimatedSubtotal = suggestedQty * lastCost;
 
@@ -596,13 +753,16 @@ router.get('/admin/branches/:id/purchasing/mandates', requireAuth(['owner', 'bra
     const mandates = db.prepare(query).all(...params);
     for (const m of mandates) {
       m.items = db.prepare(`
-        SELECT pmi.*, m.name AS material_name, m.material_code, u.code AS base_uom_code, u.name AS base_uom_name
+        SELECT pmi.*, m.name AS material_name, m.material_code, u.code AS base_uom_code, u.name AS base_uom_name,
+               COALESCE(msb.moving_average_unit_cost, 0) AS last_moving_avg_cost
         FROM purchasing_mandate_items pmi
         JOIN materials m ON m.id = pmi.material_id
         JOIN uoms u ON u.id = m.base_uom_id
+        LEFT JOIN stock_locations sl ON sl.branch_id = ? AND sl.is_active = 1
+        LEFT JOIN material_stock_balances msb ON msb.material_id = m.id AND msb.stock_location_id = sl.id
         WHERE pmi.mandate_id = ?
         ORDER BY m.name ASC
-      `).all(m.id);
+      `).all(req.params.id, m.id);
     }
 
     res.json({ success: true, branch_id: req.params.id, mandates });
@@ -946,12 +1106,6 @@ router.post('/admin/branches/:id/purchasing/settle', requireAuth(['owner', 'bran
       // If tied to an official mandate, update mandate status and record items
       const mandateId = req.body && req.body.mandate_id ? String(req.body.mandate_id) : null;
       if (mandateId) {
-        db.prepare(`
-          UPDATE purchasing_mandates
-          SET status = 'COMPLETED', completed_by = ?, completed_at = ?, updated_at = ?
-          WHERE id = ? AND branch_id = ?
-        `).run(actorId, now, now, mandateId, req.params.id);
-
         const updateMandateItem = db.prepare(`
           UPDATE purchasing_mandate_items
           SET is_purchased = 1, purchased_quantity = ?, actual_unit_price = ?
@@ -960,6 +1114,21 @@ router.post('/admin/branches/:id/purchasing/settle', requireAuth(['owner', 'bran
         for (const line of parsedLines) {
           updateMandateItem.run(line.quantity, line.unit_price, mandateId, line.material_id);
         }
+
+        // Check if there are still unpurchased items in this mandate
+        const unpurchasedRow = db.prepare(`
+          SELECT COUNT(*) AS count FROM purchasing_mandate_items
+          WHERE mandate_id = ? AND (is_purchased = 0 OR is_purchased IS NULL)
+        `).get(mandateId);
+
+        const isFullyDone = !unpurchasedRow || unpurchasedRow.count === 0;
+        const newStatus = isFullyDone ? 'COMPLETED' : 'RELEASED';
+
+        db.prepare(`
+          UPDATE purchasing_mandates
+          SET status = ?, completed_by = ?, completed_at = ?, updated_at = ?
+          WHERE id = ? AND branch_id = ?
+        `).run(newStatus, isFullyDone ? actorId : null, isFullyDone ? now : null, now, mandateId, req.params.id);
       }
 
       db.exec('COMMIT;');

@@ -981,7 +981,7 @@ router.patch('/admin/branches/:id/categories/:catId', requireAuth(['owner', 'bra
       }
     }
 
-    const cat = db.prepare('SELECT id, name, slug, COALESCE(is_active, 1) AS is_active FROM branch_categories WHERE id = ? AND branch_id = ? AND brand_id = ?')
+    const cat = db.prepare('SELECT id, name, slug, image_url, COALESCE(is_active, 1) AS is_active FROM branch_categories WHERE id = ? AND branch_id = ? AND brand_id = ?')
       .get(req.params.catId, req.params.id, req.brand_id);
     if (!cat) return res.status(404).json({ success: false, error: 'Kategori cabang tidak ditemukan.' });
 
@@ -990,6 +990,7 @@ router.patch('/admin/branches/:id/categories/:catId', requireAuth(['owner', 'bra
     let newName = cat.name;
     let newSlug = cat.slug;
     let newActive = cat.is_active;
+    let newImageUrl = cat.image_url;
 
     if (req.body && req.body.name !== undefined) {
       const name = String(req.body.name).trim();
@@ -1005,9 +1006,13 @@ router.patch('/admin/branches/:id/categories/:catId', requireAuth(['owner', 'bra
       newActive = req.body.is_active ? 1 : 0;
     }
 
+    if (req.body && req.body.image_url !== undefined) {
+      newImageUrl = req.body.image_url ? String(req.body.image_url).trim() : null;
+    }
+
     try {
-      db.prepare("UPDATE branch_categories SET name = ?, slug = ?, is_active = ?, updated_at = datetime('now') WHERE id = ?")
-        .run(newName, newSlug, newActive, req.params.catId);
+      db.prepare("UPDATE branch_categories SET name = ?, slug = ?, is_active = ?, image_url = ?, updated_at = datetime('now') WHERE id = ?")
+        .run(newName, newSlug, newActive, newImageUrl, req.params.catId);
     } catch (e) {
       if (String(e).includes('no such column')) {
         db.prepare("UPDATE branch_categories SET name = ?, slug = ? WHERE id = ?")
@@ -1017,7 +1022,7 @@ router.patch('/admin/branches/:id/categories/:catId', requireAuth(['owner', 'bra
       }
     }
 
-    res.json({ success: true, category: { id: req.params.catId, name: newName, slug: newSlug, is_active: newActive } });
+    res.json({ success: true, category: { id: req.params.catId, name: newName, slug: newSlug, is_active: newActive, image_url: newImageUrl } });
   } catch (err) {
     console.error('[API Error PATCH /admin/branches/:id/categories/:catId]:', err);
     res.status(500).json({ success: false, error: err.message });

@@ -36,17 +36,21 @@
      ROUTING (Branch Manager routes only)
      ========================================================================= */
   var BM_ROUTE_META = {
-    "hari-ini":         { title: "Hari Ini",         sub: "Ringkasan operasional harian cabang dan kendali layanan", tab: "hari-ini" },
-    "pesanan":          { title: "Pesanan",          sub: "Antrean pesanan dan branch acceptance operasional",       tab: "bm-pesanan" },
-    "meja":             { title: "Meja",             sub: "Status operasional meja dan dine-in cabang",              tab: "bm-meja" },
-    "menu":             { title: "Menu",             sub: "Ketersediaan produk dan operasional menu cabang",         tab: "bm-menu" },
-    "promo":            { title: "Promo",            sub: "Promosi dan diskon operasional aktif cabang",             tab: "bm-promo" },
-    "stok":             { title: "Stok",             sub: "Pemantauan stok dan peringatan inventaris cabang",        tab: "bm-stok" },
-    "belanja":          { title: "Belanja Pasar",    sub: "Catatan belanja pasar bahan baku dan hitung kasbon",      tab: "bm-belanja" },
-    "staff":            { title: "Staff",            sub: "Daftar staf operasional dan kasir cabang",                tab: "bm-staff" },
-    "reports":          { title: "Laporan",          sub: "Laporan penjualan dan operasional harian cabang",         tab: "bm-reports" },
-    "jam-operasional":  { title: "Jam Operasional",  sub: "Jam operasional dan pengecualian libur cabang",           tab: "bm-jam-operasional" },
-    "pengaturan":       { title: "Pengaturan",       sub: "Pengaturan aplikasi merchant dan pemulihan data",                tab: "bm-settings" }
+    "hari-ini":         { title: "Hari Ini",         sub: "Ringkasan operasional dan kendali resto hari ini", tab: "hari-ini" },
+    "pesanan":          { title: "Pesanan",          sub: "Antrean pesanan masuk dan status pesanan",       tab: "bm-pesanan" },
+    "meja":             { title: "Meja",             sub: "Status dan ketersediaan meja makan (dine-in)",   tab: "bm-meja" },
+    "menu":             { title: "Menu",             sub: "Katalog menu dan pengaturan etalase",            tab: "bm-menu" },
+    "promo":            { title: "Promo",            sub: "Daftar promosi dan diskon yang sedang aktif",    tab: "bm-promo" },
+    "stok":             { title: "Stok Porsi",       sub: "Pantau dan atur sisa porsi menu yang siap disajikan", tab: "bm-stok" },
+    "belanja":          { title: "Belanja Pasar",    sub: "Catatan belanja bahan baku dan kasbon",          tab: "bm-belanja" },
+    "purchasing":       { title: "Belanja Pasar",    sub: "Catatan belanja bahan baku dan kasbon",          tab: "bm-belanja" },
+    "staff":            { title: "Staff",            sub: "Daftar akun kasir dan staf resto",               tab: "bm-staff" },
+    "reports":          { title: "Laporan",          sub: "Laporan transaksi dan omzet penjualan",          tab: "bm-reports" },
+    "jam-operasional":  { title: "Jam Operasional",  sub: "Jadwal buka dan jam operasional resto",          tab: "bm-jam-operasional" },
+    "pengaturan":       { title: "Pengaturan",       sub: "Pengaturan profil dan preferensi aplikasi",      tab: "bm-settings" },
+    "printer":          { title: "Printer Struk",    sub: "Pengaturan printer kasir dan cetak struk",       tab: "bm-printer" },
+    "bantuan":          { title: "Bantuan",          sub: "Pusat bantuan operasional merchant",             tab: "bm-help" },
+    "ketentuan":        { title: "Ketentuan",        sub: "Syarat layanan dan kebijakan privasi",          tab: "bm-terms" }
   };
 
   function closeMobileSidebar() {
@@ -97,10 +101,38 @@
     navigateTo(tabToRoute[tabId] || tabId);
   }
   window.switchTab = switchTab;
+  window.switchBMTab = function (tabOrRoute) {
+    if (tabOrRoute === 'purchasing' || tabOrRoute === 'bm-belanja') {
+      navigateTo('belanja');
+    } else {
+      switchTab(tabOrRoute);
+    }
+  };
+
+  var BM_SUBPAGE_ROUTES = {
+    'jam-operasional': true,
+    'staff': true,
+    'pengaturan': true,
+    'printer': true,
+    'bantuan': true,
+    'ketentuan': true,
+    'reports': true
+  };
 
   function applyRoute(route) {
+    if (window.XentraNav && typeof window.XentraNav.clear === 'function') {
+      window.XentraNav.clear();
+    }
     var meta = BM_ROUTE_META[route] || BM_ROUTE_META['hari-ini'];
     var tabId = meta.tab;
+
+    var isSubpage = !!BM_SUBPAGE_ROUTES[route];
+    document.body.classList.toggle('is-subpage-view', isSubpage);
+    if (isSubpage) {
+      var activeSection = document.getElementById('tab-' + tabId);
+      if (activeSection) activeSection.scrollTop = 0;
+      window.scrollTo(0, 0);
+    }
 
     // Sidebar active state (desktop)
     document.querySelectorAll('#x-dash-nav .x-nav-item[data-route]').forEach(function (btn) {
@@ -130,12 +162,25 @@
       if (typeof loadBMOrders === 'function') loadBMOrders();
     } else {
       if (typeof stopBMOrdersPolling === 'function') stopBMOrdersPolling();
+      if (typeof closeBMOrderDetail === 'function') closeBMOrderDetail({ fromPopState: true });
     }
 
     if (tabId === 'bm-meja' && typeof loadBMTables === 'function') loadBMTables();
     if (tabId === 'bm-menu' && typeof loadBMMenu === 'function') loadBMMenu();
     if (tabId === 'bm-stok' && typeof loadBMStock === 'function') loadBMStock();
-    if (tabId === 'bm-belanja' && typeof loadPurchasingChecklist === 'function') loadPurchasingChecklist();
+    if (tabId === 'bm-belanja') {
+      document.body.classList.add('is-belanja-active');
+      if (typeof loadPurchasingChecklist === 'function') loadPurchasingChecklist();
+    } else {
+      document.body.classList.remove('is-belanja-active');
+      if (!document.body.classList.contains('is-purchasing-mode')) {
+        var pBottomBar = $('purchasing-bottom-bar');
+        if (pBottomBar) {
+          pBottomBar.classList.add('is-hidden');
+          pBottomBar.style.setProperty('display', 'none', 'important');
+        }
+      }
+    }
     if (tabId === 'bm-promo' && typeof loadBMPromotions === 'function') loadBMPromotions();
     if (tabId === 'hari-ini' && typeof loadHariIni === 'function') loadHariIni();
     if (tabId === 'bm-staff' && typeof loadBMStaff === 'function') loadBMStaff();
@@ -266,44 +311,21 @@
     var roleLabel = user.role === 'purchasing' ? 'Petugas Belanja' : (user.role || 'branch_manager').toUpperCase();
     if ($('dash-user-role')) $('dash-user-role').textContent = roleLabel;
 
-    // Purchasing staff specific surface adjustments: clean 100% mobile view (like Driver App)
+    // Purchasing staff specific surface redirect: standalone isolated surface (/belanja/)
+    if (user.role === 'purchasing') {
+      window.location.replace('/belanja/');
+      return;
+    }
+
     var purchasingTopbar = $('purchasing-mobile-topbar');
     var mobileTopbar = document.querySelector('.x-mobile-topbar');
-    if (user.role === 'purchasing') {
-      document.body.classList.add('is-purchasing-mode');
-      if (purchasingTopbar) purchasingTopbar.style.display = 'flex';
-      if (mobileTopbar) mobileTopbar.style.display = 'none';
-      var purchasingBranchEl = $('purchasing-topbar-branch-name');
-      if (purchasingBranchEl) {
-        var bName = user.branch_name || '';
-        var brName = user.brand_name || '';
-        if (bName && brName && !bName.toLowerCase().includes(brName.toLowerCase())) {
-          purchasingBranchEl.textContent = brName + ' ' + bName;
-        } else {
-          purchasingBranchEl.textContent = bName || brName || 'MyBangjo Pringsewu';
-        }
-      }
-      if (typeof window.loadBrandLogoForPurchasing === 'function') {
-        window.loadBrandLogoForPurchasing();
-      }
-      var mobileNav = $('x-merchant-mobile-nav');
-      if (mobileNav) {
-        mobileNav.style.display = 'none';
-      }
-      var bottomBar = $('purchasing-bottom-bar');
-      if (bottomBar) {
-        bottomBar.classList.remove('is-hidden');
-        bottomBar.style.setProperty('display', 'flex', 'important');
-      }
-    } else {
-      document.body.classList.remove('is-purchasing-mode');
-      if (purchasingTopbar) purchasingTopbar.style.display = 'none';
-      if (mobileTopbar) mobileTopbar.style.display = '';
-      var bottomBar = $('purchasing-bottom-bar');
-      if (bottomBar) {
-        bottomBar.classList.add('is-hidden');
-        bottomBar.style.setProperty('display', 'none', 'important');
-      }
+    document.body.classList.remove('is-purchasing-mode');
+    if (purchasingTopbar) purchasingTopbar.style.display = 'none';
+    if (mobileTopbar) mobileTopbar.style.display = '';
+    var bottomBar = $('purchasing-bottom-bar');
+    if (bottomBar) {
+      bottomBar.classList.add('is-hidden');
+      bottomBar.style.setProperty('display', 'none', 'important');
     }
 
     // Show Mandat tab button for Branch Manager / Manager
@@ -346,13 +368,50 @@
    * tombolnya tampil tapi tidak melakukan apa pun — persis seperti keluhan
    * "tidak bisa logout".
    */
+  window.__subpageReturnToAccount = false;
+  function navigateBackFromSubpage() {
+    document.body.classList.remove('is-subpage-view');
+    if (window.__subpageReturnToAccount) {
+      window.__subpageReturnToAccount = false;
+      window.location.hash = 'hari-ini';
+      applyRoute('hari-ini');
+      openMobileAccount();
+    } else {
+      navigateTo('hari-ini');
+    }
+  }
+  window.navigateBackFromSubpage = navigateBackFromSubpage;
+
+  function closeMerchantSettings(returnToAccount) {
+    if (returnToAccount) {
+      window.__subpageReturnToAccount = true;
+    }
+    navigateBackFromSubpage();
+  }
+  window.closeMerchantSettings = closeMerchantSettings;
+
   function bindMerchantSettingsControls() {
     var settingsBtn = $('btn-mobile-account-settings');
     if (settingsBtn && !settingsBtn.dataset.bound) {
       settingsBtn.dataset.bound = '1';
       settingsBtn.addEventListener('click', function () {
+        window.__subpageReturnToAccount = true;
         closeMobileAccount();
         navigateTo('pengaturan');
+      });
+    }
+    var backBtn = $('btn-bm-settings-back');
+    if (backBtn && !backBtn.dataset.bound) {
+      backBtn.dataset.bound = '1';
+      backBtn.addEventListener('click', function () {
+        closeMerchantSettings(true);
+      });
+    }
+    var closeBtn = $('btn-bm-settings-close');
+    if (closeBtn && !closeBtn.dataset.bound) {
+      closeBtn.dataset.bound = '1';
+      closeBtn.addEventListener('click', function () {
+        closeMerchantSettings(false);
       });
     }
     var refreshBtn = $('btn-bm-refresh-app-data');
@@ -411,9 +470,124 @@
     var profile = $('mobile-user-profile');
     var back = $('btn-mobile-account-back');
     var logout = $('btn-mobile-account-logout');
-    if (profile) profile.addEventListener('click', openMobileAccount);
-    if (back) back.addEventListener('click', closeMobileAccount);
-    if (logout) logout.addEventListener('click', logoutFromMobileAccount);
+    var profileCard = $('mobile-account-profile-card');
+    var notifBtn = $('btn-mobile-account-notifications');
+    var opsHoursBtn = $('btn-mobile-account-operational-hours');
+    var staffBtn = $('btn-mobile-account-staff');
+    var settingsBtn = $('btn-mobile-account-settings');
+    var printerBtn = $('btn-mobile-account-printer');
+    var helpBtn = $('btn-mobile-account-help');
+    var termsBtn = $('btn-mobile-account-terms');
+    var versionBtn = $('btn-mobile-account-version');
+
+    if (profile && !profile.dataset.accountBound) {
+      profile.dataset.accountBound = '1';
+      profile.addEventListener('click', openMobileAccount);
+    }
+    if (back && !back.dataset.accountBound) {
+      back.dataset.accountBound = '1';
+      back.addEventListener('click', closeMobileAccount);
+    }
+    if (logout && !logout.dataset.accountBound) {
+      logout.dataset.accountBound = '1';
+      logout.addEventListener('click', logoutFromMobileAccount);
+    }
+    if (profileCard && !profileCard.dataset.accountBound) {
+      profileCard.dataset.accountBound = '1';
+      profileCard.addEventListener('click', function () {
+        var user = getStoredUser ? getStoredUser() : null;
+        var name = (user && (user.full_name || user.username)) || 'Pengguna';
+        var role = (user && user.role) || 'Branch Manager';
+        showToast('Masuk sebagai ' + name + ' (' + role + ')', 'info');
+      });
+    }
+    if (notifBtn && !notifBtn.dataset.accountBound) {
+      notifBtn.dataset.accountBound = '1';
+      notifBtn.addEventListener('click', function () {
+        if ('Notification' in window && Notification.permission === 'default') {
+          Notification.requestPermission().then(function (perm) {
+            if (perm === 'granted') {
+              showToast('Notifikasi pesanan diizinkan & alarm suara aktif', 'success');
+            } else {
+              showToast('Notifikasi browser diblokir. Alarm suara tetap aktif.', 'info');
+            }
+            if (window.XentraAudio && typeof window.XentraAudio.orderIncoming === 'function') {
+              window.XentraAudio.orderIncoming({ text: 'Notifikasi aktif' });
+            }
+          }).catch(function () {
+            showToast('Alarm suara pesanan aktif', 'info');
+          });
+        } else {
+          if (window.XentraAudio && typeof window.XentraAudio.orderIncoming === 'function') {
+            window.XentraAudio.orderIncoming({ text: 'Tes alarm pesanan masuk' });
+          }
+          showToast('Alarm suara dan notifikasi pesanan aktif', 'success');
+        }
+      });
+    }
+    if (opsHoursBtn && !opsHoursBtn.dataset.accountBound) {
+      opsHoursBtn.dataset.accountBound = '1';
+      opsHoursBtn.addEventListener('click', function () {
+        window.__subpageReturnToAccount = true;
+        closeMobileAccount();
+        navigateTo('jam-operasional');
+      });
+    }
+    if (staffBtn && !staffBtn.dataset.accountBound) {
+      staffBtn.dataset.accountBound = '1';
+      staffBtn.addEventListener('click', function () {
+        window.__subpageReturnToAccount = true;
+        closeMobileAccount();
+        navigateTo('staff');
+      });
+    }
+    if (settingsBtn && !settingsBtn.dataset.bound) {
+      settingsBtn.dataset.bound = '1';
+      settingsBtn.addEventListener('click', function () {
+        window.__subpageReturnToAccount = true;
+        closeMobileAccount();
+        navigateTo('pengaturan');
+      });
+    }
+    if (printerBtn && !printerBtn.dataset.accountBound) {
+      printerBtn.dataset.accountBound = '1';
+      printerBtn.addEventListener('click', function () {
+        window.__subpageReturnToAccount = true;
+        closeMobileAccount();
+        navigateTo('printer');
+      });
+    }
+    if (helpBtn && !helpBtn.dataset.accountBound) {
+      helpBtn.dataset.accountBound = '1';
+      helpBtn.addEventListener('click', function () {
+        window.__subpageReturnToAccount = true;
+        closeMobileAccount();
+        navigateTo('bantuan');
+      });
+    }
+    var privacyBtn = $('btn-mobile-account-privacy');
+    if (privacyBtn && !privacyBtn.dataset.accountBound) {
+      privacyBtn.dataset.accountBound = '1';
+      privacyBtn.addEventListener('click', function () {
+        window.__subpageReturnToAccount = true;
+        closeMobileAccount();
+        navigateTo('ketentuan');
+      });
+    }
+    if (termsBtn && !termsBtn.dataset.accountBound) {
+      termsBtn.dataset.accountBound = '1';
+      termsBtn.addEventListener('click', function () {
+        window.__subpageReturnToAccount = true;
+        closeMobileAccount();
+        navigateTo('ketentuan');
+      });
+    }
+    if (versionBtn && !versionBtn.dataset.accountBound) {
+      versionBtn.dataset.accountBound = '1';
+      versionBtn.addEventListener('click', function () {
+        showToast('Xentra Core Merchant App v1.4.7 (Versi Terbaru)', 'success');
+      });
+    }
   }
 
   window.openMobileAccount = openMobileAccount;
@@ -439,6 +613,216 @@
     }
   }
 
+  /* =========================================================================
+     NOTIFICATION BELL & NOTIFICATION CENTER (Contract v1)
+     ========================================================================= */
+  var _notificationsState = {
+    items: [],
+    unreadCount: 0,
+    pollTimer: null
+  };
+
+  async function fetchUnreadNotificationCount() {
+    try {
+      var res = await adminFetch(API_BASE + '/notifications/unread-count', { headers: getAuthHeaders() });
+      var data = await res.json();
+      if (data && data.success) {
+        updateNotificationBadge(data.unread_count || 0);
+      }
+    } catch (_) {}
+  }
+
+  function updateNotificationBadge(count) {
+    _notificationsState.unreadCount = count;
+    var badge = $('mobile-notification-count');
+    var pill = $('notif-unread-pill');
+
+    if (badge) {
+      badge.textContent = count > 99 ? '99+' : count;
+      badge.style.setProperty('display', count > 0 ? 'flex' : 'none', 'important');
+    }
+    if (pill) {
+      pill.textContent = (count > 99 ? '99+' : count) + ' Baru';
+      pill.style.setProperty('display', count > 0 ? 'inline-block' : 'none', 'important');
+    }
+  }
+
+  function updateMobileOrdersBadge(count) {
+    var badge = $('mobile-orders-count');
+    if (!badge) return;
+    var num = Number(count) || 0;
+    if (num > 0) {
+      badge.textContent = num > 99 ? '99+' : String(num);
+      badge.style.setProperty('display', 'flex', 'important');
+    } else {
+      badge.textContent = '0';
+      badge.style.setProperty('display', 'none', 'important');
+    }
+  }
+  window.updateMobileOrdersBadge = updateMobileOrdersBadge;
+
+  async function fetchActionableOrdersCount() {
+    var user = getStoredUser();
+    var branchId = user ? (user.branch_id || user.branchId) : null;
+    if (!branchId) return;
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/orders?status=pending', {
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (data && data.success && Array.isArray(data.orders)) {
+        var count = data.orders.filter(function (o) {
+          return o.status === 'pending' || Number(o.pending_additions_count || 0) > 0;
+        }).length;
+        updateMobileOrdersBadge(count);
+        if (typeof checkAndNotifyNewPendingOrders === 'function') {
+          checkAndNotifyNewPendingOrders(data.orders);
+        }
+      }
+    } catch (_) {}
+  }
+  window.fetchActionableOrdersCount = fetchActionableOrdersCount;
+
+  var _actionableOrdersTimeout = null;
+  function scheduleActionableOrdersCheck(delayMs) {
+    if (_actionableOrdersTimeout) clearTimeout(_actionableOrdersTimeout);
+    _actionableOrdersTimeout = setTimeout(async function () {
+      if (document.visibilityState === 'hidden') {
+        scheduleActionableOrdersCheck(15000);
+        return;
+      }
+      var activeTab = document.querySelector('.x-tab-content.active');
+      if (!activeTab || activeTab.id !== 'tab-bm-pesanan') {
+        await fetchActionableOrdersCount();
+      }
+      scheduleActionableOrdersCheck(15000);
+    }, delayMs || 15000);
+  }
+
+  async function openNotificationsSheet() {
+    var sheet = $('sheet-notifications');
+    if (!sheet) return;
+    sheet.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    await loadNotificationsList();
+  }
+
+  function closeNotificationsSheet() {
+    var sheet = $('sheet-notifications');
+    if (!sheet) return;
+    sheet.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+
+  async function loadNotificationsList() {
+    var container = $('notif-list-container');
+    if (!container) return;
+    container.innerHTML = '<div style="text-align:center;padding:28px 16px;color:#64748b;font-size:13px;">Memuat notifikasi...</div>';
+
+    try {
+      var res = await adminFetch(API_BASE + '/notifications?limit=30', { headers: getAuthHeaders() });
+      var data = await res.json();
+      if (!data || !data.success || !Array.isArray(data.notifications)) {
+        container.innerHTML = '<div style="text-align:center;padding:28px 16px;color:#64748b;font-size:13px;">Gagal memuat notifikasi.</div>';
+        return;
+      }
+
+      _notificationsState.items = data.notifications;
+      updateNotificationBadge(data.unread_count || 0);
+
+      if (data.notifications.length === 0) {
+        container.innerHTML = '<div style="text-align:center;padding:40px 16px;color:#94a3b8;font-size:13px;"><div style="font-size:32px;margin-bottom:8px;">🔔</div>Belum ada notifikasi baru.</div>';
+        return;
+      }
+
+      var html = '';
+      data.notifications.forEach(function (n) {
+        var isUnread = !n.read_at;
+        var icon = '🔔';
+        if (n.source_type === 'order') icon = '🛍️';
+        else if (n.source_type === 'delivery') icon = '🛵';
+        else if (n.source_type === 'payment') icon = '💵';
+        else if (n.source_type === 'announcement') icon = '📢';
+
+        var bg = isUnread ? '#f0fdf4' : '#ffffff';
+        var border = isUnread ? '#bbf7d0' : '#e2e8f0';
+
+        html += '<div onclick="handleNotificationClick(\'' + esc(n.id) + '\', \'' + esc(n.action_url || '') + '\')" style="background:' + bg + ';border:1px solid ' + border + ';border-radius:12px;padding:12px 14px;cursor:pointer;display:flex;gap:12px;align-items:flex-start;transition:all 0.15s ease;">';
+        html += '<span style="font-size:22px;line-height:1;margin-top:2px;">' + icon + '</span>';
+        html += '<div style="flex:1;">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">';
+        html += '<strong style="font-size:13px;color:#0f172a;">' + esc(n.title) + '</strong>';
+        if (isUnread) html += '<span style="width:8px;height:8px;border-radius:50%;background:#16a34a;display:inline-block;"></span>';
+        html += '</div>';
+        html += '<p style="margin:0 0 6px 0;font-size:12.5px;color:#475569;line-height:1.4;">' + esc(n.body) + '</p>';
+        html += '<small style="color:#94a3b8;font-size:11px;">' + new Date(n.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' · ' + new Date(n.created_at).toLocaleDateString('id-ID') + '</small>';
+        html += '</div>';
+        html += '</div>';
+      });
+
+      container.innerHTML = html;
+    } catch (err) {
+      container.innerHTML = '<div style="text-align:center;padding:28px 16px;color:#ef4444;font-size:13px;">Error: ' + esc(err.message) + '</div>';
+    }
+  }
+
+  async function handleNotificationClick(id, actionUrl) {
+    try {
+      await adminFetch(API_BASE + '/notifications/' + encodeURIComponent(id) + '/read', { method: 'POST', headers: getAuthHeaders() });
+      fetchUnreadNotificationCount();
+    } catch (_) {}
+
+    closeNotificationsSheet();
+
+    if (actionUrl) {
+      if (actionUrl.startsWith('/merchant/orders/')) {
+        navigateTo('pesanan');
+      } else if (actionUrl.startsWith('/pos/')) {
+        window.location.href = '/pos/';
+      } else if (actionUrl.startsWith('/driver/')) {
+        window.location.href = '/driver/';
+      }
+    }
+  }
+
+  async function markAllNotificationsAsRead() {
+    try {
+      await adminFetch(API_BASE + '/notifications/read-all', { method: 'POST', headers: getAuthHeaders() });
+      showToast('Semua notifikasi telah ditandai dibaca.');
+      loadNotificationsList();
+      fetchUnreadNotificationCount();
+    } catch (err) {
+      showToast('Gagal menandai notifikasi: ' + err.message);
+    }
+  }
+
+  function startNotificationPolling() {
+    fetchUnreadNotificationCount();
+    fetchActionableOrdersCount();
+    if (_notificationsState.pollTimer) clearInterval(_notificationsState.pollTimer);
+    _notificationsState.pollTimer = setInterval(function () {
+      if (document.visibilityState === 'hidden') return;
+      fetchUnreadNotificationCount();
+      var activeTab = document.querySelector('.x-tab-content.active');
+      if (!activeTab || activeTab.id !== 'tab-bm-pesanan') {
+        fetchActionableOrdersCount();
+      }
+    }, 15000);
+  }
+
+  window.openNotificationsSheet = openNotificationsSheet;
+  window.closeNotificationsSheet = closeNotificationsSheet;
+  window.handleNotificationClick = handleNotificationClick;
+  window.markAllNotificationsAsRead = markAllNotificationsAsRead;
+
+  function initNotificationListeners() {
+    var btnDesktop = $('btn-notifications-desktop');
+    var btnMobile = $('btn-notifications');
+    if (btnDesktop) btnDesktop.onclick = openNotificationsSheet;
+    if (btnMobile) btnMobile.onclick = openNotificationsSheet;
+  }
+
+
   async function boot() {
     initAuthListeners();
 
@@ -459,6 +843,10 @@
 
     applyRoleBasedUI();
     renderBranchManagerNavigation();
+    initNotificationListeners();
+    fetchUnreadNotificationCount();
+    fetchActionableOrdersCount();
+    scheduleActionableOrdersCheck(15000);
 
     var currentRoute = getCurrentRoute();
     if (user.role === 'purchasing' && (!window.location.hash || window.location.hash === '#hari-ini')) {

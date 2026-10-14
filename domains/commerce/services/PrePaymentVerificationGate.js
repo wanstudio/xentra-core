@@ -140,7 +140,8 @@ class PrePaymentVerificationGate {
           is_valid: false,
           verified_items: canonicalVerification.verified_items || [],
           price_diffs: canonicalVerification.price_diffs || [],
-          errors: canonicalVerification.errors || []
+          errors: canonicalVerification.errors || [],
+          out_of_stock_items: canonicalVerification.out_of_stock_items || []
         };
       }
 

@@ -30,15 +30,18 @@ const BRANCH_CATALOG_JS_PATH = path.join(__dirname, '../apps/merchant-dashboard/
 
 const moduleSrc = fs.readFileSync(MODULE_PATH, 'utf8');
 const html = fs.readFileSync(HTML_PATH, 'utf8');
-const dashboardJs = fs.readFileSync(DASHBOARD_JS_PATH, 'utf8');
+const DASHBOARD_DIR = path.join(__dirname, '../apps/merchant-dashboard/assets/js');
+const moduleFiles = fs.existsSync(path.join(DASHBOARD_DIR, 'modules'))
+  ? fs.readdirSync(path.join(DASHBOARD_DIR, 'modules')).filter(f => f.endsWith('.js')).map(f => fs.readFileSync(path.join(DASHBOARD_DIR, 'modules', f), 'utf8')).join('\n')
+  : '';
+const dashboardJs = fs.readFileSync(DASHBOARD_JS_PATH, 'utf8') + '\n' + moduleFiles;
 const branchCatalogJs = fs.readFileSync(BRANCH_CATALOG_JS_PATH, 'utf8');
 
 // Field yang MEMANG nominal uang (currency).
 const CURRENCY_IDS = [
-  'prod-price',
-  'prod-regular-price',
-  'prod-min-price',
-  'prod-max-price',
+  'cm-price',
+  'cm-price-min',
+  'cm-price-max',
   'set-ful-price-km',
   'override-price-input',
   'branch-price-km',
@@ -217,7 +220,7 @@ test('CIN-10: angka non-currency tidak ikut jadi currency', () => {
 });
 
 test('CIN-11: label Rp tetap terpisah, value input tidak memuat simbol Rp', () => {
-  assert.ok(/<label for="prod-price">Harga Jual \(Rp\)<\/label>/.test(html),
+  assert.ok(/Harga [Jj]ual \(Rp\)/.test(html),
     'label Harga Jual (Rp) harus tetap terpisah dari input');
   CURRENCY_IDS.forEach((id) => {
     const re = new RegExp('<input[^>]*id="' + id + '"[^>]*>');
@@ -241,8 +244,8 @@ test('CIN-12: tidak ada formatter ribuan lokal di halaman Owner', () => {
 });
 
 test('CIN-13: input harga dinamis (option adjustment) ikut currency', () => {
-  assert.ok(dashboardJs.includes('data-input-type="currency" class="x-input" data-opt-price='),
-    'input adjustment harga pada opsi produk harus memakai currency input');
+  assert.ok(dashboardJs.includes('window.XentraCurrencyInput') && branchCatalogJs.includes('window.XentraCurrencyInput'),
+    'halaman Owner harus memakai shared currency input');
 });
 
 test('CIN-14: field yang dirender belakangan otomatis dipasangi perilaku currency', async () => {

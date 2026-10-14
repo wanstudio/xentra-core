@@ -6,8 +6,10 @@
   <meta name="theme-color" content="#ffffff">
   <meta name="color-scheme" content="light">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Xentra Driver">
   <meta name="mobile-web-app-capable" content="yes">
+  <link rel="apple-touch-icon" href="/driver/assets/icons/icon-192.png">
   <link rel="manifest" href="/driver/manifest.json">
   <link rel="stylesheet" href="/merchant-shared/fonts/plus-jakarta-sans.css">
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.3">
@@ -160,7 +162,16 @@
   </div>
 
   <script src="/merchant-shared/js/crop-editor.js?v=1.0.2"></script>
+  <script src="/merchant-shared/js/audio-alerts.js?v=1.0.0"></script>
   <script src="/driver/assets/js/driver-app.js?v=4"></script>
-  <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/driver/sw.js", { scope: "/driver/" }).catch(function () {}); }</script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        var isSubdomain = window.location.hostname.startsWith('driver.') || window.location.hostname.startsWith('kurir.');
+        var swScope = isSubdomain ? '/' : (window.location.pathname.startsWith('/driver') ? '/driver/' : '/');
+        navigator.serviceWorker.register("/driver/sw.js", { scope: swScope }).catch(function () {});
+      });
+    }
+  </script>
 </body>
 </html>

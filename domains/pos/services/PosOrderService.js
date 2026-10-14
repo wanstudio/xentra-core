@@ -837,6 +837,7 @@ class PosOrderService {
     const placementResult = await OrderPlacementService.submitOrder({
       brand_id,
       branch_id,
+      client_transaction_id: client_transaction_id || null,
       customer: {
         name: customer.name || 'Pelanggan POS',
         phone: customer.phone || ''

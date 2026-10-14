@@ -13,7 +13,7 @@
  */
 
 var APP_CACHE_PREFIX = "xentra-merchant-";
-var APP_VERSION = "v1.2.8";
+var APP_VERSION = "v1.4.10";
 var FALLBACK_CACHE_NAME = "xentra-merchant-live";
 
 var STATIC_ASSETS = [
@@ -21,28 +21,28 @@ var STATIC_ASSETS = [
   "/merchant-app/manifest.json",
   "/merchant-app/assets/icons/icon-192.png",
   "/merchant-app/assets/icons/icon-512.png",
-  "/merchant-shared/css/shared.css?v=1.0.0",
-  "/merchant-shared/css/dashboard.css?v=1.0.28",
-  "/merchant-app/assets/css/home.css?v=1.0.3",
-  "/merchant-shared/js/shared.js?v=1.0.0",
+  "/merchant-shared/css/shared.css?v=1.0.1",
+  "/merchant-shared/css/dashboard.css?v=1.0.39",
+  "/merchant-app/assets/css/home.css?v=1.0.18",
+  "/merchant-shared/js/shared.js?v=1.0.1",
   "/merchant-shared/js/action-menu.js?v=1.0.0",
   "/merchant-shared/js/crop-editor.js?v=1.0.2",
   "/merchant-shared/js/catalog-client.js?v=1.0.0",
-  "/assets/js/core/fulfillment-environments.js?v=1.0.0",
+  "/assets/js/core/fulfillment-environments.js?v=1.0.1",
   "/merchant-app/assets/js/branch-catalog-ui.js?v=1.0.1",
   "/merchant-app/assets/js/context.js?v=1.0.0",
-  "/merchant-app/assets/js/menu.js?v=1.0.6",
-  "/merchant-app/assets/js/hari-ini.js?v=1.0.0",
+  "/merchant-app/assets/js/menu.js?v=1.1.0",
+  "/merchant-app/assets/js/hari-ini.js?v=1.0.6",
   "/merchant-app/assets/js/home.js?v=1.0.2",
   "/merchant-app/assets/js/jam-operasional.js?v=1.0.0",
   "/merchant-app/assets/js/reports.js?v=1.0.0",
   "/merchant-app/assets/js/tables.js?v=1.0.0",
   "/merchant-app/assets/js/stock.js?v=1.1.0",
-  "/merchant-app/assets/js/purchasing.js?v=1.0.9",
-  "/merchant-app/assets/js/promotions.js?v=1.0.0",
+  "/merchant-app/assets/js/purchasing.js?v=1.1.4",
+  "/merchant-app/assets/js/promotions.js?v=1.0.2",
   "/merchant-app/assets/js/staff.js?v=1.0.0",
-  "/merchant-app/assets/js/orders.js?v=1.0.1",
-  "/merchant-app/assets/js/merchant-app.js?v=1.0.5"
+  "/merchant-app/assets/js/orders.js?v=1.0.8",
+  "/merchant-app/assets/js/merchant-app.js?v=1.1.6"
 ];
 
 var _cacheNamePromise = null;
@@ -189,4 +189,66 @@ self.addEventListener("fetch", function (event) {
   ) {
     event.respondWith(networkFirst(event));
   }
+});
+
+// 6. Notification Click & Quick Action Buttons (Heads-up banner actions)
+self.addEventListener("notificationclick", function (event) {
+  event.notification.close();
+  var data = event.notification.data || {};
+  var orderId = data.orderId;
+  var action = event.action;
+
+  // Direct action: [✓ Terima] clicked directly from floating notification banner
+  if (action === "accept" && orderId) {
+    var reqHeaders = { "Content-Type": "application/json" };
+    if (data.token) reqHeaders["Authorization"] = "Bearer " + data.token;
+
+    event.waitUntil(
+      fetch("/api/v1/orders/" + encodeURIComponent(orderId) + "/branch-acceptance", {
+        method: "POST",
+        headers: reqHeaders,
+        body: JSON.stringify({
+          decision: "accept",
+          note: "Diterima melalui Notifikasi Cepat"
+        })
+      })
+        .then(function () {
+          return self.registration.showNotification("✅ Pesanan Diterima", {
+            body: "Pesanan #" + (data.orderNumber || orderId) + " berhasil diterima dan diproses dapur.",
+            icon: "/merchant-app/assets/icons/icon-192.png",
+            tag: "order-accepted-" + orderId,
+            silent: true
+          });
+        })
+        .then(function () {
+          return self.clients.matchAll({ type: "window", includeUncontrolled: true });
+        })
+        .then(function (clients) {
+          clients.forEach(function (client) {
+            client.postMessage({ type: "ORDER_ACCEPTED_FROM_NOTIFICATION", orderId: orderId });
+          });
+        })
+        .catch(function (err) {
+          console.error("[SW Notification Accept Error]:", err);
+        })
+    );
+    return;
+  }
+
+  // Default action: tap on notification body or [Buka Detail] button
+  var targetUrl = data.url || "/merchant-app/#pesanan";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (clientList) {
+      for (var i = 0; i < clientList.length; i++) {
+        var client = clientList[i];
+        if (client.url && client.url.includes("/merchant-app") && "focus" in client) {
+          client.postMessage({ type: "NAVIGATE_TO_ORDER", orderId: orderId });
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+    })
+  );
 });

@@ -20,6 +20,8 @@ const ExistingTenantResolver = require('./ExistingTenantResolver');
 const OwnershipClaimService = require('./OwnershipClaimService');
 const TenantOwnershipTransferService = require('./TenantOwnershipTransferService');
 const CustomerIdentityService = require('./CustomerIdentityService');
+const CashierOnboardingService = require('./CashierOnboardingService');
+const TenantDomainResolver = require('./TenantDomainResolver');
 const { EmailProvider, defaultEmailProvider, ResendEmailAdapter } = require('./EmailProvider');
 
 module.exports = {
@@ -41,6 +43,8 @@ module.exports = {
   OwnershipClaimService,
   TenantOwnershipTransferService,
   CustomerIdentityService,
+  CashierOnboardingService,
+  TenantDomainResolver,
   EmailProvider,
   defaultEmailProvider,
   ResendEmailAdapter,

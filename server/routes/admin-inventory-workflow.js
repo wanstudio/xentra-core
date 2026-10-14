@@ -85,10 +85,12 @@ function listContext(req, db) {
   const purchaseOrderLines = db.queryMany("SELECT pol.*, sm.material_id, m.name AS material_name, m.base_uom_id, base_uom.name AS base_uom_name, smp.name AS supplier_pack_name, smp.content_quantity, smp.content_uom_id, cu.name AS purchase_uom_name FROM purchase_order_lines pol JOIN purchase_orders po ON po.id = pol.purchase_order_id JOIN supplier_materials sm ON sm.id = pol.supplier_material_id JOIN materials m ON m.id = sm.material_id JOIN uoms base_uom ON base_uom.id = m.base_uom_id LEFT JOIN supplier_material_packs smp ON smp.id = pol.supplier_pack_id LEFT JOIN uoms cu ON cu.id = pol.purchase_uom_id WHERE po.organization_id = ? ORDER BY po.created_at DESC, pol.id", [orgId]);
   const recipes = db.queryMany("SELECT pi.id AS production_item_id, pi.output_product_id, pi.production_item_code, pi.name AS production_item_name, pi.status AS production_item_status, r.id AS recipe_id, r.name AS recipe_name, r.status AS recipe_status, rv.id AS recipe_version_id, rv.version_number, rv.status AS recipe_version_status, rv.planned_yield_quantity, rv.yield_uom_id, yu.name AS yield_uom_name, p.name AS output_product_name, p.sku AS output_product_sku, p.price AS selling_price, pil.stock_location_id FROM production_items pi JOIN products p ON p.id = pi.output_product_id JOIN brands br ON br.id = p.brand_id AND br.organization_id = pi.organization_id JOIN recipes r ON r.production_item_id = pi.id JOIN recipe_versions rv ON rv.recipe_id = r.id JOIN uoms yu ON yu.id = rv.yield_uom_id JOIN production_item_locations pil ON pil.production_item_id = pi.id AND pil.is_active = 1 WHERE pi.organization_id = ? AND pi.status = 'ACTIVE' AND r.status = 'ACTIVE' ORDER BY pi.name, rv.version_number DESC", [orgId]);
   recipes.forEach(function (recipe) {
-    recipe.components = db.queryMany("SELECT rc.material_id, m.material_code, m.name AS material_name, rc.planned_quantity, rc.planned_uom_id, u.name AS planned_uom_name, m.base_uom_id, bu.name AS base_uom_name, COALESCE(msb.moving_average_unit_cost, 0) AS unit_cost FROM recipe_components rc JOIN materials m ON m.id = rc.material_id JOIN uoms u ON u.id = rc.planned_uom_id JOIN uoms bu ON bu.id = m.base_uom_id LEFT JOIN (SELECT material_id, AVG(moving_average_unit_cost) AS moving_average_unit_cost FROM material_stock_balances WHERE moving_average_unit_cost > 0 GROUP BY material_id) msb ON msb.material_id = rc.material_id WHERE rc.recipe_version_id = ? ORDER BY rc.sort_order, m.name", [recipe.recipe_version_id]);
+    recipe.components = db.queryMany("SELECT rc.material_id, m.material_code, m.name AS material_name, rc.planned_quantity, rc.planned_uom_id, u.name AS planned_uom_name, u.conversion_factor AS planned_uom_factor, bu.conversion_factor AS base_uom_factor, m.base_uom_id, bu.name AS base_uom_name, COALESCE(msb.moving_average_unit_cost, 0) AS unit_cost FROM recipe_components rc JOIN materials m ON m.id = rc.material_id JOIN uoms u ON u.id = rc.planned_uom_id JOIN uoms bu ON bu.id = m.base_uom_id LEFT JOIN (SELECT material_id, AVG(moving_average_unit_cost) AS moving_average_unit_cost FROM material_stock_balances WHERE moving_average_unit_cost > 0 GROUP BY material_id) msb ON msb.material_id = rc.material_id WHERE rc.recipe_version_id = ? ORDER BY rc.sort_order, m.name", [recipe.recipe_version_id]);
     let totalCost = 0;
     recipe.components.forEach(function (comp) {
-      totalCost += Number(comp.planned_quantity || 0) * Number(comp.unit_cost || 0);
+      const factor = (Number(comp.planned_uom_factor) || 1) / (Number(comp.base_uom_factor) || 1);
+      const qtyInBaseUom = Number(comp.planned_quantity || 0) * factor;
+      totalCost += qtyInBaseUom * Number(comp.unit_cost || 0);
     });
     const yieldQty = Number(recipe.planned_yield_quantity) || 1;
     recipe.total_batch_cost = Math.round(totalCost);
@@ -346,7 +348,8 @@ function registerAdminInventoryWorkflowRoutes(router, deps = {}) {
       const components = req.body && req.body.components;
       if (!Array.isArray(components) || components.length === 0) throw fail('RECIPE_COMPONENTS_REQUIRED');
       const existingRoute = productionRepository.findProductionItemByProductAndLocation(outputProductId, location.id);
-      if (existingRoute.length) throw fail('PRODUCTION_ROUTE_ALREADY_EXISTS');
+      const isUpdate = req.body && (req.body.is_update || req.body.allow_update || req.body.recipe_id);
+      if (existingRoute.length && !isUpdate) throw fail('PRODUCTION_ROUTE_ALREADY_EXISTS');
       const outputUomRow = db.queryOne('SELECT product_stock_uom_id FROM products WHERE id = ?', [outputProductId]);
       const outputUom = outputUomRow && outputUomRow.product_stock_uom_id ? uomRepository.findById(outputUomRow.product_stock_uom_id) : null;
       const yieldUomId = required(req.body && req.body.yield_uom_id, 'YIELD_UOM_REQUIRED');
@@ -379,6 +382,8 @@ function registerAdminInventoryWorkflowRoutes(router, deps = {}) {
         if (!recipe) {
           recipe = ProductionService.createRecipe({ productionItemId: item.id, name: recipeName, repository: productionRepository });
           ProductionService.activateRecipe({ recipeId: recipe.id, repository: productionRepository });
+        } else {
+          db.execute('UPDATE recipes SET name = ?, updated_at = datetime(\'now\') WHERE id = ?', [recipeName, recipe.id]);
         }
       } else {
         item = ProductionService.createProductionItem({ organizationId: orgId, outputProductId: outputProductId, productionItemCode: code, name: recipeName, repository: productionRepository });
@@ -403,6 +408,34 @@ function registerAdminInventoryWorkflowRoutes(router, deps = {}) {
       });
       const published = ProductionService.publishRecipeVersion({ recipeVersionId: version.recipe_version.id, repository: productionRepository });
       return res.status(201).json({ success: true, production_item: item, recipe: recipe, recipe_version: published, components: version.components, stock_location_id: location.id });
+    } catch (error) { return respondError(res, error); }
+  });
+
+  router.delete('/admin/inventory-workflow/recipes/:id', authGate, (req, res) => {
+    try {
+      const orgId = organizationId(req);
+      const recipeId = required(req.params.id, 'RECIPE_ID_REQUIRED');
+      const recipe = db.queryOne(
+        "SELECT r.id, r.production_item_id, pi.organization_id, pi.output_product_id " +
+        "FROM recipes r " +
+        "JOIN production_items pi ON pi.id = r.production_item_id " +
+        "WHERE r.id = ? AND pi.organization_id = ?",
+        [recipeId, orgId]
+      );
+      if (!recipe) throw fail('RECIPE_NOT_FOUND', 404);
+
+      db.transaction(() => {
+        const rvs = db.queryMany("SELECT id FROM recipe_versions WHERE recipe_id = ?", [recipe.id]);
+        for (const rv of rvs) {
+          db.execute("DELETE FROM recipe_components WHERE recipe_version_id = ?", [rv.id]);
+        }
+        db.execute("DELETE FROM recipe_versions WHERE recipe_id = ?", [recipe.id]);
+        db.execute("DELETE FROM recipes WHERE id = ?", [recipe.id]);
+        db.execute("DELETE FROM production_item_locations WHERE production_item_id = ?", [recipe.production_item_id]);
+        db.execute("DELETE FROM production_items WHERE id = ?", [recipe.production_item_id]);
+      })();
+
+      return res.json({ success: true, message: 'RECIPE_DELETED' });
     } catch (error) { return respondError(res, error); }
   });
 

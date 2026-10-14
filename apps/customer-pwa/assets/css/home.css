@@ -1954,24 +1954,34 @@
 /* Branch-level availability is displayed ONLY from the server-provided
    is_available flag present on branch-scoped menus (never client-derived). */
 .x-product-unavailable {
-  opacity: 0.55;
+  background: #f8fafc !important;
+  box-shadow: none !important;
+  border: 1px solid #e2e8f0;
 }
 
 .x-product-unavailable .x-product-name {
-  color: var(--x-gray-500);
+  color: #94a3b8;
+}
+
+.x-product-unavailable .x-product-subtitle,
+.x-product-unavailable .x-product-description,
+.x-product-unavailable .x-current-price,
+.x-product-unavailable .x-price {
+  color: #94a3b8 !important;
+}
+
+.x-product-unavailable .x-product-image {
+  filter: grayscale(1);
+  opacity: 0.55;
+}
+
+.x-product-unavailable .x-product-menu-indicator {
+  opacity: 0.4;
+  filter: grayscale(1);
 }
 
 .x-unavailable-tag {
-  margin-top: 6px;
-  padding: 2px 9px;
-  border-radius: 999px;
-  background: var(--x-gray-bg);
-  color: var(--x-gray-500);
-  font-size: 11px;
-  line-height: 16px;
-  font-weight: 600;
-  display: inline-block;
-  margin-right: 8px;
+  display: none !important;
 }
 
 .x-unavailable-label {
@@ -1981,10 +1991,96 @@
   height: 34px;
   margin-top: 7px;
   border-radius: var(--x-radius-lg);
-  background: var(--x-gray-bg);
-  color: var(--x-gray-500);
+  background: #e2e8f0;
+  color: #64748b;
   font-size: 11px;
   font-weight: 700;
+  cursor: not-allowed;
+}
+
+.x-unavailable-label.is-closed {
+  background: #ffe4e6;
+  color: #e11d48;
+}
+
+/* Branch Closed Banner */
+.x-branch-closed-banner {
+  margin: 10px 16px 6px;
+  padding: 12px 14px;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-radius: var(--x-radius-lg, 14px);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: #9f1239;
+}
+
+.x-branch-closed-banner[hidden] {
+  display: none !important;
+}
+
+.x-branch-closed-icon {
+  flex-shrink: 0;
+  color: #e11d48;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+}
+
+.x-branch-closed-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.x-branch-closed-info strong {
+  font-size: 13px;
+  font-weight: 700;
+  color: #9f1239;
+}
+
+.x-branch-closed-info span {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: #be123c;
+}
+
+.x-product-image-wrap {
+  position: relative;
+  width: 105px;
+  height: 105px;
+  border-radius: 15px;
+  overflow: hidden;
+  background: var(--x-gray-bg);
+  flex-shrink: 0;
+}
+
+.x-photo-overlay-habis {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.x-photo-overlay-habis.is-closed {
+  background: rgba(159, 18, 57, 0.65);
+}
+
+.x-detail-overlay-habis {
+  font-size: 16px;
+  letter-spacing: 0.08em;
 }
 
 /* Product Detail sheet — reuses note overlay base, strictly content-fitted */
@@ -2058,6 +2154,7 @@
 }
 
 .x-detail-image-wrap {
+  position: relative;
   width: 100%;
   aspect-ratio: 1 / 1;
   max-height: none;

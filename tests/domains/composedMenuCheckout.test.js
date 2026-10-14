@@ -7,6 +7,7 @@ const db = require('../../server/database/db');
 const { ensureComposedMenuSchema } = require('../../domains/catalog/schema/ComposedMenuSchema');
 const ComposedMenuService = require('../../domains/catalog/services/ComposedMenuService');
 const { verifyComposedCheckout } = require('../../domains/commerce/services/ComposedMenuCheckoutService');
+const OrderPlacementService = require('../../domains/commerce/services/OrderPlacementService');
 
 const ORG = 'cmc_test_org';
 const BRAND = 'cmc_test_brand';
@@ -137,15 +138,80 @@ test('canonical checkout rejects client option/modifier payload until canonical 
   assert.ok(result.errors.includes('CANONICAL_MENU_OPTIONS_NOT_MODELED'));
 });
 
+test('canonical checkout allows BY_ORDER products with SKU even when branch stock is 0', () => {
+  const PRODUCT_BY_ORDER = 'cmc_product_by_order';
+  const MENU_BY_ORDER = 'cmc_menu_by_order';
+
+  db.prepare("INSERT OR REPLACE INTO products (id, brand_id, category_id, name, slug, price, is_active, sku, fulfillment_type) VALUES (?, ?, ?, 'Telor Cabe CMC', 'telor-cabe-cmc', 6000, 1, 'LAU-TLR-002', 'BY_ORDER')").run(PRODUCT_BY_ORDER, BRAND, CATEGORY);
+  db.prepare("INSERT OR REPLACE INTO menus (id, brand_id, menu_type, sub_category_id, rasa_id, selling_price, status) VALUES (?, ?, 'SINGLE', ?, ?, 6000, 'ACTIVE')").run(MENU_BY_ORDER, BRAND, SUB_B, ORIGINAL);
+  db.prepare("INSERT OR REPLACE INTO menu_items (menu_id, product_id, quantity, sort_order) VALUES (?, ?, 1, 0)").run(MENU_BY_ORDER, PRODUCT_BY_ORDER);
+  db.prepare("INSERT OR REPLACE INTO branch_menus (branch_id, menu_id, is_available, price_override) VALUES (?, ?, 1, 6000)").run(BRANCH, MENU_BY_ORDER);
+  db.prepare("INSERT OR REPLACE INTO branch_product_inventory (branch_id, product_id, stock_qty, low_stock_threshold) VALUES (?, ?, 0, 5)").run(BRANCH, PRODUCT_BY_ORDER);
+
+  const result = verifyComposedCheckout({
+    brandId: BRAND,
+    branchId: BRANCH,
+    items: [
+      { menu_id: MENU_BY_ORDER, quantity: 3, expected_price: 18000 }
+    ]
+  });
+
+  assert.equal(result.is_valid, true);
+  assert.equal(result.verified_items.length, 1);
+  assert.equal(result.verified_items[0].quantity, 3);
+});
+
+test('deductStockForSettledOrder successfully settles package with BY_ORDER component (stock 0) without [OUT_OF_STOCK_RACE]', async () => {
+  const PRODUCT_BY_ORDER = 'cmc_product_by_order_settle';
+  const PRODUCT_BY_STOCK = 'cmc_product_by_stock_settle';
+  const MENU_PACKAGE_SETTLE = 'cmc_menu_package_settle';
+
+  db.prepare("INSERT OR REPLACE INTO products (id, brand_id, category_id, name, slug, price, is_active, sku, fulfillment_type) VALUES (?, ?, ?, 'Telor Cabe Settle', 'telor-cabe-settle', 6000, 1, 'LAU-TLR-999', 'BY_ORDER')").run(PRODUCT_BY_ORDER, BRAND, CATEGORY);
+  db.prepare("INSERT OR REPLACE INTO products (id, brand_id, category_id, name, slug, price, is_active, sku, fulfillment_type) VALUES (?, ?, ?, 'Nasi Settle', 'nasi-settle', 5000, 1, 'NAS-PTH-999', 'BY_STOCK')").run(PRODUCT_BY_STOCK, BRAND, CATEGORY);
+  db.prepare("INSERT OR REPLACE INTO menus (id, brand_id, menu_type, package_name, selling_price, status) VALUES (?, ?, 'PACKAGE', 'Paket Jagoan Settle', 15000, 'ACTIVE')").run(MENU_PACKAGE_SETTLE, BRAND);
+  db.prepare("INSERT OR REPLACE INTO menu_items (menu_id, product_id, quantity, sort_order) VALUES (?, ?, 2, 0)").run(MENU_PACKAGE_SETTLE, PRODUCT_BY_ORDER);
+  db.prepare("INSERT OR REPLACE INTO menu_items (menu_id, product_id, quantity, sort_order) VALUES (?, ?, 1, 1)").run(MENU_PACKAGE_SETTLE, PRODUCT_BY_STOCK);
+  db.prepare("INSERT OR REPLACE INTO branch_menus (branch_id, menu_id, is_available, price_override) VALUES (?, ?, 1, 15000)").run(BRANCH, MENU_PACKAGE_SETTLE);
+  db.prepare("INSERT OR REPLACE INTO branch_product_inventory (branch_id, product_id, stock_qty, low_stock_threshold) VALUES (?, ?, 0, 5)").run(BRANCH, PRODUCT_BY_ORDER);
+  db.prepare("INSERT OR REPLACE INTO branch_product_inventory (branch_id, product_id, stock_qty, low_stock_threshold) VALUES (?, ?, 10, 5)").run(BRANCH, PRODUCT_BY_STOCK);
+
+  const orderResult = await OrderPlacementService.submitOrder({
+    brand_id: BRAND,
+    branch_id: BRANCH,
+    customer: { name: 'BY_ORDER Settle Customer', phone: '081233445566' },
+    items: [
+      { menu_id: MENU_PACKAGE_SETTLE, quantity: 1, expected_price: 15000 }
+    ],
+    payment_method: 'cash',
+    order_type: 'takeaway',
+    order_channel: 'customer_app'
+  });
+
+  assert.equal(orderResult.success, true);
+  assert.ok(orderResult.order && orderResult.order.id);
+
+  // Merchant accepts / order settled
+  const settleResult = OrderPlacementService.deductStockForSettledOrder(orderResult.order.id);
+  assert.equal(settleResult.success, true);
+
+  // Verify stock of BY_STOCK was deducted by 1 (10 - 1 = 9)
+  const stockRow = db.prepare('SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?').get(BRANCH, PRODUCT_BY_STOCK);
+  assert.equal(stockRow.stock_qty, 9);
+});
+
 test.after(() => {
-  db.prepare('DELETE FROM order_items WHERE menu_id IN (?, ?, ?)').run(MENU_A, MENU_B, MENU_PACKAGE);
+  db.prepare('DELETE FROM inventory_movements WHERE branch_id = ?').run(BRANCH);
+  db.prepare('DELETE FROM order_items WHERE menu_id IN (?, ?, ?, ?, ?)').run(MENU_A, MENU_B, MENU_PACKAGE, 'cmc_menu_by_order', 'cmc_menu_package_settle');
+  db.prepare('DELETE FROM order_payments WHERE order_id IN (SELECT id FROM orders WHERE branch_id = ?)').run(BRANCH);
+  db.prepare('DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE branch_id = ?)').run(BRANCH);
+  db.prepare('DELETE FROM orders WHERE branch_id = ?').run(BRANCH);
   db.prepare('DELETE FROM branch_menus WHERE branch_id = ?').run(BRANCH);
   db.prepare('DELETE FROM branch_product_inventory WHERE branch_id = ?').run(BRANCH);
-  db.prepare('DELETE FROM menu_items WHERE menu_id IN (?, ?, ?)').run(MENU_A, MENU_B, MENU_PACKAGE);
-  db.prepare('DELETE FROM menus WHERE id IN (?, ?, ?)').run(MENU_A, MENU_B, MENU_PACKAGE);
+  db.prepare('DELETE FROM menu_items WHERE menu_id IN (?, ?, ?, ?, ?)').run(MENU_A, MENU_B, MENU_PACKAGE, 'cmc_menu_by_order', 'cmc_menu_package_settle');
+  db.prepare('DELETE FROM menus WHERE id IN (?, ?, ?, ?, ?)').run(MENU_A, MENU_B, MENU_PACKAGE, 'cmc_menu_by_order', 'cmc_menu_package_settle');
   db.prepare('DELETE FROM sub_categories WHERE id IN (?, ?)').run(SUB_A, SUB_B);
   db.prepare('DELETE FROM menu_flavors WHERE id IN (?, ?)').run(ORIGINAL, PEDAS);
-  db.prepare('DELETE FROM products WHERE id IN (?, ?, ?)').run(PRODUCT_A, PRODUCT_B, PRODUCT_NOSTOCK);
+  db.prepare('DELETE FROM products WHERE id IN (?, ?, ?, ?, ?, ?)').run(PRODUCT_A, PRODUCT_B, PRODUCT_NOSTOCK, 'cmc_product_by_order', 'cmc_product_by_order_settle', 'cmc_product_by_stock_settle');
   db.prepare('DELETE FROM branch_categories WHERE branch_id = ?').run(BRANCH);
   db.prepare('DELETE FROM branches WHERE id = ?').run(BRANCH);
   db.prepare('DELETE FROM categories WHERE id = ?').run(CATEGORY);

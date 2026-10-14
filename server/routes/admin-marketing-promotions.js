@@ -616,7 +616,24 @@ router.patch('/admin/marketing/promotions/:id/branch-activation', requireAuth(['
       return res.status(403).json({ success: false, error: 'Cabang bukan milik brand ini.' });
     }
 
-    const existingScope = corePromotionRepo.findBranchScope(promotionId, targetBranchId);
+    const allScopes = corePromotionRepo.findBranchScopes(promotionId);
+    let existingScope = corePromotionRepo.findBranchScope(promotionId, targetBranchId);
+
+    // If promo currently has no branch scopes, it was created as brand-wide (all branches eligible).
+    // Automatically initialize scopes for all active branches in the brand so each branch can be toggled independently.
+    if (!existingScope && allScopes.length === 0) {
+      const allBrandBranches = db.prepare('SELECT id FROM branches WHERE brand_id = ? AND is_active = 1').all(req.brand_id);
+      for (const b of allBrandBranches) {
+        corePromotionRepo.assignBranchScope({
+          promotionId,
+          brandId: req.brand_id,
+          branchId: b.id,
+          isActive: 1
+        });
+      }
+      existingScope = corePromotionRepo.findBranchScope(promotionId, targetBranchId);
+    }
+
     if (!existingScope) {
       return res.status(404).json({ success: false, error: 'Promotion is not scoped to this branch.' });
     }

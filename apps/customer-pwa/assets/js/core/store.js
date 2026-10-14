@@ -316,7 +316,29 @@
   // branch_name) captured at add time. Cart line identity = id within a branch
   // scope: the same catalog product added under two different branches stays
   // two lines, so a multi-branch cart never silently merges scopes.
+  function isProductOutOfStock(product) {
+    if (!product) return false;
+    if (product.is_promo_reward) return false;
+    if (product.is_available === false || product.is_available === 0) return true;
+    if (product.availability === false || product.availability === 0) return true;
+    if (product.branch_is_available === false || product.branch_is_available === 0) return true;
+    if (product.branch_menu_is_available === false || product.branch_menu_is_available === 0) return true;
+    if (product.blocking_reason === 'OUT_OF_STOCK' || product.blocking_reason === 'BRANCH_MENU_UNAVAILABLE' || product.blocking_reason === 'COMPONENT_UNAVAILABLE') return true;
+    if (product.inventory) {
+      if (product.inventory.stock_available === false) return true;
+      if (product.inventory.blocking_reason === 'OUT_OF_STOCK') return true;
+      if (product.inventory.stock_managed && product.inventory.available_quantity != null && product.inventory.available_quantity <= 0) return true;
+    }
+    if (product.stock_estimate != null && product.stock_estimate <= 0) return true;
+    return false;
+  }
+
   function addItem(product, qty, branchCtx) {
+    if (isProductOutOfStock(product)) {
+      console.warn('[Store.addItem] Item sedang habis di cabang ini:', (product && (product.name || product.id)));
+      return false;
+    }
+
     qty = qty || 1;
 
     var rawBranchId = (branchCtx && (branchCtx.branch_id || branchCtx.branchId)) ||

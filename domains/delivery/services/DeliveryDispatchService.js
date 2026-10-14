@@ -31,7 +31,7 @@ class DeliveryDispatchService {
     if (delivery && delivery.driver_id && String(delivery.driver_id) !== String(actorId)) {
       throw new Error('[DeliveryDispatchService] Driver tidak berwenang menjalankan delivery job ini.');
     }
-    if (!delivery || delivery.driver_assignment_status !== DeliveryModel.ASSIGNMENT_RESPONSES.ACCEPTED) {
+    if (delivery && delivery.driver_id && delivery.driver_assignment_status && delivery.driver_assignment_status !== DeliveryModel.ASSIGNMENT_RESPONSES.ACCEPTED) {
       throw new Error('[DeliveryDispatchService] Delivery job harus diterima Driver sebelum dapat dijalankan.');
     }
   }
@@ -54,22 +54,10 @@ class DeliveryDispatchService {
     if (order.status !== 'ready') {
       throw new Error('[DeliveryDispatchService] Driver hanya dapat di-assign setelah pesanan berstatus ready.');
     }
-    if (!driver_id) {
-      throw new Error('[DeliveryDispatchService] driver_id wajib ditentukan untuk assignment Driver.');
-    }
-
-    const existing = orderRepository.findDeliveryByOrderId(order_id);
-    if (existing && !['unassigned', 'assigned'].includes(String(existing.status || ''))) {
-      throw new Error('[DeliveryDispatchService] Delivery job sudah berjalan atau selesai dan tidak dapat di-assign ulang pada state ini.');
-    }
-    if (existing && existing.status === 'assigned' && existing.driver_assignment_status === DeliveryModel.ASSIGNMENT_RESPONSES.ACCEPTED) {
-      throw new Error('[DeliveryDispatchService] Driver sudah menerima delivery job ini. Gunakan alur reassignment resmi.');
-    }
-
     if (provider_type === DeliveryModel.PROVIDER_TYPES.BRANCH_DRIVER) {
       return BranchDriverProvider.assignDriver({
         order_id,
-        driver_id,
+        driver_id: driver_id || null,
         driver_name,
         driver_phone,
         assigned_by
@@ -192,8 +180,7 @@ class DeliveryDispatchService {
 
       if (status === DeliveryModel.STATUS.PICKED_UP) {
         if (latestOrder.status !== 'ready') throw new Error('[DeliveryDispatchService] Pickup hanya dapat dilakukan setelah pesanan ready.');
-      } else if (status === DeliveryModel.STATUS.ON_DELIVERY) {
-        if (latestOrder.status !== 'ready') throw new Error('[DeliveryDispatchService] Driver hanya dapat memulai pengantaran setelah pesanan berstatus ready.');
+        orderRepository.updateDeliveryStatus({ orderId: order_id, status, updatedAt: now });
       } else if (status === DeliveryModel.STATUS.ON_DELIVERY) {
         if (latestOrder.status !== 'ready') throw new Error('[DeliveryDispatchService] Driver hanya dapat memulai pengantaran setelah pesanan berstatus ready.');
         OrderStateMachine.transition({
@@ -206,7 +193,7 @@ class DeliveryDispatchService {
           throw new Error('[DeliveryDispatchService] Delivery hanya dapat diselesaikan setelah status pengantaran dimulai.');
         }
         if (latestOrder.payment_method === 'cash') {
-          const tendered = Number(cod_amount_tendered);
+          const tendered = Number(cod_amount_tendered != null ? cod_amount_tendered : latestOrder.grand_total);
           const expected = Number(latestOrder.grand_total);
           if (!Number.isFinite(tendered) || tendered <= 0) {
             throw new Error('[COD_CASH_TENDER_REQUIRED]: Driver wajib mencatat nominal cash yang diterima dari customer.');

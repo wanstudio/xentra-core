@@ -32,6 +32,11 @@ class ReplenishmentService {
       location = dbInstance.prepare(
         "SELECT id, organization_id, branch_id, name FROM stock_locations WHERE branch_id = ? AND organization_id = ? AND is_active = 1 AND location_type = 'BRANCH' LIMIT 1"
       ).get(branchId, organizationId);
+    } else {
+      // Fallback: ambil lokasi stok cabang aktif pertama milik organisasi jika tidak ada filter cabang spesifik
+      location = dbInstance.prepare(
+        "SELECT id, organization_id, branch_id, name FROM stock_locations WHERE organization_id = ? AND is_active = 1 AND location_type = 'BRANCH' ORDER BY id ASC LIMIT 1"
+      ).get(organizationId);
     }
 
     if (!location) {
@@ -119,7 +124,73 @@ class ReplenishmentService {
       }
     }
 
-    // 4. Hitung kebutuhan kotor bahan baku (Gross Material Requirement) dari defisit menu
+    // 4. Analisis batas atas kebutuhan resep per bahan baku (Worst-Case Recipe Requirement)
+    // Misalnya Bahan A dipakai 3g di Menu X dan 5g di Menu Y -> max_unit_usage = 5g (Menu Y).
+    // Jika sisa stok bahan A < 5g (atau <= 0), bahan tersebut otomatis masuk rekomendasi belanja!
+    const materialRecipeDemandMap = new Map();
+
+    for (const [prodId, recipe] of latestRecipeByProduct.entries()) {
+      const yieldQty = Number(recipe.planned_yield_quantity) || 1;
+      const components = componentsByVersion.get(recipe.recipe_version_id) || [];
+      const prodInfo = productPolicies.find(p => String(p.product_id) === String(prodId));
+      const prodName = (prodInfo && prodInfo.product_name) || recipe.production_item_name || 'Menu';
+
+      for (const comp of components) {
+        let qtyInBase = Number(comp.planned_quantity || 0);
+        if (comp.planned_uom_id && comp.planned_uom_id !== comp.base_uom_id) {
+          try {
+            const conv = UomConversionService.convertQuantity({
+              quantity: qtyInBase,
+              sourceUomId: comp.planned_uom_id,
+              targetUomId: comp.base_uom_id,
+              repository: uomRepository
+            });
+            qtyInBase = Number(conv.target_quantity);
+          } catch (_) {}
+        }
+
+        const unitUsage = qtyInBase / yieldQty;
+        const matId = String(comp.material_id);
+
+        if (!materialRecipeDemandMap.has(matId)) {
+          materialRecipeDemandMap.set(matId, {
+            material_id: comp.material_id,
+            material_name: comp.material_name,
+            material_code: comp.material_code,
+            base_uom_id: comp.base_uom_id,
+            base_uom_name: comp.base_uom_name,
+            base_uom_code: comp.base_uom_code,
+            total_resto_usage: 0,
+            max_unit_usage: 0,
+            max_unit_product_name: '',
+            max_batch_usage: 0,
+            max_batch_product_name: '',
+            usages: []
+          });
+        }
+
+        const demand = materialRecipeDemandMap.get(matId);
+        demand.total_resto_usage += unitUsage;
+        demand.usages.push({
+          product_id: prodId,
+          product_name: prodName,
+          unit_usage: unitUsage,
+          batch_usage: qtyInBase,
+          yield_quantity: yieldQty
+        });
+
+        if (unitUsage > demand.max_unit_usage) {
+          demand.max_unit_usage = unitUsage;
+          demand.max_unit_product_name = prodName;
+        }
+        if (qtyInBase > demand.max_batch_usage) {
+          demand.max_batch_usage = qtyInBase;
+          demand.max_batch_product_name = prodName;
+        }
+      }
+    }
+
+    // 5. Hitung kebutuhan kotor bahan baku (Gross Material Requirement) dari defisit menu siap jual
     // materialGrossMap: material_id -> { material_id, material_name, material_code, base_uom_id, base_uom_name, base_uom_code, gross_needed, demand_sources: [] }
     const materialGrossMap = new Map();
 
@@ -186,16 +257,21 @@ class ReplenishmentService {
       }
     }
 
-    // Tambahkan juga bahan baku yang memiliki direct reorder policy jika berada di bawah batas minimumnya
+    // 6. Evaluasi stok bahan mentah gudang:
+    // - Batas atas kebutuhan menu terbesar (Worst-Case Threshold)
+    // - Direct reorder policy jika disetel
     const materialBalances = dbInstance.prepare(`
       SELECT 
         m.id AS material_id,
         m.name AS material_name,
         m.material_code,
         m.base_uom_id,
+        COALESCE(m.purchase_uom_name, '') AS purchase_uom_name,
+        COALESCE(m.purchase_uom_ratio, 1) AS purchase_uom_ratio,
         u.name AS base_uom_name,
         u.code AS base_uom_code,
         COALESCE(msb.quantity_base, 0) AS current_stock,
+        COALESCE(msb.moving_average_unit_cost, 0) AS moving_average_unit_cost,
         COALESCE(rp.minimum_quantity, 0) AS minimum_quantity,
         COALESCE(rp.target_quantity, 0) AS target_quantity
       FROM materials m
@@ -212,11 +288,35 @@ class ReplenishmentService {
       const curStock = Number(mb.current_stock || 0);
       const minStock = Number(mb.minimum_quantity || 0);
       const tarStock = Math.max(Number(mb.target_quantity || 0), minStock);
+      const matId = String(mb.material_id);
+      const recipeDemand = materialRecipeDemandMap.get(matId);
 
-      // Jika ada defisit langsung dari reorder policy material itu sendiri
-      if (minStock > 0 && curStock <= minStock && tarStock > curStock) {
-        const matDeficit = tarStock - curStock;
-        const matId = String(mb.material_id);
+      // A. Cek defisit reorder policy langsung
+      // Jika target stok belanja telah diisi dan stok saat ini berada di bawah target
+      // (baik karena menyentuh batas minimum atau sisa fisik saat ini < target belanja kulkas)
+      const hasPolicyDeficit = tarStock > curStock && (minStock > 0 ? curStock <= minStock : curStock < tarStock);
+
+      // B. Cek Batas Kebutuhan Resto (Total Resep Resto & Safety Buffer):
+      // Ambang batas warning dihitung dari total kebutuhan seluruh menu resto yang memakai bahan tersebut x 2 (Safety Buffer),
+      // dan minimal 2x takaran porsi menu terbesar agar dapur aman dan tidak kehabisan bahan saat ramai!
+      let hasWorstCaseDeficit = false;
+      let singlePortionUsage = 0;
+      let totalRestoUsage = 0;
+      let safeRestoThreshold = 0;
+      let worstProductName = '';
+
+      if (recipeDemand && (recipeDemand.total_resto_usage > 0 || recipeDemand.max_unit_usage > 0)) {
+        singlePortionUsage = recipeDemand.max_unit_usage || 0;
+        totalRestoUsage = recipeDemand.total_resto_usage || singlePortionUsage;
+        safeRestoThreshold = Math.max(totalRestoUsage * 2, singlePortionUsage * 2);
+        worstProductName = recipeDemand.max_unit_product_name || 'Menu';
+
+        if (curStock <= safeRestoThreshold || curStock <= 0) {
+          hasWorstCaseDeficit = true;
+        }
+      }
+
+      if (hasPolicyDeficit || hasWorstCaseDeficit) {
         if (!materialGrossMap.has(matId)) {
           materialGrossMap.set(matId, {
             material_id: mb.material_id,
@@ -229,16 +329,40 @@ class ReplenishmentService {
             demand_sources: []
           });
         }
+
         const item = materialGrossMap.get(matId);
-        item.gross_needed += matDeficit;
-        item.demand_sources.push({
-          type: 'DIRECT_MATERIAL_POLICY',
-          material_name: mb.material_name,
-          current_stock: curStock,
-          target_stock: tarStock,
-          deficit_portions: matDeficit,
-          material_portion_needed: matDeficit
-        });
+
+        if (hasWorstCaseDeficit) {
+          const recommendedMinTarget = Math.max(recipeDemand.max_batch_usage || 0, safeRestoThreshold * 2, tarStock, 1);
+          const deficit = Math.max(1, recommendedMinTarget - curStock);
+
+          if (item.gross_needed < recommendedMinTarget) {
+            item.gross_needed = recommendedMinTarget;
+          }
+
+          item.demand_sources.push({
+            type: 'WORST_CASE_RECIPE_THRESHOLD',
+            material_name: mb.material_name,
+            current_stock: curStock,
+            total_resto_usage: Math.round(totalRestoUsage * 1000) / 1000,
+            single_portion_usage: Math.round(singlePortionUsage * 1000) / 1000,
+            threshold: Math.round(safeRestoThreshold * 1000) / 1000,
+            worst_product_name: worstProductName,
+            deficit: Math.round(deficit * 1000) / 1000,
+            target_stock: recommendedMinTarget
+          });
+        } else if (hasPolicyDeficit) {
+          const matDeficit = tarStock - curStock;
+          item.gross_needed = Math.max(item.gross_needed, tarStock);
+          item.demand_sources.push({
+            type: 'DIRECT_MATERIAL_POLICY',
+            material_name: mb.material_name,
+            current_stock: curStock,
+            target_stock: tarStock,
+            deficit_portions: matDeficit,
+            material_portion_needed: matDeficit
+          });
+        }
       }
     }
 
@@ -386,11 +510,22 @@ class ReplenishmentService {
 
         totalPacksCount += purchasePacks;
       } else {
-        // Fallback jika belum didaftarkan supplier pack resmi: gunakan kelipatan 1 dalam base UOM
-        purchasePacks = Math.ceil(netDeficit);
-        purchaseTotalBaseQty = purchasePacks;
-        unitPrice = 0;
-        estCost = 0;
+        // Fallback jika belum didaftarkan supplier pack resmi: gunakan belanja pasar/eceran (Market Purchase)
+        const marketUnitName = (balance && balance.purchase_uom_name) ? balance.purchase_uom_name : grossInfo.base_uom_name;
+        const marketUnitRatio = (balance && Number(balance.purchase_uom_ratio) > 0) ? Number(balance.purchase_uom_ratio) : 1;
+
+        // Hitung kebutuhan dibulatkan ke satuan beli pasar terdekat (misal Ekor, Bungkus, Jerigen)
+        purchasePacks = Math.ceil(netDeficit / marketUnitRatio);
+        purchaseTotalBaseQty = purchasePacks * marketUnitRatio;
+        unitPrice = balance ? Number(balance.moving_average_unit_cost || 0) : 0;
+        estCost = Math.round(purchaseTotalBaseQty * unitPrice);
+
+        supplierInfo = {
+          is_market_purchase: true,
+          purchase_uom_name: marketUnitName,
+          purchase_uom_ratio: marketUnitRatio,
+          base_uom_name: grossInfo.base_uom_name
+        };
       }
 
       totalEstCost += estCost;
@@ -401,6 +536,8 @@ class ReplenishmentService {
         material_code: grossInfo.material_code,
         base_uom_name: grossInfo.base_uom_name,
         base_uom_code: grossInfo.base_uom_code,
+        purchase_uom_name: (balance && balance.purchase_uom_name) || (supplierInfo && supplierInfo.pack_uom_name) || grossInfo.base_uom_name,
+        purchase_uom_ratio: (balance && Number(balance.purchase_uom_ratio) > 0) ? Number(balance.purchase_uom_ratio) : 1,
         gross_quantity_needed: Math.round(grossNeeded * 1000) / 1000,
         current_stock: currentPhysicalStock,
         on_order_stock: onOrderStock,
@@ -409,6 +546,7 @@ class ReplenishmentService {
         recommended_purchase_packs: purchasePacks,
         recommended_purchase_base_quantity: purchaseTotalBaseQty,
         estimated_cost: estCost,
+        unit_price: unitPrice,
         supplier: supplierInfo,
         reasons: grossInfo.demand_sources
       });

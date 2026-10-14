@@ -459,6 +459,108 @@
   }
 
   /* =========================================================================
+     UNIVERSAL NAVIGATION & MODAL STACK (LIFO)
+     Coordinates sub-views, drawers, and modals with browser / mobile hardware back.
+     ========================================================================= */
+  var _navStack = [];
+  var _isHandlingPopstate = false;
+  var _suppressNextPopstate = 0;
+
+  var XentraNav = {
+    /**
+     * Registers an open sub-view, sheet, or modal to the back navigation stack.
+     * @param {Function} closeFn Function executed when popped (back pressed)
+     * @param {string} [id] Optional unique identifier for deduplication
+     */
+    push: function (closeFn, id) {
+      if (typeof closeFn !== 'function') return;
+      if (id && _navStack.length > 0 && _navStack[_navStack.length - 1].id === id) {
+        return;
+      }
+      _navStack.push({ fn: closeFn, id: id });
+      try {
+        if (window.history && typeof window.history.pushState === 'function') {
+          window.history.pushState({ xentra_nav_depth: _navStack.length, id: id }, '', window.location.href);
+        }
+      } catch (_) {}
+    },
+
+    /**
+     * Closes an entry programmatically from on-screen button/chevron.
+     * Unwinds one history state without re-triggering the popstate handler.
+     * @param {string} [id] Optional identifier to close specific layer
+     */
+    pop: function (id) {
+      if (!_navStack.length) return false;
+      var entryIndex = -1;
+      if (id) {
+        for (var i = _navStack.length - 1; i >= 0; i--) {
+          if (_navStack[i].id === id) {
+            entryIndex = i;
+            break;
+          }
+        }
+      } else {
+        entryIndex = _navStack.length - 1;
+      }
+
+      if (entryIndex === -1) return false;
+
+      var entry = _navStack.splice(entryIndex, 1)[0];
+      if (entry && typeof entry.fn === 'function') {
+        try { entry.fn(); } catch (err) { console.warn('[XentraNav] Close error:', err); }
+      }
+
+      if (!_isHandlingPopstate) {
+        _suppressNextPopstate++;
+        try {
+          if (window.history && typeof window.history.back === 'function') {
+            window.history.back();
+          }
+        } catch (_) {
+          _suppressNextPopstate = Math.max(0, _suppressNextPopstate - 1);
+        }
+      }
+      return true;
+    },
+
+    /**
+     * Clears all layers from stack (e.g. on full tab route switch).
+     */
+    clear: function () {
+      _navStack = [];
+    },
+
+    hasOpen: function (id) {
+      if (!id) return _navStack.length > 0;
+      return _navStack.some(function (entry) { return entry.id === id; });
+    },
+
+    isHandlingPopstate: function () {
+      return _isHandlingPopstate;
+    }
+  };
+
+  if (typeof window.addEventListener === 'function') {
+    window.addEventListener('popstate', function () {
+      if (_suppressNextPopstate > 0) {
+        _suppressNextPopstate--;
+        return;
+      }
+      if (XentraNav.hasOpen()) {
+        _isHandlingPopstate = true;
+        try {
+          XentraNav.pop();
+        } finally {
+          _isHandlingPopstate = false;
+        }
+      }
+    });
+  }
+
+  window.XentraNav = XentraNav;
+
+  /* =========================================================================
      EXPORTS
      ========================================================================= */
   window.XentraShared = {
@@ -484,6 +586,7 @@
     esc:                esc,
     showToast:          showToast,
     setupPasswordToggle: setupPasswordToggle,
+    Nav:                XentraNav,
     showSplash:         function (message) { if (window.Xentra && typeof window.Xentra.showSplash === 'function') window.Xentra.showSplash(message); },
     hideSplash:         function () { if (window.Xentra && typeof window.Xentra.hideSplash === 'function') window.Xentra.hideSplash(); }
   };

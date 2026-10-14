@@ -433,10 +433,20 @@ class ProductionService {
       if (!material || material.status !== 'ACTIVE') throw fail('MATERIAL_NOT_FOUND');
 
       const sourceUomId = text(input.source_uom_id, 'SOURCE_UOM_REQUIRED');
-      const sourceQuantity = positive(
+      let sourceQuantity = positive(
         input.actual_quantity,
         'INVALID_CONSUMPTION_QUANTITY'
       );
+
+      const sourceUom = uomRepository.findById(sourceUomId);
+      if (!sourceUom || Number(sourceUom.is_active) !== 1) {
+        throw fail('SOURCE_UOM_REQUIRED');
+      }
+      const sourcePrecision = Math.min(6, Math.max(0, Number(sourceUom.quantity_precision)));
+      if (Number(sourceUom.allows_fraction) === 1) {
+        const factor = 10 ** sourcePrecision;
+        sourceQuantity = Math.round((sourceQuantity + Number.EPSILON) * factor) / factor;
+      }
 
       const converted = UomConversionService.resolveBaseQuantity({
         materialId,

@@ -61,8 +61,11 @@ class WorkforceService {
     }
 
     // Driver and Purchasing accounts are always branch-scoped.
-    if ((role === 'driver' || role === 'purchasing') && !branch_id) {
-      throw { status: 400, code: 'BRANCH_REQUIRED', message: `Role ${role} harus ditugaskan ke cabang tertentu.` };
+    if (role === 'driver' && !branch_id) {
+      throw { status: 400, code: 'BRANCH_REQUIRED', message: 'Role driver harus ditugaskan ke cabang tertentu.' };
+    }
+    if (role === 'purchasing' && !branch_id) {
+      throw { status: 400, code: 'BRANCH_REQUIRED', message: 'Role purchasing harus ditugaskan ke cabang tertentu.' };
     }
 
     // Validate branch exists if provided
@@ -486,11 +489,17 @@ class WorkforceService {
   // ==================== AUTHENTICATION ====================
 
   authenticate(username, password, brandId) {
-    let user = this.repository.prepare('SELECT * FROM users WHERE (username = ? OR email = ?) AND brand_id = ?')
-      .get(username, username, brandId);
+    let user = null;
+    if (brandId) {
+      user = this.repository.prepare('SELECT * FROM users WHERE (username = ? OR email = ?) AND brand_id = ?')
+        .get(username, username, brandId);
+    } else {
+      user = this.repository.prepare('SELECT * FROM users WHERE (username = ? OR email = ?)')
+        .get(username, username);
+    }
 
     // Fallback: identity-only users (pre-invitation) have brand_id = NULL
-    if (!user) {
+    if (!user && brandId) {
       user = this.repository.prepare('SELECT * FROM users WHERE (username = ? OR email = ?) AND brand_id IS NULL')
         .get(username, username);
     }

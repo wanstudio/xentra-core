@@ -19,17 +19,41 @@ router.get('/catalog/composed-menu', (req, res) => {
 
     const brandId = req.brand_id;
     const branchId = req.query && req.query.branch_id ? String(req.query.branch_id).trim() : '';
-    const includeUnavailable = req.query && (req.query.include_unavailable === '1' || req.query.include_unavailable === 'true');
+    const includeUnavailable = !(req.query && (req.query.include_unavailable === '0' || req.query.include_unavailable === 'false'));
 
+    let branch = null;
     if (branchId) {
-      const branch = db.prepare('SELECT id, is_active FROM branches WHERE id = ? AND brand_id = ?').get(branchId, brandId);
+      branch = db.prepare('SELECT id, name, is_active, is_open_override FROM branches WHERE id = ? AND brand_id = ?').get(branchId, brandId);
       if (!branch) return res.status(400).json({ success: false, error: 'BRANCH_NOT_FOUND' });
       if (branch.is_active === 0) return res.status(400).json({ success: false, error: 'BRANCH_INACTIVE' });
+    } else {
+      branch = db.prepare('SELECT id, name, is_active, is_open_override FROM branches WHERE brand_id = ? AND is_active = 1 LIMIT 1').get(brandId);
     }
 
     const resolvedMenus = branchId
       ? ComposedMenuResolver.resolveBranchMenu({ brandId, branchId, includeUnavailable })
       : ComposedMenuResolver.resolveMasterMenu({ brandId });
+
+    let activeCategories = [];
+    try {
+      if (branchId) {
+        activeCategories = db.prepare(
+          'SELECT id, brand_id, branch_id, name, slug, image_url, media_id, sort_order ' +
+          'FROM branch_categories ' +
+          'WHERE branch_id = ? AND brand_id = ? AND COALESCE(is_active, 1) = 1 ' +
+          'ORDER BY sort_order ASC, name ASC'
+        ).all(branchId, brandId);
+      } else {
+        activeCategories = db.prepare(
+          'SELECT id, brand_id, name, slug, image_url, media_id, sort_order ' +
+          'FROM categories ' +
+          'WHERE brand_id = ? AND COALESCE(is_active, 1) = 1 ' +
+          'ORDER BY sort_order ASC, name ASC'
+        ).all(brandId);
+      }
+    } catch (_) {
+      activeCategories = [];
+    }
 
     // Menu presentation media is owned by the Menu. Canonical READY derivatives take precedence;
     // the Menu's own legacy image_url is the only fallback — never a component Product image
@@ -39,6 +63,42 @@ router.get('/catalog/composed-menu', (req, res) => {
       brandId,
       assetType: 'square'
     });
+
+    const categoryMediaIds = [];
+    for (const cat of activeCategories) {
+      if (cat && cat.media_id) categoryMediaIds.push(cat.media_id);
+    }
+    for (const menu of resolvedMenus) {
+      if (Array.isArray(menu.branch_categories)) {
+        for (const bc of menu.branch_categories) {
+          if (bc && bc.media_id) categoryMediaIds.push(bc.media_id);
+        }
+      }
+      if (menu.category && menu.category.media_id) {
+        categoryMediaIds.push(menu.category.media_id);
+      }
+    }
+
+    const categoryMediaMap = batchResolveCustomerMediaDelivery({
+      mediaIds: categoryMediaIds,
+      brandId,
+      assetType: 'square'
+    });
+
+    const enrichCategory = (category) => {
+      if (!category) return category;
+      const resolved = category.media_id ? categoryMediaMap.get(category.media_id) : null;
+      const legacyImg = category.image_url || category.image || '';
+      const previewUrl = resolved ? resolved.preview_url : (legacyImg || null);
+      return {
+        ...category,
+        preview_url: previewUrl,
+        image_url: previewUrl || legacyImg || '',
+        image: previewUrl || legacyImg || '',
+        media_id: resolved ? resolved.media_id : (category.media_id || null),
+        srcset_variants: resolved ? resolved.srcset_variants : []
+      };
+    };
 
     const menus = resolvedMenus.map((menu) => {
       const resolved = menu.media_id ? menuMediaMap.get(menu.media_id) : null;
@@ -50,11 +110,20 @@ router.get('/catalog/composed-menu', (req, res) => {
         image_url: previewUrl || legacyImg || '',
         image: previewUrl || legacyImg || '',
         media_id: resolved ? resolved.media_id : (menu.media_id || null),
-        srcset_variants: resolved ? resolved.srcset_variants : []
+        srcset_variants: resolved ? resolved.srcset_variants : [],
+        category: enrichCategory(menu.category),
+        branch_categories: Array.isArray(menu.branch_categories)
+          ? menu.branch_categories.map(enrichCategory)
+          : []
       };
     });
 
     const categoriesMap = new Map();
+    for (const cat of activeCategories) {
+      const enriched = enrichCategory(cat);
+      categoriesMap.set(String(enriched.id), { ...enriched, menus: [] });
+    }
+
     for (const menu of menus) {
       const sourceCategories = branchId && Array.isArray(menu.branch_categories) && menu.branch_categories.length
         ? menu.branch_categories
@@ -74,7 +143,14 @@ router.get('/catalog/composed-menu', (req, res) => {
     res.json({
       success: true,
       model: 'product-menu-inventory-v1',
-      branch_id: branchId || null,
+      branch_id: branch ? branch.id : (branchId || null),
+      branch: branch ? {
+        id: branch.id,
+        name: branch.name,
+        is_active: branch.is_active === 1,
+        is_open: branch.is_open_override === 1,
+        is_open_override: branch.is_open_override
+      } : null,
       categories: Array.from(categoriesMap.values()),
       menus
     });
@@ -93,14 +169,17 @@ router.get('/catalog/composed-menu/search', (req, res) => {
     const brandId = req.brand_id;
     const branchId = req.query && req.query.branch_id ? String(req.query.branch_id).trim() : '';
     const query = req.query && req.query.q != null ? req.query.q : '';
+    const includeUnavailable = !(req.query && (req.query.include_unavailable === '0' || req.query.include_unavailable === 'false'));
 
+    let branch = null;
     let menus;
     if (branchId) {
-      const branch = db.prepare('SELECT id, is_active FROM branches WHERE id = ? AND brand_id = ?').get(branchId, brandId);
+      branch = db.prepare('SELECT id, name, is_active, is_open_override FROM branches WHERE id = ? AND brand_id = ?').get(branchId, brandId);
       if (!branch) return res.status(400).json({ success: false, error: 'BRANCH_NOT_FOUND' });
       if (branch.is_active === 0) return res.status(400).json({ success: false, error: 'BRANCH_INACTIVE' });
-      menus = ComposedMenuResolver.searchBranchMenu({ brandId, branchId, query });
+      menus = ComposedMenuResolver.searchBranchMenu({ brandId, branchId, query, includeUnavailable });
     } else {
+      branch = db.prepare('SELECT id, name, is_active, is_open_override FROM branches WHERE brand_id = ? AND is_active = 1 LIMIT 1').get(brandId);
       const needle = String(query == null ? '' : query).trim().toLocaleLowerCase();
       const all = ComposedMenuResolver.resolveMasterMenu({ brandId });
       menus = needle
@@ -111,7 +190,14 @@ router.get('/catalog/composed-menu/search', (req, res) => {
     res.json({
       success: true,
       model: 'product-menu-inventory-v1',
-      branch_id: branchId || null,
+      branch_id: branch ? branch.id : (branchId || null),
+      branch: branch ? {
+        id: branch.id,
+        name: branch.name,
+        is_active: branch.is_active === 1,
+        is_open: branch.is_open_override === 1,
+        is_open_override: branch.is_open_override
+      } : null,
       query: String(query == null ? '' : query),
       menus
     });

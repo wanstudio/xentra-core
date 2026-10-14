@@ -1240,10 +1240,15 @@
     if (pay) pay.textContent=money(displayTotal);
 
     if (btn) {
-      btn.innerHTML = isAddition
-        ? 'Kirim Tambahan <span>'+money(displayTotal)+'</span>'
-        : 'Bayar <span>'+money(displayTotal)+'</span>';
-      btn.disabled=!displayCart.length || !state.shift || !!state.shift.active_break;
+      if (!isExisting && state.branchOperationalOpen === false) {
+        btn.innerHTML = 'Merchant Tutup <span>'+money(displayTotal)+'</span>';
+        btn.disabled = true;
+      } else {
+        btn.innerHTML = isAddition
+          ? 'Kirim Tambahan <span>'+money(displayTotal)+'</span>'
+          : 'Bayar <span>'+money(displayTotal)+'</span>';
+        btn.disabled=!displayCart.length || !state.shift || !!state.shift.active_break;
+      }
       btn.classList.toggle('pos-btn-additional-submit', isAddition);
     }
 
@@ -1261,8 +1266,10 @@
 
     var holdBtn=$('btn-pos-hold'), clearBtn=$('btn-pos-clear');
     if (holdBtn) {
+      var canHold = !isExisting && !isAddition && state.branchOperationalOpen !== false;
       holdBtn.hidden=isExisting || isAddition;
       holdBtn.classList.toggle('hidden', isExisting || isAddition);
+      holdBtn.disabled = !canHold;
     }
     if (clearBtn) {
       clearBtn.hidden=isExisting;
@@ -1312,8 +1319,10 @@
         if(mQty)mQty.textContent=totalQty;
         if(mTotal)mTotal.textContent=money(displayTotal);
         if(mBtn){
-          var mLabel=isAddition?'Kirim Tambahan':'Bayar Sekarang';
-          var mSpan=mBtn.querySelector('span'); if(mSpan)mSpan.textContent=mLabel;
+          var isClosed = !isExisting && state.branchOperationalOpen === false;
+          var mLabel = isClosed ? 'Merchant Tutup' : (isAddition ? 'Kirim Tambahan' : 'Bayar Sekarang');
+          var mSpan = mBtn.querySelector('span'); if(mSpan) mSpan.textContent = mLabel;
+          mBtn.disabled = isClosed;
         }
       }else{
         mCartBar.classList.add('hidden');
@@ -1484,6 +1493,14 @@
   }
 
   function addProduct(p){
+    if(state.branchOperationalOpen === false) {
+      toast('Merchant sedang tutup. Buka cabang terlebih dahulu.', 'error');
+      return;
+    }
+    if(!p || p.is_available === 0 || p.is_available === false || (p.inventory && p.inventory.stock_estimate <= 0 && p.blocking_reason === 'OUT_OF_STOCK')) {
+      toast('Stok produk habis', 'error');
+      return;
+    }
     if(composer().isExisting()) return showOrderLockedWarning();
     if(optionGroups(p).length > 0) {
       return openProductOptions(p);
@@ -1492,6 +1509,10 @@
   }
 
   function openProductOptions(p){
+    if(state.branchOperationalOpen === false) {
+      toast('Merchant sedang tutup. Buka cabang terlebih dahulu.', 'error');
+      return;
+    }
     if(composer().isExisting()) return showOrderLockedWarning();
     var groups=optionGroups(p);
     var title=p.name || p.product_name || 'Produk';
@@ -1629,7 +1650,7 @@
       }
 
       grid.innerHTML=filtered.map(function(p){
-        var unavailable=p.is_available===0||p.is_available===false;
+        var unavailable=p.is_available===0||p.is_available===false||(p.inventory && p.inventory.stock_estimate<=0 && p.blocking_reason==='OUT_OF_STOCK');
         var pName=p.name||p.product_name||'Produk';
         var cat=cats.find(function(c){return String(c.id)===String(p.category_id);});
         var catIndex=cat?cats.indexOf(cat):-1;
@@ -1645,11 +1666,12 @@
 
         var initials=(pName||'').split(' ').slice(0,2).map(function(w){return w.charAt(0);}).join('').toUpperCase()||'P';
         var mediaHtml='';
-        var imgUrl=p.image_url;
+        var imgUrl=p.image_url || p.image || '';
+        var overlayHabis=unavailable?'<span class="pos-photo-overlay-habis">Habis</span>':'';
         if(imgUrl){
-          mediaHtml='<div class="pos-product-media"><img src="'+esc(imgUrl)+'" alt="'+esc(pName)+'" loading="lazy" class="pos-product-img" onerror="this.style.display=\'none\';if(this.nextElementSibling)this.nextElementSibling.style.display=\'flex\';"><span class="pos-product-avatar" style="display:none;background:'+color.bg+';color:'+color.text+';border-color:'+color.border+'">'+esc(initials)+'</span></div>';
+          mediaHtml='<div class="pos-product-media"><img src="'+esc(imgUrl)+'" alt="'+esc(pName)+'" loading="lazy" class="pos-product-img" onerror="this.style.display=\'none\';if(this.nextElementSibling)this.nextElementSibling.style.display=\'flex\';"><span class="pos-product-avatar" style="display:none;background:'+color.bg+';color:'+color.text+';border-color:'+color.border+'">'+esc(initials)+'</span>'+overlayHabis+'</div>';
         }else{
-          mediaHtml='<div class="pos-product-media"><span class="pos-product-avatar" style="background:'+color.bg+';color:'+color.text+';border-color:'+color.border+'">'+esc(initials)+'</span></div>';
+          mediaHtml='<div class="pos-product-media"><span class="pos-product-avatar" style="background:'+color.bg+';color:'+color.text+';border-color:'+color.border+'">'+esc(initials)+'</span>'+overlayHabis+'</div>';
         }
 
         var badgeHtml = '';
@@ -1700,13 +1722,22 @@
         if(plusBtn) plusBtn.onclick = function(e){ incrementProduct(p, e); };
         if(addBtn) addBtn.onclick = function(e){ incrementProduct(p, e); };
 
+        var isUnavailable = p.is_available === 0 || p.is_available === false || (p.inventory && p.inventory.stock_estimate <= 0 && p.blocking_reason === 'OUT_OF_STOCK');
         card.onclick = function(e){
           if(e.target.closest('button')) return;
+          if(isUnavailable){
+            toast('Stok produk habis', 'error');
+            return;
+          }
           addProduct(p);
         };
         card.onkeydown = function(e){
           if((e.key==='Enter'||e.key===' ') && !e.target.closest('button')){
             e.preventDefault();
+            if(isUnavailable){
+              toast('Stok produk habis', 'error');
+              return;
+            }
             addProduct(p);
           }
         };
@@ -2312,8 +2343,8 @@
       }
       state.coreConnection=true;
       if(d && d.branch){
-        state.branchOperationalOpen = d.branch.is_open_override === true && d.branch.is_active !== false;
-        state.branchStatusReason = state.branchOperationalOpen ? 'open' : (d.branch.is_open_override === false ? 'closed' : 'inactive');
+        state.branchOperationalOpen = (d.branch.is_open_override === true || d.branch.is_open_override === 1) && d.branch.is_active !== false && d.branch.is_active !== 0;
+        state.branchStatusReason = state.branchOperationalOpen ? 'open' : ((d.branch.is_open_override === false || d.branch.is_open_override === 0) ? 'closed' : 'inactive');
       }else{
         // Never infer GO from missing branch state. The readiness classifier
         // must not become green when branch operational state is unknown.
@@ -2322,6 +2353,7 @@
       }
       if(state.terminalId) localStorage.setItem('xentra_pos_terminal_id',state.terminalId);
       updatePosReadiness();
+      renderCart();
       return !!state.terminalId;
     }catch(e){
       state.coreConnection=false;
@@ -2337,13 +2369,14 @@
     try{
       var d=await request('/pos/terminal/current',{headers:headers()});
       if(d && d.branch){
-        state.branchOperationalOpen = d.branch.is_open_override === true && d.branch.is_active !== false;
-        state.branchStatusReason = state.branchOperationalOpen ? 'open' : (d.branch.is_open_override === false ? 'closed' : 'inactive');
+        state.branchOperationalOpen = (d.branch.is_open_override === true || d.branch.is_open_override === 1) && d.branch.is_active !== false && d.branch.is_active !== 0;
+        state.branchStatusReason = state.branchOperationalOpen ? 'open' : ((d.branch.is_open_override === false || d.branch.is_open_override === 0) ? 'closed' : 'inactive');
       }else{
         state.branchOperationalOpen = null;
         state.branchStatusReason = 'unknown';
       }
       updatePosReadiness();
+      renderCart();
     }catch(e){
       // Keep the last known branch state during a transient refresh failure,
       // while Core reachability remains independently represented.
@@ -2856,6 +2889,9 @@
     var tx=composer();
     if(tx.isAddition()) return submitAdditionalOrder();
     if(!tx.hasItems())return;
+    if(!tx.isExisting() && state.branchOperationalOpen === false) {
+      return toast('Merchant sedang tutup. Buka cabang terlebih dahulu.', 'error');
+    }
     if(!state.shift)return toast('Buka shift terlebih dahulu.');
     if(state.shift.active_break)return toast('Akhiri istirahat sebelum melanjutkan transaksi.');
 
@@ -2932,6 +2968,9 @@
   }
 
   function showPaymentSuccess(order,change){
+    if (window.XentraAudio && typeof window.XentraAudio.paymentReceived === 'function') {
+      window.XentraAudio.paymentReceived({ text: 'Pembayaran diterima!' });
+    }
     showModal('<h3>Pembayaran Berhasil</h3><p>Sale '+esc(order.order_number||order.id||'')+' selesai.</p><div class="pos-payment-total">'+money(order.grand_total||total())+'</div>'+(change!=null?'<div class="pos-change">Kembalian: '+money(change)+'</div>':'')+'<div class="pos-modal-actions"><button class="pos-btn ghost" id="pos-sale-close">Selesai</button><button class="pos-btn" id="pos-sale-print">Cetak Struk</button></div>');
     $('pos-sale-close').onclick=function(){hideModal();resetSale();};
     $('pos-sale-print').onclick=function(){printReceipt(order.id);};
@@ -2960,6 +2999,9 @@
     var tx=composer();
     if(tx.isAddition()) return submitAdditionalOrder();
     if(!tx.hasItems()) return toast('Cart masih kosong.');
+    if(!tx.isExisting() && state.branchOperationalOpen === false) {
+      return toast('Merchant sedang tutup. Buka cabang terlebih dahulu.', 'error');
+    }
     if(!state.shift)return toast('Buka shift terlebih dahulu.');
     if(tx.getOrderType()==='dine_in'&&!tx.getTable()){hideModal();openTableSelector();return;}
     if(!navigator.onLine&&paymentMode!=='cash')return toast('Payment Gateway dan QRIS Statis membutuhkan koneksi internet pada POS.');
@@ -2986,9 +3028,17 @@
       }catch(e){return toast(e.message);}
     }
 
+    var confirmBtn=$('pos-pay-confirm');
+    if(confirmBtn){
+      if(confirmBtn.disabled) return;
+      confirmBtn.disabled=true;
+      confirmBtn.textContent='Memproses...';
+    }
+
     var table=tx.getTable();
     var orderType=tx.getOrderType();
     var items=tx.getDisplayItems();
+    var clientTxId=tx.getClientTransactionId() || ('pos_'+Date.now()+'_'+Math.random().toString(36).slice(2,8));
     var payload={
       branch_id:state.branchId,
       shift_id:state.shift.id,
@@ -3001,7 +3051,7 @@
         table_number:table?table.table_number:null
       },
       items:items.map(function(i){return {product_id:i.menu_id ? (i.product_id || null) : i.product_id,name:i.name,quantity:i.quantity,unit_price:i.unit_price,expected_price:i.unit_price,menu_id:i.menu_id||null,menu_type:i.menu_type||null,component_snapshot:Array.isArray(i.component_snapshot)?i.component_snapshot:null,menu_snapshot:i.menu_snapshot||null,options:i.options||[],note:i.note||''};}),
-      client_transaction_id:'pos_'+Date.now()+'_'+Math.random().toString(36).slice(2,8)
+      client_transaction_id:clientTxId
     };
 
     try{
@@ -3021,6 +3071,10 @@
       else if(paymentMode==='payment_gateway'){hideModal();showGatewayPending(d);}
       else if(paymentMode==='qris_static'){hideModal();showStaticQrisPending(d);}
     }catch(e){
+      if(confirmBtn){
+        confirmBtn.disabled=false;
+        confirmBtn.textContent='Lanjutkan';
+      }
       if(paymentMode==='cash' && isCoreUnreachableError(e)){
         try{
           var fallbackCreatedAt=new Date().toISOString();
@@ -3193,6 +3247,9 @@
 
   async function holdSale(){
     var tx=composer();
+    if(state.branchOperationalOpen === false) {
+      return toast('Merchant sedang tutup. Buka cabang terlebih dahulu.', 'error');
+    }
     if(tx.isExisting()) return showOrderLockedWarning();
     if(tx.isAddition()) return toast('Tambahan pesanan dikirim langsung, bukan melalui Hold Bill.');
     var items=tx.getDisplayItems();

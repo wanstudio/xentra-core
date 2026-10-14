@@ -27,7 +27,7 @@ class InventoryRepository {
 
   _findProductStockIdentity(productId) {
     return this.db.queryOne(
-      'SELECT id, brand_id, sku FROM products WHERE id = ?',
+      'SELECT id, brand_id, sku, fulfillment_type FROM products WHERE id = ?',
       [productId]
     );
   }
@@ -393,22 +393,35 @@ class InventoryRepository {
   }
 
   findBranchProduct(branchId, productId) {
+    const product = this._findProductStockIdentity(productId);
+    const isByOrder = Boolean(product && String(product.fulfillment_type || '').toUpperCase() === 'BY_ORDER');
+
     if (this._isCanonicalStockProduct(productId)) {
       const canonical = this.findCanonicalBranchInventory(branchId, productId);
-      if (!canonical) return null;
+      if (!canonical && !isByOrder) return null;
       return {
-        branch_id: canonical.branch_id,
-        product_id: canonical.product_id,
-        stock: Number(canonical.stock_qty || 0),
-        low_stock_threshold: Number(canonical.low_stock_threshold || 0),
-        canonical: true
+        branch_id: canonical ? canonical.branch_id : branchId,
+        product_id: productId,
+        stock: isByOrder ? 999999 : Number(canonical ? canonical.stock_qty || 0 : 0),
+        low_stock_threshold: Number(canonical ? canonical.low_stock_threshold || 0 : 5),
+        canonical: true,
+        by_order: isByOrder
       };
     }
 
-    return this.db.queryOne(
+    const legacy = this.db.queryOne(
       'SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?',
       [branchId, productId]
     );
+    if (!legacy && isByOrder) {
+      return {
+        branch_id: branchId,
+        product_id: productId,
+        stock: 999999,
+        by_order: true
+      };
+    }
+    return legacy;
   }
 
   updateBranchProductStock({ branchId, productId, stock, updatedAt }) {
@@ -429,6 +442,11 @@ class InventoryRepository {
   }
 
   deductBranchProduct({ branchId, productId, quantity }) {
+    const product = this._findProductStockIdentity(productId);
+    if (product && String(product.fulfillment_type || '').toUpperCase() === 'BY_ORDER') {
+      return { changes: 1, byOrder: true };
+    }
+
     if (this._isCanonicalStockProduct(productId)) {
       this.ensureBranchProductInventory({ branchId, productId });
       return this.db.execute(`

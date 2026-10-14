@@ -1151,13 +1151,15 @@ class WorkforceInvitationService {
         };
       }
 
-      // Assign role and scope to user strictly from invitation record
+      // Assign role and scope to user strictly from invitation record.
+      // If invited role is cashier, onboarding status becomes 'ACCEPTED' (mandatory onboarding begins).
       this.db.prepare(`
         UPDATE users
         SET role = ?,
             brand_id = ?,
             organization_id = ?,
             branch_id = ?,
+            cashier_onboarding_status = CASE WHEN ? = 'cashier' THEN 'ACCEPTED' ELSE cashier_onboarding_status END,
             updated_at = ?
         WHERE id = ?
       `).run(
@@ -1165,6 +1167,7 @@ class WorkforceInvitationService {
         invitation.brand_id,
         invitation.organization_id,
         invitation.branch_id || null,
+        invitation.role,
         now,
         userRecord.id
       );
@@ -1552,8 +1555,8 @@ class WorkforceInvitationService {
         this.db.prepare(`
           INSERT INTO users (
             id, username, email, password_hash, full_name, role, status,
-            organization_id, brand_id, branch_id, email_verified_at, created_at, updated_at
-          ) VALUES (?, ?, ?, NULL, ?, ?, 'active', ?, ?, ?, ?, ?, ?)
+            organization_id, brand_id, branch_id, email_verified_at, cashier_onboarding_status, created_at, updated_at
+          ) VALUES (?, ?, ?, NULL, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?)
         `).run(
           targetUserId,
           candidateUsername,
@@ -1564,6 +1567,7 @@ class WorkforceInvitationService {
           invitation.brand_id,
           invitation.branch_id || null,
           now,
+          invitation.role === 'cashier' ? 'ACCEPTED' : 'IDENTITY_COMPLETED',
           now,
           now
         );
@@ -1574,6 +1578,7 @@ class WorkforceInvitationService {
               brand_id = ?,
               organization_id = ?,
               branch_id = ?,
+              cashier_onboarding_status = CASE WHEN ? = 'cashier' THEN 'ACCEPTED' ELSE cashier_onboarding_status END,
               updated_at = ?
           WHERE id = ?
         `).run(
@@ -1581,6 +1586,7 @@ class WorkforceInvitationService {
           invitation.brand_id,
           invitation.organization_id,
           invitation.branch_id || null,
+          invitation.role,
           now,
           targetUserId
         );

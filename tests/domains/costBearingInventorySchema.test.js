@@ -55,8 +55,8 @@ function setupFixture() {
   `).run(PRODUCT, BRAND, 'Cost Schema Product', 'cost-schema-product');
 
   db.prepare(`
-    INSERT OR IGNORE INTO materials (id, organization_id, name)
-    VALUES ('material_cost_schema_test', ?, 'Cost Schema Material')
+    INSERT OR IGNORE INTO materials (id, organization_id, material_code, name, base_uom_id)
+    VALUES ('material_cost_schema_test', ?, 'MAT-COST-TEST', 'Cost Schema Material', 'uom_kg')
   `).run(ORG);
 
   db.prepare(`

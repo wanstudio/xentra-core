@@ -8,6 +8,7 @@
   var S = window.XentraShared || {};
   var $ = S.$ || function (id) { return document.getElementById(id); };
   var esc = S.esc || function (t) { return t || ''; };
+  var escapeHtml = esc;
   var formatMoney = S.formatMoney || function (v) { return 'Rp ' + Number(v || 0).toLocaleString('id-ID'); };
   var showToast = S.showToast || function (m) { alert(m); };
   var API_BASE = S.API_BASE || '/api/v1';
@@ -86,24 +87,31 @@
       if (allScopeEl) allScopeEl.textContent = 'Semua Cabang';
     }
 
+    var allItemsContainer = $('owner-stock-all-items-container');
+    if (allItemsContainer) allItemsContainer.innerHTML = '<div class="x-owner-stock-loading">Memuat seluruh data stok...</div>';
+
     return adminFetch(API_BASE + '/reports/operations' + query, {
       headers: getAuthHeaders()
     }).then(function (res) {
-      return res.json();
+      return res.json().then(function (json) {
+        if (!res.ok || !json || !json.success || !json.data) {
+          var errMsg = (json && (json.error || json.message)) || ('Gagal memuat data stok (HTTP ' + res.status + ')');
+          throw new Error(errMsg);
+        }
+        return json;
+      });
     }).then(function (json) {
-      if (!json.success || !json.data) {
-        throw new Error((json && (json.error || json.message)) || 'Gagal memuat data stok.');
-      }
       renderOwnerStockOverview(json.data);
       _ownerStockLoadedOnce = true;
     }).catch(function (err) {
       console.warn('[Owner Stock Load Error]:', err);
       var message = err && err.message === 'SESSION_EXPIRED'
         ? 'Sesi berakhir. Silakan masuk kembali.'
-        : 'Data stok belum dapat dimuat. Coba lagi.';
+        : (err && err.message ? err.message : 'Data stok belum dapat dimuat. Coba lagi.');
       if (alertList) alertList.innerHTML = '<div class="x-owner-stock-error">' + escapeHtml(message) + '</div>';
       if (branchList) branchList.innerHTML = '<div class="x-owner-stock-error">' + escapeHtml(message) + '</div>';
       if (movementList) movementList.innerHTML = '<div class="x-owner-stock-error">' + escapeHtml(message) + '</div>';
+      if (allItemsContainer) allItemsContainer.innerHTML = '<div class="x-owner-stock-error">' + escapeHtml(message) + '</div>';
     }).finally(function () {
       if (root) root.setAttribute('aria-busy', 'false');
     });
@@ -286,51 +294,79 @@
       return;
     }
 
-    var rows = items.map(function (it) {
+    var mobileCards = items.map(function (it) {
       var cur = Number(it.current_stock || 0);
       var th = Number(it.low_stock_threshold || 5);
       var isOut = cur <= 0;
       var isLow = cur > 0 && cur <= th;
 
-      var statusBadge = '';
-      if (isOut) {
-        statusBadge = '<span style="background:#FEE2E2; color:#991B1B; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700;">🔴 Habis</span>';
-      } else if (isLow) {
-        statusBadge = '<span style="background:#FEF3C7; color:#92400E; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700;">🟡 Menipis</span>';
-      } else {
-        statusBadge = '<span style="background:#ECFDF5; color:#065F46; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700;">🟢 Aman</span>';
-      }
+      var statusText = isOut ? 'Habis' : (isLow ? 'Menipis' : 'Aman');
+      var statusClass = isOut ? 'danger' : (isLow ? 'warning' : 'good');
 
       return (
-        '<tr style="border-bottom:1px solid #F1F5F9;">' +
-          '<td style="padding:10px 12px; font-size:13px;">' +
-            '<div style="font-weight:700; color:#0F172A;">' + escapeHtml(it.product_name || '-') + '</div>' +
-            '<div style="font-size:11px; color:#64748B;">' + (it.sku ? 'SKU: ' + escapeHtml(it.sku) : '') + (it.category_name ? ' • ' + escapeHtml(it.category_name) : '') + '</div>' +
+        '<div class="x-owner-stock-item-card ' + (isOut ? 'is-out' : '') + '">' +
+          '<div class="x-owner-stock-item-card-main">' +
+            '<div class="x-owner-stock-item-card-top">' +
+              '<span class="x-owner-stock-branch-badge ' + statusClass + '">' + statusText + '</span>' +
+              '<span class="x-owner-stock-item-card-branch">' + escapeHtml(it.branch_name || '-') + '</span>' +
+            '</div>' +
+            '<strong class="x-owner-stock-item-card-title">' + escapeHtml(it.product_name || '-') + '</strong>' +
+            '<div class="x-owner-stock-item-card-sub">' +
+              (it.sku ? '<span class="x-owner-stock-item-sku">SKU: ' + escapeHtml(it.sku) + '</span>' : '') +
+              (it.category_name ? '<span class="x-owner-stock-item-cat">' + escapeHtml(it.category_name) + '</span>' : '') +
+            '</div>' +
+          '</div>' +
+          '<div class="x-owner-stock-item-card-stock">' +
+            '<div class="x-owner-stock-item-card-cur ' + (isOut ? 'text-danger' : (isLow ? 'text-warning' : '')) + '">' +
+              '<strong>' + formatUnitCount(cur) + '</strong> <small>unit</small>' +
+            '</div>' +
+            '<div class="x-owner-stock-item-card-min">Min. ' + formatUnitCount(th) + '</div>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+
+    var desktopRows = items.map(function (it) {
+      var cur = Number(it.current_stock || 0);
+      var th = Number(it.low_stock_threshold || 5);
+      var isOut = cur <= 0;
+      var isLow = cur > 0 && cur <= th;
+
+      var statusText = isOut ? 'Habis' : (isLow ? 'Menipis' : 'Aman');
+      var statusClass = isOut ? 'danger' : (isLow ? 'warning' : 'good');
+
+      return (
+        '<tr class="x-owner-stock-table-tr">' +
+          '<td class="x-owner-stock-table-td main-col">' +
+            '<div class="x-owner-stock-td-title">' + escapeHtml(it.product_name || '-') + '</div>' +
+            '<div class="x-owner-stock-td-sub">' + (it.sku ? 'SKU: ' + escapeHtml(it.sku) : '') + (it.category_name ? ' • ' + escapeHtml(it.category_name) : '') + '</div>' +
           '</td>' +
-          '<td style="padding:10px 12px; font-size:12px; color:#475569;">' + escapeHtml(it.branch_name || '-') + '</td>' +
-          '<td style="padding:10px 12px; font-size:13px; text-align:center;">' +
-            '<strong style="font-size:14px; color:' + (isOut ? '#DC2626' : (isLow ? '#B45309' : '#0F172A')) + ';">' + formatUnitCount(cur) + '</strong>' +
-            ' <small style="color:#64748B;">unit</small>' +
+          '<td class="x-owner-stock-table-td">' + escapeHtml(it.branch_name || '-') + '</td>' +
+          '<td class="x-owner-stock-table-td text-center">' +
+            '<strong class="' + (isOut ? 'text-danger' : (isLow ? 'text-warning' : '')) + '">' + formatUnitCount(cur) + '</strong> <small class="text-muted">unit</small>' +
           '</td>' +
-          '<td style="padding:10px 12px; font-size:12px; color:#64748B; text-align:center;">' + formatUnitCount(th) + ' unit</td>' +
-          '<td style="padding:10px 12px; text-align:right;">' + statusBadge + '</td>' +
+          '<td class="x-owner-stock-table-td text-center text-muted">' + formatUnitCount(th) + ' unit</td>' +
+          '<td class="x-owner-stock-table-td text-right">' +
+            '<span class="x-owner-stock-branch-badge ' + statusClass + '">' + statusText + '</span>' +
+          '</td>' +
         '</tr>'
       );
     }).join('');
 
     container.innerHTML = (
-      '<div style="overflow-x:auto;">' +
-        '<table style="width:100%; border-collapse:collapse; min-width:480px;">' +
+      '<div class="x-owner-stock-items-mobile-list">' + mobileCards + '</div>' +
+      '<div class="x-owner-stock-items-desktop-table">' +
+        '<table class="x-owner-stock-table">' +
           '<thead>' +
-            '<tr style="background:#F8FAFC; border-bottom:1px solid #E2E8F0; font-size:11px; font-weight:700; color:#475569; text-transform:uppercase;">' +
-              '<th style="padding:8px 12px; text-align:left;">Menu / Produk</th>' +
-              '<th style="padding:8px 12px; text-align:left;">Cabang</th>' +
-              '<th style="padding:8px 12px; text-align:center;">Sisa Stok</th>' +
-              '<th style="padding:8px 12px; text-align:center;">Batas Min.</th>' +
-              '<th style="padding:8px 12px; text-align:right;">Status</th>' +
+            '<tr>' +
+              '<th style="text-align:left;">Menu / Produk</th>' +
+              '<th style="text-align:left;">Cabang</th>' +
+              '<th style="text-align:center;">Sisa Stok</th>' +
+              '<th style="text-align:center;">Batas Min.</th>' +
+              '<th style="text-align:right;">Status</th>' +
             '</tr>' +
           '</thead>' +
-          '<tbody>' + rows + '</tbody>' +
+          '<tbody>' + desktopRows + '</tbody>' +
         '</table>' +
       '</div>'
     );
@@ -371,6 +407,13 @@
     var matContent = $('subtab-content-stock-materials');
     var historyContent = $('subtab-content-stock-history');
     var suppliersContent = $('subtab-content-stock-suppliers');
+
+    var editorView = $('recipe-editor-view');
+    var mainView = $('owner-stock-main-view');
+    if (editorView && editorView.style.display !== 'none') {
+      editorView.style.display = 'none';
+      if (mainView) mainView.style.display = 'block';
+    }
 
     document.querySelectorAll('#stock-subnav-tabs .x-subnav-tab').forEach(function (tab) {
       tab.classList.toggle('active', tab.dataset.subtab === subtab);
@@ -419,7 +462,7 @@
   async function loadOwnerReplenishmentSuggestions() {
     var container = $('owner-replenishment-suggestions-container');
     if (container) {
-      container.innerHTML = '<div class="x-owner-stock-loading">Menghitung defisit menu, kebutuhan resep, dan MOQ supplier...</div>';
+      container.innerHTML = '<div class="x-owner-stock-loading">Memeriksa stok bahan belanjaan...</div>';
     }
 
     var branchId = getEffectiveBranchId();
@@ -527,86 +570,39 @@
 
     var cardsHtml = suggestions.map(function (s) {
       var isChecked = _selectedReplenishmentIds.has(s.material_id);
-      var reasonsHtml = (s.reasons || []).map(function (r) {
-        if (r.type === 'DIRECT_MATERIAL_POLICY') {
-          return '<span>• Batas minimum bahan mentah (sisa ' + r.current_stock + ', target ' + r.target_stock + ')</span>';
-        }
-        return '<span>• Defisit menu <strong>' + escapeHtml(r.product_name) + '</strong> (-' + r.deficit_portions + ' porsi) butuh ' + r.material_portion_needed + ' ' + escapeHtml(s.base_uom_name) + '</span>';
-      }).join('<br>');
-
-      var sup = s.supplier;
-      var purchaseBox = '';
-      if (sup) {
-        purchaseBox = '<div style="background:#F0FDF4; border:1px solid #BBF7D0; border-radius:10px; padding:10px 12px; margin-top:10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">' +
-          '<div>' +
-            '<div style="font-size:11px; font-weight:700; color:#166534; text-transform:uppercase;">Rekomendasi Supplier: ' + escapeHtml(sup.supplier_name) + '</div>' +
-            '<div style="font-size:14px; font-weight:800; color:#0F172A; margin-top:2px;">' +
-              s.recommended_purchase_packs + ' Pack (' + s.recommended_purchase_base_quantity + ' ' + escapeHtml(s.base_uom_name) + ')' +
-              ' <small style="font-weight:600; color:#64748B;">@ ' + formatMoney(sup.unit_price) + '</small>' +
-            '</div>' +
-            '<div style="font-size:11.5px; color:#166534; margin-top:2px;">(Isi 1 pack = ' + sup.pack_size + ' ' + escapeHtml(sup.pack_uom_name) + ', Min. Beli = ' + sup.minimum_order_quantity + ' pack)</div>' +
-          '</div>' +
-          '<div style="text-align:right;">' +
-            '<div style="font-size:11px; color:#64748B;">Estimasi Biaya:</div>' +
-            '<strong style="font-size:15px; color:#0F172A;">' + formatMoney(s.estimated_cost) + '</strong>' +
-          '</div>' +
-        '</div>';
-      } else {
-        var retailUnitPrice = Number(s.unit_price || 0);
-        var retailCost = Number(s.estimated_cost || 0);
-        purchaseBox = '<div style="background:#FFFBEB; border:1px solid #FDE68A; border-radius:10px; padding:10px 12px; margin-top:10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">' +
-          '<div>' +
-            '<div style="font-size:11px; font-weight:700; color:#92400E; text-transform:uppercase;">Belanja Pasar / Eceran</div>' +
-            '<div style="font-size:14px; font-weight:800; color:#0F172A; margin-top:2px;">' +
-              s.recommended_purchase_packs + ' ' + escapeHtml(s.base_uom_name) +
-              (retailUnitPrice > 0 ? (' <small style="font-weight:600; color:#64748B;">@ ' + formatMoney(retailUnitPrice) + '</small>') : '') +
-            '</div>' +
-            '<div style="font-size:11.5px; color:#92400E;">Harga estimasi pasar / rata-rata pembelian terakhir.</div>' +
-          '</div>' +
-          (retailCost > 0 ? (
-            '<div style="text-align:right;">' +
-              '<div style="font-size:11px; color:#64748B;">Estimasi Uang Belanja:</div>' +
-              '<strong style="font-size:15px; color:#0F172A;">' + formatMoney(retailCost) + '</strong>' +
-            '</div>'
-          ) : '') +
-        '</div>';
-      }
+      var purchaseQty = s.recommended_purchase_packs || 1;
+      var purchaseUnit = escapeHtml(s.purchase_uom_name || s.base_uom_name || 'Unit');
+      var retailCost = Number(s.estimated_cost || 0);
 
       var isDirectOut = Number(s.current_stock || 0) <= 0;
       var priorityBadge = isDirectOut
-        ? '<span style="font-size:11px; font-weight:800; background:#FEE2E2; color:#991B1B; padding:3px 8px; border-radius:6px; display:inline-flex; align-items:center; gap:4px;">🚨 Mendesak (Stok Habis)</span>'
-        : '<span style="font-size:11px; font-weight:700; background:#FEF3C7; color:#92400E; padding:3px 8px; border-radius:6px; display:inline-flex; align-items:center; gap:4px;">🟡 Stok Menipis</span>';
+        ? '<span style="font-size:11px; font-weight:800; background:#FEE2E2; color:#991B1B; padding:3px 8px; border-radius:6px;">🚨 Habis</span>'
+        : '<span style="font-size:11px; font-weight:700; background:#FEF3C7; color:#92400E; padding:3px 8px; border-radius:6px;">🟡 Menipis</span>';
 
-      return '<div style="background:#FFFFFF; border:1.5px solid ' + (isChecked ? '#059669' : '#E2E8F0') + '; border-radius:14px; padding:16px; margin-bottom:12px; box-shadow:' + (isChecked ? '0 4px 12px rgba(5,150,105,0.08)' : '0 1px 3px rgba(0,0,0,0.03)') + '; cursor:pointer; transition:all 0.16s ease;" onclick="toggleReplenishmentItem(\'' + escapeHtml(s.material_id) + '\')">' +
-        '<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">' +
-          '<div style="display:flex; align-items:flex-start; gap:12px;">' +
-            '<div style="margin-top:2px;">' +
-              '<div style="width:24px; height:24px; border-radius:7px; border:2px solid ' + (isChecked ? '#059669' : '#cbd5e1') + '; background:' + (isChecked ? '#059669' : '#ffffff') + '; display:flex; align-items:center; justify-content:center; box-shadow:' + (isChecked ? '0 2px 5px rgba(5, 150, 105, 0.25)' : 'none') + '; transition:all 0.16s ease;" aria-hidden="true">' +
-                '<svg viewBox="0 0 12 12" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px; display:' + (isChecked ? 'block' : 'none') + ';">' +
-                  '<polyline points="2 6 4.5 9 10 3"></polyline>' +
-                '</svg>' +
-              '</div>' +
-            '</div>' +
-            '<div>' +
-              '<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">' +
-                '<strong style="font-size:16px; color:#0F172A;">' + escapeHtml(s.material_name) + '</strong>' +
-                priorityBadge +
-              '</div>' +
-              '<div style="font-size:12px; color:#64748B; margin-top:2px;">Kode: ' + escapeHtml(s.material_code) + '</div>' +
+      return '<div style="background:#FFFFFF; border:1.5px solid ' + (isChecked ? '#059669' : '#E2E8F0') + '; border-radius:12px; padding:14px 16px; margin-bottom:10px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; box-shadow:' + (isChecked ? '0 2px 8px rgba(5,150,105,0.08)' : 'none') + ';" onclick="toggleReplenishmentItem(\'' + escapeHtml(s.material_id) + '\')">' +
+        '<div style="display:flex; align-items:center; gap:12px;">' +
+          '<div style="width:22px; height:22px; border-radius:6px; border:2px solid ' + (isChecked ? '#059669' : '#cbd5e1') + '; background:' + (isChecked ? '#059669' : '#ffffff') + '; display:flex; align-items:center; justify-content:center;">' +
+            '<svg viewBox="0 0 12 12" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:13px; height:13px; display:' + (isChecked ? 'block' : 'none') + ';"><polyline points="2 6 4.5 9 10 3"></polyline></svg>' +
+          '</div>' +
+          '<div>' +
+            '<div style="display:flex; align-items:center; gap:8px;">' +
+              '<strong style="font-size:15px; color:#0F172A;">' + escapeHtml(s.material_name) + '</strong>' +
+              priorityBadge +
             '</div>' +
           '</div>' +
+        '</div>' +
+        '<div style="display:flex; align-items:center; gap:16px;">' +
           '<div style="text-align:right;">' +
-            '<div style="font-size:11px; color:#64748B;">Kebutuhan Bersih:</div>' +
-            '<strong style="font-size:15px; color:#DC2626;">' + s.net_deficit_quantity + ' ' + escapeHtml(s.base_uom_name) + '</strong>' +
+            '<div style="font-size:11px; color:#64748B; font-weight:600; text-transform:uppercase;">Saran Belanja:</div>' +
+            '<strong style="font-size:17px; color:#059669;">' + purchaseQty + ' ' + purchaseUnit + '</strong>' +
           '</div>' +
+          (retailCost > 0 ? (
+            '<div style="text-align:right; border-left:1px solid #E2E8F0; padding-left:14px;">' +
+              '<div style="font-size:11px; color:#64748B; font-weight:600; text-transform:uppercase;">Est. Biaya:</div>' +
+              '<strong style="font-size:15px; color:#0F172A;">' + formatMoney(retailCost) + '</strong>' +
+            '</div>'
+          ) : '') +
         '</div>' +
-        '<div style="font-size:12px; color:#475569; background:#F8FAFC; border-radius:8px; padding:8px 10px; margin-top:10px; border-left:3px solid #3B82F6;">' +
-          '<div style="font-weight:700; color:#1E293B; margin-bottom:2px;">Faktor Perhitungan:</div>' +
-          'Kebutuhan Resep: <strong>' + s.gross_quantity_needed + ' ' + escapeHtml(s.base_uom_name) + '</strong> | Stok Kulkas/Dapur: <strong>' + s.current_stock + ' ' + escapeHtml(s.base_uom_name) + '</strong>' +
-          (s.on_order_stock > 0 ? ' | Dalam Pengiriman PO: <strong>' + s.on_order_stock + ' ' + escapeHtml(s.base_uom_name) + '</strong>' : '') +
-          '<div style="margin-top:4px; font-size:11.5px; color:#64748B;">' + reasonsHtml + '</div>' +
-        '</div>' +
-        purchaseBox +
       '</div>';
     }).join('');
 
@@ -624,12 +620,12 @@
         '<span style="color:#CBD5E1;">|</span>' +
         '<div>' +
           '<div style="font-size:12px; color:#64748B;" id="replenishment-selected-count">' + selectedItems.length + ' dari ' + suggestions.length + ' bahan dipilih</div>' +
-          '<div style="font-size:16px; font-weight:800; color:#0F172A;">Estimasi Kasbon: <span id="replenishment-selected-cost">' + formatMoney(currentSelectedCost) + '</span></div>' +
+          '<div style="font-size:16px; font-weight:800; color:#0F172A;">Estimasi Belanja: <span id="replenishment-selected-cost">' + formatMoney(currentSelectedCost) + '</span></div>' +
         '</div>' +
       '</div>' +
       '<div style="display:flex; gap:8px;">' +
         '<button type="button" class="x-btn-primary" id="btn-release-mandate-action" onclick="releaseMandateFromSuggestions()" ' + (selectedItems.length === 0 ? 'disabled style="opacity:0.5; padding:8px 16px; font-size:13px; font-weight:700; border-radius:10px; background:#059669; border-color:#059669; cursor:not-allowed;"' : 'style="padding:8px 16px; font-size:13px; font-weight:700; border-radius:10px; background:#059669; border-color:#059669; cursor:pointer;"') + '>' +
-          '📋 Rilis Mandat Belanja ke Staf (' + selectedItems.length + ' Bahan)' +
+          '📋 Rilis Tugas Belanja ke Staf (' + selectedItems.length + ' Bahan)' +
         '</button>' +
       '</div>' +
     '</div>';
@@ -669,8 +665,8 @@
     }, 0);
 
     var cashPrompt = await requestTextInputSheet({
-      title: 'Uang Kasbon Belanja',
-      label: 'Masukkan uang kasbon belanja (handover money):',
+      title: 'Uang Belanja',
+      label: 'Masukkan uang belanja yang diserahkan ke staf:',
       value: estCost > 0 ? String(estCost) : '100000',
       placeholder: '0'
     });
@@ -697,13 +693,13 @@
       });
       var data = await res.json();
       if (res.ok && data.success) {
-        showToast('✅ Mandat belanja #' + data.mandate.mandate_number + ' (' + items.length + ' item) berhasil dirilis ke staf!', 'success');
+        showToast('✅ Tugas belanja #' + data.mandate.mandate_number + ' (' + items.length + ' item) berhasil dirilis ke staf!', 'success');
         switchStockSubtab('mandates');
       } else {
-        showToast('Gagal rilis mandat: ' + (data.message || data.error || 'Terjadi kesalahan'), 'error');
+        showToast('Gagal rilis tugas belanja: ' + (data.message || data.error || 'Terjadi kesalahan'), 'error');
       }
     } catch (err) {
-      showToast('Gangguan jaringan saat merilis mandat.', 'error');
+      showToast('Gangguan jaringan saat merilis tugas belanja.', 'error');
     }
   }
   window.releaseMandateFromSuggestions = releaseMandateFromSuggestions;
@@ -714,11 +710,32 @@
   var _ownerMandatesList = [];
   var _ownerMandatesQuery = '';
 
+  function mandateHasUnpurchasedItems(m) {
+    var items = m.items || [];
+    if (!items.length) return false;
+    return items.some(function (itm) { return !itm.is_purchased; });
+  }
+
+  function isMandateActive(m) {
+    if (m.status === 'ARCHIVED') return false;
+    return m.status === 'RELEASED' || mandateHasUnpurchasedItems(m);
+  }
+
   function onMandatesSearchInput(val) {
     _ownerMandatesQuery = (val || '').trim().toLowerCase();
-    var filtered = _ownerMandatesList;
+    applyMandatesFilterAndRender();
+  }
+  window.onMandatesSearchInput = onMandatesSearchInput;
+
+  function applyMandatesFilterAndRender() {
+    // Tab ini murni hanya menampilkan tugas yang sedang berjalan atau masih ada item belum dibeli.
+    // Tugas yang 100% tuntas langsung berpindah ke Laporan & Riwayat Belanja.
+    var list = _ownerMandatesList.filter(function (m) {
+      return isMandateActive(m);
+    });
+
     if (_ownerMandatesQuery) {
-      filtered = _ownerMandatesList.filter(function (m) {
+      list = list.filter(function (m) {
         var num = (m.mandate_number || '').toLowerCase();
         var notes = (m.notes || '').toLowerCase();
         var status = (m.status || '').toLowerCase();
@@ -728,9 +745,9 @@
         return num.includes(_ownerMandatesQuery) || notes.includes(_ownerMandatesQuery) || status.includes(_ownerMandatesQuery) || itemsMatch;
       });
     }
-    renderOwnerMandatesList(filtered);
+
+    renderOwnerMandatesList(list);
   }
-  window.onMandatesSearchInput = onMandatesSearchInput;
 
   async function loadOwnerMandates() {
     var container = $('owner-mandates-list-container');
@@ -751,7 +768,7 @@
 
       if (res.ok && data.success) {
         _ownerMandatesList = data.mandates || [];
-        renderOwnerMandatesList(_ownerMandatesList);
+        applyMandatesFilterAndRender();
       } else {
         if (container) {
           container.innerHTML = '<div class="x-owner-stock-error" style="color:#DC2626; padding:16px;">Gagal memuat mandat: ' + escapeHtml(data.error || 'Server error') + '</div>';
@@ -770,30 +787,45 @@
     if (!container) return;
 
     if (!mandates || !mandates.length) {
-      if (_ownerMandatesQuery && _ownerMandatesList && _ownerMandatesList.length > 0) {
+      if (_ownerMandatesQuery) {
         container.innerHTML = '<div class="text-center py-10 text-muted" style="padding:32px 16px;">' +
           '<div style="font-size:32px; margin-bottom:8px;">🔍</div>' +
-          '<div style="font-size:15px; font-weight:700; color:#1E293B;">Tidak Ada Mandat yang Cocok</div>' +
-          '<p style="font-size:13px; color:#64748B; margin-top:4px;">Tidak ditemukan mandat belanja dengan kata kunci "' + escapeHtml(_ownerMandatesQuery) + '"</p>' +
+          '<div style="font-size:15px; font-weight:700; color:#1E293B;">Tidak Ada Tugas yang Cocok</div>' +
+          '<p style="font-size:13px; color:#64748B; margin-top:4px;">Tidak ditemukan tugas belanja aktif dengan kata kunci "' + escapeHtml(_ownerMandatesQuery) + '"</p>' +
         '</div>';
         return;
       }
-      container.innerHTML = '<div class="text-center py-10 text-muted" style="padding:32px 16px;">' +
-        '<div style="font-size:36px; margin-bottom:8px;">📋</div>' +
-        '<div style="font-size:15px; font-weight:700; color:#1E293B;">Belum Ada Mandat Belanja</div>' +
-        '<p style="font-size:13px; max-width:440px; margin:4px auto 0 auto; color:#64748B; line-height:1.5;">' +
-          'Buka tab "Saran Belanja" dan klik "Rilis Mandat Belanja ke Staf" untuk menugaskan belanja pasar.' +
+
+      container.innerHTML = '<div class="text-center py-10 text-muted" style="padding:36px 16px; background:#F8FAFC; border-radius:12px; border:1px dashed #CBD5E1;">' +
+        '<div style="font-size:36px; margin-bottom:8px;">🎉</div>' +
+        '<div style="font-size:16px; font-weight:700; color:#0F172A;">Tidak Ada Tugas Belanja Berjalan</div>' +
+        '<p style="font-size:13px; max-width:480px; margin:6px auto 16px auto; color:#64748B; line-height:1.5;">' +
+          'Semua daftar belanja yang selesai otomatis tercatat di <strong>Laporan &amp; Riwayat Belanja</strong>. ' +
+          'Belanjaan baru dapat ditugaskan melalui tab <strong>Saran Belanja</strong>.' +
         '</p>' +
+        '<div style="display:flex; justify-content:center; gap:8px; flex-wrap:wrap;">' +
+          '<button type="button" class="x-btn-primary" onclick="switchStockSubtab(\'history\')" style="padding:8px 16px; font-size:13px; font-weight:600; border-radius:8px; cursor:pointer;">' +
+            '🧾 Buka Laporan &amp; Riwayat Belanja' +
+          '</button>' +
+          '<button type="button" class="x-btn-secondary" onclick="switchStockSubtab(\'replenishment\')" style="padding:8px 16px; font-size:13px; font-weight:600; border-radius:8px; cursor:pointer;">' +
+            '⚡ Buat Tugas Belanja Baru' +
+          '</button>' +
+        '</div>' +
       '</div>';
       return;
     }
 
     var html = mandates.map(function (m) {
       var statusBadge = '';
+      var hasUnpurchased = mandateHasUnpurchasedItems(m);
       if (m.status === 'RELEASED') {
         statusBadge = '<span class="x-badge" style="background:#FEF3C7; color:#92400E; font-weight:700;">AKTIF (DI PASAR)</span>';
       } else if (m.status === 'COMPLETED') {
-        statusBadge = '<span class="x-badge" style="background:#D1FAE5; color:#065F46; font-weight:700;">SELESAI BELANJA</span>';
+        if (hasUnpurchased) {
+          statusBadge = '<span class="x-badge" style="background:#FEF3C7; color:#B45309; font-weight:700;">SELESAI SEBAGIAN (ADA SISA BELUM DIBELI)</span>';
+        } else {
+          statusBadge = '<span class="x-badge" style="background:#D1FAE5; color:#065F46; font-weight:700;">100% SELESAI BELANJA</span>';
+        }
       } else if (m.status === 'ARCHIVED') {
         statusBadge = '<span class="x-badge" style="background:#F1F5F9; color:#64748B; font-weight:700;">DIARSIPKAN</span>';
       } else {
@@ -801,18 +833,19 @@
       }
 
       var itemsListHtml = (m.items || []).map(function (itm) {
-        return '<div style="display:flex; align-items:center; gap:8px; font-size:12.5px; padding:6px 0; border-bottom:1px dashed #E2E8F0;">' +
-          (itm.is_purchased
+        var isPurchased = Boolean(itm.is_purchased);
+        return '<div style="display:flex; align-items:center; gap:8px; font-size:12.5px; padding:6px 8px; border-bottom:1px dashed #E2E8F0;' + (isPurchased ? ' opacity:0.85;' : ' background:#FFFBEB; border-radius:6px; margin:2px 0;') + '">' +
+          (isPurchased
             ? '<span style="color:#059669; font-weight:800; font-size:15px; width:20px; text-align:center; flex-shrink:0;">✓</span>'
-            : '<span style="color:#94A3B8; font-weight:700; font-size:15px; width:20px; text-align:center; flex-shrink:0;">○</span>') +
+            : '<span style="color:#D97706; font-weight:800; font-size:15px; width:20px; text-align:center; flex-shrink:0;">⚠️</span>') +
           '<div style="flex:1; min-width:0;">' +
-            '<strong>' + escapeHtml(itm.material_name) + '</strong>' +
+            '<strong style="' + (isPurchased ? 'text-decoration:line-through; color:#475569;' : 'color:#0F172A;') + '">' + escapeHtml(itm.material_name) + '</strong>' +
             ' <span style="color:#64748B;">(' + itm.target_quantity + ' ' + escapeHtml(itm.base_uom_code || '') + ')</span>' +
           '</div>' +
           '<div style="flex-shrink:0;">' +
-            (itm.is_purchased
-              ? '<span style="color:#059669; font-weight:700; font-size:11.5px;">Terbeli (' + itm.purchased_quantity + ' ' + escapeHtml(itm.base_uom_code || '') + ')</span>'
-              : '<span style="color:#D97706; font-weight:600; font-size:11.5px;">Belum Dibeli</span>') +
+            (isPurchased
+              ? '<span style="color:#059669; font-weight:700; font-size:11.5px;">✓ Terbeli (' + itm.purchased_quantity + ' ' + escapeHtml(itm.base_uom_code || '') + ')</span>'
+              : '<span style="color:#B45309; background:#FEF3C7; padding:2px 6px; border-radius:4px; font-weight:700; font-size:11px;">⚠️ Belum Dibeli</span>') +
           '</div>' +
         '</div>';
       }).join('');
@@ -820,7 +853,7 @@
       var canEdit = m.status === 'RELEASED';
       var actionButtons = '<div style="display:flex; gap:6px; margin-top:12px; flex-wrap:wrap;">';
       if (canEdit) {
-        actionButtons += '<button type="button" class="x-btn-secondary" onclick="openEditMandateModal(\'' + m.id + '\')" style="padding:5px 10px; font-size:12px; font-weight:600; border-radius:6px; cursor:pointer;">✏️ Edit Mandat</button>';
+        actionButtons += '<button type="button" class="x-btn-secondary" onclick="openEditMandateModal(\'' + m.id + '\')" style="padding:5px 10px; font-size:12px; font-weight:600; border-radius:6px; cursor:pointer;">✏️ Edit Tugas</button>';
       }
       if (m.status !== 'ARCHIVED') {
         actionButtons += '<button type="button" class="x-btn-secondary" onclick="archiveMandate(\'' + m.id + '\')" style="padding:5px 10px; font-size:12px; font-weight:600; border-radius:6px; cursor:pointer;">📁 Arsipkan</button>';
@@ -830,15 +863,15 @@
 
       return '<div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:12px; padding:16px; margin-bottom:12px;">' +
         '<div style="display:flex; justify-content:space-between; align-items:start; flex-wrap:wrap; gap:8px;">' +
-          '<div>' +
+        '<div>' +
             '<div style="display:flex; align-items:center; gap:8px;">' +
-              '<strong style="font-size:15px; color:#0F172A;">Mandat #' + escapeHtml(m.mandate_number) + '</strong>' +
+              '<strong style="font-size:15px; color:#0F172A;">Tugas #' + escapeHtml(m.mandate_number) + '</strong>' +
               statusBadge +
             '</div>' +
             '<div style="font-size:12px; color:#64748B; margin-top:4px;">Dibuat: ' + (m.created_at ? new Date(m.created_at).toLocaleString('id-ID') : '—') + (m.notes ? ' | ' + escapeHtml(m.notes) : '') + '</div>' +
           '</div>' +
           '<div style="text-align:right;">' +
-            '<div style="font-size:11px; color:#64748B;">Kasbon Handover:</div>' +
+            '<div style="font-size:11px; color:#64748B;">Uang Belanja:</div>' +
             '<strong style="font-size:15px; color:#059669;">' + formatMoney(m.cash_advance || 0) + '</strong>' +
           '</div>' +
         '</div>' +
@@ -862,9 +895,10 @@
     if (!modal) return;
 
     $('edit-mandate-id').value = mandate.id;
+    var rawCash = Number(mandate.cash_advance || 0);
     $('edit-mandate-cash-advance').value = rawCash > 0 ? (window.XentraCurrencyInput ? window.XentraCurrencyInput.format(rawCash) : (window.XentraShared && window.XentraShared.formatNumber ? window.XentraShared.formatNumber(rawCash) : String(rawCash))) : '';
     $('edit-mandate-notes').value = mandate.notes || '';
-    $('modal-edit-mandate-title').textContent = 'Edit Mandat #' + mandate.mandate_number;
+    $('modal-edit-mandate-title').textContent = 'Edit Tugas #' + mandate.mandate_number;
 
     var container = $('edit-mandate-items-container');
     if (container) {
@@ -931,21 +965,21 @@
       });
       var data = await res.json();
       if (res.ok && data.success) {
-        showToast('✅ Mandat belanja berhasil diperbarui.', 'success');
+        showToast('✅ Tugas belanja berhasil diperbarui.', 'success');
         closeEditMandateModal();
         loadOwnerMandates();
       } else {
-        showToast('Gagal update mandat: ' + (data.message || data.error || 'Terjadi kesalahan'), 'error');
+        showToast('Gagal update tugas belanja: ' + (data.message || data.error || 'Terjadi kesalahan'), 'error');
       }
     } catch (err) {
-      showToast('Gangguan jaringan saat memperbarui mandat.', 'error');
+      showToast('Gangguan jaringan saat memperbarui tugas belanja.', 'error');
     }
   }
   window.submitEditMandateForm = submitEditMandateForm;
 
   // Archive Mandate
   async function archiveMandate(mandateId) {
-    var ok = await confirmFeatureAction('archive-mandate-confirm', 'Arsipkan Mandat', 'Arsipkan mandat belanja ini? Mandat yang diarsipkan tidak akan muncul lagi di daftar aktif staf.', 'Arsipkan');
+    var ok = await confirmFeatureAction('archive-mandate-confirm', 'Arsipkan Tugas', 'Arsipkan tugas belanja ini? Tugas yang diarsipkan tidak akan muncul lagi di daftar aktif staf.', 'Arsipkan');
     if (!ok) return;
 
     var branchId = getEffectiveBranchId();
@@ -958,20 +992,20 @@
       });
       var data = await res.json();
       if (res.ok && data.success) {
-        showToast('📁 Mandat belanja berhasil diarsipkan.', 'success');
+        showToast('📁 Tugas belanja berhasil diarsipkan.', 'success');
         loadOwnerMandates();
       } else {
-        showToast('Gagal arsip mandat: ' + (data.message || data.error || 'Terjadi kesalahan'), 'error');
+        showToast('Gagal arsip tugas belanja: ' + (data.message || data.error || 'Terjadi kesalahan'), 'error');
       }
     } catch (err) {
-      showToast('Gangguan jaringan saat mengarsipkan mandat.', 'error');
+      showToast('Gangguan jaringan saat mengarsipkan tugas belanja.', 'error');
     }
   }
   window.archiveMandate = archiveMandate;
 
   // Delete Mandate Permanently
   async function deleteMandate(mandateId) {
-    var ok = await confirmFeatureAction('delete-mandate-confirm', 'Hapus Mandat', 'Hapus permanen mandat belanja ini? Tindakan ini tidak dapat dibatalkan.', 'Hapus Permanen');
+    var ok = await confirmFeatureAction('delete-mandate-confirm', 'Hapus Tugas', 'Hapus permanen tugas belanja ini? Tindakan ini tidak dapat dibatalkan.', 'Hapus Permanen');
     if (!ok) return;
 
     var branchId = getEffectiveBranchId();
@@ -984,33 +1018,37 @@
       });
       var data = await res.json();
       if (res.ok && data.success) {
-        showToast('🗑️ Mandat belanja berhasil dihapus secara permanen.', 'success');
+        showToast('🗑️ Tugas belanja berhasil dihapus secara permanen.', 'success');
         loadOwnerMandates();
       } else {
-        showToast('Gagal menghapus mandat: ' + (data.message || data.error || 'Terjadi kesalahan'), 'error');
+        showToast('Gagal menghapus tugas belanja: ' + (data.message || data.error || 'Terjadi kesalahan'), 'error');
       }
     } catch (err) {
-      showToast('Gangguan jaringan saat menghapus mandat.', 'error');
+      showToast('Gangguan jaringan saat menghapus tugas belanja.', 'error');
     }
   }
   window.deleteMandate = deleteMandate;
 
   function loadOwnerUoms() {
-    return adminFetch('/api/admin/uoms', { headers: getAuthHeaders() })
+    return adminFetch(API_BASE + '/admin/uoms', { headers: getAuthHeaders() })
       .then(function (res) {
         if (!res.ok) throw new Error('Gagal memuat UOM');
         return res.json();
       })
       .then(function (data) {
         _ownerUoms = data.uoms || [];
-        var select = $('mat-input-uom');
-        if (select && _ownerUoms.length > 0) {
-          var html = '<option value="">Pilih Satuan Dasar...</option>';
-          _ownerUoms.forEach(function (u) {
-            html += '<option value="' + escapeHtml(u.id) + '">' + escapeHtml(u.name) + ' (' + escapeHtml(u.code) + ')</option>';
-          });
-          select.innerHTML = html;
-        }
+        var targets = [$('mat-input-uom'), $('edit-mat-uom')];
+        targets.forEach(function (select) {
+          if (select && _ownerUoms.length > 0) {
+            var currentVal = select.value;
+            var html = '<option value="">Pilih Satuan Dasar...</option>';
+            _ownerUoms.forEach(function (u) {
+              html += '<option value="' + escapeHtml(u.id) + '">' + escapeHtml(u.name) + ' (' + escapeHtml(u.code) + ')</option>';
+            });
+            select.innerHTML = html;
+            if (currentVal) select.value = currentVal;
+          }
+        });
       })
       .catch(function (err) {
         console.warn('[Materials] Load UOM error:', err.message);
@@ -1039,7 +1077,7 @@
       container.innerHTML = '<div class="x-owner-stock-loading">Memuat daftar bahan baku...</div>';
     }
 
-    adminFetch('/api/admin/materials', { headers: getAuthHeaders() })
+    adminFetch(API_BASE + '/admin/materials', { headers: getAuthHeaders() })
       .then(function (res) {
         if (!res.ok) throw new Error('Gagal mengambil data bahan baku (HTTP ' + res.status + ')');
         return res.json();
@@ -1089,24 +1127,30 @@
       var unitCost = Number(m.moving_average_unit_cost || m.unit_cost || 0);
       var uomLabel = m.base_uom_name ? (m.base_uom_name + ' (' + m.base_uom_code + ')') : (m.base_uom_code || m.base_uom_id);
 
+      var minRecipeReq = Number(m.min_recipe_requirement || 0);
+      var effectiveLowThreshold = Math.max(minQty, minRecipeReq);
+
       var stockStatusBadge = '';
       if (isArchived) {
         stockStatusBadge = '<span style="background:#F1F5F9; color:#64748B; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:600;">Diarsipkan</span>';
       } else if (currentStock <= 0) {
         stockStatusBadge = '<span style="background:#FEF2F2; color:#DC2626; border:1px solid #FECACA; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700;">🔴 Habis</span>';
-      } else if (minQty > 0 && currentStock <= minQty) {
-        stockStatusBadge = '<span style="background:#FFFBEB; color:#B45309; border:1px solid #FDE68A; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700;">🟡 Menipis (Sisa ' + currentStock + ')</span>';
+      } else if (effectiveLowThreshold > 0 && currentStock <= effectiveLowThreshold) {
+        var reasonText = (minRecipeReq > 0 && currentStock <= minRecipeReq) ? 'Kurang untuk Masak' : ('Sisa ' + currentStock);
+        stockStatusBadge = '<span style="background:#FFFBEB; color:#B45309; border:1px solid #FDE68A; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700;">🟡 Menipis (' + reasonText + ')</span>';
       } else {
         stockStatusBadge = '<span style="background:#ECFDF5; color:#059669; border:1px solid #A7F3D0; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700;">🟢 Aman</span>';
       }
 
-      var stockDisplay = '<strong style="font-size:14px; color:' + (currentStock <= minQty ? '#DC2626' : '#0F172A') + ';">' + currentStock + '</strong> <span style="font-size:11.5px; color:#64748B;">' + escapeHtml(m.base_uom_code || m.base_uom_name || '') + '</span>';
+      var stockDisplay = '<strong style="font-size:14px; color:' + (currentStock <= effectiveLowThreshold ? '#DC2626' : '#0F172A') + ';">' + currentStock + '</strong> <span style="font-size:11.5px; color:#64748B;">' + escapeHtml(m.base_uom_code || m.base_uom_name || '') + '</span>';
       var costDisplay = unitCost > 0 ? ('<strong style="color:#0F172A;">' + formatMoney(unitCost) + '</strong> <span style="font-size:11px; color:#64748B;">/' + escapeHtml(m.base_uom_code || '') + '</span>') : '<span style="color:#94A3B8; font-style:italic;">Belum ada harga</span>';
-      var warningDisplay = minQty > 0 ? ('<span style="font-weight:600; color:#B45309;">Sisa ' + minQty + '</span> <span style="font-size:11px; color:#64748B;">(target ' + targetQty + ')</span>') : '<span style="color:#94A3B8;">Belum diatur</span>';
+      var targetDisplay = targetQty > 0
+        ? ('<strong style="color:#0F172A;">' + targetQty + '</strong> <span style="font-size:11px; color:#64748B;">' + escapeHtml(m.base_uom_code || '') + '</span>')
+        : (minRecipeReq > 0 ? ('<span style="color:#D97706; font-size:11px; font-weight:600;">Min. ' + minRecipeReq + ' (Resep)</span>') : '<span style="color:#94A3B8; font-style:italic;">Belum diatur</span>');
 
       var actionHtml = (
         '<div style="display:flex; justify-content:flex-end; gap:6px;">' +
-          '<button type="button" onclick="event.stopPropagation(); openEditMaterialModal(\'' + escapeHtml(m.id) + '\')" style="display:inline-flex; align-items:center; gap:4px; padding:5px 10px; border-radius:6px; font-size:12px; font-weight:600; background:#F1F5F9; color:#0F172A; border:1px solid #CBD5E1; cursor:pointer;" title="Atur Stok & Pengingat Belanja">' +
+          '<button type="button" onclick="event.stopPropagation(); openEditMaterialModal(\'' + escapeHtml(m.id) + '\')" style="display:inline-flex; align-items:center; gap:4px; padding:5px 10px; border-radius:6px; font-size:12px; font-weight:600; background:#F1F5F9; color:#0F172A; border:1px solid #CBD5E1; cursor:pointer;" title="Atur Stok & Target Belanja">' +
             '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg> Atur' +
           '</button>' +
           (!isArchived ? (
@@ -1125,7 +1169,7 @@
           '</td>' +
           '<td style="padding:12px 14px; font-size:13px;">' + stockDisplay + '</td>' +
           '<td style="padding:12px 14px; font-size:13px;">' + costDisplay + '</td>' +
-          '<td style="padding:12px 14px; font-size:12px;">' + warningDisplay + '</td>' +
+          '<td style="padding:12px 14px; font-size:12px;">' + targetDisplay + '</td>' +
           '<td style="padding:12px 14px; font-size:13px;">' + stockStatusBadge + '</td>' +
           '<td style="padding:12px 14px; text-align:right; font-size:13px;">' + actionHtml + '</td>' +
         '</tr>'
@@ -1138,9 +1182,9 @@
           '<thead>' +
             '<tr style="background:#F8FAFC; border-bottom:1px solid #E2E8F0; color:#64748B; font-size:12px; text-transform:uppercase; letter-spacing:0.025em;">' +
               '<th style="padding:10px 14px; font-weight:600;">Bahan Baku Mentah</th>' +
-              '<th style="padding:10px 14px; font-weight:600;">Stok Kulkas / Fisik</th>' +
+              '<th style="padding:10px 14px; font-weight:600;">Sisa Stok Fisik</th>' +
               '<th style="padding:10px 14px; font-weight:600;">Harga Pasar / Beli</th>' +
-              '<th style="padding:10px 14px; font-weight:600;">Ingatkan Saat Sisa</th>' +
+              '<th style="padding:10px 14px; font-weight:600;">Target Stok Resto</th>' +
               '<th style="padding:10px 14px; font-weight:600;">Status</th>' +
               '<th style="padding:10px 14px; font-weight:600; text-align:right;">Aksi</th>' +
             '</tr>' +
@@ -1171,8 +1215,37 @@
     if ($('edit-mat-id')) $('edit-mat-id').value = material.id;
     if ($('edit-mat-name')) $('edit-mat-name').value = material.name || '';
     if ($('edit-mat-code')) $('edit-mat-code').value = material.material_code || '';
-    var uomText = material.base_uom_name ? (material.base_uom_name + ' (' + material.base_uom_code + ')') : (material.base_uom_code || material.base_uom_id);
-    if ($('edit-mat-uom-label')) $('edit-mat-uom-label').value = uomText;
+
+    var uomSelect = $('edit-mat-uom');
+    if (uomSelect) {
+      if (_ownerUoms && _ownerUoms.length > 0) {
+        var html = '<option value="">Pilih Satuan Dasar...</option>';
+        _ownerUoms.forEach(function (u) {
+          html += '<option value="' + escapeHtml(u.id) + '">' + escapeHtml(u.name) + ' (' + escapeHtml(u.code) + ')</option>';
+        });
+        uomSelect.innerHTML = html;
+      }
+      uomSelect.value = material.base_uom_id || '';
+
+      var syncUomSuffix = function () {
+        var selectedUom = (_ownerUoms || []).find(function (u) { return String(u.id) === String(uomSelect.value); });
+        var code = selectedUom ? (selectedUom.code || selectedUom.name) : (material.base_uom_code || material.base_uom_name || '');
+        if ($('edit-mat-base-uom-suffix')) $('edit-mat-base-uom-suffix').textContent = code;
+        if ($('edit-mat-target-unit-label')) $('edit-mat-target-unit-label').textContent = code || 'Satuan';
+      };
+
+      uomSelect.onchange = syncUomSuffix;
+      syncUomSuffix();
+
+      var enhanceFn = window.createFloatingDropdown || (window.XentraDropdown && window.XentraDropdown.enhance);
+      if (typeof enhanceFn === 'function') {
+        setTimeout(function () {
+          enhanceFn(uomSelect);
+          uomSelect.dispatchEvent(new Event('change'));
+        }, 50);
+      }
+    }
+
     if ($('edit-mat-desc')) $('edit-mat-desc').value = material.description || '';
 
     if ($('edit-mat-current-stock')) $('edit-mat-current-stock').value = material.current_stock != null ? material.current_stock : 0;
@@ -1182,7 +1255,25 @@
       else $('edit-mat-unit-cost').value = cost;
     }
     if ($('edit-mat-min-qty')) $('edit-mat-min-qty').value = material.minimum_quantity != null ? material.minimum_quantity : 0;
-    if ($('edit-mat-target-qty')) $('edit-mat-target-qty').value = material.target_quantity != null ? material.target_quantity : 0;
+
+    var baseUomCode = material.base_uom_code || material.base_uom_name || '';
+    if ($('edit-mat-base-uom-suffix')) $('edit-mat-base-uom-suffix').textContent = baseUomCode;
+
+    var targetUnitLabel = $('edit-mat-target-unit-label');
+    if (targetUnitLabel) targetUnitLabel.textContent = baseUomCode;
+
+    var targetInput = $('edit-mat-target-qty');
+    var existingTarget = material.target_quantity != null ? Number(material.target_quantity) : '';
+
+    if (targetInput) {
+      targetInput.min = "0";
+      targetInput.value = existingTarget !== '' ? existingTarget : '';
+    }
+
+    var targetHint = $('edit-mat-target-hint');
+    if (targetHint) {
+      targetHint.textContent = 'Jumlah stok yang ingin selalu tersedia di resto. Jika stok fisik kurang dari ini, sistem otomatis sarankan belanja.';
+    }
   };
 
   window.closeEditMaterialModal = function() {
@@ -1201,12 +1292,13 @@
 
     var matId = $('edit-mat-id') ? $('edit-mat-id').value : '';
     var name = $('edit-mat-name') ? $('edit-mat-name').value.trim() : '';
+    var baseUomId = $('edit-mat-uom') ? $('edit-mat-uom').value : '';
     var desc = $('edit-mat-desc') ? $('edit-mat-desc').value.trim() : '';
     var currentStock = $('edit-mat-current-stock') ? Number($('edit-mat-current-stock').value) : 0;
     var rawCost = $('edit-mat-unit-cost') ? $('edit-mat-unit-cost').value : '0';
     var unitCost = Number(String(rawCost).replace(/\D/g, '')) || 0;
-    var minQty = $('edit-mat-min-qty') ? Number($('edit-mat-min-qty').value) : 0;
     var targetQty = $('edit-mat-target-qty') ? Number($('edit-mat-target-qty').value) : 0;
+
     var btn = $('btn-save-edit-material');
 
     if (!matId || !name) {
@@ -1214,22 +1306,32 @@
       return;
     }
 
+    if (!baseUomId) {
+      showToast('Satuan dasar (UOM) tidak boleh kosong', 'warning');
+      return;
+    }
+
+    var currentMat = (_ownerMaterials || []).find(function(m) { return String(m.id) === String(matId); }) || {};
+
     if (btn) {
       btn.disabled = true;
       btn.textContent = 'Menyimpan...';
     }
 
     try {
+      var minQty = Number(currentMat.minimum_quantity || 0);
+
       var payload = {
         name: name,
         description: desc || null,
+        base_uom_id: baseUomId,
         current_stock: Math.max(0, currentStock),
         unit_cost: Math.max(0, unitCost),
-        minimum_quantity: Math.max(0, minQty),
-        target_quantity: Math.max(minQty, targetQty)
+        minimum_quantity: minQty,
+        target_quantity: Math.max(0, targetQty)
       };
 
-      var res = await adminFetch('/api/admin/materials/' + encodeURIComponent(matId), {
+      var res = await adminFetch(API_BASE + '/admin/materials/' + encodeURIComponent(matId), {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify(payload)
@@ -1239,7 +1341,7 @@
         throw new Error(data.message || data.error || 'Gagal memperbarui data bahan');
       }
 
-      showToast('✅ Data bahan baku, stok, & batas warning berhasil disimpan.', 'success');
+      showToast('✅ Data bahan baku, stok fisik, & target belanja berhasil disimpan.', 'success');
       closeEditMaterialModal();
       loadOwnerMaterials();
       if (typeof loadOwnerReplenishmentSuggestions === 'function') loadOwnerReplenishmentSuggestions();
@@ -1302,7 +1404,7 @@
       description: desc || null
     };
 
-    adminFetch('/api/admin/materials', {
+    adminFetch(API_BASE + '/admin/materials', {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(payload)
@@ -1335,7 +1437,7 @@
     var confirmed = await confirmFeatureAction('archive-material', 'Arsipkan Bahan Baku', 'Apakah Anda yakin ingin mengarsipkan bahan baku "' + name + '"?', 'Arsipkan');
     if (!confirmed) return;
 
-    adminFetch('/api/admin/materials/' + encodeURIComponent(id) + '/archive', {
+    adminFetch(API_BASE + '/admin/materials/' + encodeURIComponent(id) + '/archive', {
       method: 'PUT',
       headers: getAuthHeaders()
     })
@@ -1527,13 +1629,13 @@
   }
 
   function openAddRecipeModal() {
-    var modal = $('modal-add-recipe');
-    if (!modal) return;
-    if (window.XentraUI && window.XentraUI.Modal) {
-      window.XentraUI.Modal.open('modal-add-recipe');
-    } else {
-      modal.style.display = 'flex';
-    }
+    var mainView = $('owner-stock-main-view');
+    var editorView = $('recipe-editor-view');
+    if (!editorView) return;
+
+    if (mainView) mainView.style.display = 'none';
+    editorView.style.display = 'block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 
     var form = $('form-add-recipe');
     if (form) {
@@ -1543,10 +1645,17 @@
       delete form.dataset.editRecipeName;
     }
 
-    var modalTitleEl = modal.querySelector('h3');
-    var modalSubtitleEl = modal.querySelector('p');
-    if (modalTitleEl) modalTitleEl.textContent = 'Buat Formula Resep Masakan';
-    if (modalSubtitleEl) modalSubtitleEl.textContent = 'Tentukan bahan mentah & bumbu untuk menu siap saji';
+    var mobileTitle = $('recipe-editor-mobile-title');
+    var mobileSub = $('recipe-editor-mobile-subtitle');
+    var desktopTitle = $('recipe-editor-desktop-title');
+    var desktopSub = $('recipe-editor-desktop-subtitle');
+    var breadcrumb = $('recipe-editor-breadcrumb');
+
+    if (mobileTitle) mobileTitle.textContent = 'Buat Formula Resep';
+    if (mobileSub) mobileSub.textContent = 'Tentukan bahan mentah & takaran bumbu untuk menu siap saji.';
+    if (desktopTitle) desktopTitle.textContent = 'Buat Formula Resep Masakan';
+    if (desktopSub) desktopSub.textContent = 'Atur takaran bahan baku dan bumbu agar stok mentah terpotong otomatis dan HPP terhitung akurat.';
+    if (breadcrumb) breadcrumb.textContent = 'Buat Formula Resep';
 
     var btnSave = $('btn-save-recipe');
     if (btnSave) btnSave.textContent = 'Simpan Resep Masakan';
@@ -1588,18 +1697,26 @@
       return;
     }
 
-    var modal = $('modal-add-recipe');
-    if (!modal) return;
-    if (window.XentraUI && window.XentraUI.Modal) {
-      window.XentraUI.Modal.open('modal-add-recipe');
-    } else {
-      modal.style.display = 'flex';
-    }
+    var mainView = $('owner-stock-main-view');
+    var editorView = $('recipe-editor-view');
+    if (!editorView) return;
 
-    var modalTitleEl = modal.querySelector('h3');
-    var modalSubtitleEl = modal.querySelector('p');
-    if (modalTitleEl) modalTitleEl.textContent = 'Edit Formula Resep Masakan';
-    if (modalSubtitleEl) modalSubtitleEl.textContent = 'Perbarui formula takaran bahan masakan untuk ' + (recipe.output_product_name || recipe.recipe_name);
+    if (mainView) mainView.style.display = 'none';
+    editorView.style.display = 'block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    var prodName = recipe.output_product_name || recipe.recipe_name || 'Menu';
+    var mobileTitle = $('recipe-editor-mobile-title');
+    var mobileSub = $('recipe-editor-mobile-subtitle');
+    var desktopTitle = $('recipe-editor-desktop-title');
+    var desktopSub = $('recipe-editor-desktop-subtitle');
+    var breadcrumb = $('recipe-editor-breadcrumb');
+
+    if (mobileTitle) mobileTitle.textContent = 'Edit Resep: ' + prodName;
+    if (mobileSub) mobileSub.textContent = 'Perbarui formula takaran bahan masakan untuk ' + prodName;
+    if (desktopTitle) desktopTitle.textContent = 'Edit Formula Resep: ' + prodName;
+    if (desktopSub) desktopSub.textContent = 'Perbarui formula takaran bahan masakan untuk ' + prodName;
+    if (breadcrumb) breadcrumb.textContent = 'Edit Resep: ' + prodName;
 
     var btnSave = $('btn-save-recipe');
     if (btnSave) btnSave.textContent = 'Perbarui Resep Masakan';
@@ -1678,13 +1795,12 @@
     prodSelect.innerHTML = html;
   }
 
-  function closeAddRecipeModal() {
-    if (window.XentraUI && window.XentraUI.Modal) {
-      window.XentraUI.Modal.close('modal-add-recipe');
-    } else {
-      var modal = $('modal-add-recipe');
-      if (modal) modal.style.display = 'none';
-    }
+  function closeRecipeEditorPage() {
+    var mainView = $('owner-stock-main-view');
+    var editorView = $('recipe-editor-view');
+    if (editorView) editorView.style.display = 'none';
+    if (mainView) mainView.style.display = 'block';
+
     var form = $('form-add-recipe');
     if (form) {
       form.reset();
@@ -1692,15 +1808,19 @@
       delete form.dataset.editProductId;
       delete form.dataset.editRecipeName;
     }
-    var modalTitleEl = modal && modal.querySelector('h3');
-    var modalSubtitleEl = modal && modal.querySelector('p');
-    if (modalTitleEl) modalTitleEl.textContent = 'Buat Formula Resep Masakan';
-    if (modalSubtitleEl) modalSubtitleEl.textContent = 'Tentukan bahan mentah & bumbu untuk menu siap saji';
-    var btnSave = $('btn-save-recipe');
-    if (btnSave) btnSave.textContent = 'Simpan Resep Masakan';
+
     var prodSelect = $('recipe-input-product');
     if (prodSelect) prodSelect.disabled = false;
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
+
+  function closeAddRecipeModal() {
+    closeRecipeEditorPage();
+  }
+  window.closeAddRecipeModal = closeAddRecipeModal;
+  window.closeRecipeEditorPage = closeRecipeEditorPage;
+  window.goBackFromRecipeEditor = closeRecipeEditorPage;
 
   function addRecipeIngredientRow(defaultMatId, defaultQty, defaultUomId) {
     var container = $('recipe-ingredients-container');
@@ -1709,7 +1829,7 @@
     var rowId = 'ing-row-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
     var row = document.createElement('div');
     row.id = rowId;
-    row.style.cssText = 'display:grid; grid-template-columns: 2fr 1fr 1fr auto; gap:8px; align-items:center; background:#F8FAFC; border:1px solid #E2E8F0; padding:8px 10px; border-radius:8px;';
+    row.className = 'x-recipe-ingredient-row';
 
     var materials = _ownerMaterials || (_ownerInventoryContext && _ownerInventoryContext.materials) || [];
     var matOptions = '<option value="">Pilih Bahan Mentah...</option>';
@@ -1728,23 +1848,19 @@
     var qtyVal = defaultQty != null ? Number(defaultQty) : '';
 
     row.innerHTML = (
-      '<div>' +
-        '<select class="recipe-ing-material" required onchange="handleRecipeMaterialChange(this, \'' + rowId + '\')" style="width:100%; box-sizing:border-box; padding:6px 8px; border:1px solid #CBD5E1; border-radius:6px; font-size:12px; background:#FFFFFF;">' +
+      '<div class="x-recipe-ing-top">' +
+        '<select class="recipe-ing-material x-input" required onchange="handleRecipeMaterialChange(this, \'' + rowId + '\')">' +
           matOptions +
         '</select>' +
+        '<button type="button" class="x-recipe-ing-del-btn" onclick="removeRecipeIngredientRow(\'' + rowId + '\')" title="Hapus Bahan">' +
+          '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
+        '</button>' +
       '</div>' +
-      '<div>' +
-        '<input type="number" step="any" min="0.001" placeholder="Jumlah" value="' + (qtyVal !== '' ? qtyVal : '') + '" required class="recipe-ing-qty" style="width:100%; box-sizing:border-box; padding:6px 8px; border:1px solid #CBD5E1; border-radius:6px; font-size:12px;">' +
-      '</div>' +
-      '<div>' +
-        '<select class="recipe-ing-uom" required style="width:100%; box-sizing:border-box; padding:6px 8px; border:1px solid #CBD5E1; border-radius:6px; font-size:12px; background:#FFFFFF;">' +
+      '<div class="x-recipe-ing-bottom">' +
+        '<input type="number" step="any" min="0.001" inputmode="decimal" placeholder="Jumlah takaran" value="' + (qtyVal !== '' ? qtyVal : '') + '" required class="recipe-ing-qty x-input">' +
+        '<select class="recipe-ing-uom x-input" required>' +
           uomOptions +
         '</select>' +
-      '</div>' +
-      '<div>' +
-        '<button type="button" onclick="removeRecipeIngredientRow(\'' + rowId + '\')" style="background:none; border:none; color:#EF4444; cursor:pointer; padding:4px; display:inline-flex; align-items:center;" title="Hapus Bahan">' +
-          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
-        '</button>' +
       '</div>'
     );
 

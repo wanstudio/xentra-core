@@ -1215,7 +1215,22 @@
 
     try {
       var data = await api('/driver/tasks');
-      state.tasks = Array.isArray(data.tasks) ? data.tasks : [];
+      var newTasks = Array.isArray(data.tasks) ? data.tasks : [];
+
+      // Check for newly assigned pending tasks to trigger audio alert
+      var prevCount = state.knownPendingCount || 0;
+      var newPendingCount = newTasks.filter(function (t) {
+        return t.assignment_status === 'pending' || t.status === 'assigned';
+      }).length;
+
+      if (newPendingCount > prevCount) {
+        if (window.XentraAudio && typeof window.XentraAudio.deliveryAssigned === 'function') {
+          window.XentraAudio.deliveryAssigned({ text: 'Tugas pengantaran baru!' });
+        }
+      }
+      state.knownPendingCount = newPendingCount;
+
+      state.tasks = newTasks;
       state.loading = false;
       state.error = null;
       return data;
@@ -1537,5 +1552,13 @@
     refreshTasks(false).then(render);
   });
 
-  loadDriver();
+  loadDriver().then(function () {
+    // Start periodic polling for new tasks every 12 seconds
+    setInterval(function () {
+      if (document.visibilityState === 'hidden' || !token()) return;
+      refreshTasks(false).then(function () {
+        if (state.page === 'tasks') render();
+      });
+    }, 12000);
+  });
 })();

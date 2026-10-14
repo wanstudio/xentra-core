@@ -336,7 +336,31 @@ class CostResolutionService {
     }
 
     if (balance.quantity > 0 && !latest) {
-      throw fail('VALUATION_STATE_INVALID', 'VALUATION_STATE_INVALID');
+      if (balance.costAvailabilityStatus === 'AVAILABLE' && balance.movingAverageUnitCost >= 0 && identityType === 'MATERIAL') {
+        const autoMoveId = 'msm_auto_' + stockIdentityId + '_' + Date.now();
+        const autoMutationId = 'mut_auto_' + stockIdentityId + '_' + Date.now();
+        repository.insertMaterialValuationMovement({
+          id: autoMoveId,
+          stockLocationId,
+          materialId: stockIdentityId,
+          movementType: 'OPENING_STOCK',
+          quantityBase: balance.quantity,
+          previousQuantity: 0,
+          currentQuantity: balance.quantity,
+          unitCost: balance.movingAverageUnitCost,
+          totalCost: balance.carryingValue,
+          currencyCode: currency || 'IDR',
+          costBasisType: 'OPENING_ACTUAL',
+          sourceType: 'OPENING_BALANCE',
+          sourceReference: 'AUTO_INITIALIZED',
+          postingMutationId: autoMutationId,
+          valuationVersion: balance.valuationVersion || 1,
+          postingTimestamp: timestamp,
+          resolverVersion: 'v1'
+        });
+      } else {
+        throw fail('VALUATION_STATE_INVALID', 'VALUATION_STATE_INVALID');
+      }
     }
 
     const unitCost = balance.movingAverageUnitCost;

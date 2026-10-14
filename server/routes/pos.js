@@ -82,7 +82,7 @@ router.post('/pos/orders/:id/cod-handover', requireAuth(['cashier']), (req, res)
   }
 });
 
-router.post('/pos/orders/:id/settle-cash', requireAuth(['cashier']), (req, res) => {
+router.post('/pos/orders/:id/settle-cash', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
   try {
     const orderId = req.params.id;
     const { amount_tendered, shift_id } = req.body;
@@ -199,6 +199,13 @@ router.post('/pos/sales', requireAuth(['cashier']), async (req, res) => {
 
     if (!branchId) {
       return res.status(400).json({ success: false, error: 'Kasir belum memiliki cabang.' });
+    }
+    const branch = db.prepare('SELECT id, is_active, is_open_override FROM branches WHERE id = ?').get(branchId);
+    if (!branch || branch.is_active === 0) {
+      return res.status(400).json({ success: false, error: 'Cabang tidak aktif.' });
+    }
+    if (branch.is_open_override !== 1) {
+      return res.status(400).json({ success: false, error: 'Merchant sedang tutup. Buka cabang terlebih dahulu sebelum membuat transaksi baru.' });
     }
     if (!shift_id) {
       return res.status(400).json({ success: false, error: 'Shift aktif wajib dipilih.' });
@@ -343,10 +350,18 @@ router.get('/pos/sales', requireAuth(['cashier']), (req, res) => {
     }
 
     const rows = db.prepare(`
-      SELECT o.*, p.payment_status AS payment_status
+      SELECT o.*, p.payment_status AS payment_status,
+             d.status AS delivery_status,
+             d.driver_name, d.driver_phone,
+             d.cod_collection_status, d.cod_cash_custody, d.cod_collected_amount,
+             d.cod_handed_over_at, d.cod_handed_over_to
       FROM orders o
       LEFT JOIN order_payments p ON p.order_id = o.id
-      WHERE o.brand_id = ? AND o.branch_id = ? AND o.order_channel = 'pos_cashier'
+      LEFT JOIN order_deliveries d ON d.order_id = o.id
+      WHERE o.brand_id = ? AND o.branch_id = ? AND (
+        o.order_channel = 'pos_cashier'
+        OR (o.order_type = 'delivery' AND o.payment_method = 'cash')
+      )
       ORDER BY o.created_at DESC
       LIMIT 100
     `).all(req.brand_id, branchId);
@@ -384,6 +399,13 @@ router.post('/pos/held-orders', requireAuth(['cashier']), async (req, res) => {
     const branchId = req.user.branch_id || req.user.branchId;
     const { table_number = '', customer_name = 'Tamu', customer_phone = '', items = [], order_type = 'dine_in' } = req.body || {};
     if (!branchId) return res.status(400).json({ success: false, error: 'Kasir belum memiliki cabang.' });
+    const branch = db.prepare('SELECT id, is_active, is_open_override FROM branches WHERE id = ?').get(branchId);
+    if (!branch || branch.is_active === 0) {
+      return res.status(400).json({ success: false, error: 'Cabang tidak aktif.' });
+    }
+    if (branch.is_open_override !== 1) {
+      return res.status(400).json({ success: false, error: 'Merchant sedang tutup. Buka cabang terlebih dahulu sebelum membuat transaksi baru.' });
+    }
     if (!Array.isArray(items) || !items.length) return res.status(400).json({ success: false, error: 'Tidak ada item untuk ditahan.' });
     if (String(order_type || 'dine_in').toLowerCase() === 'dine_in' && !String(table_number || '').trim()) {
       return res.status(400).json({ success: false, error: 'Meja wajib dipilih untuk pesanan dine-in.' });

@@ -23,7 +23,8 @@ module.exports = function registerCheckoutRoutes(router, deps) {
     OrderStateMachine,
     AcceptanceTimeoutService,
     authorizeCustomerSession,
-    requireCustomerAuth
+    requireCustomerAuth,
+    notificationService
   } = deps;
 
 router.post('/checkout/verify', requireCustomerAuth(), (req, res) => {
@@ -373,7 +374,8 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
           status: verification.status,
           error: primaryError,
           errors: verification.errors,
-          price_diffs: verification.price_diffs
+          price_diffs: verification.price_diffs,
+          out_of_stock_items: verification.out_of_stock_items || []
         });
       }
 
@@ -687,6 +689,27 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
         SET snap_token = ?, merchant_id = ?, updated_at = ?
         WHERE order_id = ?
       `).run(snapResult.snap_token || null, snapResult.merchant_id || (payment_method === 'cash' ? 'cash' : payment_method), new Date().toISOString(), orderId);
+    }
+
+    // Trigger Notification for Merchant and Cashier
+    if (notificationService) {
+      try {
+        notificationService.createNotification({
+          brand_id: brandId,
+          branch_id: branchId,
+          source_type: 'order',
+          title: 'Ada Pesanan Baru Masuk!',
+          body: `Pesanan #${orderNumber} (${order_type === 'delivery' ? 'Delivery' : order_type === 'dine_in' ? 'Dine In' : 'Takeaway'}) senilai Rp ${(grandTotal || 0).toLocaleString('id-ID')}`,
+          priority: 'high',
+          target_role: null, // Delivered to branch manager, cashier, and owner
+          target_scope: 'branch',
+          related_entity_type: 'order',
+          related_entity_id: orderId,
+          action_url: `/merchant/orders/${orderId}`
+        });
+      } catch (notifErr) {
+        console.error('[Notification Trigger Error]:', notifErr.message);
+      }
     }
 
     res.status(201).json({

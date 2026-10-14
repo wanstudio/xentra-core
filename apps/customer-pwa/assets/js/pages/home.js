@@ -214,8 +214,9 @@
     deferTask(function () {
       perfLog('promo_discovery_start');
       perfLog('home_api_promo_start');
-      // Do not require login/WhatsApp registration to discover this promo.
-      API.get('/promotions/active?is_pwa=0&phone=')
+      var bId = currentCustomerBranchId();
+      var bQuery = bId ? '&branch_id=' + encodeURIComponent(bId) : '';
+      API.get('/promotions/active?is_pwa=0&phone=' + bQuery)
         .then(function (res) {
           perfLog('home_api_promo_end');
           if (!res || !res.success) return;
@@ -703,10 +704,19 @@
   //  fresh API data replaces it. No road routing, ETA, delivery-cost, payment,
   //  stock, eligibility, or acceptance calls are made from Home.
   // ======================================================================
+  function isBranchClosed(branch) {
+    if (!branch) return false;
+    if (branch.is_open_override === 0 || branch.is_open_override === false) return true;
+    if (branch.is_open === false) return true;
+    return false;
+  }
+
   function branchContextOf(branch) {
     return {
       branch_id: (branch && branch.id) || null,
-      branch_name: (branch && branch.name) || null
+      branch_name: (branch && branch.name) || null,
+      is_open_override: branch ? (branch.is_open_override !== undefined ? branch.is_open_override : (branch.is_open === false ? 0 : 1)) : 1,
+      is_open: branch ? (branch.is_open !== undefined ? Boolean(branch.is_open) : (branch.is_open_override !== 0)) : true
     };
   }
 
@@ -1165,6 +1175,11 @@
             id: cat.id,
             name: cat.name || 'Menu',
             slug: cat.slug || '',
+            image_url: cat.image_url || cat.image || '',
+            image: cat.image || cat.image_url || '',
+            media_id: cat.media_id || null,
+            preview_url: cat.preview_url || null,
+            srcset_variants: Array.isArray(cat.srcset_variants) ? cat.srcset_variants : [],
             products: []
           };
         }
@@ -1184,7 +1199,7 @@
         menu_indicator_level: menu.level && menu.level.value != null ? menu.level.value : null,
         price: Number(menu.price || 0),
         regular_price: Number(menu.price || 0),
-        description: menu.description || (componentSnapshot.length === 1 ? (componentSnapshot[0].description || '') : ''),
+        description: menu.description || '',
         // Foto customer-facing adalah milik Menu (Satuan maupun Paket), bukan komponen Product.
         // Kosong berarti placeholder netral — bukan foto salah satu Product.
         image_url: menu.image_url || menu.image || '',
@@ -1227,6 +1242,11 @@
             id: cat.id,
             name: cat.name || 'Menu',
             slug: cat.slug || '',
+            image_url: cat.image_url || cat.image || '',
+            image: cat.image || cat.image_url || '',
+            media_id: cat.media_id || null,
+            preview_url: cat.preview_url || null,
+            srcset_variants: Array.isArray(cat.srcset_variants) ? cat.srcset_variants : [],
             products: []
           };
         }
@@ -1236,6 +1256,7 @@
 
     return {
       success: true,
+      branch: (data && data.branch) || null,
       categories: Object.keys(categoryMap).map(function (key) { return categoryMap[key]; }),
       products: Object.keys(productsByMenu).map(function (key) { return productsByMenu[key]; }),
       all_products: Object.keys(productsByMenu).map(function (key) { return productsByMenu[key]; })
@@ -1254,6 +1275,17 @@
       .then(function (rawData) {
         if (seq !== catalogLoadSeq) return;
         perfLog('home_api_catalog_end');
+
+        if (rawData && rawData.branch) {
+          if (!activeBranch) {
+            activeBranch = rawData.branch;
+          } else if (String(activeBranch.id) === String(rawData.branch.id)) {
+            activeBranch.is_open_override = rawData.branch.is_open_override;
+            activeBranch.is_open = rawData.branch.is_open;
+            activeBranch.is_active = rawData.branch.is_active;
+          }
+          try { Store.setBranchContext(branchContextOf(activeBranch)); } catch (_) {}
+        }
 
         var data = rawData && Array.isArray(rawData.menus)
           ? adaptCanonicalHomeCatalog(rawData)
@@ -1395,9 +1427,32 @@
     return html + '</span></div>';
   }
 
+  function isProductUnavailable(product) {
+    if (!product) return false;
+    if (product.is_available === false || product.is_available === 0) return true;
+    if (product.availability === false || product.availability === 0) return true;
+    if (product.branch_is_available === false || product.branch_is_available === 0) return true;
+    if (product.branch_menu_is_available === false || product.branch_menu_is_available === 0) return true;
+    if (product.blocking_reason === 'OUT_OF_STOCK' || product.blocking_reason === 'BRANCH_MENU_UNAVAILABLE' || product.blocking_reason === 'COMPONENT_UNAVAILABLE' || product.blocking_reason === 'BRANCH_CATEGORY_UNAVAILABLE' || product.blocking_reason === 'MENU_INACTIVE') return true;
+    if (product.inventory) {
+      if (product.inventory.stock_available === false) return true;
+      if (product.inventory.blocking_reason) return true;
+      if (product.inventory.stock_managed && product.inventory.available_quantity != null && product.inventory.available_quantity <= 0) return true;
+      if (product.inventory.stock_estimate != null && product.inventory.stock_estimate <= 0) return true;
+    }
+    if (product.stock_estimate != null && product.stock_estimate <= 0) return true;
+    return false;
+  }
+
   function renderProducts() {
     var container = $('x-products');
     if (!container) return;
+
+    var branchClosed = isBranchClosed(activeBranch);
+    var closedBanner = $('x-branch-closed-banner');
+    if (closedBanner) {
+      closedBanner.hidden = !branchClosed;
+    }
 
     if (!products.length) {
       // Skip the write when the empty state is already on screen.
@@ -1432,18 +1487,18 @@
 
       // P3: branch-level availability is a SERVER-computed flag (is_available is
       // only present on branch-scoped menus). The client merely presents it.
-      var unavailable = !!activeBranch && product.is_available === false;
+      var unavailable = isProductUnavailable(product);
 
       var oldPriceHtml = regPrice > price
         ? '<div class="x-old-price">' + UI.money(regPrice) + '</div>'
         : '';
 
-      var unavailableTag = unavailable
-        ? '<div class="x-unavailable-tag">Habis</div>'
-        : '';
-
       var controls = '';
-      if (qty > 0) {
+      if (branchClosed) {
+        controls = '<span class="x-unavailable-label is-closed">Resto Tutup</span>';
+      } else if (unavailable) {
+        controls = '<span class="x-unavailable-label">Habis</span>';
+      } else if (qty > 0) {
         var noteIcon = note ? ICONS.write : ICONS.file;
         controls =
           '<div class="x-quantity">' +
@@ -1455,8 +1510,6 @@
           '  <img src="' + noteIcon + '" alt="Catatan" class="x-note-icon">' +
           '  Catatan' +
           '</button>';
-      } else if (unavailable) {
-        controls = '<span class="x-unavailable-label">Habis</span>';
       } else {
         controls = '<button type="button" class="x-add" data-add="' + product.id + '">Tambah</button>';
       }
@@ -1480,20 +1533,22 @@
       }
 
       html +=
-        '<article class="x-product' + (unavailable ? ' x-product-unavailable' : '') + '" data-product-card="' + UI.escape(String(product.id)) + '">' +
+        '<article class="x-product' + (branchClosed ? ' x-product-unavailable is-closed' : (unavailable ? ' x-product-unavailable' : '')) + '" data-product-card="' + UI.escape(String(product.id)) + '">' +
         '<div class="x-product-info">' +
         '  <div class="x-product-name">' + UI.escape(menuTitle) + '</div>' +
         (menuSubtitle ? '  <div class="x-product-subtitle">' + UI.escape(menuSubtitle) + '</div>' : '') +
         (menuDetail.length ? '  <div class="x-product-description">' + UI.escape(menuDetail.join(' · ')) + '</div>' : '') +
         renderCustomerSpiceIndicator(product.menu_indicator_level) +
         (!menuDetail.length && legacyDesc ? '  <div class="x-product-description">' + UI.escape(legacyDesc) + '</div>' : '') +
-        unavailableTag +
         '  <div class="x-price">' + oldPriceHtml +
         '    <div class="x-current-price">' + UI.money(price) + '</div>' +
         '  </div>' +
         '</div>' +
-        '<div class="x-product-right">' +
+        '<div class="x-product-side">' +
+        '<div class="x-product-image-wrap">' +
         imgHtml +
+        (branchClosed ? '<span class="x-photo-overlay-habis is-closed">Tutup</span>' : (unavailable ? '<span class="x-photo-overlay-habis">Habis</span>' : '')) +
+        '</div>' +
         controls +
         '</div>' +
         '</article>';
@@ -1552,9 +1607,17 @@
     document.querySelectorAll('[data-add]').forEach(function (btn) {
       btn.onclick = function (e) {
         e.stopPropagation();
+        if (isBranchClosed(activeBranch)) {
+          if (UI && UI.toast) UI.toast('Maaf, resto sedang tutup sementara.');
+          return;
+        }
         var pid = btn.dataset.add;
         var p = products.find(function (x) { return String(x.id) === String(pid); });
         if (p) {
+          if (isProductUnavailable(p)) {
+            if (UI && UI.toast) UI.toast('Maaf, stok menu ini sedang habis di cabang ini.');
+            return;
+          }
           Store.addItem(p, 1, activeBranch ? branchContextOf(activeBranch) : undefined);
           ensureCardVisible(pid);
         }
@@ -1564,9 +1627,22 @@
     document.querySelectorAll('[data-plus]').forEach(function (btn) {
       btn.onclick = function (e) {
         e.stopPropagation();
+        if (isBranchClosed(activeBranch)) {
+          if (UI && UI.toast) UI.toast('Maaf, resto sedang tutup sementara.');
+          return;
+        }
         var pid = btn.dataset.plus;
+        var p = products.find(function (x) { return String(x.id) === String(pid); });
+        if (p && isProductUnavailable(p)) {
+          if (UI && UI.toast) UI.toast('Maaf, stok menu ini sudah habis.');
+          return;
+        }
         var item = Store.findCartItem(pid, activeBranch ? String(activeBranch.id) : undefined);
         if (item) {
+          if (p && p.inventory && p.inventory.stock_managed && p.inventory.available_quantity != null && item.quantity >= p.inventory.available_quantity) {
+            if (UI && UI.toast) UI.toast('Stok maksimal telah tercapai (' + p.inventory.available_quantity + ' porsi).');
+            return;
+          }
           Store.setQty(pid, item.quantity + 1, item.branch_id == null ? null : item.branch_id);
           ensureCardVisible(pid);
         }
@@ -1701,7 +1777,8 @@
     if (!product || !product.id) return;
 
     var branchCtx = activeBranch ? branchContextOf(activeBranch) : null;
-    var unavailable = !!activeBranch && product.is_available === false;
+    var branchClosed = isBranchClosed(activeBranch);
+    var unavailable = isProductUnavailable(product);
     var price = Number(product.price || 0);
     var regPrice = Number(product.regular_price || price);
     var menuTitle = product.menu_title || product.title || product.name || '';
@@ -1723,7 +1800,12 @@
     if (!detailImgSrc) detailImgSrc = product.image_url || product.image || '';
 
     if (detailImgSrc) {
-      imgHtml = '<div class="x-detail-image-wrap"><img src="' + UI.escape(detailImgSrc) + '" alt="' + UI.escape(product.name) + '" loading="eager" decoding="async"></div>';
+      imgHtml = '<div class="x-detail-image-wrap">' +
+        '<img src="' + UI.escape(detailImgSrc) + '" alt="' + UI.escape(product.name) + '" loading="eager" decoding="async">' +
+        (branchClosed
+          ? '<span class="x-photo-overlay-habis x-detail-overlay-habis is-closed">Tutup</span>'
+          : (unavailable ? '<span class="x-photo-overlay-habis x-detail-overlay-habis">Habis</span>' : '')) +
+        '</div>';
     }
 
     var scopedQty = 0;
@@ -1741,9 +1823,12 @@
     var oldPriceHtml = regPrice > price
       ? '<span class="x-detail-old-price">' + UI.money(regPrice) + '</span>'
       : '';
-    var availabilityHtml = unavailable
-      ? '<div class="x-unavailable-tag">Habis</div>'
-      : '';
+    var availabilityHtml = '';
+    if (branchClosed) {
+      availabilityHtml = '<div style="background:#ffe4e6;color:#e11d48;padding:8px 12px;border-radius:10px;font-size:12px;font-weight:700;margin:8px 0;display:inline-flex;align-items:center;gap:6px;">⚠️ Resto Sedang Tutup Sementara</div>';
+    } else if (unavailable) {
+      availabilityHtml = '<div style="background:#fee2e2;color:#dc2626;padding:8px 12px;border-radius:10px;font-size:12px;font-weight:700;margin:8px 0;display:inline-flex;align-items:center;gap:6px;">⚠️ Stok Habis di Cabang Ini</div>';
+    }
     // Branch name is intentionally not shown in Customer product detail.
     // Branch context remains operational state only, not part of the product title block.
     var branchLabelHtml = '';
@@ -1775,9 +1860,11 @@
       '    </div>' +
       '  </div>' +
       '  <div class="x-detail-footer">' +
-      (unavailable
-        ? '<button type="button" class="x-detail-add" disabled>Habis</button>'
-        : '<button type="button" class="x-detail-add">' + (scopedQty > 0 ? 'Tambah lagi' : 'Masukkan ke keranjang') + '</button>') +
+      (branchClosed
+        ? '<button type="button" class="x-detail-add" disabled style="opacity:0.6;background:#ffe4e6;color:#e11d48;cursor:not-allowed;">Resto Tutup</button>'
+        : (unavailable
+          ? '<button type="button" class="x-detail-add" disabled style="opacity:0.6;background:#e5e7eb;color:#9ca3af;cursor:not-allowed;">Habis</button>'
+          : '<button type="button" class="x-detail-add">' + (scopedQty > 0 ? 'Tambah lagi' : 'Masukkan ke keranjang') + '</button>')) +
       cartHint +
       '  </div>' +
       '</div>';
@@ -1824,6 +1911,18 @@
     var addBtn = overlay.querySelector('.x-detail-add');
     if (addBtn && !addBtn.disabled) {
       addBtn.onclick = function () {
+        if (isBranchClosed(activeBranch)) {
+          if (UI && typeof UI.toast === 'function') {
+            UI.toast('Maaf, resto sedang tutup sementara.');
+          }
+          return;
+        }
+        if (isProductUnavailable(product)) {
+          if (UI && typeof UI.toast === 'function') {
+            UI.toast('Maaf, menu ini sedang habis di cabang ini.');
+          }
+          return;
+        }
         Store.addItem(product, 1, branchCtx || undefined);
         if (window.XentraNav && typeof window.XentraNav.close === 'function') {
           window.XentraNav.close();
@@ -2023,6 +2122,12 @@
       ? '<div class="x-sheet-item-note" data-edit-note="' + item.id + '" data-edit-note-branch="' + (item.branch_id || '') + '"><img src="' + ICONS.write + '" alt="Edit catatan"><span>: ' + UI.escape(note) + '</span></div>'
       : '';
 
+    var prodMatch = products.find(function (p) { return String(p.id) === String(item.id); });
+    var isItemUnavailable = prodMatch ? isProductUnavailable(prodMatch) : false;
+    var unavailBadge = isItemUnavailable
+      ? '<div style="display:inline-block;background:#fee2e2;color:#dc2626;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;margin-top:3px;">Stok Habis di Cabang Ini</div>'
+      : '';
+
     row.innerHTML =
       '<div class="x-sheet-item-main">' +
       (image
@@ -2030,6 +2135,7 @@
         : '<div class="x-sheet-item-image"></div>') +
       '  <div class="x-sheet-item-body">' +
       '    <div class="x-sheet-item-name">' + UI.escape(item.name) + '</div>' +
+      unavailBadge +
       noteHtml +
       '    <div class="x-sheet-item-qty-price">' + item.quantity + ' × ' + UI.money(item.price) + '</div>' +
       '  </div>' +
@@ -2144,7 +2250,22 @@
   // scope → that branch's #checkout directly. More than one scope → Branch
   // Order Switcher (no silent-select, no merged checkout).
   function openCheckoutFlow() {
+    if (isBranchClosed(activeBranch)) {
+      if (UI && UI.toast) UI.toast('Maaf, resto sedang tutup sementara. Tidak dapat melanjutkan pesanan.');
+      return;
+    }
     var groups = (Store.getConcreteCheckoutBranchGroups ? Store.getConcreteCheckoutBranchGroups() : Store.getCartBranchGroups());
+    var cartItems = Store.getState().cart.items || [];
+    var hasUnavailable = cartItems.some(function (ci) {
+      if (ci.is_promo_reward) return false;
+      var p = products.find(function (x) { return String(x.id) === String(ci.id); });
+      return p && isProductUnavailable(p);
+    });
+    if (hasUnavailable) {
+      if (UI && UI.toast) UI.toast('Ada menu di keranjang yang sedang habis. Silakan hapus menu tersebut.');
+      openCartSheet();
+      return;
+    }
     closeSheet();
     if (groups.length > 1) {
       openBranchSwitcher();

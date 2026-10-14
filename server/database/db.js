@@ -968,6 +968,7 @@ function initSchema(targetDb) {
       menu_schema_version INTEGER NOT NULL DEFAULT 1,
       menu_migration_status TEXT NOT NULL DEFAULT 'legacy',
       inventory_type TEXT DEFAULT 'COOKED',
+      fulfillment_type TEXT DEFAULT 'BY_STOCK',
       FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
       FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
     );
@@ -2036,6 +2037,40 @@ function initSchema(targetDb) {
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      brand_id TEXT,
+      branch_id TEXT,
+      source_type TEXT NOT NULL,
+      source_actor_id TEXT,
+      title TEXT NOT NULL,
+      body TEXT NOT NULL,
+      priority TEXT DEFAULT 'normal',
+      target_role TEXT,
+      target_user_id TEXT,
+      target_scope TEXT,
+      related_entity_type TEXT,
+      related_entity_id TEXT,
+      action_url TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
+      FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_notifications_scope ON notifications(brand_id, branch_id, target_role);
+    CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS notification_recipients (
+      id TEXT PRIMARY KEY,
+      notification_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      read_at TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (notification_id) REFERENCES notifications(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_notif_recipients_user ON notification_recipients(user_id, read_at);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_notif_recipients_unique ON notification_recipients(notification_id, user_id);
   `);
 
   // Promotion Reward Target migration: Menu is the canonical commercial
@@ -2044,6 +2079,12 @@ function initSchema(targetDb) {
   // additively without destructive table rebuilds.
   try { targetDb.exec("ALTER TABLE promotion_rewards ADD COLUMN target_menu_id TEXT;"); } catch (_) {}
   try { targetDb.exec("CREATE INDEX IF NOT EXISTS idx_promotion_rewards_target_menu ON promotion_rewards(target_menu_id);"); } catch (_) {}
+
+  // Material Market Purchase Packaging migration (Satuan Beli Lapangan/Pasar):
+  // Memungkinkan input target belanja dan rekomendasi kulakan menggunakan satuan pasar (Ekor, Bungkus, Jerigen, Karung)
+  // dengan rasio konversi otomatis ke base UOM masak dapur.
+  try { targetDb.exec("ALTER TABLE materials ADD COLUMN purchase_uom_name TEXT;"); } catch (_) {}
+  try { targetDb.exec("ALTER TABLE materials ADD COLUMN purchase_uom_ratio REAL DEFAULT 1;"); } catch (_) {}
 
   try {
     targetDb.exec(`
@@ -2176,6 +2217,7 @@ function initSchema(targetDb) {
   try { targetDb.exec("ALTER TABLE products ADD COLUMN menu_schema_version INTEGER NOT NULL DEFAULT 1;"); } catch (e) {}
   try { targetDb.exec("ALTER TABLE products ADD COLUMN menu_migration_status TEXT NOT NULL DEFAULT 'legacy';"); } catch (e) {}
   try { targetDb.exec("ALTER TABLE products ADD COLUMN inventory_type TEXT DEFAULT 'COOKED';"); } catch (e) {}
+  try { targetDb.exec("ALTER TABLE products ADD COLUMN fulfillment_type TEXT DEFAULT 'BY_STOCK';"); } catch (e) {}
   try { targetDb.exec("ALTER TABLE menus ADD COLUMN description TEXT;"); } catch (e) {}
   try { targetDb.exec('ALTER TABLE brands ADD COLUMN tagline TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE brands ADD COLUMN banners TEXT;'); } catch (e) {}

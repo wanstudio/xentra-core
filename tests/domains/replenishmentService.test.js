@@ -226,3 +226,100 @@ test('ProcurementService.createPurchaseOrder rejects orders below supplier pack 
     return true;
   });
 });
+
+test('Worst-case recipe threshold: Material A used 3g in Menu X and 5g in Menu Y triggers warning when stock is 4g (< 5g)', () => {
+  // Material A (Keju Mozzarella)
+  const cheese = MaterialService.createMaterial({
+    organizationId: ORG,
+    materialCode: 'RAW-CHEESE-01',
+    name: 'Keju Mozzarella',
+    baseUomId: 'uom_kg',
+    status: 'ACTIVE'
+  });
+
+  // Menu X (butuh 0.003 kg / 3g per porsi)
+  const prodX = 'prod_menu_x_test';
+  db.prepare(`
+    INSERT INTO products (id, brand_id, name, slug, sku, price, is_active, product_stock_uom_id)
+    VALUES (?, ?, 'Menu X (Keju Ringan)', 'menu-x-test', 'SKU-MENU-X', 15000, 1, 'uom_pcs')
+  `).run(prodX, BRAND);
+
+  const piX = db.prepare(`
+    INSERT INTO production_items (id, organization_id, output_product_id, production_item_code, name, status, created_at, updated_at)
+    VALUES ('pi_menu_x', ?, ?, 'PI-X', 'Menu X Batch', 'ACTIVE', datetime('now'), datetime('now'))
+    RETURNING id
+  `).get(ORG, prodX);
+
+  const recX = db.prepare(`
+    INSERT INTO recipes (id, production_item_id, name, status, created_at, updated_at)
+    VALUES ('rec_menu_x', ?, 'Resep Menu X', 'ACTIVE', datetime('now'), datetime('now'))
+    RETURNING id
+  `).get(piX.id);
+
+  const rvX = db.prepare(`
+    INSERT INTO recipe_versions (id, recipe_id, version_number, status, planned_yield_quantity, yield_uom_id, created_at, updated_at)
+    VALUES ('rv_menu_x_v1', ?, 1, 'PUBLISHED', 1, 'uom_pcs', datetime('now'), datetime('now'))
+    RETURNING id
+  `).get(recX.id);
+
+  db.prepare(`
+    INSERT INTO recipe_components (id, recipe_version_id, material_id, planned_quantity, planned_uom_id, sort_order)
+    VALUES ('rc_x_01', ?, ?, 0.003, 'uom_kg', 1)
+  `).run(rvX.id, cheese.id);
+
+  // Menu Y (butuh 0.005 kg / 5g per porsi)
+  const prodY = 'prod_menu_y_test';
+  db.prepare(`
+    INSERT INTO products (id, brand_id, name, slug, sku, price, is_active, product_stock_uom_id)
+    VALUES (?, ?, 'Menu Y (Keju Tebal)', 'menu-y-test', 'SKU-MENU-Y', 25000, 1, 'uom_pcs')
+  `).run(prodY, BRAND);
+
+  const piY = db.prepare(`
+    INSERT INTO production_items (id, organization_id, output_product_id, production_item_code, name, status, created_at, updated_at)
+    VALUES ('pi_menu_y', ?, ?, 'PI-Y', 'Menu Y Batch', 'ACTIVE', datetime('now'), datetime('now'))
+    RETURNING id
+  `).get(ORG, prodY);
+
+  const recY = db.prepare(`
+    INSERT INTO recipes (id, production_item_id, name, status, created_at, updated_at)
+    VALUES ('rec_menu_y', ?, 'Resep Menu Y', 'ACTIVE', datetime('now'), datetime('now'))
+    RETURNING id
+  `).get(piY.id);
+
+  const rvY = db.prepare(`
+    INSERT INTO recipe_versions (id, recipe_id, version_number, status, planned_yield_quantity, yield_uom_id, created_at, updated_at)
+    VALUES ('rv_menu_y_v1', ?, 1, 'PUBLISHED', 1, 'uom_pcs', datetime('now'), datetime('now'))
+    RETURNING id
+  `).get(recY.id);
+
+  db.prepare(`
+    INSERT INTO recipe_components (id, recipe_version_id, material_id, planned_quantity, planned_uom_id, sort_order)
+    VALUES ('rc_y_01', ?, ?, 0.005, 'uom_kg', 1)
+  `).run(rvY.id, cheese.id);
+
+  // Stok Keju di kulkas 0.008 kg (8 gram):
+  // Total kebutuhan seluruh menu resto = 3g (Menu X) + 5g (Menu Y) = 8g.
+  // Ambang batas warning safety buffer 2x seluruh menu = 16g (0.016 kg).
+  // Karena stok di kulkas (8g) <= batas aman (16g), sistem memberi peringatan dini sebelum kehabisan!
+  db.prepare(`
+    INSERT INTO material_stock_balances (stock_location_id, material_id, quantity_base, carrying_value, moving_average_unit_cost, cost_availability_status, updated_at)
+    VALUES (?, ?, 0.008, 1600, 200000, 'AVAILABLE', datetime('now'))
+  `).run(LOCATION, cheese.id);
+
+  const result = ReplenishmentService.calculateReplenishment({
+    organizationId: ORG,
+    stockLocationId: LOCATION
+  });
+
+  const cheeseSugg = result.suggestions.find(s => s.material_id === cheese.id);
+  assert.ok(cheeseSugg, 'Keju Mozzarella HARUS otomatis masuk saran belanja karena stok 8g <= 16g (safety buffer 2x seluruh menu resto)');
+
+  // Verifikasi alasan
+  const worstCaseReason = cheeseSugg.reasons.find(r => r.type === 'WORST_CASE_RECIPE_THRESHOLD');
+  assert.ok(worstCaseReason, 'Harus memiliki alasan WORST_CASE_RECIPE_THRESHOLD');
+  assert.equal(worstCaseReason.worst_product_name, 'Menu Y (Keju Tebal)');
+  assert.equal(worstCaseReason.total_resto_usage, 0.008);
+  assert.equal(worstCaseReason.single_portion_usage, 0.005);
+  assert.equal(worstCaseReason.threshold, 0.016);
+  assert.equal(worstCaseReason.current_stock, 0.008);
+});

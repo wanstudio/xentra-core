@@ -84,7 +84,7 @@
     if (!container) return;
 
     if (!promos || !promos.length) {
-      container.innerHTML = '<div class="text-center py-6 text-muted">Belum ada promosi aktif dari Brand untuk cabang ini.</div>';
+      container.innerHTML = '<div class="text-center py-6 text-muted">Belum ada promosi yang aktif saat ini.</div>';
       return;
     }
 
@@ -94,35 +94,20 @@
       // Branch-level activation state
       var isBranchActive = p.branch_is_active !== undefined ? (p.branch_is_active === 1 || p.branch_is_active === true) : (p.is_active === 1 || p.is_active === true);
       var isBrandActive = (p.is_active === 1 || p.is_active === true);
+      var isExpired = p.end_at && p.end_at < now;
+      var canToggle = isBrandActive && !isExpired;
 
-      // Operational Status derivation
-      var statusBadge = '';
-      var canToggle = true;
-
-      if (!isBrandActive) {
-        statusBadge = '<span class="x-badge" style="background:#f1f5f9;color:#64748b;font-size:11px;">NONAKTIF (BRAND)</span>';
-        canToggle = false;
-      } else if (p.end_at && p.end_at < now) {
-        statusBadge = '<span class="x-badge" style="background:#fee2e2;color:#991b1b;font-size:11px;">KADALUARSA</span>';
-        canToggle = false;
-      } else if (p.start_at && p.start_at > now) {
-        statusBadge = '<span class="x-badge" style="background:#fef3c7;color:#92400e;font-size:11px;">TERJADWAL</span>';
-      } else if (isBranchActive) {
-        statusBadge = '<span class="x-badge x-badge-success" style="font-size:11px;font-weight:700;">AKTIF DI CABANG</span>';
-      } else {
-        statusBadge = '<span class="x-badge" style="background:#f1f5f9;color:#475569;font-size:11px;">NONAKTIF (CABANG)</span>';
-      }
-
-      // Action button
-      var actionBtnHtml = '';
+      // Toggle switch HTML (Hijau = Aktif, Merah = Nonaktif)
+      var toggleHtml = '';
       if (canToggle) {
-        if (isBranchActive) {
-          actionBtnHtml = '<button type="button" class="x-btn-secondary" onclick="toggleBMPromoActivation(\'' + esc(p.id) + '\', 0, this)" style="padding:5px 12px;font-size:12px;color:#dc2626;border-color:#fca5a5;">Nonaktifkan di Cabang</button>';
-        } else {
-          actionBtnHtml = '<button type="button" class="x-btn-primary" onclick="toggleBMPromoActivation(\'' + esc(p.id) + '\', 1, this)" style="padding:5px 12px;font-size:12px;">Aktifkan di Cabang</button>';
-        }
-      } else {
-        actionBtnHtml = '<span style="font-size:11px;color:#94a3b8;font-style:italic;">Dikelola Pusat</span>';
+        toggleHtml = '<label class="x-toggle' + (isBranchActive ? ' x-toggle-on' : '') + '" title="' + (isBranchActive ? 'Promo Aktif (klik untuk nonaktifkan)' : 'Promo Nonaktif (klik untuk aktifkan)') + '" style="margin:0;cursor:pointer;">' +
+          '<input type="checkbox" ' + (isBranchActive ? 'checked' : '') + ' onchange="toggleBMPromoActivation(\'' + esc(p.id) + '\', this.checked ? 1 : 0, this)">' +
+          '<span class="x-toggle-slider"></span>' +
+        '</label>';
+      } else if (!isBrandActive) {
+        toggleHtml = '<span class="x-badge" style="background:#f1f5f9;color:#64748b;font-size:11px;font-weight:700;">NONAKTIF PUSAT</span>';
+      } else if (isExpired) {
+        toggleHtml = '<span class="x-badge" style="background:#fee2e2;color:#991b1b;font-size:11px;font-weight:700;">KADALUARSA</span>';
       }
 
       // Rewards summary text
@@ -138,46 +123,51 @@
 
       var promoCode = p.code || p.promo_code;
 
-      return '<div class="x-card" style="padding:14px 16px; border:1px solid var(--border-color); border-radius:8px; background:#ffffff;">' +
-        '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">' +
-          '<div>' +
-            '<strong style="font-size:15px; color:var(--text-main);">' + esc(p.name || p.title || 'Promosi') + '</strong>' +
+      return '<div class="x-card" style="padding:14px 16px; border:1px solid var(--border-color); border-radius:12px; background:#ffffff;">' +
+        '<div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:8px;">' +
+          '<div style="min-width:0; flex:1;">' +
+            '<strong style="font-size:15px; color:var(--text-main); display:block;">' + esc(p.name || p.title || 'Promosi') + '</strong>' +
             (promoCode ? ('<div style="font-size:12px; margin-top:3px;">Kode: <code style="background:#f1f5f9; padding:2px 6px; border-radius:4px; font-weight:700;">' + esc(promoCode) + '</code></div>') : '') +
           '</div>' +
-          statusBadge +
+          '<div style="flex-shrink:0; display:flex; align-items:center;">' +
+            toggleHtml +
+          '</div>' +
         '</div>' +
         (p.description ? ('<p style="font-size:12px; color:var(--text-muted); margin:4px 0 8px;">' + esc(p.description) + '</p>') : '') +
         '<div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; border-top:1px dashed var(--border-color); padding-top:10px; margin-top:8px;">' +
           '<div>Benefit: <strong style="color:var(--accent-teal);">' + esc(rewardText) + '</strong></div>' +
-          actionBtnHtml +
         '</div>' +
       '</div>';
     }).join('');
   }
 
-  async function toggleBMPromoActivation(promoId, newStatus, btnEl) {
-    if (btnEl) {
-      btnEl.disabled = true;
-      btnEl.textContent = 'Memproses...';
-    }
+  async function toggleBMPromoActivation(promoId, newStatus, inputEl) {
+    var parentLabel = inputEl && inputEl.closest ? inputEl.closest('.x-toggle') : null;
+    if (inputEl) inputEl.disabled = true;
 
     try {
+      var user = getStoredUser();
+      var branchId = user ? (user.branch_id || user.branchId) : null;
       var res = await adminFetch('/api/v1/admin/marketing/promotions/' + encodeURIComponent(promoId) + '/branch-activation', {
         method: 'PATCH',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ is_active: newStatus })
+        body: JSON.stringify({ is_active: newStatus, branch_id: branchId })
       });
       var json = await res.json();
-      if (!res.ok || !json.success) throw new Error((json && json.error) || 'Gagal mengubah status aktivasi promo di cabang.');
+      if (!res.ok || !json.success) throw new Error((json && json.error) || 'Gagal mengubah status aktivasi promo.');
 
-      showToast(newStatus === 1 ? 'Promo berhasil diaktifkan untuk operasional cabang ini.' : 'Promo berhasil dinonaktifkan di cabang ini.');
+      if (parentLabel) parentLabel.classList.toggle('x-toggle-on', newStatus === 1);
+      showToast(newStatus === 1 ? 'Promo berhasil diaktifkan.' : 'Promo berhasil dinonaktifkan.');
       loadBMPromotions();
     } catch (err) {
       console.error('[BM Promo Toggle Error]:', err);
       showToast(err.message || 'Gagal mengubah status promosi.');
-      if (btnEl) {
-        btnEl.disabled = false;
-        btnEl.textContent = newStatus === 1 ? 'Aktifkan di Cabang' : 'Nonaktifkan di Cabang';
+      if (inputEl) {
+        inputEl.checked = newStatus !== 1;
+        inputEl.disabled = false;
+      }
+      if (parentLabel) {
+        parentLabel.classList.toggle('x-toggle-on', newStatus !== 1);
       }
     }
   }
@@ -188,7 +178,7 @@
     if (!tbody) return;
 
     if (!redemptions || !redemptions.length) {
-      tbody.innerHTML = '<tr><td colspan="4" class="text-center py-6 text-muted">Belum ada penebusan promo di cabang ini.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center py-6 text-muted">Belum ada riwayat penggunaan promo.</td></tr>';
       return;
     }
 

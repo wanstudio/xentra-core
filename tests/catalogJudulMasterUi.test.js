@@ -26,6 +26,9 @@ const INDEX_HTML = fs.readFileSync(path.join(DASHBOARD_DIR, 'index.html'), 'utf8
 const DASHBOARD_JS = fs.readFileSync(path.join(DASHBOARD_DIR, 'assets', 'js', 'dashboard.js'), 'utf8') + '\n' +
   (fs.existsSync(path.join(DASHBOARD_DIR, 'assets', 'js', 'modules', 'catalog.js'))
     ? fs.readFileSync(path.join(DASHBOARD_DIR, 'assets', 'js', 'modules', 'catalog.js'), 'utf8')
+    : '') + '\n' +
+  (fs.existsSync(path.join(DASHBOARD_DIR, 'assets', 'js', 'modules', 'catalog-reference.js'))
+    ? fs.readFileSync(path.join(DASHBOARD_DIR, 'assets', 'js', 'modules', 'catalog-reference.js'), 'utf8')
     : '');
 
 async function mockFetch(requestPath, options = {}) {

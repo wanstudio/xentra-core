@@ -6,7 +6,11 @@ const assert = require('assert');
 const root = path.join(__dirname, '..');
 const shellJs = fs.readFileSync(path.join(root, 'apps/merchant-shared/js/presentation-shells.js'), 'utf8');
 const shellCss = fs.readFileSync(path.join(root, 'apps/merchant-shared/css/presentation-shells.css'), 'utf8');
-const dashboardJs = fs.readFileSync(path.join(root, 'apps/merchant-dashboard/assets/js/dashboard.js'), 'utf8');
+const dashboardDir = path.join(root, 'apps/merchant-dashboard/assets/js');
+const moduleFiles = fs.existsSync(path.join(dashboardDir, 'modules'))
+  ? fs.readdirSync(path.join(dashboardDir, 'modules')).filter(f => f.endsWith('.js')).map(f => fs.readFileSync(path.join(dashboardDir, 'modules', f), 'utf8')).join('\n')
+  : '';
+const dashboardJs = fs.readFileSync(path.join(dashboardDir, 'dashboard.js'), 'utf8') + '\n' + moduleFiles;
 const dashboardHtml = fs.readFileSync(path.join(root, 'apps/merchant-dashboard/index.html'), 'utf8');
 const branchCatalogJs = fs.readFileSync(path.join(root, 'apps/merchant-dashboard/assets/js/branch-catalog-ui.js'), 'utf8');
 const merchantMenuJs = fs.readFileSync(path.join(root, 'apps/merchant-app/assets/js/menu.js'), 'utf8');
@@ -129,15 +133,17 @@ test('PRES-13: Owner Dashboard legacy interactive surfaces use canonical present
 });
 
 test('PRES-14: Owner Dashboard destructive confirmations do not use native confirm()', () => {
-  const dashboardWithoutHelper = dashboardJs.replace(/function confirmFeatureAction[\s\S]*?\n  }\n/, '');
-  const branchWithoutHelper = branchCatalogJs.replace(/async function confirmBranchCatalogAction[\s\S]*?\n  }\n/, '');
+  const dashboardWithoutHelper = dashboardJs
+    .replace(/async function confirmFeatureAction[\s\S]*?\n  }\n/g, '')
+    .replace(/function confirmFeatureAction[\s\S]*?\n  }\n/g, '');
+  const branchWithoutHelper = branchCatalogJs.replace(/async function confirmBranchCatalogAction[\s\S]*?\n  }\n/g, '');
   assert.equal((dashboardWithoutHelper.match(/(?<![.\w])confirm\s*\(/g) || []).length, 0);
   assert.equal((branchWithoutHelper.match(/(?<![.\w])confirm\s*\(/g) || []).length, 0);
 });
 
 test('PRES-15: Owner Dashboard no longer uses native prompt() for feature input', () => {
-  const dashboardWithoutHelper = dashboardJs.replace(/function requestTextInputSheet[\s\S]*?\n  }\n/, '');
-  const branchWithoutHelper = branchCatalogJs.replace(/function requestBranchTextInput[\s\S]*?\n  }\n/, '');
+  const dashboardWithoutHelper = dashboardJs.replace(/function requestTextInputSheet[\s\S]*?\n  }\n/g, '');
+  const branchWithoutHelper = branchCatalogJs.replace(/function requestBranchTextInput[\s\S]*?\n  }\n/g, '');
   assert.equal((dashboardWithoutHelper.match(/\bprompt\s*\(/g) || []).length, 0);
   assert.equal((branchWithoutHelper.match(/\bprompt\s*\(/g) || []).length, 0);
 });

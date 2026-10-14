@@ -48,6 +48,7 @@ test.before(async () => {
 });
 
 test.after(() => {
+  db.exec('DROP TRIGGER IF EXISTS trg_material_stock_movement_immutable_delete');
   db.prepare('DELETE FROM material_stock_movements WHERE stock_location_id = ?').run(LOCATION);
   db.prepare('DELETE FROM material_stock_balances WHERE stock_location_id = ?').run(LOCATION);
   db.prepare('DELETE FROM stock_locations WHERE id = ?').run(LOCATION);

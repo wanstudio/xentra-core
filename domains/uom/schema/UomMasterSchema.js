@@ -92,6 +92,7 @@ function ensureUomMasterSchema(db) {
     ['uom_mg', 'uom_cat_mass', 'mg', 'Milligram', 0.000001, 1, 6],
     ['uom_l', 'uom_cat_volume', 'L', 'Liter', 1, 1, 6],
     ['uom_ml', 'uom_cat_volume', 'ml', 'Milliliter', 0.001, 1, 6],
+    ['uom_galon', 'uom_cat_volume', 'galon', 'Galon', 19, 1, 3],
     ['uom_pcs', 'uom_cat_count', 'pcs', 'Pieces', 1, 0, 0],
     ['uom_dozen', 'uom_cat_count', 'dozen', 'Dozen', 12, 0, 0]
   ];

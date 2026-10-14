@@ -30,6 +30,9 @@ const registerOperationalOrderRoutes = require('./operational-orders');
 const registerAdminBranchCatalogRoutes = require('./admin-branch-catalog');
 const registerAdminBranchMenuRoutes = require('./admin-branch-menu');
 const registerAdminBranchOperationsRoutes = require('./admin-branch-operations');
+const registerNotificationRoutes = require('./notifications');
+const { NotificationService } = require('../../core');
+const notificationService = new NotificationService(db);
 const registerDineInRoutes = require('./dine-in');
 const registerPaymentWebhooks = require('./webhooks');
 const registerSettingsRoutes = require('./settings');
@@ -813,11 +816,13 @@ registerCheckoutRoutes(router, {
   OrderStateMachine,
   AcceptanceTimeoutService,
   authorizeCustomerSession,
-  requireCustomerAuth
+  requireCustomerAuth,
+  notificationService
 });
 
 // Business onboarding and tenant claim routes are isolated in server/routes/onboarding.js.
-registerDriverRoutes(router, { db, requireAuth, DeliveryDispatchService, mediaService });
+registerDriverRoutes(router, { db, requireAuth, DeliveryDispatchService, mediaService, notificationService });
+registerNotificationRoutes(router, { notificationService, requireAuth });
 
 registerOnboardingRoutes(router, {
   db,

@@ -35,6 +35,29 @@
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.08);
+
+  /* Typography Scale Standard (Mobile-Native & Desktop Standard) */
+  --font-size-display: 26px;
+  --font-size-h1: 22px;
+  --font-size-h2: 18px;
+  --font-size-h3: 16px;
+  --font-size-h4: 14.5px;
+  --font-size-body: 13.5px;
+  --font-size-body-sm: 12.5px;
+  --font-size-caption: 11.5px;
+
+  /* Font Weight Standard */
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-extrabold: 800;
+
+  /* Line Height Standard */
+  --line-height-tight: 1.18;
+  --line-height-snug: 1.32;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.6;
 }
 
 *, *::before, *::after {

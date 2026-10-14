@@ -71,6 +71,9 @@
       });
       var data = await res.json();
       if (res.ok && data.success) {
+        if (window.XentraAudio && typeof window.XentraAudio.orderAccepted === 'function') {
+          window.XentraAudio.orderAccepted();
+        }
         showToast("Pesanan #" + orderId + " berhasil diterima.");
         loadHariIni();
         if (typeof loadBMOrders === 'function') loadBMOrders({ background: true });
@@ -117,6 +120,10 @@
   // Browser-local audible chime for genuinely new pending orders (Web Audio API synthesis)
   // Fails gracefully if browser autoplay policy blocks un-interacted audio without spamming errors
   function playNewOrderAudibleChime() {
+    if (window.XentraAudio && typeof window.XentraAudio.orderReceived === 'function') {
+      window.XentraAudio.orderReceived({ text: 'Ada pesanan baru masuk!' });
+      return;
+    }
     try {
       var AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (!AudioCtx) return;
@@ -157,6 +164,108 @@
       // Ignore audio failure cleanly
     }
   }
+  window.playNewOrderAudibleChime = playNewOrderAudibleChime;
+
+  function showSystemOrderNotification(ord) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    if (!navigator.serviceWorker) return;
+
+    var typeMap = {
+      delivery: 'Delivery',
+      pickup: 'Pickup',
+      dine_in: 'Dine-in',
+      reservation: 'Reservasi'
+    };
+    var typeStr = typeMap[ord.order_type] || 'Pesanan';
+    var number = '#' + String(ord.order_number || ord.id || '').slice(0, 16);
+    var customer = ord.customer_name || 'Pelanggan';
+    var totalStr = (typeof formatMoney === 'function') ? formatMoney(ord.grand_total) : ('Rp ' + (ord.grand_total || 0));
+    var tableStr = (ord.table_name || ord.table_number) ? (' · Meja ' + (ord.table_name || ord.table_number)) : '';
+
+    var title = '🔔 Pesanan Masuk! ' + number;
+    var body = typeStr + tableStr + ' · ' + customer + ' · ' + totalStr;
+    var token = localStorage.getItem('xentra_merchant_token') || '';
+
+    navigator.serviceWorker.ready.then(function (reg) {
+      reg.showNotification(title, {
+        body: body,
+        icon: '/merchant-app/assets/icons/icon-192.png',
+        badge: '/merchant-app/assets/icons/icon-192.png',
+        tag: 'order-pending-' + ord.id,
+        renotify: true,
+        requireInteraction: true,
+        vibrate: [200, 100, 200, 100, 400],
+        actions: [
+          { action: 'accept', title: '✓ Terima Pesanan' },
+          { action: 'view', title: 'Buka Detail' }
+        ],
+        data: {
+          orderId: ord.id,
+          orderNumber: ord.order_number || ord.id,
+          token: token,
+          url: '/merchant-app/#pesanan'
+        }
+      }).catch(function (err) {
+        console.warn('[Show notification failed]:', err);
+      });
+    });
+  }
+
+  function checkAndNotifyNewPendingOrders(orders) {
+    if (!Array.isArray(orders)) return;
+    var currentPendingOrders = orders.filter(function (o) { return o.status === 'pending'; });
+    var currentPendingIds = {};
+    currentPendingOrders.forEach(function (o) { currentPendingIds[o.id] = true; });
+
+    var seen = _bmOrdersState.seenPendingOrderIds || window.__xentraSeenPendingOrderIds;
+    if (seen !== null && seen !== undefined) {
+      var newlyAppeared = [];
+      currentPendingOrders.forEach(function (o) {
+        if (!seen[o.id]) {
+          newlyAppeared.push(o.id);
+        }
+      });
+
+      if (newlyAppeared.length > 0) {
+        newlyAppeared.forEach(function (id) {
+          _bmOrdersState.newPendingOrderIds[id] = true;
+          var matchedOrder = currentPendingOrders.find(function (o) { return o.id === id; });
+          if (matchedOrder) {
+            showSystemOrderNotification(matchedOrder);
+          }
+        });
+        playNewOrderAudibleChime();
+      }
+    } else {
+      _bmOrdersState.newPendingOrderIds = {};
+    }
+
+    Object.keys(_bmOrdersState.newPendingOrderIds).forEach(function (id) {
+      if (!currentPendingIds[id]) {
+        delete _bmOrdersState.newPendingOrderIds[id];
+      }
+    });
+
+    _bmOrdersState.seenPendingOrderIds = currentPendingIds;
+    window.__xentraSeenPendingOrderIds = currentPendingIds;
+  }
+  window.checkAndNotifyNewPendingOrders = checkAndNotifyNewPendingOrders;
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', function (event) {
+      if (event.data && event.data.type === 'ORDER_ACCEPTED_FROM_NOTIFICATION') {
+        if (window.XentraAudio && typeof window.XentraAudio.orderAccepted === 'function') {
+          window.XentraAudio.orderAccepted();
+        }
+        if (typeof loadBMOrders === 'function') loadBMOrders({ background: true });
+        if (typeof loadHariIni === 'function') loadHariIni();
+      } else if (event.data && event.data.type === 'NAVIGATE_TO_ORDER' && event.data.orderId) {
+        if (typeof viewBMOrderDetail === 'function') {
+          viewBMOrderDetail(event.data.orderId);
+        }
+      }
+    });
+  }
 
   function formatBMTimeRemaining(ms) {
     if (ms <= 0) return '00:00';
@@ -175,10 +284,10 @@
     var tbody = $('bm-orders-tbody');
     var cardsContainer = $('bm-orders-cards-container');
     if (tbody && !isBg && (!_bmOrdersState.orders || !_bmOrdersState.orders.length)) {
-      tbody.innerHTML = '<tr><td colspan="8" class="text-center py-6 text-muted">Memuat antrean pesanan cabang...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center py-6 text-muted">Memuat antrean pesanan...</td></tr>';
     }
     if (cardsContainer && !isBg && (!_bmOrdersState.orders || !_bmOrdersState.orders.length)) {
-      cardsContainer.innerHTML = '<div class="text-center py-6 text-muted">Memuat antrean pesanan cabang...</div>';
+      cardsContainer.innerHTML = '<div class="text-center py-6 text-muted">Memuat antrean pesanan...</div>';
     }
 
     var currentSeq = ++_bmOrdersState.fetchSeq;
@@ -197,38 +306,7 @@
       if (currentSeq !== _bmOrdersState.fetchSeq) return;
 
       if (res.ok && data.success && Array.isArray(data.orders)) {
-        var currentPendingOrders = data.orders.filter(function (o) { return o.status === 'pending'; });
-        var currentPendingIds = {};
-        currentPendingOrders.forEach(function (o) { currentPendingIds[o.id] = true; });
-
-        if (_bmOrdersState.seenPendingOrderIds !== null) {
-          var newlyAppeared = [];
-          currentPendingOrders.forEach(function (o) {
-            if (!_bmOrdersState.seenPendingOrderIds[o.id]) {
-              newlyAppeared.push(o.id);
-            }
-          });
-
-          if (newlyAppeared.length > 0) {
-            newlyAppeared.forEach(function (id) {
-              _bmOrdersState.newPendingOrderIds[id] = true;
-            });
-            playNewOrderAudibleChime();
-          }
-        } else {
-          // Initial snapshot boot: baseline established, do not sound alert on first page load
-          _bmOrdersState.newPendingOrderIds = {};
-        }
-
-        // Clean up attention for orders that are no longer pending
-        Object.keys(_bmOrdersState.newPendingOrderIds).forEach(function (id) {
-          if (!currentPendingIds[id]) {
-            delete _bmOrdersState.newPendingOrderIds[id];
-          }
-        });
-
-        // Store authoritative seen set
-        _bmOrdersState.seenPendingOrderIds = currentPendingIds;
+        checkAndNotifyNewPendingOrders(data.orders);
         _bmOrdersState.orders = data.orders;
 
         renderBMOrdersFeed();
@@ -490,10 +568,19 @@
     if (attentionBtn && $('bm-orders-attention-count')) $('bm-orders-attention-count').textContent = attentionCount;
     if (allBtn && $('bm-orders-all-count')) $('bm-orders-all-count').textContent = allCount;
 
+    // Synchronize bottom navigation badge with total actionable orders
+    var totalAttentionOrders = (_bmOrdersState.orders || []).filter(function (ord) {
+      var proj = getBMOrderProjection(ord);
+      return proj.attention || Number(ord.pending_additions_count || 0) > 0;
+    });
+    if (typeof updateMobileOrdersBadge === 'function') {
+      updateMobileOrdersBadge(totalAttentionOrders.length);
+    }
+
     if (!visible.length) {
-      var emptyTitle = _bmOrdersState.queueView === 'attention' ? 'Tidak ada yang perlu ditangani.' : 'Belum ada pesanan.';
+      var emptyTitle = _bmOrdersState.queueView === 'attention' ? 'Tidak ada pesanan menunggu.' : 'Belum ada pesanan.';
       var emptySub = _bmOrdersState.queueView === 'attention'
-        ? 'Semua antrean cabang aman untuk sekarang.'
+        ? 'Semua pesanan saat ini sudah ditangani.'
         : 'Pesanan baru akan muncul di sini.';
       container.innerHTML =
         '<div class="bm-order-empty">' +
@@ -536,24 +623,26 @@
 
       var primary = '';
       if (pendingAdditions > 0) {
-        primary = '<button type="button" class="bm-order-primary-action" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Tinjau tambahan +' + pendingAdditions + '</button>';
+        primary = '<button type="button" class="bm-order-primary-action" onclick="event.stopPropagation(); viewBMOrderDetail(\'' + esc(ord.id) + '\')">Tinjau tambahan +' + pendingAdditions + '</button>';
       } else if (p.actionType === 'accept') {
         if (type === 'reservation') {
-          primary = '<button type="button" class="bm-order-primary-action" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'pending\', \'reservation\', this)">Konfirmasi</button>';
+          primary = '<button type="button" class="bm-order-primary-action" onclick="event.stopPropagation(); advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'pending\', \'reservation\', this)">Konfirmasi</button>';
         } else {
-          primary = '<button type="button" class="bm-order-primary-action" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'pending\', \'' + esc(type) + '\', this)">Terima</button>';
+          primary = '<button type="button" class="bm-order-primary-action" onclick="event.stopPropagation(); advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'pending\', \'' + esc(type) + '\', this)">Terima</button>';
         }
       } else if (p.actionType === 'reservation_checkin') {
-        primary = '<button type="button" class="bm-order-primary-action" onclick="checkInBMReservation(\'' + esc(ord.id) + '\')">Check-in</button>';
+        primary = '<button type="button" class="bm-order-primary-action" onclick="event.stopPropagation(); checkInBMReservation(\'' + esc(ord.id) + '\')">Check-in</button>';
       } else if (p.actionType === 'advance') {
-        primary = '<button type="button" class="bm-order-primary-action" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'';
+        primary = '<button type="button" class="bm-order-primary-action" onclick="event.stopPropagation(); advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'';
         primary += esc(String(ord.status)) + '\', \'';
         primary += esc(type) + '\', this)">' + esc(p.actionLabel || 'Lanjutkan') + '</button>';
       }
 
-      var detail = '<button type="button" class="bm-order-detail-action" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Detail</button>';
+      var actionsHtml = primary
+        ? '<div class="bm-order-feed-actions">' + primary + '</div>'
+        : '';
 
-      return '<article class="bm-order-feed-card' + attentionClass + '" data-order-id="' + esc(ord.id) + '">' +
+      return '<article class="bm-order-feed-card' + attentionClass + '" data-order-id="' + esc(ord.id) + '" style="cursor:pointer;" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">' +
         '<div class="bm-order-feed-top">' +
           '<div class="bm-order-feed-context">' +
             '<span class="bm-order-type-pill ' + typeClass + '">' + esc(typeLabel) + '</span>' +
@@ -572,7 +661,7 @@
         '</div>' +
         renderBMOrderPaymentLine(ord) +
         (pendingAdditions > 0 ? '<div class="bm-order-addition-alert">+' + pendingAdditions + ' tambahan menunggu diterima</div>' : '') +
-        '<div class="bm-order-feed-actions">' + (primary || '') + detail + '</div>' +
+        actionsHtml +
       '</article>';
     }).join('');
   }
@@ -580,7 +669,7 @@
 
   async function advanceBMOrderStatus(orderId, currentStatus, fulfillmentType, btnEl) {
     if (currentStatus === 'pending') {
-      if (!confirm('Terima pesanan #' + orderId + '? Dapur akan mulai mempersiapkan pesanan.')) return;
+      if (!confirm('Terima pesanan #' + orderId + '?')) return;
       if (_bmOrdersState.inFlightAccept[orderId]) return;
       _bmOrdersState.inFlightAccept[orderId] = true;
 
@@ -594,11 +683,14 @@
         var res = await adminFetch(API_BASE + '/orders/' + encodeURIComponent(orderId) + '/branch-acceptance', {
           method: 'POST',
           headers: getAuthHeaders(),
-          body: JSON.stringify({ decision: 'accept', note: 'Diterima oleh Branch Manager' })
+          body: JSON.stringify({ decision: 'accept', note: 'Diterima oleh resto' })
         });
         var data = await res.json();
         if (res.ok && data.success) {
-          showToast('Pesanan berhasil diterima (CONFIRMED).');
+          if (window.XentraAudio && typeof window.XentraAudio.orderAccepted === 'function') {
+            window.XentraAudio.orderAccepted();
+          }
+          showToast('Pesanan diterima.');
           loadBMOrders();
           if (typeof loadHariIni === 'function') loadHariIni();
           var detailView = $('bm-orders-detail-view');
@@ -627,9 +719,6 @@
     }
 
     var isDelivery = (fulfillmentType === 'delivery');
-    // MVP: Branch Manager handles the full required operational order flow,
-    // including cooking stages. The same Core endpoint and state machine are
-    // reused; KDS remains an optional future add-on.
     var nextMap = {
       confirmed: 'preparing',
       preparing: 'ready',
@@ -642,7 +731,6 @@
       return;
     }
 
-    // In-flight / double-click protection for status updates
     _bmOrdersState.inFlightStatus = _bmOrdersState.inFlightStatus || {};
     if (_bmOrdersState.inFlightStatus[orderId]) return;
     _bmOrdersState.inFlightStatus[orderId] = true;
@@ -654,16 +742,14 @@
     }
 
     try {
-      // MVP uses this same Core endpoint for BM kitchen-stage actions and
-      // dispatch. Future KDS uses the same endpoint with its own role boundary.
       var patchRes = await adminFetch(API_BASE + '/kitchen/orders/' + encodeURIComponent(orderId) + '/status', {
         method: 'PATCH',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ status: nextStatus, note: 'Status diperbarui oleh Branch Manager' })
+        body: JSON.stringify({ status: nextStatus, note: 'Status diperbarui' })
       });
       var patchData = await patchRes.json();
       if (patchRes.ok && patchData.success) {
-        showToast('Status pesanan berhasil diubah menjadi ' + nextStatus.toUpperCase());
+        showToast('Status pesanan diperbarui.');
         loadBMOrders();
         if (typeof loadHariIni === 'function') loadHariIni();
         var detailView = $('bm-orders-detail-view');
@@ -714,15 +800,22 @@
     if (confirmBtn) confirmBtn.disabled = false;
 
     if (modal) modal.style.display = 'flex';
+    if (window.XentraNav && typeof window.XentraNav.push === 'function') {
+      window.XentraNav.push(function () { closeBMRejectModal({ fromNav: true }); }, 'modal-bm-reject-order');
+    }
     if (reasonInput) setTimeout(function () { reasonInput.focus(); }, 50);
   }
   window.openBMRejectModal = openBMRejectModal;
 
-  function closeBMRejectModal() {
+  function closeBMRejectModal(options) {
+    options = options || {};
     var modal = $('modal-bm-reject-order');
     if (modal) modal.style.display = 'none';
     var idInput = $('bm-reject-order-id');
     if (idInput) idInput.value = '';
+    if (!options.fromNav && window.XentraNav && window.XentraNav.hasOpen('modal-bm-reject-order')) {
+      window.XentraNav.pop('modal-bm-reject-order');
+    }
   }
   window.closeBMRejectModal = closeBMRejectModal;
 
@@ -875,13 +968,17 @@
   }
   window.noShowBMReservation = noShowBMReservation;
 
-  
-  async function viewBMOrderDetail(orderId) {
+  async function viewBMOrderDetail(orderId, options) {
+    options = options || {};
     _bmOrdersState.currentDetailOrderId = orderId;
     var listView = $('bm-orders-list-view');
     var detailView = $('bm-orders-detail-view');
     if (listView) listView.style.display = 'none';
     if (detailView) detailView.style.display = 'block';
+
+    if (!options.skipNav && window.XentraNav && typeof window.XentraNav.push === 'function') {
+      window.XentraNav.push(function () { closeBMOrderDetail({ fromNav: true }); }, 'order-detail');
+    }
 
     if (_bmOrdersState.detailCountdownTimer) {
       clearInterval(_bmOrdersState.detailCountdownTimer);
@@ -906,18 +1003,19 @@
 
       var ord = data.order;
       var ordType = getBMOrderType(ord);
+      var typeLabel = ordType === 'dine_in' ? 'Dine-in' : (ordType === 'pickup' ? 'Pickup' : (ordType === 'delivery' ? 'Delivery' : 'Reservasi'));
       if ($('bm-detail-order-number')) $('bm-detail-order-number').textContent = '#' + (ord.order_number || ord.id);
       if ($('bm-detail-status-badge')) {
         var detailStatusLabel = FulfillmentEnv && typeof FulfillmentEnv.getStatusLabel === 'function'
           ? FulfillmentEnv.getStatusLabel(ordType, ord.status)
           : String(ord.status || '').replace(/_/g, ' ');
-        $('bm-detail-status-badge').textContent = detailStatusLabel.toUpperCase();
+        $('bm-detail-status-badge').textContent = detailStatusLabel;
         $('bm-detail-status-badge').className = 'x-badge ' + (['completed', 'ready'].indexOf(ord.status) !== -1 ? 'x-badge-success' : (['rejected', 'cancelled', 'timeout', 'fulfillment_exception'].indexOf(ord.status) !== -1 ? 'x-badge-danger' : 'x-badge-warning'));
       }
       if ($('bm-detail-cust-name')) $('bm-detail-cust-name').textContent = ord.customer_name || 'Pelanggan';
       if ($('bm-detail-cust-phone')) $('bm-detail-cust-phone').textContent = ord.customer_phone || '—';
-      if ($('bm-detail-fulfillment-badge')) $('bm-detail-fulfillment-badge').textContent = ordType.toUpperCase();
-      if ($('bm-detail-order-time')) $('bm-detail-order-time').textContent = ord.created_at ? new Date(ord.created_at).toLocaleString('id-ID') : '—';
+      if ($('bm-detail-fulfillment-badge')) $('bm-detail-fulfillment-badge').textContent = typeLabel;
+      if ($('bm-detail-order-time')) $('bm-detail-order-time').textContent = ord.created_at ? new Date(ord.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '—';
       var reservationRow = $('bm-detail-reservation-row');
       if (reservationRow) {
         if (ordType === 'reservation') {
@@ -928,15 +1026,24 @@
           reservationRow.style.display = 'none';
         }
       }
-      if ($('bm-detail-order-notes')) $('bm-detail-order-notes').textContent = ord.notes || ord.order_notes || '—';
-
-      var tableRow = $('bm-detail-table-row');
-      if (tableRow) {
-        if (ord.table_number) {
-          tableRow.style.display = 'block';
-          if ($('bm-detail-table-number')) $('bm-detail-table-number').textContent = 'Meja ' + ord.table_number;
+      var notesCont = $('bm-detail-notes-container');
+      var noteVal = ord.notes || ord.order_notes;
+      if (notesCont) {
+        if (noteVal) {
+          notesCont.style.display = 'block';
+          if ($('bm-detail-order-notes')) $('bm-detail-order-notes').textContent = noteVal;
         } else {
-          tableRow.style.display = 'none';
+          notesCont.style.display = 'none';
+        }
+      }
+
+      var tableNumberEl = $('bm-detail-table-number');
+      if (tableNumberEl) {
+        if (ord.table_number) {
+          tableNumberEl.style.display = 'inline-block';
+          tableNumberEl.textContent = '• Meja ' + ord.table_number;
+        } else {
+          tableNumberEl.style.display = 'none';
         }
       }
 
@@ -944,9 +1051,15 @@
       if ($('bm-detail-calc-delivery')) $('bm-detail-calc-delivery').textContent = formatMoney(ord.delivery_fee || 0);
       if ($('bm-detail-calc-discount')) $('bm-detail-calc-discount').textContent = formatMoney(ord.discount_amount || 0);
       if ($('bm-detail-calc-grandtotal')) $('bm-detail-calc-grandtotal').textContent = formatMoney(ord.grand_total || 0);
-      if ($('bm-detail-pay-status')) $('bm-detail-pay-status').textContent = ((ord.payment_method || 'Tunai') + ' (' + (ord.payment_status || 'unpaid') + ')').toUpperCase();
+      var pay = getBMOrderPaymentState(ord);
+      var payMethod = (ord.payment_method || 'Tunai').toUpperCase();
+      var payStatusText = pay.key === 'paid' ? 'Lunas' : (pay.key === 'partial' ? 'Sebagian dibayar' : 'Belum dibayar');
+      if ($('bm-detail-pay-status')) {
+        $('bm-detail-pay-status').textContent = payMethod + ' · ' + payStatusText;
+        $('bm-detail-pay-status').style.color = pay.key === 'paid' ? '#16a34a' : (pay.key === 'partial' ? '#d97706' : '#dc2626');
+      }
 
-      // P8: Branch Acceptance Warning Banner & Countdown
+      // Branch Acceptance Countdown
       var acceptanceBanner = $('bm-detail-acceptance-banner');
       var countdownText = $('bm-detail-countdown-text');
 
@@ -955,7 +1068,7 @@
           acceptanceBanner.style.display = 'block';
 
           if (!ord.acceptance_deadline_at) {
-            if (countdownText) countdownText.textContent = 'Memeriksa status...';
+            if (countdownText) countdownText.textContent = '--:--';
             _bmOrdersState.detailCountdownTimer = setTimeout(function () {
               _bmOrdersState.detailCountdownTimer = null;
               viewBMOrderDetail(ord.id);
@@ -963,19 +1076,18 @@
           } else {
             var expiresAtMs = new Date(ord.acceptance_deadline_at).getTime();
             if (isNaN(expiresAtMs)) {
-              if (countdownText) countdownText.textContent = 'Deadline tidak tersedia';
+              if (countdownText) countdownText.textContent = '--:--';
             } else {
               var updateDetailCountdown = function () {
                 var diff = expiresAtMs - Date.now();
                 if (diff > 0) {
                   if (countdownText) countdownText.textContent = formatBMTimeRemaining(diff);
                 } else {
-                  if (countdownText) countdownText.textContent = 'Memeriksa status...';
+                  if (countdownText) countdownText.textContent = '00:00';
                   if (_bmOrdersState.detailCountdownTimer) {
                     clearInterval(_bmOrdersState.detailCountdownTimer);
                     _bmOrdersState.detailCountdownTimer = null;
                   }
-                  // Authoritative refresh from server; never mutate locally
                   viewBMOrderDetail(ord.id);
                 }
               };
@@ -989,101 +1101,111 @@
         }
       }
 
-      // Render items
-      var tbody = $('bm-detail-items-tbody');
-      if (tbody) {
+      // Render items list
+      var itemsContainer = $('bm-detail-items-container') || $('bm-detail-items-tbody');
+      if (itemsContainer) {
         var items = ord.items || [];
         if (!items.length) {
-          tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">Tidak ada item dalam pesanan ini.</td></tr>';
+          itemsContainer.innerHTML = '<div class="text-center py-4 text-muted" style="font-size:13px;">Tidak ada menu dalam pesanan ini.</div>';
         } else {
-          tbody.innerHTML = items.map(function (it) {
+          var itemsHtml = items.map(function (it, idx) {
             var sub = it.item_subtotal != null ? it.item_subtotal : ((it.unit_price || 0) * (it.quantity || 1));
-            return '<tr>' +
-              '<td><strong>' + esc(it.product_name || it.product_id) + '</strong></td>' +
-              '<td>' + formatMoney(it.unit_price || 0) + '</td>' +
-              '<td>' + (it.quantity || 1) + '</td>' +
-              '<td><small class="text-muted">' + esc(it.note || '—') + '</small></td>' +
-              '<td class="text-right"><strong>' + formatMoney(sub) + '</strong></td>' +
-            '</tr>';
+            var noteHtml = it.note ? '<div style="font-size:11.5px; color:#d97706; margin-top:2px;">Catatan: ' + esc(it.note) + '</div>' : '';
+            var borderStyle = (idx < items.length - 1) ? 'border-bottom:1px solid #f1f5f9;' : '';
+            return '<div style="display:flex; justify-content:space-between; align-items:flex-start; padding:8px 0; ' + borderStyle + '">' +
+              '<div style="min-width:0; flex:1; padding-right:12px;">' +
+                '<div style="display:flex; align-items:baseline; gap:6px;">' +
+                  '<span style="font-size:13.5px; font-weight:800; color:#15803d; min-width:22px;">' + (it.quantity || 1) + 'x</span>' +
+                  '<span style="font-size:13.5px; font-weight:700; color:var(--text-main);">' + esc(getBMOrderItemTitle(it)) + '</span>' +
+                '</div>' +
+                noteHtml +
+              '</div>' +
+              '<div style="text-align:right; flex-shrink:0;">' +
+                '<div style="font-size:13.5px; font-weight:700; color:var(--text-main);">' + formatMoney(sub) + '</div>' +
+                ((Number(it.quantity || 1) > 1) ? '<div style="font-size:11px; color:var(--text-muted);">@' + formatMoney(it.unit_price || 0) + '</div>' : '') +
+              '</div>' +
+            '</div>';
           }).join('');
+
+          // Pending Additional Orders
+          var pendingAdditions = (ord.additions || []).filter(function (addition) {
+            return addition.status === 'pending_acceptance';
+          });
+          if (pendingAdditions.length) {
+            var additionsHtml = pendingAdditions.map(function (addition) {
+              var header = '<div style="margin-top:10px; background:#fff7ed; border:1px solid #fed7aa; border-radius:10px; padding:10px 12px;">' +
+                '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">' +
+                  '<div><strong>Tambahan #' + esc(addition.sequence_no) + '</strong> <span class="x-badge x-badge-warning" style="font-size:10px;">MENUNGGU DITERIMA</span></div>' +
+                  '<div style="display:flex; gap:6px;">' +
+                    '<button type="button" class="x-btn-primary" style="font-size:11px; padding:4px 8px;" onclick="decideBMOrderAddition(\'' + esc(ord.id) + '\',\'' + esc(addition.id) + '\',\'accept\')">Terima</button>' +
+                    '<button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px; color:#dc2626; border-color:#fecaca;" onclick="decideBMOrderAddition(\'' + esc(ord.id) + '\',\'' + esc(addition.id) + '\',\'reject\')">Tolak</button>' +
+                  '</div>' +
+                '</div>';
+              var subItemsHtml = (addition.items || []).map(function (it) {
+                var sub = it.subtotal != null ? it.subtotal : ((it.unit_price || 0) * (it.quantity || 1));
+                var noteHtml = it.note ? '<div style="font-size:11px; color:#d97706;">Catatan: ' + esc(it.note) + '</div>' : '';
+                return '<div style="display:flex; justify-content:space-between; font-size:12.5px; padding:4px 0;">' +
+                  '<div>↳ ' + esc(it.name || it.product_name || it.product_id) + ' x' + (it.quantity || 1) + noteHtml + '</div>' +
+                  '<strong>' + formatMoney(sub) + '</strong>' +
+                '</div>';
+              }).join('');
+              return header + subItemsHtml + '</div>';
+            }).join('');
+            itemsHtml += additionsHtml;
+          }
+
+          itemsContainer.innerHTML = itemsHtml;
         }
       }
 
-      // Pending Additional Orders require their own explicit acceptance action.
-      var pendingAdditions = (ord.additions || []).filter(function (addition) {
-        return addition.status === 'pending_acceptance';
-      });
-      var tbodyAdditions = $('bm-detail-items-tbody');
-      if (tbodyAdditions && pendingAdditions.length) {
-        var currentItemsHtml = tbodyAdditions.innerHTML;
-        var additionsHtml = pendingAdditions.map(function (addition) {
-          var header = '<tr><td colspan="5" style="background:#fff7ed;border-top:2px solid #fed7aa;padding:10px 12px;">' +
-            '<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;">' +
-              '<div><strong>Tambahan #' + esc(addition.sequence_no) + '</strong> <span class="x-badge x-badge-warning">MENUNGGU DITERIMA</span>' +
-                '<small style="display:block;color:#6b7280;margin-top:3px;">' + esc(addition.source_channel || 'POS') + ' · ' + esc(addition.created_at || '') + '</small></div>' +
-              '<div style="display:flex;gap:6px;">' +
-                '<button type="button" class="x-btn-primary" style="font-size:11px;padding:5px 9px;" onclick="decideBMOrderAddition(\'' + esc(ord.id) + '\',\'' + esc(addition.id) + '\',\'accept\')">Terima</button>' +
-                '<button type="button" class="x-btn-secondary" style="font-size:11px;padding:5px 9px;color:#dc2626;border-color:#fecaca;" onclick="decideBMOrderAddition(\'' + esc(ord.id) + '\',\'' + esc(addition.id) + '\',\'reject\')">Tolak</button>' +
-              '</div>' +
-            '</div></td></tr>';
-          var itemsHtml = (addition.items || []).map(function (it) {
-            var sub = it.subtotal != null ? it.subtotal : ((it.unit_price || 0) * (it.quantity || 1));
-            return '<tr>' +
-              '<td><span style="padding-left:12px;">↳ ' + esc(it.name || it.product_name || it.product_id) + '</span></td>' +
-              '<td>' + formatMoney(it.unit_price || 0) + '</td>' +
-              '<td>' + (it.quantity || 1) + '</td>' +
-              '<td><small class="text-muted">' + esc(it.note || '—') + '</small></td>' +
-              '<td class="text-right"><strong>' + formatMoney(sub) + '</strong></td>' +
-            '</tr>';
-          }).join('');
-          return header + itemsHtml;
-        }).join('');
-        tbodyAdditions.innerHTML = currentItemsHtml + additionsHtml;
-      }
-
-      // Render audit logs
+      // Render status logs
       var logsList = $('bm-detail-logs-list');
       if (logsList) {
         var logs = ord.status_logs || [];
         if (!logs.length) {
-          logsList.innerHTML = '<span class="text-muted">Tidak ada catatan audit tambahan.</span>';
+          logsList.innerHTML = '<span class="text-muted">Belum ada riwayat status.</span>';
         } else {
           logsList.innerHTML = logs.map(function (l) {
-            var time = l.created_at ? new Date(l.created_at).toLocaleTimeString('id-ID') : '—';
-            return '<div style="background:#f8fafc; padding:8px 12px; border-radius:6px; border:1px solid #e2e8f0;">' +
-              '<div><strong>' + esc((l.previous_status || 'INIT') + ' ➔ ' + l.new_status) + '</strong> <small class="text-muted">(' + time + ')</small></div>' +
-              '<div style="color:var(--text-muted); margin-top:2px;">' + esc(l.note || 'Pembaruan status sistem') + '</div>' +
+            var time = l.created_at ? new Date(l.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '—';
+            return '<div style="background:#f8fafc; padding:8px 12px; border-radius:6px; border:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">' +
+              '<div><strong>' + esc(l.new_status) + '</strong>' + (l.note ? ' <span class="text-muted">· ' + esc(l.note) + '</span>' : '') + '</div>' +
+              '<small class="text-muted">' + time + '</small>' +
             '</div>';
           }).join('');
         }
       }
 
-      // Top action buttons in detail
+      // Action buttons in detail
       var topActions = $('bm-detail-actions-top');
       if (topActions) {
         if (ordType === 'reservation' && ord.status === 'confirmed') {
+          topActions.style.display = 'flex';
           topActions.innerHTML =
-            '<button type="button" class="x-btn-primary" style="font-size:13px; padding:6px 14px;" onclick="checkInBMReservation(\'' + esc(ord.id) + '\');">Check-in Reservasi</button>' +
-            '<button type="button" class="x-btn-secondary" style="font-size:13px; padding:6px 14px; color:#dc2626; border-color:#fecaca;" onclick="noShowBMReservation(\'' + esc(ord.id) + '\');">No-show</button>';
+            '<button type="button" class="x-btn-primary" style="flex:1; height:42px; font-size:13.5px; font-weight:700; justify-content:center;" onclick="checkInBMReservation(\'' + esc(ord.id) + '\');">Check-in</button>' +
+            '<button type="button" class="x-btn-secondary" style="height:42px; padding:0 16px; font-size:13.5px; color:#dc2626; border-color:#fecaca; justify-content:center;" onclick="noShowBMReservation(\'' + esc(ord.id) + '\');">No-show</button>';
         } else if (ord.status === 'pending') {
           var isAccepting = !!_bmOrdersState.inFlightAccept[ord.id];
+          topActions.style.display = 'flex';
           topActions.innerHTML =
-            '<button type="button" class="x-btn-primary" style="font-size:13px; padding:6px 14px;" ' + (isAccepting ? 'disabled' : '') + ' onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'pending\', \'' + esc(ordType) + '\', this);">Terima Pesanan</button>' +
-            '<button type="button" class="x-btn-secondary" style="font-size:13px; padding:6px 14px; color:#dc2626; border-color:#fecaca;" ' + (isAccepting ? 'disabled' : '') + ' onclick="rejectBMOrder(\'' + esc(ord.id) + '\');">Tolak Pesanan</button>';
+            '<button type="button" class="x-btn-primary" style="flex:1; height:42px; font-size:14px; font-weight:700; background:#16a34a; border-color:#16a34a; justify-content:center;" ' + (isAccepting ? 'disabled' : '') + ' onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'pending\', \'' + esc(ordType) + '\', this);">Terima</button>' +
+            '<button type="button" class="x-btn-secondary" style="height:42px; padding:0 18px; font-size:14px; font-weight:700; color:#dc2626; border-color:#fecaca; justify-content:center;" ' + (isAccepting ? 'disabled' : '') + ' onclick="rejectBMOrder(\'' + esc(ord.id) + '\');">Tolak</button>';
         } else if (ord.status === 'confirmed' || ord.status === 'preparing') {
           var detailKitchenLabel = ord.status === 'confirmed' ? 'Mulai Masak' : 'Tandai Siap';
+          topActions.style.display = 'flex';
           topActions.innerHTML =
-            '<button type="button" class="x-btn-primary" style="font-size:13px; padding:6px 14px;" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'' + esc(ord.status) + '\', \'' + esc(ordType) + '\', this);">' +
+            '<button type="button" class="x-btn-primary" style="width:100%; height:42px; font-size:14px; font-weight:700; justify-content:center;" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'' + esc(ord.status) + '\', \'' + esc(ordType) + '\', this);">' +
             detailKitchenLabel + '</button>';
         } else if (ord.status === 'ready') {
-          var label = (ordType === 'delivery') ? 'Kirim Pesanan ➔' : 'Selesaikan Pesanan ➔';
+          var label = (ordType === 'delivery') ? 'Kirim Pesanan' : 'Selesaikan';
+          topActions.style.display = 'flex';
           topActions.innerHTML =
-            '<button type="button" class="x-btn-primary" style="font-size:13px; padding:6px 14px;" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'ready\', \'' + esc(ordType) + '\', this);">' + label + '</button>';
+            '<button type="button" class="x-btn-primary" style="width:100%; height:42px; font-size:14px; font-weight:700; background:#16a34a; border-color:#16a34a; justify-content:center;" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'ready\', \'' + esc(ordType) + '\', this);">' + label + '</button>';
         } else if (ord.status === 'out_for_delivery') {
-          // Completion is recorded by the Driver lifecycle.
+          topActions.style.display = 'flex';
           topActions.innerHTML =
-            '<small class="text-muted" style="font-size:12.5px; font-weight:700;">Dalam pengantaran (kurir)</small>';
+            '<div style="width:100%; text-align:center; padding:10px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; font-size:13px; font-weight:700; color:#1d4ed8;">🚚 Sedang Diantar Kurir</div>';
         } else {
+          topActions.style.display = 'none';
           topActions.innerHTML = '';
         }
       }
@@ -1096,7 +1218,8 @@
   }
   window.viewBMOrderDetail = viewBMOrderDetail;
 
-  function closeBMOrderDetail() {
+  function closeBMOrderDetail(options) {
+    options = options || {};
     _bmOrdersState.currentDetailOrderId = null;
     if (_bmOrdersState.detailCountdownTimer) {
       clearInterval(_bmOrdersState.detailCountdownTimer);
@@ -1106,6 +1229,10 @@
     var detailView = $('bm-orders-detail-view');
     if (detailView) detailView.style.display = 'none';
     if (listView) listView.style.display = 'block';
+
+    if (!options.fromNav && window.XentraNav && window.XentraNav.hasOpen('order-detail')) {
+      window.XentraNav.pop('order-detail');
+    }
   }
   window.closeBMOrderDetail = closeBMOrderDetail;
 
@@ -1128,6 +1255,9 @@
       });
       var data = await res.json();
       if (res.ok && data.success) {
+        if (decision === 'accept' && window.XentraAudio && typeof window.XentraAudio.orderAccepted === 'function') {
+          window.XentraAudio.orderAccepted();
+        }
         showToast(decision === 'accept' ? 'Tambahan pesanan diterima.' : 'Tambahan pesanan ditolak.');
         loadBMOrders({ background: true });
         if (typeof loadHariIni === 'function') loadHariIni();

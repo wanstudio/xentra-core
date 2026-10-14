@@ -70,6 +70,24 @@ class OrderRepository {
     `, [branchId, clientTransactionId]);
   }
 
+  findRecentDuplicateOrder({ branchId, customerPhone, grandTotal, windowSeconds = 30 }) {
+    if (!branchId || !customerPhone || grandTotal == null) return null;
+    const cleanPhone = String(customerPhone).trim();
+    if (!cleanPhone) return null;
+    return this.db.queryOne(`
+      SELECT *
+      FROM orders
+      WHERE branch_id = ?
+        AND customer_phone = ?
+        AND grand_total = ?
+        AND status IN ('pending', 'confirmed')
+        AND created_at >= datetime('now', ?)
+      ORDER BY created_at DESC
+      LIMIT 1
+    `, [branchId, cleanPhone, grandTotal, `-${windowSeconds} seconds`]);
+  }
+
+
   findById(orderId) {
     return this.db.queryOne('SELECT * FROM orders WHERE id = ?', [orderId]);
   }

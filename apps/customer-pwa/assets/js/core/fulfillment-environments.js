@@ -58,7 +58,7 @@
         completed: 'Selesai diantar',
         rejected: 'Pesanan ditolak',
         cancelled: 'Pesanan dibatalkan',
-        timeout: 'Waktu penerimaan habis',
+        timeout: 'Waktu habis',
         fulfillment_exception: 'Perlu penanganan'
       },
       completion: { label: 'Selesai diantar', actor: 'driver' },
@@ -83,7 +83,7 @@
         completed: 'Sudah diambil',
         rejected: 'Pesanan ditolak',
         cancelled: 'Pesanan dibatalkan',
-        timeout: 'Waktu penerimaan habis',
+        timeout: 'Waktu habis',
         fulfillment_exception: 'Perlu penanganan'
       },
       completion: { label: 'Sudah diambil', actor: 'fulfillment_handoff' },
@@ -109,7 +109,7 @@
         active_table: 'Sedang makan',
         rejected: 'Pesanan ditolak',
         cancelled: 'Pesanan dibatalkan',
-        timeout: 'Waktu penerimaan habis',
+        timeout: 'Waktu habis',
         fulfillment_exception: 'Perlu penanganan'
       },
       completion: { label: 'Pesanan selesai', actor: 'dine_in_order_authority' },
@@ -130,7 +130,7 @@
         confirmed: 'Reservasi dikonfirmasi',
         cancelled: 'Reservasi dibatalkan',
         rejected: 'Reservasi ditolak',
-        timeout: 'Waktu penerimaan habis',
+        timeout: 'Waktu habis',
         active_table: 'Tamu sudah datang'
       },
       completion: { label: 'Handoff ke Dine-in', actor: 'branch_operational' },

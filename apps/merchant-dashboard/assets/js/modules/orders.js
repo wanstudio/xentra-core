@@ -337,12 +337,8 @@
   }
 
   window.rejectOrder = async function (orderId) {
-    var reason = null;
-    if (typeof window.requestTextInputSheet === 'function') {
-      reason = await window.requestTextInputSheet({ title: 'Tolak Pesanan', label: 'Alasan Penolakan', saveLabel: 'Tolak' });
-    } else {
-      reason = prompt('Alasan Penolakan:');
-    }
+    if (typeof window.requestTextInputSheet !== 'function') return;
+    var reason = await window.requestTextInputSheet({ title: 'Tolak Pesanan', label: 'Alasan Penolakan', saveLabel: 'Tolak' });
     if (reason === null) return;
     reason = reason.trim();
     if (!reason) {

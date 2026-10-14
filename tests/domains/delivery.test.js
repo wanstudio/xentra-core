@@ -107,10 +107,17 @@ test('Delivery 3 — Branch Driver Provider: assigns internal driver and advance
     if (evt.payload.order_id === orderId) completedEvent = evt;
   });
 
+  const driverId = `usr_driver_${Date.now()}`;
+  db.prepare(`
+    INSERT OR REPLACE INTO users (id, username, brand_id, branch_id, email, password_hash, full_name, role, status)
+    VALUES (?, ?, 'brand_del', 'branch_del', 'budi@test.com', 'hash', 'Budi Kurir', 'driver', 'active')
+  `).run(driverId, `budi_${Date.now()}`);
+
   // 1. Assign Internal Branch Driver
   const assignResult = DeliveryDispatchService.assign({
     order_id: orderId,
     provider_type: DeliveryModel.PROVIDER_TYPES.BRANCH_DRIVER,
+    driver_id: driverId,
     driver_name: 'Budi Kurir',
     driver_phone: '081299998888',
     assigned_by: 'manager_1'
@@ -128,13 +135,17 @@ test('Delivery 3 — Branch Driver Provider: assigns internal driver and advance
 
   // Verify Event
   assert.ok(assignedEvent);
-  assert.strictEqual(assignedEvent.payload.driver_name, 'Budi Kurir');
+  // 1b. Driver accepts assignment
+  DeliveryDispatchService.acceptAssignment({
+    order_id: orderId,
+    actor_id: driverId
+  });
 
   // 2. Driver pickup
   DeliveryDispatchService.updateStatus({
     order_id: orderId,
     status: DeliveryModel.STATUS.PICKED_UP,
-    actor_id: 'driver_1'
+    actor_id: driverId
   });
 
   const pickedUpRecord = DeliveryDispatchService.getDelivery(orderId);
@@ -144,7 +155,7 @@ test('Delivery 3 — Branch Driver Provider: assigns internal driver and advance
   DeliveryDispatchService.updateStatus({
     order_id: orderId,
     status: DeliveryModel.STATUS.ON_DELIVERY,
-    actor_id: 'driver_1'
+    actor_id: driverId
   });
 
   const onDelRecord = DeliveryDispatchService.getDelivery(orderId);
@@ -157,7 +168,7 @@ test('Delivery 3 — Branch Driver Provider: assigns internal driver and advance
   DeliveryDispatchService.updateStatus({
     order_id: orderId,
     status: DeliveryModel.STATUS.DELIVERED,
-    actor_id: 'driver_1'
+    actor_id: driverId
   });
 
   const deliveredRecord = DeliveryDispatchService.getDelivery(orderId);

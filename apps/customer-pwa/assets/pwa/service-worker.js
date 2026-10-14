@@ -7,6 +7,9 @@
  * Release 2026-10-04a: Menu presentation media (foto Menu milik Menu) + fix parser
  *   error di pages/home.js. Cache bubble WAJIB di-bump agar shell lama terbuang
  *   dan perbaikan/JS baru benar-benar sampai ke klien.
+ * Release 2026-10-13a: Fix syntax error in pages/home.js (missing closing brace on
+ *   renderCustomerSpiceIndicator) to resolve stuck loading in customer PWA.
+ * Release 2026-10-14a: Operational open/close branch guard in Customer PWA and POS.
  * When this file changes (new commit), the hash changes → new cache → old purged.
  * No hardcoded version strings. No external endpoints. No manual edits.
  *

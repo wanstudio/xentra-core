@@ -185,6 +185,8 @@
     });
     return true;
   }
+  window.openExistingCardInPresentation = openExistingCardInPresentation;
+  window.confirmFeatureAction = confirmFeatureAction;
 
   async function confirmFeatureAction(id, title, message, okLabel) {
     if (window.XentraPresentation && typeof window.XentraPresentation.confirm === 'function') {
@@ -535,8 +537,15 @@
     if (current === 'finance') return 'business';
     if (current.indexOf('finance/') === 0) return 'finance/overview';
 
-    if (current === 'marketing/promotions') return 'business';
-    if (current.indexOf('marketing/') === 0) return 'marketing/promotions';
+    if (current === 'marketing/promotions/new' || /^marketing\/promotions\/[^/]+\/edit$/.test(current)) {
+      return 'marketing/promotions';
+    }
+    if (current === 'marketing/banners/new' || /^marketing\/banners\/[^/]+\/edit$/.test(current)) {
+      return 'marketing/banners';
+    }
+    if (current === 'marketing' || current.indexOf('marketing/') === 0) {
+      return 'business';
+    }
 
     if (current === 'settings') return 'more';
     if (current.indexOf('settings/') === 0) return 'settings';
@@ -856,36 +865,48 @@
     document.querySelectorAll('.x-tab-content').forEach(function (section) {
       section.classList.toggle('active', section.id === 'tab-' + tabId);
     });
+    var mktHeader = $('marketing-main-header');
+    var mktSubnav = $('marketing-subnav-tabs');
+
     if (isMarketingEditor) {
+      if (mktHeader) mktHeader.style.display = 'none';
+      if (mktSubnav) mktSubnav.style.display = 'none';
       document.querySelectorAll('.x-marketing-subview').forEach(function (view) { view.style.display = 'none'; });
       var promoPage = $('marketing-promotion-editor-view');
       var bannerPage = $('marketing-banner-editor-view');
       if (promoPage) promoPage.style.display = marketingEditorType === 'promotion' ? 'block' : 'none';
       if (bannerPage) bannerPage.style.display = marketingEditorType === 'banner' ? 'block' : 'none';
     } else {
+      if (mktHeader) mktHeader.style.display = '';
+      if (mktSubnav) mktSubnav.style.display = '';
       var promoPage2 = $('marketing-promotion-editor-view');
       var bannerPage2 = $('marketing-banner-editor-view');
       if (promoPage2) promoPage2.style.display = 'none';
       if (bannerPage2) bannerPage2.style.display = 'none';
+      if (typeof unmountMarketingEditors === 'function') unmountMarketingEditors();
     }
 
     // 5. Update topbar title
     var titleEl = $('dash-page-title');
     var subEl = $('dash-page-subtitle');
-    if (titleEl) titleEl.textContent = isMasterMenuEditor
-      ? (masterMenuEditorId ? 'Edit Menu Master' : 'Tambah Menu Master')
-      : (isCategoryEditor
-        ? (categoryEditorId ? 'Edit Kategori' : 'Tambah Kategori')
-        : (isProductEditor
-          ? (productEditorId ? 'Edit Item' : 'Tambah Item')
-          : (isBranchEditor ? (branchEditorId ? 'Edit Cabang' : 'Tambah Cabang') : (isProductDetail ? 'Product Detail' : (isBranchDetail ? 'Branch Detail' : (isOrderDetail ? 'Order Detail' : (isCustomerDetail ? 'Customer Detail' : (isReportsRoute ? 'Reports' : meta.title))))))));
-    if (subEl) subEl.textContent = isMasterMenuEditor
-      ? 'Susun menu komersial brand yang dijual ke pelanggan'
-      : (isCategoryEditor
-        ? 'Pengelompokan utama menu komersial di storefront'
-        : (isProductEditor
-          ? 'Kelola Product atomic, SKU, media, dan status inventory'
-          : (isBranchEditor ? 'Kelola identitas, lokasi, kontak, dan aturan operasional cabang' : (isProductDetail ? 'Detail produk master dan status adopsi di cabang' : (isBranchDetail ? 'Detail informasi, operasional, menu, dan tim cabang' : (isOrderDetail ? 'Detail transaksi, rincian biaya, dan status pesanan' : (isCustomerDetail ? 'Profil pelanggan, riwayat pesanan, dan loyalitas' : (isReportsRoute ? 'Laporan penjualan, analitik bisnis, dan kinerja cabang' : meta.sub))))))));
+    if (titleEl) titleEl.textContent = isMarketingEditor
+      ? (marketingEditorType === 'banner' ? (marketingEditorId ? 'Edit Banner' : 'Tambah Banner') : (marketingEditorId ? 'Edit Promosi' : 'Buat Promosi Baru'))
+      : (isMasterMenuEditor
+        ? (masterMenuEditorId ? 'Edit Menu Master' : 'Tambah Menu Master')
+        : (isCategoryEditor
+          ? (categoryEditorId ? 'Edit Kategori' : 'Tambah Kategori')
+          : (isProductEditor
+            ? (productEditorId ? 'Edit Item' : 'Tambah Item')
+            : (isBranchEditor ? (branchEditorId ? 'Edit Cabang' : 'Tambah Cabang') : (isProductDetail ? 'Product Detail' : (isBranchDetail ? 'Branch Detail' : (isOrderDetail ? 'Order Detail' : (isCustomerDetail ? 'Customer Detail' : (isReportsRoute ? 'Reports' : meta.title)))))))));
+    if (subEl) subEl.textContent = isMarketingEditor
+      ? (marketingEditorType === 'banner' ? 'Atur konten, penempatan, jadwal, dan publikasi banner' : 'Atur program promosi, benefit pelanggan, dan tampilan promo')
+      : (isMasterMenuEditor
+        ? 'Susun menu komersial brand yang dijual ke pelanggan'
+        : (isCategoryEditor
+          ? 'Pengelompokan utama menu komersial di storefront'
+          : (isProductEditor
+            ? 'Kelola Product atomic, SKU, media, dan status inventory'
+            : (isBranchEditor ? 'Kelola identitas, lokasi, kontak, dan aturan operasional cabang' : (isProductDetail ? 'Detail produk master dan status adopsi di cabang' : (isBranchDetail ? 'Detail informasi, operasional, menu, dan tim cabang' : (isOrderDetail ? 'Detail transaksi, rincian biaya, dan status pesanan' : (isCustomerDetail ? 'Profil pelanggan, riwayat pesanan, dan loyalitas' : (isReportsRoute ? 'Laporan penjualan, analitik bisnis, dan kinerja cabang' : meta.sub)))))))));
 
     // 6. Sync Owner bottom nav active module (no-op on desktop, hidden by CSS)
     if (typeof syncOwnerBottomNavActive === 'function') {
@@ -1312,6 +1333,33 @@
     }
   }
 
+  function showProductListSection() {
+    if (window.XentraCatalogModule && window.XentraCatalogModule.showProductListSection) {
+      return window.XentraCatalogModule.showProductListSection();
+    }
+    if (typeof window.showProductListSection === 'function') {
+      return window.showProductListSection();
+    }
+  }
+
+  function showProductDetailSection() {
+    if (window.XentraCatalogModule && window.XentraCatalogModule.showProductDetailSection) {
+      return window.XentraCatalogModule.showProductDetailSection();
+    }
+    if (typeof window.showProductDetailSection === 'function') {
+      return window.showProductDetailSection();
+    }
+  }
+
+  function showProductEditorSection() {
+    if (window.XentraCatalogModule && window.XentraCatalogModule.showProductEditorSection) {
+      return window.XentraCatalogModule.showProductEditorSection();
+    }
+    if (typeof window.showProductEditorSection === 'function') {
+      return window.showProductEditorSection();
+    }
+  }
+
   var _masterReferenceTab = 'category';
   var _masterReferenceLoadSeq = 0;
   var _masterMenuComponents = { title: [], flavor: [], complement: [], level: [] };
@@ -1319,62 +1367,122 @@
   window._ownerMasterMenuState = _ownerMasterMenuState;
 
   function showCategoryEditorSection() {
+    if (window.XentraCatalogReference && window.XentraCatalogReference.showCategoryEditorSection) {
+      return window.XentraCatalogReference.showCategoryEditorSection();
+    }
     if (window.XentraCatalogModule && window.XentraCatalogModule.showCategoryEditorSection) {
       return window.XentraCatalogModule.showCategoryEditorSection();
+    }
+    if (typeof window.showCategoryEditorSection === 'function') {
+      return window.showCategoryEditorSection();
     }
   }
 
   function showMasterCategoriesPage() {
+    if (window.XentraCatalogReference && window.XentraCatalogReference.showMasterCategoriesPage) {
+      return window.XentraCatalogReference.showMasterCategoriesPage();
+    }
     if (window.XentraCatalogModule && window.XentraCatalogModule.showMasterCategoriesPage) {
       return window.XentraCatalogModule.showMasterCategoriesPage();
+    }
+    if (typeof window.showMasterCategoriesPage === 'function') {
+      return window.showMasterCategoriesPage();
     }
   }
 
   function setMasterReferenceTab(type) {
+    if (window.XentraCatalogReference && window.XentraCatalogReference.setMasterReferenceTab) {
+      return window.XentraCatalogReference.setMasterReferenceTab(type);
+    }
     if (window.XentraCatalogModule && window.XentraCatalogModule.setMasterReferenceTab) {
       return window.XentraCatalogModule.setMasterReferenceTab(type);
+    }
+    if (typeof window.setMasterReferenceTab === 'function') {
+      return window.setMasterReferenceTab(type);
     }
   }
 
   async function loadMasterCategoriesPage() {
+    if (window.XentraCatalogReference && window.XentraCatalogReference.loadMasterCategoriesPage) {
+      return window.XentraCatalogReference.loadMasterCategoriesPage();
+    }
     if (window.XentraCatalogModule && window.XentraCatalogModule.loadMasterCategoriesPage) {
       return window.XentraCatalogModule.loadMasterCategoriesPage();
+    }
+    if (typeof window.loadMasterCategoriesPage === 'function') {
+      return window.loadMasterCategoriesPage();
     }
   }
 
   function renderMasterItemsList() {
+    if (window.XentraCatalogReference && window.XentraCatalogReference.renderMasterItemsList) {
+      return window.XentraCatalogReference.renderMasterItemsList();
+    }
     if (window.XentraCatalogModule && window.XentraCatalogModule.renderMasterItemsList) {
       return window.XentraCatalogModule.renderMasterItemsList();
+    }
+    if (typeof window.renderMasterItemsList === 'function') {
+      return window.renderMasterItemsList();
     }
   }
 
   function renderMasterReferenceList(type) {
+    if (window.XentraCatalogReference && window.XentraCatalogReference.renderMasterReferenceList) {
+      return window.XentraCatalogReference.renderMasterReferenceList(type);
+    }
     if (window.XentraCatalogModule && window.XentraCatalogModule.renderMasterReferenceList) {
       return window.XentraCatalogModule.renderMasterReferenceList(type);
+    }
+    if (typeof window.renderMasterReferenceList === 'function') {
+      return window.renderMasterReferenceList(type);
     }
   }
 
   function renderMasterCategoriesPage() {
+    if (window.XentraCatalogReference && window.XentraCatalogReference.renderMasterCategoriesPage) {
+      return window.XentraCatalogReference.renderMasterCategoriesPage();
+    }
     if (window.XentraCatalogModule && window.XentraCatalogModule.renderMasterCategoriesPage) {
       return window.XentraCatalogModule.renderMasterCategoriesPage();
+    }
+    if (typeof window.renderMasterCategoriesPage === 'function') {
+      return window.renderMasterCategoriesPage();
     }
   }
 
   function renderMasterFlavorsPage() {
+    if (window.XentraCatalogReference && window.XentraCatalogReference.renderMasterFlavorsPage) {
+      return window.XentraCatalogReference.renderMasterFlavorsPage();
+    }
     if (window.XentraCatalogModule && window.XentraCatalogModule.renderMasterFlavorsPage) {
       return window.XentraCatalogModule.renderMasterFlavorsPage();
+    }
+    if (typeof window.renderMasterFlavorsPage === 'function') {
+      return window.renderMasterFlavorsPage();
     }
   }
 
   function openMasterReferenceQuickAdd(type) {
+    if (window.XentraCatalogReference && window.XentraCatalogReference.openMasterReferenceQuickAdd) {
+      return window.XentraCatalogReference.openMasterReferenceQuickAdd(type);
+    }
     if (window.XentraCatalogModule && window.XentraCatalogModule.openMasterReferenceQuickAdd) {
       return window.XentraCatalogModule.openMasterReferenceQuickAdd(type);
+    }
+    if (typeof window.openMasterReferenceQuickAdd === 'function') {
+      return window.openMasterReferenceQuickAdd(type);
     }
   }
 
   async function loadCategoryEditorPage(categoryId) {
+    if (window.XentraCatalogReference && window.XentraCatalogReference.loadCategoryEditorPage) {
+      return window.XentraCatalogReference.loadCategoryEditorPage(categoryId);
+    }
     if (window.XentraCatalogModule && window.XentraCatalogModule.loadCategoryEditorPage) {
       return window.XentraCatalogModule.loadCategoryEditorPage(categoryId);
+    }
+    if (typeof window.loadCategoryEditorPage === 'function') {
+      return window.loadCategoryEditorPage(categoryId);
     }
   }
 
@@ -1673,6 +1781,16 @@
     }
   }
 
+  function unmountMarketingEditors() {
+    if (typeof window.unmountPromotionEditorPage === 'function') {
+      window.unmountPromotionEditorPage();
+    }
+    if (typeof window.unmountMarketingBannerEditorPage === 'function') {
+      window.unmountMarketingBannerEditorPage();
+    }
+  }
+  window.unmountMarketingEditors = unmountMarketingEditors;
+
   // Wire shared branch-catalog hooks: the Owner surface supplies the branch list.
   if (window.XentraOwnerBranchCatalog) {
     window.XentraOwnerBranchCatalog.setHooks({
@@ -1701,9 +1819,30 @@
      OWNER MASTER MENU — CANONICAL COMMERCIAL MENU WORKSPACE
      Extracted to standalone module: assets/js/modules/master-menu.js
      ========================================================================= */
+  function showOwnerMasterMenuList() {
+    if (window.XentraMasterMenuModule && typeof window.XentraMasterMenuModule.showOwnerMasterMenuList === 'function') {
+      return window.XentraMasterMenuModule.showOwnerMasterMenuList();
+    }
+    if (typeof window.showOwnerMasterMenuList === 'function') {
+      return window.showOwnerMasterMenuList();
+    }
+  }
+
+  function showOwnerMasterMenuEditor() {
+    if (window.XentraMasterMenuModule && typeof window.XentraMasterMenuModule.showOwnerMasterMenuEditor === 'function') {
+      return window.XentraMasterMenuModule.showOwnerMasterMenuEditor();
+    }
+    if (typeof window.showOwnerMasterMenuEditor === 'function') {
+      return window.showOwnerMasterMenuEditor();
+    }
+  }
+
   async function loadOwnerMasterMenus() {
     if (window.XentraMasterMenuModule && window.XentraMasterMenuModule.loadOwnerMasterMenus) {
       return window.XentraMasterMenuModule.loadOwnerMasterMenus();
+    }
+    if (typeof window.loadOwnerMasterMenus === 'function') {
+      return window.loadOwnerMasterMenus();
     }
   }
 
@@ -1711,11 +1850,17 @@
     if (window.XentraMasterMenuModule && window.XentraMasterMenuModule.loadOwnerMasterMenuEditor) {
       return window.XentraMasterMenuModule.loadOwnerMasterMenuEditor(menuId);
     }
+    if (typeof window.loadOwnerMasterMenuEditor === 'function') {
+      return window.loadOwnerMasterMenuEditor(menuId);
+    }
   }
 
   function initOwnerMasterMenuUI() {
     if (window.XentraMasterMenuModule && window.XentraMasterMenuModule.initOwnerMasterMenuUI) {
       return window.XentraMasterMenuModule.initOwnerMasterMenuUI();
+    }
+    if (typeof window.initOwnerMasterMenuUI === 'function') {
+      return window.initOwnerMasterMenuUI();
     }
   }
 
@@ -1955,136 +2100,11 @@
   }
 
   /* =========================================================================
-     STANDARDIZED FLOATING DROPDOWN TEMPLATE ENGINE (Owner Context)
-     Converts native filter <select> into .x-floating-dropdown while keeping
-     underlying select fully synced with change events and form submissions.
+     STANDARDIZED FLOATING DROPDOWN (Delegated to /merchant-shared/js/dropdown.js)
      ========================================================================= */
-  function createFloatingDropdown(select, options) {
-    if (!select || select.dataset.floatingEnhanced === '1') return null;
-    options = options || {};
-
-    var wrapper = document.createElement('div');
-    wrapper.className = 'x-floating-dropdown' + (options.className ? ' ' + options.className : '');
-    if (options.style) {
-      wrapper.setAttribute('style', options.style);
-    }
-
-    var trigger = document.createElement('button');
-    trigger.type = 'button';
-    trigger.className = 'x-floating-dropdown-trigger';
-    trigger.setAttribute('aria-haspopup', 'listbox');
-    trigger.setAttribute('aria-expanded', 'false');
-    if (select.disabled) trigger.disabled = true;
-
-    var labelSpan = document.createElement('span');
-    labelSpan.className = 'x-floating-dropdown-label';
-
-    var chevronSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    chevronSvg.setAttribute('class', 'x-floating-dropdown-chevron');
-    chevronSvg.setAttribute('width', '13');
-    chevronSvg.setAttribute('height', '13');
-    chevronSvg.setAttribute('viewBox', '0 0 24 24');
-    chevronSvg.setAttribute('fill', 'none');
-    chevronSvg.setAttribute('stroke', 'currentColor');
-    chevronSvg.setAttribute('stroke-width', '2.2');
-    chevronSvg.innerHTML = '<polyline points="6 9 12 15 18 9"></polyline>';
-
-    trigger.appendChild(labelSpan);
-    trigger.appendChild(chevronSvg);
-
-    var menu = document.createElement('div');
-    menu.className = 'x-floating-dropdown-menu';
-    menu.setAttribute('role', 'listbox');
-
-    function syncItems() {
-      menu.innerHTML = '';
-      var currentVal = String(select.value);
-      var currentText = '';
-
-      Array.prototype.forEach.call(select.options, function (opt) {
-        var isCurrent = String(opt.value) === currentVal;
-        if (isCurrent || !currentText) {
-          currentText = opt.textContent;
-        }
-
-        var item = document.createElement('button');
-        item.type = 'button';
-        item.className = 'x-floating-dropdown-item' + (isCurrent ? ' active' : '');
-        item.setAttribute('role', 'option');
-        item.setAttribute('aria-selected', isCurrent ? 'true' : 'false');
-        item.dataset.value = opt.value;
-        if (opt.disabled) item.disabled = true;
-
-        item.innerHTML = '<span>' + esc(opt.textContent) + '</span>' +
-          '<svg class="x-floating-check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>';
-
-        item.addEventListener('click', function (e) {
-          e.stopPropagation();
-          if (item.disabled) return;
-          select.value = opt.value;
-          wrapper.classList.remove('open');
-          trigger.setAttribute('aria-expanded', 'false');
-          syncItems();
-          select.dispatchEvent(new Event('change', { bubbles: true }));
-        });
-
-        menu.appendChild(item);
-      });
-
-      labelSpan.textContent = currentText || 'Pilih opsi';
-      trigger.disabled = Boolean(select.disabled);
-    }
-
-    wrapper.appendChild(trigger);
-    wrapper.appendChild(menu);
-
-    // Sembunyikan select asli tanpa memutus nilainya
-    select.parentNode.insertBefore(wrapper, select);
-    select.style.position = 'absolute';
-    select.style.opacity = '0';
-    select.style.pointerEvents = 'none';
-    select.style.width = '1px';
-    select.style.height = '1px';
-    select.style.overflow = 'hidden';
-    select.setAttribute('tabindex', '-1');
-    select.dataset.floatingEnhanced = '1';
-
-    // Interaktivitas
-    trigger.addEventListener('click', function (e) {
-      e.stopPropagation();
-      if (trigger.disabled) return;
-      var isOpen = wrapper.classList.contains('open');
-      document.querySelectorAll('.x-floating-dropdown.open').forEach(function (el) {
-        if (el !== wrapper) {
-          el.classList.remove('open');
-          var tr = el.querySelector('.x-floating-dropdown-trigger');
-          if (tr) tr.setAttribute('aria-expanded', 'false');
-        }
-      });
-      wrapper.classList.toggle('open', !isOpen);
-      trigger.setAttribute('aria-expanded', !isOpen ? 'true' : 'false');
-    });
-
-    document.addEventListener('click', function (e) {
-      if (wrapper.classList.contains('open') && !wrapper.contains(e.target)) {
-        wrapper.classList.remove('open');
-        trigger.setAttribute('aria-expanded', 'false');
-      }
-    });
-
-    // Tangani perubahan programmatic select asli atau observer
-    select.addEventListener('change', syncItems);
-    if (typeof MutationObserver === 'function') {
-      var observer = new MutationObserver(syncItems);
-      observer.observe(select, { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled'] });
-    }
-
-    syncItems();
-    return { wrapper: wrapper, trigger: trigger, menu: menu, sync: syncItems };
-  }
-  window.createFloatingDropdown = createFloatingDropdown;
-
   function initOwnerFloatingDropdowns() {
+    var enhanceFn = window.createFloatingDropdown || (window.XentraDropdown && window.XentraDropdown.enhance);
+    if (typeof enhanceFn !== 'function') return;
     var targets = [
       'branch-filter-status',
       'mkt-banners-branch-filter'
@@ -2092,7 +2112,7 @@
 
     targets.forEach(function (id) {
       var sel = $(id);
-      if (sel) createFloatingDropdown(sel);
+      if (sel) enhanceFn(sel);
     });
   }
 

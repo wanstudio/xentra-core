@@ -14,11 +14,22 @@ This repository uses small, task-focused agent skills rather than one giant inst
 ## Commands
 
 ```bash
-npm test          # only verification step — no lint, no typecheck, no formatter
-npm start         # node server/app.js on port 3000
+npm test                                   # Full test suite (3000+ tests) — JANGAN dijalankan berulang kali!
+node --test tests/<targeted>.test.js       # Targeted test cepat (hanya untuk file relevan)
+npm start                                  # node server/app.js on port 3000
 ```
 
 Tests use Node's built-in test runner (`node --test`) with `--test-concurrency=1`. Pattern: `tests/*.test.js tests/**/*.test.js`. There is no ESLint, Prettier, TypeScript, or other static analysis.
+
+## Test Execution Discipline (Strict Rule)
+
+- **DILARANG KERAS** menjalankan `npm test` (full suite) berulang-ulang setiap saat atau setelah perubahan kecil.
+- **Jangan jalankan test jika hanya perubahan styling, CSS, layout visual, atau teks label minor** yang tidak mengubah logika bisnis atau API.
+- **Gunakan Targeted Test**: Jika memang harus memvalidasi regresi logika atau kontrak, **hanya jalankan file test yang relevan**:
+  ```bash
+  node --test tests/<spesifik-test>.test.js
+  ```
+- **Frekuensi Minim**: Uji coba hanya dilakukan di akhir pekerjaan saat fitur/perbaikan benar-benar sudah siap, bukan di setiap langkah debugging.
 
 ## Before coding
 

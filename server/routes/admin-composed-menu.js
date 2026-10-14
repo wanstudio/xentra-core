@@ -180,6 +180,7 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
       );
       const menu = service.createMenu({
         brandId: req.brand_id,
+        packageName: body.package_name !== undefined ? body.package_name : (body.title_name || undefined),
         categoryId: body.category_id,
         titleId: body.title_id,
         rasaId: body.rasa_id,
@@ -207,6 +208,7 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
       const menu = service.updateMenu({
         brandId: req.brand_id,
         menuId: req.params.id,
+        packageName: body.package_name !== undefined ? body.package_name : (body.title_name || undefined),
         categoryId: body.category_id,
         titleId: body.title_id,
         rasaId: body.rasa_id,

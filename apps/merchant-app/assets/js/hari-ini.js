@@ -36,7 +36,7 @@
     var branchId = user.branch_id;
     var headers = getAuthHeaders();
 
-    // Parallelize all dashboard operational queries in one concurrent network burst
+    // Parallelize dashboard operational queries in one concurrent network burst
     var results = await Promise.allSettled([
       // 0: Branch Details
       adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId), { headers: headers }),
@@ -49,9 +49,7 @@
       // 4: Branch Menus (availability)
       adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId) + "/menu", { headers: headers }),
       // 5: Promotions
-      adminFetch(API_BASE + "/admin/marketing/promotions", { headers: headers }),
-      // 6: Operational Activity Logs
-      adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId) + "/operation-logs?limit=5", { headers: headers })
+      adminFetch(API_BASE + "/admin/marketing/promotions", { headers: headers })
     ]);
 
     // 1. Process Branch Details
@@ -63,12 +61,12 @@
           var b = bData.branch;
 
           var nameEl = $("bm-home-branch-name");
-          if (nameEl) nameEl.textContent = b.name || ("Cabang " + branchId);
+          if (nameEl) nameEl.textContent = b.name || user.brand_name || 'Resto';
 
           var topbarBMBranchEl = $("dash-bm-branch-name");
-          if (topbarBMBranchEl) topbarBMBranchEl.textContent = b.name || ("Cabang " + branchId);
+          if (topbarBMBranchEl) topbarBMBranchEl.textContent = b.name || user.brand_name || 'Resto';
           var mobileTopbarBrandEl = $("topbar-brand-name");
-          if (mobileTopbarBrandEl) mobileTopbarBrandEl.textContent = b.name || ("Cabang " + branchId);
+          if (mobileTopbarBrandEl) mobileTopbarBrandEl.textContent = b.name || user.brand_name || 'Resto';
 
           var dotEl = $("bm-home-status-dot");
           var badgeEl = $("bm-home-status-badge");
@@ -83,14 +81,14 @@
           }
           if (badgeEl) {
             badgeEl.className = "x-badge " + (isOpen ? "x-badge-success" : "x-badge-danger");
-            badgeEl.textContent = isOpen ? "CABANG: BUKA" : "CABANG: TUTUP";
+            badgeEl.textContent = isOpen ? "RESTO BUKA" : "RESTO TUTUP";
           }
           if (onlineBadgeEl) {
             onlineBadgeEl.className = "x-badge " + (isDeliveryActive ? "x-badge-info" : "x-badge-warning");
-            onlineBadgeEl.textContent = isDeliveryActive ? "ONLINE: AKTIF" : "ONLINE: DIJEDA";
+            onlineBadgeEl.textContent = isDeliveryActive ? "ONLINE: AKTIF" : "ONLINE: JEDA";
           }
           if (toggleBtn) {
-            toggleBtn.innerHTML = isOpen ? "<span>Tutup Sementara</span>" : "<span>Buka Cabang</span>";
+            toggleBtn.innerHTML = isOpen ? "<span>Tutup Sementara</span>" : "<span>Buka Resto</span>";
             toggleBtn.className = isOpen ? "x-btn-secondary" : "x-btn-primary";
           }
 
@@ -139,6 +137,15 @@
           _hariIniState.orders = orders;
 
           var pendingList = orders.filter(function (o) { return o.status === "pending"; });
+          var actionableList = orders.filter(function (o) {
+            return o.status === "pending" || Number(o.pending_additions_count || 0) > 0;
+          });
+          if (typeof updateMobileOrdersBadge === "function") {
+            updateMobileOrdersBadge(actionableList.length);
+          }
+          if (typeof checkAndNotifyNewPendingOrders === "function") {
+            checkAndNotifyNewPendingOrders(orders);
+          }
           var activeList = orders.filter(function (o) { return ["confirmed", "preparing"].indexOf(o.status) !== -1; });
           var readyList = orders.filter(function (o) { return o.status === "ready"; });
 
@@ -226,27 +233,16 @@
         var promoData = await results[5].value.json();
         if (promoData.success && Array.isArray(promoData.promotions)) {
           var activePromos = promoData.promotions.filter(function (p) {
-            var active = (p.is_active === 1 || p.is_active === true || p.status === "active");
-            if (!active) return false;
-            if (!p.branch_id || p.branch_id === branchId) return true;
-            return false;
+            var isBrandActive = (p.is_active === 1 || p.is_active === true || p.status === "active");
+            var isBranchActive = p.branch_is_active !== undefined
+              ? (p.branch_is_active === 1 || p.branch_is_active === true)
+              : isBrandActive;
+            return isBrandActive && isBranchActive;
           });
           renderHariIniPromos(activePromos);
         }
       } catch (e) {
         console.warn("[BM Hari Ini Promos Parse Error]:", e);
-      }
-    }
-
-    // 6. Process Authoritative Recent Branch Operational Activity Logs
-    if (results[6].status === "fulfilled" && results[6].value && results[6].value.ok) {
-      try {
-        var logsData = await results[6].value.json();
-        if (logsData.success && Array.isArray(logsData.logs)) {
-          renderHariIniRecentActivity(logsData.logs);
-        }
-      } catch (e) {
-        console.warn("[BM Hari Ini Logs Parse Error]:", e);
       }
     }
 
@@ -259,66 +255,72 @@
     if (!container) return;
 
     if (!promos || !promos.length) {
-      container.innerHTML = "<div class=\"x-home-empty\"><strong>Belum ada promo aktif</strong>Promosi aktif cabang akan tampil di sini.</div>";
+      container.innerHTML = "<div class=\"x-home-empty\"><strong>Belum ada promo aktif</strong>Promosi aktif di restoran ini akan tampil di sini.</div>";
       return;
     }
 
     container.innerHTML = promos.slice(0, 3).map(function (p) {
-      var discountStr = p.discount_type === "percentage"
-        ? (p.discount_value + "%")
-        : formatMoney(p.discount_value);
+      var hasFreebie = Array.isArray(p.rewards) && p.rewards.some(function (r) {
+        return r.reward_type === 'freebie_product' || r.target_menu_title || r.target_product_name;
+      });
+      var firstReward = Array.isArray(p.rewards) && p.rewards[0];
+      var rewardMenuName = firstReward ? (firstReward.target_menu_title || firstReward.target_product_name || '') : '';
 
-      return "<div class=\"x-home-promo-item\">" +
-        "<span class=\"x-home-promo-icon\" aria-hidden=\"true\">%" + "</span>" +
-        "<span class=\"x-home-promo-copy\">" +
-          "<strong>" + esc(p.name || p.title || "Promo") + "</strong>" +
-          "<span>" + esc(p.description || "Promo aktif dapat digunakan pelanggan.") + "</span>" +
-        "</span>" +
-        "<span class=\"x-home-promo-badge\">" + esc(discountStr) + "</span>" +
-      "</div>";
+      var badgeText = '';
+      var iconSvg = '';
+
+      if (hasFreebie) {
+        badgeText = 'Menu Hadiah';
+        // Solid Gift icon
+        iconSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20 6h-2.18c.11-.31.18-.65.18-1 0-1.66-1.34-3-3-3-1.62 0-2.95 1.19-3 2.8L12 5.08 11.99 4.8C11.95 3.19 10.62 2 9 2 7.34 2 6 3.34 6 5c0 .35.07.69.18 1H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-5-2c.55 0 1 .45 1 1s-.45 1-1 1h-2.22l.14-.54C13.13 4.67 13.98 4 15 4zM9 4c1.02 0 1.87.67 2.08 1.46l.14.54H9c-.55 0-1-.45-1-1s.45-1 1-1zm11 15H4v-2h16v2zm0-5H4V8h16v6z"/></svg>';
+      } else if (p.discount_type === 'percentage' && p.discount_value) {
+        badgeText = 'Diskon ' + p.discount_value + '%';
+        // Solid Percent icon
+        iconSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M7.5 4C5.57 4 4 5.57 4 7.5S5.57 11 7.5 11 11 9.43 11 7.5 9.43 4 7.5 4zm0 5A2.5 2.5 0 0 1 5 7.5 2.5 2.5 0 0 1 7.5 5 2.5 2.5 0 0 1 10 7.5 2.5 2.5 0 0 1 7.5 9zm9 6c-1.93 0-3.5 1.57-3.5 3.5s1.57 3.5 3.5 3.5 3.5-1.57 3.5-3.5-1.57-3.5-3.5-3.5zm0 5a2.5 2.5 0 0 1-2.5-2.5 2.5 2.5 0 0 1 2.5-2.5 2.5 2.5 0 0 1 2.5 2.5 2.5 2.5 0 0 1-2.5 2.5zM19.07 4.93a1 1 0 0 0-1.41 0L4.93 17.66a1 1 0 1 0 1.41 1.41L19.07 6.34a1 1 0 0 0 0-1.41z"/></svg>';
+      } else if (p.discount_type === 'fixed' && p.discount_value) {
+        badgeText = 'Potongan ' + formatMoney(p.discount_value);
+        // Solid Tag icon
+        iconSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/></svg>';
+      } else if (p.code || p.promo_code) {
+        badgeText = 'Kode Promo';
+        iconSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/></svg>';
+      } else {
+        badgeText = 'Promo Aktif';
+        iconSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/></svg>';
+      }
+
+      var promoCopy = '';
+      if (rewardMenuName) {
+        promoCopy = 'Gratis 1x ' + esc(rewardMenuName);
+        if (p.capability_type === 'install_incentive') {
+          promoCopy += ' • Khusus order via aplikasi';
+        }
+      } else if (p.description) {
+        promoCopy = esc(p.description);
+      } else if (p.code || p.promo_code) {
+        promoCopy = 'Gunakan kode: ' + esc(p.code || p.promo_code);
+      } else {
+        promoCopy = 'Otomatis berlaku di keranjang pesanan';
+      }
+
+      return '<div class="x-home-promo-item" onclick="navigateTo(\'promo\')" style="cursor:pointer;" title="Klik untuk kelola promo">' +
+        '<span class="x-home-promo-icon" aria-hidden="true">' + iconSvg + '</span>' +
+        '<span class="x-home-promo-copy">' +
+          '<strong>' + esc(p.name || p.title || 'Promo') + '</strong>' +
+          '<span>' + promoCopy + '</span>' +
+        '</span>' +
+        '<span class="x-home-promo-badge">' + esc(badgeText) + '</span>' +
+      '</div>';
     }).join("");
   }
 
-  function renderHariIniRecentActivity(logs) {
+  function renderHariIniRecentActivity(orders) {
     var container = $("bm-recent-activity-list");
     if (!container) return;
-
-    if (!logs || !logs.length) {
-      container.innerHTML = "<div class=\"x-home-empty\"><strong>Belum ada aktivitas</strong>Perubahan operasional terbaru akan tampil di sini.</div>";
+    if (!orders || !orders.length) {
+      container.innerHTML = "<div class=\"x-home-empty\"><strong>Belum ada aktivitas</strong>Aktivitas terbaru akan muncul di sini.</div>";
       return;
     }
-
-    container.innerHTML = logs.slice(0, 4).map(function (l) {
-      var timeStr = l.created_at ? l.created_at.substring(11, 16) : "—";
-      var actionDesc = "";
-
-      if (l.field === "is_open_override") {
-        var isOpen = l.new_value === "1" || l.new_value === 1 || l.new_value === "true";
-        actionDesc = isOpen ? "Membuka operasional cabang" : "Menutup operasional cabang sementara";
-      } else if (l.field === "is_delivery_active") {
-        var isDel = l.new_value === "1" || l.new_value === 1 || l.new_value === "true";
-        actionDesc = isDel ? "Mengaktifkan pesanan online" : "Menjeda pesanan online";
-      } else if (l.field === "is_available") {
-        var isAvail = l.new_value === "1" || l.new_value === 1 || l.new_value === "true";
-        actionDesc = isAvail
-          ? "Mengaktifkan kembali menu"
-          : "Menandai menu tidak tersedia";
-      } else if (l.field) {
-        actionDesc = "Memperbarui operasional cabang";
-      } else {
-        actionDesc = "Aktivitas operasional cabang";
-      }
-
-      var actor = l.actor_name || "Staf cabang";
-      return "<div class=\"x-home-activity-item\">" +
-        "<span class=\"x-home-activity-icon\" aria-hidden=\"true\">•</span>" +
-        "<span class=\"x-home-activity-copy\">" +
-          "<strong>" + actionDesc + "</strong>" +
-          "<span>Oleh " + esc(actor) + "</span>" +
-        "</span>" +
-        "<span class=\"x-home-activity-time\">" + esc(timeStr) + "</span>" +
-      "</div>";
-    }).join("");
   }
 
   function renderHariIniPendingOrders(orders) {
@@ -394,17 +396,105 @@
     renderHariIniAttention(items, []);
   }
 
+  var _branchConfirmResolver = null;
+
+  function closeBranchStatusConfirmModal(confirmed) {
+    var modal = $('modal-branch-status-confirm');
+    if (modal) modal.style.display = 'none';
+    if (_branchConfirmResolver) {
+      var resolve = _branchConfirmResolver;
+      _branchConfirmResolver = null;
+      resolve(Boolean(confirmed));
+    }
+  }
+  window.closeBranchStatusConfirmModal = closeBranchStatusConfirmModal;
+
+  function showBranchStatusConfirm(options) {
+    return new Promise(function (resolve) {
+      _branchConfirmResolver = resolve;
+      var modal = $('modal-branch-status-confirm');
+      if (!modal) {
+        resolve(confirm(options.title + '\n\n' + options.desc));
+        return;
+      }
+
+      var iconWrap = $('branch-status-confirm-icon-wrap');
+      var titleEl = $('branch-status-confirm-title');
+      var descEl = $('branch-status-confirm-desc');
+      var badgeEl = $('branch-status-confirm-badge');
+      var submitBtn = $('btn-branch-status-confirm-submit');
+      var cancelBtn = $('btn-branch-status-confirm-cancel');
+
+      if (titleEl) titleEl.textContent = options.title || 'Konfirmasi';
+      if (descEl) descEl.textContent = options.desc || '';
+
+      if (iconWrap) {
+        iconWrap.style.background = options.iconBg || '#f1f5f9';
+        iconWrap.innerHTML = options.iconHtml || '⚠️';
+      }
+
+      if (badgeEl) {
+        if (options.badgeText) {
+          badgeEl.style.display = 'inline-flex';
+          badgeEl.style.background = options.badgeBg || '#f8fafc';
+          badgeEl.style.color = options.badgeColor || '#475569';
+          badgeEl.textContent = options.badgeText;
+        } else {
+          badgeEl.style.display = 'none';
+        }
+      }
+
+      if (submitBtn) {
+        submitBtn.textContent = options.submitText || 'Ya, Lanjutkan';
+        submitBtn.style.background = options.submitBg || '#0f172a';
+        submitBtn.style.color = '#ffffff';
+      }
+
+      if (cancelBtn) {
+        cancelBtn.textContent = options.cancelText || 'Batal';
+      }
+
+      modal.style.display = 'flex';
+    });
+  }
+
   async function toggleBranchOpen() {
     var user = getStoredUser();
     if (!user || !user.branch_id) return;
     var branch = _hariIniState.branch;
     var curOpen = branch ? (branch.is_open_override === 1 || branch.is_open_override === true) : true;
     var newOpen = curOpen ? 0 : 1;
-    var actionName = newOpen ? "Buka Cabang" : "Tutup Sementara";
 
-    if (!confirm("Apakah Anda yakin ingin melakukan " + actionName + " untuk operasional cabang?")) {
-      return;
+    var confirmed = false;
+    if (!newOpen) {
+      confirmed = await showBranchStatusConfirm({
+        title: 'Tutup Resto Sementara?',
+        desc: 'Resto akan ditandai tutup sementara. Pelanggan di Customer PWA dan kasir POS tidak dapat membuat pesanan baru sampai resto dibuka kembali.',
+        iconBg: '#ffe4e6',
+        iconHtml: '<svg width="30" height="30" viewBox="0 0 24 24" fill="#e11d48"><path d="M20 4H4v2h16V4zm1 10v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6h1zm-9 4H6v-4h6v4z"/></svg>',
+        badgeText: '🛑 Semua pesanan via Online & POS akan distop',
+        badgeBg: '#fff1f2',
+        badgeColor: '#be123c',
+        submitText: 'Ya, Tutup Resto',
+        submitBg: '#e11d48',
+        cancelText: 'Batal'
+      });
+    } else {
+      confirmed = await showBranchStatusConfirm({
+        title: 'Buka Operasional Resto?',
+        desc: 'Resto akan dibuka kembali untuk menerima pesanan dine-in, takeaway, dan pesanan online sesuai jadwal operasional.',
+        iconBg: '#dcfce7',
+        iconHtml: '<svg width="30" height="30" viewBox="0 0 24 24" fill="#16a34a"><path d="M20 4H4v2h16V4zm1 10v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6h1zm-9 4H6v-4h6v4z"/></svg>',
+        badgeText: '🟢 Resto aktif melayani pesanan kembali',
+        badgeBg: '#f0fdf4',
+        badgeColor: '#15803d',
+        submitText: 'Ya, Buka Resto',
+        submitBg: '#16a34a',
+        cancelText: 'Batal'
+      });
     }
+
+    if (!confirmed) return;
 
     try {
       var res = await adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(user.branch_id), {
@@ -414,8 +504,9 @@
       });
       var data = await res.json();
       if (res.ok && data.success) {
-        showToast("Status operasional cabang berhasil diubah menjadi " + (newOpen ? "BUKA" : "TUTUP"));
+        showToast("Status operasional berhasil diubah menjadi " + (newOpen ? "BUKA" : "TUTUP"));
         loadHariIni();
+        if (typeof loadBMJamOperasional === 'function') loadBMJamOperasional();
       } else {
         showToast("Gagal mengubah status: " + (data.error || "Terjadi kesalahan"));
       }
@@ -431,11 +522,37 @@
     var branch = _hariIniState.branch;
     var curDelivery = branch ? (branch.is_delivery_active !== 0 && branch.is_delivery_active !== false) : true;
     var newDelivery = curDelivery ? 0 : 1;
-    var actionName = newDelivery ? "Resume Order Online" : "Pause Order Online";
 
-    if (!confirm("Apakah Anda yakin ingin melakukan " + actionName + " untuk cabang ini?")) {
-      return;
+    var confirmed = false;
+    if (!newDelivery) {
+      confirmed = await showBranchStatusConfirm({
+        title: 'Jeda Pesanan Online?',
+        desc: 'Layanan order online / delivery akan dijeda sementara. Pelanggan di Customer PWA tidak bisa checkout, namun pesanan langsung di resto tetap berjalan.',
+        iconBg: '#ffedd5',
+        iconHtml: '<svg width="30" height="30" viewBox="0 0 24 24" fill="#ea580c"><path d="M19 7c0-1.1-.9-2-2-2h-3v2h3v2.65L13.52 14H10V9H6c-2.21 0-4 1.79-4 4v3h2c0 1.66 1.34 3 3 3s3-1.34 3-3h4c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-4-4zm-12 8c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm11 0c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"/></svg>',
+        badgeText: '⏸️ Order online dijeda, pesanan resto tetap jalan',
+        badgeBg: '#fff7ed',
+        badgeColor: '#c2410c',
+        submitText: 'Ya, Jeda Online',
+        submitBg: '#ea580c',
+        cancelText: 'Batal'
+      });
+    } else {
+      confirmed = await showBranchStatusConfirm({
+        title: 'Aktifkan Pesanan Online?',
+        desc: 'Layanan order online / delivery akan kembali aktif menerima pesanan dari pelanggan.',
+        iconBg: '#e0f2fe',
+        iconHtml: '<svg width="30" height="30" viewBox="0 0 24 24" fill="#0284c7"><path d="M19 7c0-1.1-.9-2-2-2h-3v2h3v2.65L13.52 14H10V9H6c-2.21 0-4 1.79-4 4v3h2c0 1.66 1.34 3 3 3s3-1.34 3-3h4c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-4-4zm-12 8c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm11 0c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"/></svg>',
+        badgeText: '🛵 Order online aktif melayani pelanggan',
+        badgeBg: '#f0f9ff',
+        badgeColor: '#0369a1',
+        submitText: 'Ya, Aktifkan Online',
+        submitBg: '#0284c7',
+        cancelText: 'Batal'
+      });
     }
+
+    if (!confirmed) return;
 
     try {
       var res = await adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(user.branch_id), {
@@ -445,7 +562,7 @@
       });
       var data = await res.json();
       if (res.ok && data.success) {
-        showToast("Layanan pesanan online cabang berhasil " + (newDelivery ? "DIAKTIFKAN" : "DIJEDA"));
+        showToast("Layanan pesanan online berhasil " + (newDelivery ? "DIAKTIFKAN" : "DIJEDA"));
         loadHariIni();
         if (typeof loadBMJamOperasional === 'function') loadBMJamOperasional();
       } else {

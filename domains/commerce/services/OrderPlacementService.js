@@ -79,13 +79,27 @@ function aggregateComposedRequirements(items) {
       const sku = component.sku == null ? '' : String(component.sku).trim();
       if (!sku) continue;
 
+      // BY_ORDER products (made-to-order kitchen items) are not stock-managed
+      // and do not participate in branch finished goods inventory deduction.
+      let fulfillmentType = component.fulfillment_type;
+      if (!fulfillmentType) {
+        const prod = inventoryRepository._findProductStockIdentity(productId);
+        if (prod && prod.fulfillment_type) {
+          fulfillmentType = prod.fulfillment_type;
+        }
+      }
+      if (String(fulfillmentType || '').toUpperCase() === 'BY_ORDER') {
+        continue;
+      }
+
       const key = productId;
       if (!requirements.has(key)) {
         requirements.set(key, {
           product_id: productId,
           product_name: component.product_name || productId,
           quantity: 0,
-          sku
+          sku,
+          fulfillment_type: fulfillmentType || 'BY_STOCK'
         });
       }
       requirements.get(key).quantity += menuQuantity * componentQuantity;
@@ -178,7 +192,7 @@ function deductComposedStock({
         );
       }
 
-      const currentStock = previousStock - requirement.quantity;
+      const currentStock = result && result.byOrder ? previousStock : (previousStock - requirement.quantity);
       inventoryRepository.insertSaleDeduction({
         id: 'mov_' + crypto.randomBytes(6).toString('hex'),
         branchId: order.branch_id,
@@ -348,6 +362,46 @@ class OrderPlacementService {
     const verifiedItems = verification.verified_items;
     const subtotal = verifiedItems.reduce((acc, it) => acc + it.subtotal, 0);
     const grandTotal = Math.max(0, subtotal + Number(delivery_fee || 0) - Number(discount_amount || 0));
+
+    // Semantic deduplication guard (30-second window):
+    // If the same customer phone places an identical grand_total order at the same branch within 30 seconds,
+    // verify if item composition matches to protect against duplicate checkout clicks or network replays.
+    if (customer && customer.phone && branch_id) {
+      const recentDuplicate = orderRepository.findRecentDuplicateOrder({
+        branchId: branch_id,
+        customerPhone: customer.phone,
+        grandTotal,
+        windowSeconds: 30
+      });
+      if (recentDuplicate) {
+        const existingItems = orderRepository.findItems(recentDuplicate.id) || [];
+        const isItemCountMatch = existingItems.length === verifiedItems.length;
+        if (isItemCountMatch) {
+          const matchAll = verifiedItems.every(vi => {
+            const viId = vi.menu_id ? String(vi.menu_id) : String(vi.product_id || vi.id);
+            return existingItems.some(ei => {
+              const eiId = ei.menu_id ? String(ei.menu_id) : String(ei.product_id);
+              return eiId === viId && Number(ei.quantity) === Number(vi.quantity);
+            });
+          });
+          if (matchAll) {
+            return {
+              success: true,
+              idempotent: true,
+              status: 'VERIFIED',
+              order_id: recentDuplicate.id,
+              order_number: recentDuplicate.order_number,
+              grand_total: recentDuplicate.grand_total,
+              subtotal: recentDuplicate.subtotal,
+              delivery_fee: recentDuplicate.delivery_fee,
+              discount_amount: recentDuplicate.discount_amount,
+              order: recentDuplicate
+            };
+          }
+        }
+      }
+    }
+
     const orderId = `ord_${crypto.randomBytes(6).toString('hex')}`;
     const now = new Date().toISOString();
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -431,7 +485,7 @@ class OrderPlacementService {
           if (!deductResult || deductResult.changes === 0) {
             throw new Error(`[CONCURRENCY_RACE] Stok untuk produk "${item.name}" baru saja habis atau tidak mencukupi.`);
           }
-          const currentStock = prevStock - Number(item.quantity);
+          const currentStock = deductResult && deductResult.byOrder ? prevStock : (prevStock - Number(item.quantity));
           inventoryRepository.insertSaleDeduction({
             id: `mov_${crypto.randomBytes(6).toString('hex')}`,
             branchId: branch_id,
@@ -671,7 +725,7 @@ class OrderPlacementService {
           throw new Error('[OUT_OF_STOCK_RACE] Stok untuk produk "' + (item.product_name || item.name || item.product_id) + '" tidak mencukupi untuk Additional Order (tersisa ' + prevStock + ', diminta ' + quantity + ').');
         }
 
-        const currentStock = prevStock - quantity;
+        const currentStock = deductResult && deductResult.byOrder ? prevStock : (prevStock - quantity);
         inventoryRepository.insertMovement({
           id: 'mov_' + crypto.randomBytes(6).toString('hex'),
           branchId: order.branch_id,
@@ -736,7 +790,7 @@ class OrderPlacementService {
           throw new Error(`[OUT_OF_STOCK_RACE] Stok untuk produk "${item.product_name || item.product_id}" tidak mencukupi saat pembayaran diselesaikan (tersisa ${prevStock}, diminta ${item.quantity}).`);
         }
 
-        const currentStock = prevStock - Number(item.quantity);
+        const currentStock = deductResult && deductResult.byOrder ? prevStock : (prevStock - Number(item.quantity));
         inventoryRepository.insertSaleDeduction({
           id: `mov_${crypto.randomBytes(6).toString('hex')}`,
           branchId: order.branch_id,

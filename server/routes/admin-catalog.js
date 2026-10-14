@@ -510,11 +510,45 @@ router.patch('/admin/products/:id/toggle', requireAuth(['owner', 'brand_manager'
 
 router.delete('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
-    const stmt = db.prepare('DELETE FROM products WHERE id = ? AND brand_id = ?').run(req.params.id, req.brand_id);
+    const prodId = req.params.id;
+    const existing = db.prepare('SELECT id, name FROM products WHERE id = ? AND brand_id = ?').get(prodId, req.brand_id);
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Product tidak ditemukan.' });
+    }
+
+    // Guard: Cek apakah Item sedang dipakai oleh Menu komersial
+    const menuUsages = db.prepare(`
+      SELECT m.id, COALESCE(m.package_name, mt.name, m.title_id) AS menu_title
+      FROM menu_items mi
+      JOIN menus m ON m.id = mi.menu_id
+      LEFT JOIN menu_titles mt ON mt.id = m.title_id
+      WHERE mi.product_id = ? AND m.brand_id = ?
+    `).all(prodId, req.brand_id);
+
+    if (menuUsages && menuUsages.length > 0) {
+      const menuNames = menuUsages.map(m => m.menu_title || m.id);
+      return res.status(409).json({
+        success: false,
+        error: 'PRODUCT_IN_USE_BY_MENU',
+        menus: menuNames,
+        message: `Item "${existing.name}" tidak dapat dihapus karena masih digunakan di ${menuUsages.length} Menu:\n• ` + menuNames.join('\n• ') + '\n\nKeluarkan item ini dari komposisi menu tersebut terlebih dahulu, atau hapus menunya agar item ter-release.'
+      });
+    }
+
+    // Bersihkan referensi dummy internal (stok, mutasi, inventory cabang, riwayat SKU) agar tidak terhalang foreign key
+    try { db.prepare('DELETE FROM branch_product_inventory WHERE product_id = ?').run(prodId); } catch (_) {}
+    try { db.prepare('DELETE FROM product_stock_balances WHERE product_id = ?').run(prodId); } catch (_) {}
+    try { db.prepare('DELETE FROM product_stock_movements WHERE product_id = ?').run(prodId); } catch (_) {}
+    try { db.prepare('DELETE FROM product_sku_history WHERE product_id = ?').run(prodId); } catch (_) {}
+    try { db.prepare('DELETE FROM production_items WHERE output_product_id = ?').run(prodId); } catch (_) {}
+    try { db.prepare('DELETE FROM product_stock WHERE product_id = ?').run(prodId); } catch (_) {}
+    try { db.prepare('DELETE FROM order_items WHERE product_id = ?').run(prodId); } catch (_) {}
+
+    const stmt = db.prepare('DELETE FROM products WHERE id = ? AND brand_id = ?').run(prodId, req.brand_id);
     if (!stmt || stmt.changes === 0) {
       return res.status(404).json({ success: false, error: 'Product tidak ditemukan.' });
     }
-    res.json({ success: true, message: 'Product berhasil dihapus.' });
+    res.json({ success: true, message: `Item "${existing.name}" berhasil dihapus permanen.` });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

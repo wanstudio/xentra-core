@@ -15,6 +15,7 @@ const audit = require('./audit');
 const domain = require('./domain');
 const data = require('./data');
 const media = require('./media');
+const NotificationService = require('./notification/NotificationService');
 
 module.exports = {
   events,
@@ -24,5 +25,6 @@ module.exports = {
   audit,
   domain,
   data,
-  media
+  media,
+  NotificationService
 };

@@ -423,6 +423,17 @@ class PosLocalOperationService {
             const sku = component.sku == null ? '' : String(component.sku).trim();
             if (!sku) continue;
 
+            let fulfillmentType = component.fulfillment_type;
+            if (!fulfillmentType) {
+              const prod = inventoryRepository._findProductStockIdentity(productId);
+              if (prod && prod.fulfillment_type) {
+                fulfillmentType = prod.fulfillment_type;
+              }
+            }
+            if (String(fulfillmentType || '').toUpperCase() === 'BY_ORDER') {
+              continue;
+            }
+
             const required = item.quantity * componentQty;
             if (!canonicalRequirements.has(productId)) {
               canonicalRequirements.set(productId, {
@@ -449,7 +460,7 @@ class PosLocalOperationService {
           throw new Error('[INSUFFICIENT_LOCAL_STOCK] Stok lokal produk ' + item.name + ' tidak mencukupi untuk penjualan offline.');
         }
 
-        const currentStock = prevStock - item.quantity;
+        const currentStock = deductResult && deductResult.byOrder ? prevStock : (prevStock - item.quantity);
         inventoryRepository.insertSaleDeduction({
           id: 'mov_' + crypto.randomBytes(6).toString('hex'),
           branchId: branch_id,
@@ -477,7 +488,7 @@ class PosLocalOperationService {
           throw new Error('[INSUFFICIENT_LOCAL_STOCK] Stok lokal komponen ' + requirement.product_name + ' tidak mencukupi untuk penjualan offline (tersisa ' + prevStock + ', diminta ' + requirement.quantity + ').');
         }
 
-        const currentStock = prevStock - requirement.quantity;
+        const currentStock = deductResult && deductResult.byOrder ? prevStock : (prevStock - requirement.quantity);
         inventoryRepository.insertSaleDeduction({
           id: 'mov_' + crypto.randomBytes(6).toString('hex'),
           branchId: branch_id,

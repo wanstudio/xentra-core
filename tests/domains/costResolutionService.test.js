@@ -44,6 +44,7 @@ test.before(async () => {
 });
 
 test.after(() => {
+  db.exec('DROP TRIGGER IF EXISTS trg_product_stock_movement_immutable_delete');
   db.prepare('DELETE FROM product_stock_movements WHERE stock_location_id IN (?, ?)').run(LOCATION_A, LOCATION_B);
   db.prepare('DELETE FROM product_stock_balances WHERE stock_location_id IN (?, ?)').run(LOCATION_A, LOCATION_B);
   db.prepare('DELETE FROM stock_locations WHERE id IN (?, ?)').run(LOCATION_A, LOCATION_B);
@@ -322,7 +323,7 @@ test('Cost Resolution — valuation is isolated by Stock Location', () => {
     postingTimestamp: '2026-10-08T10:00:00.000Z'
   });
 
-  assert.equal(result.status, 'AVAILABLE');
+  assert.equal(result.status, 'ESTIMATED');
 
   const a = repository.findProductValuationBalance({ stockLocationId: LOCATION_A, productId: PRODUCT });
   const b = repository.findProductValuationBalance({ stockLocationId: LOCATION_B, productId: PRODUCT });

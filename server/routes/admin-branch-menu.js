@@ -77,9 +77,16 @@ function registerAdminBranchMenuRoutes(router, deps = {}) {
           image_url: menu.image_url || '',
           menu_composition: menu,
           category_ids: cats.map(c => String(c.id)),
-          categories: cats
+          categories: cats,
+          master_category_id: menu.category_id || (menu.category && menu.category.id) || null,
+          master_category_name: (menu.category && menu.category.name) || menu.category_name || null,
+          master_category: menu.category || null
         });
       }
+
+      const masterCategories = db.prepare(
+        'SELECT id, brand_id, name, slug, sort_order, COALESCE(is_active, 1) AS is_active FROM categories WHERE brand_id = ? AND COALESCE(is_active, 1) = 1 ORDER BY sort_order ASC, name ASC'
+      ).all(req.brand_id);
 
       const adoptedMenus = adopted.map(enrichMenu);
       const availableMenus = availableMasterMenus.map(enrichMenu);
@@ -91,6 +98,7 @@ function registerAdminBranchMenuRoutes(router, deps = {}) {
         model: 'branch-menu-v1',
         branch,
         categories,
+        master_categories: masterCategories,
         adopted_menus: adoptedMenus,
         available_master_menus: availableMenus,
         adopted_products: adoptedMenus,

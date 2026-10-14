@@ -20,7 +20,7 @@ class ReportFilterModel {
     actor = null
   } = {}) {
     let effectiveBrandId = brand_id;
-    let effectiveBranchId = branch_id;
+    let effectiveBranchId = (branch_id && branch_id !== 'all' && branch_id.trim() !== '') ? branch_id.trim() : null;
 
     // P1 RBAC Boundary Guard: Unified with Xentra Core RoleModel
     if (actor) {

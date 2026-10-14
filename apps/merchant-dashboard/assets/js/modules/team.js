@@ -30,9 +30,23 @@
 
   function getStoredUser() {
     if (window.XentraShared && typeof window.XentraShared.getStoredUser === 'function') {
-      return window.XentraShared.getStoredUser();
+      var u = window.XentraShared.getStoredUser();
+      if (u) return u;
     }
-    return null;
+    if (window.XentraAuthModule && typeof window.XentraAuthModule.getStoredUser === 'function') {
+      var u = window.XentraAuthModule.getStoredUser();
+      if (u) return u;
+    }
+    if (typeof window.getStoredUser === 'function') {
+      var u = window.getStoredUser();
+      if (u) return u;
+    }
+    try {
+      var raw = localStorage.getItem('xentra_merchant_user');
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
+    }
   }
 
   async function confirmFeatureAction(id, title, message, okLabel) {
@@ -50,10 +64,29 @@
 
   function openExistingCardInPresentation(modalId, cardId, mode) {
     if (window.openExistingCardInPresentation) {
-      return window.openExistingCardInPresentation(modalId, cardId, mode);
+      var ok = window.openExistingCardInPresentation(modalId, cardId, mode);
+      if (ok) return true;
+    }
+    if (window.XentraPresentation && typeof window.XentraPresentation.open === 'function') {
+      var backdrop = $(modalId);
+      var card = backdrop ? backdrop.querySelector('.x-modal-card') : null;
+      if (card) {
+        window.XentraPresentation.open({
+          id: cardId,
+          type: mode || 'bottom-sheet',
+          content: card,
+          dismissible: true
+        });
+        return true;
+      }
     }
     var el = $(modalId);
-    if (el) el.style.display = 'block';
+    if (el) {
+      el.style.display = 'flex';
+      el.classList.add('open');
+      return true;
+    }
+    return false;
   }
 
   /* =========================================================================
@@ -219,12 +252,13 @@
     var roleSelect = $('user-role');
     roleSelect.innerHTML = '';
     var currentRole = getTimCurrentUserRole();
-    if (currentRole === 'owner') {
-      roleSelect.innerHTML = '<option value="brand_manager">Brand Manager</option><option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option><option value="purchasing">Petugas Belanja (Purchasing)</option>';
+    if (currentRole === 'branch_manager') {
+      roleSelect.innerHTML = '<option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option><option value="purchasing">Petugas Belanja (Purchasing)</option>';
     } else if (currentRole === 'brand_manager') {
       roleSelect.innerHTML = '<option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option><option value="purchasing">Petugas Belanja (Purchasing)</option>';
-    } else if (currentRole === 'branch_manager') {
-      roleSelect.innerHTML = '<option value="cashier">Kasir</option><option value="driver">Driver (Kurir)</option><option value="purchasing">Petugas Belanja (Purchasing)</option>';
+    } else {
+      // Default to owner permissions/roles
+      roleSelect.innerHTML = '<option value="brand_manager">Brand Manager</option><option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option><option value="purchasing">Petugas Belanja (Purchasing)</option>';
     }
 
     var branchSelect = $('user-branch');
@@ -261,12 +295,13 @@
     var roleSelect = $('user-role');
     roleSelect.innerHTML = '';
     var currentRole = getTimCurrentUserRole();
-    if (currentRole === 'owner') {
-      roleSelect.innerHTML = '<option value="brand_manager">Brand Manager</option><option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option><option value="purchasing">Petugas Belanja (Purchasing)</option>';
+    if (currentRole === 'branch_manager') {
+      roleSelect.innerHTML = '<option value="cashier">Kasir</option><option value="driver">Driver (Kurir)</option><option value="purchasing">Petugas Belanja (Purchasing)</option>';
     } else if (currentRole === 'brand_manager') {
       roleSelect.innerHTML = '<option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option><option value="purchasing">Petugas Belanja (Purchasing)</option>';
-    } else if (currentRole === 'branch_manager') {
-      roleSelect.innerHTML = '<option value="cashier">Kasir</option><option value="driver">Driver (Kurir)</option><option value="purchasing">Petugas Belanja (Purchasing)</option>';
+    } else {
+      // Default to owner permissions/roles
+      roleSelect.innerHTML = '<option value="brand_manager">Brand Manager</option><option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option><option value="purchasing">Petugas Belanja (Purchasing)</option>';
     }
     roleSelect.value = user.role;
 
@@ -293,8 +328,11 @@
   function closeUserModal() {
     if (window.XentraPresentation && window.XentraPresentation.isOpen('team-user-editor')) {
       window.XentraPresentation.close('team-user-editor');
-    } else {
-      $('modal-user').style.display = 'none';
+    }
+    var el = $('modal-user');
+    if (el) {
+      el.style.display = 'none';
+      el.classList.remove('open');
     }
   }
 
@@ -480,8 +518,11 @@
   function closeResetPasswordModal() {
     if (window.XentraPresentation && window.XentraPresentation.isOpen('team-reset-password')) {
       window.XentraPresentation.close('team-reset-password');
-    } else {
-      $('modal-reset-password').style.display = 'none';
+    }
+    var el = $('modal-reset-password');
+    if (el) {
+      el.style.display = 'none';
+      el.classList.remove('open');
     }
   }
 
@@ -591,12 +632,13 @@
     var roleSelect = $('invite-input-role');
     roleSelect.innerHTML = '';
     var currentRole = getTimCurrentUserRole();
-    if (currentRole === 'owner') {
-      roleSelect.innerHTML = '<option value="branch_manager">Branch Manager</option><option value="brand_manager">Brand Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option><option value="purchasing">Petugas Belanja (Purchasing)</option>';
+    if (currentRole === 'branch_manager') {
+      roleSelect.innerHTML = '<option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option><option value="purchasing">Petugas Belanja (Purchasing)</option>';
     } else if (currentRole === 'brand_manager') {
       roleSelect.innerHTML = '<option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option><option value="purchasing">Petugas Belanja (Purchasing)</option>';
-    } else if (currentRole === 'branch_manager') {
-      roleSelect.innerHTML = '<option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option><option value="purchasing">Petugas Belanja (Purchasing)</option>';
+    } else {
+      // Default to owner permissions/roles
+      roleSelect.innerHTML = '<option value="branch_manager">Branch Manager</option><option value="brand_manager">Brand Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option><option value="driver">Driver (Kurir)</option><option value="purchasing">Petugas Belanja (Purchasing)</option>';
     }
 
     var branchSelect = $('invite-input-branch');
@@ -622,8 +664,11 @@
   function closeInviteUserModal() {
     if (window.XentraPresentation && window.XentraPresentation.isOpen('team-invite-editor')) {
       window.XentraPresentation.close('team-invite-editor');
-    } else {
-      $('modal-invite-user').style.display = 'none';
+    }
+    var el = $('modal-invite-user');
+    if (el) {
+      el.style.display = 'none';
+      el.classList.remove('open');
     }
   }
 

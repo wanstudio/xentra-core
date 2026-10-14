@@ -68,6 +68,7 @@
     isSubmitting: false,
     isRedirectingToPayment: false,
     openBillLoaded: false,
+    checkoutClientTransactionId: null,
     additionalClientTransactionId: null
   };
 
@@ -229,7 +230,9 @@
     if (!API) return Promise.resolve(promoEvaluation);
     var isPwa = checkIsPwaInstalled();
     var phone = state.customer.phone || '';
-    return API.get('/promotions/active?is_pwa=' + (isPwa ? '1' : '0') + '&phone=' + encodeURIComponent(phone))
+    var bId = (state.matchedBranch && state.matchedBranch.id) || (currentBranchId && currentBranchId !== '__unassigned__' ? currentBranchId : (state.branch && state.branch.id) || null);
+    var branchQuery = bId ? '&branch_id=' + encodeURIComponent(bId) : '';
+    return API.get('/promotions/active?is_pwa=' + (isPwa ? '1' : '0') + '&phone=' + encodeURIComponent(phone) + branchQuery)
       .then(function (res) {
         if (res && res.success) {
           promoEvaluation = {
@@ -830,6 +833,40 @@
     }
   }
 
+  function isBranchClosed(b) {
+    if (!b) return false;
+    if (b.is_open_override === 0 || b.is_open_override === false) return true;
+    if (b.is_open === false) return true;
+    return false;
+  }
+
+  function isCurrentBranchClosed() {
+    var cur = state.matchedBranch || (availableBranches && availableBranches.find(function (b) { return String(b.id) === String(currentBranchId); })) || (availableBranches && availableBranches[0]);
+    return isBranchClosed(cur);
+  }
+
+  function syncClosedBranchState() {
+    var isClosed = isCurrentBranchClosed();
+    var banner = $('x-checkout-closed-banner');
+    if (banner) {
+      banner.style.display = isClosed ? 'flex' : 'none';
+    }
+    var btn = $('x-btn-submit-order');
+    if (btn) {
+      if (isClosed) {
+        btn.disabled = true;
+        btn.textContent = 'Resto Sedang Tutup';
+        btn.style.opacity = '0.6';
+        btn.style.cursor = 'not-allowed';
+      } else if (!state.isSubmitting) {
+        btn.disabled = false;
+        btn.textContent = submitCtaLabel(state.fulfillment.type === 'reservation');
+        btn.style.opacity = '1';
+        btn.style.cursor = 'pointer';
+      }
+    }
+  }
+
   function loadBranches() {
     if (!API) return;
     API.get('/brand/branches').then(function (res) {
@@ -865,6 +902,7 @@
             }
           }
         }
+        syncClosedBranchState();
       }
       // Branch list resolved -> the Checkout fulfillment Branch is now known
       // (may have been unresolved at the initial mount): scope the upsell rail.
@@ -1104,6 +1142,12 @@
       // 1. Header
       '  <div class="x-alt-header"><button type="button" id="x-checkout-back" class="x-alt-back" aria-label="Kembali"><img src="/assets/icons/arrowback.svg" alt=""></button><span>Checkout Bangjo</span></div>' +
 
+      // 1.5 Closed Branch Warning Banner
+      '  <div id="x-checkout-closed-banner" style="display:' + (isCurrentBranchClosed() ? 'flex' : 'none') + ';margin:0 14px 10px;padding:12px 14px;background:#fff1f2;border:1px solid #fecdd3;border-radius:14px;align-items:center;gap:10px;color:#9f1239;">' +
+      '    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#e11d48" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>' +
+      '    <div style="display:flex;flex-direction:column;gap:2px;"><strong style="font-size:13px;font-weight:700;">Resto Sedang Tutup</strong><span style="font-size:11.5px;color:#be123c;">Cabang ini sedang tidak menerima pesanan baru saat ini.</span></div>' +
+      '  </div>' +
+
       // 2. Dynamic Promo Presentation (Slot for zero-blink targeted updates)
       '  <div id="x-promo-slot">' + getPromoBannerHtml(items) + '</div>' +
 
@@ -1308,6 +1352,7 @@
   }
 
   function submitCtaLabel(isReservation) {
+    if (isCurrentBranchClosed()) return 'Resto Sedang Tutup';
     if (isReservation) return 'Reservasi';
     if (isPayAtCashier()) return 'Bayar nanti di kasir';
     if (isOnlinePayment(state.paymentMethod)) return 'Bayar sekarang';
@@ -1359,6 +1404,11 @@
     if (Array.isArray(data.menus)) {
       data.menus.forEach(function (menu) {
         if (!menu || !(menu.menu_id || menu.id)) return;
+        if (menu.is_available === false || menu.availability === false || Boolean(menu.blocking_reason)) return;
+        if (menu.branch_is_available === false || menu.branch_menu_is_available === false) return;
+        if (menu.inventory && (menu.inventory.stock_available === false || Boolean(menu.inventory.blocking_reason))) return;
+        if (menu.inventory && menu.inventory.stock_managed && menu.inventory.available_quantity != null && menu.inventory.available_quantity <= 0) return;
+
         var components = Array.isArray(menu.components) ? menu.components : [];
         var first = components.length === 1 ? components[0] : null;
         list.push(Object.assign({}, menu, {
@@ -1792,7 +1842,21 @@
       };
     }
 
-    var submit = $('x-btn-submit-order'); if (submit) submit.onclick = executePrePaymentAndSubmit;
+    var submit = $('x-btn-submit-order');
+    if (submit) {
+      if (isCurrentBranchClosed()) {
+        submit.disabled = true;
+        submit.style.opacity = '0.6';
+        submit.style.cursor = 'not-allowed';
+      }
+      submit.onclick = function () {
+        if (isCurrentBranchClosed()) {
+          if (UI && UI.toast) UI.toast('Maaf, resto sedang tutup sementara.');
+          return;
+        }
+        executePrePaymentAndSubmit();
+      };
+    }
 
     checkoutContainer.querySelectorAll('[data-note-item]').forEach(function (btn) {
       btn.onclick = function () { openItemNoteSheet(btn.dataset.noteItem, btn.dataset.noteBranch !== undefined ? btn.dataset.noteBranch : currentBranchId); };
@@ -4066,15 +4130,68 @@
         '</div>';
     });
 
+    var isOutOfStock = verificationData.status === 'OUT_OF_STOCK' || errors.some(function (e) {
+      return /out_of_stock|stok.*habis|stok.*tidak mencukupi/i.test(String(e));
+    });
+
+    var outOfStockItemIds = [];
+    if (Array.isArray(verificationData.out_of_stock_items) && verificationData.out_of_stock_items.length > 0) {
+      verificationData.out_of_stock_items.forEach(function (osi) {
+        if (Array.isArray(osi.menu_ids)) {
+          osi.menu_ids.forEach(function (mid) { if (mid) outOfStockItemIds.push(String(mid)); });
+        }
+        if (osi.product_id) outOfStockItemIds.push(String(osi.product_id));
+      });
+    }
+
+    var cleanErrors = errors.map(function (e) {
+      var str = String(e || '');
+      // Format raw OUT_OF_STOCK:prod_xxx:available=0:required=1
+      var oosMatch = str.match(/^OUT_OF_STOCK:([^:]+)(?::available=(\d+))?(?::required=(\d+))?/i);
+      if (oosMatch) {
+        var rawId = oosMatch[1];
+        outOfStockItemIds.push(rawId);
+        var avail = Number(oosMatch[2] || 0);
+        var req = Number(oosMatch[3] || 1);
+        var foundCartItem = (Store.getState().cart.items || []).find(function (it) {
+          return String(it.id) === rawId || String(it.product_id) === rawId || String(it.menu_id) === rawId;
+        });
+        var menuName = foundCartItem ? foundCartItem.name : 'Menu';
+        if (avail <= 0) {
+          return 'Stok untuk menu "' + menuName + '" saat ini habis di cabang ini.';
+        }
+        return 'Stok untuk menu "' + menuName + '" tidak mencukupi (Tersedia: ' + avail + ', Diminta: ' + req + ').';
+      }
+
+      // If string contains (cmc_product_a) or (prod_...) at end, collect ID and clean up
+      var idMatch = str.match(/\(([a-zA-Z0-9_\-]+)\)$/);
+      if (idMatch) {
+        outOfStockItemIds.push(idMatch[1]);
+        str = str.replace(/\s*\([a-zA-Z0-9_\-]+\)$/, '');
+      }
+
+      str = str.replace(/\[OUT_OF_STOCK_RACE\]\s*/gi, '');
+      return str;
+    });
+
+    if (outOfStockItemIds.length === 0 && isOutOfStock) {
+      (Store.getState().cart.items || []).forEach(function (ci) {
+        var ciName = ci.name || '';
+        if (ciName && errors.some(function (err) { return String(err).indexOf(ciName) !== -1; })) {
+          outOfStockItemIds.push(String(ci.id));
+        }
+      });
+    }
+
     var errHtml = '';
-    errors.forEach(function (e) {
+    cleanErrors.forEach(function (e) {
       errHtml += '<div style="color:#dc2626;font-size:12px;margin-top:4px;">• ' + UI.escape(e) + '</div>';
     });
 
     // Detect if verification error is related to reward unavailability
     var isRewardError = errors.some(function (e) {
       var s = String(e).toLowerCase();
-      return s.indexOf('hadiah') !== -1 || s.indexOf('promo') !== -1 || s.indexOf('reward') !== -1 || s.indexOf('stok') !== -1;
+      return s.indexOf('hadiah') !== -1 || s.indexOf('promo') !== -1 || s.indexOf('reward') !== -1;
     });
 
     var hasRewardInCart = (Store.getState().cart.items || []).some(function (it) {
@@ -4093,17 +4210,31 @@
       return mentioned && !installed;
     })();
 
-    // Single helper: strip invalid reward lines from the LIVE cart.
-    // NOTE: Store.getState() returns a detached deep clone — mutating it (and
-    // mirroring to localStorage) does NOT touch the live cart, so the reward
-    // would be re-submitted, re-rejected, and the sheet would reopen forever.
-    // Removal must go through Store.setQty (live state + notify + persist).
+    // Helper: strip invalid reward lines from the LIVE cart.
     function stripRewardFromCart() {
       var liveItems = [];
       try { liveItems = (Store.getState().cart.items || []).slice(); } catch (_) {}
       liveItems.forEach(function (it) {
         if (it && (it.is_promo_reward || it.promotion_id || String(it.id).indexOf('reward_') === 0)) {
           try { Store.setQty(it.id, 0); } catch (_) {}
+        }
+      });
+    }
+
+    // Helper: strip out of stock items from the LIVE cart
+    function stripOutOfStockFromCart() {
+      var liveItems = [];
+      try { liveItems = (Store.getState().cart.items || []).slice(); } catch (_) {}
+      liveItems.forEach(function (it) {
+        if (!it) return;
+        var itId = String(it.id);
+        var itProdId = String(it.product_id || '');
+        var itMenuId = String(it.menu_id || '');
+        var isMatch = outOfStockItemIds.some(function (oid) {
+          return oid === itId || oid === itProdId || oid === itMenuId;
+        });
+        if (isMatch) {
+          try { Store.setQty(it.id, 0, currentBranchId); } catch (_) {}
         }
       });
     }
@@ -4115,13 +4246,19 @@
       titleHtml = 'Hadiah khusus pengguna aplikasi';
       descHtml = 'Hadiah promo ini hanya berlaku jika aplikasi sudah ter-install di perangkatmu. Install dulu, hadiah otomatis bisa diklaim.';
       acceptLabel = 'Install Aplikasi';
+    } else if (isOutOfStock) {
+      titleHtml = 'Stok Menu Tidak Mencukupi';
+      descHtml = 'Restoran baru saja memperbarui ketersediaan menu. Menu yang habis perlu disesuaikan.';
+      acceptLabel = 'Hapus Menu Habis &amp; Lanjutkan';
     }
 
-    var removeRewardBtnHtml = '';
+    var secondaryBtnHtml = '';
     if (isRewardError && hasRewardInCart && !isInstallGated) {
-      removeRewardBtnHtml = '<button type="button" class="x-alt-submit-btn" id="x-btn-remove-reward-continue" style="margin-top:8px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;">Lanjut Tanpa Hadiah Promo</button>';
+      secondaryBtnHtml = '<button type="button" class="x-alt-submit-btn" id="x-btn-secondary-action" style="margin-top:8px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;">Lanjut Tanpa Hadiah Promo</button>';
     } else if (isInstallGated) {
-      removeRewardBtnHtml = '<button type="button" class="x-alt-submit-btn" id="x-btn-remove-reward-continue" style="margin-top:8px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;">Lanjut Tanpa Hadiah</button>';
+      secondaryBtnHtml = '<button type="button" class="x-alt-submit-btn" id="x-btn-secondary-action" style="margin-top:8px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;">Lanjut Tanpa Hadiah</button>';
+    } else if (isOutOfStock) {
+      secondaryBtnHtml = '<button type="button" class="x-alt-submit-btn" id="x-btn-secondary-action" style="margin-top:8px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;">Kembali ke Menu</button>';
     }
 
     var sh = makeOverlay(
@@ -4134,12 +4271,19 @@
       diffHtml + errHtml +
       '</div>' +
       '<button type="button" class="x-alt-submit-btn" id="x-btn-accept-changes" style="margin-top:14px;">' + acceptLabel + '</button>' +
-      removeRewardBtnHtml
+      secondaryBtnHtml
     );
 
-    var removeBtn = sh.overlay.querySelector('#x-btn-remove-reward-continue');
-    if (removeBtn) {
-      removeBtn.onclick = function () {
+    var secBtn = sh.overlay.querySelector('#x-btn-secondary-action');
+    if (secBtn) {
+      secBtn.onclick = function () {
+        if (isOutOfStock) {
+          sh.close();
+          if (window.Xentra && window.Xentra.Router) {
+            window.Xentra.Router.navigate('home');
+          }
+          return;
+        }
         stripRewardFromCart();
         sh.close();
         renderLayout();
@@ -4153,6 +4297,22 @@
       if (isInstallGated) {
         sh.close();
         if (typeof handleInstallClick === 'function') handleInstallClick();
+        return;
+      }
+      if (isOutOfStock) {
+        stripOutOfStockFromCart();
+        sh.close();
+        renderLayout();
+        calculateTotals();
+        var remainingItems = getCheckoutItems();
+        if (remainingItems.length === 0) {
+          if (UI && UI.toast) UI.toast('Menu yang habis telah dihapus. Keranjang Anda sekarang kosong.');
+          if (window.Xentra && window.Xentra.Router) {
+            window.Xentra.Router.navigate('home');
+          }
+          return;
+        }
+        if (typeof onConfirm === 'function') onConfirm();
         return;
       }
       // Sync cart items with actual prices within current branch scope
@@ -4311,6 +4471,11 @@
       return;
     }
 
+    if (isCurrentBranchClosed()) {
+      if (UI && UI.toast) UI.toast('Maaf, resto sedang tutup sementara. Tidak dapat melanjutkan pesanan.');
+      return;
+    }
+
     state.isSubmitting = true;
     if (isOnlinePayment(state.paymentMethod)) {
       state.isRedirectingToPayment = true;
@@ -4425,6 +4590,9 @@
         btn.style.opacity = '1';
       }
       var msg = (errObj && (errObj.message || errObj.error)) || (verifyErr && verifyErr.message) || 'Gagal memverifikasi pesanan. Periksa koneksi lalu coba lagi.';
+      if (typeof msg === 'string' && msg.indexOf('OUT_OF_STOCK') !== -1) {
+        msg = 'Maaf, menu yang Anda pilih saat ini sedang habis di cabang ini.';
+      }
       if (UI && UI.toast) {
         UI.toast(msg);
       }
@@ -4600,7 +4768,10 @@
     // selalu netral, jadi meja dine-in tidak mungkin ikut terkirim di order delivery.
     var envPayload = buildFulfillmentPayload();
 
-    var clientTxId = 'ctx_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 8);
+    if (!state.checkoutClientTransactionId) {
+      state.checkoutClientTransactionId = 'ctx_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 8);
+    }
+    var clientTxId = state.checkoutClientTransactionId;
     var payload = {
       client_transaction_id: clientTxId,
       branch_id: branchId,
@@ -4666,6 +4837,7 @@
 
       if (Store && typeof Store.clearRecipient === 'function') Store.clearRecipient();
       state.recipient = { type: 'self', name: '', phone: '' };
+      state.checkoutClientTransactionId = null;
 
       if (state.fulfillment.type === 'dine_in') {
         var fTableId = (state.fulfillment.table_ids && state.fulfillment.table_ids[0]) || '';
@@ -4783,6 +4955,9 @@
       }
 
       var msg = (errData && (errData.message || errData.error)) || 'Gagal memproses pesanan.';
+      if (typeof msg === 'string' && msg.indexOf('OUT_OF_STOCK') !== -1) {
+        msg = 'Maaf, menu yang Anda pilih saat ini sedang habis di cabang ini.';
+      }
       if (UI && UI.toast) UI.toast(msg);
       renderLayout();
       calculateTotals();

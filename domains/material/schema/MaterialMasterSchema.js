@@ -14,6 +14,8 @@ function ensureMaterialMasterSchema(db) {
       name TEXT NOT NULL,
       description TEXT,
       base_uom_id TEXT NOT NULL,
+      purchase_uom_name TEXT,
+      purchase_uom_ratio REAL DEFAULT 1,
       status TEXT NOT NULL DEFAULT 'DRAFT'
         CHECK (status IN ('DRAFT', 'ACTIVE', 'ARCHIVED')),
       created_at TEXT NOT NULL DEFAULT (datetime('now')),

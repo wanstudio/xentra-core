@@ -67,6 +67,7 @@ function buildRequirements(menus) {
           product_id: component.product_id,
           product_name: component.product_name,
           sku: component.sku || null,
+          fulfillment_type: component.fulfillment_type || null,
           required_quantity: 0,
           menu_line_ids: []
         });
@@ -93,12 +94,15 @@ function getInventoryRequirements({ branchId, requirements }) {
 
   return new Map(requirements.map(item => {
     const row = inventoryMap.get(String(item.product_id));
-    const stockManaged = Boolean(item.sku);
+    const fulfillmentType = String(item.fulfillment_type || (row && row.fulfillment_type) || 'BY_STOCK').toUpperCase();
+    const isByOrder = fulfillmentType === 'BY_ORDER';
+    const stockManaged = Boolean(item.sku) && !isByOrder;
     const currentStock = stockManaged ? Number(row ? row.stock_qty : 0) : null;
     return [
       String(item.product_id),
       {
         ...item,
+        fulfillment_type: fulfillmentType,
         stock_managed: stockManaged,
         current_stock: currentStock,
         low_stock_threshold: stockManaged ? Number(row ? row.low_stock_threshold : 5) : null
@@ -185,16 +189,35 @@ function verifyComposedCheckout({ brandId, branchId, items }) {
   const requirements = buildRequirements(resolved);
   const inventoryMap = getInventoryRequirements({ branchId, requirements });
   const inventoryErrors = [];
+  const outOfStockItems = [];
 
   for (const requirement of inventoryMap.values()) {
     if (!requirement.stock_managed) continue;
 
     if (requirement.current_stock < requirement.required_quantity) {
-      inventoryErrors.push(
-        'OUT_OF_STOCK:' + requirement.product_id +
-        ':available=' + requirement.current_stock +
-        ':required=' + requirement.required_quantity
+      const affectedMenus = resolved.filter(entry =>
+        (requirement.menu_line_ids || []).includes(entry.menu_id)
       );
+      const menuTitles = affectedMenus.map(entry =>
+        entry.menu && (entry.menu.title || entry.menu.package_name)
+      ).filter(Boolean);
+      const displayName = menuTitles.length > 0
+        ? menuTitles.join(', ')
+        : (requirement.product_name || requirement.product_id);
+
+      const isZero = requirement.current_stock <= 0;
+      const errorMsg = isZero
+        ? `Stok untuk menu "${displayName}" saat ini habis di cabang ini (${requirement.product_id}).`
+        : `Stok untuk menu "${displayName}" tidak mencukupi di cabang ini (Tersedia: ${requirement.current_stock}, Diminta: ${requirement.required_quantity}) (${requirement.product_id}).`;
+
+      inventoryErrors.push(errorMsg);
+      outOfStockItems.push({
+        product_id: requirement.product_id,
+        menu_ids: affectedMenus.map(m => m.menu_id),
+        name: displayName,
+        available: requirement.current_stock,
+        required: requirement.required_quantity
+      });
     }
   }
 
@@ -204,7 +227,8 @@ function verifyComposedCheckout({ brandId, branchId, items }) {
       status: 'OUT_OF_STOCK',
       verified_items: [],
       price_diffs: [],
-      errors: inventoryErrors
+      errors: inventoryErrors,
+      out_of_stock_items: outOfStockItems
     };
   }
 
@@ -213,6 +237,7 @@ function verifyComposedCheckout({ brandId, branchId, items }) {
       product_id: component.product_id,
       product_name: component.product_name,
       sku: component.sku || null,
+      fulfillment_type: component.fulfillment_type || 'BY_STOCK',
       quantity: Number(component.quantity),
       description: component.description || ''
     }));

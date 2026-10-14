@@ -46,13 +46,19 @@ function resolveMenuBase(menu, branchState = null) {
   const displayNameOverride = branchState && branchState.display_name_override
     ? String(branchState.display_name_override).trim()
     : null;
+  const customerTitle = displayNameOverride || resolveCustomerTitle(menu);
+  const rasaRedundant = Boolean(
+    menu.rasa_name &&
+    customerTitle &&
+    customerTitle.toLowerCase().includes(String(menu.rasa_name).trim().toLowerCase())
+  );
 
   return {
     id: menu.id,
     menu_id: menu.id,
     menu_type: menu.menu_type,
-    title: displayNameOverride || resolveCustomerTitle(menu),
-    subtitle: menu.rasa_name && !rasaIsOriginal ? menu.rasa_name : null,
+    title: customerTitle,
+    subtitle: !rasaRedundant && !rasaIsOriginal ? menu.rasa_name : null,
     description: menu.description || null,
     price: Number(menu.selling_price),
     selling_price: Number(menu.selling_price),
@@ -68,7 +74,14 @@ function resolveMenuBase(menu, branchState = null) {
       ? { id: menu.title_id, name: menu.title_name, slug: menu.title_slug }
       : null,
     category: menu.category_id
-      ? { id: menu.category_id, name: menu.category_name, slug: menu.category_slug }
+      ? {
+          id: menu.category_id,
+          name: menu.category_name,
+          slug: menu.category_slug,
+          image_url: menu.category_image_url || menu.category_image || '',
+          image: menu.category_image || menu.category_image_url || '',
+          media_id: menu.category_media_id || null
+        }
       : null,
     sub_category: menu.sub_category_id
       ? { id: menu.sub_category_id, name: menu.sub_category_name, slug: menu.sub_category_slug }
@@ -118,7 +131,8 @@ function calculateInventory(menuItems, inventoryRows, menuType = null, checkStoc
 
   const items = normalizedItems.map(item => {
     const sku = item.sku == null ? null : String(item.sku).trim() || null;
-    const stockManaged = !!sku;
+    const isByOrder = String(item.fulfillment_type || '').toUpperCase() === 'BY_ORDER';
+    const stockManaged = !!sku && !isByOrder;
     const inv = inventoryMap.get(String(item.product_id));
     const stockQty = stockManaged ? Number(inv ? inv.stock_qty : 0) : null;
     const quantity = Number(item.quantity);
@@ -126,7 +140,7 @@ function calculateInventory(menuItems, inventoryRows, menuType = null, checkStoc
       ? (checkStock ? Math.max(0, Math.floor(stockQty / quantity)) : null)
       : null;
 
-    if (item.product_is_active === 0) {
+    if (item.product_is_active === 0 || item.product_is_available === 0 || item.product_is_available === false) {
       // Product lifecycle invalidity is distinct from temporary stock depletion.
       // It must win so the customer receives the repair-required reason rather
       // than a misleading OUT_OF_STOCK result.
@@ -146,6 +160,7 @@ function calculateInventory(menuItems, inventoryRows, menuType = null, checkStoc
       product_name: item.product_name,
       sku,
       quantity,
+      fulfillment_type: item.fulfillment_type || 'BY_STOCK',
       stock_managed: stockManaged,
       branch_stock: stockQty,
       package_capacity: capacity
@@ -226,7 +241,8 @@ class ComposedMenuResolver {
           description: item.product_description || '',
           image_url: item.product_image_url || item.product_image || '',
           media_id: item.product_media_id || null,
-          product_is_active: item.product_is_active !== 0
+          product_is_active: item.product_is_active !== 0,
+          fulfillment_type: item.fulfillment_type || 'BY_STOCK'
         }))
       };
     });
@@ -272,8 +288,9 @@ class ComposedMenuResolver {
       const menuStatusValid = String(menu.status).toUpperCase() === 'ACTIVE';
       const categoryMemberships = membershipMap.get(String(menu.id)) || [];
       const activeBranchCategories = categoryMemberships.filter(row => row.branch_category_is_active !== 0);
+      const branchEnabled = branchState.is_available !== 0 && branchState.is_available !== false;
       let blockingReason = null;
-      if (!branchState.is_available) blockingReason = 'BRANCH_MENU_UNAVAILABLE';
+      if (!branchEnabled) blockingReason = 'BRANCH_MENU_UNAVAILABLE';
       else if (!menuStatusValid) blockingReason = 'MENU_INACTIVE';
       else if (categoryMemberships.length > 0 && activeBranchCategories.length === 0) blockingReason = 'BRANCH_CATEGORY_UNAVAILABLE';
       else if (inventoryState.blocking_reason) blockingReason = inventoryState.blocking_reason;
@@ -285,6 +302,8 @@ class ComposedMenuResolver {
         price,
         is_available: available,
         availability: available,
+        branch_is_available: branchEnabled,
+        branch_menu_is_available: branchEnabled,
         blocking_reason: blockingReason,
         branch: {
           id: branchId
@@ -292,7 +311,10 @@ class ComposedMenuResolver {
         branch_categories: activeBranchCategories.map(row => ({
           id: row.branch_category_id,
           name: row.branch_category_name,
-          slug: row.branch_category_slug
+          slug: row.branch_category_slug,
+          image_url: row.branch_category_image_url || '',
+          image: row.branch_category_image_url || '',
+          media_id: row.branch_category_media_id || null
         })),
         components: (itemMap.get(String(menu.id)) || []).map(item => ({
           product_id: item.product_id,
@@ -303,7 +325,8 @@ class ComposedMenuResolver {
           description: item.product_description || '',
           image_url: item.product_image_url || item.product_image || '',
           media_id: item.product_media_id || null,
-          product_is_active: item.product_is_active !== 0
+          product_is_active: item.product_is_active !== 0,
+          fulfillment_type: item.fulfillment_type || 'BY_STOCK'
         })),
         inventory: inventoryState
       };
@@ -313,16 +336,16 @@ class ComposedMenuResolver {
   }
 
   static searchBranchMenu({
-    brandId, branchId, query
+    brandId, branchId, query, includeUnavailable = true
   }) {
     ensureSchema();
     const needle = String(query == null ? '' : query).trim().toLocaleLowerCase();
-    if (!needle) return this.resolveBranchMenu({ brandId, branchId });
+    if (!needle) return this.resolveBranchMenu({ brandId, branchId, includeUnavailable });
 
     const menus = this.resolveBranchMenu({
       brandId,
       branchId,
-      includeUnavailable: false
+      includeUnavailable
     });
 
     return menus.filter(menu => {

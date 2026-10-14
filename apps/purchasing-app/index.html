@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Xentra Belanja — Pencatatan Belanja Pasar & Penerimaan Barang</title>
+
+  <!-- PWA & Mobile Web App Capabilities -->
+  <link rel="manifest" href="/belanja/manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="/belanja/assets/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/belanja/assets/icons/icon-192.png">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Xentra Belanja">
+
+  <!-- Core Font & Dedicated Scoped Styles -->
+  <link rel="stylesheet" href="/merchant-shared/fonts/plus-jakarta-sans.css">
+  <link rel="stylesheet" href="/belanja/assets/css/purchasing.css?v=1.0.3">
+</head>
+<body>
+  <div class="purchasing-shell">
+
+    <!-- Dedicated Mobile Topbar -->
+    <header class="purchasing-topbar" id="purchasing-topbar">
+      <div class="purchasing-topbar-brand">
+        <img id="purchasing-topbar-logo" class="purchasing-topbar-logo" src="/belanja/assets/icons/icon-192.png" alt="Logo" onerror="this.style.display='none'; document.getElementById('purchasing-topbar-fallback-icon').style.display='block';">
+        <div id="purchasing-topbar-fallback-icon" style="display:none; font-size:22px; line-height:1;">🛒</div>
+        <div class="purchasing-topbar-text">
+          <span class="purchasing-topbar-title" id="purchasing-topbar-title">Belanja Pasar</span>
+          <span class="purchasing-topbar-branch" id="purchasing-topbar-branch">Memuat cabang...</span>
+        </div>
+      </div>
+      <div class="purchasing-topbar-actions">
+        <button type="button" class="purchasing-icon-btn" onclick="refreshPurchasingActiveView()" title="Segarkan Data" aria-label="Segarkan">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        </button>
+        <button type="button" class="purchasing-icon-btn is-exit" onclick="logoutPurchasing()" title="Keluar Akun" aria-label="Keluar">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="purchasing-content">
+
+      <!-- View 1: Tasks / Belanja Pasar -->
+      <section id="purchasing-view-tasks" class="purchasing-subview">
+        <!-- Kasbon Card Input -->
+        <div class="purchasing-kasbon-card">
+          <div class="purchasing-kasbon-header">
+            <span class="purchasing-kasbon-title">💵 Uang Belanja</span>
+          </div>
+          <div class="purchasing-kasbon-input-wrap">
+            <span class="purchasing-kasbon-currency">Rp</span>
+            <input type="text" id="input-purchasing-cash-advance" class="purchasing-kasbon-input" placeholder="0" inputmode="numeric" pattern="[0-9]*" autocomplete="off" readonly oninput="onPurchasingCashAdvanceInput(this)">
+          </div>
+          <div class="purchasing-kasbon-footer">
+            <span class="purchasing-kasbon-caption">Estimasi kebutuhan belanja:</span>
+            <strong id="label-purchasing-est-budget" class="purchasing-kasbon-est">Rp 0</strong>
+          </div>
+        </div>
+
+        <!-- Section Header -->
+        <div class="purchasing-section-header">
+          <strong style="font-size:13.5px; color:#0f172a;" id="purchasing-list-title">Tugas Mandat Belanja</strong>
+          <span style="font-size:12px; font-weight:700; color:#64748b;"><span id="purchasing-item-count">0</span> item</span>
+        </div>
+
+        <!-- Checklist List Items Container -->
+        <div id="purchasing-checklist-container" style="display:flex; flex-direction:column; gap:8px;">
+          <div style="text-align:center; padding:32px 0; color:#64748b; font-weight:600;">Memeriksa mandat belanja aktif...</div>
+        </div>
+      </section>
+
+      <!-- View 2: PO Supplier & Goods Receipt -->
+      <section id="purchasing-view-po" class="purchasing-subview" style="display:none;">
+        <div style="margin-bottom:12px;">
+          <strong style="font-size:13.5px; color:#0f172a;">Pesanan Supplier Cabang</strong>
+          <div style="font-size:11.5px; color:#64748b; margin-top:2px;">Konfirmasi penerimaan barang masuk dari supplier resmi.</div>
+        </div>
+        <div id="purchasing-orders-container" style="display:flex; flex-direction:column; gap:10px;">
+          <div style="text-align:center; padding:32px 0; color:#64748b; font-weight:600;">Memuat daftar pesanan supplier...</div>
+        </div>
+      </section>
+
+      <!-- View 3: Riwayat Belanja -->
+      <section id="purchasing-view-history" class="purchasing-subview" style="display:none;">
+        <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px;">
+          <div style="position:relative; display:flex; align-items:center;">
+            <span style="position:absolute; left:12px; color:#94a3b8; pointer-events:none; font-size:14px;">🔍</span>
+            <input type="text" id="purchasing-history-search" class="x-input" placeholder="Cari nama bahan, kode STL, petugas..." autocomplete="off" style="padding-left:36px; padding-right:32px; height:42px; border-radius:12px; font-size:13px;" oninput="onPurchasingHistorySearch(this.value)" onkeyup="onPurchasingHistorySearch(this.value)">
+            <button type="button" id="btn-clear-history-search" onclick="clearPurchasingHistorySearch()" style="display:none; position:absolute; right:10px; background:none; border:none; color:#94a3b8; font-size:16px; cursor:pointer; padding:4px;" aria-label="Hapus Pencarian">✕</button>
+          </div>
+          <!-- Filter Chips: Hari Ini, Kemarin, 7 Hari, 30 Hari -->
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; gap:6px; overflow-x:auto; padding-bottom:2px; -webkit-overflow-scrolling:touch;" id="purchasing-history-filter-chips">
+              <button type="button" class="purchasing-history-chip active" data-filter="today" onclick="setPurchasingHistoryFilter('today', this)">Hari Ini</button>
+              <button type="button" class="purchasing-history-chip" data-filter="yesterday" onclick="setPurchasingHistoryFilter('yesterday', this)">Kemarin</button>
+              <button type="button" class="purchasing-history-chip" data-filter="7days" onclick="setPurchasingHistoryFilter('7days', this)">7 Hari</button>
+              <button type="button" class="purchasing-history-chip" data-filter="30days" onclick="setPurchasingHistoryFilter('30days', this)">30 Hari</button>
+            </div>
+            <!-- Custom Date Range: [ Tanggal Awal ] s/d [ Tanggal Akhir ] [ Cari ] -->
+            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; padding:8px 10px;">
+              <input type="date" id="purchasing-history-date-from" class="x-input" style="height:36px; border-radius:8px; font-size:12.5px; padding:4px 8px; flex:1; min-width:120px; border:1px solid #cbd5e1; background:#ffffff;" aria-label="Pilih Tanggal Awal">
+              <span style="font-size:12px; font-weight:700; color:#64748b; white-space:nowrap;">s/d</span>
+              <input type="date" id="purchasing-history-date-to" class="x-input" style="height:36px; border-radius:8px; font-size:12.5px; padding:4px 8px; flex:1; min-width:120px; border:1px solid #cbd5e1; background:#ffffff;" aria-label="Pilih Tanggal Akhir">
+              <button type="button" class="x-btn-primary" onclick="searchPurchasingHistoryCustomRange()" style="height:36px; padding:0 14px; border-radius:8px; font-size:12.5px; font-weight:700; white-space:nowrap; background:#0f172a; border-color:#0f172a;">Cari</button>
+            </div>
+          </div>
+        </div>
+        <div id="purchasing-history-container" style="display:flex; flex-direction:column; gap:10px;">
+          <div style="text-align:center; padding:32px 0; color:#64748b; font-weight:600;">Memuat riwayat belanja...</div>
+        </div>
+      </section>
+
+      <!-- View 4: Kalkulator Kasir Pasar (Keypad Interaktif Fisik & Quick Cash) -->
+      <section id="purchasing-view-calc" class="purchasing-subview" style="display:none;">
+        <div class="purchasing-calc-card">
+          <div class="purchasing-calc-display-box">
+            <div class="purchasing-calc-display-formula" id="purchasing-calc-formula">0</div>
+            <div class="purchasing-calc-display-result" id="purchasing-calc-result">0</div>
+          </div>
+
+          <!-- Kembalian Helper Box -->
+          <div class="purchasing-calc-kembalian-box">
+            <label for="input-purchasing-calc-cash" style="display:block; font-size:11.5px; font-weight:700; color:#166534; margin-bottom:2px;">
+              💵 Uang Diserahkan ke Pedagang:
+            </label>
+            <div class="purchasing-calc-cash-input-wrap">
+              <span class="purchasing-calc-cash-rp">Rp</span>
+              <input type="text" id="input-purchasing-calc-cash" class="purchasing-calc-cash-input" placeholder="0" inputmode="numeric" pattern="[0-9]*" autocomplete="off" oninput="onPurchasingCalcCashInput(this.value)">
+            </div>
+
+            <!-- Quick Cash Presets (Uang Pas, 10k, 20k, 50k, 100k) -->
+            <div class="purchasing-calc-quick-grid" id="purchasing-calc-quick-grid">
+              <button type="button" class="purchasing-btn-quick-cash" data-cash-val="exact" onclick="selectPurchasingQuickCash('exact')">Uang Pas</button>
+              <button type="button" class="purchasing-btn-quick-cash" data-cash-val="10000" onclick="selectPurchasingQuickCash(10000)">10k</button>
+              <button type="button" class="purchasing-btn-quick-cash" data-cash-val="20000" onclick="selectPurchasingQuickCash(20000)">20k</button>
+              <button type="button" class="purchasing-btn-quick-cash" data-cash-val="50000" onclick="selectPurchasingQuickCash(50000)">50k</button>
+              <button type="button" class="purchasing-btn-quick-cash" data-cash-val="100000" onclick="selectPurchasingQuickCash(100000)">100k</button>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px dashed #bbf7d0; padding-top:8px;">
+              <span style="font-size:12px; font-weight:600; color:#166534;">Kembalian Diterima:</span>
+              <strong id="label-purchasing-calc-change" style="font-size:16px; font-weight:800; color:#059669;">Rp 0</strong>
+            </div>
+          </div>
+
+          <!-- Keypad Grid -->
+          <div class="purchasing-calc-keypad">
+            <button type="button" class="purchasing-key" onclick="pressPurchasingCalc('7')">7</button>
+            <button type="button" class="purchasing-key" onclick="pressPurchasingCalc('8')">8</button>
+            <button type="button" class="purchasing-key" onclick="pressPurchasingCalc('9')">9</button>
+            <button type="button" class="purchasing-key op" onclick="pressPurchasingCalc('/')">÷</button>
+
+            <button type="button" class="purchasing-key" onclick="pressPurchasingCalc('4')">4</button>
+            <button type="button" class="purchasing-key" onclick="pressPurchasingCalc('5')">5</button>
+            <button type="button" class="purchasing-key" onclick="pressPurchasingCalc('6')">6</button>
+            <button type="button" class="purchasing-key op" onclick="pressPurchasingCalc('*')">×</button>
+
+            <button type="button" class="purchasing-key" onclick="pressPurchasingCalc('1')">1</button>
+            <button type="button" class="purchasing-key" onclick="pressPurchasingCalc('2')">2</button>
+            <button type="button" class="purchasing-key" onclick="pressPurchasingCalc('3')">3</button>
+            <button type="button" class="purchasing-key op" onclick="pressPurchasingCalc('-')">−</button>
+
+            <button type="button" class="purchasing-key" onclick="pressPurchasingCalc('0')">0</button>
+            <button type="button" class="purchasing-key" onclick="pressPurchasingCalc('000')">000</button>
+            <button type="button" class="purchasing-key" onclick="pressPurchasingCalc('.')">.</button>
+            <button type="button" class="purchasing-key op" onclick="pressPurchasingCalc('+')">+</button>
+
+            <button type="button" class="purchasing-key clear" onclick="resetPurchasingCalc()">C</button>
+            <button type="button" class="purchasing-key back" onclick="backspacePurchasingCalc()">⌫</button>
+            <button type="button" class="purchasing-key equals" onclick="evaluatePurchasingCalc()" style="grid-column: span 2;">=</button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Floating Sticky Settlement Bar above Bottom Nav -->
+    <div id="purchasing-bottom-bar" class="is-hidden">
+      <div style="flex:1; min-width:0; padding-right:12px;">
+        <div style="display:flex; align-items:baseline; gap:5px;">
+          <span style="font-size:11.5px; color:#64748b;">Total:</span>
+          <strong id="label-purchasing-total-real" style="font-size:16px; font-weight:800; color:#0f172a; letter-spacing:-0.02em;">Rp 0</strong>
+        </div>
+        <div style="display:flex; align-items:center; gap:5px; margin-top:2px;">
+          <span style="font-size:11px; color:#64748b;">Sisa:</span>
+          <strong id="label-purchasing-change-due" style="font-size:13px; font-weight:800; color:#059669;">Rp 0</strong>
+        </div>
+      </div>
+      <button type="button" id="btn-purchasing-submit-settle" onclick="submitPurchasingSettle()">
+        <span>✓</span> Selesai Belanja
+      </button>
+    </div>
+
+    <!-- Dedicated Bottom Navigation -->
+    <nav id="purchasing-bottom-nav">
+      <button type="button" class="nav-item active" id="btn-purchasing-nav-tasks" onclick="switchPurchasingView('tasks')">
+        <span class="nav-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+        </span>
+        <span>Belanja</span>
+      </button>
+      <button type="button" class="nav-item" id="btn-purchasing-nav-po" onclick="switchPurchasingView('po')">
+        <span class="nav-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+        </span>
+        <span>PO Supplier</span>
+      </button>
+      <button type="button" class="nav-item" id="btn-purchasing-nav-history" onclick="switchPurchasingView('history')">
+        <span class="nav-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><polyline points="12 7 12 12 15 15"/></svg>
+        </span>
+        <span>Riwayat</span>
+      </button>
+      <button type="button" class="nav-item" id="btn-purchasing-nav-calc" onclick="switchPurchasingView('calc')">
+        <span class="nav-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="20" x="3" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M8 10h.01"/><path d="M12 10h.01"/><path d="M16 10h.01"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/></svg>
+        </span>
+        <span>Kalkulator</span>
+      </button>
+    </nav>
+
+  </div>
+
+  <!-- Modal 1: Update Harga Pasar Baru -->
+  <div id="modal-purchasing-update-price" class="purchasing-modal-backdrop" onclick="if(event.target === this) closePurchasingUpdatePriceModal()">
+    <div class="purchasing-modal-card">
+      <div style="padding:16px 18px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <strong style="font-size:15px; color:#0f172a;" id="purchasing-update-price-item-name">Bahan Baku</strong>
+          <div style="font-size:11.5px; color:#64748b; margin-top:2px;" id="purchasing-update-price-item-uom">per Unit</div>
+        </div>
+        <button type="button" onclick="closePurchasingUpdatePriceModal()" style="background:none; border:none; font-size:18px; color:#94a3b8; cursor:pointer;">✕</button>
+      </div>
+      <div style="padding:18px; display:flex; flex-direction:column; gap:12px;">
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px;">
+          <div style="font-size:11.5px; color:#64748b; margin-bottom:4px;">Harga Acuan Terakhir:</div>
+          <strong style="font-size:14px; color:#1e293b;" id="purchasing-update-price-old-price">Rp 0</strong>
+        </div>
+        <div>
+          <label style="display:block; font-size:12px; font-weight:700; color:#0f172a; margin-bottom:6px;">Jumlah Dibeli (Qty):</label>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <input type="number" id="input-purchasing-modal-qty" class="x-input" placeholder="1" step="any" min="0.01" style="font-size:16px; font-weight:700; padding:10px 14px; flex:1;">
+            <span id="purchasing-update-price-modal-uom-suffix" style="font-size:13px; font-weight:700; color:#475569; min-width:36px;">unit</span>
+          </div>
+        </div>
+        <div>
+          <label style="display:block; font-size:12px; font-weight:700; color:#0f172a; margin-bottom:6px;">Harga Beli Riil di Pasar (Rp):</label>
+          <input type="text" id="input-purchasing-modal-price" class="x-input" placeholder="0" inputmode="numeric" pattern="[0-9]*" autocomplete="off" style="font-size:17px; font-weight:800; padding:10px 14px;" oninput="this.value = this.value ? formatNumberWithDots(this.value.replace(/\D/g,'')) : ''">
+        </div>
+      </div>
+      <div style="padding:12px 18px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; gap:8px; justify-content:flex-end;">
+        <button type="button" class="x-btn-secondary" onclick="closePurchasingUpdatePriceModal()">Batal</button>
+        <button type="button" class="x-btn-primary" onclick="confirmPurchasingPriceUpdate()">Simpan Perubahan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: Konfirmasi Selesai Belanja -->
+  <div id="modal-purchasing-settle-confirm" class="purchasing-modal-backdrop" onclick="if(event.target === this) closePurchasingSettleConfirmModal()">
+    <div class="purchasing-modal-card" style="max-height:85vh;">
+      <div style="padding:16px 18px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:20px; line-height:1;">🛒</span>
+          <div>
+            <strong style="font-size:15px; color:#0f172a;">Konfirmasi Selesai Belanja</strong>
+            <div style="font-size:11.5px; color:#64748b; margin-top:1px;">Periksa kembali belanjaanmu</div>
+          </div>
+        </div>
+        <button type="button" onclick="closePurchasingSettleConfirmModal()" style="background:none; border:none; font-size:18px; color:#94a3b8; cursor:pointer;">✕</button>
+      </div>
+      <div style="padding:16px 18px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:12px;">
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:12px 14px; display:flex; flex-direction:column; gap:8px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px;">
+            <span style="color:#64748b; font-weight:600;">Total Real Belanja:</span>
+            <strong id="settle-confirm-total-real" style="color:#0f172a; font-weight:800; font-size:15px;">Rp 0</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px;">
+            <span style="color:#64748b; font-weight:600;">Uang Kasbon / Modal:</span>
+            <span id="settle-confirm-cash-advance" style="color:#0f172a; font-weight:700;">Rp 0</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:13.5px; border-top:1px dashed #cbd5e1; padding-top:8px;">
+            <span id="settle-confirm-change-label" style="font-weight:700; color:#166534;">Sisa Kembalian:</span>
+            <strong id="settle-confirm-change-due" style="font-size:16px; font-weight:800; color:#059669;">Rp 0</strong>
+          </div>
+        </div>
+        <div id="settle-confirm-items-summary" style="font-size:12px; color:#334155; line-height:1.4; background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:8px 12px;"></div>
+        <div>
+          <div style="font-size:11.5px; font-weight:700; color:#475569; margin-bottom:6px;">Daftar Barang yang Dibeli:</div>
+          <div id="settle-confirm-items-list" style="display:flex; flex-direction:column; gap:6px; max-height:160px; overflow-y:auto;"></div>
+        </div>
+        <div style="font-size:11.5px; color:#64748b; line-height:1.4; text-align:center;">
+          ℹ️ Pastikan belanjaanmu benar, laporan ini akan masuk ke sistem dan tidak bisa diubah
+        </div>
+      </div>
+      <div style="padding:14px 18px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; gap:10px; justify-content:center;">
+        <button type="button" class="x-btn-secondary" onclick="closePurchasingSettleConfirmModal()" style="font-size:13px; font-weight:700; padding:10px 16px; border-radius:12px;">Belum, Lanjut Belanja</button>
+        <button type="button" class="x-btn-primary" id="btn-purchasing-confirm-settle-ok" onclick="executePurchasingSettle()" style="background:#059669; border-color:#059669; font-size:13px; font-weight:800; padding:10px 18px; border-radius:12px;">
+          <span>✓</span> Ya, Selesai Belanja
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 3: Penerimaan PO Supplier (Goods Receipt) -->
+  <div id="modal-purchasing-receive" class="purchasing-modal-backdrop" onclick="if(event.target === this) closePurchasingReceiveModal()">
+    <div class="purchasing-modal-card purchasing-receive-modal-card">
+      <div class="purchasing-receive-modal-header">
+        <div>
+          <h3 id="purchasing-receive-title" class="purchasing-receive-modal-title">Penerimaan Barang PO</h3>
+          <div id="purchasing-receive-code" style="font-size:12px; font-weight:800; color:#0284c7; letter-spacing:0.04em; margin-top:2px;">-</div>
+          <div id="purchasing-receive-supplier" style="font-size:13.5px; font-weight:700; color:#334155; margin-top:1px;">-</div>
+        </div>
+        <button type="button" onclick="closePurchasingReceiveModal()" style="background:none; border:none; font-size:18px; color:#94a3b8; cursor:pointer;" aria-label="Tutup">✕</button>
+      </div>
+
+      <div id="purchasing-receive-body" class="purchasing-receive-modal-body">
+        <!-- Rendered items with good/bad inputs -->
+      </div>
+
+      <!-- Discrepancy & Notes area -->
+      <div class="purchasing-receive-notes-box">
+        <label for="input-purchasing-receive-notes" class="purchasing-receive-notes-label">Catatan <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(jika barang lebih/kurang/rusak)</span>:</label>
+        <textarea id="input-purchasing-receive-notes" class="x-input purchasing-receive-notes-input" rows="2" placeholder="Contoh: 1 kemasan bocor di jalan, sisanya diterima baik."></textarea>
+      </div>
+
+      <div class="purchasing-receive-modal-footer">
+        <button type="button" class="x-btn-secondary purchasing-receive-btn-cancel" onclick="closePurchasingReceiveModal()">Tutup</button>
+        <button type="button" class="x-btn-primary purchasing-receive-btn-submit" id="btn-submit-purchasing-receive" onclick="submitPurchasingReceive()">
+          ✓ Terima Barang
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 4: Konfirmasi Terkunci Penerimaan Barang (Permanent Lock Warning) -->
+  <div id="modal-purchasing-receive-confirm" class="purchasing-modal-backdrop" onclick="if(event.target === this) closePurchasingReceiveConfirmModal()">
+    <div class="purchasing-modal-card purchasing-confirm-modal-card">
+      <div class="purchasing-confirm-modal-header">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span id="purchasing-confirm-icon" style="font-size:20px; line-height:1;">✓</span>
+          <div>
+            <h3 id="purchasing-confirm-title" class="purchasing-confirm-modal-title">Konfirmasi Penerimaan Barang</h3>
+            <p id="purchasing-confirm-subtitle" class="purchasing-confirm-modal-subtitle">Keputusan fisik akan disimpan permanen</p>
+          </div>
+        </div>
+        <button type="button" onclick="closePurchasingReceiveConfirmModal()" style="background:none; border:none; font-size:18px; color:#94a3b8; cursor:pointer;" aria-label="Batal">✕</button>
+      </div>
+
+      <div class="purchasing-confirm-modal-body">
+        <div class="purchasing-confirm-warning-box">
+          <div style="font-size:12px; font-weight:800; color:#991b1b; display:flex; align-items:center; gap:6px;">
+            <span>⚠️</span> Data Terkunci Permanen
+          </div>
+          <p style="font-size:11.5px; color:#475569; margin:4px 0 0; line-height:1.4;">
+            Setelah dikonfirmasi, mutasi kartu stok akan langsung diposting dan <strong>tidak dapat diubah kembali</strong> oleh staff.
+          </p>
+        </div>
+
+        <div style="font-size:11.5px; font-weight:700; color:#334155; margin-bottom:2px;">Ringkasan Pemeriksaan Fisik:</div>
+        <div id="purchasing-confirm-summary-list" class="purchasing-confirm-summary-list"></div>
+
+        <div id="purchasing-confirm-notes-preview" class="purchasing-confirm-notes-preview" style="display:none;">
+          <span style="font-weight:700; color:#475569;">Catatan: </span>
+          <span id="purchasing-confirm-notes-text" style="color:#0f172a;">-</span>
+        </div>
+      </div>
+
+      <div class="purchasing-confirm-modal-footer">
+        <button type="button" class="x-btn-secondary purchasing-confirm-btn-cancel" onclick="closePurchasingReceiveConfirmModal()">Periksa Lagi</button>
+        <button type="button" class="x-btn-primary purchasing-confirm-btn-submit" id="btn-execute-purchasing-receive" onclick="executePurchasingReceiveSubmit()">
+          Ya, Simpan Keputusan
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Standalone Purchasing Controller -->
+  <script src="/belanja/assets/js/purchasing-app.js?v=1.0.7"></script>
+</body>
+</html>
+

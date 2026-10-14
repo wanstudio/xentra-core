@@ -34,21 +34,21 @@
 .x-home-greeting-date {
   margin: 0 0 5px;
   color: var(--x-home-muted);
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: .01em;
 }
 
 .x-home-greeting-title {
   margin: 0;
-  font-size: 25px;
-  line-height: 1.14;
+  font-size: 26px;
+  line-height: 1.15;
   letter-spacing: -.035em;
   font-weight: 800;
 }
 
 .x-home-section {
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
 .x-home-section-head {
@@ -56,24 +56,24 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin: 0 2px 8px;
+  margin: 0 2px 10px;
 }
 
 .x-home-section-title {
   margin: 0;
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.25;
   font-weight: 800;
   letter-spacing: -.01em;
 }
 
 .x-home-section-action {
-  min-height: 34px;
-  padding: 0 4px;
+  min-height: 36px;
+  padding: 0 6px;
   border: 0;
   background: transparent;
   color: var(--x-home-green);
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 800;
   cursor: pointer;
 }
@@ -86,7 +86,7 @@
 }
 
 .x-home-sales {
-  padding: 17px;
+  padding: 18px;
 }
 
 .x-home-sales-top {
@@ -106,14 +106,14 @@
 .x-home-eyebrow {
   margin: 0;
   color: var(--x-home-muted);
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 700;
 }
 
 .x-home-sales-value {
   display: block;
   margin: 4px 0 0;
-  font-size: 29px;
+  font-size: 30px;
   line-height: 1.05;
   letter-spacing: -.04em;
   font-weight: 800;
@@ -125,14 +125,14 @@
 
 .x-home-sales-compare {
   flex: 0 0 auto;
-  min-height: 27px;
+  min-height: 28px;
   display: inline-flex;
   align-items: center;
-  padding: 0 9px;
+  padding: 0 10px;
   border-radius: 999px;
   background: var(--x-home-green-soft);
   color: var(--x-home-green);
-  font-size: 10px;
+  font-size: 11.5px;
   font-weight: 800;
 }
 
@@ -150,7 +150,7 @@
 
 .x-home-sales-stat {
   min-width: 0;
-  padding: 11px 12px;
+  padding: 12px 14px;
   border-radius: 13px;
   background: #f7f8f8;
 }
@@ -158,15 +158,15 @@
 .x-home-sales-stat-label {
   display: block;
   color: var(--x-home-muted);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
 }
 
 .x-home-sales-stat-value {
   display: block;
-  margin-top: 3px;
+  margin-top: 4px;
   color: var(--x-home-text);
-  font-size: 16px;
+  font-size: 18px;
   line-height: 1.15;
   font-weight: 800;
 }
@@ -195,23 +195,23 @@
 }
 
 .x-home-attention-count {
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
   background: #fff0d0;
   color: #9a5a00;
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 800;
 }
 
 .x-home-attention-sub {
   margin: 5px 0 0 16px;
   color: var(--x-home-muted);
-  font-size: 10.5px;
+  font-size: 13px;
   line-height: 1.4;
 }
 
@@ -222,7 +222,7 @@
 
 .x-home-order-card {
   display: block;
-  padding: 13px 15px;
+  padding: 14px 16px;
   border-top: 1px solid #f0f2f3;
 }
 
@@ -236,22 +236,22 @@
 .x-home-order-id {
   margin: 0;
   color: var(--x-home-text);
-  font-size: 13px;
-  line-height: 1.2;
+  font-size: 15px;
+  line-height: 1.25;
   font-weight: 800;
 }
 
 .x-home-order-type {
   margin: 4px 0 0;
   color: var(--x-home-muted);
-  font-size: 10.5px;
+  font-size: 12.5px;
   line-height: 1.35;
 }
 
 .x-home-order-time {
   flex: 0 0 auto;
   color: #9aa1a8;
-  font-size: 9.5px;
+  font-size: 11.5px;
   font-weight: 700;
 }
 
@@ -265,24 +265,24 @@
 
 .x-home-order-total {
   color: var(--x-home-text);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 800;
 }
 
 .x-home-order-actions {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
 }
 
 .x-home-order-action {
-  min-height: 38px;
-  padding: 0 13px;
+  min-height: 40px;
+  padding: 0 14px;
   border-radius: 11px;
   border: 1px solid var(--x-home-border);
   background: #fff;
   color: #606970;
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 800;
   cursor: pointer;
 }
@@ -301,19 +301,19 @@
 }
 
 .x-home-empty {
-  padding: 18px 15px;
+  padding: 20px 16px;
   border-top: 1px solid #f0f2f3;
   color: var(--x-home-muted);
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.45;
   text-align: center;
 }
 
 .x-home-empty strong {
   display: block;
-  margin-bottom: 3px;
+  margin-bottom: 4px;
   color: var(--x-home-text);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .x-home-quick-grid {
@@ -323,11 +323,11 @@
 }
 
 .x-home-quick {
-  min-height: 62px;
+  min-height: 64px;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 11px;
+  padding: 11px 12px;
   border: 1px solid var(--x-home-border);
   border-radius: 15px;
   background: #fff;
@@ -338,9 +338,9 @@
 }
 
 .x-home-quick-icon {
-  width: 34px;
-  height: 34px;
-  flex: 0 0 34px;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -350,8 +350,8 @@
 }
 
 .x-home-quick-icon svg {
-  width: 19px;
-  height: 19px;
+  width: 20px;
+  height: 20px;
 }
 
 .x-home-quick-copy {
@@ -360,7 +360,7 @@
 
 .x-home-quick-copy strong {
   display: block;
-  font-size: 11.5px;
+  font-size: 13.5px;
   font-weight: 800;
 }
 
@@ -368,7 +368,7 @@
   display: block;
   margin-top: 3px;
   color: var(--x-home-muted);
-  font-size: 9.5px;
+  font-size: 11.5px;
   line-height: 1.25;
 }
 
@@ -379,8 +379,8 @@
 }
 
 .x-home-snapshot-item {
-  min-height: 72px;
-  padding: 12px 13px;
+  min-height: 74px;
+  padding: 13px 14px;
   background: #fff;
   border-bottom: 1px solid #eef1f2;
 }
@@ -396,15 +396,15 @@
 .x-home-snapshot-label {
   display: block;
   color: var(--x-home-muted);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
 }
 
 .x-home-snapshot-value {
   display: block;
   margin-top: 4px;
-  font-size: 21px;
-  line-height: 1;
+  font-size: 22px;
+  line-height: 1.05;
   font-weight: 800;
 }
 
@@ -418,12 +418,12 @@
 }
 
 .x-home-attention-row {
-  min-height: 58px;
+  min-height: 60px;
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding: 11px 14px;
-  border-top: 1px solid #f0f2f3;
+  gap: 12px;
+  padding: 13px 15px;
+  border-top: 1px solid #e2e8f0;
   background: #fff;
   cursor: pointer;
 }
@@ -433,9 +433,9 @@
 }
 
 .x-home-attention-row-icon {
-  width: 34px;
-  height: 34px;
-  flex: 0 0 34px;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -461,7 +461,7 @@
 
 .x-home-attention-row-copy strong {
   display: block;
-  font-size: 11.5px;
+  font-size: 14px;
   font-weight: 800;
 }
 
@@ -469,12 +469,13 @@
   display: block;
   margin-top: 3px;
   color: var(--x-home-muted);
-  font-size: 9.5px;
+  font-size: 12px;
 }
 
 .x-home-attention-row-arrow {
   flex: 0 0 auto;
   color: #a2a9ae;
+  font-size: 16px;
 }
 
 .x-home-mini-list {
@@ -487,8 +488,8 @@
 .x-home-activity-item {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  padding: 12px 14px;
+  gap: 11px;
+  padding: 13px 15px;
   border-top: 1px solid #f0f2f3;
 }
 
@@ -499,9 +500,9 @@
 
 .x-home-promo-icon,
 .x-home-activity-icon {
-  width: 31px;
-  height: 31px;
-  flex: 0 0 31px;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -524,7 +525,7 @@
 .x-home-promo-copy strong,
 .x-home-activity-copy strong {
   display: block;
-  font-size: 11.5px;
+  font-size: 13.5px;
   line-height: 1.35;
   font-weight: 800;
 }
@@ -534,27 +535,27 @@
   display: block;
   margin-top: 3px;
   color: var(--x-home-muted);
-  font-size: 9.5px;
+  font-size: 12px;
   line-height: 1.35;
 }
 
 .x-home-promo-badge {
   flex: 0 0 auto;
-  min-height: 24px;
-  padding: 0 7px;
+  min-height: 25px;
+  padding: 0 8px;
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
   background: var(--x-home-green-soft);
   color: var(--x-home-green);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 800;
 }
 
 .x-home-activity-time {
   flex: 0 0 auto;
   color: #a1a8ad;
-  font-size: 9px;
+  font-size: 11.5px;
   font-weight: 700;
 }
 
@@ -568,50 +569,6 @@
   white-space: nowrap;
 }
 
-@media (min-width: 769px) {
-  .x-home-screen {
-    max-width: 860px;
-    padding: 8px 4px 32px;
-  }
-
-  .x-home-greeting {
-    padding-bottom: 18px;
-  }
-
-  .x-home-greeting-title {
-    font-size: 30px;
-  }
-
-  .x-home-sales {
-    padding: 22px;
-  }
-
-  .x-home-quick-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .x-home-snapshot {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .x-home-snapshot-item {
-    border-bottom: 0;
-  }
-
-  .x-home-snapshot-item:nth-child(odd) {
-    border-right: 0;
-  }
-
-  .x-home-snapshot-item:not(:last-child) {
-    border-right: 1px solid #eef1f2;
-  }
-
-  .x-home-attention-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-}
 
 @media (prefers-reduced-motion: reduce) {
   .x-home-order-action,
@@ -675,22 +632,31 @@
   color: #fff;
 }
 
-.x-home-snapshot-item,
-.x-home-attention-row {
+.x-home-snapshot-item {
   border-top: 0;
   border-left: 0;
   border-right: 0;
   appearance: none;
   -webkit-appearance: none;
   font: inherit;
-}
-
-.x-home-snapshot-item {
   text-align: left;
   cursor: pointer;
 }
+
 .x-home-attention-row {
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
   text-align: left;
+  width: 100%;
+}
+
+.x-home-attention-row:not(:first-child),
+.x-home-attention-row + .x-home-attention-row {
+  border-top: 1px solid #e2e8f0 !important;
 }
 
 .x-home-status-anchor {
@@ -704,39 +670,26 @@
 }
 
 .x-merchant-app #tab-hari-ini {
-  background: var(--x-home-bg) !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+  background: #f6f7f7 !important;
 }
 
-@media (min-width: 769px) {
-  .x-home-desktop-context {
-    display: block;
-    margin-bottom: 8px;
-  }
+.x-merchant-app #tab-hari-ini .x-home-screen {
+  max-width: 100% !important;
 }
 
-@media (max-width: 768px) {
-  .x-merchant-app #tab-hari-ini {
-    padding-left: 12px !important;
-    padding-right: 12px !important;
-    background: var(--x-home-bg) !important;
-  }
+.x-home-greeting {
+  padding-left: 2px;
+  padding-right: 2px;
+}
 
-  .x-merchant-app #tab-hari-ini .x-home-screen {
-    max-width: 100%;
-  }
+.x-home-sales-value {
+  font-size: 28px;
+}
 
-  .x-home-greeting {
-    padding-left: 2px;
-    padding-right: 2px;
-  }
-
-  .x-home-sales-value {
-    font-size: 28px;
-  }
-
-  .x-home-desktop-context {
-    display: none !important;
-  }
+.x-home-desktop-context {
+  display: none !important;
 }
 
 /* Ikon kecil di depan judul tiap bagian, mengikuti pola aplikasi merchant pada
@@ -950,6 +903,11 @@ body.is-purchasing-mode .icon-btn.icon-btn-exit:hover {
 /* Hide purchasing-bottom-nav and purchasing-bottom-bar by default when not in purchasing mode */
 #purchasing-bottom-nav,
 #purchasing-bottom-bar {
+  display: none;
+}
+
+#purchasing-bottom-nav.is-hidden,
+#purchasing-bottom-bar.is-hidden {
   display: none !important;
 }
 
@@ -1479,7 +1437,9 @@ body.is-purchasing-mode .nav-item.active .nav-icon svg {
 }
 
 /* Floating Sticky Settlement Bar above Bottom Nav */
-body.is-purchasing-mode #purchasing-bottom-bar {
+body.is-purchasing-mode #purchasing-bottom-bar,
+body:has(#tab-bm-belanja.active) #purchasing-bottom-bar,
+.is-belanja-active #purchasing-bottom-bar {
   position: fixed !important;
   left: 50% !important;
   transform: translateX(-50%) !important;
@@ -1492,7 +1452,7 @@ body.is-purchasing-mode #purchasing-bottom-bar {
   padding: 12px 16px !important;
   box-shadow: 0 -6px 24px rgba(15, 23, 42, 0.12) !important;
   z-index: 50 !important;
-  display: flex;
+  display: flex !important;
   justify-content: space-between !important;
   align-items: center !important;
   box-sizing: border-box !important;
@@ -1502,6 +1462,7 @@ body.is-purchasing-mode #purchasing-bottom-bar.is-hidden,
 #purchasing-bottom-bar.is-hidden {
   display: none !important;
 }
+
 
 /* Responsiveness on small phone screens (< 420px) */
 @media (max-width: 420px) {
@@ -2468,5 +2429,698 @@ body.is-purchasing-mode #tab-bm-belanja.is-calc-view {
   box-shadow: 0 4px 12px rgba(5, 150, 105, 0.35);
 }
 
+/* ==========================================================================
+   XENTRA MERCHANT APP — CANONICAL MOBILE APP SHELL (LOCKED ON ALL SCREENS)
+   Locked 1:1 to mobile shell across phone and desktop (like /belanja & /driver).
+   Centered mobile column on wide screens, full viewport on mobile devices.
+   ========================================================================== */
+html.x-merchant-app,
+body.x-merchant-app {
+  width: 100% !important;
+  height: 100% !important;
+  height: 100dvh !important;
+  overflow: hidden !important;
+  position: fixed !important;
+  inset: 0 !important;
+  background: #f1f5f9 !important; /* Clean light surface background like Driver / Belanja */
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: stretch !important;
+}
 
+/* App frame: Centered mobile shell (max 500px on desktop, 100% on phone) */
+.x-merchant-app .x-dash-layout {
+  width: 100% !important;
+  max-width: 500px !important;
+  height: 100% !important;
+  height: 100dvh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  background: #f6f7f7 !important;
+  overflow: hidden !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
+  position: relative !important;
+  border-left: 1px solid rgba(15, 23, 42, 0.08) !important;
+  border-right: 1px solid rgba(15, 23, 42, 0.08) !important;
+  box-shadow: 0 0 40px rgba(15, 23, 42, 0.06) !important;
+}
 
+@media (max-width: 500px) {
+  html.x-merchant-app,
+  body.x-merchant-app {
+    background: #f6f7f7 !important;
+  }
+  .x-merchant-app .x-dash-layout {
+    border-left: none !important;
+    border-right: none !important;
+    box-shadow: none !important;
+  }
+}
+
+/* Disable desktop navigation, desktop topbar, and desktop-only contexts permanently */
+.x-merchant-app .x-dash-sidebar,
+.x-merchant-app .x-sidebar-overlay,
+.x-merchant-app .x-hamburger,
+.x-merchant-app .x-topbar-desktop,
+.x-merchant-app .x-home-desktop-context {
+  display: none !important;
+}
+
+/* Topbar: Canonical Mobile Topbar (Row 1 + Row 2) locked to mobile width */
+.x-merchant-app .x-dash-topbar {
+  flex: 0 0 auto !important;
+  position: relative !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 100 !important;
+  padding: max(8px, env(safe-area-inset-top, 0px)) 16px 8px !important;
+  background: #ffffff !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: 0 2px 6px rgba(15,23,42,.16) !important;
+  backdrop-filter: none !important;
+  width: 100% !important;
+  max-width: 500px !important;
+  margin: 0 auto !important;
+  box-sizing: border-box !important;
+}
+
+.x-merchant-app .x-mobile-topbar {
+  display: block !important;
+  width: 100% !important;
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+.x-merchant-app .x-mobile-topbar-main {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  width: 100% !important;
+  min-height: 40px !important;
+  height: 40px !important;
+}
+
+.x-merchant-app .x-mobile-branch-pill {
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  padding: 0 14px 0 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  border-radius: 20px !important;
+  background: #ffffff !important;
+  color: #111111 !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,.04) !important;
+}
+
+.x-merchant-app .x-mobile-branch-logo {
+  width: 26px !important;
+  height: 26px !important;
+  flex: 0 0 26px !important;
+  border-radius: 6px !important;
+  object-fit: cover !important;
+}
+
+.x-merchant-app .x-mobile-branch-pill span {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  font-size: 15px !important;
+  line-height: 1.2 !important;
+  font-weight: 700 !important;
+  letter-spacing: -.2px !important;
+}
+
+.x-merchant-app .x-mobile-topbar-actions {
+  flex: 0 0 auto !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+.x-merchant-app .x-mobile-circle-btn {
+  position: relative !important;
+  width: 40px !important;
+  height: 40px !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: #ffffff !important;
+  color: #111111 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  cursor: pointer !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,.04) !important;
+}
+
+.x-merchant-app .x-mobile-circle-btn svg {
+  width: 18px !important;
+  height: 18px !important;
+  fill: currentColor !important;
+}
+
+.x-merchant-app .x-mobile-profile-btn svg {
+  width: 16px !important;
+  height: 16px !important;
+}
+
+.x-merchant-app .x-mobile-notification-badge {
+  position: absolute !important;
+  top: -3px !important;
+  right: -3px !important;
+  min-width: 18px !important;
+  height: 18px !important;
+  padding: 0 5px !important;
+  border-radius: 9px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: #ef3340 !important;
+  color: #ffffff !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  box-sizing: border-box !important;
+}
+
+.x-merchant-app .x-mobile-operational-row {
+  margin-top: 6px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  width: 100% !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  background: transparent !important;
+  height: 34px !important;
+  min-height: 34px !important;
+}
+
+.x-merchant-app .x-mobile-status-control {
+  height: 34px !important;
+  min-height: 34px !important;
+  min-width: 0 !important;
+  border: 0 !important;
+  border-radius: 17px !important;
+  padding: 0 12px 0 5px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+  background: #ffffff !important;
+  color: #111111 !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  white-space: nowrap !important;
+  cursor: pointer !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,.04) !important;
+}
+
+.x-merchant-app .x-mobile-online-control {
+  margin-left: auto !important;
+  justify-content: flex-end !important;
+  min-width: 0 !important;
+  padding-left: 10px !important;
+  padding-right: 4px !important;
+  gap: 8px !important;
+}
+
+.x-merchant-app .x-mobile-switch {
+  position: relative !important;
+  width: 38px !important;
+  height: 22px !important;
+  flex: 0 0 38px !important;
+  border-radius: 11px !important;
+  background: #ef3340 !important;
+  transition: background .15s ease !important;
+}
+
+.x-merchant-app .x-mobile-switch span {
+  position: absolute !important;
+  top: 2px !important;
+  left: 2px !important;
+  width: 18px !important;
+  height: 18px !important;
+  border-radius: 50% !important;
+  background: #ffffff !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,.25) !important;
+  transition: left .15s ease !important;
+}
+
+.x-merchant-app .x-mobile-switch.is-on {
+  background: #08a94f !important;
+}
+
+.x-merchant-app .x-mobile-switch.is-on span {
+  left: 18px !important;
+}
+
+.x-merchant-app .x-mobile-switch.is-off {
+  background: #ef3340 !important;
+}
+
+.x-merchant-app .x-mobile-switch.is-off span {
+  left: 2px !important;
+}
+
+/* Main Content Area */
+.x-merchant-app .x-dash-main {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  width: 100% !important;
+  max-width: 500px !important;
+  margin: 0 auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  background: #f6f7f7 !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+}
+
+/* Tab Content: Pure flat mobile surface, content scrolls inside */
+.x-merchant-app .x-tab-content {
+  background: #f6f7f7 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  max-width: 500px !important;
+  margin: 0 auto !important;
+  position: relative !important;
+}
+
+.x-merchant-app .x-tab-content.active {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  display: block !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  margin: 0 auto !important;
+  padding: 12px 12px 0 !important;
+  box-sizing: border-box !important;
+}
+
+.x-merchant-app .x-tab-content:not(.active) {
+  display: none !important;
+}
+
+/* Spacer for clearance above bottom navbar */
+.x-merchant-app .x-tab-content.active::after {
+  content: "" !important;
+  display: block !important;
+  height: calc(138px + env(safe-area-inset-bottom, 0px)) !important;
+  width: 100% !important;
+  clear: both !important;
+  flex-shrink: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Bottom Navigation Bar: Locked to mobile shell width, centered at bottom */
+.x-merchant-app .x-merchant-mobile-nav {
+  position: fixed !important;
+  display: grid !important;
+  grid-template-columns: repeat(5, 1fr) !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  max-width: 500px !important;
+  margin: 0 auto !important;
+  z-index: 200 !important;
+  min-height: 68px !important;
+  height: calc(68px + env(safe-area-inset-bottom, 0px)) !important;
+  padding: 8px 4px calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+  box-sizing: border-box !important;
+  background: #ffffff !important;
+  border: 0 !important;
+  border-radius: 28px 28px 0 0 !important;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08) !important;
+}
+
+.x-merchant-app .x-merchant-mobile-nav-item {
+  position: relative !important;
+  min-width: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: #111111 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  padding: 2px 2px 0 !important;
+  cursor: pointer !important;
+  font-size: 11px !important;
+  line-height: 1.1 !important;
+  font-weight: 700 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+.x-merchant-app .x-merchant-mobile-nav-item svg {
+  width: 24px !important;
+  height: 24px !important;
+  color: #111111 !important;
+  fill: currentColor !important;
+  overflow: visible !important;
+  display: block !important;
+  transition: color .15s ease, fill .15s ease !important;
+}
+
+.x-merchant-app .x-merchant-mobile-nav-item > span:not(.x-mobile-nav-badge) {
+  font-size: 11px !important;
+  line-height: 1.1 !important;
+  font-weight: 700 !important;
+  color: #111111 !important;
+  white-space: nowrap !important;
+}
+
+.x-merchant-app .x-merchant-mobile-nav-item.active {
+  color: #08a94f !important;
+  background: transparent !important;
+}
+
+.x-merchant-app .x-merchant-mobile-nav-item.active svg {
+  color: #08a94f !important;
+  fill: #08a94f !important;
+}
+
+.x-merchant-app .x-merchant-mobile-nav-item.active::before {
+  content: "" !important;
+  position: absolute !important;
+  top: -8px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: 48px !important;
+  height: 4px !important;
+  border-radius: 0 0 4px 4px !important;
+  background: #08a94f !important;
+}
+
+.x-merchant-app .x-merchant-mobile-nav .x-mobile-nav-badge,
+.x-merchant-app .x-merchant-mobile-nav-item .x-mobile-nav-badge {
+  position: absolute !important;
+  top: 0 !important;
+  right: calc(50% - 18px) !important;
+  min-width: 18px !important;
+  height: 18px !important;
+  padding: 0 5px !important;
+  border-radius: 9px !important;
+  background: #ef3340 !important;
+  color: #ffffff !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 10px !important;
+  line-height: 1 !important;
+  font-weight: 800 !important;
+  box-sizing: border-box !important;
+}
+
+/* Canonical Mobile Account View (Locked into the identical 500px mobile shell container) */
+.x-merchant-app .x-mobile-account-page {
+  position: fixed !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: 100% !important;
+  max-width: 500px !important;
+  height: 100% !important;
+  height: 100dvh !important;
+  z-index: 1000 !important;
+  display: none !important;
+  flex-direction: column !important;
+  background: #f6f7f7 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  box-sizing: border-box !important;
+  border-left: 1px solid rgba(15, 23, 42, 0.08) !important;
+  border-right: 1px solid rgba(15, 23, 42, 0.08) !important;
+  box-shadow: 0 0 40px rgba(15, 23, 42, 0.06) !important;
+}
+
+@media (max-width: 500px) {
+  .x-merchant-app .x-mobile-account-page {
+    border-left: none !important;
+    border-right: none !important;
+    box-shadow: none !important;
+    left: 0 !important;
+    transform: none !important;
+  }
+}
+
+.x-merchant-app.x-mobile-account-open .x-mobile-account-page,
+body.x-mobile-account-open .x-mobile-account-page {
+  display: flex !important;
+}
+
+.x-merchant-app.x-mobile-account-open .x-dash-layout,
+.x-merchant-app.x-mobile-account-open .x-merchant-mobile-nav,
+body.x-mobile-account-open .x-dash-layout,
+body.x-mobile-account-open .x-merchant-mobile-nav {
+  display: none !important;
+}
+
+/* Header inside Account Page: matches topbar geometry and aesthetic */
+.x-merchant-app .x-mobile-account-header {
+  height: 52px !important;
+  min-height: 52px !important;
+  padding: max(8px, env(safe-area-inset-top, 0px)) 16px 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  background: #ffffff !important;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 20 !important;
+}
+
+.x-merchant-app .x-mobile-account-header h1 {
+  margin: 0 !important;
+  font-size: 18px !important;
+  line-height: 1.2 !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.3px !important;
+  color: #0f172a !important;
+}
+
+.x-merchant-app .x-mobile-account-back {
+  width: 36px !important;
+  height: 36px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: #f1f5f9 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #0f172a !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+  transition: background .15s ease !important;
+}
+
+.x-merchant-app .x-mobile-account-back:hover {
+  background: #e2e8f0 !important;
+}
+
+.x-merchant-app .x-mobile-account-statusbar-spacer {
+  height: env(safe-area-inset-top, 0px) !important;
+  width: 100% !important;
+  background: #ffffff !important;
+}
+
+.x-merchant-app .x-mobile-account-content {
+  width: 100% !important;
+  padding: 16px 16px 36px !important;
+  box-sizing: border-box !important;
+  flex: 1 1 auto !important;
+}
+
+/* Subpage View: Clean fullscreen native view for Akun subpages */
+body.is-subpage-view .x-dash-topbar,
+.x-merchant-app.is-subpage-view .x-dash-topbar {
+  display: none !important;
+}
+
+body.is-subpage-view .x-merchant-mobile-nav,
+.x-merchant-app.is-subpage-view .x-merchant-mobile-nav {
+  display: none !important;
+}
+
+body.is-subpage-view .x-tab-content.active,
+.x-merchant-app.is-subpage-view .x-tab-content.active {
+  padding: max(16px, env(safe-area-inset-top, 0px)) 16px calc(36px + env(safe-area-inset-bottom, 0px)) !important;
+  background: #f6f7f7 !important;
+  min-height: 100vh !important;
+}
+
+body.is-subpage-view .x-tab-content.active::after,
+.x-merchant-app.is-subpage-view .x-tab-content.active::after {
+  display: none !important;
+  height: 0 !important;
+}
+
+/* Unified Mobile Subpage Header (outside card, clean native typography) */
+.x-merchant-app .x-subpage-header {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 12px !important;
+  min-height: 44px !important;
+  margin-bottom: 20px !important;
+  padding: 4px 2px !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+}
+
+.x-merchant-app .x-subpage-back-btn {
+  flex: 0 0 40px !important;
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 50% !important;
+  border: 1px solid rgba(15, 23, 42, 0.08) !important;
+  background: #ffffff !important;
+  color: #0f172a !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04) !important;
+  transition: background 0.15s ease, transform 0.1s ease !important;
+  padding: 0 !important;
+  margin-top: 1px !important;
+}
+
+.x-merchant-app .x-subpage-back-btn:hover {
+  background: #f1f5f9 !important;
+}
+
+.x-merchant-app .x-subpage-back-btn:active {
+  transform: scale(0.92) !important;
+}
+
+.x-merchant-app .x-subpage-header-copy {
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-start !important;
+}
+
+.x-merchant-app .x-subpage-header-copy h3 {
+  margin: 0 !important;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
+  font-size: 20px !important;
+  line-height: 1.25 !important;
+  font-weight: 800 !important;
+  color: #0f172a !important;
+  letter-spacing: -0.3px !important;
+}
+
+.x-merchant-app .x-subpage-header-copy p {
+  margin: 4px 0 0 !important;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
+  font-size: 13px !important;
+  line-height: 1.45 !important;
+  color: #64748b !important;
+}
+
+.x-merchant-app .x-subpage-content {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 14px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Backward compatibility for x-subpage-navbar */
+.x-merchant-app .x-subpage-navbar {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 12px !important;
+  min-height: 44px !important;
+  margin-bottom: 16px !important;
+  padding: 4px 2px !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+}
+
+.x-merchant-app .x-subpage-navbar-left {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 12px !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+}
+
+.x-merchant-app .x-subpage-navbar-text h3 {
+  margin: 0 !important;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
+  font-size: 19px !important;
+  line-height: 1.25 !important;
+  font-weight: 800 !important;
+  color: #0f172a !important;
+}
+
+.x-merchant-app .x-subpage-navbar-text p {
+  margin: 3px 0 0 !important;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
+  font-size: 12.5px !important;
+  line-height: 1.4 !important;
+  color: #64748b !important;
+}
+
+.x-merchant-app .x-subpage-nav-btn {
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 50% !important;
+  border: 1px solid rgba(15, 23, 42, 0.08) !important;
+  background: #ffffff !important;
+  color: #0f172a !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04) !important;
+  transition: background 0.15s ease, transform 0.1s ease !important;
+  padding: 0 !important;
+  flex-shrink: 0 !important;
+  margin-top: 1px !important;
+}
+
+.x-merchant-app .x-subpage-close-btn {
+  color: #64748b !important;
+}
+
+.x-merchant-app .x-subpage-close-btn:hover {
+  color: #0f172a !important;
+}

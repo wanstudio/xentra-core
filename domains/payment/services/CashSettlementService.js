@@ -54,7 +54,10 @@ class CashSettlementService {
       // Completed Order Exception (Contract v1.1):
       // Normal COD state is Delivery = delivered, Order = completed, Payment = pending.
       // Order completion does not close the payment lifecycle for cash/COD.
-      // Blanket terminal-order guard must not block cash settlement when payment_method is cash.
+      // Non-COD orders (dine_in, take_away, etc.) in 'completed' state must strictly reject cash settlement.
+      if (order.order_type !== 'delivery') {
+        throw new Error(`[CashSettlementService] Tidak dapat menyelesaikan pembayaran tunai untuk pesanan yang sudah berada pada status terminal "${order.status}".`);
+      }
       if (order.payment_method !== 'cash') {
         throw new Error(`[CashSettlementService] Tidak dapat menyelesaikan pembayaran tunai untuk pesanan "${order_id}" yang sudah selesai dan bukan pembayaran tunai/COD.`);
       }
@@ -276,6 +279,24 @@ class CashSettlementService {
         settled_at: now
       }
     }).catch(() => {});
+
+    try {
+      const { NotificationService } = require('../../../core');
+      const notifService = new NotificationService(paymentRepository.db);
+      notifService.createNotification({
+        brand_id: order.brand_id,
+        branch_id: order.branch_id,
+        source_type: 'payment',
+        title: 'Pembayaran Diterima!',
+        body: `Pembayaran pesanan #${order.order_number} senilai Rp ${(expectedAmount || 0).toLocaleString('id-ID')} telah lunas.`,
+        priority: 'normal',
+        target_role: null, // Broadcast to branch manager & cashier
+        target_scope: 'branch',
+        related_entity_type: 'payment',
+        related_entity_id: actualPaymentId,
+        action_url: `/pos/`
+      });
+    } catch (_) {}
 
     return {
       success: true,

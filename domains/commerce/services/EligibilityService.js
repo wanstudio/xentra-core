@@ -156,9 +156,12 @@ class EligibilityService {
       return { eligible: false, reasons: [EligibilityService.REASONS.PRODUCT_UNAVAILABLE], branch_id, brand_id, product_id, quantity: qty };
     }
 
-    const stock = bp.stock != null ? Number(bp.stock) : 0;
-    if (stock < qty) {
-      return { eligible: false, reasons: [EligibilityService.REASONS.INSUFFICIENT_STOCK], branch_id, brand_id, product_id, quantity: qty };
+    const isByOrder = String(product.fulfillment_type || '').toUpperCase() === 'BY_ORDER';
+    if (!isByOrder) {
+      const stock = bp.stock != null ? Number(bp.stock) : 0;
+      if (stock < qty) {
+        return { eligible: false, reasons: [EligibilityService.REASONS.INSUFFICIENT_STOCK], branch_id, brand_id, product_id, quantity: qty };
+      }
     }
 
     return { eligible: true, reasons: [], branch_id, brand_id, product_id, quantity: qty };

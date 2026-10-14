@@ -25,7 +25,7 @@ class EligibilityRepository {
 
   findProductForEligibility({ productId, brandId }) {
     return this.db.queryOne(
-      'SELECT id, name, is_active FROM products WHERE id = ? AND brand_id = ?',
+      'SELECT id, name, is_active, COALESCE(fulfillment_type, \'BY_STOCK\') AS fulfillment_type FROM products WHERE id = ? AND brand_id = ?',
       [productId, brandId]
     );
   }

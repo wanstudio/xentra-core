@@ -220,6 +220,41 @@ class ComposedMenuService {
     });
   }
 
+  static normalizeProductComponents(value) {
+    if (!Array.isArray(value) || value.length === 0) {
+      throw new Error('MENU_PACKAGE_COMPONENTS_REQUIRED');
+    }
+
+    const components = value.map((item, index) => {
+      if (!item || typeof item !== 'object') {
+        throw new Error('MENU_PACKAGE_COMPONENT_INVALID');
+      }
+
+      const productId = String(item.product_id ?? item.productId ?? '').trim();
+      if (!productId) throw new Error('MENU_PACKAGE_PRODUCT_REQUIRED');
+
+      const quantity = Number(item.quantity ?? 1);
+      if (!Number.isInteger(quantity) || quantity <= 0) {
+        throw new Error('MENU_PACKAGE_COMPONENT_QUANTITY_INVALID');
+      }
+
+      return { productId, quantity, sortOrder: index };
+    });
+
+    const seen = new Set();
+    for (const component of components) {
+      if (seen.has(component.productId)) {
+        throw new Error('MENU_PACKAGE_DUPLICATE_PRODUCT');
+      }
+      seen.add(component.productId);
+    }
+
+    const totalUnits = components.reduce((sum, item) => sum + item.quantity, 0);
+    if (totalUnits < 2) throw new Error('MENU_PACKAGE_MIN_TWO_UNITS');
+
+    return components;
+  }
+
   /**
    * Contract v4 Canonical Menu Creation (§1, §2, §3, §4, §7, §9, §11, §14):
    * - Category: required
@@ -235,6 +270,7 @@ class ComposedMenuService {
     titleId,
     subCategoryId = null,
     menuType = null,
+    packageName = null,
     rasaId = null,
     description = null,
     spiceEnabled = false,
@@ -279,15 +315,14 @@ class ComposedMenuService {
       }
     }
 
+    const resolvedMenuType = menuType || (normalizedItems.length === 1 && Number(normalizedItems[0].quantity) === 1 ? 'SINGLE' : 'PACKAGE');
     let finalDescription = description !== null && description !== undefined ? String(description).trim() : null;
-    if (!finalDescription && normalizedItems.length > 0) {
+    if (!finalDescription && resolvedMenuType === 'PACKAGE' && normalizedItems.length > 0) {
       finalDescription = normalizedItems.map(it => {
         const prod = repository.findProduct({ brandId, productId: it.productId });
         return (it.quantity > 1 ? `${it.quantity}x ` : '') + (prod ? prod.name : '');
       }).filter(Boolean).join(' + ');
     }
-
-    const resolvedMenuType = menuType || (normalizedItems.length === 1 && Number(normalizedItems[0].quantity) === 1 ? 'SINGLE' : 'PACKAGE');
     const id = makeId('menu');
     repository.begin();
     try {
@@ -299,7 +334,7 @@ class ComposedMenuService {
         titleId: title.id,
         subCategoryId: subCategoryId || null,
         rasaId: resolvedRasa ? resolvedRasa.id : null,
-        packageName: null,
+        packageName: packageName !== undefined && packageName !== null ? packageName : (resolvedMenuType === 'PACKAGE' ? title.name : null),
         description: finalDescription,
         sellingPrice: price,
         costPrice: cost,
@@ -328,6 +363,7 @@ class ComposedMenuService {
   static updateMenu({
     brandId,
     menuId,
+    packageName = undefined,
     categoryId,
     titleId,
     subCategoryId = undefined,
@@ -406,24 +442,43 @@ class ComposedMenuService {
       }
     }
 
+    const nextMenuType = normalizedItems.length === 1 && Number(normalizedItems[0].quantity) === 1 ? 'SINGLE' : 'PACKAGE';
+    let finalDescription = description === undefined
+      ? current.description
+      : (description === null || description === '' ? null : String(description).trim());
+
+    if (!finalDescription && nextMenuType === 'PACKAGE' && normalizedItems.length > 0) {
+      finalDescription = normalizedItems.map(it => {
+        const prod = repository.findProduct({ brandId, productId: it.productId });
+        return (it.quantity > 1 ? `${it.quantity}x ` : '') + (prod ? prod.name : '');
+      }).filter(Boolean).join(' + ');
+    }
+
+    const fieldsToUpdate = {
+      category_id: category.id,
+      title_id: title.id,
+      sub_category_id: nextSubCategoryId,
+      rasa_id: resolvedRasa ? resolvedRasa.id : null,
+      description: finalDescription,
+      selling_price: nextPrice,
+      cost_price: nextCost,
+      spice_enabled: nextSpice.enabled,
+      spice_level: nextSpice.level,
+      menu_type: nextMenuType,
+      status: nextStatus
+    };
+    if (packageName !== undefined) {
+      fieldsToUpdate.package_name = packageName;
+    } else if (title) {
+      fieldsToUpdate.package_name = title.name;
+    }
+
     repository.begin();
     try {
       repository.updateMenu({
         brandId,
         menuId,
-        fields: {
-          category_id: category.id,
-          title_id: title.id,
-          sub_category_id: nextSubCategoryId,
-          rasa_id: resolvedRasa ? resolvedRasa.id : null,
-          description: nextDescription,
-          selling_price: nextPrice,
-          cost_price: nextCost,
-          spice_enabled: nextSpice.enabled,
-          spice_level: nextSpice.level,
-          menu_type: normalizedItems.length === 1 && Number(normalizedItems[0].quantity) === 1 ? 'SINGLE' : 'PACKAGE',
-          status: nextStatus
-        }
+        fields: fieldsToUpdate
       });
 
       repository.replaceMenuItems({ menuId, items: normalizedItems });
@@ -493,6 +548,21 @@ class ComposedMenuService {
     ensureSchema();
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
 
+    const resolvedRasa = rasaId
+      ? repository.findRasa({ brandId, rasaId })
+      : ComposedMenuService.ensureOriginalRasa({ brandId });
+    if (!resolvedRasa) throw new Error('RASA_NOT_FOUND');
+    if (resolvedRasa.is_active === 0) throw new Error('RASA_INACTIVE');
+
+    if (subCategoryId) {
+      const duplicate = repository.findSingleMenuByIdentity({
+        brandId,
+        subCategoryId,
+        rasaId: resolvedRasa.id
+      });
+      if (duplicate) throw new Error('MENU_SATUAN_ALREADY_EXISTS');
+    }
+
     let effCategoryId = categoryId;
     let effTitleId = titleId;
 
@@ -523,7 +593,8 @@ class ComposedMenuService {
       categoryId: effCategoryId,
       titleId: effTitleId,
       subCategoryId,
-      rasaId,
+      menuType: 'SINGLE',
+      rasaId: resolvedRasa.id,
       sellingPrice,
       costPrice,
       status,
@@ -576,6 +647,7 @@ class ComposedMenuService {
     packageName,
     categoryId = null,
     titleId = null,
+    subCategoryId = null,
     rasaId = null,
     sellingPrice,
     costPrice = 0,
@@ -585,8 +657,21 @@ class ComposedMenuService {
     ensureSchema();
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
 
+    const normalizedComponents = ComposedMenuService.normalizeProductComponents(components);
+
     let effCategoryId = categoryId;
     let effTitleId = titleId;
+
+    if (subCategoryId) {
+      const sub = repository.db.queryOne('SELECT id, category_id, name FROM sub_categories WHERE id = ?', [subCategoryId]);
+      if (sub) {
+        if (!effCategoryId) effCategoryId = sub.category_id;
+        if (!effTitleId) {
+          const title = ComposedMenuService.createMenuTitle({ brandId, name: sub.name });
+          effTitleId = title.id;
+        }
+      }
+    }
 
     if (!effCategoryId) {
       const cat = repository.db.queryOne('SELECT id FROM categories WHERE brand_id = ? AND is_active = 1 LIMIT 1', [brandId]);
@@ -597,20 +682,18 @@ class ComposedMenuService {
       effTitleId = title.id;
     }
 
-    const items = components.map(c => ({
-      productId: c.productId || c.product_id,
-      quantity: Number(c.quantity || 1)
-    }));
-
     return ComposedMenuService.createMenu({
       brandId,
       categoryId: effCategoryId,
       titleId: effTitleId,
+      subCategoryId,
+      menuType: 'PACKAGE',
+      packageName: packageName || null,
       rasaId,
       sellingPrice,
       costPrice,
       status,
-      items
+      items: normalizedComponents
     });
   }
 
@@ -648,24 +731,40 @@ class ComposedMenuService {
       effTitleId = title.id;
     }
 
-    const items = Array.isArray(components)
-      ? components.map(c => ({
-          productId: c.productId || c.product_id,
-          quantity: Number(c.quantity || 1)
-        }))
-      : undefined;
+    const currentItems = repository.listMenuItems({ brandId, menuIds: [menuId] });
+    const normalizedComponents = components === undefined
+      ? currentItems.map(item => ({ productId: item.product_id, quantity: Number(item.quantity) }))
+      : ComposedMenuService.normalizeProductComponents(components);
+
+    if (!Array.isArray(normalizedComponents) || normalizedComponents.length === 0) {
+      throw new Error('MENU_PACKAGE_COMPONENTS_REQUIRED');
+    }
+    const normalizedProductIds = new Set();
+    for (const component of normalizedComponents) {
+      if (!component || !component.productId || !Number.isSafeInteger(Number(component.quantity)) || Number(component.quantity) <= 0) {
+        throw new Error('MENU_PACKAGE_COMPONENT_INVALID');
+      }
+      if (normalizedProductIds.has(String(component.productId))) {
+        throw new Error('MENU_PACKAGE_DUPLICATE_PRODUCT');
+      }
+      normalizedProductIds.add(String(component.productId));
+    }
+    const totalUnits = normalizedComponents.reduce((sum, item) => sum + Number(item.quantity), 0);
+    if (totalUnits < 2) throw new Error('MENU_PACKAGE_MIN_TWO_UNITS');
 
     return ComposedMenuService.updateMenu({
       brandId,
       menuId,
+      packageName: packageName !== undefined ? packageName : current.package_name,
       categoryId: effCategoryId,
       titleId: effTitleId,
+      subCategoryId,
       rasaId: rasaId === undefined ? current.rasa_id : rasaId,
       description,
       sellingPrice: sellingPrice === undefined ? current.selling_price : sellingPrice,
       costPrice: costPrice === undefined ? current.cost_price : costPrice,
       status: status === undefined ? current.status : status,
-      items
+      items: normalizedComponents
     });
   }
 

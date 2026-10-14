@@ -496,8 +496,37 @@ app.get(['/pos/sw.js', '/pos-app/sw.js', '/pos/service-worker.js', '/pos-app/ser
   res.setHeader('Service-Worker-Allowed', '/');
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
   res.sendFile(path.join(__dirname, '../apps/pos-app/sw.js'));
+});
+
+// Purchasing PWA Manifest & Service Worker Routes
+app.get(['/belanja/manifest.json', '/purchasing/manifest.json', '/purchasing-app/manifest.json'], async (req, res) => {
+  res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+
+  const manifestPath = path.join(__dirname, '../apps/purchasing-app/manifest.json');
+  try {
+    const data = applyCanonicalPwaTheme(JSON.parse(fs.readFileSync(manifestPath, 'utf8')));
+    const brand = await resolveBrandForManifest(req);
+    if (brand && brand.name) {
+      data.name = brand.name + ' Belanja';
+      data.short_name = (brand.name + ' Belanja').substring(0, 12);
+    }
+    const iconOverride = brand ? (brand.logo_url || null) : null;
+    data.icons = buildPwaIcons(iconOverride, '/belanja/assets/icons/icon-192.png', '/belanja/assets/icons/icon-512.png');
+    return res.json(data);
+  } catch (_) {
+    return res.sendFile(manifestPath);
+  }
+});
+
+app.get(['/belanja/sw.js', '/purchasing/sw.js', '/purchasing-app/sw.js', '/belanja/service-worker.js'], (req, res) => {
+  res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+  res.setHeader('Service-Worker-Allowed', '/');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.sendFile(path.join(__dirname, '../apps/purchasing-app/sw.js'));
 });
 
 // Serve Public Static Assets — setHeaders ensures Cloudflare does not cache JS/CSS
@@ -745,7 +774,7 @@ app.get(['/driver/manifest.json', '/driver-app/manifest.json'], (req, res) => {
 
 app.get(['/driver/sw.js', '/driver-app/sw.js', '/driver/service-worker.js', '/driver-app/service-worker.js'], (req, res) => {
   res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
-  res.setHeader('Service-Worker-Allowed', '/driver/');
+  res.setHeader('Service-Worker-Allowed', '/');
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(__dirname, '../apps/driver-app/sw.js'));
 });
@@ -792,8 +821,47 @@ app.get([/^\/pos(\/.*)?$/, /^\/pos-app(\/.*)?$/], async (req, res) => {
       }
     }
   }
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(__dirname, '../apps/pos-app/index.html'));
+});
+
+// Purchasing App Assets (standalone shopping & receiving operational surface)
+app.use(['/belanja/assets', '/purchasing/assets', '/purchasing-app/assets'], express.static(path.join(__dirname, '../apps/purchasing-app/assets'), {
+  maxAge: 0,
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+}));
+
+// Purchasing App entry point: m.<clientdomain>/belanja
+app.get([/^\/belanja(\/.*)?$/, /^\/purchasing(\/.*)?$/, /^\/purchasing-app(\/.*)?$/], async (req, res) => {
+  if (!isSaaSHost(req)) {
+    const cleanHost = (req.headers.host || '').split(':')[0].trim().toLowerCase();
+    await brandRepository.ready();
+    const brand = brandRepository.findByCustomDomain(cleanHost);
+    if (!brand) {
+      return res.status(404).json({
+        success: false,
+        error: 'TENANT_NOT_FOUND',
+        message: 'Brand/Tenant tidak ditemukan untuk host yang diberikan.'
+      });
+    }
+
+    const subType = getRequestSubdomainType(req);
+    // If on customer (app.) or pos, redirect to managerial m.* domain
+    if (process.env.NODE_ENV !== 'test') {
+      const base = getBaseTenantDomain(req);
+      if (subType === 'pos' || subType === 'customer' || cleanHost.startsWith('app.')) {
+        if (base && base !== cleanHost) {
+          const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+          return res.redirect(302, `${proto}://m.${base}/belanja/`);
+        }
+      }
+    }
+  }
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, '../apps/purchasing-app/index.html'));
 });
 
 // Health Check with Persistence & DB Readiness Verification

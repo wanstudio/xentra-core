@@ -6,10 +6,13 @@
   <title>Xentra Core — Portal Pemilik Resto & Dashboard</title>
   <!-- Shared merchant infrastructure — design tokens, toast, action-menu, crop editor -->
   <link rel="stylesheet" href="/merchant-shared/fonts/plus-jakarta-sans.css?v=1.0.0">
-  <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.4">
-  <link rel="stylesheet" href="/merchant-shared/css/presentation-shells.css?v=1.0.3">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.52">
-  <link rel="stylesheet" href="/merchant-shared/css/ui-primitives.css?v=1.0.0">
+  <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.5">
+  <link rel="stylesheet" href="/merchant-shared/css/presentation-shells.css?v=1.0.4">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.57">
+  <link rel="stylesheet" href="/merchant-shared/css/modules/marketing.css?v=1.0.0">
+  <link rel="stylesheet" href="/merchant-shared/css/modules/stock.css?v=1.0.2">
+  <link rel="stylesheet" href="/merchant-shared/css/modules/catalog.css?v=1.0.0">
+  <link rel="stylesheet" href="/merchant-shared/css/ui-primitives.css?v=1.0.1">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#ffffff">
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
@@ -2177,8 +2180,7 @@
                   <p style="margin:0 0 14px 0;font-size:12px;color:#64748B;">Pilih, atau tambahkan kategori sesuai dengan menu yang ingin kamu buat.</p>
                   <div style="display:flex;gap:8px;">
                     <div style="position:relative;flex:1;">
-                      <select id="cm-category" class="x-input" required style="width:100%;height:44px;border-radius:12px;border:1px solid #CBD5E1;padding:0 36px 0 14px;font-size:13px;background:#FFFFFF;appearance:none;-webkit-appearance:none;box-sizing:border-box;color:#0F172A;"></select>
-                      <svg style="position:absolute;right:14px;top:50%;transform:translateY(-50%);pointer-events:none;color:#64748B;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+                      <select id="cm-category" class="x-input" required style="width:100%;height:44px;border-radius:12px;border:1px solid #CBD5E1;padding:0 14px;font-size:13px;background:#FFFFFF;appearance:none;-webkit-appearance:none;box-sizing:border-box;color:#0F172A;"></select>
                     </div>
                     <button type="button" id="btn-quick-add-category" class="x-btn-secondary" style="width:44px;height:44px;min-width:44px;border-radius:12px;border:1px solid #CBD5E1;background:#FFFFFF;display:flex;align-items:center;justify-content:center;color:#475569;cursor:pointer;" title="Tambah Kategori">
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -2195,7 +2197,7 @@
                     <span id="cm-title-char-count">0</span>/150
                   </div>
                   <!-- Hidden select for compatibility with title repository/tests -->
-                  <select id="cm-title" style="display:none;"></select>
+                  <select id="cm-title" data-no-enhance="1" hidden style="display:none !important;"></select>
                   <button type="button" id="btn-quick-add-title" style="display:none;">+</button>
                 </div>
 
@@ -2213,18 +2215,17 @@
                   </button>
 
                   <!-- Hidden backward compatibility elements -->
-                  <div id="master-menu-single-fields" style="display:none;"><select id="cm-product"></select></div>
+                  <div id="master-menu-single-fields" style="display:none;"><select id="cm-product" data-no-enhance="1" hidden style="display:none !important;"></select></div>
                   <div id="master-menu-package-fields" style="display:none;"><input type="text" id="cm-package-name"><div id="cm-package-components"></div><button type="button" id="btn-cm-add-component"></button></div>
-                  <div style="display:none;"><select id="cm-rasa"></select><button type="button" id="btn-quick-add-rasa"></button><input type="checkbox" id="cm-spice-toggle"><input type="hidden" id="cm-spice-level-val"><div id="cm-spice-scale-wrapper"><div id="cm-spice-dots-row"></div></div></div>
+                  <div style="display:none;"><select id="cm-rasa" data-no-enhance="1" hidden style="display:none !important;"></select><button type="button" id="btn-quick-add-rasa"></button><input type="checkbox" id="cm-spice-toggle"><input type="hidden" id="cm-spice-level-val"><div id="cm-spice-scale-wrapper"><div id="cm-spice-dots-row"></div></div></div>
                 </div>
 
                 <!-- 4b. KETERANGAN ISI (DESKRIPSI) CARD -->
                 <div class="x-card" id="cm-desc-card" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
-                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                  <div style="margin-bottom:4px;">
                     <h4 style="margin:0;font-size:16px;font-weight:700;color:#0F172A;">Keterangan isi</h4>
-                    <span style="font-size:11px;color:#94A3B8;font-weight:500;">Otomatis dari item / bisa diedit</span>
                   </div>
-                  <p style="margin:0 0 12px 0;font-size:12px;color:#64748B;">Ringkasan komposisi item yang akan dilihat kasir atau pelanggan (contoh: Ayam Tulang Lunak + Nasi + Tempe).</p>
+                  <p style="margin:0 0 12px 0;font-size:12px;color:#64748B;">Komposisi item yang dilihat customer kamu, ini terisi otomatis, edit jika memang diperlukan.</p>
                   <input type="text" id="cm-description-input" class="x-input" placeholder="contoh: Ayam Tulang Lunak + Nasi + Tempe" style="width:100%;height:44px;border-radius:12px;border:1px solid #CBD5E1;padding:0 14px;font-size:14px;color:#0F172A;box-sizing:border-box;">
                 </div>
 
@@ -2250,7 +2251,7 @@
                     Harga jual (Rp) <span style="font-size:13px;font-weight:400;color:#64748B;font-style:italic;">termasuk pajak</span>
                   </h4>
                   <p style="margin:0 0 14px 0;font-size:12px;color:#64748B;line-height:1.45;">
-                    Tentukan harga jual menu ini, kamu bisa pilih harga tetap (Fixed) atau rentang harga (Range) sesuai kebutuhanmu. <a href="javascript:void(0)" style="color:#0284C7;text-decoration:none;">Pelajari tentang harga Range</a>
+                    Tentukan harga jual menu ini, kamu bisa pilih harga tetap (Fixed) atau rentang harga (Range) sesuai kebutuhanmu.
                   </p>
 
                   <!-- Tabs: Fixed vs Range -->
@@ -2266,6 +2267,7 @@
 
                   <!-- Range Mode Input -->
                   <div id="price-mode-range-container" style="display:none;">
+                    <p style="margin:0 0 10px 0;font-size:12px;color:#64748B;font-style:italic;">cabang yang kamu miliki, bisa menjual menu di range harga ini</p>
                     <div style="display:flex;gap:12px;align-items:center;">
                       <div style="flex:1;">
                         <label style="display:block;font-size:11px;font-weight:600;color:#64748B;margin-bottom:4px;">Min (Rp)</label>
@@ -2289,7 +2291,7 @@
                     <h4 style="margin:0;font-size:16px;font-weight:700;color:#0F172A;">Preview Customer</h4>
                     <span class="x-badge x-badge-info" style="font-size:11px;">Live</span>
                   </div>
-                  <p style="margin:0 0 14px 0;font-size:12px;color:#64748B;">Seperti inilah yang akan pelanggan kamu lihat di Customer PWA.</p>
+                  <p style="margin:0 0 14px 0;font-size:12px;color:#64748B;">Seperti inilah yang akan pelanggan kamu lihat di aplikasi customer.</p>
 
                   <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:16px;padding:16px;display:flex;justify-content:space-between;align-items:stretch;gap:14px;">
                     <div style="flex:1;display:flex;flex-direction:column;justify-content:space-between;">
@@ -2321,7 +2323,7 @@
                     <input type="checkbox" id="cm-toggle-active" checked>
                     <span class="x-toggle-slider"></span>
                   </label>
-                  <select id="cm-status" style="display:none;">
+                  <select id="cm-status" data-no-enhance="1" hidden style="display:none !important;">
                     <option value="ACTIVE" selected>Aktif</option>
                     <option value="DRAFT">Draft</option>
                     <option value="ARCHIVED">Arsip</option>
@@ -2675,7 +2677,7 @@
 
       <!-- OWNER STOCK OVERVIEW — read-only inventory health for Owner -->
       <section id="tab-stock" class="x-tab-content" data-tab="stock">
-        <div class="x-owner-stock-view">
+        <div class="x-owner-stock-view" id="owner-stock-main-view">
 
           <div class="x-owner-stock-header">
             <div class="x-owner-child-mobile-header">
@@ -2685,22 +2687,18 @@
               </h3>
               <p class="x-owner-mobile-page-sub">Pantau kesehatan persediaan seluruh cabang tanpa mengubah stok operasional.</p>
             </div>
-            <div class="x-owner-stock-header-actions">
-              <span class="x-owner-stock-scope" id="owner-stock-scope">Semua Cabang</span>
-              <button type="button" class="x-btn-secondary" id="btn-owner-stock-refresh" style="font-size:12px; padding:5px 12px; border-radius:8px;">↻ Segarkan</button>
-            </div>
           </div>
 
           <!-- Stock Sub-navigation Tabs -->
           <div class="x-subnav-tabs" id="stock-subnav-tabs">
             <button type="button" class="x-subnav-tab active" id="btn-subtab-stock-branches" data-subtab="branches" onclick="switchStockSubtab('branches')">
-              Stok Cabang (Produk Jadi)
+              Stok Menu di Cabang
             </button>
             <button type="button" class="x-subnav-tab" id="btn-subtab-stock-replenishment" data-subtab="replenishment" onclick="switchStockSubtab('replenishment')">
               ⚡ Saran Belanja (Pengadaan)
             </button>
             <button type="button" class="x-subnav-tab" id="btn-subtab-stock-mandates" data-subtab="mandates" onclick="switchStockSubtab('mandates')">
-              📋 Mandat Belanja
+              📋 Tugas Belanja
             </button>
             <button type="button" class="x-subnav-tab" id="btn-subtab-stock-recipes" data-subtab="recipes" onclick="switchStockSubtab('recipes')">
               Resep Masakan
@@ -2757,56 +2755,15 @@
               </div>
             </div>
 
-            <div class="x-owner-stock-grid">
-              <section class="x-owner-stock-panel x-owner-stock-attention-panel">
-                <div class="x-owner-stock-panel-head">
-                  <div>
-                    <h3>Perlu Perhatian</h3>
-                    <p>Item yang sudah mencapai atau melewati batas minimum.</p>
-                  </div>
-                  <button type="button" class="x-owner-stock-link" id="btn-owner-stock-full-report">Lihat laporan
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
-                  </button>
-                </div>
-                <div id="owner-stock-alerts-list" class="x-owner-stock-alerts" aria-live="polite">
-                  <div class="x-owner-stock-loading">Memuat stok...</div>
-                </div>
-              </section>
-
-              <section class="x-owner-stock-panel">
-                <div class="x-owner-stock-panel-head">
-                  <div>
-                    <h3>Status Cabang</h3>
-                    <p>Ringkasan stok per cabang.</p>
-                  </div>
-                </div>
-                <div id="owner-stock-branch-list" class="x-owner-stock-branches" aria-live="polite">
-                  <div class="x-owner-stock-loading">Memuat cabang...</div>
-                </div>
-              </section>
-            </div>
-
-            <section class="x-owner-stock-panel">
-              <div class="x-owner-stock-panel-head">
-                <div>
-                  <h3>Mutasi Persediaan</h3>
-                  <p>Ringkasan seluruh pergerakan stok yang tercatat di Core.</p>
-                </div>
-              </div>
-              <div id="owner-stock-movement-list" class="x-owner-stock-movements" aria-live="polite">
-                <div class="x-owner-stock-loading">Memuat mutasi...</div>
-              </div>
-            </section>
-
             <section class="x-owner-stock-panel">
               <div class="x-owner-stock-panel-head">
                 <div>
                   <h3>Daftar Stok Seluruh Menu & Produk</h3>
                   <p>Semua produk aktif cabang beserta sisa stok fisik dan batas minimum.</p>
                 </div>
-                <div style="display:flex; gap:8px; align-items:center;">
-                  <input type="search" id="input-search-owner-stock-items" class="x-input" placeholder="🔍 Cari nama produk / SKU..." oninput="onOwnerStockItemsSearch(this.value)" autocomplete="off" style="font-size:12px; padding:6px 12px; width:200px; border-radius:8px;">
-                  <select id="select-filter-owner-stock-status" class="x-input" onchange="onOwnerStockStatusFilter(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px;">
+                <div class="x-owner-stock-panel-controls">
+                  <input type="search" id="input-search-owner-stock-items" class="x-input x-owner-stock-search" placeholder="🔍 Cari nama produk / SKU..." oninput="onOwnerStockItemsSearch(this.value)" autocomplete="off">
+                  <select id="select-filter-owner-stock-status" class="x-input x-owner-stock-filter-select" onchange="onOwnerStockStatusFilter(this.value)">
                     <option value="all">Semua Status</option>
                     <option value="safe">🟢 Stok Aman</option>
                     <option value="low">🟡 Stok Menipis</option>
@@ -2814,7 +2771,7 @@
                   </select>
                 </div>
               </div>
-              <div id="owner-stock-all-items-container" style="padding:12px 16px;">
+              <div id="owner-stock-all-items-container" class="x-owner-stock-items-wrap">
                 <div class="x-owner-stock-loading">Memuat seluruh data stok...</div>
               </div>
             </section>
@@ -2827,15 +2784,9 @@
 
           <!-- SUBTAB CONTENT: SARAN BELANJA (PENGADAAN OTOMATIS BERBASIS RESEP) -->
           <div id="subtab-content-stock-replenishment" style="display:none;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
-              <div>
-                <h3 style="margin:0 0 4px 0; font-size:16px; font-weight:700; color:#0F172A;">Rekomendasi Pembelian Bahan Baku</h3>
-                <p style="margin:0; font-size:13px; color:#64748B;">Dihitung otomatis dari defisit target menu & resep dapur, dikurangi sisa stok fisik, dan dibulatkan sesuai MOQ supplier.</p>
-              </div>
-              <button type="button" class="x-btn-secondary" onclick="loadOwnerReplenishmentSuggestions()" style="display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:8px; font-weight:600; font-size:13px; cursor:pointer;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-                <span>Hitung Ulang</span>
-              </button>
+            <div style="margin-bottom:16px;">
+              <h3 style="margin:0 0 4px 0; font-size:16px; font-weight:700; color:#0F172A;">Rekomendasi Pembelian Bahan Baku</h3>
+              <p style="margin:0; font-size:13px; color:#64748B;">Daftar bahan baku yang perlu segera dibeli berdasarkan sisa stok dan kebutuhan menu.</p>
             </div>
 
             <div class="x-owner-stock-panel" style="background:#FFFFFF; border-radius:12px; border:1px solid #E2E8F0; padding:16px;">
@@ -2848,39 +2799,31 @@
             </div>
           </div>
 
-          <!-- SUBTAB CONTENT: MANDAT BELANJA (PENGADAAN PASAR CABANG) -->
+          <!-- SUBTAB CONTENT: TUGAS BELANJA (PENGADAAN PASAR CABANG) -->
           <div id="subtab-content-stock-mandates" style="display:none;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
-              <div>
-                <h3 style="margin:0 0 4px 0; font-size:16px; font-weight:700; color:#0F172A;">Daftar Mandat Belanja Pasar</h3>
-                <p style="margin:0; font-size:13px; color:#64748B;">Kelola mandat belanja cabang, sesuaikan jumlah yang harus dibeli, atur uang kasbon, edit, arsipkan, atau hapus mandat.</p>
-              </div>
-              <div style="display:flex; gap:8px;">
-                <button type="button" class="x-btn-secondary" onclick="loadOwnerMandates()" style="display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:8px; font-weight:600; font-size:13px; cursor:pointer;">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-                  <span>Segarkan</span>
-                </button>
-              </div>
+            <div style="margin-bottom:16px;">
+              <h3 style="margin:0 0 4px 0; font-size:16px; font-weight:700; color:#0F172A;">Daftar Tugas Belanja</h3>
+              <p style="margin:0; font-size:13px; color:#64748B;">Pantau dan atur daftar belanjaan serta uang yang dibawa staf ke pasar.</p>
             </div>
 
             <div class="x-owner-stock-panel" style="background:#FFFFFF; border-radius:12px; border:1px solid #E2E8F0; padding:16px;">
               <div style="margin-bottom:14px;">
-                <input type="search" id="input-search-mandates" class="x-input" placeholder="🔍 Cari nomor mandat, catatan, atau item belanja..." oninput="onMandatesSearchInput(this.value)" autocomplete="off" style="width:100%; font-size:13px; padding:9px 14px; border-radius:8px;">
+                <input type="search" id="input-search-mandates" class="x-input" placeholder="🔍 Cari nomor tugas, catatan, atau item belanja..." oninput="onMandatesSearchInput(this.value)" autocomplete="off" style="width:100%; font-size:13px; padding:9px 14px; border-radius:8px;">
               </div>
               <div id="owner-mandates-list-container">
-                <div class="x-owner-stock-loading">Memuat daftar mandat belanja...</div>
+                <div class="x-owner-stock-loading">Memuat daftar tugas belanja...</div>
               </div>
             </div>
           </div>
 
           <!-- SUBTAB CONTENT: RESEP MASAKAN -->
           <div id="subtab-content-stock-recipes" style="display:none;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-              <div>
+            <div class="x-stock-subtab-header" style="margin-bottom:16px;">
+              <div class="x-stock-subtab-header-copy">
                 <h3 style="margin:0 0 4px 0; font-size:16px; font-weight:700; color:#0F172A;">Resep & Takaran Bahan Masakan</h3>
                 <p style="margin:0; font-size:13px; color:#64748B;">Atur takaran bahan baku untuk setiap masakan agar stok mentah terpotong otomatis dan HPP terhitung akurat.</p>
               </div>
-              <button type="button" class="x-btn-primary" onclick="openAddRecipeModal()" style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:8px; font-weight:600; font-size:13px; background:#0F172A; color:#FFFFFF; border:none; cursor:pointer;">
+              <button type="button" class="x-btn-primary x-stock-subtab-cta" onclick="openAddRecipeModal()">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                 <span>Buat Resep Baru</span>
               </button>
@@ -2898,12 +2841,12 @@
 
           <!-- SUBTAB CONTENT 2: BAHAN BAKU (MATERIALS) -->
           <div id="subtab-content-stock-materials" style="display:none;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-              <div>
+            <div class="x-stock-subtab-header" style="margin-bottom:16px;">
+              <div class="x-stock-subtab-header-copy">
                 <h3 style="margin:0 0 4px 0; font-size:16px; font-weight:700; color:#0F172A;">Katalog Bahan Baku (Material Master)</h3>
                 <p style="margin:0; font-size:13px; color:#64748B;">Identitas bahan mentah untuk resep dapur dan pengadaan belanja.</p>
               </div>
-              <button type="button" class="x-btn-primary" onclick="openAddMaterialModal()" style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:8px; font-weight:600; font-size:13px; background:#0F172A; color:#FFFFFF; border:none; cursor:pointer;">
+              <button type="button" class="x-btn-primary x-stock-subtab-cta" onclick="openAddMaterialModal()">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                 <span>Tambah Bahan Baku</span>
               </button>
@@ -2946,21 +2889,15 @@
 
           <!-- SUBTAB CONTENT: BANK DATA SUPPLIER / VENDOR MASTER -->
           <div id="subtab-content-stock-suppliers" style="display:none;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
-              <div>
+            <div class="x-stock-subtab-header" style="margin-bottom:16px;">
+              <div class="x-stock-subtab-header-copy">
                 <h3 style="margin:0 0 4px 0; font-size:16px; font-weight:700; color:#0F172A;">Bank Data Supplier & Vendor</h3>
                 <p style="margin:0; font-size:13px; color:#64748B;">Pusat data vendor resmi, kontak PIC/WA, nomor rekening bank, dan daftar barang yang dipasok ke cabang.</p>
               </div>
-              <div style="display:flex; gap:8px;">
-                <button type="button" class="x-btn-secondary" onclick="loadOwnerSuppliers()" style="display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:8px; font-weight:600; font-size:13px; cursor:pointer;">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-                  <span>Segarkan</span>
-                </button>
-                <button type="button" class="x-btn-primary" onclick="openAddSupplierModal()" style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:8px; font-weight:600; font-size:13px; background:#0F172A; color:#FFFFFF; border:none; cursor:pointer;">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                  <span>+ Tambah Supplier</span>
-                </button>
-              </div>
+              <button type="button" class="x-btn-primary x-stock-subtab-cta" onclick="openAddSupplierModal()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                <span>+ Tambah Supplier</span>
+              </button>
             </div>
 
             <div class="x-owner-stock-panel" style="background:#FFFFFF; border-radius:12px; border:1px solid #E2E8F0; padding:16px;">
@@ -2973,6 +2910,94 @@
             </div>
           </div>
         </div>
+        <!-- END owner-stock-main-view -->
+
+        <!-- DEDICATED CHILD PAGE: BUAT / EDIT FORMULA RESEP MASAKAN -->
+        <section id="recipe-editor-view" class="x-card-panel x-owner-child-page-shell" style="display:none;">
+          <!-- Mobile Header -->
+          <div class="x-owner-child-mobile-header" id="recipe-editor-mobile-header">
+            <h3 class="x-owner-mobile-page-title">
+              <button type="button" class="x-title-back-btn x-owner-mobile-page-back" id="btn-recipe-editor-mobile-back" aria-label="Kembali" onclick="goBackFromRecipeEditor()">
+                <svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+              </button>
+              <span id="recipe-editor-mobile-title">Buat Formula Resep</span>
+            </h3>
+            <p class="x-owner-mobile-page-sub" id="recipe-editor-mobile-subtitle">Tentukan bahan mentah & takaran bumbu untuk menu siap saji.</p>
+          </div>
+
+          <!-- Desktop / Tablet Breadcrumb & Back Navigation -->
+          <div class="x-owner-child-legacy-nav" style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+            <button type="button" class="x-btn-secondary" id="btn-back-from-recipe-editor" style="padding:6px 12px;font-size:13px;" onclick="goBackFromRecipeEditor()">
+              <svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg> Kembali ke Resep Masakan
+            </button>
+            <span class="text-muted" style="font-size:13px;">/</span>
+            <span id="recipe-editor-breadcrumb" style="font-weight:600;font-size:14px;">Buat Formula Resep</span>
+          </div>
+
+          <!-- Desktop Panel Header -->
+          <div class="x-panel-header" id="recipe-editor-desktop-header" style="margin-bottom:20px;">
+            <h3 id="recipe-editor-desktop-title" style="margin:0; font-size:18px; font-weight:800; color:#0F172A;">Buat Formula Resep Masakan</h3>
+            <p id="recipe-editor-desktop-subtitle" style="margin:4px 0 0; font-size:13px; color:#64748B;">Atur takaran bahan baku dan bumbu agar stok mentah terpotong otomatis dan HPP terhitung akurat.</p>
+          </div>
+
+          <!-- Form Recipe Editor -->
+          <form id="form-add-recipe" class="x-form x-product-editor-form" style="max-width:920px;margin:0 auto;" onsubmit="submitAddRecipeForm(event)">
+            <!-- Card 1: Target Menu & Hasil Porsi -->
+            <div class="x-card x-product-editor-main-card" style="margin-bottom:16px;">
+              <h4 style="margin:0 0 14px 0; font-size:15px; font-weight:700; color:#0F172A;">1. Target Menu & Hasil Olahan</h4>
+              
+              <div class="x-form-group">
+                <label for="recipe-input-product">Menu Siap Saji (Produk Jadi) <span class="x-required-mark">*</span></label>
+                <select id="recipe-input-product" class="x-input" required>
+                  <option value="">Pilih Menu Makanan / Minuman...</option>
+                </select>
+                <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Pilih produk menu olahan komersial yang ingin ditentukan standar resepnya.</small>
+              </div>
+
+              <div class="x-form-row" style="margin-top:16px;">
+                <div class="x-form-group">
+                  <label for="recipe-input-yield">Hasil Porsi per Formula <span class="x-required-mark">*</span></label>
+                  <input type="number" id="recipe-input-yield" class="x-input" required min="1" step="1" value="1" placeholder="Misal: 1 porsi atau 10 porsi">
+                  <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Berapa porsi jadi yang dihasilkan dari takaran bahan di bawah.</small>
+                </div>
+                <div class="x-form-group">
+                  <label for="recipe-input-yield-uom">Satuan Hasil <span class="x-required-mark">*</span></label>
+                  <select id="recipe-input-yield-uom" class="x-input" required>
+                    <option value="uom_pcs">Porsi / Pcs</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 2: Komposisi Bahan Baku (BOM) -->
+            <div class="x-card x-product-editor-main-card" style="margin-bottom:16px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+                <div>
+                  <h4 style="margin:0; font-size:15px; font-weight:700; color:#0F172A;">2. Komposisi Takaran Bahan Masakan</h4>
+                  <p style="margin:2px 0 0; font-size:12px; color:#64748B;">Bahan mentah dan bumbu dapur yang dihabiskan untuk formula ini.</p>
+                </div>
+                <button type="button" class="x-btn-secondary" onclick="addRecipeIngredientRow()" style="min-height:36px; padding:6px 14px; font-size:12px; font-weight:700; border-radius:8px;">
+                  + Tambah Bahan
+                </button>
+              </div>
+
+              <div id="recipe-ingredients-container" style="display:flex; flex-direction:column; gap:10px;">
+                <!-- Ingredient rows dynamically added -->
+              </div>
+
+              <div style="margin-top:16px; padding:12px 14px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; display:flex; align-items:center; gap:10px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                <span style="font-size:12px; color:#64748B; line-height:1.4;">Stok bahan mentah ini akan otomatis dipotong dari stok dapur/cabang saat kasir menyelesaikan transaksi penjualan menu.</span>
+              </div>
+            </div>
+
+            <!-- Actions Footer -->
+            <div class="x-product-editor-actions" style="margin-top:20px;">
+              <button type="button" class="x-btn-secondary" onclick="goBackFromRecipeEditor()">Batal</button>
+              <button type="submit" id="btn-save-recipe" class="x-btn-primary">Simpan Resep Masakan</button>
+            </div>
+          </form>
+        </section>
       </section>
 
       <!-- MODAL: TAMBAH / EDIT SUPPLIER (VENDOR MASTER MODAL) -->
@@ -3071,6 +3096,7 @@
                 <option value="uom_g">Gram (g)</option>
                 <option value="uom_l">Liter (L)</option>
                 <option value="uom_ml">Milliliter (ml)</option>
+                <option value="uom_galon">Galon (galon)</option>
                 <option value="uom_pcs">Pieces (pcs)</option>
               </select>
             </div>
@@ -3092,7 +3118,7 @@
           <div class="x-modal-handle"></div>
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
             <div>
-              <h3 id="edit-mat-modal-title" style="margin:0; font-size:16px; font-weight:700; color:#0F172A;">Edit Bahan & Stok Kulkas</h3>
+              <h3 id="edit-mat-modal-title" style="margin:0; font-size:16px; font-weight:700; color:#0F172A;">Edit Bahan & Stok</h3>
               <p style="margin:2px 0 0 0; font-size:12px; color:#64748B;">Atur stok fisik saat ini, harga pasar, dan batas peringatan belanja.</p>
             </div>
             <button type="button" onclick="closeEditMaterialModal()" style="background:none; border:none; cursor:pointer; color:#64748B;">
@@ -3112,20 +3138,29 @@
               </div>
               <div>
                 <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">Satuan Dasar (UOM)</label>
-                <input type="text" id="edit-mat-uom-label" disabled style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #E2E8F0; border-radius:8px; font-size:13px; background:#F8FAFC; color:#64748B;">
+                <select id="edit-mat-uom" required style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px; background:#FFFFFF;">
+                  <option value="">Pilih Satuan Dasar...</option>
+                  <option value="uom_kg">Kilogram (kg)</option>
+                  <option value="uom_g">Gram (g)</option>
+                  <option value="uom_l">Liter (L)</option>
+                  <option value="uom_ml">Milliliter (ml)</option>
+                  <option value="uom_galon">Galon (galon)</option>
+                  <option value="uom_pcs">Pieces (pcs)</option>
+                </select>
               </div>
             </div>
 
             <!-- Bagian Stok & Harga Pasar -->
+            <!-- Bagian Stok & Harga Pasar -->
             <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:14px; margin-bottom:14px;">
               <div style="font-size:12px; font-weight:700; color:#0F172A; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
-                <span>📦 Stok Kulkas / Gudang & Harga Pasar</span>
+                <span>📦 Stok Fisik & Harga Beli</span>
               </div>
-              <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:10px;">
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:6px;">
                 <div>
                   <label for="edit-mat-current-stock" style="display:block; font-size:11.5px; font-weight:600; color:#475569; margin-bottom:4px;">Sisa Stok Fisik Saat Ini</label>
-                  <input type="number" id="edit-mat-current-stock" step="any" min="0" placeholder="0" style="width:100%; box-sizing:border-box; padding:9px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px;">
-                  <span id="edit-mat-stock-hint" style="font-size:11px; color:#64748B; margin-top:2px; display:block;">Jumlah riil di kulkas/dapur</span>
+                  <input type="number" id="edit-mat-current-stock" step="any" min="0" placeholder="0" style="width:100%; box-sizing:border-box; padding:9px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px; font-weight:700; color:#0F172A;">
+                  <span id="edit-mat-stock-hint" style="font-size:11px; color:#64748B; margin-top:2px; display:block;">Jumlah riil yang ada saat ini</span>
                 </div>
                 <div>
                   <label for="edit-mat-unit-cost" style="display:block; font-size:11.5px; font-weight:600; color:#475569; margin-bottom:4px;">Harga Pasar / Beli (Rp)</label>
@@ -3135,26 +3170,14 @@
               </div>
             </div>
 
-            <!-- Bagian Aturan Peringatan Belanja (Reorder Policy) -->
-            <div style="background:#FEFCE8; border:1px solid #FEF08A; border-radius:12px; padding:14px; margin-bottom:18px;">
-              <div style="font-size:12px; font-weight:700; color:#854D0E; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
-                <span>⚠️ Pengingat Stok & Ceklist Belanja</span>
+            <!-- Bagian Target Stok Belanja -->
+            <div style="background:#F0FDF4; border:1px solid #BBF7D0; border-radius:12px; padding:14px; margin-bottom:18px;">
+              <label for="edit-mat-target-qty" style="display:block; font-size:12px; font-weight:700; color:#166534; margin-bottom:4px;">🎯 Target Stok Resto (Batas Belanja):</label>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <input type="number" id="edit-mat-target-qty" step="any" min="0" placeholder="0" style="flex:1; box-sizing:border-box; padding:9px 12px; border:1px solid #86EFAC; border-radius:8px; font-size:13px; font-weight:700; background:#FFFFFF; color:#0F172A;">
+                <span id="edit-mat-target-unit-label" style="font-size:13px; font-weight:800; color:#166534; background:#DCFCE7; padding:8px 12px; border-radius:8px; border:1px solid #86EFAC;">Satuan</span>
               </div>
-              <p style="margin:0 0 10px 0; font-size:11.5px; color:#713F12; line-height:1.4;">
-                Agar dapur tidak pernah kehabisan bahan: saat sisa stok tinggal sedikit, sistem akan memberi tanda <strong>Menipis</strong> dan otomatis memasukkannya ke <strong>Saran Belanja</strong>.
-              </p>
-              <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                <div>
-                  <label for="edit-mat-min-qty" style="display:block; font-size:11.5px; font-weight:600; color:#713F12; margin-bottom:4px;">Ingatkan Saat Sisa Tinggal</label>
-                  <input type="number" id="edit-mat-min-qty" step="any" min="0" placeholder="0" style="width:100%; box-sizing:border-box; padding:9px 12px; border:1px solid #FDE047; border-radius:8px; font-size:13px; background:#FFFFFF;">
-                  <span style="font-size:11px; color:#854D0E; margin-top:2px; display:block;">Mulai ditandai Menipis</span>
-                </div>
-                <div>
-                  <label for="edit-mat-target-qty" style="display:block; font-size:11.5px; font-weight:600; color:#713F12; margin-bottom:4px;">Target Stok Saat Belanja</label>
-                  <input type="number" id="edit-mat-target-qty" step="any" min="0" placeholder="0" style="width:100%; box-sizing:border-box; padding:9px 12px; border:1px solid #FDE047; border-radius:8px; font-size:13px; background:#FFFFFF;">
-                  <span style="font-size:11px; color:#854D0E; margin-top:2px; display:block;">Jumlah yang ingin dipenuhi saat kulakan</span>
-                </div>
-              </div>
+              <span id="edit-mat-target-hint" style="font-size:11px; color:#15803D; margin-top:4px; display:block;">Jumlah stok yang idealnya selalu siap sedia di resto. Jika stok fisik kurang dari target ini, sistem otomatis sarankan belanja.</span>
             </div>
 
             <div style="margin-bottom:18px;">
@@ -3169,67 +3192,14 @@
         </div>
       </div>
 
-      <!-- MODAL TAMBAH RESEP MASAKAN (BOM) -->
-      <div id="modal-add-recipe" class="x-modal-backdrop" style="display:none;">
-        <div class="x-modal-card" style="padding:24px; overflow-y:auto;">
-          <div class="x-modal-handle"></div>
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-            <div>
-              <h3 style="margin:0; font-size:16px; font-weight:700; color:#0F172A;">Buat Formula Resep Masakan</h3>
-              <p style="margin:2px 0 0 0; font-size:12px; color:#64748B;">Tentukan bahan mentah & bumbu untuk menu siap saji</p>
-            </div>
-            <button type="button" onclick="closeAddRecipeModal()" style="background:none; border:none; cursor:pointer; color:#64748B;">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            </button>
-          </div>
-          <form id="form-add-recipe" onsubmit="submitAddRecipeForm(event)">
-            <div style="margin-bottom:14px;">
-              <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">Menu Siap Saji (Produk Jadi)</label>
-              <select id="recipe-input-product" required style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px; background:#FFFFFF;">
-                <option value="">Pilih Menu Makanan / Minuman...</option>
-              </select>
-            </div>
-
-            <div style="display:grid; grid-template-columns: 2fr 1fr; gap:12px; margin-bottom:16px;">
-              <div>
-                <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">Hasil Porsi per Formula</label>
-                <input type="number" id="recipe-input-yield" required min="1" step="1" value="1" placeholder="Misal: 1 porsi atau 10 porsi" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px;">
-              </div>
-              <div>
-                <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">Satuan Hasil</label>
-                <select id="recipe-input-yield-uom" required style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px; background:#FFFFFF;">
-                  <option value="uom_pcs">Porsi / Pcs</option>
-                </select>
-              </div>
-            </div>
-
-            <div style="margin-bottom:16px; border-top:1px dashed #E2E8F0; padding-top:14px;">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                <label style="font-size:13px; font-weight:700; color:#1E293B;">Komposisi Takaran Bahan Masakan</label>
-                <button type="button" onclick="addRecipeIngredientRow()" style="background:#F1F5F9; border:1px solid #CBD5E1; padding:4px 10px; border-radius:6px; font-size:12px; font-weight:600; color:#0F172A; cursor:pointer;">+ Tambah Bahan</button>
-              </div>
-
-              <div id="recipe-ingredients-container" style="display:flex; flex-direction:column; gap:8px;">
-                <!-- Ingredient rows dynamically added -->
-              </div>
-            </div>
-
-            <div style="display:flex; justify-content:flex-end; gap:8px; border-top:1px solid #F1F5F9; padding-top:16px;">
-              <button type="button" onclick="closeAddRecipeModal()" style="padding:10px 16px; border:1px solid #CBD5E1; background:#FFFFFF; border-radius:8px; font-weight:600; font-size:13px; color:#475569; cursor:pointer;">Batal</button>
-              <button type="submit" id="btn-save-recipe" style="padding:10px 16px; border:none; background:#0F172A; border-radius:8px; font-weight:600; font-size:13px; color:#FFFFFF; cursor:pointer;">Simpan Resep Masakan</button>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      <!-- MODAL: EDIT MANDAT BELANJA (MANAGER & OWNER) -->
+      <!-- MODAL: EDIT TUGAS BELANJA (MANAGER & OWNER) -->
       <div id="modal-edit-mandate" class="x-modal-backdrop" style="display:none;">
         <div class="x-modal-card" style="padding:24px; overflow-y:auto;">
           <div class="x-modal-handle"></div>
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
             <div>
-              <h3 style="margin:0; font-size:16px; font-weight:700; color:#0F172A;" id="modal-edit-mandate-title">Edit Mandat Belanja</h3>
-              <p style="margin:2px 0 0 0; font-size:12px; color:#64748B;">Ubah rincian target belanja dan uang kasbon sebelum diselesaikan petugas.</p>
+              <h3 style="margin:0; font-size:16px; font-weight:700; color:#0F172A;" id="modal-edit-mandate-title">Edit Tugas Belanja</h3>
+              <p style="margin:2px 0 0 0; font-size:12px; color:#64748B;">Ubah rincian target belanja dan uang belanja sebelum diselesaikan petugas.</p>
             </div>
             <button type="button" onclick="closeEditMandateModal()" style="background:none; border:none; cursor:pointer; color:#64748B;">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -3238,11 +3208,11 @@
           <form id="form-edit-mandate" onsubmit="submitEditMandateForm(event)">
             <input type="hidden" id="edit-mandate-id">
             <div style="margin-bottom:14px;">
-              <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">Uang Kasbon (Diserahkan ke Staf)</label>
+              <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">Uang Belanja (Diserahkan ke Staf)</label>
               <input type="number" id="edit-mandate-cash-advance" required min="0" step="1000" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px; font-weight:700;">
             </div>
             <div style="margin-bottom:14px;">
-              <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">Catatan Mandat Belanja</label>
+              <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">Catatan Tugas Belanja</label>
               <textarea id="edit-mandate-notes" rows="2" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px;"></textarea>
             </div>
             <div style="margin-bottom:16px;">
@@ -3519,7 +3489,7 @@
 
       <!-- MARKETING TAB -->
       <section id="tab-marketing" class="x-tab-content" data-tab="marketing">
-        <div class="x-owner-child-mobile-header">
+        <div class="x-owner-child-mobile-header" id="marketing-main-header">
           <h3 class="x-owner-mobile-page-title">
             <button type="button" class="x-title-back-btn x-owner-mobile-page-back" aria-label="Kembali" onclick="goBackFromChildPage()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
             <span>Marketing &amp; Promo</span>
@@ -5167,7 +5137,7 @@
         <h3 id="modal-user-title">Tambah Anggota Tim</h3>
         <button type="button" class="x-modal-close" onclick="closeUserModal()">✕</button>
       </div>
-      <form id="form-user" class="x-form">
+      <form id="form-user" class="x-form" onsubmit="submitUserForm(event)">
         <input type="hidden" id="user-id" value="">
         <div class="x-form-group">
           <label for="user-fullname">Nama Lengkap</label>
@@ -6005,7 +5975,7 @@
   <script src="/merchant-shared/js/catalog-client.js?v=1.0.1"></script>
   <script src="/merchant-shared/js/currency-input.js?v=1.0.1"></script>
   <script src="/merchant-shared/js/live-search.js?v=1.0.0"></script>
-  <script src="/merchant-shared/js/dropdown.js?v=1.0.0"></script>
+  <script src="/merchant-shared/js/dropdown.js?v=1.0.1"></script>
   <script src="/merchant-shared/js/sheet-modal.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/branch-catalog-ui.js?v=1.0.3"></script>
   <script src="/merchant-dashboard/assets/js/owner-bottom-nav.js?v=1.0.0"></script>
@@ -6014,17 +5984,19 @@
   <script src="/merchant-dashboard/assets/js/modules/auth.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/overview.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/orders.js?v=1.0.0"></script>
-  <script src="/merchant-dashboard/assets/js/modules/stock.js?v=1.0.0"></script>
+  <script src="/merchant-dashboard/assets/js/modules/stock.js?v=2.3.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/branches.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/reports.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/team.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/customers.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/finance.js?v=1.0.0"></script>
-  <script src="/merchant-dashboard/assets/js/modules/marketing.js?v=1.0.0"></script>
+  <script src="/merchant-dashboard/assets/js/modules/marketing-banners.js?v=1.0.0"></script>
+  <script src="/merchant-dashboard/assets/js/modules/marketing.js?v=1.0.1"></script>
   <script src="/merchant-dashboard/assets/js/modules/master-menu.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/settings.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/brand.js?v=1.0.0"></script>
-  <script src="/merchant-dashboard/assets/js/modules/catalog.js?v=1.0.0"></script>
+  <script src="/merchant-dashboard/assets/js/modules/catalog-reference.js?v=1.0.0"></script>
+  <script src="/merchant-dashboard/assets/js/modules/catalog.js?v=1.0.1"></script>
   <script src="/dashboard/assets/js/dashboard.js?v=3.0.90"></script>
   <script src="/merchant-dashboard/assets/js/owner-master-menu-inline.js?v=1.0.2"></script>
 </body>

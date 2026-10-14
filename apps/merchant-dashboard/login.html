@@ -543,8 +543,14 @@
             return '/driver/';
           }
 
-          // Branch Manager / Manager / Purchasing -> Merchant App
-          if (role === 'branch_manager' || role === 'manager' || role === 'purchasing') {
+          // Petugas Belanja (Purchasing) -> Standalone Belanja PWA
+          if (role === 'purchasing') {
+            if (prefix === 'm' || prefix === 'merchant') return '/belanja/';
+            return protocol + '//m.' + baseDomain + '/belanja/';
+          }
+
+          // Branch Manager / Manager -> Merchant App
+          if (role === 'branch_manager' || role === 'manager') {
             if (prefix === 'm' || prefix === 'merchant') return '/merchant/';
             return protocol + '//m.' + baseDomain + '/merchant/';
           }
@@ -565,6 +571,7 @@
           }
         }
 
+        if (role === 'purchasing') return '/belanja/';
         return fallback;
       }
 
@@ -820,20 +827,45 @@
           return;
         }
         fetch('/api/v1/auth/merchant/me', { headers: { 'Authorization': 'Bearer ' + existingToken } })
-          .then(function (r) { return r.json(); })
-          .then(function (d) {
-            if (d && d.user) {
-              var validation = validateSubdomainRole(d.user);
-              if (!validation.allowed) {
-                localStorage.removeItem(TOKEN_KEY);
-                localStorage.removeItem(USER_KEY);
-                showRoleMismatchError(validation);
-                return;
-              }
+          .then(function (r) {
+            if (!r.ok) {
+              localStorage.removeItem(TOKEN_KEY);
+              localStorage.removeItem(USER_KEY);
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              return null;
             }
-            window.location.href = postLoginTarget(d, (d && d.landing) || '/dashboard/');
+            return r.json();
           })
-          .catch(function () { window.location.href = '/dashboard/'; });
+          .then(function (d) {
+            if (!d || !d.user) {
+              localStorage.removeItem(TOKEN_KEY);
+              localStorage.removeItem(USER_KEY);
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              return;
+            }
+            var validation = validateSubdomainRole(d.user);
+            if (!validation.allowed) {
+              localStorage.removeItem(TOKEN_KEY);
+              localStorage.removeItem(USER_KEY);
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              showRoleMismatchError(validation);
+              return;
+            }
+            var redirectParam = urlParams.get('redirect');
+            var target = (redirectParam && redirectParam.startsWith('/') && !redirectParam.startsWith('//'))
+              ? redirectParam
+              : postLoginTarget(d, (d && d.landing) || '/dashboard/');
+            window.location.href = target;
+          })
+          .catch(function () {
+            localStorage.removeItem(TOKEN_KEY);
+            localStorage.removeItem(USER_KEY);
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+          });
         return;
       }
 
@@ -895,6 +927,9 @@
 
             localStorage.setItem(TOKEN_KEY, data.token);
             localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+            // Backward compatibility
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('user', JSON.stringify(data.user));
 
             if (claimDomain) {
               btn.innerHTML = '<span>Menyelesaikan klaim bisnis...</span>';
@@ -910,8 +945,14 @@
                 var claimData = await claimRes.json();
                 if (claimRes.ok && claimData && claimData.success) {
                   sessionStorage.removeItem('xentra_pending_claim_domain');
-                  if (claimData.token) localStorage.setItem(TOKEN_KEY, claimData.token);
-                  if (claimData.user) localStorage.setItem(USER_KEY, JSON.stringify(claimData.user));
+                  if (claimData.token) {
+                    localStorage.setItem(TOKEN_KEY, claimData.token);
+                    localStorage.setItem('token', claimData.token);
+                  }
+                  if (claimData.user) {
+                    localStorage.setItem(USER_KEY, JSON.stringify(claimData.user));
+                    localStorage.setItem('user', JSON.stringify(claimData.user));
+                  }
                   btn.innerHTML = '<span>Klaim berhasil! Mengalihkan...</span>';
                   setTimeout(function () {
                     window.location.href = claimData.redirect_url || claimData.landing || (claimData.business && claimData.business.custom_domain ? 'https://' + claimData.business.custom_domain + '/dashboard/' : '/dashboard/');
@@ -957,7 +998,11 @@
             }
 
             setTimeout(function () {
-              window.location.href = postLoginTarget(data, data.redirect_url || data.landing || '/dashboard/');
+              var redirectParam = urlParams.get('redirect');
+              var target = (redirectParam && redirectParam.startsWith('/') && !redirectParam.startsWith('//'))
+                ? redirectParam
+                : postLoginTarget(data, data.redirect_url || data.landing || '/dashboard/');
+              window.location.href = target;
             }, 250);
             return;
           }

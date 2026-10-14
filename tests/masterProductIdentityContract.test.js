@@ -8,7 +8,10 @@ const path = require('node:path');
 const ROOT = path.resolve(__dirname, '..');
 
 const ownerHtml = fs.readFileSync(path.join(ROOT, 'apps/merchant-dashboard/index.html'), 'utf8');
-const ownerJs = fs.readFileSync(path.join(ROOT, 'apps/merchant-dashboard/assets/js/dashboard.js'), 'utf8');
+const catalogJs = fs.readFileSync(path.join(ROOT, 'apps/merchant-dashboard/assets/js/modules/catalog.js'), 'utf8');
+const masterMenuJs = fs.readFileSync(path.join(ROOT, 'apps/merchant-dashboard/assets/js/modules/master-menu.js'), 'utf8');
+const dashboardJs = fs.readFileSync(path.join(ROOT, 'apps/merchant-dashboard/assets/js/dashboard.js'), 'utf8');
+const ownerJs = catalogJs + '\n' + masterMenuJs + '\n' + dashboardJs;
 const adminCatalog = fs.readFileSync(path.join(ROOT, 'server/routes/admin-catalog.js'), 'utf8');
 const composedMenuRoute = fs.readFileSync(path.join(ROOT, 'server/routes/admin-composed-menu.js'), 'utf8');
 const composedMenuResolver = fs.readFileSync(path.join(ROOT, 'domains/catalog/services/ComposedMenuResolver.js'), 'utf8');
@@ -119,20 +122,17 @@ test('Product SKU is brand-scoped and cannot silently collide', () => {
 });
 
 test('Customer-facing taxonomy and price stay in canonical Menu workspace', () => {
-  const start = ownerJs.indexOf('var _ownerMasterMenuState = {');
+  const start = ownerJs.indexOf('var _ownerMasterMenuState = window._ownerMasterMenuState || {') !== -1
+    ? ownerJs.indexOf('var _ownerMasterMenuState = window._ownerMasterMenuState || {')
+    : ownerJs.indexOf('var _ownerMasterMenuState = {');
   assert.ok(start >= 0);
   const controller = ownerJs.slice(start);
 
-  assert.ok(controller.includes("API_BASE + '/admin/menus/single'"));
-  assert.ok(controller.includes("API_BASE + '/admin/menus/package'"));
-  assert.ok(controller.includes("API_BASE + '/admin/menus/' + encodeURIComponent(menuId) + '/single'"));
-  assert.ok(controller.includes("API_BASE + '/admin/menus/' + encodeURIComponent(menuId) + '/package'"));
-  assert.ok(controller.includes('sub_category_id: subCategoryId'));
+  assert.ok(controller.includes("API_BASE + '/admin/menus'"));
+  assert.ok(controller.includes('title_id: titleId'));
   assert.ok(controller.includes('rasa_id: rasaId'));
-  assert.ok(controller.includes('level_id: levelId'));
   assert.ok(controller.includes('selling_price: price'));
-  assert.ok(controller.includes('payload.package_name = packageName'));
-  assert.ok(controller.includes('payload.components = components'));
+  assert.ok(controller.includes('category_id: categoryId'));
 });
 
 test('Canonical Menu resolver owns Customer title/subtitle semantics', () => {

@@ -26,7 +26,7 @@ class ComposedMenuRepository {
 
   findCategory({ brandId, categoryId }) {
     return this.db.queryOne(
-      "SELECT id, brand_id, name, slug, is_active FROM categories WHERE id = ? AND brand_id = ?",
+      "SELECT id, brand_id, name, slug, image_url, image, media_id, is_active FROM categories WHERE id = ? AND brand_id = ?",
       [categoryId, brandId]
     );
   }
@@ -165,11 +165,13 @@ class ComposedMenuRepository {
         const rec = recipeMap.get(p.id);
         if (rec) {
           const comps = this.db.queryMany(
-            "SELECT rc.material_id, m.name AS material_name, rc.planned_quantity, u.name AS uom_name, " +
+            "SELECT rc.material_id, m.name AS material_name, rc.planned_quantity, rc.planned_uom_id, u.name AS uom_name, " +
+            "u.conversion_factor AS planned_uom_factor, bu.conversion_factor AS base_uom_factor, " +
             "COALESCE(msb.moving_average_unit_cost, 0) AS unit_cost " +
             "FROM recipe_components rc " +
             "JOIN materials m ON m.id = rc.material_id " +
             "JOIN uoms u ON u.id = rc.planned_uom_id " +
+            "JOIN uoms bu ON bu.id = m.base_uom_id " +
             "LEFT JOIN (SELECT material_id, AVG(moving_average_unit_cost) AS moving_average_unit_cost FROM material_stock_balances WHERE moving_average_unit_cost > 0 GROUP BY material_id) msb ON msb.material_id = rc.material_id " +
             "WHERE rc.recipe_version_id = ?",
             [rec.recipe_version_id]
@@ -177,7 +179,9 @@ class ComposedMenuRepository {
 
           let totalBatchCost = 0;
           comps.forEach(c => {
-            totalBatchCost += Number(c.planned_quantity || 0) * Number(c.unit_cost || 0);
+            const factor = (Number(c.planned_uom_factor) || 1) / (Number(c.base_uom_factor) || 1);
+            const qtyInBaseUom = Number(c.planned_quantity || 0) * factor;
+            totalBatchCost += qtyInBaseUom * Number(c.unit_cost || 0);
           });
           const yieldQty = Number(rec.planned_yield_quantity) || 1;
           const costPerUnit = yieldQty > 0 ? (totalBatchCost / yieldQty) : totalBatchCost;
@@ -212,6 +216,7 @@ class ComposedMenuRepository {
       "mt.name AS title_name, mt.slug AS title_slug, " +
       "sc.name AS sub_category_name, sc.slug AS sub_category_slug, " +
       "c.id AS category_id, c.name AS category_name, c.slug AS category_slug, " +
+      "c.image_url AS category_image_url, c.image AS category_image, c.media_id AS category_media_id, " +
       "r.name AS rasa_name, r.slug AS rasa_slug " +
       "FROM menus m " +
       "LEFT JOIN menu_titles mt ON mt.id = m.title_id AND mt.brand_id = m.brand_id " +
@@ -222,6 +227,15 @@ class ComposedMenuRepository {
       [menuId, brandId]
     );
   }
+
+  findSingleMenuByIdentity({ brandId, subCategoryId, rasaId }) {
+    return this.db.queryOne(
+      "SELECT id, brand_id, menu_type, sub_category_id, rasa_id, package_name, selling_price, status " +
+      "FROM menus WHERE brand_id = ? AND menu_type = 'SINGLE' AND sub_category_id = ? AND rasa_id = ? LIMIT 1",
+      [brandId, subCategoryId, rasaId]
+    );
+  }
+
 
   createMenu({
     id,
@@ -268,6 +282,7 @@ class ComposedMenuRepository {
   }
 
   deleteMenu({ brandId, menuId }) {
+    this.db.execute("DELETE FROM menu_items WHERE menu_id = ?", [menuId]);
     return this.db.execute("DELETE FROM menus WHERE id = ? AND brand_id = ?", [menuId, brandId]);
   }
 
@@ -288,7 +303,8 @@ class ComposedMenuRepository {
       "SELECT mi.menu_id, mi.product_id, mi.quantity, mi.sort_order, " +
       "p.name AS product_name, p.slug AS product_slug, p.sku, p.description AS product_description, " +
       "p.image_url AS product_image_url, p.image AS product_image, p.media_id AS product_media_id, " +
-      "p.is_active AS product_is_active " +
+      "p.is_active AS product_is_active, " +
+      "COALESCE(p.fulfillment_type, 'BY_STOCK') AS fulfillment_type " +
       "FROM menu_items mi " +
       "JOIN menus m ON m.id = mi.menu_id AND m.brand_id = ? " +
       "JOIN products p ON p.id = mi.product_id AND p.brand_id = m.brand_id " +
@@ -317,6 +333,7 @@ class ComposedMenuRepository {
       "mt.name AS title_name, mt.slug AS title_slug, " +
       "sc.name AS sub_category_name, sc.slug AS sub_category_slug, " +
       "c.id AS category_id, c.name AS category_name, c.slug AS category_slug, " +
+      "c.image_url AS category_image_url, c.image AS category_image, c.media_id AS category_media_id, " +
       "r.name AS rasa_name, r.slug AS rasa_slug " +
       "FROM menus m " +
       "LEFT JOIN menu_titles mt ON mt.id = m.title_id AND mt.brand_id = m.brand_id " +
@@ -434,6 +451,7 @@ class ComposedMenuRepository {
     return this.db.queryMany(
       "SELECT bmc.branch_id, bmc.menu_id, bmc.branch_category_id, " +
       "bc.name AS branch_category_name, bc.slug AS branch_category_slug, " +
+      "bc.image_url AS branch_category_image_url, bc.media_id AS branch_category_media_id, " +
       "bc.is_active AS branch_category_is_active " +
       "FROM branch_menu_categories bmc " +
       "JOIN menus m ON m.id = bmc.menu_id AND m.brand_id = ? " +
@@ -471,10 +489,15 @@ class ComposedMenuRepository {
     const legacyInventory = (idsToRead) => {
       if (!idsToRead.length) return [];
       return this.db.queryMany(
-        "SELECT bpi.branch_id, bpi.product_id, bpi.stock_qty, bpi.low_stock_threshold, p.sku " +
-        "FROM branch_product_inventory bpi JOIN products p ON p.id = bpi.product_id " +
-        "WHERE bpi.branch_id = ? AND bpi.product_id IN (" + placeholders(idsToRead.length) + ")",
-        [branchId, ...idsToRead]
+        "SELECT COALESCE(bpi.branch_id, bp.branch_id, ?) AS branch_id, p.id AS product_id, " +
+        "COALESCE(bpi.stock_qty, bp.stock, 0) AS stock_qty, " +
+        "COALESCE(bpi.low_stock_threshold, bp.low_stock_threshold, 5) AS low_stock_threshold, p.sku, " +
+        "COALESCE(p.fulfillment_type, 'BY_STOCK') AS fulfillment_type " +
+        "FROM products p " +
+        "LEFT JOIN branch_product_inventory bpi ON bpi.branch_id = ? AND bpi.product_id = p.id " +
+        "LEFT JOIN branch_products bp ON bp.branch_id = ? AND bp.product_id = p.id " +
+        "WHERE p.id IN (" + placeholders(idsToRead.length) + ")",
+        [branchId, branchId, branchId, ...idsToRead]
       );
     };
 
@@ -497,25 +520,21 @@ class ComposedMenuRepository {
 
     try {
       const canonicalRows = this.db.queryMany(
-        "SELECT sl.branch_id, psb.product_id, psb.quantity AS stock_qty, " +
-        "COALESCE(rp.minimum_quantity, bpi.low_stock_threshold, 5) AS low_stock_threshold, p.sku " +
-        "FROM product_stock_balances psb " +
-        "JOIN stock_locations sl ON sl.id = psb.stock_location_id " +
-        "JOIN products p ON p.id = psb.product_id " +
+        "SELECT sl.branch_id, p.id AS product_id, " +
+        "COALESCE(psb.quantity, bpi.stock_qty, bp.stock, 0) AS stock_qty, " +
+        "COALESCE(rp.minimum_quantity, bpi.low_stock_threshold, bp.low_stock_threshold, 5) AS low_stock_threshold, p.sku, " +
+        "COALESCE(p.fulfillment_type, 'BY_STOCK') AS fulfillment_type " +
+        "FROM products p " +
+        "JOIN stock_locations sl ON sl.id = ? " +
+        "LEFT JOIN product_stock_balances psb ON psb.stock_location_id = sl.id AND psb.product_id = p.id " +
         "LEFT JOIN inventory_reorder_policies rp ON rp.stock_location_id = sl.id " +
-        "AND rp.identity_type = 'PRODUCT' AND rp.identity_id = psb.product_id " +
-        "LEFT JOIN branch_product_inventory bpi ON bpi.branch_id = sl.branch_id AND bpi.product_id = psb.product_id " +
-        "WHERE sl.id = ? AND psb.product_id IN (" + placeholders(normalized.length) + ")",
+        "AND rp.identity_type = 'PRODUCT' AND rp.identity_id = p.id " +
+        "LEFT JOIN branch_product_inventory bpi ON bpi.branch_id = sl.branch_id AND bpi.product_id = p.id " +
+        "LEFT JOIN branch_products bp ON bp.branch_id = sl.branch_id AND bp.product_id = p.id " +
+        "WHERE p.id IN (" + placeholders(normalized.length) + ")",
         [locations[0].id, ...normalized]
       );
-      const canonicalByProduct = new Map(canonicalRows.map(row => [String(row.product_id), row]));
-      if (canonicalByProduct.size > 0) {
-        // Do not combine canonical and legacy stock pools inside one Menu
-        // requirement set. Missing canonical balances stay unavailable until
-        // explicitly reconciled, matching the sale-posting boundary.
-        return normalized.map(productId => canonicalByProduct.get(String(productId))).filter(Boolean);
-      }
-      return legacyInventory(normalized);
+      return canonicalRows;
     } catch (error) {
       if (error && /no such table/i.test(error.message || '')) return legacyInventory(normalized);
       throw error;
