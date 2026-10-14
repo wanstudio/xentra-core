@@ -13,7 +13,7 @@
  */
 
 var APP_CACHE_PREFIX = "xentra-merchant-";
-var APP_VERSION = "v1.4.15";
+var APP_VERSION = "v1.4.16";
 var FALLBACK_CACHE_NAME = "xentra-merchant-live";
 
 var STATIC_ASSETS = [
@@ -36,7 +36,7 @@ var STATIC_ASSETS = [
   "/merchant-app/assets/js/branch-catalog-ui.js?v=1.0.1",
   "/merchant-app/assets/js/context.js?v=1.0.0",
   "/merchant-app/assets/js/menu.js?v=1.1.0",
-  "/merchant-app/assets/js/hari-ini.js?v=1.0.7",
+  "/merchant-app/assets/js/hari-ini.js?v=1.0.8",
   "/merchant-app/assets/js/home.js?v=1.0.2",
   "/merchant-app/assets/js/jam-operasional.js?v=1.0.0",
   "/merchant-app/assets/js/reports.js?v=1.0.0",
@@ -45,8 +45,8 @@ var STATIC_ASSETS = [
   "/merchant-app/assets/js/purchasing.js?v=1.1.4",
   "/merchant-app/assets/js/promotions.js?v=1.0.2",
   "/merchant-app/assets/js/staff.js?v=1.0.0",
-  "/merchant-app/assets/js/orders.js?v=1.0.11",
-  "/merchant-app/assets/js/merchant-app.js?v=1.1.8"
+  "/merchant-app/assets/js/orders.js?v=1.0.12",
+  "/merchant-app/assets/js/merchant-app.js?v=1.1.9"
 ];
 
 var _cacheNamePromise = null;
@@ -285,5 +285,17 @@ self.addEventListener("push", function (event) {
     ],
     data: payload.data || { url: "/merchant-app/#pesanan" }
   };
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    self.registration.showNotification(title, options).then(function () {
+      return self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    }).then(function (clients) {
+      if (clients && clients.length) {
+        clients.forEach(function (client) {
+          client.postMessage({ type: "NEW_ORDER_PUSH_RECEIVED", payload: payload });
+        });
+      }
+    }).catch(function (err) {
+      console.warn("[SW Push Notification Warning]:", err);
+    })
+  );
 });

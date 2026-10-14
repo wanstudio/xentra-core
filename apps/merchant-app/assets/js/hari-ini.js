@@ -367,6 +367,16 @@
     }
   }
 
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') {
+      var activeTab = document.querySelector('.x-tab-content.active');
+      if (activeTab && activeTab.id === 'tab-hari-ini') {
+        loadHariIniOrders({ background: true });
+        startHariIniPolling();
+      }
+    }
+  });
+
   function renderHariIniPendingOrders(orders) {
     var list = $("bm-pending-orders-list");
     var countBadge = $("bm-badge-pending-count");

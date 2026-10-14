@@ -133,7 +133,8 @@ class WebPushService {
 
         try {
           await webpush.sendNotification(pushSubscription, stringPayload, {
-            TTL: 3600 // Keep in queue for 1 hour if device is temporarily offline
+            TTL: 3600, // Keep in queue for 1 hour if device is temporarily offline
+            urgency: 'high'
           });
           sent++;
         } catch (err) {

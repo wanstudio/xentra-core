@@ -295,6 +295,10 @@
         if (typeof viewBMOrderDetail === 'function') {
           viewBMOrderDetail(event.data.orderId);
         }
+      } else if (event.data && event.data.type === 'NEW_ORDER_PUSH_RECEIVED') {
+        if (typeof loadBMOrders === 'function') loadBMOrders({ background: true });
+        if (typeof loadHariIniOrders === 'function') loadHariIniOrders({ background: true });
+        if (typeof fetchActionableOrdersCount === 'function') fetchActionableOrdersCount();
       }
     });
   }
@@ -342,6 +346,9 @@
         _bmOrdersState.orders = data.orders;
 
         renderBMOrdersFeed();
+        if (typeof applyHariIniOrders === 'function') {
+          applyHariIniOrders(data.orders);
+        }
       } else {
         if (tbody && !isBg) {
           tbody.innerHTML = '<tr><td colspan="8" class="text-center py-6 text-danger">Gagal memuat pesanan: ' + esc(data.error || 'Terjadi kesalahan') + '</td></tr>';

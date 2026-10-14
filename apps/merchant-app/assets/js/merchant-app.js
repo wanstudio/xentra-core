@@ -729,10 +729,20 @@
       var activeTab = document.querySelector('.x-tab-content.active');
       if (!activeTab || (activeTab.id !== 'tab-bm-pesanan' && activeTab.id !== 'tab-hari-ini')) {
         await fetchActionableOrdersCount();
+      } else if (activeTab && activeTab.id === 'tab-hari-ini') {
+        if (typeof loadHariIniOrders === 'function') {
+          await loadHariIniOrders({ background: true });
+        }
       }
       scheduleActionableOrdersCheck(10000);
     }, delayMs || 10000);
   }
+
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') {
+      fetchActionableOrdersCount();
+    }
+  });
 
   async function openNotificationsSheet() {
     var sheet = $('sheet-notifications');

@@ -66,19 +66,19 @@ class NotificationService {
     if (target_user_id) {
       recipientUserIds.push(target_user_id);
     } else {
-      let query = 'SELECT id FROM users WHERE status != "deleted"';
+      let query = "SELECT id FROM users WHERE (status != 'deleted' OR status IS NULL)";
       const params = [];
 
       if (brand_id) {
-        query += ' AND (brand_id = ? OR role = "owner")';
+        query += " AND (brand_id = ? OR role = 'owner')";
         params.push(brand_id);
       }
       if (branch_id) {
-        query += ' AND (branch_id = ? OR role IN ("owner", "brand_manager"))';
+        query += " AND (branch_id = ? OR role IN ('owner', 'brand_manager'))";
         params.push(branch_id);
       }
       if (target_role) {
-        query += ' AND role = ?';
+        query += " AND role = ?";
         params.push(target_role);
       }
 

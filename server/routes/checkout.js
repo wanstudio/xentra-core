@@ -695,8 +695,8 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
     if (notificationService) {
       try {
         notificationService.createNotification({
-          brand_id: brandId,
-          branch_id: branchId,
+          brand_id: req.brand_id || (branch && branch.brand_id) || null,
+          branch_id: (branch && branch.id) || null,
           source_type: 'order',
           title: 'Ada Pesanan Baru Masuk!',
           body: `Pesanan #${orderNumber} (${order_type === 'delivery' ? 'Delivery' : order_type === 'dine_in' ? 'Dine In' : 'Takeaway'}) senilai Rp ${(grandTotal || 0).toLocaleString('id-ID')}`,
