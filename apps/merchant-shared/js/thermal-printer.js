@@ -110,9 +110,15 @@
       order = order || {};
       storeInfo = storeInfo || {};
       var storeName = storeInfo.name || 'MYBANGJO RESTO';
-      var branchName = storeInfo.branch || 'Cabang Resto';
-      var orderNum = order.order_number || order.id || 'Pesanan';
-      var orderTypeMap = { delivery: 'Delivery', pickup: 'Pickup', dine_in: 'Dine-In', reservation: 'Reservasi' };
+      var orderNum = order.order_number || '';
+      if (!orderNum && order.id) {
+        var digits = String(order.id).replace(/\D/g, '');
+        var num = digits.length >= 3 ? digits.slice(-3) : '100';
+        var pfx = (order.order_type === 'dine_in' ? 'DI' : (order.order_type === 'reservation' ? 'RS' : (order.order_type === 'takeaway' ? 'TK' : 'OD')));
+        orderNum = pfx + '-' + num;
+      }
+      if (orderNum && !orderNum.startsWith('#')) orderNum = '#' + orderNum;
+      if (!orderNum) orderNum = 'Pesanan';
       var orderType = orderTypeMap[order.order_type] || 'Pesanan';
       var customer = order.customer_name || 'Pelanggan';
       var table = (order.table_name || order.table_number) ? ('Meja ' + (order.table_name || order.table_number)) : '';

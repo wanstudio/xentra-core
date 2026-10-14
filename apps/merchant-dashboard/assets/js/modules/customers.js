@@ -247,8 +247,9 @@
           ordersTbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-muted">Belum ada riwayat transaksi.</td></tr>';
         } else {
           var ordRows = c.orders.map(function (o) {
+            var oCode = (window.formatDashOrderCode ? window.formatDashOrderCode(o) : (o.order_number ? (o.order_number.startsWith('#') ? o.order_number : ('#' + o.order_number)) : '#—'));
             return '<tr>' +
-              '<td><a href="#orders/' + encodeURIComponent(o.id) + '" style="font-weight:600;color:var(--primary);text-decoration:none;">#' + esc(o.order_number || o.id) + '</a></td>' +
+              '<td><a href="#orders/' + encodeURIComponent(o.id) + '" style="font-weight:600;color:var(--primary);text-decoration:none;">' + esc(oCode) + '</a></td>' +
               '<td style="font-size:12px;color:#64748b;">' + esc(o.created_at) + '</td>' +
               '<td>' + esc(o.branch_name || '—') + '</td>' +
               '<td><span class="x-badge" style="background:#e0f2fe;color:#0369a1;font-size:11px;">' + esc(o.order_channel || 'customer_app') + '</span></td>' +

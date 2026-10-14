@@ -34,6 +34,28 @@
     return fetch(url, options);
   }
 
+  function formatDashOrderCode(ord) {
+    if (!ord) return '#—';
+    var raw = (typeof ord === 'string') ? ord : (ord.order_number || ord.orderNumber || ord.code || ord.id || '');
+    raw = String(raw).trim();
+    if (!raw) return '#—';
+    var match = raw.match(/^(?:#)?(OD|DI|TK|RS|POS)-(\d{3,4})\b/i);
+    if (match) {
+      var prefix = match[1].toUpperCase();
+      if (prefix === 'POS') prefix = 'TK';
+      return '#' + prefix + '-' + match[2];
+    }
+    var type = (typeof ord === 'object' && ord !== null) ? (ord.order_type || ord.fulfillment_type || '') : '';
+    var pfx = 'TK';
+    if (type === 'delivery') pfx = 'OD';
+    else if (type === 'dine_in') pfx = 'DI';
+    else if (type === 'reservation') pfx = 'RS';
+    var digits = raw.replace(/\D/g, '');
+    var num = digits.length >= 3 ? digits.slice(-3) : ((digits + '100').slice(0, 3));
+    return '#' + pfx + '-' + num;
+  }
+  window.formatDashOrderCode = formatDashOrderCode;
+
   function showOrdersListView() {
     var listView = $('orders-list-view');
     var detailView = $('order-detail-view');
@@ -142,7 +164,7 @@
 
       return [
         '<tr data-order-id="' + ord.id + '" style="cursor:pointer;" onclick="if (!event.target.closest(\'button, a, input\')) { navigateTo(\'orders/' + ord.id + '\'); }">',
-          '<td><a href="#orders/' + ord.id + '" style="font-weight:700;color:var(--text-main);text-decoration:none;" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">#' + esc(ord.order_number || ord.id.substring(0, 8)) + '</a></td>',
+          '<td><a href="#orders/' + ord.id + '" style="font-weight:700;color:var(--text-main);text-decoration:none;" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">' + esc(formatDashOrderCode(ord)) + '</a></td>',
           '<td><small class="text-muted">' + timeStr + '</small></td>',
           '<td><strong>' + esc(ord.branch_name || ord.branch_id || '-') + '</strong></td>',
           '<td><strong>' + esc(ord.customer_name || 'Pelanggan') + '</strong><br><small class="text-muted">' + esc(ord.customer_phone || '-') + '</small></td>',
@@ -187,9 +209,10 @@
       var ord = data.order;
 
       // Update Summary Header
-      if ($('order-detail-breadcrumb')) $('order-detail-breadcrumb').textContent = '#' + (ord.order_number || ord.id);
-      if ($('order-detail-mobile-title')) $('order-detail-mobile-title').textContent = 'Detail Pesanan · #' + (ord.order_number || ord.id);
-      if ($('order-detail-number')) $('order-detail-number').textContent = '#' + (ord.order_number || ord.id);
+      var orderCode = formatDashOrderCode(ord);
+      if ($('order-detail-breadcrumb')) $('order-detail-breadcrumb').textContent = orderCode;
+      if ($('order-detail-mobile-title')) $('order-detail-mobile-title').textContent = 'Detail Pesanan · ' + orderCode;
+      if ($('order-detail-number')) $('order-detail-number').textContent = orderCode;
 
       var statusBadges = {
         pending: 'x-badge-warning',
@@ -254,7 +277,7 @@
           if (sessionList) {
             sessionList.innerHTML = ord.session_orders.map(function (so) {
               return '<div style="display:flex;justify-content:space-between;align-items:center;background:#ffffff;padding:6px 10px;border-radius:4px;border:1px solid #dcfce7;">' +
-                '<span><a href="#orders/' + so.id + '" style="font-weight:700;color:#166534;text-decoration:none;">#' + (so.order_number || so.id) + '</a> (' + so.order_channel + ')</span>' +
+                '<span><a href="#orders/' + so.id + '" style="font-weight:700;color:#166534;text-decoration:none;">' + esc(formatDashOrderCode(so)) + '</a> (' + so.order_channel + ')</span>' +
                 '<span><strong>' + formatMoney(so.grand_total) + '</strong> &bull; ' + (so.payment_status || 'unpaid').toUpperCase() + '</span>' +
               '</div>';
             }).join('');

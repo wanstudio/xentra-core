@@ -273,11 +273,12 @@
         var methodLabel = t.payment_method === 'cash' ? 'Tunai (Cash)'
           : (t.payment_method === 'doku' ? 'DOKU' : 'Midtrans');
         var timeText = t.created_at ? esc(t.created_at.substring(0, 19).replace('T', ' ')) : '—';
+        var oCode = (window.formatDashOrderCode ? window.formatDashOrderCode(t) : (t.order_number ? (t.order_number.startsWith('#') ? t.order_number : ('#' + t.order_number)) : '#—'));
 
         return '<tr>' +
           '<td data-label="ID Transaksi"><code style="font-size:12px;background:#f8fafc;padding:2px 6px;border-radius:4px;">' + esc(t.id || '—') + '</code></td>' +
           '<td data-label="Waktu" style="font-size:12px;color:#64748b;">' + timeText + '</td>' +
-          '<td data-label="Pesanan"><a href="#orders/' + encodeURIComponent(t.order_id) + '" style="font-weight:600;color:var(--primary);text-decoration:none;">#' + esc(t.order_number || t.order_id) + '</a></td>' +
+          '<td data-label="Pesanan"><a href="#orders/' + encodeURIComponent(t.order_id) + '" style="font-weight:600;color:var(--primary);text-decoration:none;">' + esc(oCode) + '</a></td>' +
           '<td data-label="Cabang">' + esc(t.branch_name || 'Cabang Utama') + '</td>' +
           '<td data-label="Metode"><strong>' + esc(methodLabel) + '</strong></td>' +
           '<td data-label="Nominal"><strong>' + formatMoney(t.amount || 0) + '</strong></td>' +
@@ -312,8 +313,9 @@
 
       var rows = recs.map(function (r) {
         var timeText = r.created_at ? esc(r.created_at.substring(0, 19).replace('T', ' ')) : '—';
+        var oCode = (window.formatDashOrderCode ? window.formatDashOrderCode(r) : (r.order_number ? (r.order_number.startsWith('#') ? r.order_number : ('#' + r.order_number)) : '#—'));
         return '<tr>' +
-          '<td><a href="#orders/' + encodeURIComponent(r.order_id) + '" style="font-weight:600;color:var(--primary);text-decoration:none;">#' + esc(r.order_number || r.order_id) + '</a></td>' +
+          '<td><a href="#orders/' + encodeURIComponent(r.order_id) + '" style="font-weight:600;color:var(--primary);text-decoration:none;">' + esc(oCode) + '</a></td>' +
           '<td>' + esc(r.branch_name || 'Cabang Utama') + '</td>' +
           '<td>' + esc(r.provider) + '</td>' +
           '<td><strong>' + formatMoney(r.amount || 0) + '</strong></td>' +
