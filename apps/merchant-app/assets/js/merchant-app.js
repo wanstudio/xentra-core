@@ -509,22 +509,41 @@
     if (notifBtn && !notifBtn.dataset.accountBound) {
       notifBtn.dataset.accountBound = '1';
       notifBtn.addEventListener('click', function () {
-        if ('Notification' in window && Notification.permission === 'default') {
+        if (window.XentraWebPush && typeof window.XentraWebPush.requestAndSubscribe === 'function') {
+          window.XentraWebPush.requestAndSubscribe().then(function (success) {
+            if (success) {
+              showToast('Notifikasi pesanan & latar belakang (Web Push) aktif', 'success');
+            } else if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+              showToast('Notifikasi pesanan aktif', 'success');
+            } else {
+              showToast('Notifikasi browser belum diizinkan', 'info');
+            }
+            if (window.XentraAudio && typeof window.XentraAudio.orderIncoming === 'function') {
+              window.XentraAudio.orderIncoming({ single: true });
+            }
+          });
+        } else if ('Notification' in window && Notification.permission === 'default') {
           Notification.requestPermission().then(function (perm) {
             if (perm === 'granted') {
               showToast('Notifikasi pesanan diizinkan & alarm suara aktif', 'success');
+              if (window.XentraWebPush && typeof window.XentraWebPush.register === 'function') {
+                window.XentraWebPush.register();
+              }
             } else {
               showToast('Notifikasi browser diblokir. Alarm suara tetap aktif.', 'info');
             }
             if (window.XentraAudio && typeof window.XentraAudio.orderIncoming === 'function') {
-              window.XentraAudio.orderIncoming({ text: 'Notifikasi aktif' });
+              window.XentraAudio.orderIncoming({ single: true });
             }
           }).catch(function () {
             showToast('Alarm suara pesanan aktif', 'info');
           });
         } else {
+          if (window.XentraWebPush && typeof window.XentraWebPush.register === 'function') {
+            window.XentraWebPush.register();
+          }
           if (window.XentraAudio && typeof window.XentraAudio.orderIncoming === 'function') {
-            window.XentraAudio.orderIncoming({ text: 'Tes alarm pesanan masuk' });
+            window.XentraAudio.orderIncoming({ single: true });
           }
           showToast('Alarm suara dan notifikasi pesanan aktif', 'success');
         }

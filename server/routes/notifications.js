@@ -76,6 +76,66 @@ function registerNotificationRoutes(router, { notificationService, requireAuth }
       res.status(500).json({ success: false, error: err.message });
     }
   });
+
+  // 5. Get VAPID public key for browser PushManager subscription
+  router.get('/notifications/vapid-public-key', (req, res) => {
+    try {
+      const webPushService = notificationService && notificationService.webPushService;
+      const publicKey = webPushService ? webPushService.getPublicKey() : null;
+      if (!publicKey) {
+        return res.status(503).json({ success: false, error: 'WebPush service not initialized' });
+      }
+      res.json({ success: true, public_key: publicKey });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 6. Subscribe device to Web Push
+  router.post('/notifications/subscribe', requireAuth(), (req, res) => {
+    try {
+      const userId = req.user && req.user.id;
+      const subscription = req.body && req.body.subscription;
+      const userAgent = req.headers['user-agent'] || '';
+
+      const webPushService = notificationService && notificationService.webPushService;
+      if (!webPushService) {
+        return res.status(503).json({ success: false, error: 'WebPush service not initialized' });
+      }
+
+      webPushService.saveSubscription({
+        userId,
+        subscription,
+        userAgent
+      });
+
+      res.json({ success: true, message: 'WebPush subscription saved' });
+    } catch (err) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  });
+
+  // 7. Unsubscribe device from Web Push
+  router.post('/notifications/unsubscribe', requireAuth(), (req, res) => {
+    try {
+      const userId = req.user && req.user.id;
+      const endpoint = req.body && req.body.endpoint;
+
+      const webPushService = notificationService && notificationService.webPushService;
+      if (!webPushService) {
+        return res.status(503).json({ success: false, error: 'WebPush service not initialized' });
+      }
+
+      webPushService.removeSubscription({
+        endpoint,
+        userId
+      });
+
+      res.json({ success: true, message: 'WebPush subscription removed' });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
 }
 
 module.exports = registerNotificationRoutes;

@@ -8,10 +8,12 @@
  * - Read state persistence per recipient
  */
 const { v4: uuidv4 } = require('crypto');
+const WebPushService = require('./WebPushService');
 
 class NotificationService {
-  constructor(db) {
+  constructor(db, webPushService = null) {
     this.db = db;
+    this.webPushService = webPushService || (db ? new WebPushService(db) : null);
   }
 
   /**
@@ -92,6 +94,27 @@ class NotificationService {
       `);
       for (const uid of recipientUserIds) {
         insertRecipient.run('rcp_' + Math.random().toString(36).substring(2, 10), notifId, uid, now);
+      }
+
+      // Dispatch background Web Push (reaches device when locked/closed)
+      if (this.webPushService) {
+        const pushPayload = {
+          title: title,
+          body: body,
+          icon: '/merchant-app/assets/icons/icon-192.png',
+          badge: '/merchant-app/assets/icons/icon-192.png',
+          tag: 'order-pending-' + (related_entity_id || notifId),
+          url: action_url || '/merchant-app/#pesanan',
+          data: {
+            notificationId: notifId,
+            orderId: related_entity_id,
+            entityType: related_entity_type,
+            url: action_url || '/merchant-app/#pesanan'
+          }
+        };
+        this.webPushService.sendPushToUsers(recipientUserIds, pushPayload).catch(err => {
+          console.warn('[NotificationService] Push dispatch warning:', err && err.message);
+        });
       }
     }
 

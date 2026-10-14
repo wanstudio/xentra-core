@@ -16,6 +16,7 @@ const domain = require('./domain');
 const data = require('./data');
 const media = require('./media');
 const NotificationService = require('./notification/NotificationService');
+const WebPushService = require('./notification/WebPushService');
 
 module.exports = {
   events,
@@ -26,5 +27,6 @@ module.exports = {
   domain,
   data,
   media,
-  NotificationService
+  NotificationService,
+  WebPushService
 };
