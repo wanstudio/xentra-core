@@ -2,11 +2,16 @@ package com.mybangjo.merchant;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.view.View;
 import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
@@ -21,6 +26,7 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
@@ -141,9 +147,13 @@ public class MainActivity extends AppCompatActivity {
 
     private void handleIncomingIntent(android.content.Intent intent) {
         if (intent == null) return;
-        // User interacted with app or notification: stop loud siren and overlay
+        // User interacted with app or notification: stop loud siren and return overlay to ball standby
         OrderAlarmService.stopAlarm(this);
-        OrderOverlayService.hideOverlay(this);
+        if (OrderOverlayService.isAssistiveBallEnabled(this)) {
+            OrderOverlayService.showBall(this, 0);
+        } else {
+            OrderOverlayService.hideOverlay(this);
+        }
 
         Uri data = intent.getData();
         if (data != null && webView != null) {
