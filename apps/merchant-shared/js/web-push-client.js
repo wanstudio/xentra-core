@@ -29,6 +29,15 @@
           if (sub) await sub.unsubscribe();
         } catch (_) {}
       }
+      try {
+        var S_native = window.XentraShared;
+        var apiBase_native = S_native ? S_native.API_BASE : '/api/v1';
+        var hdrs_native = S_native ? S_native.getAuthHeaders() : {};
+        fetch(apiBase_native + '/notifications/unsubscribe-all', {
+          method: 'POST',
+          headers: hdrs_native
+        }).catch(function () {});
+      } catch (_) {}
       return false;
     }
 

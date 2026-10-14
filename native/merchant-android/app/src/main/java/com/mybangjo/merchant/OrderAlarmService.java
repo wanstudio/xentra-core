@@ -116,6 +116,7 @@ public class OrderAlarmService extends Service {
             }
 
             if (mediaPlayer != null) {
+                mediaPlayer.setWakeMode(this, PowerManager.PARTIAL_WAKE_LOCK);
                 mediaPlayer.setLooping(true);
                 mediaPlayer.setVolume(1.0f, 1.0f);
                 mediaPlayer.start();
@@ -151,6 +152,13 @@ public class OrderAlarmService extends Service {
         } catch (Exception e) {
             e.printStackTrace();
         }
+
+        try {
+            if (wakeLock != null && wakeLock.isHeld()) {
+                wakeLock.release();
+                wakeLock = null;
+            }
+        } catch (Exception ignored) {}
 
         try {
             android.os.Vibrator v = (android.os.Vibrator) getSystemService(Context.VIBRATOR_SERVICE);

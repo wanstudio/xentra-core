@@ -1521,22 +1521,38 @@
             </div>
           </div>
 
-          <!-- Floating Order Widget Panel -->
+          <!-- Floating Order Widget & Assistive Ball Panel -->
           <div id="panel-floating-widget" class="x-card-panel" style="padding:18px 20px; border-radius:14px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.04); margin-bottom:14px;">
             <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
               <span style="display:flex; align-items:center; justify-content:center; width:38px; height:38px; border-radius:10px; background:#ecfdf5; color:#059669; flex-shrink:0;">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19 4H5c-1.11 0-2 .9-2 2v12c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H5V8h14v10z"/></svg>
               </span>
               <div>
-                <h4 style="margin:0; font-size:15px; font-weight:800; color:#0f172a;">Pop-up Pesanan Baru</h4>
-                <p style="margin:2px 0 0; color:#64748b; font-size:12px; font-weight:700;">Tampilkan pesanan di atas aplikasi lain</p>
+                <h4 style="margin:0; font-size:15px; font-weight:800; color:#0f172a;">Bola Melayang & Pop-up Pesanan</h4>
+                <p style="margin:2px 0 0; color:#64748b; font-size:12px; font-weight:700;">Ikon bulat & kartu pesanan di atas aplikasi lain</p>
               </div>
             </div>
-            <p style="margin:0 0 14px; color:#64748b; font-size:13px; line-height:1.5;">Pesanan baru langsung tampil di layar HP saat Anda membuka WhatsApp atau aplikasi lain.</p>
-            <div style="display:flex; gap:10px;">
-              <button type="button" class="x-btn-primary" onclick="if(window.XentraNative&&window.XentraNative.requestOverlayPermission)window.XentraNative.requestOverlayPermission();else alert('Fitur ini khusus aplikasi Android.');" style="flex:1; justify-content:center; height:42px; font-size:13px; font-weight:700; border-radius:10px;">⚙️ Aktifkan Izin</button>
-              <button type="button" class="x-btn-secondary" onclick="if(window.XentraNative&&window.XentraNative.testOverlay)window.XentraNative.testOverlay();else alert('Fitur ini khusus aplikasi Android.');" style="flex:1; justify-content:center; height:42px; font-size:13px; font-weight:700; border-radius:10px;">✨ Tes Pop-up</button>
+            <p style="margin:0 0 14px; color:#64748b; font-size:13px; line-height:1.5;">Bola melayang menjaga aplikasi tetap hidup di background dan langsung menampilkan kartu orderan saat ada pesanan baru.</p>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button type="button" class="x-btn-primary" onclick="if(window.XentraNative&&window.XentraNative.requestOverlayPermission)window.XentraNative.requestOverlayPermission();else alert('Fitur ini khusus aplikasi Android.');" style="flex:1; min-width:130px; justify-content:center; height:42px; font-size:13px; font-weight:700; border-radius:10px;">⚙️ Aktifkan Izin</button>
+              <button type="button" class="x-btn-secondary" onclick="if(window.XentraNative&&window.XentraNative.testAssistiveBall)window.XentraNative.testAssistiveBall();else alert('Fitur ini khusus aplikasi Android.');" style="flex:1; min-width:130px; justify-content:center; height:42px; font-size:13px; font-weight:700; border-radius:10px;">🔘 Tes Bola Melayang</button>
+              <button type="button" class="x-btn-secondary" onclick="if(window.XentraNative&&window.XentraNative.testOverlay)window.XentraNative.testOverlay();else alert('Fitur ini khusus aplikasi Android.');" style="flex:1; min-width:130px; justify-content:center; height:42px; font-size:13px; font-weight:700; border-radius:10px;">✨ Tes Pop-up Order</button>
             </div>
+          </div>
+
+          <!-- Background Execution & Battery Optimization Panel -->
+          <div id="panel-battery-optimization" class="x-card-panel" style="padding:18px 20px; border-radius:14px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.04); margin-bottom:14px;">
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+              <span style="display:flex; align-items:center; justify-content:center; width:38px; height:38px; border-radius:10px; background:#eff6ff; color:#2563eb; flex-shrink:0;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4zM11 20v-5.5H9L13 7v5.5h2L11 20z"/></svg>
+              </span>
+              <div>
+                <h4 style="margin:0; font-size:15px; font-weight:800; color:#0f172a;">Performa Layar Mati & Baterai</h4>
+                <p style="margin:2px 0 0; color:#64748b; font-size:12px; font-weight:700;">Pastikan suara sirene tetap bunyi saat HP terkunci</p>
+              </div>
+            </div>
+            <p style="margin:0 0 14px; color:#64748b; font-size:13px; line-height:1.5;">Atur aplikasi ke <strong>"Tidak Dibatasi (Unrestricted)"</strong> agar Android tidak mematikan koneksi internet saat layar HP mati.</p>
+            <button type="button" class="x-btn-secondary" onclick="if(window.XentraNative&&window.XentraNative.requestIgnoreBatteryOptimization)window.XentraNative.requestIgnoreBatteryOptimization();else alert('Fitur ini khusus aplikasi Android.');" style="width:100%; justify-content:center; height:42px; font-size:13px; font-weight:700; border-radius:10px;">🔋 Buka Pengaturan Baterai Android</button>
           </div>
 
           <div class="x-card-panel" style="padding:18px 20px; border-radius:14px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.04);">

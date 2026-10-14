@@ -136,6 +136,20 @@ function registerNotificationRoutes(router, { notificationService, requireAuth }
       res.status(500).json({ success: false, error: err.message });
     }
   });
+
+  // 8. Purge all Web Push subscriptions for user (used by Native Android App so browser never intercepts notifications)
+  router.post('/notifications/unsubscribe-all', requireAuth(), (req, res) => {
+    try {
+      const userId = req.user && req.user.id;
+      const webPushService = notificationService && notificationService.webPushService;
+      if (webPushService && userId) {
+        webPushService.removeAllSubscriptionsForUser(userId);
+      }
+      res.json({ success: true, message: 'All WebPush subscriptions removed for user' });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
 }
 
 module.exports = registerNotificationRoutes;

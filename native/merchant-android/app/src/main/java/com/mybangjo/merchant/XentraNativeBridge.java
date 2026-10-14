@@ -40,7 +40,7 @@ public class XentraNativeBridge {
         OrderMonitorService.clearAuthContext(context);
     }
 
-    // ── Floating Order Widget (System Overlay) ──
+    // ── Floating Order Widget (System Overlay & Assistive Ball) ──
     @JavascriptInterface
     public boolean hasOverlayPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -64,14 +64,59 @@ public class XentraNativeBridge {
     }
 
     @JavascriptInterface
+    public boolean isAssistiveBallEnabled() {
+        return OrderOverlayService.isAssistiveBallEnabled(context);
+    }
+
+    @JavascriptInterface
+    public void setAssistiveBallEnabled(boolean enabled) {
+        OrderOverlayService.setAssistiveBallEnabled(context, enabled);
+    }
+
+    @JavascriptInterface
     public void testOverlay() {
-        OrderOverlayService.showOverlay(
+        OrderOverlayService.showOrderCard(
             context,
             "ord_demo",
             "99",
             "Pelanggan Bangjo (Demo)",
             "Rp 45.000"
         );
+    }
+
+    @JavascriptInterface
+    public void testAssistiveBall() {
+        OrderOverlayService.showBall(context, 1);
+    }
+
+    // ── Battery Optimization Whitelist ──
+    @JavascriptInterface
+    public boolean isIgnoringBatteryOptimizations() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+            return pm != null && pm.isIgnoringBatteryOptimizations(context.getPackageName());
+        }
+        return true;
+    }
+
+    @JavascriptInterface
+    public void requestIgnoreBatteryOptimization() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                Intent intent = new Intent(
+                    Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                    Uri.parse("package:" + context.getPackageName())
+                );
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(intent);
+            } catch (Exception e) {
+                try {
+                    Intent intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    context.startActivity(intent);
+                } catch (Exception ignored) {}
+            }
+        }
     }
 
     // ── Audio & Alarm Controls ──

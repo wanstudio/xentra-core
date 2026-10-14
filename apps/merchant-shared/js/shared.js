@@ -37,6 +37,13 @@
     var token = localStorage.getItem(TOKEN_KEY);
     if (token) {
       headers['Authorization'] = 'Bearer ' + token;
+      if (window.XentraNative && typeof window.XentraNative.syncAuth === 'function') {
+        try {
+          var u = getStoredUser();
+          var bId = u ? (u.branch_id || u.branchId || '') : '';
+          window.XentraNative.syncAuth(token, bId);
+        } catch (_) {}
+      }
     }
     return headers;
   }
@@ -45,6 +52,9 @@
   function clearStoredSession() {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    if (window.XentraNative && typeof window.XentraNative.clearAuth === 'function') {
+      try { window.XentraNative.clearAuth(); } catch (_) {}
+    }
   }
 
   /**

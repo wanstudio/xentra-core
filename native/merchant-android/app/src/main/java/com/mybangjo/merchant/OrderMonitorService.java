@@ -99,6 +99,9 @@ public class OrderMonitorService extends Service {
         startForeground(NOTIF_PERSISTENT_ID, buildPersistentNotification());
         startPollingScheduler();
 
+        // Standby Assistive Ball if enabled and permission granted
+        OrderOverlayService.showBall(this, 0);
+
         return START_STICKY;
     }
 
@@ -124,13 +127,26 @@ public class OrderMonitorService extends Service {
         String token = prefs.getString(KEY_TOKEN, null);
         String branchId = prefs.getString(KEY_BRANCH_ID, null);
 
-        if (token == null || branchId == null || token.isEmpty() || branchId.isEmpty()) {
+        if (token == null || token.trim().isEmpty()) {
             return;
         }
 
+        PowerManager.WakeLock pollLock = null;
+        try {
+            PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (pm != null) {
+                pollLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Mybangjo:OrderPollLock");
+                pollLock.acquire(10 * 1000L);
+            }
+        } catch (Exception ignored) {}
+
         HttpURLConnection conn = null;
         try {
-            URL url = new URL("https://m.mybangjo.com/api/v1/admin/branches/" + branchId + "/orders?status=pending");
+            String urlStr = (branchId != null && !branchId.trim().isEmpty() && !branchId.equals("null"))
+                ? ("https://m.mybangjo.com/api/v1/admin/branches/" + branchId + "/orders?status=pending")
+                : "https://m.mybangjo.com/api/v1/admin/orders?status=pending";
+
+            URL url = new URL(urlStr);
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
             conn.setRequestProperty("Authorization", "Bearer " + token);
@@ -157,6 +173,9 @@ public class OrderMonitorService extends Service {
         } finally {
             if (conn != null) {
                 conn.disconnect();
+            }
+            if (pollLock != null && pollLock.isHeld()) {
+                try { pollLock.release(); } catch (Exception ignored) {}
             }
         }
     }
@@ -186,6 +205,9 @@ public class OrderMonitorService extends Service {
                 }
             }
 
+            // Always update Assistive Ball badge count
+            OrderOverlayService.updateBadge(this, pendingCount);
+
             if (pendingCount > 0) {
                 boolean hasNewOrder = false;
                 for (String id : currentPendingIds) {
@@ -209,7 +231,7 @@ public class OrderMonitorService extends Service {
                     // 3. Post High Priority Native Notification
                     showNativeOrderNotification(pendingCount, latestOrder);
 
-                    // 4. Show Floating Overlay widget over other apps
+                    // 4. Show Floating Order Card over other apps
                     if (latestOrder != null) {
                         String orderId = latestOrder.optString("id", "");
                         String orderNum = latestOrder.optString("order_number", "");
@@ -217,7 +239,7 @@ public class OrderMonitorService extends Service {
                         double amount = latestOrder.optDouble("total_amount", 0);
                         String totalStr = amount > 0 ? ("Rp " + String.format("%,.0f", amount).replace(',', '.')) : "";
 
-                        OrderOverlayService.showOverlay(this, orderId, orderNum, customer, totalStr);
+                        OrderOverlayService.showOrderCard(this, orderId, orderNum, customer, totalStr);
                     }
                 }
             } else {
@@ -226,7 +248,6 @@ public class OrderMonitorService extends Service {
                     isAlarmActive = false;
                     seenPendingOrderIds.clear();
                     OrderAlarmService.stopAlarm(this);
-                    OrderOverlayService.hideOverlay(this);
                     dismissOrderNotification();
                 }
             }

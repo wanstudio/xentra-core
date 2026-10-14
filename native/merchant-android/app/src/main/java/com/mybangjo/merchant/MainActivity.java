@@ -68,6 +68,7 @@ public class MainActivity extends AppCompatActivity {
         setupWebView();
         requestNecessaryPermissions();
         checkOverlayPermission();
+        checkBatteryOptimization();
 
         if (savedInstanceState == null) {
             webView.loadUrl(TARGET_URL);
@@ -96,6 +97,37 @@ public class MainActivity extends AppCompatActivity {
                     })
                     .setNegativeButton("Nanti", null)
                     .show();
+            }
+        }
+    }
+
+    private void checkBatteryOptimization() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (pm != null && !pm.isIgnoringBatteryOptimizations(getPackageName())) {
+                SharedPreferences prefs = getSharedPreferences("xentra_merchant_prefs", Context.MODE_PRIVATE);
+                boolean alreadyAsked = prefs.getBoolean("battery_prompt_shown", false);
+                if (!alreadyAsked) {
+                    prefs.edit().putBoolean("battery_prompt_shown", true).apply();
+                    new androidx.appcompat.app.AlertDialog.Builder(this)
+                        .setTitle("🔋 Izin Latar Belakang & Baterai")
+                        .setMessage("Agar sirene pesanan tetap berbunyi saat layar HP mati atau terkunci, mohon izinkan aplikasi berjalan tanpa dibatasi penghemat baterai.")
+                        .setPositiveButton("Izinkan", (dialog, which) -> {
+                            try {
+                                Intent intent = new Intent(
+                                    Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                                    Uri.parse("package:" + getPackageName())
+                                );
+                                startActivity(intent);
+                            } catch (Exception e) {
+                                try {
+                                    startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+                                } catch (Exception ignored) {}
+                            }
+                        })
+                        .setNegativeButton("Nanti", null)
+                        .show();
+                }
             }
         }
     }
@@ -179,8 +211,9 @@ public class MainActivity extends AppCompatActivity {
                     "    var token = localStorage.getItem('xentra_merchant_token');" +
                     "    var user = null;" +
                     "    try { user = JSON.parse(localStorage.getItem('xentra_merchant_user')); } catch(_){}" +
-                    "    if (token && user && user.branch_id && window.XentraNative && typeof window.XentraNative.syncAuth === 'function') {" +
-                    "      window.XentraNative.syncAuth(token, user.branch_id);" +
+                    "    var branchId = user ? (user.branch_id || user.branchId || '') : '';" +
+                    "    if (token && window.XentraNative && typeof window.XentraNative.syncAuth === 'function') {" +
+                    "      window.XentraNative.syncAuth(token, branchId);" +
                     "    }" +
                     "  } catch(e) {}" +
                     "})();",

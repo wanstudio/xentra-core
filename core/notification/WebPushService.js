@@ -99,6 +99,12 @@ class WebPushService {
     return result.changes > 0;
   }
 
+  removeAllSubscriptionsForUser(userId) {
+    if (!userId) return 0;
+    const result = this.db.prepare('DELETE FROM push_subscriptions WHERE user_id = ?').run(userId);
+    return result.changes || 0;
+  }
+
   async sendPushToUsers(userIds, payload) {
     if (!this.initialized || !Array.isArray(userIds) || userIds.length === 0) {
       return { sent: 0, failed: 0 };
