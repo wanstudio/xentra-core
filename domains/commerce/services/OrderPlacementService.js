@@ -404,9 +404,17 @@ class OrderPlacementService {
 
     const orderId = `ord_${crypto.randomBytes(6).toString('hex')}`;
     const now = new Date().toISOString();
-    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const randSuffix = `${Math.floor(1000 + Math.random() * 9000)}-${crypto.randomBytes(3).toString('hex')}`;
-    const orderNumber = `XN-${today}-${randSuffix}`;
+    const prefix = effectiveOrderType === 'delivery' ? 'OD' :
+                   (effectiveOrderType === 'dine_in' ? 'DI' :
+                   (effectiveOrderType === 'reservation' ? 'RS' : 'TK'));
+    let orderNumber = `${prefix}-${Math.floor(100 + Math.random() * 900)}`;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      if (orderRepository.findByOrderNumberBranchToday && orderRepository.findByOrderNumberBranchToday(orderNumber, branch_id)) {
+        orderNumber = `${prefix}-${Math.floor(100 + Math.random() * 900)}`;
+      } else {
+        break;
+      }
+    }
 
     // Recipient Identity Layer: resolve authoritative recipient snapshot.
     // SELF uses the authenticated customer identity (authoritative); OTHER uses

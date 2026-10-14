@@ -253,9 +253,8 @@ class PosLocalOperationService {
 
     const now = offline_created_at || new Date().toISOString();
     const orderId = `ord_${crypto.randomBytes(6).toString('hex')}`;
-    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const randSuffix = `${Math.floor(1000 + Math.random() * 9000)}-${crypto.randomBytes(3).toString('hex')}`;
-    const orderNumber = `POS-${today}-${randSuffix}`;
+    const posPrefix = order_type === 'dine_in' ? 'DI' : (order_type === 'delivery' ? 'OD' : 'TK');
+    const orderNumber = `${posPrefix}-${Math.floor(100 + Math.random() * 900)}`;
 
     // Offline POS operates from its locally cached canonical Menu snapshot.
     // It may not call the online resolver while disconnected, but the sale still

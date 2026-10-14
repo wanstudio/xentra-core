@@ -1139,7 +1139,7 @@ function initSchema(targetDb) {
 
     CREATE TABLE IF NOT EXISTS orders (
       id TEXT PRIMARY KEY,
-      order_number TEXT UNIQUE NOT NULL,
+      order_number TEXT NOT NULL,
       client_transaction_id TEXT,
       brand_id TEXT NOT NULL,
       branch_id TEXT NOT NULL,
@@ -2313,6 +2313,68 @@ function initSchema(targetDb) {
   // so a stale file database migrates in place instead of crashing the boot.
   try { targetDb.exec('ALTER TABLE inventory_movements ADD COLUMN mutation_id TEXT;'); } catch (e) {}
   try { targetDb.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_inventory_movements_mutation ON inventory_movements(mutation_id) WHERE mutation_id IS NOT NULL;'); } catch (e) {}
+  // Relax UNIQUE constraint on orders.order_number so 3-digit order codes (#OD-834, #DI-105, etc.)
+  // can be reused across dates/branches without SQLITE_CONSTRAINT collision.
+  try {
+    let hasUniqueOrderNumber = false;
+    if (typeof targetDb.prepare === 'function') {
+      const idx = targetDb.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'orders' AND name = 'sqlite_autoindex_orders_2'").get();
+      if (idx) hasUniqueOrderNumber = true;
+    }
+    if (hasUniqueOrderNumber) {
+      targetDb.exec(`
+        PRAGMA foreign_keys = OFF;
+        CREATE TABLE orders_migration_temp (
+          id TEXT PRIMARY KEY,
+          order_number TEXT NOT NULL,
+          client_transaction_id TEXT,
+          brand_id TEXT NOT NULL,
+          branch_id TEXT NOT NULL,
+          customer_name TEXT NOT NULL,
+          customer_phone TEXT NOT NULL,
+          order_type TEXT NOT NULL,
+          fulfillment_schedule_type TEXT DEFAULT 'asap',
+          scheduled_slot_start TEXT,
+          scheduled_slot_end TEXT,
+          status TEXT NOT NULL DEFAULT 'pending',
+          subtotal REAL NOT NULL,
+          delivery_fee REAL DEFAULT 0.0,
+          discount_amount REAL DEFAULT 0.0,
+          grand_total REAL NOT NULL,
+          total_amount REAL,
+          payment_method TEXT DEFAULT 'cash',
+          payment_status TEXT DEFAULT 'pending',
+          order_note TEXT,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now')),
+          order_channel TEXT DEFAULT 'customer_app',
+          selection_mode TEXT,
+          fulfillment_type TEXT DEFAULT 'delivery',
+          table_number TEXT,
+          dining_session_id TEXT,
+          cash_tendered REAL,
+          customer_id TEXT,
+          recipient_type TEXT NOT NULL DEFAULT 'self',
+          recipient_name TEXT,
+          recipient_phone TEXT,
+          FOREIGN KEY (brand_id) REFERENCES brands(id),
+          FOREIGN KEY (branch_id) REFERENCES branches(id)
+        );
+        INSERT INTO orders_migration_temp SELECT 
+          id, order_number, client_transaction_id, brand_id, branch_id, customer_name, customer_phone, order_type,
+          fulfillment_schedule_type, scheduled_slot_start, scheduled_slot_end, status, subtotal, delivery_fee, discount_amount,
+          grand_total, total_amount, payment_method, payment_status, order_note, created_at, updated_at, order_channel,
+          selection_mode, fulfillment_type, table_number, dining_session_id, cash_tendered, customer_id, recipient_type,
+          recipient_name, recipient_phone
+        FROM orders;
+        DROP TABLE orders;
+        ALTER TABLE orders_migration_temp RENAME TO orders;
+        CREATE INDEX IF NOT EXISTS idx_orders_customer_id ON orders(customer_id);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_branch_client_tx ON orders(branch_id, client_transaction_id) WHERE client_transaction_id IS NOT NULL;
+        PRAGMA foreign_keys = ON;
+      `);
+    }
+  } catch (e) {}
   // C1 AUDIT (B1/C1): branch_operation_logs created before the C1 schema lacks
   // the product_id column used for product-scoped audit rows.
   try { targetDb.exec('ALTER TABLE branch_operation_logs ADD COLUMN product_id TEXT;'); } catch (e) {}

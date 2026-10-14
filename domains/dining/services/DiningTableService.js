@@ -313,7 +313,7 @@ class DiningTableService {
 
     const orderId = `ord_${crypto.randomBytes(6).toString('hex')}`;
     const now = new Date().toISOString();
-    const orderNumber = `RES-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
+    const orderNumber = `RS-${Math.floor(100 + Math.random() * 900)}`;
     orderRepository.beginTransaction();
     try {
       if (customer && customer.phone) {

@@ -63,6 +63,64 @@
     return found || null;
   }
 
+  function formatBMOrderCode(ord) {
+    if (!ord) return '#—';
+    var raw = (typeof ord === 'string') ? ord : (ord.order_number || ord.orderNumber || ord.code || ord.id || '');
+    raw = String(raw).trim();
+    if (!raw) return '#—';
+
+    // Standard format: #OD-834, OD-834, DI-123, TK-456, RS-789
+    var match = raw.match(/^(?:#)?(OD|DI|TK|RS|POS)-(\d{3,4})\b/i);
+    if (match) {
+      var prefix = match[1].toUpperCase();
+      if (prefix === 'POS') prefix = 'TK';
+      return '#' + prefix + '-' + match[2];
+    }
+
+    // Fallback for legacy format: derive prefix from order type + 3 digits
+    var type = (typeof ord === 'object' && ord !== null) ? (ord.order_type || ord.fulfillment_type || '') : '';
+    var pfx = 'TK';
+    if (type === 'delivery') pfx = 'OD';
+    else if (type === 'dine_in') pfx = 'DI';
+    else if (type === 'reservation') pfx = 'RS';
+
+    var digits = raw.replace(/\D/g, '');
+    var num = digits.length >= 3 ? digits.slice(-3) : ((digits + '100').slice(0, 3));
+    return '#' + pfx + '-' + num;
+  }
+  window.formatBMOrderCode = formatBMOrderCode;
+
+  function formatBMItemModifiers(it) {
+    if (!it) return '';
+    var raw = it.modifiers_snapshot || it.modifiers || it.options;
+    if (!raw) return '';
+    try {
+      var parsed = (typeof raw === 'string') ? JSON.parse(raw) : raw;
+      if (Array.isArray(parsed)) {
+        return parsed.map(function (m) {
+          if (typeof m === 'string') return m;
+          var title = (m.group_name ? (m.group_name + ': ') : '') + (m.name || m.title || m.option_name || '');
+          if (m.price && Number(m.price) > 0) title += ' (+' + formatMoney(m.price) + ')';
+          return title;
+        }).filter(Boolean).join(', ');
+      } else if (typeof parsed === 'object' && parsed !== null) {
+        var parts = [];
+        Object.keys(parsed).forEach(function (k) {
+          var v = parsed[k];
+          if (Array.isArray(v)) {
+            parts.push(k + ': ' + v.map(function (x) { return x.name || x.title || x; }).join(', '));
+          } else if (typeof v === 'object' && v !== null) {
+            parts.push((v.group_name || k) + ': ' + (v.name || v.title || JSON.stringify(v)));
+          } else if (v) {
+            parts.push(k + ': ' + v);
+          }
+        });
+        return parts.join(', ');
+      }
+    } catch (e) {}
+    return (typeof raw === 'string' && raw.length < 80) ? raw : '';
+  }
+
   function openBMAcceptOrderModal(orderId, btnEl, origin) {
     _bmAcceptContext = {
       orderId: orderId,
@@ -76,13 +134,21 @@
     var custEl = $('bm-accept-order-customer');
     var totalEl = $('bm-accept-order-total');
     var itemsEl = $('bm-accept-order-items-preview');
+    var itemsCountEl = $('bm-accept-order-items-count');
+    var noteBox = $('bm-accept-order-note-box');
+    var noteTextEl = $('bm-accept-order-note-text');
+    var subtotalEl = $('bm-accept-order-subtotal');
+    var delivRow = $('bm-accept-order-delivery-row');
+    var delivFeeEl = $('bm-accept-order-delivery-fee');
+    var discRow = $('bm-accept-order-discount-row');
+    var discEl = $('bm-accept-order-discount');
     var btnConfirm = $('btn-bm-accept-confirm');
     var btnText = $('btn-bm-accept-text');
 
     var ord = findBMOrderById(orderId);
 
     if (numEl) {
-      numEl.textContent = (ord && ord.order_number) ? ord.order_number : ('#' + orderId);
+      numEl.textContent = formatBMOrderCode(ord);
     }
 
     if (badgeEl) {
@@ -108,29 +174,100 @@
 
     if (custEl) {
       var custText = (ord && ord.customer_name) ? ord.customer_name : 'Pelanggan';
+      if (ord && ord.customer_phone) {
+        custText += ' (' + ord.customer_phone + ')';
+      }
       if (ord && ord.table_number && ord.order_type !== 'dine_in') {
         custText += ' • Meja ' + ord.table_number;
       }
       custEl.textContent = custText;
     }
 
-    if (totalEl) {
-      totalEl.textContent = (ord && ord.grand_total != null) ? formatMoney(ord.grand_total) : '—';
-    }
+    // Detail Daftar Menu & Isinya
+    var items = (ord && Array.isArray(ord.items)) ? ord.items : [];
+    if (itemsCountEl) itemsCountEl.textContent = items.length + ' menu';
 
     if (itemsEl) {
-      if (ord && Array.isArray(ord.items) && ord.items.length) {
-        var preview = ord.items.slice(0, 3).map(function (it) {
-          return esc(it.quantity || 1) + 'x ' + esc(it.product_name || it.title || 'Item');
-        }).join(', ');
-        if (ord.items.length > 3) {
-          preview += ' (+' + (ord.items.length - 3) + ' lainnya)';
-        }
-        itemsEl.textContent = preview;
-        itemsEl.style.display = 'block';
+      if (items.length) {
+        itemsEl.innerHTML = items.map(function (it) {
+          var qty = Number(it.quantity || 1);
+          var name = esc(it.product_name || it.title || 'Item Menu');
+          var itemSub = (it.item_subtotal != null) ? Number(it.item_subtotal) :
+                        ((it.subtotal != null) ? Number(it.subtotal) :
+                        (Number(it.unit_price || it.price || 0) * qty));
+          var modText = esc(formatBMItemModifiers(it));
+          var itemNote = esc(String(it.note || it.notes || '').trim());
+
+          var html = '<div style="padding-bottom:6px; border-bottom:1px solid #f1f5f9;">' +
+            '<div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">' +
+              '<span style="font-size:13px; font-weight:700; color:#0f172a; line-height:1.4;">' +
+                '<span style="color:#16a34a; margin-right:4px;">' + qty + 'x</span> ' + name +
+              '</span>' +
+              '<span style="font-size:12.5px; font-weight:700; color:#334155; white-space:nowrap;">' + formatMoney(itemSub) + '</span>' +
+            '</div>';
+
+          if (modText) {
+            html += '<div style="font-size:11.5px; color:#64748b; margin-top:2px; padding-left:18px; line-height:1.35;">' +
+              '🔹 ' + modText +
+            '</div>';
+          }
+
+          if (itemNote) {
+            html += '<div style="margin-top:3px; padding-left:18px;">' +
+              '<span style="display:inline-block; font-size:11px; color:#d97706; background:#fffbeb; border:1px solid #fef3c7; border-radius:4px; padding:2px 6px; line-height:1.3;">' +
+                '📝 ' + itemNote +
+              '</span>' +
+            '</div>';
+          }
+
+          html += '</div>';
+          return html;
+        }).join('');
+        itemsEl.style.display = 'flex';
       } else {
-        itemsEl.style.display = 'none';
+        itemsEl.innerHTML = '<div style="color:#94a3b8; font-size:12px; text-align:center; padding:10px 0;">Tidak ada item detail</div>';
+        itemsEl.style.display = 'block';
       }
+    }
+
+    // Catatan Keseluruhan Pemesan
+    var ordNote = String(ord && (ord.order_note || ord.notes || ord.order_notes || '')).trim();
+    if (noteBox && noteTextEl) {
+      if (ordNote) {
+        noteTextEl.textContent = ordNote;
+        noteBox.style.display = 'block';
+      } else {
+        noteBox.style.display = 'none';
+      }
+    }
+
+    // Subtotal, Ongkir, Diskon & Total Bersih
+    var subtotalVal = (ord && ord.subtotal != null) ? Number(ord.subtotal) :
+                      items.reduce(function (s, it) { return s + (Number(it.item_subtotal || it.subtotal || 0) || (Number(it.unit_price || 0) * Number(it.quantity || 1))); }, 0);
+    if (subtotalEl) subtotalEl.textContent = formatMoney(subtotalVal);
+
+    var delivFee = (ord && ord.delivery_fee != null) ? Number(ord.delivery_fee) : 0;
+    if (delivRow && delivFeeEl) {
+      if (delivFee > 0) {
+        delivFeeEl.textContent = formatMoney(delivFee);
+        delivRow.style.display = 'flex';
+      } else {
+        delivRow.style.display = 'none';
+      }
+    }
+
+    var discountVal = (ord && ord.discount_amount != null) ? Number(ord.discount_amount) : 0;
+    if (discRow && discEl) {
+      if (discountVal > 0) {
+        discEl.textContent = '-' + formatMoney(discountVal);
+        discRow.style.display = 'flex';
+      } else {
+        discRow.style.display = 'none';
+      }
+    }
+
+    if (totalEl) {
+      totalEl.textContent = (ord && ord.grand_total != null) ? formatMoney(ord.grand_total) : formatMoney(subtotalVal + delivFee - discountVal);
     }
 
     if (btnConfirm) btnConfirm.disabled = false;
@@ -318,7 +455,7 @@
       reservation: 'Reservasi'
     };
     var typeStr = typeMap[ord.order_type] || 'Pesanan';
-    var number = '#' + String(ord.order_number || ord.id || '').slice(0, 16);
+    var number = formatBMOrderCode(ord);
     var customer = ord.customer_name || 'Pelanggan';
     var totalStr = (typeof formatMoney === 'function') ? formatMoney(ord.grand_total) : ('Rp ' + (ord.grand_total || 0));
     var tableStr = (ord.table_name || ord.table_number) ? (' · Meja ' + (ord.table_name || ord.table_number)) : '';
@@ -784,7 +921,7 @@
       var type = getBMOrderType(ord);
       var typeLabel = type === 'dine_in' ? 'Dine-in' : (type === 'pickup' ? 'Pickup' : (type === 'delivery' ? 'Delivery' : 'RESERVASI'));
       var typeClass = 'type-' + type.replace('_', '-');
-      var number = '#' + String(ord.order_number || ord.id || '').slice(0, 24);
+      var number = formatBMOrderCode(ord);
       var reservationGuests = type === 'reservation' ? getBMReservationGuestCount(ord) : 0;
       var reservationInfo = type === 'reservation'
         ? (formatBMReservationDateTime(ord) + (reservationGuests ? ' · ' + reservationGuests + ' tamu' : ''))
@@ -940,7 +1077,7 @@
     if (reasonInput) reasonInput.value = '';
     if (errorEl) errorEl.style.display = 'none';
     if (subtitle) {
-      var subText = (ord && ord.order_number) ? ord.order_number : ('Pesanan #' + orderId);
+      var subText = formatBMOrderCode(ord);
       if (ord && ord.customer_name) subText += ' • ' + ord.customer_name;
       subtitle.textContent = subText;
     }
@@ -1165,7 +1302,7 @@
       _bmOrdersState.detailCountdownTimer = null;
     }
 
-    if ($('bm-detail-order-number')) $('bm-detail-order-number').textContent = '#' + orderId;
+    if ($('bm-detail-order-number')) $('bm-detail-order-number').textContent = formatBMOrderCode(orderId);
     if ($('bm-detail-items-tbody')) {
       $('bm-detail-items-tbody').innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">Memuat rincian pesanan...</td></tr>';
     }
@@ -1184,7 +1321,7 @@
       var ord = data.order;
       var ordType = getBMOrderType(ord);
       var typeLabel = ordType === 'dine_in' ? 'Dine-in' : (ordType === 'pickup' ? 'Pickup' : (ordType === 'delivery' ? 'Delivery' : 'Reservasi'));
-      if ($('bm-detail-order-number')) $('bm-detail-order-number').textContent = '#' + (ord.order_number || ord.id);
+      if ($('bm-detail-order-number')) $('bm-detail-order-number').textContent = formatBMOrderCode(ord);
       if ($('bm-detail-status-badge')) {
         var detailStatusLabel = FulfillmentEnv && typeof FulfillmentEnv.getStatusLabel === 'function'
           ? FulfillmentEnv.getStatusLabel(ordType, ord.status)

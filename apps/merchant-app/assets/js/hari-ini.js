@@ -398,7 +398,7 @@
     }
 
     list.innerHTML = orders.slice(0, 3).map(function (o) {
-      var orderNum = esc(o.order_number || o.id || "Pesanan");
+      var orderNum = esc(window.formatBMOrderCode ? window.formatBMOrderCode(o) : (o.order_number || o.id || "Pesanan"));
       var typeMap = {
         delivery: "Delivery",
         pickup: "Pickup",

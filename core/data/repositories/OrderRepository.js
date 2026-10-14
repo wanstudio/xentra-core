@@ -92,6 +92,17 @@ class OrderRepository {
     return this.db.queryOne('SELECT * FROM orders WHERE id = ?', [orderId]);
   }
 
+  findByOrderNumber(orderNumber) {
+    return this.db.queryOne('SELECT * FROM orders WHERE order_number = ?', [orderNumber]);
+  }
+
+  findByOrderNumberBranchToday(orderNumber, branchId) {
+    return this.db.queryOne(
+      "SELECT id, order_number FROM orders WHERE order_number = ? AND branch_id = ? AND created_at >= date('now', 'start of day')",
+      [orderNumber, branchId]
+    );
+  }
+
   findItems(orderId) {
     return this.db.queryMany('SELECT * FROM order_items WHERE order_id = ?', [orderId]);
   }
