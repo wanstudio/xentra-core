@@ -67,6 +67,7 @@ public class MainActivity extends AppCompatActivity {
         setupSwipeRefresh();
         setupWebView();
         requestNecessaryPermissions();
+        checkOverlayPermission();
 
         if (savedInstanceState == null) {
             webView.loadUrl(TARGET_URL);
@@ -75,6 +76,28 @@ public class MainActivity extends AppCompatActivity {
         }
 
         handleIncomingIntent(getIntent());
+    }
+
+    private void checkOverlayPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !android.provider.Settings.canDrawOverlays(this)) {
+            android.content.SharedPreferences prefs = getSharedPreferences("xentra_merchant_prefs", android.content.Context.MODE_PRIVATE);
+            boolean alreadyAsked = prefs.getBoolean("overlay_prompt_shown", false);
+            if (!alreadyAsked) {
+                prefs.edit().putBoolean("overlay_prompt_shown", true).apply();
+                new androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle("🔔 Izin Balon Pesanan (Ala GoBiz)")
+                    .setMessage("Agar pesanan baru otomatis muncul melayang di layar saat kasir sedang membuka WhatsApp atau aplikasi lain, mohon aktifkan izin 'Tampilkan di atas aplikasi lain'.")
+                    .setPositiveButton("Aktifkan Izin", (dialog, which) -> {
+                        android.content.Intent intent = new android.content.Intent(
+                            android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            android.net.Uri.parse("package:" + getPackageName())
+                        );
+                        startActivity(intent);
+                    })
+                    .setNegativeButton("Nanti Saja", null)
+                    .show();
+            }
+        }
     }
 
     @Override

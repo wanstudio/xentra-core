@@ -19,6 +19,19 @@
   }
 
   async function registerWebPushSubscription() {
+    // In Native Android App, native Java OrderMonitorService handles notifications!
+    // Unsubscribe from browser web push so Google Chrome never intercepts notifications
+    if (window.IS_NATIVE_APP) {
+      if ('serviceWorker' in navigator && 'PushManager' in window) {
+        try {
+          var r = await navigator.serviceWorker.ready;
+          var sub = await r.pushManager.getSubscription();
+          if (sub) await sub.unsubscribe();
+        } catch (_) {}
+      }
+      return false;
+    }
+
     if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
       return false;
     }
