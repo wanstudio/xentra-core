@@ -1403,17 +1403,21 @@
 
         <div class="x-subpage-content">
           <div class="x-card-panel" style="padding:18px 20px; border-radius:14px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
-            <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
-              <span style="display:flex; align-items:center; justify-content:center; width:38px; height:38px; border-radius:10px; background:#eff6ff; color:#2563eb; flex-shrink:0;">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
-              </span>
-              <div>
-                <h4 style="margin:0; font-size:15px; font-weight:800; color:#0f172a;">Data Aplikasi</h4>
-                <p style="margin:2px 0 0; color:#64748b; font-size:12px;">Sinkronisasi cache &amp; data lokal</p>
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px;">
+              <div style="display:flex; align-items:center; gap:12px;">
+                <span style="display:flex; align-items:center; justify-content:center; width:38px; height:38px; border-radius:10px; background:#fef3c7; color:#d97706; flex-shrink:0;">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 14.5a1 1 0 0 1-2 0v-5a1 1 0 0 1 2 0zm-1-7.5a1.25 1.25 0 1 1 1.25-1.25A1.25 1.25 0 0 1 12 9z"/></svg>
+                </span>
+                <div>
+                  <h4 style="margin:0; font-size:15px; font-weight:800; color:#0f172a;">Layar Tetap Aktif</h4>
+                  <p style="margin:2px 0 0; color:#64748b; font-size:12px;">Cegah HP/tablet terkunci otomatis</p>
+                </div>
               </div>
+              <button type="button" class="x-mobile-status-control" id="btn-toggle-wake-lock" onclick="toggleScreenWakeLock()" style="padding:4px 8px; border:none; background:transparent; cursor:pointer;" aria-label="Toggle Layar Tetap Aktif">
+                <span class="x-mobile-switch is-on" id="switch-wake-lock"><span></span></span>
+              </button>
             </div>
-            <p style="margin:0 0 14px; color:#64748b; font-size:13px; line-height:1.5;">Gunakan ini jika data transaksi atau menu belum sinkron dengan server. Aplikasi akan memuat ulang data terbaru.</p>
-            <button type="button" class="x-btn-primary" id="btn-bm-refresh-app-data" style="width:100%; justify-content:center; height:42px; font-size:14px; font-weight:700; border-radius:10px;">Segarkan data aplikasi</button>
+            <p style="margin:0; color:#64748b; font-size:13px; line-height:1.5;">Menjaga layar perangkat selalu menyala selama jam operasional restoran agar alarm suara "Ada pesanan baru" dan notifikasi berdering kencang tanpa terhalang lockscreen.</p>
           </div>
 
           <div class="x-card-panel" style="padding:18px 20px; border-radius:14px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
@@ -2310,6 +2314,7 @@
 
   <script src="/merchant-shared/js/shared.js?v=1.0.1"></script>
   <script src="/merchant-shared/js/audio-alerts.js?v=1.0.4"></script>
+  <script src="/merchant-shared/js/wake-lock.js?v=1.0.0"></script>
   <script src="/merchant-shared/js/presentation-shells.js?v=1.0.2"></script>
   <script src="/merchant-shared/js/action-menu.js?v=1.0.0"></script>
   <script src="/merchant-shared/js/crop-editor.js?v=1.0.2"></script>
@@ -2328,7 +2333,7 @@
   <script src="/merchant-app/assets/js/purchasing.js?v=1.1.4"></script>
   <script src="/merchant-app/assets/js/promotions.js?v=1.0.2"></script>
   <script src="/merchant-app/assets/js/staff.js?v=1.0.0"></script>
-  <script src="/merchant-app/assets/js/orders.js?v=1.0.9"></script>
+  <script src="/merchant-app/assets/js/orders.js?v=1.0.10"></script>
   <script src="/merchant-app/assets/js/merchant-app.js?v=1.1.7"></script>
 
   <!-- ═══════════════════════════════════════════════════

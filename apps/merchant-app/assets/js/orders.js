@@ -186,6 +186,14 @@
     var body = typeStr + tableStr + ' · ' + customer + ' · ' + totalStr;
     var token = localStorage.getItem('xentra_merchant_token') || '';
 
+    // Aggressive attention vibration pattern: buzz-pause-buzz-pause-long buzz-pause-long buzz
+    var aggressiveVibratePattern = [500, 250, 500, 250, 1000, 250, 1000];
+    if ('vibrate' in navigator) {
+      try {
+        navigator.vibrate(aggressiveVibratePattern);
+      } catch (_) {}
+    }
+
     navigator.serviceWorker.ready.then(function (reg) {
       reg.showNotification(title, {
         body: body,
@@ -194,7 +202,9 @@
         tag: 'order-pending-' + ord.id,
         renotify: true,
         requireInteraction: true,
-        vibrate: [200, 100, 200, 100, 400],
+        silent: false,
+        vibrate: aggressiveVibratePattern,
+        timestamp: Date.now(),
         actions: [
           { action: 'accept', title: '✓ Terima Pesanan' },
           { action: 'view', title: 'Buka Detail' }

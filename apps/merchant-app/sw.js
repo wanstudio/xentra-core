@@ -13,7 +13,7 @@
  */
 
 var APP_CACHE_PREFIX = "xentra-merchant-";
-var APP_VERSION = "v1.4.12";
+var APP_VERSION = "v1.4.13";
 var FALLBACK_CACHE_NAME = "xentra-merchant-live";
 
 var STATIC_ASSETS = [
@@ -26,6 +26,7 @@ var STATIC_ASSETS = [
   "/merchant-app/assets/css/home.css?v=1.0.18",
   "/merchant-shared/js/shared.js?v=1.0.1",
   "/merchant-shared/js/audio-alerts.js?v=1.0.4",
+  "/merchant-shared/js/wake-lock.js?v=1.0.0",
   "/merchant-shared/audio/ada-pesanan-baru.mp3",
   "/merchant-shared/js/action-menu.js?v=1.0.0",
   "/merchant-shared/js/crop-editor.js?v=1.0.2",
@@ -43,7 +44,7 @@ var STATIC_ASSETS = [
   "/merchant-app/assets/js/purchasing.js?v=1.1.4",
   "/merchant-app/assets/js/promotions.js?v=1.0.2",
   "/merchant-app/assets/js/staff.js?v=1.0.0",
-  "/merchant-app/assets/js/orders.js?v=1.0.9",
+  "/merchant-app/assets/js/orders.js?v=1.0.10",
   "/merchant-app/assets/js/merchant-app.js?v=1.1.7"
 ];
 
@@ -253,4 +254,35 @@ self.addEventListener("notificationclick", function (event) {
       }
     })
   );
+});
+
+// 7. Push Event Listener (Incoming Web Push Notifications)
+self.addEventListener("push", function (event) {
+  var payload = {};
+  if (event.data) {
+    try {
+      payload = event.data.json();
+    } catch (_) {
+      payload = { title: "Pesanan Masuk", body: event.data.text() };
+    }
+  }
+  var title = payload.title || "🔔 Pesanan Baru Masuk!";
+  var aggressiveVibrate = [500, 250, 500, 250, 1000, 250, 1000];
+  var options = {
+    body: payload.body || "Ada pesanan baru yang memerlukan konfirmasi segera.",
+    icon: "/merchant-app/assets/icons/icon-192.png",
+    badge: "/merchant-app/assets/icons/icon-192.png",
+    tag: payload.tag || ("order-pending-" + Date.now()),
+    renotify: true,
+    requireInteraction: true,
+    silent: false,
+    vibrate: aggressiveVibrate,
+    timestamp: Date.now(),
+    actions: [
+      { action: "accept", title: "✓ Terima Pesanan" },
+      { action: "view", title: "Buka Detail" }
+    ],
+    data: payload.data || { url: "/merchant-app/#pesanan" }
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
 });
