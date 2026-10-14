@@ -1,0 +1,44 @@
+name: Build Mybangjo Merchant APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'native/merchant-android/**'
+      - '.github/workflows/build-merchant-apk.yml'
+
+jobs:
+  build-apk:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        working-directory: native/merchant-android
+        run: chmod +x gradlew
+
+      - name: Build Debug APK
+        working-directory: native/merchant-android
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Rename APK Output
+        run: |
+          mkdir -p build-output
+          cp native/merchant-android/app/build/outputs/apk/debug/app-debug.apk build-output/mybangjo-merchant.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mybangjo-merchant-apk
+          path: build-output/mybangjo-merchant.apk
+          retention-days: 30

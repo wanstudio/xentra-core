@@ -191,6 +191,7 @@
     if (tabId === 'bm-staff' && typeof loadBMStaff === 'function') loadBMStaff();
     if (tabId === 'bm-jam-operasional' && typeof loadBMJamOperasional === 'function') loadBMJamOperasional();
     if (tabId === 'bm-reports' && typeof loadBMReports === 'function') loadBMReports();
+    if (tabId === 'bm-printer' && typeof initBMPrinterView === 'function') initBMPrinterView();
   }
   window.applyRoute = applyRoute;
 
@@ -743,6 +744,93 @@
       fetchActionableOrdersCount();
     }
   });
+
+  function initBMPrinterView() {
+    var nativePanel = $('bm-native-printer-panel');
+    var webPanel = $('bm-web-printer-panel');
+    var statusEl = $('bm-native-printer-status');
+    var selectEl = $('bm-native-printer-select');
+    var btnConnect = $('btn-native-printer-connect');
+    var btnTest = $('btn-native-printer-test');
+    var chkAutoprint = $('chk-native-autoprint');
+
+    if (!window.XentraPrinter || !window.XentraPrinter.isNative()) {
+      if (nativePanel) nativePanel.style.display = 'none';
+      if (webPanel) webPanel.style.display = 'block';
+      return;
+    }
+
+    if (nativePanel) nativePanel.style.display = 'block';
+    if (webPanel) webPanel.style.display = 'none';
+
+    var paired = window.XentraPrinter.getPairedPrinters();
+    var savedMac = window.XentraPrinter.getSavedPrinter();
+
+    if (selectEl) {
+      if (!paired || paired.length === 0) {
+        selectEl.innerHTML = '<option value="">Tidak ada printer paired. Silakan pairing di Bluetooth Android dahulu.</option>';
+      } else {
+        selectEl.innerHTML = paired.map(function (dev) {
+          var sel = (dev.address === savedMac) ? ' selected' : '';
+          return '<option value="' + dev.address + '"' + sel + '>' + dev.name + ' (' + dev.address + ')</option>';
+        }).join('');
+      }
+    }
+
+    var isConn = window.XentraPrinter.isConnected();
+    if (statusEl) {
+      statusEl.textContent = isConn ? '● Terhubung ke Printer' : '○ Belum terhubung';
+      statusEl.style.color = isConn ? '#059669' : '#64748b';
+    }
+
+    if (chkAutoprint) {
+      chkAutoprint.checked = window.XentraPrinter.isAutoPrintEnabled();
+      chkAutoprint.onchange = function () {
+        window.XentraPrinter.setAutoPrint(chkAutoprint.checked);
+        showToast(chkAutoprint.checked ? 'Auto-cetak struk diaktifkan' : 'Auto-cetak struk dinonaktifkan');
+      };
+    }
+
+    if (btnConnect && !btnConnect.dataset.bound) {
+      btnConnect.dataset.bound = '1';
+      btnConnect.onclick = function () {
+        var mac = selectEl ? selectEl.value : '';
+        if (!mac) {
+          showToast('Pilih printer Bluetooth terlebih dahulu.');
+          return;
+        }
+        btnConnect.disabled = true;
+        btnConnect.textContent = 'Menghubungkan...';
+        setTimeout(function () {
+          var ok = window.XentraPrinter.connect(mac);
+          btnConnect.disabled = false;
+          btnConnect.textContent = 'Hubungkan';
+          if (ok) {
+            showToast('Berhasil terhubung ke printer!');
+            if (statusEl) {
+              statusEl.textContent = '● Terhubung ke Printer';
+              statusEl.style.color = '#059669';
+            }
+          } else {
+            showToast('Gagal terhubung. Pastikan printer menyala.');
+          }
+        }, 150);
+      };
+    }
+
+    if (btnTest && !btnTest.dataset.bound) {
+      btnTest.dataset.bound = '1';
+      btnTest.onclick = function () {
+        var ok = window.XentraPrinter.testPrint();
+        if (ok) {
+          showToast('Perintah cetak terkirim ke printer!');
+        } else {
+          showToast('Gagal mencetak. Hubungkan printer terlebih dahulu.');
+        }
+      };
+    }
+  }
+  window.initBMPrinterView = initBMPrinterView;
 
   async function openNotificationsSheet() {
     var sheet = $('sheet-notifications');

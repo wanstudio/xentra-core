@@ -74,6 +74,13 @@
         if (window.XentraAudio && typeof window.XentraAudio.orderAccepted === 'function') {
           window.XentraAudio.orderAccepted();
         }
+        if (window.XentraPrinter && window.XentraPrinter.isNative() && window.XentraPrinter.isAutoPrintEnabled()) {
+          var matchedOrd = (_bmOrdersState.orders || []).find(function (o) { return o.id === orderId; });
+          var u = getStoredUser();
+          if (matchedOrd) {
+            window.XentraPrinter.printOrder(matchedOrd, { name: u.brand_name || 'Mybangjo Resto', branch: u.branch_name });
+          }
+        }
         showToast("Pesanan #" + orderId + " berhasil diterima.");
         loadHariIni();
         if (typeof loadBMOrders === 'function') loadBMOrders({ background: true });
@@ -728,6 +735,13 @@
         if (res.ok && data.success) {
           if (window.XentraAudio && typeof window.XentraAudio.orderAccepted === 'function') {
             window.XentraAudio.orderAccepted();
+          }
+          if (window.XentraPrinter && window.XentraPrinter.isNative() && window.XentraPrinter.isAutoPrintEnabled()) {
+            var matchedOrd = (_bmOrdersState.orders || []).find(function (o) { return o.id === orderId; });
+            var u = getStoredUser();
+            if (matchedOrd) {
+              window.XentraPrinter.printOrder(matchedOrd, { name: u.brand_name || 'Mybangjo Resto', branch: u.branch_name });
+            }
           }
           showToast('Pesanan diterima.');
           loadBMOrders();

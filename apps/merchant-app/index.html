@@ -1455,13 +1455,47 @@
         </div>
 
         <div class="x-subpage-content">
-          <div class="x-card-panel" style="padding:18px 20px; border-radius:14px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+          <!-- Native Bluetooth Thermal Printer Panel (Active in APK) -->
+          <div id="bm-native-printer-panel" class="x-card-panel" style="display:none; padding:18px 20px; border-radius:14px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.04); margin-bottom:14px;">
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:14px;">
+              <span style="display:flex; align-items:center; justify-content:center; width:38px; height:38px; border-radius:10px; background:#ecfdf5; color:#059669; flex-shrink:0;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19 8h-1V3H6v5H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zM8 5h8v3H8V5zm8 12v2H8v-4h8v2zm2-2v-2H6v2H4v-4c0-.55.45-1 1-1h14c.55 0 1 .45 1 1v4h-2z"/><circle cx="18" cy="11.5" r="1"/></svg>
+              </span>
+              <div>
+                <h4 style="margin:0; font-size:15px; font-weight:800; color:#0f172a;">Printer Bluetooth Native</h4>
+                <p id="bm-native-printer-status" style="margin:2px 0 0; color:#64748b; font-size:12px; font-weight:700;">● Memeriksa koneksi Bluetooth...</p>
+              </div>
+            </div>
+
+            <div style="margin-bottom:14px;">
+              <label style="display:block; font-size:12.5px; font-weight:700; color:#334155; margin-bottom:6px;">Pilih Printer Bluetooth Paired:</label>
+              <select id="bm-native-printer-select" style="width:100%; height:42px; border:1px solid #cbd5e1; border-radius:10px; padding:0 12px; font-size:13.5px; color:#0f172a; background:#f8fafc;">
+                <option value="">Memuat perangkat Bluetooth...</option>
+              </select>
+            </div>
+
+            <div style="display:flex; gap:10px; margin-bottom:16px;">
+              <button type="button" id="btn-native-printer-connect" class="x-btn-primary" style="flex:1; justify-content:center; height:42px; font-size:13.5px; font-weight:700; border-radius:10px;">Hubungkan</button>
+              <button type="button" id="btn-native-printer-test" class="x-btn-secondary" style="flex:1; justify-content:center; height:42px; font-size:13.5px; font-weight:700; border-radius:10px;">Tes Cetak Struk</button>
+            </div>
+
+            <label style="display:flex; align-items:center; gap:10px; padding:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; cursor:pointer;">
+              <input type="checkbox" id="chk-native-autoprint" style="width:18px; height:18px; accent-color:#059669; cursor:pointer;">
+              <div>
+                <strong style="display:block; font-size:13px; color:#0f172a;">Auto-Cetak saat Pesanan Diterima</strong>
+                <span style="display:block; font-size:11.5px; color:#64748b;">Printer langsung mencetak struk kasir &amp; dapur saat tombol Terima ditekan.</span>
+              </div>
+            </label>
+          </div>
+
+          <!-- Web Print Fallback Panel (Active in Browser) -->
+          <div id="bm-web-printer-panel" class="x-card-panel" style="padding:18px 20px; border-radius:14px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.04); margin-bottom:14px;">
             <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
               <span style="display:flex; align-items:center; justify-content:center; width:38px; height:38px; border-radius:10px; background:#ecfdf5; color:#059669; flex-shrink:0;">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19 8h-1V3H6v5H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zM8 5h8v3H8V5zm8 12v2H8v-4h8v2zm2-2v-2H6v2H4v-4c0-.55.45-1 1-1h14c.55 0 1 .45 1 1v4h-2z"/><circle cx="18" cy="11.5" r="1"/></svg>
               </span>
               <div>
-                <h4 style="margin:0; font-size:15px; font-weight:800; color:#0f172a;">Status Printer</h4>
+                <h4 style="margin:0; font-size:15px; font-weight:800; color:#0f172a;">Status Printer Browser</h4>
                 <p style="margin:2px 0 0; color:#059669; font-size:12px; font-weight:700;">● Siap Cetak (Dialog Perangkat)</p>
               </div>
             </div>
@@ -1476,8 +1510,8 @@
               <strong style="color:#0f172a; font-weight:700;">58mm / 80mm</strong>
             </div>
             <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-top:1px solid #f1f5f9; font-size:13px;">
-              <span style="color:#64748b;">Header Struk</span>
-              <strong style="color:#0f172a; font-weight:700;">Otomatis Nama Resto &amp; Cabang</strong>
+              <span style="color:#64748b;">Protokol Printer</span>
+              <strong style="color:#0f172a; font-weight:700;">ESC/POS Standard (SPP)</strong>
             </div>
           </div>
         </div>
@@ -2313,9 +2347,10 @@
   </div>
 
   <script src="/merchant-shared/js/shared.js?v=1.0.1"></script>
-  <script src="/merchant-shared/js/audio-alerts.js?v=1.0.5"></script>
+  <script src="/merchant-shared/js/audio-alerts.js?v=1.0.6"></script>
   <script src="/merchant-shared/js/wake-lock.js?v=1.0.0"></script>
   <script src="/merchant-shared/js/web-push-client.js?v=1.0.0"></script>
+  <script src="/merchant-shared/js/thermal-printer.js?v=1.0.0"></script>
   <script src="/merchant-shared/js/presentation-shells.js?v=1.0.2"></script>
   <script src="/merchant-shared/js/action-menu.js?v=1.0.0"></script>
   <script src="/merchant-shared/js/crop-editor.js?v=1.0.2"></script>
@@ -2334,8 +2369,8 @@
   <script src="/merchant-app/assets/js/purchasing.js?v=1.1.4"></script>
   <script src="/merchant-app/assets/js/promotions.js?v=1.0.2"></script>
   <script src="/merchant-app/assets/js/staff.js?v=1.0.0"></script>
-  <script src="/merchant-app/assets/js/orders.js?v=1.0.12"></script>
-  <script src="/merchant-app/assets/js/merchant-app.js?v=1.1.9"></script>
+  <script src="/merchant-app/assets/js/orders.js?v=1.0.13"></script>
+  <script src="/merchant-app/assets/js/merchant-app.js?v=1.1.10"></script>
 
   <!-- ═══════════════════════════════════════════════════
        MERCHANT PWA ENGINE (Service Worker & Install Flow)

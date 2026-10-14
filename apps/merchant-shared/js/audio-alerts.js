@@ -145,6 +145,9 @@
    * Stop any recurring order alert immediately (e.g. order accepted or rejected)
    */
   function stopOrderAlert() {
+    if (window.XentraNative && typeof window.XentraNative.stopOrderAlarm === 'function') {
+      try { window.XentraNative.stopOrderAlarm(); } catch (_) {}
+    }
     _orderAlertActive = false;
     if (_orderAlertTimer) {
       clearTimeout(_orderAlertTimer);
@@ -229,6 +232,9 @@
    */
   function playOrderAlertAudio(options) {
     options = options || {};
+    if (window.XentraNative && typeof window.XentraNative.playOrderAlarm === 'function') {
+      try { window.XentraNative.playOrderAlarm(); } catch (_) {}
+    }
     // If an alert is already actively playing and not finished, do not double-trigger or overlap
     if (_orderAlertActive && !options.force) {
       return;
