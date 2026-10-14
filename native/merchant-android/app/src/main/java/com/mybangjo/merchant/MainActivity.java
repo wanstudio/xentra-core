@@ -13,6 +13,7 @@ import android.os.Bundle;
 import android.os.PowerManager;
 import android.provider.Settings;
 import android.view.View;
+import android.webkit.JsResult;
 import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -262,6 +263,29 @@ public class MainActivity extends AppCompatActivity {
                 }
                 MainActivity.this.filePathCallback = filePathCallback;
                 fileChooserLauncher.launch("image/*");
+                return true;
+            }
+
+            @Override
+            public boolean onJsConfirm(WebView view, String url, String message, JsResult result) {
+                new AlertDialog.Builder(MainActivity.this)
+                    .setTitle("Konfirmasi")
+                    .setMessage(message)
+                    .setPositiveButton("Ya", (dialog, which) -> result.confirm())
+                    .setNegativeButton("Batal", (dialog, which) -> result.cancel())
+                    .setOnCancelListener(dialog -> result.cancel())
+                    .show();
+                return true;
+            }
+
+            @Override
+            public boolean onJsAlert(WebView view, String url, String message, JsResult result) {
+                new AlertDialog.Builder(MainActivity.this)
+                    .setTitle("Pemberitahuan")
+                    .setMessage(message)
+                    .setPositiveButton("OK", (dialog, which) -> result.confirm())
+                    .setOnCancelListener(dialog -> result.confirm())
+                    .show();
                 return true;
             }
         });

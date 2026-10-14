@@ -52,11 +52,125 @@
     newPendingOrderIds: {}     // Map of order IDs that are genuinely new in current snapshot
   };
 
-  async function quickAcceptBMOrder(orderId, btnEl) {
-    if (!confirm("Terima pesanan #" + orderId + "? Dapur akan mulai menyiapkan pesanan.")) return;
+  var _bmAcceptContext = null;
+
+  function findBMOrderById(orderId) {
+    if (!orderId) return null;
+    var found = (_bmOrdersState.orders || []).find(function (o) { return String(o.id) === String(orderId); });
+    if (!found && window._hariIniState && Array.isArray(window._hariIniState.orders)) {
+      found = window._hariIniState.orders.find(function (o) { return String(o.id) === String(orderId); });
+    }
+    return found || null;
+  }
+
+  function openBMAcceptOrderModal(orderId, btnEl, origin) {
+    _bmAcceptContext = {
+      orderId: orderId,
+      btnEl: btnEl || null,
+      origin: origin || 'orders'
+    };
+
+    var modal = $('modal-bm-accept-order');
+    var numEl = $('bm-accept-order-number');
+    var badgeEl = $('bm-accept-order-type-badge');
+    var custEl = $('bm-accept-order-customer');
+    var totalEl = $('bm-accept-order-total');
+    var itemsEl = $('bm-accept-order-items-preview');
+    var btnConfirm = $('btn-bm-accept-confirm');
+    var btnText = $('btn-bm-accept-text');
+
+    var ord = findBMOrderById(orderId);
+
+    if (numEl) {
+      numEl.textContent = (ord && ord.order_number) ? ord.order_number : ('#' + orderId);
+    }
+
+    if (badgeEl) {
+      var ordType = (ord && (ord.order_type || ord.fulfillment_type)) || 'delivery';
+      var typeLabel = 'Pesanan Masuk';
+      var badgeCls = 'background:#e0f2fe; color:#0369a1;';
+      if (ordType === 'delivery') {
+        typeLabel = '🛵 Delivery';
+        badgeCls = 'background:#e0f2fe; color:#0369a1;';
+      } else if (ordType === 'dine_in') {
+        typeLabel = '🍽️ Dine-in' + (ord && ord.table_number ? (' (Meja ' + ord.table_number + ')') : '');
+        badgeCls = 'background:#fef3c7; color:#b45309;';
+      } else if (ordType === 'pickup' || ordType === 'takeaway') {
+        typeLabel = '🛍️ Takeaway';
+        badgeCls = 'background:#f3e8ff; color:#7e22ce;';
+      } else if (ordType === 'reservation') {
+        typeLabel = '📅 Reservasi Meja';
+        badgeCls = 'background:#fce7f3; color:#be185d;';
+      }
+      badgeEl.textContent = typeLabel;
+      badgeEl.setAttribute('style', 'font-size:11px; font-weight:700; padding:3px 8px; border-radius:8px; ' + badgeCls);
+    }
+
+    if (custEl) {
+      var custText = (ord && ord.customer_name) ? ord.customer_name : 'Pelanggan';
+      if (ord && ord.table_number && ord.order_type !== 'dine_in') {
+        custText += ' • Meja ' + ord.table_number;
+      }
+      custEl.textContent = custText;
+    }
+
+    if (totalEl) {
+      totalEl.textContent = (ord && ord.grand_total != null) ? formatMoney(ord.grand_total) : '—';
+    }
+
+    if (itemsEl) {
+      if (ord && Array.isArray(ord.items) && ord.items.length) {
+        var preview = ord.items.slice(0, 3).map(function (it) {
+          return esc(it.quantity || 1) + 'x ' + esc(it.product_name || it.title || 'Item');
+        }).join(', ');
+        if (ord.items.length > 3) {
+          preview += ' (+' + (ord.items.length - 3) + ' lainnya)';
+        }
+        itemsEl.textContent = preview;
+        itemsEl.style.display = 'block';
+      } else {
+        itemsEl.style.display = 'none';
+      }
+    }
+
+    if (btnConfirm) btnConfirm.disabled = false;
+    if (btnText) btnText.textContent = 'Terima Pesanan';
+
+    if (modal) modal.style.display = 'flex';
+    if (window.XentraNav && typeof window.XentraNav.push === 'function') {
+      window.XentraNav.push(function () { closeBMAcceptOrderModal({ fromNav: true }); }, 'modal-bm-accept-order');
+    }
+  }
+  window.openBMAcceptOrderModal = openBMAcceptOrderModal;
+
+  function closeBMAcceptOrderModal(options) {
+    options = options || {};
+    var modal = $('modal-bm-accept-order');
+    if (modal) modal.style.display = 'none';
+    _bmAcceptContext = null;
+    if (!options.fromNav && window.XentraNav && window.XentraNav.hasOpen('modal-bm-accept-order')) {
+      window.XentraNav.pop('modal-bm-accept-order');
+    }
+  }
+  window.closeBMAcceptOrderModal = closeBMAcceptOrderModal;
+
+  async function confirmBMAcceptOrderSubmit() {
+    if (!_bmAcceptContext || !_bmAcceptContext.orderId) {
+      closeBMAcceptOrderModal();
+      return;
+    }
+
+    var orderId = _bmAcceptContext.orderId;
+    var btnEl = _bmAcceptContext.btnEl;
+    var origin = _bmAcceptContext.origin;
+    var btnConfirm = $('btn-bm-accept-confirm');
+    var btnText = $('btn-bm-accept-text');
+
     if (_bmOrdersState.inFlightAccept[orderId]) return;
     _bmOrdersState.inFlightAccept[orderId] = true;
 
+    if (btnConfirm) btnConfirm.disabled = true;
+    if (btnText) btnText.textContent = 'Memproses...';
     if (btnEl) {
       btnEl.disabled = true;
       btnEl.dataset.originalText = btnEl.innerHTML;
@@ -67,37 +181,55 @@
       var res = await adminFetch(API_BASE + "/orders/" + encodeURIComponent(orderId) + "/branch-acceptance", {
         method: "POST",
         headers: getAuthHeaders(),
-        body: JSON.stringify({ decision: "accept", note: "Diterima melalui Aksi Cepat Dashboard" })
+        body: JSON.stringify({ decision: "accept", note: "Diterima melalui Merchant App" })
       });
       var data = await res.json();
       if (res.ok && data.success) {
         if (window.XentraAudio && typeof window.XentraAudio.orderAccepted === 'function') {
           window.XentraAudio.orderAccepted();
+        } else if (window.XentraAudio && typeof window.XentraAudio.stopOrderAlert === 'function') {
+          window.XentraAudio.stopOrderAlert();
         }
         if (window.XentraPrinter && window.XentraPrinter.isNative() && window.XentraPrinter.isAutoPrintEnabled()) {
-          var matchedOrd = (_bmOrdersState.orders || []).find(function (o) { return o.id === orderId; });
+          var matchedOrd = findBMOrderById(orderId);
           var u = getStoredUser();
           if (matchedOrd) {
-            window.XentraPrinter.printOrder(matchedOrd, { name: u.brand_name || 'Mybangjo Resto', branch: u.branch_name });
+            window.XentraPrinter.printOrder(matchedOrd, { name: (u && u.brand_name) || 'Mybangjo Resto', branch: u && u.branch_name });
           }
         }
         showToast("Pesanan #" + orderId + " berhasil diterima.");
-        loadHariIni();
-        if (typeof loadBMOrders === 'function') loadBMOrders({ background: true });
+        closeBMAcceptOrderModal();
+        if (typeof loadHariIni === 'function') loadHariIni();
+        if (typeof loadBMOrders === 'function') loadBMOrders();
+        var detailView = $('bm-orders-detail-view');
+        if (detailView && detailView.style.display !== 'none' && _bmOrdersState.currentDetailOrderId === orderId) {
+          viewBMOrderDetail(orderId);
+        }
       } else {
         showToast("Gagal menerima pesanan: " + (data.error || "Terjadi kesalahan"));
-        loadHariIni();
-        if (typeof loadBMOrders === 'function') loadBMOrders();
+        if (btnConfirm) btnConfirm.disabled = false;
+        if (btnText) btnText.textContent = 'Terima Pesanan';
+        if (btnEl) {
+          btnEl.disabled = false;
+          if (btnEl.dataset.originalText) btnEl.innerHTML = btnEl.dataset.originalText;
+        }
       }
     } catch (e) {
       showToast("Kesalahan jaringan.");
-    } finally {
-      delete _bmOrdersState.inFlightAccept[orderId];
+      if (btnConfirm) btnConfirm.disabled = false;
+      if (btnText) btnText.textContent = 'Terima Pesanan';
       if (btnEl) {
         btnEl.disabled = false;
         if (btnEl.dataset.originalText) btnEl.innerHTML = btnEl.dataset.originalText;
       }
+    } finally {
+      delete _bmOrdersState.inFlightAccept[orderId];
     }
+  }
+  window.confirmBMAcceptOrderSubmit = confirmBMAcceptOrderSubmit;
+
+  function quickAcceptBMOrder(orderId, btnEl) {
+    openBMAcceptOrderModal(orderId, btnEl, 'hari-ini');
   }
   window.quickAcceptBMOrder = quickAcceptBMOrder;
 
@@ -329,7 +461,7 @@
 
   async function loadBMOrders(opts) {
     var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
+    var branchId = (typeof window.getBMTargetBranchId === 'function' ? window.getBMTargetBranchId() : null) || (user ? (user.branch_id || user.branchId) : null);
     if (!branchId) return;
 
     var isBg = opts && opts.background;
@@ -724,59 +856,7 @@
 
   async function advanceBMOrderStatus(orderId, currentStatus, fulfillmentType, btnEl) {
     if (currentStatus === 'pending') {
-      if (!confirm('Terima pesanan #' + orderId + '?')) return;
-      if (_bmOrdersState.inFlightAccept[orderId]) return;
-      _bmOrdersState.inFlightAccept[orderId] = true;
-
-      if (btnEl) {
-        btnEl.disabled = true;
-        btnEl.dataset.originalText = btnEl.innerHTML;
-        btnEl.innerHTML = 'Memproses...';
-      }
-
-      try {
-        var res = await adminFetch(API_BASE + '/orders/' + encodeURIComponent(orderId) + '/branch-acceptance', {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ decision: 'accept', note: 'Diterima oleh resto' })
-        });
-        var data = await res.json();
-        if (res.ok && data.success) {
-          if (window.XentraAudio && typeof window.XentraAudio.orderAccepted === 'function') {
-            window.XentraAudio.orderAccepted();
-          }
-          if (window.XentraPrinter && window.XentraPrinter.isNative() && window.XentraPrinter.isAutoPrintEnabled()) {
-            var matchedOrd = (_bmOrdersState.orders || []).find(function (o) { return o.id === orderId; });
-            var u = getStoredUser();
-            if (matchedOrd) {
-              window.XentraPrinter.printOrder(matchedOrd, { name: u.brand_name || 'Mybangjo Resto', branch: u.branch_name });
-            }
-          }
-          showToast('Pesanan diterima.');
-          loadBMOrders();
-          if (typeof loadHariIni === 'function') loadHariIni();
-          var detailView = $('bm-orders-detail-view');
-          if (detailView && detailView.style.display !== 'none' && _bmOrdersState.currentDetailOrderId === orderId) {
-            viewBMOrderDetail(orderId);
-          }
-        } else {
-          showToast('Gagal menerima pesanan: ' + (data.error || 'Terjadi kesalahan'));
-          loadBMOrders();
-          if (typeof loadHariIni === 'function') loadHariIni();
-          var detailView = $('bm-orders-detail-view');
-          if (detailView && detailView.style.display !== 'none' && _bmOrdersState.currentDetailOrderId === orderId) {
-            viewBMOrderDetail(orderId);
-          }
-        }
-      } catch (e) {
-        showToast('Kesalahan jaringan.');
-      } finally {
-        delete _bmOrdersState.inFlightAccept[orderId];
-        if (btnEl) {
-          btnEl.disabled = false;
-          if (btnEl.dataset.originalText) btnEl.innerHTML = btnEl.dataset.originalText;
-        }
-      }
+      openBMAcceptOrderModal(orderId, btnEl, 'orders');
       return;
     }
 
@@ -854,18 +934,30 @@
     var btnText = $('bm-reject-btn-text');
     var confirmBtn = $('btn-bm-confirm-reject');
 
+    var ord = findBMOrderById(orderId);
+
     if (idInput) idInput.value = orderId;
     if (reasonInput) reasonInput.value = '';
     if (errorEl) errorEl.style.display = 'none';
-    if (subtitle) subtitle.textContent = 'Pesanan #' + orderId;
-    if (btnText) btnText.textContent = 'Konfirmasi Tolak Pesanan';
+    if (subtitle) {
+      var subText = (ord && ord.order_number) ? ord.order_number : ('Pesanan #' + orderId);
+      if (ord && ord.customer_name) subText += ' • ' + ord.customer_name;
+      subtitle.textContent = subText;
+    }
+    if (btnText) btnText.textContent = 'Tolak Pesanan';
     if (confirmBtn) confirmBtn.disabled = false;
+
+    // Reset active chip state
+    var chips = document.querySelectorAll('.bm-reject-chip');
+    if (chips) {
+      chips.forEach(function (c) { c.classList.remove('is-active'); });
+    }
 
     if (modal) modal.style.display = 'flex';
     if (window.XentraNav && typeof window.XentraNav.push === 'function') {
       window.XentraNav.push(function () { closeBMRejectModal({ fromNav: true }); }, 'modal-bm-reject-order');
     }
-    if (reasonInput) setTimeout(function () { reasonInput.focus(); }, 50);
+    if (reasonInput) setTimeout(function () { reasonInput.focus(); }, 80);
   }
   window.openBMRejectModal = openBMRejectModal;
 
@@ -881,7 +973,7 @@
   }
   window.closeBMRejectModal = closeBMRejectModal;
 
-  function setBMRejectReason(reasonText) {
+  function setBMRejectReason(reasonText, chipEl) {
     var reasonInput = $('bm-reject-reason-input');
     var errorEl = $('bm-reject-error');
     if (reasonInput) {
@@ -889,6 +981,11 @@
       reasonInput.focus();
     }
     if (errorEl) errorEl.style.display = 'none';
+    var chips = document.querySelectorAll('.bm-reject-chip');
+    if (chips) {
+      chips.forEach(function (c) { c.classList.remove('is-active'); });
+    }
+    if (chipEl && chipEl.classList) chipEl.classList.add('is-active');
   }
   window.setBMRejectReason = setBMRejectReason;
 
@@ -1012,7 +1109,23 @@
   window.checkInBMReservation = checkInBMReservation;
 
   async function noShowBMReservation(orderId) {
-    if (!confirm('Tandai reservasi #' + orderId + ' sebagai NO-SHOW? Ini hanya berhasil setelah jadwal + grace period.')) return;
+    if (typeof window.showBranchStatusConfirm === 'function') {
+      var ok = await window.showBranchStatusConfirm({
+        title: 'Tandai Reservasi No-Show?',
+        desc: 'Tamu tidak hadir pada jadwal yang ditentukan. Status meja akan dikosongkan.',
+        iconBg: '#ffedd5',
+        iconHtml: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="18" y1="8" x2="23" y2="13"/><line x1="23" y1="8" x2="18" y2="13"/></svg>',
+        badgeText: 'Hanya berhasil setelah grace period berakhir',
+        badgeBg: '#fff7ed',
+        badgeColor: '#c2410c',
+        submitText: 'Tandai No-Show',
+        submitBg: '#ea580c',
+        cancelText: 'Batal'
+      });
+      if (!ok) return;
+    } else {
+      if (!confirm('Tandai reservasi #' + orderId + ' sebagai NO-SHOW? Ini hanya berhasil setelah jadwal + grace period.')) return;
+    }
 
     try {
       var res = await adminFetch(API_BASE + '/pos/reservations/' + encodeURIComponent(orderId) + '/no-show', {
@@ -1306,10 +1419,43 @@
   async function decideBMOrderAddition(orderId, additionId, decision) {
     var reason = '';
     if (decision === 'accept') {
-      if (!confirm('Terima tambahan pesanan ini? Item akan masuk ke pesanan dan stok akan dipotong.')) return;
+      if (typeof window.showBranchStatusConfirm === 'function') {
+        var ok = await window.showBranchStatusConfirm({
+          title: 'Terima Tambahan Pesanan?',
+          desc: 'Item tambahan akan dimasukkan ke pesanan dan stok bahan baku akan dipotong.',
+          iconBg: '#dcfce7',
+          iconHtml: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
+          badgeText: 'Item baru akan masuk ke antrean dapur',
+          badgeBg: '#f0fdf4',
+          badgeColor: '#15803d',
+          submitText: 'Ya, Terima Tambahan',
+          submitBg: '#16a34a',
+          cancelText: 'Batal'
+        });
+        if (!ok) return;
+      } else {
+        if (!confirm('Terima tambahan pesanan ini? Item akan masuk ke pesanan dan stok akan dipotong.')) return;
+      }
     } else if (decision === 'reject') {
-      reason = prompt('Alasan penolakan tambahan:') || '';
-      if (!reason.trim()) return;
+      if (typeof window.showBranchStatusConfirm === 'function') {
+        var ok = await window.showBranchStatusConfirm({
+          title: 'Tolak Tambahan Pesanan?',
+          desc: 'Tambahan pesanan ini akan dibatalkan.',
+          iconBg: '#ffe4e6',
+          iconHtml: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#e11d48" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+          badgeText: 'Item tambahan tidak akan dimasak',
+          badgeBg: '#fff1f2',
+          badgeColor: '#be123c',
+          submitText: 'Ya, Tolak Tambahan',
+          submitBg: '#e11d48',
+          cancelText: 'Batal'
+        });
+        if (!ok) return;
+        reason = 'Ditolak oleh resto';
+      } else {
+        reason = prompt('Alasan penolakan tambahan:') || '';
+        if (!reason.trim()) return;
+      }
     } else {
       return;
     }

@@ -29,28 +29,30 @@
 
   async function loadHariIni() {
     var user = getStoredUser();
-    if (!user || !user.branch_id) {
-      console.warn("[BM Hari Ini]: User is not a branch manager or branch_id missing");
+    var branchId = (typeof window.getBMTargetBranchId === 'function' ? window.getBMTargetBranchId() : null) || (user ? (user.branch_id || user.branchId) : null);
+    if (!branchId) {
+      console.warn("[BM Hari Ini]: branch_id missing");
+      try { window.dispatchEvent(new CustomEvent("merchant:home-ready")); } catch (_) {}
       return;
     }
-    var branchId = user.branch_id;
     var headers = getAuthHeaders();
 
-    // Parallelize dashboard operational queries in one concurrent network burst
-    var results = await Promise.allSettled([
-      // 0: Branch Details
-      adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId), { headers: headers }),
-      // 1: Branch Orders
-      adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId) + "/orders?status=all", { headers: headers }),
-      // 2: Tables Layout
-      adminFetch(API_BASE + "/dine-in/layout?branch_id=" + encodeURIComponent(branchId), { headers: headers }),
-      // 3: Branch Inventory
-      adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId) + "/inventory", { headers: headers }),
-      // 4: Branch Menus (availability)
-      adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId) + "/menu", { headers: headers }),
-      // 5: Promotions
-      adminFetch(API_BASE + "/admin/marketing/promotions", { headers: headers })
-    ]);
+    try {
+      // Parallelize dashboard operational queries in one concurrent network burst
+      var results = await Promise.allSettled([
+        // 0: Branch Details
+        adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId), { headers: headers }),
+        // 1: Branch Orders
+        adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId) + "/orders?status=all", { headers: headers }),
+        // 2: Tables Layout
+        adminFetch(API_BASE + "/dine-in/layout?branch_id=" + encodeURIComponent(branchId), { headers: headers }),
+        // 3: Branch Inventory
+        adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId) + "/inventory", { headers: headers }),
+        // 4: Branch Menus (availability)
+        adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId) + "/menu", { headers: headers }),
+        // 5: Promotions
+        adminFetch(API_BASE + "/admin/marketing/promotions", { headers: headers })
+      ]);
 
     // 1. Process Branch Details
     if (results[0].status === "fulfilled" && results[0].value && results[0].value.ok) {
@@ -210,8 +212,9 @@
         console.warn("[BM Hari Ini Promos Parse Error]:", e);
       }
     }
-
-    try { window.dispatchEvent(new CustomEvent("merchant:home-ready")); } catch (_) {}
+    } finally {
+      try { window.dispatchEvent(new CustomEvent("merchant:home-ready")); } catch (_) {}
+    }
   }
   window.loadHariIni = loadHariIni;
 
@@ -330,9 +333,10 @@
   async function loadHariIniOrders(opts) {
     opts = opts || {};
     var user = getStoredUser();
-    if (!user || !user.branch_id) return;
+    var branchId = (typeof window.getBMTargetBranchId === 'function' ? window.getBMTargetBranchId() : null) || (user ? (user.branch_id || user.branchId) : null);
+    if (!branchId) return;
     try {
-      var res = await adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(user.branch_id) + "/orders?status=all", {
+      var res = await adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId) + "/orders?status=all", {
         headers: getAuthHeaders()
       });
       if (res && res.ok) {
@@ -516,10 +520,12 @@
       modal.style.display = 'flex';
     });
   }
+  window.showBranchStatusConfirm = showBranchStatusConfirm;
 
   async function toggleBranchOpen() {
     var user = getStoredUser();
-    if (!user || !user.branch_id) return;
+    var branchId = (typeof window.getBMTargetBranchId === 'function' ? window.getBMTargetBranchId() : null) || (user ? (user.branch_id || user.branchId) : null);
+    if (!branchId) return;
     var branch = _hariIniState.branch;
     var curOpen = branch ? (branch.is_open_override === 1 || branch.is_open_override === true) : true;
     var newOpen = curOpen ? 0 : 1;
@@ -556,7 +562,7 @@
     if (!confirmed) return;
 
     try {
-      var res = await adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(user.branch_id), {
+      var res = await adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId), {
         method: "PUT",
         headers: getAuthHeaders(),
         body: JSON.stringify({ is_open_override: newOpen })
@@ -577,7 +583,8 @@
 
   async function toggleBranchOnlineOrders() {
     var user = getStoredUser();
-    if (!user || !user.branch_id) return;
+    var branchId = (typeof window.getBMTargetBranchId === 'function' ? window.getBMTargetBranchId() : null) || (user ? (user.branch_id || user.branchId) : null);
+    if (!branchId) return;
     var branch = _hariIniState.branch;
     var curDelivery = branch ? (branch.is_delivery_active !== 0 && branch.is_delivery_active !== false) : true;
     var newDelivery = curDelivery ? 0 : 1;
@@ -614,7 +621,7 @@
     if (!confirmed) return;
 
     try {
-      var res = await adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(user.branch_id), {
+      var res = await adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId), {
         method: "PUT",
         headers: getAuthHeaders(),
         body: JSON.stringify({ is_delivery_active: newDelivery })

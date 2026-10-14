@@ -46,37 +46,53 @@ public class OrderMonitorService extends Service {
     private boolean isAlarmActive = false;
 
     public static void saveAuthContext(Context context, String token, String branchId) {
-        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        prefs.edit()
-            .putString(KEY_TOKEN, token)
-            .putString(KEY_BRANCH_ID, branchId)
-            .apply();
+        try {
+            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            prefs.edit()
+                .putString(KEY_TOKEN, token)
+                .putString(KEY_BRANCH_ID, branchId)
+                .apply();
 
-        if (token != null && !token.isEmpty() && branchId != null && !branchId.isEmpty()) {
-            startMonitoring(context);
+            if (token != null && !token.isEmpty() && branchId != null && !branchId.isEmpty()) {
+                startMonitoring(context);
+            }
+        } catch (Exception e) {
+            android.util.Log.w("OrderMonitorService", "Failed to save auth context: " + e.getMessage());
         }
     }
 
     public static void clearAuthContext(Context context) {
-        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        prefs.edit().clear().apply();
-        stopMonitoring(context);
+        try {
+            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            prefs.edit().clear().apply();
+            stopMonitoring(context);
+        } catch (Exception e) {
+            android.util.Log.w("OrderMonitorService", "Failed to clear auth context: " + e.getMessage());
+        }
     }
 
     public static void startMonitoring(Context context) {
-        Intent intent = new Intent(context, OrderMonitorService.class);
-        intent.setAction(ACTION_START);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(intent);
-        } else {
-            context.startService(intent);
+        try {
+            Intent intent = new Intent(context, OrderMonitorService.class);
+            intent.setAction(ACTION_START);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent);
+            } else {
+                context.startService(intent);
+            }
+        } catch (Exception e) {
+            android.util.Log.w("OrderMonitorService", "Failed to start monitoring: " + e.getMessage());
         }
     }
 
     public static void stopMonitoring(Context context) {
-        Intent intent = new Intent(context, OrderMonitorService.class);
-        intent.setAction(ACTION_STOP);
-        context.startService(intent);
+        try {
+            Intent intent = new Intent(context, OrderMonitorService.class);
+            intent.setAction(ACTION_STOP);
+            context.startService(intent);
+        } catch (Exception e) {
+            android.util.Log.w("OrderMonitorService", "Failed to stop monitoring: " + e.getMessage());
+        }
     }
 
     @Override

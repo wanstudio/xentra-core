@@ -357,8 +357,9 @@
     if (branchSelectorWrap) branchSelectorWrap.style.display = 'none';
     var bmBranchBadge = $('dash-bm-branch-badge');
     if (bmBranchBadge) bmBranchBadge.style.display = 'flex';
-    if (user.branch_id) {
-      Catalog.state.branchId = user.branch_id;
+    var bId = (typeof window.getBMTargetBranchId === 'function' ? window.getBMTargetBranchId() : null) || (user ? (user.branch_id || user.branchId) : null);
+    if (bId) {
+      if (Catalog && Catalog.state) Catalog.state.branchId = bId;
       var bmBranchName = $('dash-bm-branch-name');
       if (bmBranchName && (user.branch_name || user.brand_name)) {
         bmBranchName.textContent = user.branch_name || user.brand_name;
@@ -960,44 +961,49 @@
 
 
   async function boot() {
-    initAuthListeners();
+    try {
+      initAuthListeners();
 
-    await handleHandoffExchange();
+      await handleHandoffExchange();
 
-    if (!checkAuth()) return;
+      if (!checkAuth()) return;
 
-    var user = getStoredUser();
-    // Not signed in at all → the unified login.
-    if (!user) { window.location.replace('/login'); return; }
+      var user = getStoredUser();
+      // Not signed in at all → the unified login.
+      if (!user) { window.location.replace('/login'); return; }
 
-    var isValid = await validateServerSession();
-    if (!isValid) return;
+      var isValid = await validateServerSession();
+      if (!isValid) return;
 
-    // Sync authenticated session with native Android background monitoring service
-    var token = localStorage.getItem('xentra_merchant_token');
-    if (token && user && user.branch_id && window.XentraNative && typeof window.XentraNative.syncAuth === 'function') {
-      try { window.XentraNative.syncAuth(token, user.branch_id); } catch (_) {}
-    }
+      // Sync authenticated session with native Android background monitoring service
+      var token = localStorage.getItem('xentra_merchant_token');
+      var bId = (typeof window.getBMTargetBranchId === 'function' ? window.getBMTargetBranchId() : null) || (user ? (user.branch_id || user.branchId) : null);
+      if (token && bId && window.XentraNative && typeof window.XentraNative.syncAuth === 'function') {
+        try { window.XentraNative.syncAuth(token, bId); } catch (_) {}
+      }
 
-    // Surface guard: the server resolves the landing surface for this role, so
-    // swapping the URL can never grant a surface this role does not own.
-    if (enforceSurface(['/merchant/', '/merchant-app/'])) return;
+      // Surface guard: the server resolves the landing surface for this role, so
+      // swapping the URL can never grant a surface this role does not own.
+      if (enforceSurface(['/merchant/', '/merchant-app/', '/owner/', '/dashboard/'])) return;
 
-    applyRoleBasedUI();
-    renderBranchManagerNavigation();
-    initNotificationListeners();
-    fetchUnreadNotificationCount();
-    fetchActionableOrdersCount();
-    scheduleActionableOrdersCheck(15000);
+      applyRoleBasedUI();
+      renderBranchManagerNavigation();
+      initNotificationListeners();
+      fetchUnreadNotificationCount();
+      fetchActionableOrdersCount();
+      scheduleActionableOrdersCheck(15000);
 
-    var currentRoute = getCurrentRoute();
-    if (user.role === 'purchasing' && (!window.location.hash || window.location.hash === '#hari-ini')) {
-      currentRoute = 'belanja';
-    }
-    applyRoute(currentRoute);
-
-    if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
-      window.Xentra.hideSplash();
+      var currentRoute = getCurrentRoute();
+      if (user.role === 'purchasing' && (!window.location.hash || window.location.hash === '#hari-ini')) {
+        currentRoute = 'belanja';
+      }
+      applyRoute(currentRoute);
+    } catch (err) {
+      console.error('[Merchant App Boot Error]:', err);
+    } finally {
+      if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
+        window.Xentra.hideSplash();
+      }
     }
   }
 

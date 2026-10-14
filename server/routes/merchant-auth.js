@@ -324,7 +324,7 @@ module.exports = function registerMerchantAuthRoutes(router, deps) {
         avatar_url: (userRow && userRow.avatar_url) || null,
         brand_id: brandId,
         organization_id: organizationId,
-        branch_id: branchId,
+        branch_id: resolvedBranchId || branchId,
         branch_name: branchName,
         email_verified: req.user.email_verified !== undefined ? req.user.email_verified : true,
         brand_name: brand ? brand.name : null
@@ -461,6 +461,7 @@ module.exports = function registerMerchantAuthRoutes(router, deps) {
       });
   
       let branchName = null;
+      let effectiveBranchId = user.branch_id || null;
       if (user.branch_id) {
         try {
           const bRow = db.prepare('SELECT name FROM branches WHERE id = ?').get(user.branch_id);
@@ -469,8 +470,11 @@ module.exports = function registerMerchantAuthRoutes(router, deps) {
       }
       if (!branchName && effectiveBrandId) {
         try {
-          const bActive = db.prepare('SELECT name FROM branches WHERE brand_id = ? AND is_active = 1 LIMIT 1').get(effectiveBrandId);
-          if (bActive) branchName = bActive.name;
+          const bActive = db.prepare('SELECT id, name FROM branches WHERE brand_id = ? AND is_active = 1 LIMIT 1').get(effectiveBrandId);
+          if (bActive) {
+            branchName = bActive.name;
+            if (!effectiveBranchId) effectiveBranchId = bActive.id;
+          }
         } catch (_) {}
       }
 
@@ -484,7 +488,7 @@ module.exports = function registerMerchantAuthRoutes(router, deps) {
           email: user.email,
           full_name: user.full_name,
           role: user.role,
-          branch_id: user.branch_id || null,
+          branch_id: effectiveBranchId,
           branch_name: branchName,
           email_verified: user.email_verified,
           brand_name: (req.brand && req.brand.name) ? req.brand.name : 'MyBangjo'

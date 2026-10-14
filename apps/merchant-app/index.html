@@ -22,7 +22,7 @@
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.1">
   <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.0.39">
   <link rel="stylesheet" href="/merchant-shared/css/presentation-shells.css?v=1.0.4">
-  <link rel="stylesheet" href="/merchant-app/assets/css/home.css?v=1.0.18">
+  <link rel="stylesheet" href="/merchant-app/assets/css/home.css?v=1.0.19">
 </head>
 <body class="x-merchant-app">
   <script>
@@ -50,7 +50,7 @@
         }
       });
 
-      setTimeout(window.__xentraHideSplash, 3000);
+      setTimeout(window.__xentraHideSplash, 2000);
     })();
   </script>
 
@@ -169,7 +169,7 @@
           </button>
         </div>
       </header>
-      <section id="tab-hari-ini" class="x-tab-content" data-tab="hari-ini">
+      <section id="tab-hari-ini" class="x-tab-content active" data-tab="hari-ini">
         <div class="x-home-screen">
 
           <!-- Greeting / date -->
@@ -2115,46 +2115,102 @@
     </div>
   </div>
 
-  <!-- P8: Operational Modal: Branch Order Rejection -->
-  <div id="modal-bm-reject-order" class="x-modal" role="dialog" aria-modal="true" aria-labelledby="bm-reject-modal-title" style="display:none;">
-    <div class="x-modal-backdrop" onclick="closeBMRejectModal()"></div>
-    <div class="x-modal-card" style="max-width:480px; width:100%; z-index:1001; margin:auto; background:var(--card-bg, #fff); border-radius:12px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); overflow:hidden;">
-      <div class="x-modal-header" style="padding:16px 20px; border-bottom:1px solid var(--border-color, #e2e8f0); display:flex; justify-content:space-between; align-items:center;">
-        <div>
-          <h3 id="bm-reject-modal-title" style="margin:0; font-size:16px; font-weight:700; color:#dc2626;">Tolak Pesanan</h3>
-          <p id="bm-reject-order-subtitle" style="margin:2px 0 0; font-size:12px; color:var(--text-muted, #64748b);">Pesanan #ORD-0000</p>
+  <!-- MODAL: KONFIRMASI TERIMA PESANAN (CUSTOM IN-APP DIALOG) -->
+  <div id="modal-bm-accept-order" class="bm-modal-confirm-overlay" role="dialog" aria-modal="true" aria-labelledby="bm-accept-modal-title" style="display:none;" onclick="if(event.target === this) closeBMAcceptOrderModal(false)">
+    <div class="bm-modal-confirm-card">
+      <button type="button" onclick="closeBMAcceptOrderModal(false)" style="position:absolute; top:14px; right:14px; width:32px; height:32px; border-radius:50%; background:#f1f5f9; border:none; cursor:pointer; font-size:16px; color:#64748b; display:flex; align-items:center; justify-content:center;" aria-label="Tutup">✕</button>
+
+      <!-- Icon & Title -->
+      <div style="text-align:center; margin-bottom:16px;">
+        <div style="width:58px; height:58px; border-radius:50%; background:#dcfce7; color:#16a34a; margin:0 auto 12px; display:flex; align-items:center; justify-content:center;">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
         </div>
-        <button type="button" class="x-btn-close" onclick="closeBMRejectModal()" aria-label="Tutup modal" style="background:transparent; border:none; font-size:20px; cursor:pointer; color:var(--text-muted, #64748b);">&times;</button>
+        <h3 id="bm-accept-modal-title" style="margin:0 0 6px; font-size:18px; font-weight:800; color:#0f172a;">Terima Pesanan Ini?</h3>
+        <p id="bm-accept-modal-desc" style="margin:0; font-size:12.5px; color:#64748b; line-height:1.5;">Dapur akan langsung mulai memproses dan menyiapkan pesanan.</p>
       </div>
 
-      <form id="form-bm-reject-order" onsubmit="submitBMRejectOrder(event)" style="padding:20px;">
+      <!-- Order Context Card -->
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:14px; margin-bottom:18px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <strong id="bm-accept-order-number" style="font-size:15px; color:#0f172a; font-family:monospace; font-weight:800;">#ORD-0000</strong>
+          <span id="bm-accept-order-type-badge" style="font-size:11px; font-weight:700; padding:3px 8px; border-radius:8px; background:#e0f2fe; color:#0369a1;">Dine In</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px; color:#475569; margin-bottom:5px;">
+          <span>Pelanggan / Meja:</span>
+          <strong id="bm-accept-order-customer" style="color:#0f172a;">—</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px; color:#475569; margin-bottom:6px;">
+          <span>Total Pesanan:</span>
+          <strong id="bm-accept-order-total" style="color:#16a34a; font-size:14px; font-weight:800;">Rp 0</strong>
+        </div>
+        <div id="bm-accept-order-items-preview" style="font-size:12px; color:#64748b; border-top:1px dashed #cbd5e1; padding-top:7px; margin-top:6px; line-height:1.45;">
+          <!-- Item details -->
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div style="display:grid; grid-template-columns:1fr 1.3fr; gap:10px;">
+        <button type="button" id="btn-bm-accept-cancel" onclick="closeBMAcceptOrderModal(false)" style="padding:12px 14px; border:1px solid #cbd5e1; background:#ffffff; border-radius:12px; font-weight:700; font-size:13.5px; color:#475569; cursor:pointer;">
+          Batal
+        </button>
+        <button type="button" id="btn-bm-accept-confirm" onclick="confirmBMAcceptOrderSubmit()" style="padding:12px 14px; border:none; background:#16a34a; border-radius:12px; font-weight:800; font-size:13.5px; color:#ffffff; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          <span id="btn-bm-accept-text">Terima Pesanan</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- P8: Operational Modal: Branch Order Rejection (CUSTOM IN-APP DIALOG) -->
+  <div id="modal-bm-reject-order" class="bm-modal-confirm-overlay" role="dialog" aria-modal="true" aria-labelledby="bm-reject-modal-title" style="display:none;" onclick="if(event.target === this) closeBMRejectModal()">
+    <div class="bm-modal-confirm-card">
+      <button type="button" class="x-btn-close" onclick="closeBMRejectModal()" aria-label="Tutup modal" style="position:absolute; top:14px; right:14px; width:32px; height:32px; border-radius:50%; background:#f1f5f9; border:none; cursor:pointer; font-size:16px; color:#64748b; display:flex; align-items:center; justify-content:center;">✕</button>
+
+      <!-- Icon & Header -->
+      <div style="text-align:center; margin-bottom:14px;">
+        <div style="width:58px; height:58px; border-radius:50%; background:#ffe4e6; color:#e11d48; margin:0 auto 12px; display:flex; align-items:center; justify-content:center;">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        </div>
+        <h3 id="bm-reject-modal-title" style="margin:0 0 4px; font-size:18px; font-weight:800; color:#0f172a;">Tolak Pesanan Ini?</h3>
+        <p id="bm-reject-order-subtitle" style="margin:0; font-size:12.5px; color:#64748b;">Pesanan #ORD-0000</p>
+      </div>
+
+      <!-- Warning Note -->
+      <div style="background:#fff1f2; border:1px solid #fecdd3; border-radius:10px; padding:10px 12px; font-size:12px; color:#be123c; margin-bottom:14px; line-height:1.45; display:flex; align-items:center; gap:8px;">
+        <span style="font-size:16px;">🛑</span>
+        <span>Pesanan yang ditolak akan dibatalkan secara permanen.</span>
+      </div>
+
+      <form id="form-bm-reject-order" onsubmit="submitBMRejectOrder(event)">
         <input type="hidden" id="bm-reject-order-id" value="">
 
-        <div style="margin-bottom:14px;">
-          <label style="display:block; font-size:12px; font-weight:700; margin-bottom:6px; color:var(--text-main, #0f172a);">
-            Alasan Cepat:
-          </label>
+        <!-- Alasan Cepat -->
+        <div style="margin-bottom:12px;">
+          <label style="display:block; font-size:12px; font-weight:700; margin-bottom:6px; color:#334155;">Pilih Alasan Cepat:</label>
           <div style="display:flex; flex-wrap:wrap; gap:6px;">
-            <button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="setBMRejectReason('Bahan baku habis')">Bahan Baku Habis</button>
-            <button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="setBMRejectReason('Dapur penuh / overload')">Dapur Penuh</button>
-            <button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="setBMRejectReason('Di luar jam operasional')">Di Luar Jam Operasional</button>
-            <button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="setBMRejectReason('Kendala kurir / pengantaran')">Kendala Kurir</button>
+            <button type="button" class="bm-reject-chip" onclick="setBMRejectReason('Bahan baku habis', this)">Bahan Baku Habis</button>
+            <button type="button" class="bm-reject-chip" onclick="setBMRejectReason('Dapur penuh / antrean panjang', this)">Dapur Penuh</button>
+            <button type="button" class="bm-reject-chip" onclick="setBMRejectReason('Di luar jam operasional resto', this)">Resto Tutup</button>
+            <button type="button" class="bm-reject-chip" onclick="setBMRejectReason('Kendala kurir / jangkauan antar', this)">Kendala Kurir</button>
+            <button type="button" class="bm-reject-chip" onclick="setBMRejectReason('Permintaan pembatalan dari pelanggan', this)">Minta Batal</button>
           </div>
         </div>
 
-        <div style="margin-bottom:16px;">
-          <label for="bm-reject-reason-input" style="display:block; font-size:12px; font-weight:700; margin-bottom:6px; color:var(--text-main, #0f172a);">
-            Alasan Penolakan <span style="color:#dc2626;">*</span>
+        <!-- Textarea Catatan -->
+        <div style="margin-bottom:18px;">
+          <label for="bm-reject-reason-input" style="display:block; font-size:12px; font-weight:700; margin-bottom:6px; color:#334155;">
+            Alasan Penolakan <span style="color:#e11d48;">*</span>
           </label>
-          <textarea id="bm-reject-reason-input" class="x-input" rows="3" required placeholder="Tulis alasan penolakan..." style="width:100%; box-sizing:border-box; font-size:13px; resize:vertical; padding:8px 10px;"></textarea>
-          <div style="margin-top:4px;">
-            <span id="bm-reject-error" style="font-size:11px; color:#dc2626; display:none;">Alasan penolakan wajib diisi.</span>
-          </div>
+          <textarea id="bm-reject-reason-input" class="x-input" rows="2" required placeholder="Tuliskan alasan penolakan..." style="width:100%; box-sizing:border-box; font-size:13px; resize:vertical; padding:10px 12px; border-radius:10px; border:1px solid #cbd5e1;"></textarea>
+          <span id="bm-reject-error" style="font-size:11.5px; color:#e11d48; display:none; margin-top:4px; font-weight:600;">Alasan penolakan wajib diisi.</span>
         </div>
 
-        <div style="display:flex; justify-content:flex-end; gap:8px;">
-          <button type="button" class="x-btn-secondary" onclick="closeBMRejectModal()" style="font-size:13px; padding:8px 16px;">Batal</button>
-          <button type="submit" id="btn-bm-confirm-reject" class="x-btn-primary" style="background:#dc2626; border-color:#dc2626; color:#fff; font-size:13px; padding:8px 16px;">
+        <!-- Action Buttons -->
+        <div style="display:grid; grid-template-columns:1fr 1.3fr; gap:10px;">
+          <button type="button" class="x-btn-secondary" onclick="closeBMRejectModal()" style="padding:12px 14px; border:1px solid #cbd5e1; background:#ffffff; border-radius:12px; font-weight:700; font-size:13.5px; color:#475569; cursor:pointer;">
+            Batal
+          </button>
+          <button type="submit" id="btn-bm-confirm-reject" style="padding:12px 14px; border:none; background:#e11d48; border-radius:12px; font-weight:800; font-size:13.5px; color:#ffffff; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">
             <span id="bm-reject-btn-text">Tolak Pesanan</span>
           </button>
         </div>
@@ -2398,7 +2454,7 @@
     </div>
   </div>
 
-  <script src="/merchant-shared/js/shared.js?v=1.0.1"></script>
+  <script src="/merchant-shared/js/shared.js?v=1.0.2"></script>
   <script src="/merchant-shared/js/audio-alerts.js?v=1.0.6"></script>
   <script src="/merchant-shared/js/wake-lock.js?v=1.0.0"></script>
   <script src="/merchant-shared/js/web-push-client.js?v=1.0.0"></script>
@@ -2412,7 +2468,7 @@
   <script src="/merchant-app/assets/js/branch-catalog-ui.js?v=1.0.1"></script>
   <script src="/merchant-app/assets/js/context.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/menu.js?v=1.1.0"></script>
-  <script src="/merchant-app/assets/js/hari-ini.js?v=1.0.8"></script>
+  <script src="/merchant-app/assets/js/hari-ini.js?v=1.0.9"></script>
   <script src="/merchant-app/assets/js/home.js?v=1.0.2"></script>
   <script src="/merchant-app/assets/js/jam-operasional.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/reports.js?v=1.0.0"></script>
@@ -2421,8 +2477,8 @@
   <script src="/merchant-app/assets/js/purchasing.js?v=1.1.4"></script>
   <script src="/merchant-app/assets/js/promotions.js?v=1.0.2"></script>
   <script src="/merchant-app/assets/js/staff.js?v=1.0.0"></script>
-  <script src="/merchant-app/assets/js/orders.js?v=1.0.13"></script>
-  <script src="/merchant-app/assets/js/merchant-app.js?v=1.1.10"></script>
+  <script src="/merchant-app/assets/js/orders.js?v=1.0.15"></script>
+  <script src="/merchant-app/assets/js/merchant-app.js?v=1.1.11"></script>
 
   <!-- ═══════════════════════════════════════════════════
        MERCHANT PWA ENGINE (Service Worker & Install Flow)
