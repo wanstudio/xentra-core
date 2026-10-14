@@ -1521,6 +1521,24 @@
             </div>
           </div>
 
+          <!-- GoBiz-style Floating Order Widget Panel -->
+          <div id="panel-floating-widget" class="x-card-panel" style="padding:18px 20px; border-radius:14px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.04); margin-bottom:14px;">
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+              <span style="display:flex; align-items:center; justify-content:center; width:38px; height:38px; border-radius:10px; background:#ecfdf5; color:#059669; flex-shrink:0;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19 4H5c-1.11 0-2 .9-2 2v12c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H5V8h14v10z"/></svg>
+              </span>
+              <div>
+                <h4 style="margin:0; font-size:15px; font-weight:800; color:#0f172a;">Ikon Melayang Pesanan (Floating Widget)</h4>
+                <p style="margin:2px 0 0; color:#64748b; font-size:12px; font-weight:700;">Balon pesanan muncul di atas aplikasi lain (seperti GoBiz)</p>
+              </div>
+            </div>
+            <p style="margin:0 0 14px; color:#64748b; font-size:13px; line-height:1.5;">Aktifkan izin ini agar saat ada pesanan masuk, muncul kartu pesanan melayang di layar meskipun Anda sedang membuka WhatsApp atau aplikasi lain.</p>
+            <div style="display:flex; gap:10px;">
+              <button type="button" class="x-btn-primary" onclick="if(window.XentraNative&&window.XentraNative.requestOverlayPermission)window.XentraNative.requestOverlayPermission();else alert('Izin floating widget hanya tersedia di aplikasi APK.');" style="flex:1; justify-content:center; height:42px; font-size:13px; font-weight:700; border-radius:10px;">⚙️ Aktifkan Izin Melayang</button>
+              <button type="button" class="x-btn-secondary" onclick="if(window.XentraNative&&window.XentraNative.testOverlay)window.XentraNative.testOverlay();else alert('Tes floating widget hanya tersedia di aplikasi APK.');" style="flex:1; justify-content:center; height:42px; font-size:13px; font-weight:700; border-radius:10px;">✨ Tes Balon Melayang</button>
+            </div>
+          </div>
+
           <div class="x-card-panel" style="padding:18px 20px; border-radius:14px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
             <h4 style="margin:0 0 10px; font-size:15px; font-weight:800; color:#0f172a;">Format Struk Kasir</h4>
             <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-top:1px solid #f1f5f9; font-size:13px;">

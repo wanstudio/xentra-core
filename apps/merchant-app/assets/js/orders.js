@@ -174,6 +174,8 @@
   window.playNewOrderAudibleChime = playNewOrderAudibleChime;
 
   function showSystemOrderNotification(ord) {
+    // In Native Android App, native Java OrderMonitorService handles notification & deep linking!
+    if (window.IS_NATIVE_APP) return;
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
     if (!navigator.serviceWorker) return;
 

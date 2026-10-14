@@ -468,6 +468,9 @@
 
   function logoutFromMobileAccount() {
     if (!confirm('Apakah Anda ingin keluar?')) return;
+    if (window.XentraNative && typeof window.XentraNative.clearAuth === 'function') {
+      window.XentraNative.clearAuth();
+    }
     clearStoredSession();
     redirectToLogin();
   }
@@ -969,6 +972,12 @@
 
     var isValid = await validateServerSession();
     if (!isValid) return;
+
+    // Sync authenticated session with native Android background monitoring service
+    var token = localStorage.getItem('xentra_merchant_token');
+    if (token && user && user.branch_id && window.XentraNative && typeof window.XentraNative.syncAuth === 'function') {
+      try { window.XentraNative.syncAuth(token, user.branch_id); } catch (_) {}
+    }
 
     // Surface guard: the server resolves the landing surface for this role, so
     // swapping the URL can never grant a surface this role does not own.

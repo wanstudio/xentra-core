@@ -73,6 +73,30 @@ public class MainActivity extends AppCompatActivity {
         } else {
             webView.restoreState(savedInstanceState);
         }
+
+        handleIncomingIntent(getIntent());
+    }
+
+    @Override
+    protected void onNewIntent(android.content.Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleIncomingIntent(intent);
+    }
+
+    private void handleIncomingIntent(android.content.Intent intent) {
+        if (intent == null) return;
+        // User interacted with app or notification: stop loud siren and overlay
+        OrderAlarmService.stopAlarm(this);
+        OrderOverlayService.hideOverlay(this);
+
+        Uri data = intent.getData();
+        if (data != null && webView != null) {
+            String url = data.toString();
+            if (url.startsWith("https://m.mybangjo.com")) {
+                webView.loadUrl(url);
+            }
+        }
     }
 
     private void setupSwipeRefresh() {
@@ -124,8 +148,21 @@ public class MainActivity extends AppCompatActivity {
             public void onPageFinished(WebView view, String url) {
                 progressBar.setVisibility(View.GONE);
                 swipeRefreshLayout.setRefreshing(false);
-                // Inject native flags
-                view.evaluateJavascript("window.IS_NATIVE_APP = true; window.__XENTRA_NATIVE_READY = true;", null);
+                // Inject native flags and auto-sync auth credentials to native background service
+                view.evaluateJavascript(
+                    "window.IS_NATIVE_APP = true; window.__XENTRA_NATIVE_READY = true;" +
+                    "(function() {" +
+                    "  try {" +
+                    "    var token = localStorage.getItem('xentra_merchant_token');" +
+                    "    var user = null;" +
+                    "    try { user = JSON.parse(localStorage.getItem('xentra_merchant_user')); } catch(_){}" +
+                    "    if (token && user && user.branch_id && window.XentraNative && typeof window.XentraNative.syncAuth === 'function') {" +
+                    "      window.XentraNative.syncAuth(token, user.branch_id);" +
+                    "    }" +
+                    "  } catch(e) {}" +
+                    "})();",
+                    null
+                );
             }
 
             @Override

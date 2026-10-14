@@ -1,9 +1,12 @@
 package com.mybangjo.merchant;
 
 import android.content.Context;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Build;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
+import android.provider.Settings;
 import android.webkit.JavascriptInterface;
 import android.widget.Toast;
 
@@ -23,9 +26,55 @@ public class XentraNativeBridge {
 
     @JavascriptInterface
     public String getAppVersion() {
-        return "1.0.0-native";
+        return "1.1.0-gobiz";
     }
 
+    // ── Authentication Synchronization for Native Background Worker ──
+    @JavascriptInterface
+    public void syncAuth(String token, String branchId) {
+        OrderMonitorService.saveAuthContext(context, token, branchId);
+    }
+
+    @JavascriptInterface
+    public void clearAuth() {
+        OrderMonitorService.clearAuthContext(context);
+    }
+
+    // ── Floating Order Widget (System Overlay / GoBiz-style) ──
+    @JavascriptInterface
+    public boolean hasOverlayPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            return Settings.canDrawOverlays(context);
+        }
+        return true;
+    }
+
+    @JavascriptInterface
+    public void requestOverlayPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
+            Intent intent = new Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:" + context.getPackageName())
+            );
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+        } else {
+            showToast("Izin Tampil di Atas Aplikasi Lain sudah aktif.");
+        }
+    }
+
+    @JavascriptInterface
+    public void testOverlay() {
+        OrderOverlayService.showOverlay(
+            context,
+            "ord_demo",
+            "99",
+            "Pelanggan Bangjo (Demo)",
+            "Rp 45.000"
+        );
+    }
+
+    // ── Audio & Alarm Controls ──
     @JavascriptInterface
     public void playOrderAlarm() {
         OrderAlarmService.startAlarm(context);
@@ -34,8 +83,10 @@ public class XentraNativeBridge {
     @JavascriptInterface
     public void stopOrderAlarm() {
         OrderAlarmService.stopAlarm(context);
+        OrderOverlayService.hideOverlay(context);
     }
 
+    // ── Bluetooth Thermal Printer ──
     @JavascriptInterface
     public String getPairedPrinters() {
         return printer.getPairedDevicesJson();
