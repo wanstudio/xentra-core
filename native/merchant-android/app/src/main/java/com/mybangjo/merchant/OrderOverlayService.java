@@ -83,10 +83,15 @@ public class OrderOverlayService extends Service {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
             return;
         }
+        if (!isAssistiveBallEnabled(context)) return;
+
+        Context appContext = context.getApplicationContext();
         mainHandler.post(() -> {
             lastPendingCount = pendingCount;
-            if (currentMode == 1) {
+            if (currentMode == 1 && currentOverlayView != null) {
                 updateBallBadge(lastPendingCount);
+            } else if (currentMode == 0 && isAssistiveBallEnabled(appContext)) {
+                displayAssistiveBall(appContext, lastPendingCount);
             }
         });
     }
@@ -292,7 +297,7 @@ public class OrderOverlayService extends Service {
                     case MotionEvent.ACTION_MOVE:
                         params.x = initialX + (int) (event.getRawX() - initialTouchX);
                         params.y = initialY + (int) (event.getRawY() - initialTouchY);
-                        if (currentOverlayView != null && currentOverlayView.isAttachedToWindow() && windowManager != null) {
+                        if (currentOverlayView != null && windowManager != null) {
                             try {
                                 windowManager.updateViewLayout(currentOverlayView, params);
                             } catch (Exception ignored) {}
@@ -318,7 +323,7 @@ public class OrderOverlayService extends Service {
                         } else {
                             params.x = screenWidth - dp(context, 62);
                         }
-                        if (currentOverlayView != null && currentOverlayView.isAttachedToWindow() && windowManager != null) {
+                        if (currentOverlayView != null && windowManager != null) {
                             try {
                                 windowManager.updateViewLayout(currentOverlayView, params);
                             } catch (Exception ignored) {}
@@ -498,7 +503,7 @@ public class OrderOverlayService extends Service {
                     case MotionEvent.ACTION_MOVE:
                         params.x = initialX + (int) (event.getRawX() - initialTouchX);
                         params.y = initialY + (int) (event.getRawY() - initialTouchY);
-                        if (currentOverlayView != null && currentOverlayView.isAttachedToWindow() && windowManager != null) {
+                        if (currentOverlayView != null && windowManager != null) {
                             try {
                                 windowManager.updateViewLayout(currentOverlayView, params);
                             } catch (Exception ignored) {}

@@ -265,6 +265,9 @@ public class OrderMonitorService extends Service {
                     seenPendingOrderIds.clear();
                     OrderAlarmService.stopAlarm(this);
                     dismissOrderNotification();
+                    if (OrderOverlayService.isAssistiveBallEnabled(this)) {
+                        OrderOverlayService.showBall(this, 0);
+                    }
                 }
             }
         } catch (Exception e) {

@@ -14,9 +14,6 @@
     <!-- Floating Order Overlay Widget permission -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
-    <!-- Unrestricted background execution for reliable order siren when screen locked -->
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-
     <!-- Bluetooth printer permissions -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
@@ -63,8 +60,6 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
-                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
 

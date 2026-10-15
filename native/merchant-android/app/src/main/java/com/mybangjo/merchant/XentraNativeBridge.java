@@ -104,19 +104,10 @@ public class XentraNativeBridge {
     public void requestIgnoreBatteryOptimization() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             try {
-                Intent intent = new Intent(
-                    Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                    Uri.parse("package:" + context.getPackageName())
-                );
+                Intent intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 context.startActivity(intent);
-            } catch (Exception e) {
-                try {
-                    Intent intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    context.startActivity(intent);
-                } catch (Exception ignored) {}
-            }
+            } catch (Exception ignored) {}
         }
     }
 
@@ -129,7 +120,11 @@ public class XentraNativeBridge {
     @JavascriptInterface
     public void stopOrderAlarm() {
         OrderAlarmService.stopAlarm(context);
-        OrderOverlayService.hideOverlay(context);
+        if (OrderOverlayService.isAssistiveBallEnabled(context)) {
+            OrderOverlayService.showBall(context, 0);
+        } else {
+            OrderOverlayService.hideOverlay(context);
+        }
     }
 
     // ── Bluetooth Thermal Printer ──
