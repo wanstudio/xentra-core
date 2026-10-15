@@ -4021,6 +4021,11 @@ input[type="file"].x-input,
   color: #64748b;
 }
 
+.bm-order-state-pill.danger {
+  background: #ffe4e6;
+  color: #be123c;
+}
+
 .bm-order-deadline {
   flex: 0 0 auto;
   color: #b45309;

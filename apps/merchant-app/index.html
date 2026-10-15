@@ -20,9 +20,9 @@
   <!-- Shared merchant infrastructure — tokens, toast, action-menu, crop editor, shell styles -->
   <link rel="stylesheet" href="/merchant-shared/fonts/plus-jakarta-sans.css?v=1.0.0">
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.1">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.0.39">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.0.40">
   <link rel="stylesheet" href="/merchant-shared/css/presentation-shells.css?v=1.0.4">
-  <link rel="stylesheet" href="/merchant-app/assets/css/home.css?v=1.0.21">
+  <link rel="stylesheet" href="/merchant-app/assets/css/home.css?v=1.0.25">
 </head>
 <body class="x-merchant-app">
   <script>
@@ -220,6 +220,20 @@
               <button type="button" class="x-home-section-action" style="width:100%;padding:11px 15px;border-top:1px solid #f0f2f3;" onclick="navigateTo('pesanan')">
                 Lihat semua pesanan →
               </button>
+            </div>
+
+            <!-- Section: Pesanan Ditolak Hari Ini (Merah Pink Warning Senada) -->
+            <div id="bm-home-rejected-card" style="display:none; margin-top:14px; background:#fff1f2; border:1px solid #fecdd3; border-radius:16px; padding:14px 16px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span style="font-size:16px; line-height:1;">🛑</span>
+                  <strong style="font-size:13.5px; font-weight:800; color:#9f1239;">Pesanan Ditolak Hari Ini</strong>
+                </div>
+                <span id="bm-badge-rejected-count" style="font-size:11.5px; font-weight:800; padding:2px 8px; border-radius:10px; background:#ffe4e6; color:#be123c;">0</span>
+              </div>
+              <div id="bm-home-rejected-list" style="display:flex; flex-direction:column; gap:8px;">
+                <!-- Populated by hari-ini.js -->
+              </div>
             </div>
           </section>
 
@@ -2576,7 +2590,7 @@
   <script src="/merchant-app/assets/js/branch-catalog-ui.js?v=1.0.1"></script>
   <script src="/merchant-app/assets/js/context.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/menu.js?v=1.1.0"></script>
-  <script src="/merchant-app/assets/js/hari-ini.js?v=1.0.11"></script>
+  <script src="/merchant-app/assets/js/hari-ini.js?v=1.0.25"></script>
   <script src="/merchant-app/assets/js/home.js?v=1.0.2"></script>
   <script src="/merchant-app/assets/js/jam-operasional.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/reports.js?v=1.0.0"></script>
@@ -2585,8 +2599,8 @@
   <script src="/merchant-app/assets/js/purchasing.js?v=1.1.4"></script>
   <script src="/merchant-app/assets/js/promotions.js?v=1.0.2"></script>
   <script src="/merchant-app/assets/js/staff.js?v=1.0.0"></script>
-  <script src="/merchant-app/assets/js/orders.js?v=1.0.17"></script>
-  <script src="/merchant-app/assets/js/merchant-app.js?v=1.1.12"></script>
+  <script src="/merchant-app/assets/js/orders.js?v=1.0.25"></script>
+  <script src="/merchant-app/assets/js/merchant-app.js?v=1.1.25"></script>
 
   <!-- ═══════════════════════════════════════════════════
        MERCHANT PWA ENGINE (Service Worker & Install Flow)

@@ -328,10 +328,17 @@
     if ($("bm-stat-completed-orders-snapshot")) $("bm-stat-completed-orders-snapshot").textContent = completedToday.length;
     if ($("bm-stat-net-sales-today")) $("bm-stat-net-sales-today").textContent = formatMoney(completedSales);
 
-    var avgOrderEl = $("bm-stat-average-order");
-    if (avgOrderEl) avgOrderEl.textContent = completedToday.length ? formatMoney(Math.round(completedSales / completedToday.length)) : "Rp0";
+    var localToday = new Date().toLocaleDateString('en-CA');
+    var utcToday = new Date().toISOString().substring(0, 10);
+    var rejectedToday = orders.filter(function (o) {
+      if (o.status !== "rejected") return false;
+      var cDate = (o.created_at || "").substring(0, 10);
+      var uDate = (o.updated_at || "").substring(0, 10);
+      return cDate === localToday || cDate === utcToday || uDate === localToday || uDate === utcToday;
+    });
 
     renderHariIniPendingOrders(pendingList);
+    renderHariIniRejectedOrders(rejectedToday);
   }
 
   async function loadHariIniOrders(opts) {
@@ -434,6 +441,46 @@
     }).join("");
   }
   window.renderHariIniPendingOrders = renderHariIniPendingOrders;
+
+  function renderHariIniRejectedOrders(rejectedOrders) {
+    var card = $("bm-home-rejected-card");
+    var list = $("bm-home-rejected-list");
+    var countBadge = $("bm-badge-rejected-count");
+    if (!card || !list) return;
+
+    if (!rejectedOrders || rejectedOrders.length === 0) {
+      card.style.display = "none";
+      list.innerHTML = "";
+      return;
+    }
+
+    card.style.display = "block";
+    if (countBadge) countBadge.textContent = String(rejectedOrders.length);
+
+    list.innerHTML = rejectedOrders.map(function (ro) {
+      var orderNum = esc(window.formatBMOrderCode ? window.formatBMOrderCode(ro) : (ro.order_number || ro.id || "Pesanan"));
+      var reason = esc(ro.cancellation_reason || ro.rejection_reason || ro.notes || "Ditolak oleh resto");
+      var total = formatMoney(ro.grand_total);
+      var time = ro.updated_at ? new Date(ro.updated_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : (ro.created_at ? new Date(ro.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : "—");
+
+      return '<div onclick="openBMRejectedInfoModal(\'' + esc(ro.id) + '\')" style="display:flex; justify-content:space-between; align-items:center; background:#ffffff; border:1px solid #fecdd3; border-radius:12px; padding:10px 12px; cursor:pointer; transition:all 0.15s ease;" onmouseover="this.style.background=\'#fff5f5\'" onmouseout="this.style.background=\'#ffffff\'">' +
+        '<div style="min-width:0; flex:1; margin-right:8px;">' +
+          '<div style="display:flex; align-items:center; gap:6px; margin-bottom:2px;">' +
+            '<strong style="font-size:13px; font-weight:800; color:#e11d48;">' + orderNum + '</strong>' +
+            '<span style="font-size:11px; color:#9ca3af;">• ' + esc(time) + '</span>' +
+          '</div>' +
+          '<p style="margin:0; font-size:12px; color:#4b5563; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' +
+            '<span style="color:#be123c; font-weight:700;">Alasan:</span> ' + reason +
+          '</p>' +
+        '</div>' +
+        '<div style="text-align:right; flex-shrink:0;">' +
+          '<div style="font-size:12.5px; font-weight:700; color:#1f2937;">' + total + '</div>' +
+          '<span style="display:inline-block; font-size:11px; font-weight:700; color:#e11d48; margin-top:2px;">Detail →</span>' +
+        '</div>' +
+      '</div>';
+    }).join("");
+  }
+  window.renderHariIniRejectedOrders = renderHariIniRejectedOrders;
   window.applyHariIniOrders = applyHariIniOrders;
   window.loadHariIniOrders = loadHariIniOrders;
   window.startHariIniPolling = startHariIniPolling;

@@ -837,9 +837,17 @@
         projection.muted = true;
       }
     } else if (['cancelled', 'rejected', 'timeout', 'fulfillment_exception'].indexOf(status) !== -1) {
-      projection.stateLabel = status === 'fulfillment_exception' ? 'Perlu penanganan' : 'Tidak dilanjutkan';
-      projection.muted = status !== 'fulfillment_exception';
-      projection.attention = status === 'fulfillment_exception';
+      if (status === 'rejected') {
+        projection.stateLabel = 'Ditolak';
+        projection.actionLabel = 'Lihat Info Ditolak';
+        projection.actionType = 'rejected_info';
+        projection.attention = false;
+        projection.muted = false;
+      } else {
+        projection.stateLabel = status === 'fulfillment_exception' ? 'Perlu penanganan' : 'Tidak dilanjutkan';
+        projection.muted = status !== 'fulfillment_exception';
+        projection.attention = status === 'fulfillment_exception';
+      }
     }
 
     return projection;
@@ -847,6 +855,9 @@
 
   function renderBMOrderStatusPill(projection) {
     var cls = projection.attention ? 'attention' : (projection.muted ? 'muted' : 'neutral');
+    if (projection.actionType === 'rejected_info') {
+      cls = 'danger';
+    }
     return '<span class="bm-order-state-pill ' + cls + '">' + esc(projection.stateLabel) + '</span>';
   }
 
@@ -1006,6 +1017,8 @@
         primary = '<button type="button" class="bm-order-primary-action" onclick="event.stopPropagation(); advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'';
         primary += esc(String(ord.status)) + '\', \'';
         primary += esc(type) + '\', this)">' + esc(p.actionLabel || 'Lanjutkan') + '</button>';
+      } else if (p.actionType === 'rejected_info') {
+        primary = '<button type="button" class="bm-order-primary-action" style="background:#fff1f2; color:#be123c; border:1px solid #fecdd3; font-weight:800;" onclick="event.stopPropagation(); openBMRejectedInfoModal(\'' + esc(ord.id) + '\')">Lihat Info Ditolak</button>';
       }
 
       var actionsHtml = primary
@@ -1217,7 +1230,7 @@
         var rejectedOrd = findBMOrderById(orderId) || (data && data.order) || { id: orderId };
         var formattedCode = formatBMOrderCode(rejectedOrd);
         showToast('Pesanan ' + formattedCode + ' telah ditolak.');
-        closeBMRejectModal();
+        closeBMRejectModal({ fromNav: true });
         if (_bmRejectOrigin === 'hari-ini' && typeof loadHariIni === 'function') {
           loadHariIni();
         }
@@ -1227,7 +1240,9 @@
           viewBMOrderDetail(orderId);
         }
         // Tampilkan Jendela Informasi Pesanan Ditolak Senada Merah Pink Warning
-        openBMRejectedInfoModal(orderId, reason, rejectedOrd);
+        setTimeout(function () {
+          openBMRejectedInfoModal(orderId, reason, rejectedOrd);
+        }, 50);
       } else {
         showToast('Gagal menolak pesanan: ' + (data.error || 'Terjadi kesalahan'));
         if (confirmBtn) confirmBtn.disabled = false;
