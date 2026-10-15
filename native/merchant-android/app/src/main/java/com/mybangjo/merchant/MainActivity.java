@@ -83,6 +83,21 @@ public class MainActivity extends AppCompatActivity {
             webView.restoreState(savedInstanceState);
         }
 
+        // Immediately ensure assistive ball is active on launch if permission is granted
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(this)) {
+            if (OrderOverlayService.isAssistiveBallEnabled(this)) {
+                OrderOverlayService.showBall(this, 0);
+            }
+        }
+
+        // Auto-resume background monitor if credentials exist
+        SharedPreferences authPrefs = getSharedPreferences("xentra_merchant_prefs", Context.MODE_PRIVATE);
+        String savedToken = authPrefs.getString("auth_token", null);
+        String savedBranch = authPrefs.getString("auth_branch_id", null);
+        if (savedToken != null && !savedToken.isEmpty() && savedBranch != null && !savedBranch.isEmpty()) {
+            OrderMonitorService.startMonitoring(this);
+        }
+
         handleIncomingIntent(getIntent());
     }
 
@@ -319,7 +334,8 @@ public class MainActivity extends AppCompatActivity {
         if (webView != null && webView.canGoBack()) {
             webView.goBack();
         } else {
-            super.onBackPressed();
+            // Minimize app to background without destroying MainActivity or floating icon
+            moveTaskToBack(true);
         }
     }
 

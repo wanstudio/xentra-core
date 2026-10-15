@@ -9,7 +9,9 @@ import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.provider.Settings;
 import android.util.DisplayMetrics;
 import android.view.Gravity;
@@ -37,6 +39,7 @@ public class OrderOverlayService extends Service {
     private static final String PREFS_NAME = "xentra_merchant_prefs";
     private static final String KEY_ASSISTIVE_BALL_ENABLED = "assistive_ball_enabled";
 
+    private static final Handler mainHandler = new Handler(Looper.getMainLooper());
     private static WindowManager windowManager;
     private static View currentOverlayView;
     private static WindowManager.LayoutParams params;
@@ -64,39 +67,35 @@ public class OrderOverlayService extends Service {
         }
         if (!isAssistiveBallEnabled(context)) return;
 
-        Intent intent = new Intent(context, OrderOverlayService.class);
-        intent.setAction(ACTION_SHOW_BALL);
-        intent.putExtra(EXTRA_PENDING_COUNT, pendingCount);
-        context.startService(intent);
+        Context appContext = context.getApplicationContext();
+        mainHandler.post(() -> displayAssistiveBall(appContext, pendingCount));
     }
 
     public static void showOrderCard(Context context, String orderId, String orderNumber, String customer, String total) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
             return;
         }
-        Intent intent = new Intent(context, OrderOverlayService.class);
-        intent.setAction(ACTION_SHOW_CARD);
-        intent.putExtra(EXTRA_ORDER_ID, orderId);
-        intent.putExtra(EXTRA_ORDER_NUMBER, orderNumber);
-        intent.putExtra(EXTRA_CUSTOMER, customer);
-        intent.putExtra(EXTRA_TOTAL, total);
-        context.startService(intent);
+        Context appContext = context.getApplicationContext();
+        mainHandler.post(() -> displayOrderCard(appContext, orderId, orderNumber, customer, total));
     }
 
     public static void updateBadge(Context context, int pendingCount) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
             return;
         }
-        Intent intent = new Intent(context, OrderOverlayService.class);
-        intent.setAction(ACTION_UPDATE_BADGE);
-        intent.putExtra(EXTRA_PENDING_COUNT, pendingCount);
-        context.startService(intent);
+        mainHandler.post(() -> {
+            lastPendingCount = pendingCount;
+            if (currentMode == 1) {
+                updateBallBadge(lastPendingCount);
+            }
+        });
     }
 
     public static void hideOverlay(Context context) {
-        Intent intent = new Intent(context, OrderOverlayService.class);
-        intent.setAction(ACTION_HIDE_OVERLAY);
-        context.startService(intent);
+        mainHandler.post(() -> {
+            removeOverlayView();
+            currentMode = 0;
+        });
     }
 
     @Override
@@ -107,27 +106,22 @@ public class OrderOverlayService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent == null) return START_NOT_STICKY;
+        if (intent == null) return START_STICKY;
 
         String action = intent.getAction();
         if (ACTION_HIDE_OVERLAY.equals(action)) {
-            removeOverlayView();
-            currentMode = 0;
-            stopSelf();
-            return START_NOT_STICKY;
+            hideOverlay(this);
+            return START_STICKY;
         }
 
         if (ACTION_UPDATE_BADGE.equals(action)) {
-            lastPendingCount = intent.getIntExtra(EXTRA_PENDING_COUNT, 0);
-            if (currentMode == 1) {
-                updateBallBadge(lastPendingCount);
-            }
-            return START_NOT_STICKY;
+            int count = intent.getIntExtra(EXTRA_PENDING_COUNT, 0);
+            updateBadge(this, count);
+            return START_STICKY;
         }
 
         if (ACTION_SHOW_CARD.equals(action)) {
@@ -135,25 +129,40 @@ public class OrderOverlayService extends Service {
             String orderNumber = intent.getStringExtra(EXTRA_ORDER_NUMBER);
             String customer = intent.getStringExtra(EXTRA_CUSTOMER);
             String total = intent.getStringExtra(EXTRA_TOTAL);
-
-            displayOrderCard(orderId, orderNumber, customer, total);
-            return START_NOT_STICKY;
+            showOrderCard(this, orderId, orderNumber, customer, total);
+            return START_STICKY;
         }
 
         if (ACTION_SHOW_BALL.equals(action)) {
-            lastPendingCount = intent.getIntExtra(EXTRA_PENDING_COUNT, lastPendingCount);
-            displayAssistiveBall(lastPendingCount);
-            return START_NOT_STICKY;
+            int count = intent.getIntExtra(EXTRA_PENDING_COUNT, lastPendingCount);
+            showBall(this, count);
+            return START_STICKY;
         }
 
-        return START_NOT_STICKY;
+        return START_STICKY;
+    }
+
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        super.onTaskRemoved(rootIntent);
+        // Persist the floating icon when app is cleared from recents
+        if (isAssistiveBallEnabled(this)) {
+            showBall(this, lastPendingCount);
+        }
     }
 
     // ── 1. ASSISTIVE BALL (Floating Icon Melayang) ──
 
     @SuppressLint("ClickableViewAccessibility")
-    private synchronized void displayAssistiveBall(int pendingCount) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) return;
+    private static synchronized void displayAssistiveBall(Context context, int pendingCount) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return;
+        if (!isAssistiveBallEnabled(context)) return;
+
+        if (windowManager == null) {
+            windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
+        }
+
+        lastPendingCount = pendingCount;
 
         // If assistive ball is already attached to WindowManager, DO NOT add another view! Just update badge.
         if (currentOverlayView != null && currentMode == 1) {
@@ -182,11 +191,11 @@ public class OrderOverlayService extends Service {
         );
 
         params.gravity = Gravity.TOP | Gravity.START;
-        params.x = dp(12);
-        params.y = dp(160);
+        params.x = dp(context, 12);
+        params.y = dp(context, 160);
 
-        currentOverlayView = createBallView(pendingCount);
-        attachBallDragger(currentOverlayView);
+        currentOverlayView = createBallView(context, pendingCount);
+        attachBallDragger(context, currentOverlayView);
 
         try {
             windowManager.addView(currentOverlayView, params);
@@ -195,32 +204,32 @@ public class OrderOverlayService extends Service {
         }
     }
 
-    private View createBallView(int pendingCount) {
-        FrameLayout root = new FrameLayout(this);
-        root.setPadding(dp(6), dp(6), dp(6), dp(6));
+    private static View createBallView(Context context, int pendingCount) {
+        FrameLayout root = new FrameLayout(context);
+        root.setPadding(dp(context, 6), dp(context, 6), dp(context, 6), dp(context, 6));
 
         // Circular background
         GradientDrawable bg = new GradientDrawable();
         bg.setShape(GradientDrawable.OVAL);
         bg.setColor(Color.parseColor("#0f172a")); // Dark Slate
-        bg.setStroke(dp(2.5f), Color.parseColor("#059669")); // Emerald green accent
-        bg.setSize(dp(54), dp(54));
+        bg.setStroke(dp(context, 2.5f), Color.parseColor("#059669")); // Emerald green accent
+        bg.setSize(dp(context, 54), dp(context, 54));
 
-        FrameLayout ball = new FrameLayout(this);
+        FrameLayout ball = new FrameLayout(context);
         ball.setBackground(bg);
-        ball.setLayoutParams(new FrameLayout.LayoutParams(dp(54), dp(54)));
+        ball.setLayoutParams(new FrameLayout.LayoutParams(dp(context, 54), dp(context, 54)));
 
         // App Icon inside the ball
-        ImageView iconView = new ImageView(this);
+        ImageView iconView = new ImageView(context);
         iconView.setImageResource(R.mipmap.ic_launcher_round);
-        int iconPadding = dp(7);
+        int iconPadding = dp(context, 7);
         iconView.setPadding(iconPadding, iconPadding, iconPadding, iconPadding);
-        FrameLayout.LayoutParams iconLp = new FrameLayout.LayoutParams(dp(54), dp(54));
+        FrameLayout.LayoutParams iconLp = new FrameLayout.LayoutParams(dp(context, 54), dp(context, 54));
         iconLp.gravity = Gravity.CENTER;
         ball.addView(iconView, iconLp);
 
         // Badge Counter (Red dot or number)
-        TextView badgeTv = new TextView(this);
+        TextView badgeTv = new TextView(context);
         badgeTv.setId(View.generateViewId());
         badgeTv.setTag("badge_count");
         badgeTv.setTextSize(10.5f);
@@ -233,7 +242,7 @@ public class OrderOverlayService extends Service {
         badgeBg.setColor(Color.parseColor("#ef4444")); // Crimson Red
         badgeTv.setBackground(badgeBg);
 
-        FrameLayout.LayoutParams badgeLp = new FrameLayout.LayoutParams(dp(20), dp(20));
+        FrameLayout.LayoutParams badgeLp = new FrameLayout.LayoutParams(dp(context, 20), dp(context, 20));
         badgeLp.gravity = Gravity.TOP | Gravity.END;
         badgeTv.setLayoutParams(badgeLp);
 
@@ -249,7 +258,7 @@ public class OrderOverlayService extends Service {
         return root;
     }
 
-    private void updateBallBadge(int pendingCount) {
+    private static void updateBallBadge(int pendingCount) {
         if (currentOverlayView == null) return;
         TextView badgeTv = currentOverlayView.findViewWithTag("badge_count");
         if (badgeTv != null) {
@@ -263,7 +272,7 @@ public class OrderOverlayService extends Service {
     }
 
     @SuppressLint("ClickableViewAccessibility")
-    private void attachBallDragger(View view) {
+    private static void attachBallDragger(Context context, View view) {
         view.setOnTouchListener(new View.OnTouchListener() {
             private int initialX, initialY;
             private float initialTouchX, initialTouchY;
@@ -283,8 +292,10 @@ public class OrderOverlayService extends Service {
                     case MotionEvent.ACTION_MOVE:
                         params.x = initialX + (int) (event.getRawX() - initialTouchX);
                         params.y = initialY + (int) (event.getRawY() - initialTouchY);
-                        if (currentOverlayView != null && currentOverlayView.isAttachedToWindow()) {
-                            windowManager.updateViewLayout(currentOverlayView, params);
+                        if (currentOverlayView != null && currentOverlayView.isAttachedToWindow() && windowManager != null) {
+                            try {
+                                windowManager.updateViewLayout(currentOverlayView, params);
+                            } catch (Exception ignored) {}
                         }
                         return true;
 
@@ -294,21 +305,23 @@ public class OrderOverlayService extends Service {
                         float diffY = Math.abs(event.getRawY() - initialTouchY);
 
                         // Tap detection: short touch without much movement
-                        if (duration < 250 && diffX < dp(10) && diffY < dp(10)) {
-                            openMainActivity();
+                        if (duration < 250 && diffX < dp(context, 10) && diffY < dp(context, 10)) {
+                            openMainActivity(context);
                             return true;
                         }
 
                         // Drag finished: Snap to left or right screen edge
-                        DisplayMetrics dm = getResources().getDisplayMetrics();
+                        DisplayMetrics dm = context.getResources().getDisplayMetrics();
                         int screenWidth = dm.widthPixels;
-                        if (params.x + dp(27) < screenWidth / 2) {
-                            params.x = dp(8);
+                        if (params.x + dp(context, 27) < screenWidth / 2) {
+                            params.x = dp(context, 8);
                         } else {
-                            params.x = screenWidth - dp(62);
+                            params.x = screenWidth - dp(context, 62);
                         }
-                        if (currentOverlayView != null && currentOverlayView.isAttachedToWindow()) {
-                            windowManager.updateViewLayout(currentOverlayView, params);
+                        if (currentOverlayView != null && currentOverlayView.isAttachedToWindow() && windowManager != null) {
+                            try {
+                                windowManager.updateViewLayout(currentOverlayView, params);
+                            } catch (Exception ignored) {}
                         }
                         return true;
                 }
@@ -320,9 +333,13 @@ public class OrderOverlayService extends Service {
     // ── 2. ORDER CARD POPUP (Kartu Peringatan Pesanan Masuk) ──
 
     @SuppressLint("ClickableViewAccessibility")
-    private void displayOrderCard(String orderId, String orderNumber, String customer, String total) {
+    private static synchronized void displayOrderCard(Context context, String orderId, String orderNumber, String customer, String total) {
         removeOverlayView();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) return;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return;
+
+        if (windowManager == null) {
+            windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
+        }
 
         currentMode = 2;
         int layoutType = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
@@ -342,10 +359,10 @@ public class OrderOverlayService extends Service {
 
         params.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
         params.x = 0;
-        params.y = dp(100);
+        params.y = dp(context, 100);
 
-        currentOverlayView = createOrderCardView(orderId, orderNumber, customer, total);
-        attachCardDragger(currentOverlayView);
+        currentOverlayView = createOrderCardView(context, orderId, orderNumber, customer, total);
+        attachCardDragger(context, currentOverlayView);
 
         try {
             windowManager.addView(currentOverlayView, params);
@@ -354,28 +371,28 @@ public class OrderOverlayService extends Service {
         }
     }
 
-    private View createOrderCardView(String orderId, String orderNumber, String customer, String total) {
-        LinearLayout root = new LinearLayout(this);
+    private static View createOrderCardView(Context context, String orderId, String orderNumber, String customer, String total) {
+        LinearLayout root = new LinearLayout(context);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(16), dp(14), dp(16), dp(14));
+        root.setPadding(dp(context, 16), dp(context, 14), dp(context, 16), dp(context, 14));
 
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(Color.parseColor("#0f172a")); // Dark Slate
-        bg.setCornerRadius(dp(18));
-        bg.setStroke(dp(2), Color.parseColor("#10b981")); // Emerald border
+        bg.setCornerRadius(dp(context, 18));
+        bg.setStroke(dp(context, 2), Color.parseColor("#10b981")); // Emerald border
         root.setBackground(bg);
 
         // Header: Icon + Title
-        LinearLayout header = new LinearLayout(this);
+        LinearLayout header = new LinearLayout(context);
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
 
-        TextView iconTv = new TextView(this);
+        TextView iconTv = new TextView(context);
         iconTv.setText("🛍️ ");
         iconTv.setTextSize(18);
         header.addView(iconTv);
 
-        TextView titleTv = new TextView(this);
+        TextView titleTv = new TextView(context);
         titleTv.setText("Pesanan Baru Masuk!");
         titleTv.setTextColor(Color.parseColor("#ffffff"));
         titleTv.setTextSize(15);
@@ -385,7 +402,7 @@ public class OrderOverlayService extends Service {
         root.addView(header);
 
         // Body: Customer + Total
-        TextView bodyTv = new TextView(this);
+        TextView bodyTv = new TextView(context);
         String displayNum;
         if (orderNumber != null && !orderNumber.trim().isEmpty()) {
             String trimmed = orderNumber.trim();
@@ -402,57 +419,55 @@ public class OrderOverlayService extends Service {
         bodyTv.setText(displayNum + " · " + displayCust + (displayTot.isEmpty() ? "" : ("\n" + displayTot)));
         bodyTv.setTextColor(Color.parseColor("#cbd5e1"));
         bodyTv.setTextSize(13);
-        bodyTv.setPadding(0, dp(6), 0, dp(12));
+        bodyTv.setPadding(0, dp(context, 6), 0, dp(context, 12));
         root.addView(bodyTv);
 
         // Action Buttons Row
-        LinearLayout btnRow = new LinearLayout(this);
+        LinearLayout btnRow = new LinearLayout(context);
         btnRow.setOrientation(LinearLayout.HORIZONTAL);
         btnRow.setGravity(Gravity.CENTER_VERTICAL);
 
-        Button btnOpen = new Button(this);
+        Button btnOpen = new Button(context);
         btnOpen.setText("Buka Kasir");
         btnOpen.setTextColor(Color.parseColor("#ffffff"));
         btnOpen.setTextSize(13);
         btnOpen.setTypeface(null, android.graphics.Typeface.BOLD);
         GradientDrawable openBg = new GradientDrawable();
         openBg.setColor(Color.parseColor("#059669"));
-        openBg.setCornerRadius(dp(10));
+        openBg.setCornerRadius(dp(context, 10));
         btnOpen.setBackground(openBg);
-        btnOpen.setPadding(dp(16), dp(8), dp(16), dp(8));
+        btnOpen.setPadding(dp(context, 16), dp(context, 8), dp(context, 16), dp(context, 8));
         btnOpen.setOnClickListener(v -> {
-            OrderAlarmService.stopAlarm(this);
-            openMainActivity();
-            if (isAssistiveBallEnabled(this)) {
-                displayAssistiveBall(0);
+            OrderAlarmService.stopAlarm(context);
+            openMainActivity(context);
+            if (isAssistiveBallEnabled(context)) {
+                displayAssistiveBall(context, 0);
             } else {
                 removeOverlayView();
-                stopSelf();
             }
         });
         btnRow.addView(btnOpen);
 
-        View spacer = new View(this);
-        LinearLayout.LayoutParams spacerLp = new LinearLayout.LayoutParams(dp(10), 1);
+        View spacer = new View(context);
+        LinearLayout.LayoutParams spacerLp = new LinearLayout.LayoutParams(dp(context, 10), 1);
         spacer.setLayoutParams(spacerLp);
         btnRow.addView(spacer);
 
-        Button btnDismiss = new Button(this);
+        Button btnDismiss = new Button(context);
         btnDismiss.setText("Tutup");
         btnDismiss.setTextColor(Color.parseColor("#94a3b8"));
         btnDismiss.setTextSize(13);
         GradientDrawable dismissBg = new GradientDrawable();
         dismissBg.setColor(Color.parseColor("#1e293b"));
-        dismissBg.setCornerRadius(dp(10));
+        dismissBg.setCornerRadius(dp(context, 10));
         btnDismiss.setBackground(dismissBg);
-        btnDismiss.setPadding(dp(12), dp(8), dp(12), dp(8));
+        btnDismiss.setPadding(dp(context, 12), dp(context, 8), dp(context, 12), dp(context, 8));
         btnDismiss.setOnClickListener(v -> {
-            OrderAlarmService.stopAlarm(this);
-            if (isAssistiveBallEnabled(this)) {
-                displayAssistiveBall(lastPendingCount);
+            OrderAlarmService.stopAlarm(context);
+            if (isAssistiveBallEnabled(context)) {
+                displayAssistiveBall(context, lastPendingCount);
             } else {
                 removeOverlayView();
-                stopSelf();
             }
         });
         btnRow.addView(btnDismiss);
@@ -462,7 +477,7 @@ public class OrderOverlayService extends Service {
     }
 
     @SuppressLint("ClickableViewAccessibility")
-    private void attachCardDragger(View view) {
+    private static void attachCardDragger(Context context, View view) {
         view.setOnTouchListener(new View.OnTouchListener() {
             private int initialX, initialY;
             private float initialTouchX, initialTouchY;
@@ -479,8 +494,10 @@ public class OrderOverlayService extends Service {
                     case MotionEvent.ACTION_MOVE:
                         params.x = initialX + (int) (event.getRawX() - initialTouchX);
                         params.y = initialY + (int) (event.getRawY() - initialTouchY);
-                        if (currentOverlayView != null && currentOverlayView.isAttachedToWindow()) {
-                            windowManager.updateViewLayout(currentOverlayView, params);
+                        if (currentOverlayView != null && currentOverlayView.isAttachedToWindow() && windowManager != null) {
+                            try {
+                                windowManager.updateViewLayout(currentOverlayView, params);
+                            } catch (Exception ignored) {}
                         }
                         return true;
                 }
@@ -489,10 +506,10 @@ public class OrderOverlayService extends Service {
         });
     }
 
-    private void openMainActivity() {
-        Intent intent = new Intent(this, MainActivity.class);
+    private static void openMainActivity(Context context) {
+        Intent intent = new Intent(context, MainActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        startActivity(intent);
+        context.startActivity(intent);
     }
 
     private static synchronized void removeOverlayView() {
@@ -506,14 +523,17 @@ public class OrderOverlayService extends Service {
         }
     }
 
-    private int dp(float value) {
-        float density = getResources().getDisplayMetrics().density;
+    private static int dp(Context context, float value) {
+        float density = context.getResources().getDisplayMetrics().density;
         return Math.round(value * density);
     }
 
     @Override
     public void onDestroy() {
-        removeOverlayView();
+        // Do NOT remove overlay view on service reclaim if user wants the assistive ball visible 24/7
+        if (!isAssistiveBallEnabled(this)) {
+            removeOverlayView();
+        }
         super.onDestroy();
     }
 }

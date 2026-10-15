@@ -396,6 +396,15 @@ public class OrderMonitorService extends Service {
     }
 
     @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        super.onTaskRemoved(rootIntent);
+        // Persist floating assistive ball and monitoring when app task is swiped away
+        if (OrderOverlayService.isAssistiveBallEnabled(this)) {
+            OrderOverlayService.showBall(this, 0);
+        }
+    }
+
+    @Override
     public void onDestroy() {
         stopPollingScheduler();
         super.onDestroy();
