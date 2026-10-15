@@ -837,6 +837,7 @@
   }
 
   async function clearPosSessionAndReturnToPin(){
+    clearNativeAuth();
     var currentToken=token();
     if(currentToken){
       fetch(API+'/auth/logout',{
@@ -878,6 +879,7 @@
         localStorage.setItem(USER_KEY,JSON.stringify(online.user));
         state.offlineMode=false;
         applyCashierUser(online.user);
+        syncNativeAuth();
         if(online.offline_credential) savePosPinCache(online.user,online.offline_credential,branchId);
         return {online:true};
       }catch(err){
@@ -967,6 +969,33 @@
     return composer().getDisplayItems();
   }
 
+  function updateNativeStatusBar(hexColor, darkIcons) {
+    var nativeBridge = window.XentraPos || window.XentraNative;
+    if (nativeBridge && typeof nativeBridge.setStatusBarColor === 'function') {
+      try {
+        nativeBridge.setStatusBarColor(hexColor || '#ffffff', darkIcons !== false);
+      } catch (_) {}
+    }
+  }
+
+  function syncNativeAuth() {
+    var nativeBridge = window.XentraPos || window.XentraNative;
+    if (nativeBridge && typeof nativeBridge.syncAuth === 'function') {
+      try {
+        var t = token();
+        var b = state.branchId || (state.terminal && state.terminal.branch_id) || localStorage.getItem('xentra_pos_branch_id') || '';
+        if (t && b) nativeBridge.syncAuth(t, b);
+      } catch (_) {}
+    }
+  }
+
+  function clearNativeAuth() {
+    var nativeBridge = window.XentraPos || window.XentraNative;
+    if (nativeBridge && typeof nativeBridge.clearAuth === 'function') {
+      try { nativeBridge.clearAuth(); } catch (_) {}
+    }
+  }
+
   function setView(view) {
     document.querySelectorAll('.pos-view').forEach(function(v){ v.classList.toggle('active', v.id === 'pos-view-' + view); });
     document.querySelectorAll('.pos-bottom-nav button').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-view') === view); });
@@ -979,6 +1008,8 @@
         mCartBar.classList.remove('hidden');
       }
     }
+    // Dynamic adaptive status bar matching view background
+    updateNativeStatusBar('#ffffff', true);
     if (view === 'kasir') loadMenu();
     if (view === 'transaksi') loadSales();
     if (view === 'meja') loadTables();
@@ -3241,6 +3272,7 @@
 
 
   function showModal(html, extraClass){
+    updateNativeStatusBar('#ffffff', true);
     var card = $('pos-modal-card');
     if (card) card.innerHTML = html;
     var modal = $('pos-modal');
@@ -3250,6 +3282,7 @@
     }
   }
   function hideModal(){
+    updateNativeStatusBar('#ffffff', true);
     state.autoPayAfterTable = false;
     var modal = $('pos-modal');
     if (modal) {
@@ -4320,6 +4353,7 @@
       if(!await ensureSession())return;
       await loadPaymentModes();
       await loadTerminal();
+      syncNativeAuth();
       await loadShift();
       await loadMenu();
       await updateHeldCount();

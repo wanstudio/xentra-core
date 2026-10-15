@@ -50,16 +50,18 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: pos-v1.0.0
-          name: "Mybangjo POS App v1.0.0"
+          tag_name: pos-v1.1.0
+          name: "Mybangjo POS App v1.1.0"
           make_latest: false
           body: |
-            ### Mybangjo POS App v1.0.0 (Dedicated Cashier & POS Shell)
+            ### Mybangjo POS App v1.1.0 (Full Parity Native POS Shell)
             - Download langsung file `mybangjo-pos.apk` di bawah tanpa ekstrak ZIP.
-            - **Fitur Utama Mybangjo POS v1.0.0**:
-              - **Environment Mandiri Kasir**: Terisolasi khusus untuk operasional kasir toko/cabang (`com.mybangjo.pos`).
-              - **Screen Always On (Kiosk Mode)**: Layar tablet/HP kasir tetap menyala selama jam operasional kasir.
-              - **Direct Thermal Bluetooth Printing**: Cetak struk kasir otomatis (silent print ESC/POS) langsung ke printer bluetooth kasir.
-              - **Auto Cash Drawer Kick**: Pemicu otomatis pembuka laci uang kasir (RJ11) saat transaksi tunai selesai.
-              - **Adaptive Status Bar**: Status bar bersih putih menyatu dengan UI kasir.
+            - **Fitur Baru & Paritas Lengkap v1.1.0**:
+              - **Floating Assistive Ball (Bola Melayang 24/7)**: Bola pintar kasir tetap aktif di layar Android saat membuka aplikasi lain, menampilkan badge counter pesanan baru, dan sekali ketuk langsung membuka kasir.
+              - **Top Bar / Status Bar HP Dinamis Adaptif**: Warna status bar Android (jam, baterai, sinyal) otomatis berubah mengikuti tema dan background halaman kasir yang sedang aktif.
+              - **Background Order Monitor & Sirene Audio**: Memantau pesanan masuk secara real-time di latar belakang lengkap dengan nada panggil suara kasir dan notifikasi popup kartu order.
+              - **Direct Thermal Bluetooth Printing**: Cetak struk kasir otomatis (silent print ESC/POS) langsung ke printer bluetooth.
+              - **Auto Cash Drawer Kick**: Pemicu otomatis pembuka laci kasir (RJ11) saat pembayaran tunai selesai.
+              - **Screen Always On (Kiosk Mode)**: Layar tablet/HP kasir tetap terjaga menyala selama jam operasional shift kasir.
           files: build-output/mybangjo-pos.apk
+

@@ -2,13 +2,17 @@ package com.mybangjo.pos;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.view.View;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
@@ -76,11 +80,21 @@ public class MainActivity extends AppCompatActivity {
         setupSwipeRefresh();
         setupWebView();
         requestNecessaryPermissions();
+        checkOverlayPermission();
+        checkBatteryOptimization();
 
         if (savedInstanceState == null) {
             webView.loadUrl(TARGET_URL);
         } else {
             webView.restoreState(savedInstanceState);
+        }
+
+        // Auto-resume background monitor if credentials exist
+        SharedPreferences authPrefs = getSharedPreferences("xentra_pos_prefs", Context.MODE_PRIVATE);
+        String savedToken = authPrefs.getString("auth_token", null);
+        String savedBranch = authPrefs.getString("auth_branch_id", null);
+        if (savedToken != null && !savedToken.isEmpty() && savedBranch != null && !savedBranch.isEmpty()) {
+            OrderMonitorService.startMonitoring(this);
         }
 
         // Initial adaptive status bar: pure white with crisp dark icons
@@ -136,8 +150,60 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private void checkOverlayPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            SharedPreferences prefs = getSharedPreferences("xentra_pos_prefs", Context.MODE_PRIVATE);
+            boolean alreadyAsked = prefs.getBoolean("overlay_prompt_shown", false);
+            if (!alreadyAsked) {
+                prefs.edit().putBoolean("overlay_prompt_shown", true).apply();
+                new AlertDialog.Builder(this)
+                    .setTitle("🔔 Bola Melayang & Notifikasi Kasir")
+                    .setMessage("Aktifkan fitur tampil di atas aplikasi lain agar pesanan baru dan bola pintasan kasir tetap terlihat saat membuka aplikasi lain.")
+                    .setPositiveButton("Aktifkan", (dialog, which) -> {
+                        Intent intent = new Intent(
+                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:" + getPackageName())
+                        );
+                        startActivity(intent);
+                    })
+                    .setNegativeButton("Nanti", null)
+                    .show();
+            }
+        }
+    }
+
+    private void checkBatteryOptimization() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (pm != null && !pm.isIgnoringBatteryOptimizations(getPackageName())) {
+                SharedPreferences prefs = getSharedPreferences("xentra_pos_prefs", Context.MODE_PRIVATE);
+                boolean alreadyAsked = prefs.getBoolean("battery_prompt_shown", false);
+                if (!alreadyAsked) {
+                    prefs.edit().putBoolean("battery_prompt_shown", true).apply();
+                    new AlertDialog.Builder(this)
+                        .setTitle("🔋 Izin Berjalan di Latar Belakang")
+                        .setMessage("Agar pesanan kasir baru tetap terpantau dan sirene berbunyi, mohon izinkan aplikasi berjalan tanpa dibatasi penghemat baterai.")
+                        .setPositiveButton("Izinkan", (dialog, which) -> {
+                            try {
+                                Intent intent = new Intent(
+                                    Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                                    Uri.parse("package:" + getPackageName())
+                                );
+                                startActivity(intent);
+                            } catch (Exception e) {
+                                try {
+                                    startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+                                } catch (Exception ignored) {}
+                            }
+                        })
+                        .setNegativeButton("Nanti", null)
+                        .show();
+                }
+            }
+        }
+    }
+
     private void setupSwipeRefresh() {
-        // Disabled pull-to-refresh on POS by default to avoid interrupting active carts
         swipeRefreshLayout.setEnabled(false);
         swipeRefreshLayout.setColorSchemeColors(ContextCompat.getColor(this, R.color.primary));
         swipeRefreshLayout.setOnRefreshListener(() -> webView.reload());
@@ -159,11 +225,9 @@ public class MainActivity extends AppCompatActivity {
         settings.setSupportZoom(false);
         settings.setBuiltInZoomControls(false);
 
-        // Custom User-Agent for POS identification
         String defaultUa = settings.getUserAgentString();
-        settings.setUserAgentString(defaultUa + " XentraPosNative/1.0.0 (Linux; Android POS)");
+        settings.setUserAgentString(defaultUa + " XentraPosNative/1.1.0 (Linux; Android POS)");
 
-        // Register bridges (both XentraPos and XentraNative for maximum compatibility)
         XentraPosBridge bridge = new XentraPosBridge(this);
         webView.addJavascriptInterface(bridge, "XentraPos");
         webView.addJavascriptInterface(bridge, "XentraNative");
@@ -197,7 +261,7 @@ public class MainActivity extends AppCompatActivity {
                 Uri uri = request.getUrl();
                 String scheme = uri.getScheme();
                 if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) {
-                    return false; // Load inside WebView
+                    return false;
                 }
                 try {
                     Intent intent = new Intent(Intent.ACTION_VIEW, uri);
@@ -262,6 +326,11 @@ public class MainActivity extends AppCompatActivity {
 
     private void requestNecessaryPermissions() {
         List<String> perms = new ArrayList<>();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                perms.add(Manifest.permission.POST_NOTIFICATIONS);
+            }
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
                 perms.add(Manifest.permission.BLUETOOTH_CONNECT);
