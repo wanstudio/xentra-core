@@ -146,8 +146,20 @@
       numEl.textContent = formatBMOrderCode(ord);
     }
 
+    var ordType = (ord.order_type || ord.fulfillment_type) || 'delivery';
+
+    var acceptCustLabelEl = $('bm-accept-order-customer-label');
+    if (acceptCustLabelEl) {
+      if (ordType === 'dine_in') {
+        acceptCustLabelEl.textContent = 'Meja:';
+      } else if (ordType === 'reservation') {
+        acceptCustLabelEl.textContent = 'Reservasi:';
+      } else {
+        acceptCustLabelEl.textContent = 'Pelanggan:';
+      }
+    }
+
     if (badgeEl) {
-      var ordType = (ord.order_type || ord.fulfillment_type) || 'delivery';
       var typeLabel = 'Pesanan Masuk';
       var badgeCls = 'background:#e0f2fe; color:#0369a1;';
       if (ordType === 'delivery') {
@@ -168,12 +180,22 @@
     }
 
     if (custEl) {
-      var custText = ord.customer_name ? ord.customer_name : 'Pelanggan';
-      if (ord.customer_phone) {
-        custText += ' (' + ord.customer_phone + ')';
-      }
-      if (ord.table_number && ord.order_type !== 'dine_in') {
-        custText += ' • Meja ' + ord.table_number;
+      var custText = '';
+      if (ordType === 'dine_in') {
+        var tbl = ord.table_number || ord.table_name;
+        custText = tbl ? ('Meja ' + tbl) : 'Makan di Tempat';
+        if (ord.customer_name && ord.customer_name !== 'Pelanggan' && ord.customer_name !== 'Guest') {
+          custText += ' (' + ord.customer_name + ')';
+        }
+      } else if (ordType === 'reservation') {
+        var tbl = ord.table_number || ord.table_name;
+        custText = (tbl ? ('Meja ' + tbl + ' • ') : '') + (ord.customer_name || 'Tamu');
+        if (ord.guest_count) custText += ' (' + ord.guest_count + ' Tamu)';
+      } else {
+        custText = ord.customer_name ? ord.customer_name : 'Pelanggan';
+        if (ord.customer_phone) {
+          custText += ' (' + ord.customer_phone + ')';
+        }
       }
       custEl.textContent = custText;
     }
@@ -1229,7 +1251,6 @@
         }
         var rejectedOrd = findBMOrderById(orderId) || (data && data.order) || { id: orderId };
         var formattedCode = formatBMOrderCode(rejectedOrd);
-        showToast('Pesanan ' + formattedCode + ' telah ditolak.');
         closeBMRejectModal({ fromNav: true });
         if (_bmRejectOrigin === 'hari-ini' && typeof loadHariIni === 'function') {
           loadHariIni();
@@ -1239,7 +1260,7 @@
         if (detailView && detailView.style.display !== 'none' && $('bm-detail-order-number')) {
           viewBMOrderDetail(orderId);
         }
-        // Tampilkan Jendela Informasi Pesanan Ditolak Senada Merah Pink Warning
+        // Tampilkan Jendela Informasi Pesanan Ditolak Senada Merah Pink Warning (hanya 1 sistem info)
         setTimeout(function () {
           openBMRejectedInfoModal(orderId, reason, rejectedOrd);
         }, 50);
@@ -1275,12 +1296,38 @@
                     (ordType === 'reservation' ? 'Reservasi' : 'Delivery'));
     if (badgeEl) badgeEl.textContent = typeLabel.toUpperCase();
 
-    var custText = ord.customer_name || 'Pelanggan';
-    if (ordType === 'dine_in') {
-      var tbl = ord.table_number || ord.table_name;
-      if (tbl) custText += ' • Meja ' + tbl;
+    var rejectedCustLabelEl = $('bm-rejected-info-customer-label');
+    if (rejectedCustLabelEl) {
+      if (ordType === 'dine_in') {
+        rejectedCustLabelEl.textContent = 'Meja:';
+      } else if (ordType === 'reservation') {
+        rejectedCustLabelEl.textContent = 'Reservasi:';
+      } else {
+        rejectedCustLabelEl.textContent = 'Pelanggan:';
+      }
     }
-    if (custEl) custEl.textContent = custText;
+
+    if (custEl) {
+      var custText = '';
+      if (ordType === 'dine_in') {
+        var tbl = ord.table_number || ord.table_name;
+        custText = tbl ? ('Meja ' + tbl) : 'Makan di Tempat';
+        if (ord.customer_name && ord.customer_name !== 'Pelanggan' && ord.customer_name !== 'Guest') {
+          custText += ' (' + ord.customer_name + ')';
+        }
+      } else if (ordType === 'reservation') {
+        var tbl = ord.table_number || ord.table_name;
+        custText = (tbl ? ('Meja ' + tbl + ' • ') : '') + (ord.customer_name || 'Tamu');
+        if (ord.guest_count) custText += ' (' + ord.guest_count + ' Tamu)';
+      } else {
+        // delivery / pickup
+        custText = ord.customer_name ? ord.customer_name : 'Pelanggan';
+        if (ord.customer_phone) {
+          custText += ' (' + ord.customer_phone + ')';
+        }
+      }
+      custEl.textContent = custText;
+    }
 
     if (reasonEl) reasonEl.textContent = reason || ord.rejection_reason || 'Ditolak oleh resto';
 

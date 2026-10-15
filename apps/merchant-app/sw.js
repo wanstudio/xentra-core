@@ -13,7 +13,7 @@
  */
 
 var APP_CACHE_PREFIX = "xentra-merchant-";
-var APP_VERSION = "v1.4.18";
+var APP_VERSION = "v1.4.19";
 var FALLBACK_CACHE_NAME = "xentra-merchant-live";
 
 var STATIC_ASSETS = [
@@ -37,7 +37,7 @@ var STATIC_ASSETS = [
   "/merchant-app/assets/js/branch-catalog-ui.js?v=1.0.1",
   "/merchant-app/assets/js/context.js?v=1.0.0",
   "/merchant-app/assets/js/menu.js?v=1.1.0",
-  "/merchant-app/assets/js/hari-ini.js?v=1.0.25",
+  "/merchant-app/assets/js/hari-ini.js?v=1.0.26",
   "/merchant-app/assets/js/home.js?v=1.0.2",
   "/merchant-app/assets/js/jam-operasional.js?v=1.0.0",
   "/merchant-app/assets/js/reports.js?v=1.0.0",
@@ -46,8 +46,8 @@ var STATIC_ASSETS = [
   "/merchant-app/assets/js/purchasing.js?v=1.1.4",
   "/merchant-app/assets/js/promotions.js?v=1.0.2",
   "/merchant-app/assets/js/staff.js?v=1.0.0",
-  "/merchant-app/assets/js/orders.js?v=1.0.25",
-  "/merchant-app/assets/js/merchant-app.js?v=1.1.25"
+  "/merchant-app/assets/js/orders.js?v=1.0.26",
+  "/merchant-app/assets/js/merchant-app.js?v=1.1.26"
 ];
 
 var _cacheNamePromise = null;
