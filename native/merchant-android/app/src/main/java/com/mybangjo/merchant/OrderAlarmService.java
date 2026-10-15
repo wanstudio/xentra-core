@@ -15,7 +15,7 @@ import android.os.PowerManager;
 import androidx.core.app.NotificationCompat;
 
 public class OrderAlarmService extends Service {
-    private static final String CHANNEL_ID = "channel_orders_alarm_v1";
+    private static final String CHANNEL_ID = "channel_order_alarm_silent_v2";
     private static final int NOTIF_ID = 9119;
     public static final String ACTION_START_ALARM = "com.mybangjo.merchant.ACTION_START_ALARM";
     public static final String ACTION_STOP_ALARM = "com.mybangjo.merchant.ACTION_STOP_ALARM";
@@ -183,12 +183,12 @@ public class OrderAlarmService extends Service {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID,
-                getString(R.string.notification_channel_orders),
-                NotificationManager.IMPORTANCE_HIGH
+                "Layanan Sirene Pesanan (Senyap)",
+                NotificationManager.IMPORTANCE_LOW
             );
-            channel.setDescription(getString(R.string.notification_channel_orders_desc));
-            channel.enableVibration(true);
-            channel.setVibrationPattern(new long[]{0, 500, 250, 500, 250, 1000, 250, 1000});
+            channel.setDescription("Menjalankan suara sirine pesanan baru tanpa nada dering sistem.");
+            channel.setSound(null, null);
+            channel.enableVibration(false);
             channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
             channel.setShowBadge(false);
 
@@ -218,7 +218,10 @@ public class OrderAlarmService extends Service {
             .setContentTitle("🔔 Ada Pesanan Baru Masuk!")
             .setContentText("Pesanan memerlukan konfirmasi segera. Ketuk untuk membuka.")
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setSound(null)
+            .setVibrate(null)
+            .setSilent(true)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(true)

@@ -51,16 +51,16 @@ jobs:
         if: github.ref == 'refs/heads/main'
         with:
           tag_name: merchant-app-latest
-          name: "Mybangjo Merchant App Latest (v1.2.5)"
+          name: "Mybangjo Merchant App Latest (v1.2.6)"
           body: |
-            ### Mybangjo Merchant App v1.2.5 (Signed Release)
+            ### Mybangjo Merchant App v1.2.6 (Signed Release)
             - Download langsung file `mybangjo-merchant.apk` di bawah tanpa ekstrak ZIP.
-            - **Pembaruan Penting v1.2.5**:
-              - **Fix Floating Icon Duplikat**: Mengatasi bug ikon bola melayang yang muncul ganda (menumpuk 2 ikon). Sekarang dijamin hanya ada tepat 1 bola melayang di layar.
-              - **Notifikasi Bersih**: Tetap dengan 1 kartu pop-up melayang di layar dengan tombol `[Buka Kasir]` dan `[Tutup]`.
-              - **Bebas Reload Liar**: Mematikan gesture swipe-to-refresh yang tidak disengaja.
+            - **Pembaruan Penting v1.2.6**:
+              - **Notifikasi Android Hening (Tanpa Suara Bawaan)**: Notifikasi status bar Android dibuat 100% senyap tanpa nada dering "ding/ting" bawaan HP. Suara hanya berasal dari suara sirene aplikasi (`ada_pesanan_baru`) sehingga tidak tumpang tindih.
+              - **Fix Floating Icon Duplikat (1 Bola Pasti)**: Inisialisasi ganda dan race condition WindowManager diperbaiki total. Hanya ada tepat 1 bola melayang di layar.
+              - **Kartu Pop-up Melayang Bersih**: 1 kartu orderan melayang dengan tombol besar `[Buka Kasir]` dan `[Tutup]`.
+              - **Bebas Reload Liar**: Gesture swipe-to-refresh dinonaktifkan.
               - **Offline-First Smart Cache**: Rangka UI instan tanpa blank putih.
-              - **Floating Icon Melayang 24/7**: Akses cepat buka kasir kapan pun.
-              - **Catatan Pemasangan**: Jika pembaruan gagal, copot pemasangan (uninstall) versi lama terlebih dahulu.
+              - **Catatan Pemasangan**: Copot pemasangan (uninstall) versi lama terlebih dahulu sebelum memasang versi baru agar cache channel notifikasi Android ter-reset bersih.
           files: build-output/mybangjo-merchant.apk
 

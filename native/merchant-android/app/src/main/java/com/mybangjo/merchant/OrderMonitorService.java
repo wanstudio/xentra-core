@@ -33,7 +33,7 @@ public class OrderMonitorService extends Service {
     private static final String KEY_BRANCH_ID = "auth_branch_id";
 
     private static final String CHANNEL_PERSISTENT = "channel_order_monitor_status";
-    private static final String CHANNEL_ALERT = "channel_orders_alarm_v1";
+    private static final String CHANNEL_ALERT = "channel_orders_silent_v2";
 
     private static final int NOTIF_PERSISTENT_ID = 8118;
     private static final int NOTIF_ALERT_ID = 8228;
@@ -331,7 +331,10 @@ public class OrderMonitorService extends Service {
             .setSmallIcon(R.mipmap.ic_launcher)
             .setNumber(pendingCount)
             .setBadgeIconType(NotificationCompat.BADGE_ICON_SMALL)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setSound(null)
+            .setVibrate(null)
+            .setSilent(true)
             .setCategory(NotificationCompat.CATEGORY_EVENT)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setContentIntent(contentPendingIntent)
@@ -361,19 +364,27 @@ public class OrderMonitorService extends Service {
             );
             statusChannel.setDescription("Menampilkan status aktif aplikasi di latar belakang.");
             statusChannel.setShowBadge(false);
+            statusChannel.setSound(null, null);
+            statusChannel.enableVibration(false);
             nm.createNotificationChannel(statusChannel);
 
-            // Alert Channel (Standard priority in tray without intrusive heads-up popdown)
+            // Alert Channel (Silent in status bar / tray without default notification chime)
             NotificationChannel alertChannel = new NotificationChannel(
                 CHANNEL_ALERT,
-                getString(R.string.notification_channel_orders),
-                NotificationManager.IMPORTANCE_DEFAULT
+                "Pemberitahuan Pesanan Masuk (Senyap)",
+                NotificationManager.IMPORTANCE_LOW
             );
-            alertChannel.setDescription(getString(R.string.notification_channel_orders_desc));
-            alertChannel.enableVibration(false); // Vibration & sound handled by OrderAlarmService
+            alertChannel.setDescription("Menampilkan notifikasi pesanan di status bar tanpa membunyikan nada dering bawaan Android.");
+            alertChannel.setSound(null, null);
+            alertChannel.enableVibration(false);
             alertChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
             alertChannel.setShowBadge(true);
             nm.createNotificationChannel(alertChannel);
+
+            // Clean up old noisy channels if present
+            try {
+                nm.deleteNotificationChannel("channel_orders_alarm_v1");
+            } catch (Exception ignored) {}
         }
     }
 
