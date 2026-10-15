@@ -330,8 +330,8 @@ public class OrderMonitorService extends Service {
             .setSmallIcon(R.mipmap.ic_launcher)
             .setNumber(pendingCount)
             .setBadgeIconType(NotificationCompat.BADGE_ICON_SMALL)
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_EVENT)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setContentIntent(contentPendingIntent)
             .setAutoCancel(true)
@@ -362,15 +362,14 @@ public class OrderMonitorService extends Service {
             statusChannel.setShowBadge(false);
             nm.createNotificationChannel(statusChannel);
 
-            // Alert Channel (High priority, vibration, heads-up)
+            // Alert Channel (Standard priority in tray without intrusive heads-up popdown)
             NotificationChannel alertChannel = new NotificationChannel(
                 CHANNEL_ALERT,
                 getString(R.string.notification_channel_orders),
-                NotificationManager.IMPORTANCE_HIGH
+                NotificationManager.IMPORTANCE_DEFAULT
             );
             alertChannel.setDescription(getString(R.string.notification_channel_orders_desc));
-            alertChannel.enableVibration(true);
-            alertChannel.setVibrationPattern(new long[]{0, 600, 300, 600, 300, 1000});
+            alertChannel.enableVibration(false); // Vibration & sound handled by OrderAlarmService
             alertChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
             alertChannel.setShowBadge(true);
             nm.createNotificationChannel(alertChannel);

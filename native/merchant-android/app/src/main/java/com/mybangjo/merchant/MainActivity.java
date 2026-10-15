@@ -181,8 +181,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupSwipeRefresh() {
-        swipeRefreshLayout.setColorSchemeResources(R.color.primary);
-        swipeRefreshLayout.setOnRefreshListener(() -> webView.reload());
+        // Disable swipe-to-refresh reload: scrolling lists must never trigger webView.reload()
+        swipeRefreshLayout.setEnabled(false);
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -200,6 +200,7 @@ public class MainActivity extends AppCompatActivity {
         settings.setDisplayZoomControls(false);
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        settings.setCacheMode(WebSettings.LOAD_DEFAULT);
 
         // Enable Cookies and Third-Party Cookies (essential for cross-domain session & auth)
         android.webkit.CookieManager cookieManager = android.webkit.CookieManager.getInstance();

@@ -51,14 +51,15 @@ jobs:
         if: github.ref == 'refs/heads/main'
         with:
           tag_name: merchant-app-latest
-          name: "Mybangjo Merchant App Latest (v1.2.2)"
+          name: "Mybangjo Merchant App Latest (v1.2.3)"
           body: |
-            ### Mybangjo Merchant App v1.2.2 (Signed Release)
+            ### Mybangjo Merchant App v1.2.3 (Signed Release)
             - Download langsung file `mybangjo-merchant.apk` di bawah tanpa ekstrak ZIP.
-            - **Pembaruan Penting (Floating Icon Quick Access)**:
-              - **Floating Icon Melayang 24/7**: Ikon floating kini tetap melayang aktif di layar bahkan saat aplikasi ditutup atau diminimalkan, sehingga kasir dapat membuka aplikasi seketika tanpa harus mencari icon aplikasi di daftar aplikasi lagi.
-              - **Quick Resume**: Menekan tombol kembali (Back) pada halaman utama tidak mematikan aplikasi, melainkan meminimalkan ke latar belakang secara mulus.
-              - **Background & Boot Persistence**: Layanan pemantau pesanan dan floating icon otomatis aktif saat HP baru dinyalakan (*auto-start on boot*).
-              - **Catatan Pemasangan**: Jika pembaruan gagal, copot pemasangan versi lama terlebih dahulu.
+            - **Pembaruan Penting v1.2.3 (Solid & Anti-Reload)**:
+              - **Notifikasi Bersih (Pilihan A)**: Menghilangkan tabrakan notifikasi. Sekarang hanya ada 1 kartu pop-up melayang di layar dengan tombol besar `[Buka Kasir]` dan `[Tutup]`. Notifikasi Android sistem tersimpan rapi di status bar tanpa meluncur menutupi kartu.
+              - **Bebas Reload Liar**: Mematikan `SwipeRefreshLayout` dan listener auto-reload liar. Scroll daftar menu / pesanan dijamin stabil tanpa pernah reload halaman sendiri.
+              - **Offline-First Smart Cache**: Rangka UI di-cache di memori HP untuk buka aplikasi instan tanpa blank putih.
+              - **Floating Icon Melayang 24/7**: Ikon floating tetap melayang aktif di layar bahkan saat aplikasi ditutup atau diminimalkan untuk quick access membuka kasir instan.
+              - **Catatan Pemasangan**: Jika pembaruan gagal, copot pemasangan (uninstall) versi lama terlebih dahulu.
           files: build-output/mybangjo-merchant.apk
 
