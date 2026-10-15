@@ -51,11 +51,11 @@ jobs:
         if: github.ref == 'refs/heads/main'
         with:
           tag_name: merchant-app-latest
-          name: "Mybangjo Merchant App Latest (v1.2.3)"
+          name: "Mybangjo Merchant App Latest (v1.2.4)"
           body: |
-            ### Mybangjo Merchant App v1.2.3 (Signed Release)
+            ### Mybangjo Merchant App v1.2.4 (Signed Release)
             - Download langsung file `mybangjo-merchant.apk` di bawah tanpa ekstrak ZIP.
-            - **Pembaruan Penting v1.2.3 (Solid & Anti-Reload)**:
+            - **Pembaruan Penting v1.2.4 (Solid & Anti-Reload)**:
               - **Notifikasi Bersih (Pilihan A)**: Menghilangkan tabrakan notifikasi. Sekarang hanya ada 1 kartu pop-up melayang di layar dengan tombol besar `[Buka Kasir]` dan `[Tutup]`. Notifikasi Android sistem tersimpan rapi di status bar tanpa meluncur menutupi kartu.
               - **Bebas Reload Liar**: Mematikan `SwipeRefreshLayout` dan listener auto-reload liar. Scroll daftar menu / pesanan dijamin stabil tanpa pernah reload halaman sendiri.
               - **Offline-First Smart Cache**: Rangka UI di-cache di memori HP untuk buka aplikasi instan tanpa blank putih.

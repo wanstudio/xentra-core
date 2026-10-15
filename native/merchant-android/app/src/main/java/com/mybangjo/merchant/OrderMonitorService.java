@@ -294,6 +294,7 @@ public class OrderMonitorService extends Service {
 
         String body = "Ketuk untuk membuka pesanan dan mengonfirmasi.";
         if (order != null) {
+            String cust = order.optString("customer_name", "Pelanggan");
             String rawNum = order.optString("order_number", "");
             String num;
             if (!rawNum.isEmpty()) {
