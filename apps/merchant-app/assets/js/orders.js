@@ -379,7 +379,8 @@
             window.XentraPrinter.printOrder(matchedOrd, { name: (u && u.brand_name) || 'Mybangjo Resto', branch: u && u.branch_name });
           }
         }
-        showToast("Pesanan #" + orderId + " berhasil diterima.");
+        var acceptedOrd = findBMOrderById(orderId);
+        showToast("Pesanan " + formatBMOrderCode(acceptedOrd || orderId) + " berhasil diterima.");
         closeBMAcceptOrderModal();
         if (typeof loadHariIni === 'function') loadHariIni();
         if (typeof loadBMOrders === 'function') loadBMOrders();
@@ -1213,16 +1214,20 @@
         } else if (window.XentraAudio && typeof window.XentraAudio.stopOrderAlert === 'function') {
           window.XentraAudio.stopOrderAlert();
         }
-        showToast('Pesanan #' + orderId + ' telah ditolak.');
+        var rejectedOrd = findBMOrderById(orderId) || (data && data.order) || { id: orderId };
+        var formattedCode = formatBMOrderCode(rejectedOrd);
+        showToast('Pesanan ' + formattedCode + ' telah ditolak.');
         closeBMRejectModal();
         if (_bmRejectOrigin === 'hari-ini' && typeof loadHariIni === 'function') {
           loadHariIni();
         }
         loadBMOrders();
         var detailView = $('bm-orders-detail-view');
-        if (detailView && detailView.style.display !== 'none' && $('bm-detail-order-number') && $('bm-detail-order-number').textContent.indexOf(orderId) !== -1) {
+        if (detailView && detailView.style.display !== 'none' && $('bm-detail-order-number')) {
           viewBMOrderDetail(orderId);
         }
+        // Tampilkan Jendela Informasi Pesanan Ditolak Senada Merah Pink Warning
+        openBMRejectedInfoModal(orderId, reason, rejectedOrd);
       } else {
         showToast('Gagal menolak pesanan: ' + (data.error || 'Terjadi kesalahan'));
         if (confirmBtn) confirmBtn.disabled = false;
@@ -1236,6 +1241,145 @@
     }
   }
   window.submitBMRejectOrder = submitBMRejectOrder;
+
+  function populateBMRejectedInfoUI(ord, reason) {
+    if (!ord) return;
+    var numEl = $('bm-rejected-info-number');
+    var badgeEl = $('bm-rejected-info-type-badge');
+    var custEl = $('bm-rejected-info-customer');
+    var reasonEl = $('bm-rejected-info-reason');
+    var countEl = $('bm-rejected-info-items-count');
+    var itemsEl = $('bm-rejected-info-items-preview');
+    var totalEl = $('bm-rejected-info-total');
+
+    if (numEl) numEl.textContent = formatBMOrderCode(ord);
+
+    var ordType = getBMOrderType(ord);
+    var typeLabel = ordType === 'dine_in' ? 'Dine In' :
+                    (ordType === 'pickup' ? 'Pickup' :
+                    (ordType === 'reservation' ? 'Reservasi' : 'Delivery'));
+    if (badgeEl) badgeEl.textContent = typeLabel.toUpperCase();
+
+    var custText = ord.customer_name || 'Pelanggan';
+    if (ordType === 'dine_in') {
+      var tbl = ord.table_number || ord.table_name;
+      if (tbl) custText += ' • Meja ' + tbl;
+    }
+    if (custEl) custEl.textContent = custText;
+
+    if (reasonEl) reasonEl.textContent = reason || ord.rejection_reason || 'Ditolak oleh resto';
+
+    var items = ord.items || [];
+    if (countEl) countEl.textContent = items.length + ' menu';
+
+    if (itemsEl) {
+      if (items.length) {
+        itemsEl.innerHTML = items.map(function (it) {
+          var itemTitle = getBMOrderItemTitle(it);
+          var itemQty = Number(it.quantity || 1);
+          var itemSub = (it.item_subtotal != null) ? Number(it.item_subtotal) :
+                        ((it.subtotal != null) ? Number(it.subtotal) :
+                        (Number(it.unit_price || 0) * itemQty));
+          var modText = formatBMItemModifiers(it);
+          var itemNote = (it.note || it.notes || '').trim();
+
+          var html = '<div style="background:#ffffff; border:1px solid #fecdd3; border-radius:8px; padding:7px 9px;">' +
+            '<div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">' +
+              '<span style="font-size:13px; font-weight:800; color:#0f172a; line-height:1.35;">' +
+                '<span style="color:#e11d48; margin-right:4px;">' + itemQty + 'x</span>' + esc(itemTitle) +
+              '</span>' +
+              '<span style="font-size:12.5px; font-weight:800; color:#be123c; white-space:nowrap;">' + formatMoney(itemSub) + '</span>' +
+            '</div>';
+
+          if (modText) {
+            html += '<div style="font-size:11.5px; color:#64748b; margin-top:2px; padding-left:18px; line-height:1.35;">' +
+              '🔹 ' + modText +
+            '</div>';
+          }
+
+          if (itemNote) {
+            html += '<div style="margin-top:3px; padding-left:18px;">' +
+              '<span style="display:inline-block; font-size:11px; color:#be123c; background:#fff1f2; border:1px solid #fecdd3; border-radius:4px; padding:2px 6px; line-height:1.3;">' +
+                '📝 ' + esc(itemNote) +
+              '</span>' +
+            '</div>';
+          }
+
+          html += '</div>';
+          return html;
+        }).join('');
+        itemsEl.style.display = 'flex';
+      } else {
+        itemsEl.innerHTML = '<div style="color:#94a3b8; font-size:12px; text-align:center; padding:10px 0;">Tidak ada rincian item menu</div>';
+        itemsEl.style.display = 'block';
+      }
+    }
+
+    if (totalEl) {
+      var grandTotal = (ord.grand_total != null) ? Number(ord.grand_total) :
+                       items.reduce(function (s, it) { return s + (Number(it.item_subtotal || it.subtotal || 0) || (Number(it.unit_price || 0) * Number(it.quantity || 1))); }, 0);
+      totalEl.textContent = formatMoney(grandTotal);
+    }
+  }
+
+  async function openBMRejectedInfoModal(orderId, reason, ord) {
+    var modal = $('modal-bm-rejected-info');
+    if (!ord) ord = findBMOrderById(orderId);
+
+    if (!reason && ord) {
+      if (Array.isArray(ord.status_logs)) {
+        for (var i = ord.status_logs.length - 1; i >= 0; i--) {
+          var log = ord.status_logs[i];
+          if (log.new_status === 'rejected' && log.note) {
+            reason = String(log.note).replace(/^\[REJECT by [^\]]+\]\s*/, '').trim();
+            break;
+          }
+        }
+      }
+      if (!reason) reason = ord.rejection_reason || 'Ditolak oleh resto';
+    }
+
+    if (ord) {
+      populateBMRejectedInfoUI(ord, reason);
+    }
+
+    if (modal) modal.style.display = 'flex';
+    if (window.XentraNav && typeof window.XentraNav.push === 'function') {
+      window.XentraNav.push(function () { closeBMRejectedInfoModal({ fromNav: true }); }, 'modal-bm-rejected-info');
+    }
+
+    if (!ord || !Array.isArray(ord.items) || !ord.items.length) {
+      try {
+        var res = await adminFetch(API_BASE + '/admin/orders/' + encodeURIComponent(orderId), {
+          headers: getAuthHeaders()
+        });
+        if (res && res.ok) {
+          var data = await res.json();
+          if (data && data.success && data.order) {
+            var fresh = data.order;
+            if (!_bmOrdersState.orders) _bmOrdersState.orders = [];
+            var exIdx = _bmOrdersState.orders.findIndex(function (o) { return String(o.id) === String(orderId); });
+            if (exIdx >= 0) _bmOrdersState.orders[exIdx] = fresh;
+            else _bmOrdersState.orders.push(fresh);
+            populateBMRejectedInfoUI(fresh, reason);
+          }
+        }
+      } catch (err) {
+        console.warn('[BM Rejected Info] Fetch error:', err);
+      }
+    }
+  }
+  window.openBMRejectedInfoModal = openBMRejectedInfoModal;
+
+  function closeBMRejectedInfoModal(options) {
+    options = options || {};
+    var modal = $('modal-bm-rejected-info');
+    if (modal) modal.style.display = 'none';
+    if (!options.fromNav && window.XentraNav && window.XentraNav.hasOpen('modal-bm-rejected-info')) {
+      window.XentraNav.pop('modal-bm-rejected-info');
+    }
+  }
+  window.closeBMRejectedInfoModal = closeBMRejectedInfoModal;
 
   function rejectBMOrder(orderId) {
     openBMRejectModal(orderId, 'orders');
@@ -1277,7 +1421,8 @@
       });
       var data = await res.json();
       if (res.ok && data.success) {
-        showToast('Reservasi #' + orderId + ' berhasil check-in di meja ' + tableNumber + '.');
+        var ordObj = findBMOrderById(orderId);
+        showToast('Reservasi ' + formatBMOrderCode(ordObj || orderId) + ' berhasil check-in di meja ' + tableNumber + '.');
         await loadBMOrders({ background: true });
         viewBMOrderDetail(orderId);
       } else {
@@ -1291,10 +1436,12 @@
   window.checkInBMReservation = checkInBMReservation;
 
   async function noShowBMReservation(orderId) {
+    var ordObj = findBMOrderById(orderId);
+    var formattedCode = formatBMOrderCode(ordObj || orderId);
     if (typeof window.showBranchStatusConfirm === 'function') {
       var ok = await window.showBranchStatusConfirm({
         title: 'Tandai Reservasi No-Show?',
-        desc: 'Tamu tidak hadir pada jadwal yang ditentukan. Status meja akan dikosongkan.',
+        desc: 'Tamu ' + formattedCode + ' tidak hadir pada jadwal yang ditentukan. Status meja akan dikosongkan.',
         iconBg: '#ffedd5',
         iconHtml: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="18" y1="8" x2="23" y2="13"/><line x1="23" y1="8" x2="18" y2="13"/></svg>',
         badgeText: 'Hanya berhasil setelah grace period berakhir',
@@ -1306,7 +1453,7 @@
       });
       if (!ok) return;
     } else {
-      if (!confirm('Tandai reservasi #' + orderId + ' sebagai NO-SHOW? Ini hanya berhasil setelah jadwal + grace period.')) return;
+      if (!confirm('Tandai reservasi ' + formattedCode + ' sebagai NO-SHOW? Ini hanya berhasil setelah jadwal + grace period.')) return;
     }
 
     try {
@@ -1317,7 +1464,7 @@
       });
       var data = await res.json();
       if (res.ok && data.success) {
-        showToast('Reservasi #' + orderId + ' ditandai NO-SHOW.');
+        showToast('Reservasi ' + formattedCode + ' ditandai NO-SHOW.');
         await loadBMOrders({ background: true });
         closeBMOrderDetail();
       } else {
@@ -1463,6 +1610,29 @@
         }
       }
 
+      // Rejection Banner (Merah Pink Warning Senada)
+      var rejectedBanner = $('bm-detail-rejected-banner');
+      var rejectedReasonEl = $('bm-detail-rejected-reason');
+      if (rejectedBanner) {
+        if (ord.status === 'rejected') {
+          rejectedBanner.style.display = 'block';
+          var rejReason = '';
+          if (Array.isArray(ord.status_logs)) {
+            for (var rIdx = ord.status_logs.length - 1; rIdx >= 0; rIdx--) {
+              var rLog = ord.status_logs[rIdx];
+              if (rLog.new_status === 'rejected' && rLog.note) {
+                rejReason = String(rLog.note).replace(/^\[REJECT by [^\]]+\]\s*/, '').trim();
+                break;
+              }
+            }
+          }
+          if (!rejReason) rejReason = ord.rejection_reason || 'Ditolak oleh resto';
+          if (rejectedReasonEl) rejectedReasonEl.textContent = rejReason;
+        } else {
+          rejectedBanner.style.display = 'none';
+        }
+      }
+
       // Render items list
       var itemsContainer = $('bm-detail-items-container') || $('bm-detail-items-tbody');
       if (itemsContainer) {
@@ -1566,6 +1736,12 @@
           topActions.style.display = 'flex';
           topActions.innerHTML =
             '<div style="width:100%; text-align:center; padding:10px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; font-size:13px; font-weight:700; color:#1d4ed8;">🚚 Sedang Diantar Kurir</div>';
+        } else if (ord.status === 'rejected') {
+          topActions.style.display = 'flex';
+          topActions.innerHTML =
+            '<button type="button" class="x-btn-secondary" style="width:100%; height:42px; font-size:13.5px; font-weight:800; color:#be123c; border:1px solid #fecdd3; background:#fff1f2; justify-content:center; gap:6px; cursor:pointer; border-radius:12px;" onclick="openBMRejectedInfoModal(\'' + esc(ord.id) + '\');">' +
+              '<span>Lihat Rincian Penolakan</span>' +
+            '</button>';
         } else {
           topActions.style.display = 'none';
           topActions.innerHTML = '';

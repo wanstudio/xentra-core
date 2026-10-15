@@ -693,13 +693,13 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
 
     // Trigger Notification for Merchant and Cashier
     if (notificationService) {
-      try {
+        const displayCode = String(orderNumber || '').startsWith('#') ? orderNumber : ('#' + (orderNumber || orderId.slice(-3)));
         notificationService.createNotification({
           brand_id: req.brand_id || (branch && branch.brand_id) || null,
           branch_id: (branch && branch.id) || null,
           source_type: 'order',
           title: 'Ada Pesanan Baru Masuk!',
-          body: `Pesanan #${orderNumber} (${order_type === 'delivery' ? 'Delivery' : order_type === 'dine_in' ? 'Dine In' : 'Takeaway'}) senilai Rp ${(grandTotal || 0).toLocaleString('id-ID')}`,
+          body: `Pesanan ${displayCode} (${order_type === 'delivery' ? 'Delivery' : order_type === 'dine_in' ? 'Dine In' : 'Takeaway'}) senilai Rp ${(grandTotal || 0).toLocaleString('id-ID')}`,
           priority: 'high',
           target_role: null, // Delivered to branch manager, cashier, and owner
           target_scope: 'branch',

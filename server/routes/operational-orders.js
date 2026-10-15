@@ -367,7 +367,29 @@ router.post('/orders/:id/branch-acceptance', requireAuth(['owner', 'brand_manage
         } catch (_) {}
 
         orderRepo.commitTransaction();
-        return res.json({ success: true, decision, ...result });
+
+        // Broadcast authoritative notification
+        try {
+          const { NotificationService } = require('../../core');
+          const notifService = new NotificationService(db);
+          const rawCode = fullOrder.order_number || '';
+          const displayCode = rawCode ? (rawCode.startsWith('#') ? rawCode : ('#' + rawCode)) : ('#' + fullOrder.id.slice(-3));
+          notifService.createNotification({
+            brand_id: fullOrder.brand_id,
+            branch_id: fullOrder.branch_id,
+            source_type: 'order',
+            title: 'Pesanan Ditolak',
+            body: `Pesanan ${displayCode} telah ditolak: ${String(reason).trim()}`,
+            priority: 'high',
+            target_role: null, // Broadcast to owner, branch manager, cashier
+            target_scope: 'branch',
+            related_entity_type: 'order',
+            related_entity_id: fullOrder.id,
+            action_url: `/merchant/orders/${fullOrder.id}`
+          });
+        } catch (_) {}
+
+        return res.json({ success: true, decision, order_number: fullOrder.order_number, order: fullOrder, ...result });
       }
     } catch (err) {
       try { orderRepo.rollbackTransaction(); } catch (_) {}
