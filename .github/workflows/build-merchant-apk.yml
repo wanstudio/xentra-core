@@ -50,19 +50,17 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.2.7
-          name: "Mybangjo Merchant App v1.2.7"
+          tag_name: v1.2.8
+          name: "Mybangjo Merchant App v1.2.8"
           make_latest: true
           body: |
-            ### Mybangjo Merchant App v1.2.7 (Signed Release)
+            ### Mybangjo Merchant App v1.2.8 (Signed Release)
             - Download langsung file `mybangjo-merchant.apk` di bawah tanpa ekstrak ZIP.
-            - **Pembaruan Penting v1.2.7**:
-              - **Floating Icon 100% Konsisten (Self-Healing 24/7)**: Memperbaiki bug di mana bola melayang sempat hilang saat orderan di-accept/stop-alarm. Sekarang bola melayang dijamin selalu aktif di layar dan otomatis pulih kembali jika sempat tertutup.
+            - **Pembaruan Penting v1.2.8**:
+              - **Status Bar Putih Adaptif (Seamless Full White Header - GoBiz Parity)**: Area status bar HP (jam, sinyal, baterai) kini otomatis berubah putih menyatu dengan top bar aplikasi, dengan ikon jam/baterai hitam kontras yang elegan.
+              - **Floating Icon 100% Konsisten (Self-Healing 24/7)**: Bola melayang dijamin selalu aktif di layar dan otomatis pulih kembali jika sempat tertutup.
               - **Notifikasi Android Hening (Tanpa Suara Bawaan)**: Notifikasi status bar sistem dibuat 100% senyap tanpa nada dering "ding/ting" bawaan HP. Suara hanya berasal dari suara sirene aplikasi (`ada_pesanan_baru`).
-              - **Optimasi Play Protect**: Menghapus izin berisiko tinggi (`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` dan legacy boot filters) sehingga lebih ramah Google Play Protect.
-              - **Kartu Pop-up Melayang Bersih**: 1 kartu orderan melayang dengan tombol besar `[Buka Kasir]` dan `[Tutup]`.
-              - **Bebas Reload Liar**: Gesture swipe-to-refresh dinonaktifkan.
-              - **Offline-First Smart Cache**: Rangka UI instan tanpa blank putih.
+              - **Optimasi Play Protect**: Menghapus izin berisiko tinggi sehingga ramah Google Play Protect.
               - **Catatan Pemasangan**: Copot pemasangan (uninstall) versi lama terlebih dahulu sebelum memasang versi baru agar cache sistem dan channel notifikasi ter-reset bersih.
           files: build-output/mybangjo-merchant.apk
 

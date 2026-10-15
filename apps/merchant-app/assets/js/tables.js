@@ -233,7 +233,7 @@
     var w = window.open('', '_blank');
     if (!w) return;
     w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>QR ' + esc(title) + '</title>' +
-      '<style>body{font-family:sans-serif;text-align:center;padding:32px;}h1{font-size:20px;margin:0 0 4px;}p{font-size:12px;color:#555;margin:0 0 20px;}svg{width:280px;height:280px;}</style>' +
+      '<style>body{font-family:\'Plus Jakarta Sans\', sans-serif;text-align:center;padding:32px;}h1{font-size:20px;margin:0 0 4px;}p{font-size:12px;color:#555;margin:0 0 20px;}svg{width:280px;height:280px;}</style>' +
       '</head><body><h1>' + esc(title) + '</h1><p>Scan untuk melihat pesanan meja ini</p>' + (data.svg || '') + (kode ? '<p style="font-size:11px;color:#777;margin-top:16px;">Kode meja: ' + esc(kode) + '</p>' : '') + '</body></html>');
     w.document.close();
     w.focus();

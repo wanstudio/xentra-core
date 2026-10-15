@@ -20,9 +20,10 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const DASHBOARD_JS = fs.readFileSync(
-  path.join(__dirname, '../apps/merchant-dashboard/assets/js/dashboard.js'), 'utf8'
-);
+const MASTER_MENU_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/js/modules/master-menu.js');
+const DASHBOARD_JS = fs.existsSync(MASTER_MENU_PATH)
+  ? fs.readFileSync(MASTER_MENU_PATH, 'utf8')
+  : fs.readFileSync(path.join(__dirname, '../apps/merchant-dashboard/assets/js/dashboard.js'), 'utf8');
 const INLINE_JS = fs.readFileSync(
   path.join(__dirname, '../apps/merchant-dashboard/assets/js/owner-master-menu-inline.js'), 'utf8'
 );

@@ -44,7 +44,10 @@ describe('POS ↔ Merchant App surface boundary', () => {
 
   it('prevents operational roles from using the Owner Dashboard as a fallback surface', () => {
     const dashboard = read('apps/merchant-dashboard/assets/js/dashboard.js');
-    assert.ok(dashboard.includes("var enforceSurface = _shared.enforceSurface || window.XentraShared.enforceSurface;"));
+    assert.ok(
+      dashboard.includes("var enforceSurface = _shared.enforceSurface || window.XentraShared.enforceSurface;") ||
+      dashboard.includes("var enforceSurface = (_shared && _shared.enforceSurface) || (window.XentraShared && window.XentraShared.enforceSurface);")
+    );
     assert.ok(
       dashboard.includes("enforceSurface(['/owner/']);") ||
       dashboard.includes("enforceSurface(['/owner/', '/dashboard/', '/dashboard']);") ||

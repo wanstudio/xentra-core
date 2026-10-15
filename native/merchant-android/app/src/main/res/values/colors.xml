@@ -1,6 +1,7 @@
 <resources>
     <color name="primary">#059669</color>
-    <color name="primary_dark">#047857</color>
+    <color name="primary_dark">#ffffff</color>
     <color name="accent">#10b981</color>
     <color name="background">#ffffff</color>
+    <color name="status_bar_white">#ffffff</color>
 </resources>

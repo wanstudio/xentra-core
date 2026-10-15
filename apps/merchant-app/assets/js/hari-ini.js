@@ -104,15 +104,28 @@
             onlineBtn.style.color = isDeliveryActive ? "var(--text-main)" : "#ffffff";
           }
 
-          // Mobile Home visual reference — mirror the same branch state.
-          var mobileOpenSwitch = $("mobile-open-switch");
-          var mobileOpenLabel = $("mobile-open-label");
-          var mobileOnlineSwitch = $("mobile-online-switch");
-          if (mobileOpenSwitch) mobileOpenSwitch.classList.toggle("is-on", isOpen);
-          if (mobileOpenSwitch) mobileOpenSwitch.classList.toggle("is-off", !isOpen);
-          if (mobileOpenLabel) mobileOpenLabel.textContent = isOpen ? "Buka" : "Tutup";
-          if (mobileOnlineSwitch) mobileOnlineSwitch.classList.toggle("is-on", isDeliveryActive);
-          if (mobileOnlineSwitch) mobileOnlineSwitch.classList.toggle("is-off", !isDeliveryActive);
+          // Sync operational branch status across all topbars (Home & Pesanan)
+          var brandTitle = b.name || user.brand_name || 'Resto';
+          document.querySelectorAll('.bm-topbar-brand-name, #topbar-brand-name, #pesanan-topbar-brand-name').forEach(function (el) {
+            el.textContent = brandTitle;
+          });
+          document.querySelectorAll('.bm-switch-open, #mobile-open-switch, #pesanan-open-switch').forEach(function (el) {
+            el.classList.toggle("is-on", isOpen);
+            el.classList.toggle("is-off", !isOpen);
+          });
+          document.querySelectorAll('.bm-switch-open-label, #mobile-open-label, #pesanan-open-label').forEach(function (el) {
+            el.textContent = isOpen ? "Buka" : "Tutup";
+          });
+          document.querySelectorAll('.bm-switch-online, #mobile-online-switch, #pesanan-online-switch').forEach(function (el) {
+            el.classList.toggle("is-on", isDeliveryActive);
+            el.classList.toggle("is-off", !isDeliveryActive);
+          });
+          if (typeof window.updatePesananBranchOpenState === 'function') {
+            window.updatePesananBranchOpenState(isOpen);
+          }
+          if (typeof window.renderBMOrdersFeed === 'function') {
+            window.renderBMOrdersFeed();
+          }
           // Live WIB date context
           var dateEl = $("bm-home-date");
           if (dateEl) {

@@ -30,6 +30,14 @@ public class XentraNativeBridge {
         return "1.1.0-release";
     }
 
+    // ── Dynamic / Adaptive Status Bar Control ──
+    @JavascriptInterface
+    public void setStatusBarColor(String hexColor, boolean darkIcons) {
+        if (context instanceof MainActivity) {
+            ((MainActivity) context).updateStatusBar(hexColor, darkIcons);
+        }
+    }
+
     // ── Authentication Synchronization for Native Background Worker ──
     @JavascriptInterface
     public void syncAuth(String token, String branchId) {

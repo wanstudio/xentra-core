@@ -7,12 +7,14 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.provider.Settings;
 import android.view.View;
+import android.view.WindowInsetsController;
 import android.webkit.JsResult;
 import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
@@ -91,7 +93,48 @@ public class MainActivity extends AppCompatActivity {
             OrderMonitorService.startMonitoring(this);
         }
 
+        // Initial adaptive status bar: pure white with crisp dark icons
+        updateStatusBar("#ffffff", true);
+
         handleIncomingIntent(getIntent());
+    }
+
+    public void updateStatusBar(String hexColor, boolean darkIcons) {
+        runOnUiThread(() -> {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                try {
+                    int color = Color.parseColor(hexColor);
+                    getWindow().setStatusBarColor(color);
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        WindowInsetsController controller = getWindow().getInsetsController();
+                        if (controller != null) {
+                            if (darkIcons) {
+                                controller.setSystemBarsAppearance(
+                                    WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS,
+                                    WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+                                );
+                            } else {
+                                controller.setSystemBarsAppearance(
+                                    0,
+                                    WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+                                );
+                            }
+                        }
+                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        View decor = getWindow().getDecorView();
+                        int flags = decor.getSystemUiVisibility();
+                        if (darkIcons) {
+                            flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+                        } else {
+                            flags &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+                        }
+                        decor.setSystemUiVisibility(flags);
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+        });
     }
 
     private void checkOverlayPermission() {

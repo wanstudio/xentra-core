@@ -123,6 +123,9 @@
     if (window.XentraNav && typeof window.XentraNav.clear === 'function') {
       window.XentraNav.clear();
     }
+    // Synchronize adaptive status bar with active route topbar
+    setAppStatusBarColor('#ffffff', true);
+
     var meta = BM_ROUTE_META[route] || BM_ROUTE_META['hari-ini'];
     var tabId = meta.tab;
 
@@ -346,8 +349,10 @@
     if (topbarBrandBadge) topbarBrandBadge.style.display = 'none';
     var mobileBranchBadge = $('mobile-branch-badge');
     if (mobileBranchBadge) mobileBranchBadge.style.display = 'flex';
-    var topbarBrandName = $('topbar-brand-name');
-    if (topbarBrandName) topbarBrandName.textContent = user.branch_name || user.brand_name || 'MyBangjo';
+    var brandDisplayName = user.branch_name || user.brand_name || 'MyBangjo';
+    document.querySelectorAll('.bm-topbar-brand-name, #topbar-brand-name, #pesanan-topbar-brand-name').forEach(function (el) {
+      el.textContent = brandDisplayName;
+    });
     var desktopTopbarBrandName = $('desktop-topbar-brand-name');
     if (desktopTopbarBrandName) desktopTopbarBrandName.textContent = user.brand_name || 'Bangjo Resto';
 
@@ -663,16 +668,24 @@
 
   function updateNotificationBadge(count) {
     _notificationsState.unreadCount = count;
-    var badge = $('mobile-notification-count');
+    var num = Number(count) || 0;
+    var badges = document.querySelectorAll('.x-mobile-notification-badge');
     var pill = $('notif-unread-pill');
 
-    if (badge) {
-      badge.textContent = count > 99 ? '99+' : count;
-      badge.style.setProperty('display', count > 0 ? 'flex' : 'none', 'important');
-    }
+    badges.forEach(function (badge) {
+      if (!badge) return;
+      if (num > 0) {
+        badge.textContent = num > 99 ? '99+' : String(num);
+        badge.style.setProperty('display', 'flex', 'important');
+      } else {
+        badge.textContent = '0';
+        badge.style.setProperty('display', 'none', 'important');
+      }
+    });
+
     if (pill) {
-      pill.textContent = (count > 99 ? '99+' : count) + ' Baru';
-      pill.style.setProperty('display', count > 0 ? 'inline-block' : 'none', 'important');
+      pill.textContent = (num > 99 ? '99+' : num) + ' Baru';
+      pill.style.setProperty('display', num > 0 ? 'inline-block' : 'none', 'important');
     }
   }
 
@@ -951,13 +964,38 @@
   window.closeNotificationsSheet = closeNotificationsSheet;
   window.handleNotificationClick = handleNotificationClick;
   window.markAllNotificationsAsRead = markAllNotificationsAsRead;
+  window.updateNotificationBadge = updateNotificationBadge;
 
   function initNotificationListeners() {
     var btnDesktop = $('btn-notifications-desktop');
     var btnMobile = $('btn-notifications');
+    var btnPesanan = $('pesanan-btn-notifications');
     if (btnDesktop) btnDesktop.onclick = openNotificationsSheet;
     if (btnMobile) btnMobile.onclick = openNotificationsSheet;
+    if (btnPesanan) btnPesanan.onclick = openNotificationsSheet;
   }
+
+  // ── Adaptive Dynamic Status Bar Architecture (GoBiz Parity) ──
+  function setAppStatusBarColor(hexColor, darkIcons) {
+    if (!hexColor) hexColor = '#ffffff';
+    if (typeof darkIcons === 'undefined') {
+      darkIcons = true;
+    }
+
+    // 1. Update native Android status bar via bridge (instant)
+    if (window.XentraNative && typeof window.XentraNative.setStatusBarColor === 'function') {
+      try {
+        window.XentraNative.setStatusBarColor(hexColor, !!darkIcons);
+      } catch (_) {}
+    }
+
+    // 2. Update PWA meta theme-color for Chrome / WebAPK / mobile browsers
+    var metaTheme = document.querySelectorAll('meta[name="theme-color"]');
+    metaTheme.forEach(function (m) {
+      m.setAttribute('content', hexColor);
+    });
+  }
+  window.setAppStatusBarColor = setAppStatusBarColor;
 
 
   async function boot() {
@@ -984,7 +1022,7 @@
 
       // Surface guard: the server resolves the landing surface for this role, so
       // swapping the URL can never grant a surface this role does not own.
-      if (enforceSurface(['/merchant/', '/merchant-app/', '/owner/', '/dashboard/'])) return;
+      if (enforceSurface(['/merchant/', '/merchant-app/'])) return;
 
       applyRoleBasedUI();
       renderBranchManagerNavigation();
@@ -992,6 +1030,10 @@
       fetchUnreadNotificationCount();
       fetchActionableOrdersCount();
       scheduleActionableOrdersCheck(15000);
+
+      if (typeof loadHariIni === 'function') {
+        loadHariIni();
+      }
 
       var currentRoute = getCurrentRoute();
       if (user.role === 'purchasing' && (!window.location.hash || window.location.hash === '#hari-ini')) {
