@@ -693,6 +693,7 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
 
     // Trigger Notification for Merchant and Cashier
     if (notificationService) {
+      try {
         const displayCode = String(orderNumber || '').startsWith('#') ? orderNumber : ('#' + (orderNumber || orderId.slice(-3)));
         notificationService.createNotification({
           brand_id: req.brand_id || (branch && branch.brand_id) || null,
