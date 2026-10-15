@@ -51,15 +51,16 @@ jobs:
         if: github.ref == 'refs/heads/main'
         with:
           tag_name: merchant-app-latest
-          name: "Mybangjo Merchant App Latest (v1.2.4)"
+          name: "Mybangjo Merchant App Latest (v1.2.5)"
           body: |
-            ### Mybangjo Merchant App v1.2.4 (Signed Release)
+            ### Mybangjo Merchant App v1.2.5 (Signed Release)
             - Download langsung file `mybangjo-merchant.apk` di bawah tanpa ekstrak ZIP.
-            - **Pembaruan Penting v1.2.4 (Solid & Anti-Reload)**:
-              - **Notifikasi Bersih (Pilihan A)**: Menghilangkan tabrakan notifikasi. Sekarang hanya ada 1 kartu pop-up melayang di layar dengan tombol besar `[Buka Kasir]` dan `[Tutup]`. Notifikasi Android sistem tersimpan rapi di status bar tanpa meluncur menutupi kartu.
-              - **Bebas Reload Liar**: Mematikan `SwipeRefreshLayout` dan listener auto-reload liar. Scroll daftar menu / pesanan dijamin stabil tanpa pernah reload halaman sendiri.
-              - **Offline-First Smart Cache**: Rangka UI di-cache di memori HP untuk buka aplikasi instan tanpa blank putih.
-              - **Floating Icon Melayang 24/7**: Ikon floating tetap melayang aktif di layar bahkan saat aplikasi ditutup atau diminimalkan untuk quick access membuka kasir instan.
+            - **Pembaruan Penting v1.2.5**:
+              - **Fix Floating Icon Duplikat**: Mengatasi bug ikon bola melayang yang muncul ganda (menumpuk 2 ikon). Sekarang dijamin hanya ada tepat 1 bola melayang di layar.
+              - **Notifikasi Bersih**: Tetap dengan 1 kartu pop-up melayang di layar dengan tombol `[Buka Kasir]` dan `[Tutup]`.
+              - **Bebas Reload Liar**: Mematikan gesture swipe-to-refresh yang tidak disengaja.
+              - **Offline-First Smart Cache**: Rangka UI instan tanpa blank putih.
+              - **Floating Icon Melayang 24/7**: Akses cepat buka kasir kapan pun.
               - **Catatan Pemasangan**: Jika pembaruan gagal, copot pemasangan (uninstall) versi lama terlebih dahulu.
           files: build-output/mybangjo-merchant.apk
 

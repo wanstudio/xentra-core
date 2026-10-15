@@ -62,3 +62,4 @@ apps/customer-pwa/assets/uploads/originals/*
 
 # Local agent/tool state
 .commandcode/
+build-output/

@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - 'native/**'
+      - '.github/workflows/build-merchant-apk.yml'
 
 concurrency:
   group: xentra-vps-deploy

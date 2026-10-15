@@ -158,22 +158,20 @@ public class OrderOverlayService extends Service {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return;
         if (!isAssistiveBallEnabled(context)) return;
 
+        Context appContext = context.getApplicationContext();
         if (windowManager == null) {
-            windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
+            windowManager = (WindowManager) appContext.getSystemService(Context.WINDOW_SERVICE);
         }
 
         lastPendingCount = pendingCount;
 
-        // If assistive ball is already attached to WindowManager, DO NOT add another view! Just update badge.
+        // If assistive ball is already active, NEVER add a second view! Just update badge and return.
         if (currentOverlayView != null && currentMode == 1) {
-            try {
-                if (currentOverlayView.isAttachedToWindow()) {
-                    updateBallBadge(pendingCount);
-                    return;
-                }
-            } catch (Exception ignored) {}
+            updateBallBadge(pendingCount);
+            return;
         }
 
+        // Clean up any existing overlay view (e.g. order card) before adding ball
         removeOverlayView();
 
         currentMode = 1;
@@ -191,16 +189,18 @@ public class OrderOverlayService extends Service {
         );
 
         params.gravity = Gravity.TOP | Gravity.START;
-        params.x = dp(context, 12);
-        params.y = dp(context, 160);
+        params.x = dp(appContext, 12);
+        params.y = dp(appContext, 160);
 
-        currentOverlayView = createBallView(context, pendingCount);
-        attachBallDragger(context, currentOverlayView);
+        currentOverlayView = createBallView(appContext, pendingCount);
+        attachBallDragger(appContext, currentOverlayView);
 
         try {
             windowManager.addView(currentOverlayView, params);
         } catch (Exception e) {
             e.printStackTrace();
+            currentOverlayView = null;
+            currentMode = 0;
         }
     }
 
@@ -334,12 +334,14 @@ public class OrderOverlayService extends Service {
 
     @SuppressLint("ClickableViewAccessibility")
     private static synchronized void displayOrderCard(Context context, String orderId, String orderNumber, String customer, String total) {
-        removeOverlayView();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return;
 
+        Context appContext = context.getApplicationContext();
         if (windowManager == null) {
-            windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
+            windowManager = (WindowManager) appContext.getSystemService(Context.WINDOW_SERVICE);
         }
+
+        removeOverlayView();
 
         currentMode = 2;
         int layoutType = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
@@ -359,15 +361,17 @@ public class OrderOverlayService extends Service {
 
         params.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
         params.x = 0;
-        params.y = dp(context, 100);
+        params.y = dp(appContext, 100);
 
-        currentOverlayView = createOrderCardView(context, orderId, orderNumber, customer, total);
-        attachCardDragger(context, currentOverlayView);
+        currentOverlayView = createOrderCardView(appContext, orderId, orderNumber, customer, total);
+        attachCardDragger(appContext, currentOverlayView);
 
         try {
             windowManager.addView(currentOverlayView, params);
         } catch (Exception e) {
             e.printStackTrace();
+            currentOverlayView = null;
+            currentMode = 0;
         }
     }
 
@@ -514,12 +518,17 @@ public class OrderOverlayService extends Service {
 
     private static synchronized void removeOverlayView() {
         if (currentOverlayView != null) {
-            try {
-                if (windowManager != null && currentOverlayView.isAttachedToWindow()) {
-                    windowManager.removeView(currentOverlayView);
+            if (windowManager != null) {
+                try {
+                    windowManager.removeViewImmediate(currentOverlayView);
+                } catch (Exception e1) {
+                    try {
+                        windowManager.removeView(currentOverlayView);
+                    } catch (Exception ignored) {}
                 }
-            } catch (Exception ignored) {}
+            }
             currentOverlayView = null;
+            currentMode = 0;
         }
     }
 
