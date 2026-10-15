@@ -1,0 +1,316 @@
+package com.mybangjo.pos;
+
+import android.Manifest;
+import android.annotation.SuppressLint;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.Color;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.view.View;
+import android.view.WindowInsetsController;
+import android.view.WindowManager;
+import android.webkit.JsResult;
+import android.webkit.PermissionRequest;
+import android.webkit.ValueCallback;
+import android.webkit.WebChromeClient;
+import android.webkit.WebResourceError;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.widget.ProgressBar;
+import android.widget.Toast;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class MainActivity extends AppCompatActivity {
+    private static final String TARGET_URL = "https://m.mybangjo.com/pos/";
+
+    private WebView webView;
+    private ProgressBar progressBar;
+    private SwipeRefreshLayout swipeRefreshLayout;
+    private ValueCallback<Uri[]> filePathCallback;
+
+    private final ActivityResultLauncher<String[]> permissionLauncher =
+        registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), result -> {
+            // Permissions handled gracefully
+        });
+
+    private final ActivityResultLauncher<String> fileChooserLauncher =
+        registerForActivityResult(new ActivityResultContracts.GetMultipleContents(), uris -> {
+            if (filePathCallback != null) {
+                if (uris != null && !uris.isEmpty()) {
+                    Uri[] uriArray = uris.toArray(new Uri[0]);
+                    filePathCallback.onReceiveValue(uriArray);
+                } else {
+                    filePathCallback.onReceiveValue(null);
+                }
+                filePathCallback = null;
+            }
+        });
+
+    @Override
+    @SuppressLint("SetJavaScriptEnabled")
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        // Keep cashier screen awake by default during shift
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
+        webView = findViewById(R.id.webView);
+        progressBar = findViewById(R.id.progressBar);
+        swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout);
+
+        setupSwipeRefresh();
+        setupWebView();
+        requestNecessaryPermissions();
+
+        if (savedInstanceState == null) {
+            webView.loadUrl(TARGET_URL);
+        } else {
+            webView.restoreState(savedInstanceState);
+        }
+
+        // Initial adaptive status bar: pure white with crisp dark icons
+        updateStatusBar("#ffffff", true);
+
+        handleIncomingIntent(getIntent());
+    }
+
+    public void setKeepScreenOn(boolean keepOn) {
+        runOnUiThread(() -> {
+            if (keepOn) {
+                getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            } else {
+                getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            }
+        });
+    }
+
+    public void updateStatusBar(String hexColor, boolean darkIcons) {
+        runOnUiThread(() -> {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                try {
+                    int color = Color.parseColor(hexColor);
+                    getWindow().setStatusBarColor(color);
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        WindowInsetsController controller = getWindow().getInsetsController();
+                        if (controller != null) {
+                            if (darkIcons) {
+                                controller.setSystemBarsAppearance(
+                                    WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS,
+                                    WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+                                );
+                            } else {
+                                controller.setSystemBarsAppearance(
+                                    0,
+                                    WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+                                );
+                            }
+                        }
+                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        View decor = getWindow().getDecorView();
+                        int flags = decor.getSystemUiVisibility();
+                        if (darkIcons) {
+                            flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+                        } else {
+                            flags &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+                        }
+                        decor.setSystemUiVisibility(flags);
+                    }
+                } catch (Exception ignored) {}
+            }
+        });
+    }
+
+    private void setupSwipeRefresh() {
+        // Disabled pull-to-refresh on POS by default to avoid interrupting active carts
+        swipeRefreshLayout.setEnabled(false);
+        swipeRefreshLayout.setColorSchemeColors(ContextCompat.getColor(this, R.color.primary));
+        swipeRefreshLayout.setOnRefreshListener(() -> webView.reload());
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private void setupWebView() {
+        WebSettings settings = webView.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+        settings.setDatabaseEnabled(true);
+        settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+        settings.setMediaPlaybackRequiresUserGesture(false);
+        settings.setAllowFileAccess(true);
+        settings.setAllowContentAccess(true);
+        settings.setGeolocationEnabled(true);
+        settings.setUseWideViewPort(true);
+        settings.setLoadWithOverviewMode(true);
+        settings.setSupportZoom(false);
+        settings.setBuiltInZoomControls(false);
+
+        // Custom User-Agent for POS identification
+        String defaultUa = settings.getUserAgentString();
+        settings.setUserAgentString(defaultUa + " XentraPosNative/1.0.0 (Linux; Android POS)");
+
+        // Register bridges (both XentraPos and XentraNative for maximum compatibility)
+        XentraPosBridge bridge = new XentraPosBridge(this);
+        webView.addJavascriptInterface(bridge, "XentraPos");
+        webView.addJavascriptInterface(bridge, "XentraNative");
+
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageStarted(WebView view, String url, Bitmap favicon) {
+                super.onPageStarted(view, url, favicon);
+                progressBar.setVisibility(View.VISIBLE);
+                progressBar.setProgress(10);
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                progressBar.setVisibility(View.GONE);
+                swipeRefreshLayout.setRefreshing(false);
+            }
+
+            @Override
+            public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                super.onReceivedError(view, request, error);
+                if (request.isForMainFrame()) {
+                    progressBar.setVisibility(View.GONE);
+                    swipeRefreshLayout.setRefreshing(false);
+                }
+            }
+
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                Uri uri = request.getUrl();
+                String scheme = uri.getScheme();
+                if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) {
+                    return false; // Load inside WebView
+                }
+                try {
+                    Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+                    startActivity(intent);
+                    return true;
+                } catch (Exception e) {
+                    return false;
+                }
+            }
+        });
+
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public void onProgressChanged(WebView view, int newProgress) {
+                if (newProgress < 100) {
+                    progressBar.setVisibility(View.VISIBLE);
+                    progressBar.setProgress(newProgress);
+                } else {
+                    progressBar.setVisibility(View.GONE);
+                }
+            }
+
+            @Override
+            public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
+                if (MainActivity.this.filePathCallback != null) {
+                    MainActivity.this.filePathCallback.onReceiveValue(null);
+                }
+                MainActivity.this.filePathCallback = filePathCallback;
+                fileChooserLauncher.launch("image/*");
+                return true;
+            }
+
+            @Override
+            public void onPermissionRequest(PermissionRequest request) {
+                request.grant(request.getResources());
+            }
+
+            @Override
+            public boolean onJsAlert(WebView view, String url, String message, JsResult result) {
+                new AlertDialog.Builder(MainActivity.this)
+                    .setTitle("Kasir POS")
+                    .setMessage(message)
+                    .setPositiveButton("OK", (dialog, which) -> result.confirm())
+                    .setCancelable(false)
+                    .show();
+                return true;
+            }
+
+            @Override
+            public boolean onJsConfirm(WebView view, String url, String message, JsResult result) {
+                new AlertDialog.Builder(MainActivity.this)
+                    .setTitle("Konfirmasi")
+                    .setMessage(message)
+                    .setPositiveButton("Ya", (dialog, which) -> result.confirm())
+                    .setNegativeButton("Batal", (dialog, which) -> result.cancel())
+                    .setCancelable(false)
+                    .show();
+                return true;
+            }
+        });
+    }
+
+    private void requestNecessaryPermissions() {
+        List<String> perms = new ArrayList<>();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                perms.add(Manifest.permission.BLUETOOTH_CONNECT);
+            }
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                perms.add(Manifest.permission.BLUETOOTH_SCAN);
+            }
+        } else {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH) != PackageManager.PERMISSION_GRANTED) {
+                perms.add(Manifest.permission.BLUETOOTH);
+            }
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_ADMIN) != PackageManager.PERMISSION_GRANTED) {
+                perms.add(Manifest.permission.BLUETOOTH_ADMIN);
+            }
+        }
+        if (!perms.isEmpty()) {
+            permissionLauncher.launch(perms.toArray(new String[0]));
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleIncomingIntent(intent);
+    }
+
+    private void handleIncomingIntent(Intent intent) {
+        if (intent == null) return;
+        Uri data = intent.getData();
+        if (data != null && data.toString().startsWith("http")) {
+            webView.loadUrl(data.toString());
+        }
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (webView != null && webView.canGoBack()) {
+            webView.goBack();
+        } else {
+            super.onBackPressed();
+        }
+    }
+
+    @Override
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        if (webView != null) {
+            webView.saveState(outState);
+        }
+    }
+}

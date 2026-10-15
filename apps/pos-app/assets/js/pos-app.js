@@ -2971,6 +2971,10 @@
     if (window.XentraAudio && typeof window.XentraAudio.paymentReceived === 'function') {
       window.XentraAudio.paymentReceived({ text: 'Pembayaran diterima!' });
     }
+    var nativeBridge = window.XentraPos || window.XentraNative;
+    if (nativeBridge && typeof nativeBridge.openCashDrawer === 'function') {
+      try { nativeBridge.openCashDrawer(); } catch (_) {}
+    }
     showModal('<h3>Pembayaran Berhasil</h3><p>Sale '+esc(order.order_number||order.id||'')+' selesai.</p><div class="pos-payment-total">'+money(order.grand_total||total())+'</div>'+(change!=null?'<div class="pos-change">Kembalian: '+money(change)+'</div>':'')+'<div class="pos-modal-actions"><button class="pos-btn ghost" id="pos-sale-close">Selesai</button><button class="pos-btn" id="pos-sale-print">Cetak Struk</button></div>');
     $('pos-sale-close').onclick=function(){hideModal();resetSale();};
     $('pos-sale-print').onclick=function(){printReceipt(order.id);};
@@ -3094,8 +3098,28 @@
   async function printReceipt(orderId){
     try{
       var d=await request('/pos/orders/'+encodeURIComponent(orderId)+'/receipt',{headers:headers()});
+      var raw = d && d.receipt && d.receipt.raw_content ? d.receipt.raw_content : '';
+
+      var nativeBridge = window.XentraPos || window.XentraNative;
+      if (nativeBridge && typeof nativeBridge.printReceipt === 'function') {
+        var printed = false;
+        try {
+          if (typeof nativeBridge.isPrinterConnected === 'function' && !nativeBridge.isPrinterConnected()) {
+            var savedMac = localStorage.getItem('xentra_pos_printer_mac');
+            if (savedMac && typeof nativeBridge.connectPrinter === 'function') {
+              nativeBridge.connectPrinter(savedMac);
+            }
+          }
+          printed = nativeBridge.printReceipt(raw);
+        } catch (_) {}
+        if (printed) {
+          toast('Struk berhasil dicetak');
+          return;
+        }
+      }
+
       var w=window.open('','_blank','width=420,height=700'); if(!w)throw new Error('Popup diblokir browser.');
-      w.document.write('<!doctype html><html><head><title>Struk Xentra</title><style>body{font-family:monospace;width:300px;margin:20px auto;font-size:12px}pre{white-space:pre-wrap;line-height:1.35}</style></head><body><pre>'+esc(d.receipt.raw_content)+'</pre></body></html>');
+      w.document.write('<!doctype html><html><head><title>Struk Xentra</title><style>body{font-family:monospace;width:300px;margin:20px auto;font-size:12px}pre{white-space:pre-wrap;line-height:1.35}</style></head><body><pre>'+esc(raw)+'</pre></body></html>');
       w.document.close(); w.focus(); w.print();
     }catch(e){toast(e.message);}
   }
