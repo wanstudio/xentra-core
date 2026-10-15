@@ -50,8 +50,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: merchant-app-latest
-          name: "Mybangjo Merchant App Latest (v1.2.6)"
+          tag_name: v1.2.6
+          name: "Mybangjo Merchant App v1.2.6"
+          make_latest: true
           body: |
             ### Mybangjo Merchant App v1.2.6 (Signed Release)
             - Download langsung file `mybangjo-merchant.apk` di bawah tanpa ekstrak ZIP.
