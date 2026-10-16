@@ -329,7 +329,8 @@ class ReportingRepository {
         COALESCE(bpi.stock_qty, 0) AS current_stock,
         COALESCE(bpi.low_stock_threshold, 5) AS low_stock_threshold,
         p.sku,
-        p.is_active
+        p.is_active,
+        COALESCE(p.inventory_type, 'COOKED') AS inventory_type
       FROM products p
       JOIN branches b ON b.brand_id = p.brand_id
       LEFT JOIN branch_product_inventory bpi ON bpi.branch_id = b.id AND bpi.product_id = p.id
