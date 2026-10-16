@@ -99,16 +99,32 @@
     window.loadSettingsCurrentSubtab = loadSettingsCurrentSubtab;
 
     // 1. Business Profile
-    async function loadSettingsProfile() {
+    async function loadSettingsProfile(options) {
       try {
+        var opts = options || {};
+        var forceReset = Boolean(opts.forceReset);
+        function shouldPreserve(el) {
+          if (typeof window.shouldPreserveInputValue === 'function') {
+            return window.shouldPreserveInputValue(el, forceReset);
+          }
+          if (!el || forceReset) return false;
+          if (document.activeElement === el) return true;
+          if (el.dataset && el.dataset.dirty === 'true') return true;
+          return false;
+        }
+
         var res = await adminFetch(API_BASE + '/admin/settings/business/profile', { headers: getAuthHeaders() });
         if (!res.ok) return;
         var json = await res.json();
         if (!json.success || !json.profile) return;
 
         var p = json.profile;
-        if ($('set-profile-name')) $('set-profile-name').value = p.name || '';
-        if ($('set-profile-tagline')) $('set-profile-tagline').value = p.tagline || '';
+        var setProfileNameEl = $('set-profile-name');
+        if (setProfileNameEl && !shouldPreserve(setProfileNameEl)) setProfileNameEl.value = p.name || '';
+
+        var setProfileTaglineEl = $('set-profile-tagline');
+        if (setProfileTaglineEl && !shouldPreserve(setProfileTaglineEl)) setProfileTaglineEl.value = p.tagline || '';
+
         var logoUrl = p.logo_url || '/assets/pwa/icon-192.png';
         if ($('set-profile-logo')) $('set-profile-logo').value = logoUrl;
         if ($('set-profile-logo-preview')) {
@@ -120,8 +136,12 @@
         if ($('btn-set-profile-logo-remove')) $('btn-set-profile-logo-remove').style.display = hasCustomLogo ? 'inline-block' : 'none';
         if ($('btn-set-profile-logo-pick')) $('btn-set-profile-logo-pick').textContent = hasCustomLogo ? '📁 Ganti Logo' : '📁 Unggah Logo';
 
-        if ($('set-profile-color')) $('set-profile-color').value = p.primary_color || '#b6ff00';
-        if ($('set-profile-color-hex')) $('set-profile-color-hex').value = p.primary_color || '#b6ff00';
+        var setProfileColorEl = $('set-profile-color');
+        if (setProfileColorEl && !shouldPreserve(setProfileColorEl)) setProfileColorEl.value = p.primary_color || '#b6ff00';
+
+        var setProfileColorHexEl = $('set-profile-color-hex');
+        if (setProfileColorHexEl && !shouldPreserve(setProfileColorHexEl)) setProfileColorHexEl.value = p.primary_color || '#b6ff00';
+
         if ($('set-profile-domain')) $('set-profile-domain').textContent = p.custom_domain || window.location.host || '-';
 
         // Installed PWA Identity Override for all 5 roles
@@ -140,7 +160,8 @@
           var hasCustom = Boolean(iconUrl);
 
           // Settings Modal
-          if ($('set-profile-' + r.key + '-pwa-name')) $('set-profile-' + r.key + '-pwa-name').value = pwaName;
+          var setPwaNameEl = $('set-profile-' + r.key + '-pwa-name');
+          if (setPwaNameEl && !shouldPreserve(setPwaNameEl)) setPwaNameEl.value = pwaName;
           if ($('set-profile-' + r.key + '-icon')) $('set-profile-' + r.key + '-icon').value = iconUrl || '';
           if ($('set-profile-' + r.key + '-icon-preview')) {
             $('set-profile-' + r.key + '-icon-preview').src = effectiveIcon;
@@ -151,7 +172,8 @@
           if ($('btn-set-profile-' + r.key + '-icon-pick')) $('btn-set-profile-' + r.key + '-icon-pick').textContent = hasCustom ? '📁 Ganti' : '📁 Unggah';
 
           // Brand Tab
-          if ($('brand-tab-' + r.key + '-pwa-name')) $('brand-tab-' + r.key + '-pwa-name').value = pwaName;
+          var tabPwaNameEl = $('brand-tab-' + r.key + '-pwa-name');
+          if (tabPwaNameEl && !shouldPreserve(tabPwaNameEl)) tabPwaNameEl.value = pwaName;
           if ($('brand-tab-' + r.key + '-icon')) $('brand-tab-' + r.key + '-icon').value = iconUrl || '';
           if ($('brand-tab-' + r.key + '-icon-preview')) {
             $('brand-tab-' + r.key + '-icon-preview').src = effectiveIcon;
@@ -256,9 +278,11 @@
               if ($('btn-brand-logo-remove')) $('btn-brand-logo-remove').style.display = 'none';
               if ($('btn-brand-logo-pick')) $('btn-brand-logo-pick').textContent = '📁 Unggah Logo';
               if ($('dash-sidebar-logo')) $('dash-sidebar-logo').src = defaultLogo;
-
-              loadBrandSettings();
-              loadSettingsProfile();
+              if (window.state && window.state.brand) {
+                window.state.brand.logo_url = defaultLogo;
+              }
+              // Do NOT call loadBrandSettings() or loadSettingsProfile() here.
+              // That would re-fetch the database record and wipe out any un-saved text typed in form inputs!
             } else {
               showToast('❌ Gagal menghapus logo.');
             }
@@ -268,16 +292,66 @@
         });
       }
 
+      function markDirty(el) {
+        if (typeof window.markInputDirty === 'function') window.markInputDirty(el);
+        else if (el) el.dataset.dirty = 'true';
+      }
+
+      var setNameEl = $('set-profile-name');
+      if (setNameEl) {
+        setNameEl.addEventListener('input', function () {
+          markDirty(setNameEl);
+          var brandName = $('brand-name');
+          if (brandName && document.activeElement !== brandName) {
+            brandName.value = setNameEl.value;
+            markDirty(brandName);
+          }
+          if (typeof updateLiveMockupPreview === 'function') {
+            updateLiveMockupPreview(setNameEl.value, $('brand-logo') ? $('brand-logo').value : '', $('brand-color') ? $('brand-color').value : '');
+          }
+        });
+      }
+
+      var setTaglineEl = $('set-profile-tagline');
+      if (setTaglineEl) {
+        setTaglineEl.addEventListener('input', function () {
+          markDirty(setTaglineEl);
+          var brandTag = $('brand-tagline');
+          if (brandTag && document.activeElement !== brandTag) {
+            brandTag.value = setTaglineEl.value;
+            markDirty(brandTag);
+          }
+        });
+      }
+
       // Synchronize color picker and hex input in Settings Profile
       var setColor = $('set-profile-color');
       var setColorHex = $('set-profile-color-hex');
       if (setColor && setColorHex) {
         setColor.addEventListener('input', function () {
+          markDirty(setColor);
           setColorHex.value = setColor.value;
+          markDirty(setColorHex);
+          var bCol = $('brand-color');
+          if (bCol && document.activeElement !== bCol) { bCol.value = setColor.value; markDirty(bCol); }
+          var bColHex = $('brand-color-hex');
+          if (bColHex && document.activeElement !== bColHex) { bColHex.value = setColor.value; markDirty(bColHex); }
+          if (typeof updateLiveMockupPreview === 'function') {
+            updateLiveMockupPreview($('set-profile-name') ? $('set-profile-name').value : '', $('brand-logo') ? $('brand-logo').value : '', setColor.value);
+          }
         });
         setColorHex.addEventListener('input', function () {
+          markDirty(setColorHex);
           if (/^#[0-9A-Fa-f]{6}$/.test(setColorHex.value)) {
             setColor.value = setColorHex.value;
+            markDirty(setColor);
+            var bCol = $('brand-color');
+            if (bCol && document.activeElement !== bCol) { bCol.value = setColorHex.value; markDirty(bCol); }
+            var bColHex = $('brand-color-hex');
+            if (bColHex && document.activeElement !== bColHex) { bColHex.value = setColorHex.value; markDirty(bColHex); }
+            if (typeof updateLiveMockupPreview === 'function') {
+              updateLiveMockupPreview($('set-profile-name') ? $('set-profile-name').value : '', $('brand-logo') ? $('brand-logo').value : '', setColorHex.value);
+            }
           }
         });
       }
@@ -297,6 +371,18 @@
         var pickBtn = $('btn-set-profile-' + rKey + '-icon-pick');
         var fileInput = $('input-set-profile-' + rKey + '-icon-file');
         var removeBtn = $('btn-set-profile-' + rKey + '-icon-remove');
+        var setPwaNameInput = $('set-profile-' + rKey + '-pwa-name');
+
+        if (setPwaNameInput) {
+          setPwaNameInput.addEventListener('input', function () {
+            markDirty(setPwaNameInput);
+            var tabInput = $('brand-tab-' + rKey + '-pwa-name');
+            if (tabInput && document.activeElement !== tabInput) {
+              tabInput.value = setPwaNameInput.value;
+              markDirty(tabInput);
+            }
+          });
+        }
 
         if (pickBtn && fileInput) {
           pickBtn.addEventListener('click', function () { fileInput.click(); });
@@ -327,6 +413,10 @@
                 if ($('brand-tab-' + rKey + '-icon-preview')) $('brand-tab-' + rKey + '-icon-preview').src = roleCfg.defaultIcon;
                 if ($('btn-brand-tab-' + rKey + '-icon-remove')) $('btn-brand-tab-' + rKey + '-icon-remove').style.display = 'none';
                 if ($('btn-brand-tab-' + rKey + '-icon-pick')) $('btn-brand-tab-' + rKey + '-icon-pick').textContent = '📁 Unggah Icon';
+                if (window.state && window.state.brand) {
+                  var iconProp = rKey + '_pwa_icon_url';
+                  window.state.brand[iconProp] = null;
+                }
               } else { showToast('❌ Gagal menghapus icon.'); }
             } catch (err) { showToast('❌ Kesalahan jaringan.'); }
           });
@@ -383,11 +473,16 @@
         var json = await res.json();
         if (json.success) {
           showToast('✅ Profil brand berhasil disimpan.');
-          if (json.profile) {
-            applyBrandToUI(json.profile);
+          if (typeof window.clearAllBrandInputsDirty === 'function') {
+            window.clearAllBrandInputsDirty();
           }
-          loadBrandSettings();
-          loadSettingsProfile();
+          if (json.profile && typeof applyBrandToUI === 'function') {
+            applyBrandToUI(json.profile, { forceReset: true });
+          }
+          if (typeof window.loadBrandSettings === 'function') {
+            window.loadBrandSettings({ forceReset: true });
+          }
+          loadSettingsProfile({ forceReset: true });
         } else {
           showToast('❌ Gagal: ' + (json.error || 'Terjadi kesalahan.'));
         }

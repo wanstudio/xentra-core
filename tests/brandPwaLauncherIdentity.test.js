@@ -76,4 +76,26 @@ test('Brand PWA Launcher Identities (Owner, Merchant, POS Kasir, Belanja, Driver
       coreBrandRepo.updateDriverPwaIcon(brandId, { iconUrl: brand.driver_pwa_icon_url, mediaId: brand.driver_pwa_icon_media_id });
     }
   });
+
+  await t.test('form input preservation logic guards dirty and active inputs', () => {
+    function shouldPreserveInputValue(inputEl, forceReset, activeEl) {
+      if (!inputEl) return false;
+      if (forceReset) return false;
+      if (activeEl === inputEl) return true;
+      if (inputEl.dataset && inputEl.dataset.dirty === 'true') return true;
+      return false;
+    }
+
+    const cleanInput = { value: 'Original', dataset: {} };
+    assert.strictEqual(shouldPreserveInputValue(cleanInput, false, null), false, 'clean input should be overwritable');
+
+    const dirtyInput = { value: 'User Typed Text', dataset: { dirty: 'true' } };
+    assert.strictEqual(shouldPreserveInputValue(dirtyInput, false, null), true, 'dirty input MUST be preserved during re-render');
+
+    const focusedInput = { value: 'In-progress Typing', dataset: {} };
+    assert.strictEqual(shouldPreserveInputValue(focusedInput, false, focusedInput), true, 'active/focused input MUST be preserved');
+
+    assert.strictEqual(shouldPreserveInputValue(dirtyInput, true, null), false, 'forceReset must override preservation on explicit save/cancel');
+  });
 });
+

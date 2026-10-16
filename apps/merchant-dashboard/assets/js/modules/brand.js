@@ -51,6 +51,28 @@
      MODUL 1: BRAND & THEME COLOR CONTROLLER
      ========================================================================= */
 
+  function shouldPreserveInputValue(inputEl, forceReset) {
+    if (!inputEl) return false;
+    if (forceReset) return false;
+    if (document.activeElement === inputEl) return true;
+    if (inputEl.dataset && inputEl.dataset.dirty === 'true') return true;
+    return false;
+  }
+
+  function markInputDirty(el) {
+    if (el) el.dataset.dirty = 'true';
+  }
+
+  function clearAllInputsDirty() {
+    document.querySelectorAll('[data-dirty="true"]').forEach(function (el) {
+      delete el.dataset.dirty;
+    });
+  }
+
+  window.shouldPreserveInputValue = shouldPreserveInputValue;
+  window.markInputDirty = markInputDirty;
+  window.clearAllBrandInputsDirty = clearAllInputsDirty;
+
   // ── Installed PWA Identity Override — shared upload helper ─────────────────
   async function doUploadPwaLauncherIcon(file, endpoint, previewEl, hiddenEl, removeBtn, pickBtn, cropSpec) {
     if (pickBtn) { pickBtn.disabled = true; pickBtn.textContent = 'Mengunggah...'; }
@@ -80,43 +102,97 @@
       });
       var iconData = await iconRes.json();
       if (iconRes.ok && iconData.success) {
-        var iconUrl = iconData.merchant_pwa_icon_url || iconData.pos_pwa_icon_url || iconData.url || (previewEl ? previewEl.src : '');
+        var iconUrl = iconData.owner_pwa_icon_url || iconData.merchant_pwa_icon_url || iconData.pos_pwa_icon_url || iconData.customer_pwa_icon_url || iconData.driver_pwa_icon_url || iconData.preview_url || iconData.url || (previewEl ? previewEl.src : '');
         showToast('✅ Icon PWA berhasil diperbarui.');
-        if (previewEl && iconUrl) { previewEl.src = iconUrl; previewEl.style.display = 'block'; }
-        if (hiddenEl && iconUrl) hiddenEl.value = iconUrl;
-        if (removeBtn) removeBtn.style.display = 'inline-block';
-        if (typeof window.loadSettingsProfile === 'function') {
-          window.loadSettingsProfile();
+
+        var match = endpoint.match(/\/admin\/brand\/(owner|merchant|pos|customer|driver)-icon/);
+        var rKey = match ? match[1] : null;
+
+        if (rKey) {
+          // Synchronize icon preview & hidden values across both Brand Tab and Settings Modal
+          if ($('brand-tab-' + rKey + '-icon-preview')) { $('brand-tab-' + rKey + '-icon-preview').src = iconUrl; $('brand-tab-' + rKey + '-icon-preview').style.display = 'block'; }
+          if ($('brand-tab-' + rKey + '-icon')) $('brand-tab-' + rKey + '-icon').value = iconUrl;
+          if ($('btn-brand-tab-' + rKey + '-icon-remove')) $('btn-brand-tab-' + rKey + '-icon-remove').style.display = 'inline-block';
+          if ($('btn-brand-tab-' + rKey + '-icon-pick')) $('btn-brand-tab-' + rKey + '-icon-pick').textContent = '📁 Ganti Icon';
+
+          if ($('set-profile-' + rKey + '-icon-preview')) { $('set-profile-' + rKey + '-icon-preview').src = iconUrl; $('set-profile-' + rKey + '-icon-preview').style.display = 'block'; }
+          if ($('set-profile-' + rKey + '-icon')) $('set-profile-' + rKey + '-icon').value = iconUrl;
+          if ($('set-profile-' + rKey + '-icon-empty')) $('set-profile-' + rKey + '-icon-empty').style.display = 'none';
+          if ($('btn-set-profile-' + rKey + '-icon-remove')) $('btn-set-profile-' + rKey + '-icon-remove').style.display = 'inline-block';
+          if ($('btn-set-profile-' + rKey + '-icon-pick')) $('btn-set-profile-' + rKey + '-icon-pick').textContent = '📁 Ganti';
+
+          if (window.state && window.state.brand) {
+            window.state.brand[rKey + '_pwa_icon_url'] = iconUrl;
+          }
+        } else {
+          if (previewEl && iconUrl) { previewEl.src = iconUrl; previewEl.style.display = 'block'; }
+          if (hiddenEl && iconUrl) hiddenEl.value = iconUrl;
+          if (removeBtn) removeBtn.style.display = 'inline-block';
         }
+        // NOTE: We deliberately do NOT call loadBrandSettings() or loadSettingsProfile() here.
+        // Doing so would re-fetch the database record and wipe out any un-saved text
+        // that the user has already typed in form input fields!
       } else {
         showToast('❌ ' + (iconData.error || 'Gagal menyimpan icon.'));
       }
     } catch (err) {
       showToast('❌ Kesalahan jaringan saat mengunggah icon PWA.');
     } finally {
-      if (pickBtn) { pickBtn.disabled = false; pickBtn.textContent = '📁 Unggah'; }
+      if (pickBtn) { pickBtn.disabled = false; pickBtn.textContent = '📁 Ganti Icon'; }
     }
   }
 
-  async function loadBrandSettings() {
+  async function loadBrandSettings(options) {
     try {
       var res = await adminFetch(API_BASE + '/admin/brand', { headers: getAuthHeaders() });
       var data = await res.json();
       if (data && data.brand) {
         if (!window.state) window.state = {};
         window.state.brand = data.brand;
-        applyBrandToUI(data.brand);
+        applyBrandToUI(data.brand, options);
       }
     } catch (e) {
       console.warn('[Dashboard Brand Load Warn]:', e);
     }
   }
 
-  function applyBrandToUI(brand) {
+  function applyBrandToUI(brand, options) {
     if (!brand) return;
+    var opts = options || {};
+    var onlyMedia = Boolean(opts.onlyMedia);
+    var forceReset = Boolean(opts.forceReset);
 
-    if ($('brand-name')) $('brand-name').value = brand.name || 'Bangjo Resto';
-    if ($('brand-tagline')) $('brand-tagline').value = brand.tagline || 'Official Online Food Ordering';
+    if (!onlyMedia) {
+      var brandNameEl = $('brand-name');
+      if (brandNameEl && !shouldPreserveInputValue(brandNameEl, forceReset)) brandNameEl.value = brand.name || 'Bangjo Resto';
+
+      var brandTaglineEl = $('brand-tagline');
+      if (brandTaglineEl && !shouldPreserveInputValue(brandTaglineEl, forceReset)) brandTaglineEl.value = brand.tagline || 'Official Online Food Ordering';
+
+      var brandColorEl = $('brand-color');
+      if (brandColorEl && !shouldPreserveInputValue(brandColorEl, forceReset)) brandColorEl.value = brand.primary_color || '#b6ff00';
+
+      var brandColorHexEl = $('brand-color-hex');
+      if (brandColorHexEl && !shouldPreserveInputValue(brandColorHexEl, forceReset)) brandColorHexEl.value = brand.primary_color || '#b6ff00';
+
+      var brandDomainEl = $('brand-domain');
+      if (brandDomainEl && !shouldPreserveInputValue(brandDomainEl, forceReset)) brandDomainEl.value = brand.custom_domain || 'app.mybangjo.com';
+
+      var setProfileNameEl = $('set-profile-name');
+      if (setProfileNameEl && !shouldPreserveInputValue(setProfileNameEl, forceReset)) setProfileNameEl.value = brand.name || '';
+
+      var setProfileTaglineEl = $('set-profile-tagline');
+      if (setProfileTaglineEl && !shouldPreserveInputValue(setProfileTaglineEl, forceReset)) setProfileTaglineEl.value = brand.tagline || '';
+
+      var setProfileColorEl = $('set-profile-color');
+      if (setProfileColorEl && !shouldPreserveInputValue(setProfileColorEl, forceReset)) setProfileColorEl.value = brand.primary_color || '#b6ff00';
+
+      var setProfileColorHexEl = $('set-profile-color-hex');
+      if (setProfileColorHexEl && !shouldPreserveInputValue(setProfileColorHexEl, forceReset)) setProfileColorHexEl.value = brand.primary_color || '#b6ff00';
+
+      if ($('set-profile-domain')) $('set-profile-domain').textContent = brand.custom_domain || window.location.host || '-';
+    }
+
     var logoUrl = brand.logo_url || '/assets/pwa/icon-192.png';
     if ($('brand-logo')) $('brand-logo').value = logoUrl;
     if ($('brand-logo-preview')) {
@@ -126,10 +202,6 @@
     if ($('brand-logo-empty')) $('brand-logo-empty').style.display = 'none';
     if ($('btn-brand-logo-remove')) $('btn-brand-logo-remove').style.display = (logoUrl && logoUrl !== '/assets/pwa/icon-192.png') ? 'inline-block' : 'none';
 
-    if ($('brand-color')) $('brand-color').value = brand.primary_color || '#b6ff00';
-    if ($('brand-color-hex')) $('brand-color-hex').value = brand.primary_color || '#b6ff00';
-    if ($('brand-domain')) $('brand-domain').value = brand.custom_domain || 'app.mybangjo.com';
-
     if ($('dash-brand-title')) $('dash-brand-title').textContent = brand.name || 'Bangjo Resto';
     if ($('dash-sidebar-logo')) $('dash-sidebar-logo').src = logoUrl;
     if ($('topbar-brand-name')) $('topbar-brand-name').textContent = brand.name || 'Bangjo Resto';
@@ -138,8 +210,6 @@
       $('topbar-brand-badge').style.display = 'none';
     }
 
-    if ($('set-profile-name')) $('set-profile-name').value = brand.name || '';
-    if ($('set-profile-tagline')) $('set-profile-tagline').value = brand.tagline || '';
     if ($('set-profile-logo')) $('set-profile-logo').value = logoUrl;
     if ($('set-profile-logo-preview')) {
       $('set-profile-logo-preview').src = logoUrl;
@@ -148,9 +218,6 @@
     if ($('set-profile-logo-empty')) $('set-profile-logo-empty').style.display = 'none';
     if ($('btn-set-profile-logo-remove')) $('btn-set-profile-logo-remove').style.display = (logoUrl && logoUrl !== '/assets/pwa/icon-192.png') ? 'inline-block' : 'none';
     if ($('btn-set-profile-logo-pick')) $('btn-set-profile-logo-pick').textContent = (logoUrl && logoUrl !== '/assets/pwa/icon-192.png') ? '📁 Ganti Logo' : '📁 Unggah Logo';
-    if ($('set-profile-color')) $('set-profile-color').value = brand.primary_color || '#b6ff00';
-    if ($('set-profile-color-hex')) $('set-profile-color-hex').value = brand.primary_color || '#b6ff00';
-    if ($('set-profile-domain')) $('set-profile-domain').textContent = brand.custom_domain || window.location.host || '-';
 
     if ($('auth-brand-name')) $('auth-brand-name').textContent = brand.name || 'Bangjo Resto';
     if ($('auth-logo')) $('auth-logo').src = logoUrl;
@@ -171,7 +238,10 @@
       var hasCustom = Boolean(iconUrl);
 
       // Brand tab
-      if ($('brand-tab-' + r.key + '-pwa-name')) $('brand-tab-' + r.key + '-pwa-name').value = pwaName;
+      var tabPwaNameEl = $('brand-tab-' + r.key + '-pwa-name');
+      if (!onlyMedia && tabPwaNameEl && !shouldPreserveInputValue(tabPwaNameEl, forceReset)) {
+        tabPwaNameEl.value = pwaName;
+      }
       if ($('brand-tab-' + r.key + '-icon')) $('brand-tab-' + r.key + '-icon').value = iconUrl || '';
       if ($('brand-tab-' + r.key + '-icon-preview')) {
         $('brand-tab-' + r.key + '-icon-preview').src = effectiveIcon;
@@ -181,7 +251,10 @@
       if ($('btn-brand-tab-' + r.key + '-icon-pick')) $('btn-brand-tab-' + r.key + '-icon-pick').textContent = hasCustom ? '📁 Ganti Icon' : '📁 Unggah Icon';
 
       // Settings modal
-      if ($('set-profile-' + r.key + '-pwa-name')) $('set-profile-' + r.key + '-pwa-name').value = pwaName;
+      var setPwaNameEl = $('set-profile-' + r.key + '-pwa-name');
+      if (!onlyMedia && setPwaNameEl && !shouldPreserveInputValue(setPwaNameEl, forceReset)) {
+        setPwaNameEl.value = pwaName;
+      }
       if ($('set-profile-' + r.key + '-icon')) $('set-profile-' + r.key + '-icon').value = iconUrl || '';
       if ($('set-profile-' + r.key + '-icon-preview')) {
         $('set-profile-' + r.key + '-icon-preview').src = effectiveIcon;
@@ -193,7 +266,9 @@
     });
 
     renderBannersList(brand.banners);
-    updateLiveMockupPreview(brand.name, logoUrl, brand.primary_color);
+    var activeBrandName = ($('brand-name') && $('brand-name').value) || brand.name || 'Bangjo Resto';
+    var activeColor = ($('brand-color') && $('brand-color').value) || brand.primary_color || '#b6ff00';
+    updateLiveMockupPreview(activeBrandName, logoUrl, activeColor);
   }
 
   function updateLiveMockupPreview(name, logo, color) {
@@ -288,10 +363,11 @@
         if (_nameInput2 && _colorPicker2) {
           updateLiveMockupPreview(_nameInput2.value, logoUrl, _colorPicker2.value);
         }
-        loadBrandSettings();
-        if (typeof window.loadSettingsProfile === 'function') {
-          window.loadSettingsProfile();
+        if (window.state && window.state.brand) {
+          window.state.brand.logo_url = logoUrl;
         }
+        // Do NOT call loadBrandSettings() or loadSettingsProfile() here.
+        // That would re-fetch the database record and wipe out any un-saved text typed in form inputs!
       } else {
         showToast('❌ ' + (data.error || 'Gagal mengunggah logo brand.'));
       }
@@ -311,25 +387,68 @@
     var logoInput = $('brand-logo');
     var nameInput = $('brand-name');
 
-    if (colorPicker && colorHex && nameInput && logoInput) {
+    var taglineInput = $('brand-tagline');
+    var domainInput = $('brand-domain');
+
+    if (colorPicker && colorHex) {
       colorPicker.addEventListener('input', function () {
+        markInputDirty(colorPicker);
         colorHex.value = colorPicker.value;
-        updateLiveMockupPreview(nameInput.value, logoInput.value, colorPicker.value);
+        markInputDirty(colorHex);
+        var setCol = $('set-profile-color');
+        if (setCol && document.activeElement !== setCol) { setCol.value = colorPicker.value; markInputDirty(setCol); }
+        var setColHex = $('set-profile-color-hex');
+        if (setColHex && document.activeElement !== setColHex) { setColHex.value = colorPicker.value; markInputDirty(setColHex); }
+        updateLiveMockupPreview(nameInput ? nameInput.value : '', logoInput ? logoInput.value : '', colorPicker.value);
       });
 
       colorHex.addEventListener('input', function () {
+        markInputDirty(colorHex);
         if (/^#[0-9A-Fa-f]{6}$/.test(colorHex.value)) {
           colorPicker.value = colorHex.value;
-          updateLiveMockupPreview(nameInput.value, logoInput.value, colorHex.value);
+          markInputDirty(colorPicker);
+          var setCol = $('set-profile-color');
+          if (setCol && document.activeElement !== setCol) { setCol.value = colorHex.value; markInputDirty(setCol); }
+          var setColHex = $('set-profile-color-hex');
+          if (setColHex && document.activeElement !== setColHex) { setColHex.value = colorHex.value; markInputDirty(setColHex); }
+          updateLiveMockupPreview(nameInput ? nameInput.value : '', logoInput ? logoInput.value : '', colorHex.value);
         }
       });
+    }
 
+    if (logoInput) {
       logoInput.addEventListener('input', function () {
-        updateLiveMockupPreview(nameInput.value, logoInput.value, colorPicker.value);
+        markInputDirty(logoInput);
+        updateLiveMockupPreview(nameInput ? nameInput.value : '', logoInput.value, colorPicker ? colorPicker.value : '');
       });
+    }
 
+    if (nameInput) {
       nameInput.addEventListener('input', function () {
-        updateLiveMockupPreview(nameInput.value, logoInput.value, colorPicker.value);
+        markInputDirty(nameInput);
+        var setProfileName = $('set-profile-name');
+        if (setProfileName && document.activeElement !== setProfileName) {
+          setProfileName.value = nameInput.value;
+          markInputDirty(setProfileName);
+        }
+        updateLiveMockupPreview(nameInput.value, logoInput ? logoInput.value : '', colorPicker ? colorPicker.value : '');
+      });
+    }
+
+    if (taglineInput) {
+      taglineInput.addEventListener('input', function () {
+        markInputDirty(taglineInput);
+        var setTagline = $('set-profile-tagline');
+        if (setTagline && document.activeElement !== setTagline) {
+          setTagline.value = taglineInput.value;
+          markInputDirty(setTagline);
+        }
+      });
+    }
+
+    if (domainInput) {
+      domainInput.addEventListener('input', function () {
+        markInputDirty(domainInput);
       });
     }
 
@@ -337,8 +456,12 @@
     document.querySelectorAll('.x-swatch').forEach(function (swatch) {
       swatch.addEventListener('click', function () {
         var c = swatch.dataset.color;
-        if (colorPicker) colorPicker.value = c;
-        if (colorHex) colorHex.value = c;
+        if (colorPicker) { colorPicker.value = c; markInputDirty(colorPicker); }
+        if (colorHex) { colorHex.value = c; markInputDirty(colorHex); }
+        var setCol = $('set-profile-color');
+        if (setCol) { setCol.value = c; markInputDirty(setCol); }
+        var setColHex = $('set-profile-color-hex');
+        if (setColHex) { setColHex.value = c; markInputDirty(setColHex); }
         if (nameInput && logoInput) {
           updateLiveMockupPreview(nameInput.value, logoInput.value, c);
         }
@@ -437,11 +560,11 @@
             if ($('set-profile-logo-preview')) $('set-profile-logo-preview').src = defaultLogo;
             if ($('btn-set-profile-logo-remove')) $('btn-set-profile-logo-remove').style.display = 'none';
             if ($('dash-sidebar-logo')) $('dash-sidebar-logo').src = defaultLogo;
-            updateLiveMockupPreview(nameInput ? nameInput.value : '', defaultLogo, colorPicker ? colorPicker.value : '');
-            loadBrandSettings();
-            if (typeof window.loadSettingsProfile === 'function') {
-              window.loadSettingsProfile();
+            if (window.state && window.state.brand) {
+              window.state.brand.logo_url = defaultLogo;
             }
+            // Do NOT call loadBrandSettings() or loadSettingsProfile() here.
+            // That would re-fetch the database record and wipe out any un-saved text typed in form inputs!
           } else {
             showToast('❌ Gagal menghapus logo.');
           }
@@ -530,9 +653,10 @@
           var data = await res.json();
           if (data.success) {
             showToast('✅ Brand dan tema berhasil disimpan!');
-            applyBrandToUI(data.brand);
+            clearAllInputsDirty();
+            applyBrandToUI(data.brand, { forceReset: true });
             if (typeof window.loadSettingsProfile === 'function') {
-              window.loadSettingsProfile();
+              window.loadSettingsProfile({ forceReset: true });
             }
           } else {
             showToast('❌ Gagal menyimpan: ' + data.error);
@@ -550,11 +674,11 @@
 
     // Brand Tab PWA Launcher Icon Listeners for Owner, Merchant, POS Kasir, Belanja, Driver
     var pwaRoleConfig = [
-      { key: 'owner', label: 'Owner PWA', endpoint: '/admin/brand/owner-icon' },
-      { key: 'merchant', label: 'Merchant PWA', endpoint: '/admin/brand/merchant-icon' },
-      { key: 'pos', label: 'POS Kasir PWA', endpoint: '/admin/brand/pos-icon' },
-      { key: 'customer', label: 'Belanja PWA', endpoint: '/admin/brand/customer-icon' },
-      { key: 'driver', label: 'Driver PWA', endpoint: '/admin/brand/driver-icon' }
+      { key: 'owner', label: 'Owner PWA', endpoint: '/admin/brand/owner-icon', defaultIcon: '/assets/pwa/icon-192.png', iconKey: 'owner_pwa_icon_url' },
+      { key: 'merchant', label: 'Merchant PWA', endpoint: '/admin/brand/merchant-icon', defaultIcon: '/merchant-app/assets/icons/icon-192.png', iconKey: 'merchant_pwa_icon_url' },
+      { key: 'pos', label: 'POS Kasir PWA', endpoint: '/admin/brand/pos-icon', defaultIcon: '/pos/assets/icons/icon-192.png', iconKey: 'pos_pwa_icon_url' },
+      { key: 'customer', label: 'Belanja PWA', endpoint: '/admin/brand/customer-icon', defaultIcon: '/assets/pwa/icon-192.png', iconKey: 'customer_pwa_icon_url' },
+      { key: 'driver', label: 'Driver PWA', endpoint: '/admin/brand/driver-icon', defaultIcon: '/driver-app/assets/icons/icon-192.png', iconKey: 'driver_pwa_icon_url' }
     ];
 
     pwaRoleConfig.forEach(function (roleCfg) {
@@ -563,6 +687,18 @@
       var btnPick = $('btn-brand-tab-' + rKey + '-icon-pick');
       var fileInput = $('input-brand-tab-' + rKey + '-icon-file');
       var btnRemove = $('btn-brand-tab-' + rKey + '-icon-remove');
+      var pwaNameInput = $('brand-tab-' + rKey + '-pwa-name');
+
+      if (pwaNameInput) {
+        pwaNameInput.addEventListener('input', function () {
+          markInputDirty(pwaNameInput);
+          var setInput = $('set-profile-' + rKey + '-pwa-name');
+          if (setInput && document.activeElement !== setInput) {
+            setInput.value = pwaNameInput.value;
+            markInputDirty(setInput);
+          }
+        });
+      }
 
       if (btnPick && fileInput) {
         btnPick.addEventListener('click', function () { fileInput.click(); });
@@ -611,7 +747,6 @@
                 await doUploadPwaLauncherIcon(file, roleCfg.endpoint,
                   $('brand-tab-' + rKey + '-icon-preview'), $('brand-tab-' + rKey + '-icon'),
                   btnRemove, btnPick, cropSpec);
-                loadBrandSettings();
               } finally {
                 fileInput.value = '';
               }
@@ -634,8 +769,20 @@
             var data = await res.json();
             if (res.ok && data.success) {
               showToast('✅ Icon kustom ' + rLabel + ' dihapus.');
-              loadBrandSettings();
-              if (typeof window.loadSettingsProfile === 'function') window.loadSettingsProfile();
+              var defaultIcon = roleCfg.defaultIcon;
+              if ($('brand-tab-' + rKey + '-icon')) $('brand-tab-' + rKey + '-icon').value = '';
+              if ($('brand-tab-' + rKey + '-icon-preview')) $('brand-tab-' + rKey + '-icon-preview').src = defaultIcon;
+              btnRemove.style.display = 'none';
+              if (btnPick) btnPick.textContent = '📁 Unggah Icon';
+
+              if ($('set-profile-' + rKey + '-icon')) $('set-profile-' + rKey + '-icon').value = '';
+              if ($('set-profile-' + rKey + '-icon-preview')) $('set-profile-' + rKey + '-icon-preview').src = defaultIcon;
+              if ($('btn-set-profile-' + rKey + '-icon-remove')) $('btn-set-profile-' + rKey + '-icon-remove').style.display = 'none';
+              if ($('btn-set-profile-' + rKey + '-icon-pick')) $('btn-set-profile-' + rKey + '-icon-pick').textContent = '📁 Unggah';
+
+              if (window.state && window.state.brand) {
+                window.state.brand[roleCfg.iconKey] = null;
+              }
             } else {
               showToast('❌ Gagal menghapus icon ' + rLabel + '.');
             }
