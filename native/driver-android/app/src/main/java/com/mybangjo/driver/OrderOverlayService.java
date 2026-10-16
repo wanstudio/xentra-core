@@ -3,7 +3,9 @@ package com.mybangjo.driver;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
 import android.graphics.PixelFormat;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.IBinder;
 import android.provider.Settings;
@@ -11,6 +13,7 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 
 import androidx.annotation.Nullable;
@@ -42,18 +45,40 @@ public class OrderOverlayService extends Service {
         }
 
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
-        ImageView bubble = new ImageView(this);
-        bubble.setImageResource(R.mipmap.ic_launcher);
-        int size = (int) (60 * getResources().getDisplayMetrics().density);
-        bubble.setLayoutParams(new WindowManager.LayoutParams(size, size));
+
+        FrameLayout root = new FrameLayout(this);
+        int pad = dp(6);
+        root.setPadding(pad, pad, pad, pad);
+
+        // Circular background (Dark Slate with Emerald green accent)
+        GradientDrawable bg = new GradientDrawable();
+        bg.setShape(GradientDrawable.OVAL);
+        bg.setColor(Color.parseColor("#0f172a")); // Dark Slate
+        bg.setStroke(dp(2.5f), Color.parseColor("#059669")); // Emerald green accent
+        bg.setSize(dp(54), dp(54));
+
+        FrameLayout ball = new FrameLayout(this);
+        ball.setBackground(bg);
+        ball.setLayoutParams(new FrameLayout.LayoutParams(dp(54), dp(54)));
+
+        // App Icon inside the ball (Proportional round launcher icon with 7dp padding)
+        ImageView iconView = new ImageView(this);
+        iconView.setImageResource(R.mipmap.ic_launcher_round);
+        int iconPadding = dp(7);
+        iconView.setPadding(iconPadding, iconPadding, iconPadding, iconPadding);
+        FrameLayout.LayoutParams iconLp = new FrameLayout.LayoutParams(dp(54), dp(54));
+        iconLp.gravity = Gravity.CENTER;
+        ball.addView(iconView, iconLp);
+
+        root.addView(ball);
 
         int layoutType = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
                 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                 : WindowManager.LayoutParams.TYPE_PHONE;
 
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                size,
-                size,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
                 layoutType,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT
@@ -63,7 +88,7 @@ public class OrderOverlayService extends Service {
         params.x = 20;
         params.y = 200;
 
-        bubble.setOnTouchListener(new View.OnTouchListener() {
+        root.setOnTouchListener(new View.OnTouchListener() {
             private int initialX, initialY;
             private float initialTouchX, initialTouchY;
 
@@ -79,7 +104,7 @@ public class OrderOverlayService extends Service {
                     case MotionEvent.ACTION_MOVE:
                         params.x = initialX + (int) (event.getRawX() - initialTouchX);
                         params.y = initialY + (int) (event.getRawY() - initialTouchY);
-                        windowManager.updateViewLayout(bubble, params);
+                        windowManager.updateViewLayout(root, params);
                         return true;
                     case MotionEvent.ACTION_UP:
                         float deltaX = Math.abs(event.getRawX() - initialTouchX);
@@ -96,8 +121,12 @@ public class OrderOverlayService extends Service {
             }
         });
 
-        floatingView = bubble;
+        floatingView = root;
         windowManager.addView(floatingView, params);
+    }
+
+    private int dp(float val) {
+        return (int) (val * getResources().getDisplayMetrics().density);
     }
 
     @Override

@@ -50,14 +50,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: pos-v1.1.2
-          name: "Mybangjo POS App v1.1.2"
+          tag_name: pos-v1.1.3
+          name: "Mybangjo POS App v1.1.3"
           make_latest: false
           body: |
-            ### Mybangjo POS App v1.1.2 (Official POS Icon & Full Parity)
+            ### Mybangjo POS App v1.1.3 (Official Proportional Floating Icon & Full Parity)
             - Download langsung file `mybangjo-pos.apk` di bawah tanpa ekstrak ZIP.
-            - **Pembaruan v1.1.2**:
-              - **Ikon Resmi POS Sesuai Upload Owner**: Ikon aplikasi di homescreen dan bola melayang (assistive ball) kini menggunakan logo POS resmi yang di-upload dari dashboard Owner (`/owner` POS PWA).
+            - **Pembaruan v1.1.3**:
+              - **Floating Icon Seragam & Proporsional (Merchant Parity)**: Desain bola melayang diselaraskan 100% dengan formula Merchant (Dark Slate `#0f172a` dengan aksen Emerald Green, icon bulat `ic_launcher_round` proporsional dengan padding 7dp). Tidak lagi kekecilan atau bertabrakan warna.
               - **Floating Assistive Ball (Bola Melayang 24/7)**: Bola pintar kasir dengan logo resmi POS, menampilkan counter pesanan baru, dan membuka kasir saat diklik.
               - **Top Bar / Status Bar HP Dinamis Adaptif**: Mengikuti warna halaman aktif.
               - **Background Order Monitor & Sirene Audio**: Memantau pesanan masuk secara real-time.

@@ -181,38 +181,40 @@ public class OrderOverlayService extends Service {
 
     private static View buildBallView(Context context, int pendingCount) {
         FrameLayout root = new FrameLayout(context);
-        root.setPadding(dp(context, 4), dp(context, 4), dp(context, 4), dp(context, 4));
+        root.setPadding(dp(context, 6), dp(context, 6), dp(context, 6), dp(context, 6));
 
-        FrameLayout ball = new FrameLayout(context);
-        int ballSize = dp(context, 54);
-        FrameLayout.LayoutParams ballLp = new FrameLayout.LayoutParams(ballSize, ballSize);
-        ball.setLayoutParams(ballLp);
-
+        // Circular background (Dark Slate with Emerald green accent)
         GradientDrawable bg = new GradientDrawable();
         bg.setShape(GradientDrawable.OVAL);
-        bg.setColor(Color.parseColor("#059669")); // Emerald green POS
-        bg.setStroke(dp(context, 2), Color.WHITE);
+        bg.setColor(Color.parseColor("#0f172a")); // Dark Slate
+        bg.setStroke(dp(context, 2.5f), Color.parseColor("#059669")); // Emerald green accent
+        bg.setSize(dp(context, 54), dp(context, 54));
+
+        FrameLayout ball = new FrameLayout(context);
         ball.setBackground(bg);
-        ball.setElevation(dp(context, 8));
+        ball.setLayoutParams(new FrameLayout.LayoutParams(dp(context, 54), dp(context, 54)));
 
-        ImageView icon = new ImageView(context);
-        int iconSize = dp(context, 28);
-        FrameLayout.LayoutParams iconLp = new FrameLayout.LayoutParams(iconSize, iconSize);
+        // App Icon inside the ball (Proportional round launcher icon with 7dp padding)
+        ImageView iconView = new ImageView(context);
+        iconView.setImageResource(R.mipmap.ic_launcher_round);
+        int iconPadding = dp(context, 7);
+        iconView.setPadding(iconPadding, iconPadding, iconPadding, iconPadding);
+        FrameLayout.LayoutParams iconLp = new FrameLayout.LayoutParams(dp(context, 54), dp(context, 54));
         iconLp.gravity = Gravity.CENTER;
-        icon.setLayoutParams(iconLp);
-        icon.setImageResource(R.mipmap.ic_launcher);
-        ball.addView(icon);
+        ball.addView(iconView, iconLp);
 
+        // Badge Counter (Red dot or number)
         TextView badgeTv = new TextView(context);
+        badgeTv.setId(View.generateViewId());
         badgeTv.setTag("badge_count");
-        badgeTv.setTextSize(10f);
+        badgeTv.setTextSize(10.5f);
         badgeTv.setTextColor(Color.WHITE);
+        badgeTv.setTypeface(null, android.graphics.Typeface.BOLD);
         badgeTv.setGravity(Gravity.CENTER);
 
         GradientDrawable badgeBg = new GradientDrawable();
         badgeBg.setShape(GradientDrawable.OVAL);
-        badgeBg.setColor(Color.parseColor("#EF4444")); // Red alert badge
-        badgeBg.setStroke(dp(context, 1.5f), Color.WHITE);
+        badgeBg.setColor(Color.parseColor("#ef4444")); // Crimson Red
         badgeTv.setBackground(badgeBg);
 
         FrameLayout.LayoutParams badgeLp = new FrameLayout.LayoutParams(dp(context, 20), dp(context, 20));
