@@ -397,7 +397,6 @@ class InventoryRepository {
     const isByOrder = Boolean(product && String(product.fulfillment_type || '').toUpperCase() === 'BY_ORDER');
 
     if (this._isCanonicalStockProduct(productId)) {
-      this.ensureBranchProductInventory({ branchId, productId });
       const canonical = this.findCanonicalBranchInventory(branchId, productId);
       if (!canonical && !isByOrder) return null;
       return {
