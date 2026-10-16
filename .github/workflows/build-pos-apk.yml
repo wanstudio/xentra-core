@@ -50,14 +50,16 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: pos-v1.1.4
-          name: "Mybangjo POS App v1.1.4"
+          tag_name: pos-v1.1.5
+          name: "Mybangjo POS App v1.1.5"
           make_latest: false
           body: |
-            ### Mybangjo POS App v1.1.4 (Official Proportional Floating Icon with POS Brand Blue Accent)
+            ### Mybangjo POS App v1.1.5 (Native Google Sign-In & Account Picker Parity)
             - Download langsung file `mybangjo-pos.apk` di bawah tanpa ekstrak ZIP.
-            - **Pembaruan v1.1.4**:
-              - **Floating Icon Beraksen Biru Khas POS**: Desain bola melayang diselaraskan 100% dengan formula Merchant (Dark Slate `#0f172a` dengan aksen Royal Blue khas POS `#2563eb`, icon bulat `ic_launcher_round` proporsional dengan padding 7dp). Tampilan sangat proporsional, elegan, dan identik dengan warna brand POS.
+            - **Pembaruan Penting v1.1.5**:
+              - **Native Google Sign-In (1-Tap Account Picker Bottom Sheet)**: Tombol "Continue with Google" kini langsung memunculkan bottom sheet daftar akun Google bawaan sistem HP ("Pilih akun Google") layaknya Gojek/Grab/Tokopedia via Google Play Services auth.
+              - **Seamless Token Synchronization**: ID Token terverifikasi langsung ditransfer ke backend dan otomatis masuk ke sesi POS kasir.
+              - **Floating Icon Beraksen Biru Khas POS**: Desain bola melayang diselaraskan 100% dengan formula Merchant (Dark Slate `#0f172a` dengan aksen Royal Blue khas POS `#2563eb`, icon bulat `ic_launcher_round` proporsional dengan padding 7dp).
               - **Floating Assistive Ball (Bola Melayang 24/7)**: Bola pintar kasir dengan logo resmi POS, menampilkan counter pesanan baru, dan membuka kasir saat diklik.
               - **Top Bar / Status Bar HP Dinamis Adaptif**: Mengikuti warna halaman aktif.
               - **Background Order Monitor & Sirene Audio**: Memantau pesanan masuk secara real-time.

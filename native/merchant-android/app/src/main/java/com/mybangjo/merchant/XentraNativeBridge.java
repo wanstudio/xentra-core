@@ -38,6 +38,19 @@ public class XentraNativeBridge {
         }
     }
 
+    // ── Native Google Sign-In (System Account Picker) ──
+    @JavascriptInterface
+    public void launchGoogleSignIn() {
+        launchGoogleSignIn("");
+    }
+
+    @JavascriptInterface
+    public void launchGoogleSignIn(String clientId) {
+        if (context instanceof MainActivity) {
+            ((MainActivity) context).startGoogleSignIn(clientId);
+        }
+    }
+
     // ── Authentication Synchronization for Native Background Worker ──
     @JavascriptInterface
     public void syncAuth(String token, String branchId) {

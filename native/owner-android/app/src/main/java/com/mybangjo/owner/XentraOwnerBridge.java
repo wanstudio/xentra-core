@@ -59,6 +59,17 @@ public class XentraOwnerBridge {
         activity.updateStatusBar(hexColor, darkIcons);
     }
 
+    // ── Native Google Sign-In (System Account Picker) ──
+    @JavascriptInterface
+    public void launchGoogleSignIn() {
+        launchGoogleSignIn("");
+    }
+
+    @JavascriptInterface
+    public void launchGoogleSignIn(String clientId) {
+        activity.startGoogleSignIn(clientId);
+    }
+
     // ── Authentication Synchronization for Background Order Monitor ──
     @JavascriptInterface
     public void syncAuth(String token, String branchId) {

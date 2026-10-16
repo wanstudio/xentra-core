@@ -22,6 +22,17 @@ public class XentraDriverBridge {
         return true;
     }
 
+    // ── Native Google Sign-In (System Account Picker) ──
+    @JavascriptInterface
+    public void launchGoogleSignIn() {
+        launchGoogleSignIn("");
+    }
+
+    @JavascriptInterface
+    public void launchGoogleSignIn(String clientId) {
+        activity.startGoogleSignIn(clientId);
+    }
+
     @JavascriptInterface
     public void setAuthToken(String token, String driverId, String brandId, String branchId) {
         prefs.edit()

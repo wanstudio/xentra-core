@@ -34,6 +34,13 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+import com.google.android.gms.auth.api.signin.GoogleSignIn;
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
+import com.google.android.gms.auth.api.signin.GoogleSignInClient;
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
+import com.google.android.gms.common.api.ApiException;
+import com.google.android.gms.tasks.Task;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -45,6 +52,28 @@ public class MainActivity extends AppCompatActivity {
     private ProgressBar progressBar;
     private SwipeRefreshLayout swipeRefreshLayout;
     private ValueCallback<Uri[]> filePathCallback;
+    private GoogleSignInClient googleSignInClient;
+    private final ActivityResultLauncher<Intent> googleSignInLauncher =
+        registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+            if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+                Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(result.getData());
+                try {
+                    GoogleSignInAccount account = task.getResult(ApiException.class);
+                    if (account != null) {
+                        String idToken = account.getIdToken();
+                        String email = account.getEmail() != null ? account.getEmail() : "";
+                        String displayName = account.getDisplayName() != null ? account.getDisplayName() : "";
+                        notifyGoogleSignInSuccess(idToken, email, displayName);
+                    } else {
+                        notifyGoogleSignInError(12500, "Akun Google tidak ditemukan.");
+                    }
+                } catch (ApiException e) {
+                    notifyGoogleSignInError(e.getStatusCode(), e.getMessage());
+                }
+            } else {
+                notifyGoogleSignInError(12501, "Pemilihan akun Google dibatalkan.");
+            }
+        });
 
     private final ActivityResultLauncher<String[]> permissionLauncher =
         registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), result -> {
@@ -356,6 +385,54 @@ public class MainActivity extends AppCompatActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         handleIncomingIntent(intent);
+    }
+
+    public void startGoogleSignIn(String clientId) {
+        runOnUiThread(() -> {
+            try {
+                String targetClientId = (clientId != null && !clientId.trim().isEmpty())
+                    ? clientId.trim()
+                    : "72550286278-n12ssb6giqmt5b8vv8e6pebrv1cpgnrq.apps.googleusercontent.com";
+
+                GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                    .requestIdToken(targetClientId)
+                    .requestEmail()
+                    .build();
+
+                googleSignInClient = GoogleSignIn.getClient(this, gso);
+                googleSignInClient.signOut().addOnCompleteListener(this, task -> {
+                    Intent signInIntent = googleSignInClient.getSignInIntent();
+                    googleSignInLauncher.launch(signInIntent);
+                });
+            } catch (Exception e) {
+                notifyGoogleSignInError(-1, e.getMessage());
+            }
+        });
+    }
+
+    private void notifyGoogleSignInSuccess(String idToken, String email, String displayName) {
+        if (webView == null) return;
+        String js = String.format(
+            "if (typeof window.onGoogleSignInNativeSuccess === 'function') { " +
+            "  window.onGoogleSignInNativeSuccess(%s, %s, %s); " +
+            "}",
+            JSONObject.quote(idToken != null ? idToken : ""),
+            JSONObject.quote(email != null ? email : ""),
+            JSONObject.quote(displayName != null ? displayName : "")
+        );
+        webView.post(() -> webView.evaluateJavascript(js, null));
+    }
+
+    private void notifyGoogleSignInError(int code, String message) {
+        if (webView == null) return;
+        String js = String.format(
+            "if (typeof window.onGoogleSignInNativeError === 'function') { " +
+            "  window.onGoogleSignInNativeError(%d, %s); " +
+            "}",
+            code,
+            JSONObject.quote(message != null ? message : "Google Sign-In failed")
+        );
+        webView.post(() -> webView.evaluateJavascript(js, null));
     }
 
     private void handleIncomingIntent(Intent intent) {

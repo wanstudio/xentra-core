@@ -50,13 +50,15 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: owner-v1.0.0
-          name: "Mybangjo Owner App v1.0.0"
+          tag_name: owner-v1.0.1
+          name: "Mybangjo Owner App v1.0.1"
           make_latest: false
           body: |
-            ### Mybangjo Owner App v1.0.0 (Official Owner Mobile & APK Release)
+            ### Mybangjo Owner App v1.0.1 (Native Google Sign-In & Account Picker Parity)
             - Download langsung file `mybangjo-owner.apk` di bawah tanpa ekstrak ZIP.
-            - **Fitur Utama v1.0.0**:
+            - **Pembaruan Penting v1.0.1**:
+              - **Native Google Sign-In (1-Tap Account Picker Bottom Sheet)**: Tombol "Continue with Google" kini langsung memunculkan bottom sheet daftar akun Google bawaan sistem HP ("Pilih akun Google") layaknya Gojek/Grab/Tokopedia via Google Play Services auth.
+              - **Seamless Token Synchronization**: ID Token terverifikasi langsung ditransfer ke backend dan otomatis masuk ke sesi Owner.
               - **Aplikasi Mobile Khusus Owner**: Terpisah bersih dari dashboard desktop. Menggunakan Bottom Navigation (5 Tab: Beranda, Bisnis, Pesanan, Keuangan, Lainnya).
               - **Ikon Resmi Owner**: Menggunakan logo resmi Owner (Slate Metal) yang di-upload dari dashboard.
               - **Floating Assistive Ball 24/7**: Bola melayang pintar beraksen Slate Metal `#64748b` untuk memantau pesanan masuk secara real-time.

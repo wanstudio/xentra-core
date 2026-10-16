@@ -1122,74 +1122,140 @@
       }
 
       // 7. Google Authentication
-      // Platform context: inline Google SDK — calls /api/v1/auth/google directly (pre-regression behavior).
-      // Client context: btn-google-login redirects to xentra.cloud auth broker (cross-domain handoff).
       var btnGoogleLogin = document.getElementById('btn-google-login');
       var googleBtnSlot = document.getElementById('google-btn-slot');
       var googleContainer = document.getElementById('google-auth-container');
       var googleStatus = document.getElementById('google-auth-status');
       var isGoogleAuthenticating = false;
+      var cachedGoogleClientId = '72550286278-n12ssb6giqmt5b8vv8e6pebrv1cpgnrq.apps.googleusercontent.com';
 
-      if (isPlatform) {
-        // Platform: use inline Google SDK — same path that worked before dashboard separation.
-        // DO NOT redirect to /signin (that is the SaaS restaurant-owner sign-in page, not the Platform auth path).
-        if (btnGoogleLogin) btnGoogleLogin.style.display = 'none'; // hide static button; SDK renders its own
-
-        function handlePlatformGoogleCredential(response) {
-          if (!response || !response.credential) {
-            errorBox.textContent = '❌ Kredensial Google tidak diterima.';
-            errorBox.style.display = 'block';
-            return;
-          }
-          if (isGoogleAuthenticating) return;
-          isGoogleAuthenticating = true;
-          errorBox.style.display = 'none';
-          if (googleStatus) { googleStatus.textContent = 'Memverifikasi akun Google dengan Xentra...'; googleStatus.style.display = 'block'; }
-
-          fetch('/api/v1/auth/google', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ credential: response.credential })
-          }).then(function (res) {
-            return res.json().then(function (data) {
-              if (res.ok && data && data.success && data.token) {
-                var validation = validateSubdomainRole(data.user);
-                if (!validation.allowed) {
-                  showRoleMismatchError(validation);
-                  return;
-                }
-                localStorage.setItem(TOKEN_KEY, data.token);
-                if (data.user) localStorage.setItem(USER_KEY, JSON.stringify(data.user));
-                if (googleStatus) { googleStatus.textContent = 'Login Google berhasil! Mengalihkan...'; googleStatus.style.color = '#166534'; }
-                setTimeout(function () { window.location.href = postLoginTarget(data, data.redirect_url || data.landing || '/dashboard/'); }, 250);
-                return;
-              }
-              var msg;
-              if (res.status === 404 && data && data.code === 'ACCOUNT_NOT_LINKED') {
-                msg = '⚠️ Akun Google ini belum terhubung ke akun Platform. Silakan hubungi administrator atau masuk menggunakan username dan password.';
-              } else if (res.status === 403 && data && data.code === 'ACCOUNT_DISABLED') {
-                msg = '❌ Akun Platform ini telah dinonaktifkan. Hubungi administrator.';
-              } else {
-                msg = '❌ ' + ((data && (data.error || data.message)) || 'Autentikasi Google gagal.');
-              }
-              errorBox.textContent = msg;
-              errorBox.style.display = 'block';
-            });
-          }).catch(function () {
-            errorBox.textContent = '❌ Kesalahan jaringan saat autentikasi Google. Silakan coba lagi.';
-            errorBox.style.display = 'block';
-          }).finally(function () {
-            isGoogleAuthenticating = false;
-            if (googleStatus) googleStatus.style.display = 'none';
-          });
+      // Unified credential handler for Google Sign-In (both Native Play Services and Web SDK)
+      function handleGoogleCredential(credentialToken) {
+        if (!credentialToken) {
+          errorBox.textContent = '❌ Kredensial Google tidak diterima.';
+          errorBox.style.display = 'block';
+          return;
+        }
+        if (isGoogleAuthenticating) return;
+        isGoogleAuthenticating = true;
+        errorBox.style.display = 'none';
+        if (googleStatus) {
+          googleStatus.textContent = 'Memverifikasi akun Google...';
+          googleStatus.style.display = 'block';
         }
 
+        fetch('/api/v1/auth/google', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credential: credentialToken })
+        }).then(function (res) {
+          return res.json().then(function (data) {
+            if (res.ok && data && data.success && data.token) {
+              var validation = validateSubdomainRole(data.user);
+              if (!validation.allowed) {
+                showRoleMismatchError(validation);
+                return;
+              }
+              localStorage.setItem(TOKEN_KEY, data.token);
+              localStorage.setItem('token', data.token);
+              if (data.user) {
+                localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+                localStorage.setItem('user', JSON.stringify(data.user));
+              }
+              if (googleStatus) {
+                googleStatus.textContent = 'Login Google berhasil! Mengalihkan...';
+                googleStatus.style.color = '#166534';
+              }
+              setTimeout(function () {
+                window.location.href = postLoginTarget(data, data.redirect_url || data.landing || '/dashboard/');
+              }, 250);
+              return;
+            }
+            var msg;
+            if (res.status === 404 && data && data.code === 'ACCOUNT_NOT_LINKED') {
+              msg = '⚠️ Akun Google ini belum terhubung ke akun Mybangjo. Silakan hubungi administrator atau masuk menggunakan username dan password.';
+            } else if (res.status === 403 && data && data.code === 'ACCOUNT_DISABLED') {
+              msg = '❌ Akun ini telah dinonaktifkan. Hubungi administrator.';
+            } else {
+              msg = '❌ ' + ((data && (data.error || data.message)) || 'Autentikasi Google gagal.');
+            }
+            errorBox.textContent = msg;
+            errorBox.style.display = 'block';
+          });
+        }).catch(function () {
+          errorBox.textContent = '❌ Kesalahan jaringan saat autentikasi Google. Silakan coba lagi.';
+          errorBox.style.display = 'block';
+        }).finally(function () {
+          isGoogleAuthenticating = false;
+          if (googleStatus) googleStatus.style.display = 'none';
+        });
+      }
+
+      // Native Android Google Sign-In callbacks
+      window.onGoogleSignInNativeSuccess = function (idToken, email, displayName) {
+        handleGoogleCredential(idToken);
+      };
+
+      window.onGoogleSignInNativeError = function (code, message) {
+        isGoogleAuthenticating = false;
+        if (googleStatus) googleStatus.style.display = 'none';
+        if (code === 12501) {
+          // User dismissed the account picker bottom sheet
+          return;
+        }
+        errorBox.textContent = '⚠️ Gagal memilih akun Google (' + (message || code) + ').';
+        errorBox.style.display = 'block';
+      };
+
+      var isNativeApp = !!(window.XentraNative && (typeof window.XentraNative.launchGoogleSignIn === 'function' || typeof window.XentraNative.isNativeApp === 'function'));
+
+      if (btnGoogleLogin) {
+        btnGoogleLogin.addEventListener('click', function (e) {
+          // Priority 1: Native Android Account Picker via Google Play Services
+          if (window.XentraNative && typeof window.XentraNative.launchGoogleSignIn === 'function') {
+            e.preventDefault();
+            if (googleStatus) {
+              googleStatus.textContent = 'Membuka pilihan akun Google di HP...';
+              googleStatus.style.display = 'block';
+            }
+            window.XentraNative.launchGoogleSignIn(cachedGoogleClientId);
+            return;
+          }
+
+          // Priority 2: Client/Tenant context web redirect
+          if (!isPlatform) {
+            e.preventDefault();
+            var currentOrigin = window.location.origin;
+            var returnUrl = currentOrigin + '/login' + (posTerminalSetupRequested ? '?pos_terminal_setup=1' : '');
+            var redirectTarget = 'https://xentra.cloud/auth/broker?return_to=' + encodeURIComponent(returnUrl);
+            if (claimDomain) {
+              redirectTarget += '&claim_domain=' + encodeURIComponent(claimDomain);
+            }
+            window.location.href = redirectTarget;
+          }
+        });
+      }
+
+      // In Native App: keep static button visible so tapping it triggers Native Google Play Services
+      if (isNativeApp) {
+        if (btnGoogleLogin) btnGoogleLogin.style.display = 'flex';
+        if (googleBtnSlot) googleBtnSlot.style.display = 'none';
+        if (googleContainer) googleContainer.style.display = 'flex';
+      } else if (isPlatform) {
+        // Platform Web context: render Google Web GSI button
+        if (btnGoogleLogin) btnGoogleLogin.style.display = 'none';
+
         function initPlatformGoogleSignIn(clientId) {
+          cachedGoogleClientId = clientId;
           if (!clientId || !window.google || !window.google.accounts || !window.google.accounts.id) return;
           try {
             window.google.accounts.id.initialize({
               client_id: clientId,
-              callback: handlePlatformGoogleCredential,
+              callback: function (response) {
+                if (response && response.credential) {
+                  handleGoogleCredential(response.credential);
+                }
+              },
               auto_select: false,
               cancel_on_tap_outside: true
             });
@@ -1210,27 +1276,22 @@
           return res.json();
         }).then(function (cfg) {
           if (!cfg || !cfg.google_enabled || !cfg.google_client_id) return;
+          cachedGoogleClientId = cfg.google_client_id;
           var script = document.createElement('script');
           script.src = 'https://accounts.google.com/gsi/client';
           script.async = true; script.defer = true;
           script.onload = function () { initPlatformGoogleSignIn(cfg.google_client_id); };
           document.head.appendChild(script);
         }).catch(function () {});
-
       } else {
-        // Client/Tenant context: redirect to xentra.cloud auth broker (cross-domain handoff).
-        if (btnGoogleLogin) {
-          btnGoogleLogin.addEventListener('click', function (e) {
-            e.preventDefault();
-            var currentOrigin = window.location.origin;
-            var returnUrl = currentOrigin + '/login' + (posTerminalSetupRequested ? '?pos_terminal_setup=1' : '');
-            var redirectTarget = 'https://xentra.cloud/auth/broker?return_to=' + encodeURIComponent(returnUrl);
-            if (claimDomain) {
-              redirectTarget += '&claim_domain=' + encodeURIComponent(claimDomain);
-            }
-            window.location.href = redirectTarget;
-          });
-        }
+        // Fetch config to cache client ID
+        fetch('/api/v1/auth/config').then(function (res) {
+          return res.json();
+        }).then(function (cfg) {
+          if (cfg && cfg.google_client_id) {
+            cachedGoogleClientId = cfg.google_client_id;
+          }
+        }).catch(function () {});
       }
     })();
   </script>

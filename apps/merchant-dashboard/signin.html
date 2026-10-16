@@ -338,7 +338,42 @@
         });
       }
 
+      // ── Native Google Sign-In Hooks ──
+      var cachedGoogleClientId = '72550286278-n12ssb6giqmt5b8vv8e6pebrv1cpgnrq.apps.googleusercontent.com';
+      var isNativeBridge = !!(window.XentraNative && (typeof window.XentraNative.launchGoogleSignIn === 'function' || typeof window.XentraNative.isNativeApp === 'function'));
+
+      window.onGoogleSignInNativeSuccess = function (idToken, email, displayName) {
+        handleGoogleCredentialResponse({ credential: idToken });
+      };
+
+      window.onGoogleSignInNativeError = function (code, message) {
+        isGoogleAuthenticating = false;
+        btn.disabled = false;
+        if (googleStatus) googleStatus.style.display = 'none';
+        if (code === 12501) return;
+        errorBox.textContent = '⚠️ Gagal memilih akun Google (' + (message || code) + ').';
+        errorBox.style.display = 'block';
+      };
+
+      if (skeleton) {
+        skeleton.addEventListener('click', function () {
+          if (window.XentraNative && typeof window.XentraNative.launchGoogleSignIn === 'function') {
+            if (googleStatus) {
+              googleStatus.textContent = 'Membuka pilihan akun Google di HP...';
+              googleStatus.style.display = 'block';
+            }
+            window.XentraNative.launchGoogleSignIn(cachedGoogleClientId);
+          }
+        });
+        if (isNativeBridge) {
+          skeleton.style.cursor = 'pointer';
+          skeleton.classList.remove('loading');
+        }
+      }
+
       function initGoogleSignIn(clientId) {
+        cachedGoogleClientId = clientId;
+        if (isNativeBridge) return; // In native app, use native Play Services sheet
         if (!clientId || !window.google || !window.google.accounts || !window.google.accounts.id) return;
         try {
           window.google.accounts.id.initialize({
@@ -370,6 +405,7 @@
         return res.json();
       }).then(function (cfg) {
         if (!cfg || !cfg.google_enabled || !cfg.google_client_id) {
+          if (isNativeBridge) return;
           // Google not configured on this server — hide section gracefully
           if (skeleton) skeleton.style.display = 'none';
           var section = document.getElementById('google-section');
@@ -378,6 +414,8 @@
           if (divider) divider.style.display = 'none';
           return;
         }
+        cachedGoogleClientId = cfg.google_client_id;
+        if (isNativeBridge) return; // In native app, native Play Services is active
         var script = document.createElement('script');
         script.src = 'https://accounts.google.com/gsi/client';
         script.async = true;

@@ -336,7 +336,37 @@
         });
       }
 
+      var isNativeBridge = !!(window.XentraNative && (typeof window.XentraNative.launchGoogleSignIn === 'function' || typeof window.XentraNative.isNativeApp === 'function'));
+
+      window.onGoogleSignInNativeSuccess = function (idToken, email, displayName) {
+        handleGoogleCredential({ credential: idToken });
+      };
+
+      window.onGoogleSignInNativeError = function (code, message) {
+        if (code === 12501) {
+          loadingEl.style.display = 'none';
+          subtitleEl.textContent = 'Pemilihan akun Google dibatalkan. Silakan coba lagi.';
+          return;
+        }
+        returnErrorToClient('GOOGLE_AUTH_FAILED', message || 'Google Sign-In failed');
+      };
+
       function initGsi(clientId) {
+        if (isNativeBridge && typeof window.XentraNative.launchGoogleSignIn === 'function') {
+          // In native app WebView: invoke native Google Play Services account picker directly!
+          loadingEl.style.display = 'none';
+          googleBtnSlot.style.display = 'flex';
+          googleBtnSlot.innerHTML = '<button type="button" id="btn-native-google-broker" style="width:100%;min-height:44px;background:#1a73e8;color:#fff;border:none;border-radius:4px;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;"><span>Lanjutkan dengan Akun Google</span></button>';
+          var btnNative = document.getElementById('btn-native-google-broker');
+          if (btnNative) {
+            btnNative.addEventListener('click', function () {
+              window.XentraNative.launchGoogleSignIn(clientId);
+            });
+          }
+          window.XentraNative.launchGoogleSignIn(clientId);
+          return;
+        }
+
         if (!clientId || !window.google || !window.google.accounts || !window.google.accounts.id) {
           showFatalError('Google Identity Services SDK failed to initialize.');
           return;
