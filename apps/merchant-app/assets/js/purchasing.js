@@ -132,9 +132,9 @@
         populateMaterialsDatalist(_purchasingState.allItems);
         startPettyCashPolling(branchId);
 
-        var rawItems = chkData.items;
+        var rawItems = chkData.items || [];
         var lowItems = rawItems.filter(function (itm) { return itm.is_low; });
-        var targetList = lowItems.length > 0 ? lowItems : rawItems;
+        var targetList = lowItems;
 
         _purchasingState.items = targetList.map(function (itm) {
           var initialChecked = false;
@@ -252,10 +252,13 @@
     if (!items.length) {
       hidePurchasingBottomBar();
       container.innerHTML =
-        '<div style="text-align:center; padding:40px 20px; background:#f8fafc; border-radius:12px; border:1px dashed #cbd5e1;">' +
-          '<div style="font-size:36px; margin-bottom:8px;">📋</div>' +
-          '<div style="font-size:15px; font-weight:700; color:#334155;">Belum Ada Tugas Belanja</div>' +
-          '<div style="font-size:12px; color:#64748b; margin-top:4px; max-width:320px; margin-left:auto; margin-right:auto;">Semua stok bahan baku saat ini mencukupi atau belum ada mandat belanja aktif dari Manager cabang.</div>' +
+        '<div style="text-align:center; padding:36px 20px; background:#f8fafc; border-radius:14px; border:1px dashed #cbd5e1;">' +
+          '<div style="font-size:36px; margin-bottom:8px;">✨</div>' +
+          '<div style="font-size:15px; font-weight:800; color:#0f172a;">Semua Stok Bahan Baku Aman</div>' +
+          '<div style="font-size:12px; color:#64748b; margin:4px auto 14px auto; max-width:320px; line-height:1.5;">Tidak ada bahan yang berada di bawah batas minimum saat ini.</div>' +
+          '<button type="button" class="x-btn-secondary" onclick="openPurchasingAddCustomItemModal()" style="font-size:12.5px; font-weight:700; padding:8px 16px; border-radius:10px; background:#fff; border:1px solid #cbd5e1; color:#0f172a; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">' +
+            '<span style="color:#2563eb;">➕</span> Tambah Belanjaan Lain' +
+          '</button>' +
         '</div>';
       return;
     }
