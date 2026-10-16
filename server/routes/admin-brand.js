@@ -120,7 +120,17 @@ router.get('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
 
 router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
-    const { name, primary_color, custom_domain, tagline, merchant_pwa_name, pos_pwa_name } = req.body;
+    const {
+      name,
+      primary_color,
+      custom_domain,
+      tagline,
+      owner_pwa_name,
+      merchant_pwa_name,
+      pos_pwa_name,
+      customer_pwa_name,
+      driver_pwa_name
+    } = req.body;
 
     let normalizedPrimaryColor = undefined;
     if (primary_color !== undefined && primary_color !== null) {
@@ -146,8 +156,11 @@ router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
           primary_color = COALESCE(?, primary_color),
           custom_domain = COALESCE(?, custom_domain),
           tagline = COALESCE(?, tagline),
+          owner_pwa_name = CASE WHEN ? = 1 THEN ? ELSE owner_pwa_name END,
           merchant_pwa_name = CASE WHEN ? = 1 THEN ? ELSE merchant_pwa_name END,
           pos_pwa_name = CASE WHEN ? = 1 THEN ? ELSE pos_pwa_name END,
+          customer_pwa_name = CASE WHEN ? = 1 THEN ? ELSE customer_pwa_name END,
+          driver_pwa_name = CASE WHEN ? = 1 THEN ? ELSE driver_pwa_name END,
           updated_at = datetime('now')
       WHERE id = ?
     `).run(
@@ -155,10 +168,16 @@ router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
       normalizedPrimaryColor !== undefined ? normalizedPrimaryColor : null,
       custom_domain !== undefined ? custom_domain : null,
       tagline !== undefined ? tagline : null,
+      owner_pwa_name !== undefined ? 1 : 0,
+      owner_pwa_name !== undefined ? (typeof owner_pwa_name === 'string' ? owner_pwa_name.trim() || null : null) : null,
       merchant_pwa_name !== undefined ? 1 : 0,
       merchant_pwa_name !== undefined ? (typeof merchant_pwa_name === 'string' ? merchant_pwa_name.trim() || null : null) : null,
       pos_pwa_name !== undefined ? 1 : 0,
       pos_pwa_name !== undefined ? (typeof pos_pwa_name === 'string' ? pos_pwa_name.trim() || null : null) : null,
+      customer_pwa_name !== undefined ? 1 : 0,
+      customer_pwa_name !== undefined ? (typeof customer_pwa_name === 'string' ? customer_pwa_name.trim() || null : null) : null,
+      driver_pwa_name !== undefined ? 1 : 0,
+      driver_pwa_name !== undefined ? (typeof driver_pwa_name === 'string' ? driver_pwa_name.trim() || null : null) : null,
       req.brand_id
     );
 
@@ -182,10 +201,16 @@ router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
         name: targetBrand.name,
         slug: targetBrand.slug,
         logo_url: targetBrand.logo_url || '/assets/pwa/icon-192.png',
+        owner_pwa_icon_url: targetBrand.owner_pwa_icon_url || null,
+        owner_pwa_name: targetBrand.owner_pwa_name || null,
         merchant_pwa_icon_url: targetBrand.merchant_pwa_icon_url || null,
-        pos_pwa_icon_url: targetBrand.pos_pwa_icon_url || null,
         merchant_pwa_name: targetBrand.merchant_pwa_name || null,
+        pos_pwa_icon_url: targetBrand.pos_pwa_icon_url || null,
         pos_pwa_name: targetBrand.pos_pwa_name || null,
+        customer_pwa_icon_url: targetBrand.customer_pwa_icon_url || null,
+        customer_pwa_name: targetBrand.customer_pwa_name || null,
+        driver_pwa_icon_url: targetBrand.driver_pwa_icon_url || null,
+        driver_pwa_name: targetBrand.driver_pwa_name || null,
         primary_color: targetBrand.primary_color || '#b6ff00',
         custom_domain: targetBrand.custom_domain || '',
         tagline: targetBrand.tagline || 'Official Online Food Ordering',
@@ -380,6 +405,189 @@ router.delete('/admin/brand/pos-icon', requireAuth(['owner', 'brand_manager']), 
     res.json({ success: true, message: 'Icon POS PWA berhasil dihapus.', pos_pwa_icon_url: null });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message || 'Server error', code: 'POS_PWA_ICON_DELETE_ERROR' });
+  }
+});
+
+router.post('/admin/brand/owner-icon', requireAuth(['owner', 'brand_manager']), async (req, res) => {
+  try {
+    const { image_base64, mime_type, original_filename, crop_spec } = req.body || {};
+    if (!image_base64) {
+      return res.status(400).json({ success: false, error: 'Data icon Owner PWA wajib diunggah.', code: 'MISSING_IMAGE_DATA' });
+    }
+
+    const oldMediaId = latestAttachedMediaId(req.brand_id, 'brand_owner_pwa_icon', req.brand_id);
+    const asset = await processCanonicalImage({
+      brandId: req.brand_id,
+      tenantId: req.brand ? req.brand.organization_id : null,
+      userId: req.user ? req.user.id : null,
+      imageBase64: image_base64,
+      mimeType: mime_type,
+      originalFilename: original_filename,
+      assetType: 'pwa_icon',
+      cropSpec: crop_spec || null
+    });
+
+    const iconUrl = pickPreviewUrl(asset, 320);
+    await bindBrandMediaAtomically({
+      asset,
+      oldMediaId,
+      brandId: req.brand_id,
+      entityType: 'brand_owner_pwa_icon',
+      entityId: req.brand_id,
+      persistReference: function () { coreBrandRepo.updateOwnerPwaIcon(req.brand_id, { iconUrl, mediaId: asset.media_id }); }
+    });
+    if (req.brand) req.brand.owner_pwa_icon_url = iconUrl;
+    res.status(201).json({
+      success: true,
+      message: 'Icon Owner PWA berhasil diproses dan diperbarui.',
+      media_id: asset.media_id,
+      preview_url: iconUrl,
+      owner_pwa_icon_url: iconUrl
+    });
+  } catch (err) {
+    const statusCode = err.code === 'UNAUTHORIZED_TENANT' ? 403 : 400;
+    res.status(statusCode).json({ success: false, error: err.message || 'Gagal menyimpan icon Owner PWA.', code: err.code || 'OWNER_PWA_ICON_UPLOAD_ERROR' });
+  }
+});
+
+router.delete('/admin/brand/owner-icon', requireAuth(['owner', 'brand_manager']), async (req, res) => {
+  try {
+    const oldMediaId = latestAttachedMediaId(req.brand_id, 'brand_owner_pwa_icon', req.brand_id);
+    if (oldMediaId) {
+      await unlinkBrandMediaAtomically({
+        mediaId: oldMediaId,
+        brandId: req.brand_id,
+        clearReference: function () { coreBrandRepo.removeOwnerPwaIcon(req.brand_id); }
+      });
+    } else {
+      coreBrandRepo.removeOwnerPwaIcon(req.brand_id);
+    }
+    if (req.brand) req.brand.owner_pwa_icon_url = null;
+    res.json({ success: true, message: 'Icon Owner PWA berhasil dihapus.', owner_pwa_icon_url: null });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message || 'Server error', code: 'OWNER_PWA_ICON_DELETE_ERROR' });
+  }
+});
+
+router.post('/admin/brand/customer-icon', requireAuth(['owner', 'brand_manager']), async (req, res) => {
+  try {
+    const { image_base64, mime_type, original_filename, crop_spec } = req.body || {};
+    if (!image_base64) {
+      return res.status(400).json({ success: false, error: 'Data icon Belanja PWA wajib diunggah.', code: 'MISSING_IMAGE_DATA' });
+    }
+
+    const oldMediaId = latestAttachedMediaId(req.brand_id, 'brand_customer_pwa_icon', req.brand_id);
+    const asset = await processCanonicalImage({
+      brandId: req.brand_id,
+      tenantId: req.brand ? req.brand.organization_id : null,
+      userId: req.user ? req.user.id : null,
+      imageBase64: image_base64,
+      mimeType: mime_type,
+      originalFilename: original_filename,
+      assetType: 'pwa_icon',
+      cropSpec: crop_spec || null
+    });
+
+    const iconUrl = pickPreviewUrl(asset, 320);
+    await bindBrandMediaAtomically({
+      asset,
+      oldMediaId,
+      brandId: req.brand_id,
+      entityType: 'brand_customer_pwa_icon',
+      entityId: req.brand_id,
+      persistReference: function () { coreBrandRepo.updateCustomerPwaIcon(req.brand_id, { iconUrl, mediaId: asset.media_id }); }
+    });
+    if (req.brand) req.brand.customer_pwa_icon_url = iconUrl;
+    res.status(201).json({
+      success: true,
+      message: 'Icon Belanja PWA berhasil diproses dan diperbarui.',
+      media_id: asset.media_id,
+      preview_url: iconUrl,
+      customer_pwa_icon_url: iconUrl
+    });
+  } catch (err) {
+    const statusCode = err.code === 'UNAUTHORIZED_TENANT' ? 403 : 400;
+    res.status(statusCode).json({ success: false, error: err.message || 'Gagal menyimpan icon Belanja PWA.', code: err.code || 'CUSTOMER_PWA_ICON_UPLOAD_ERROR' });
+  }
+});
+
+router.delete('/admin/brand/customer-icon', requireAuth(['owner', 'brand_manager']), async (req, res) => {
+  try {
+    const oldMediaId = latestAttachedMediaId(req.brand_id, 'brand_customer_pwa_icon', req.brand_id);
+    if (oldMediaId) {
+      await unlinkBrandMediaAtomically({
+        mediaId: oldMediaId,
+        brandId: req.brand_id,
+        clearReference: function () { coreBrandRepo.removeCustomerPwaIcon(req.brand_id); }
+      });
+    } else {
+      coreBrandRepo.removeCustomerPwaIcon(req.brand_id);
+    }
+    if (req.brand) req.brand.customer_pwa_icon_url = null;
+    res.json({ success: true, message: 'Icon Belanja PWA berhasil dihapus.', customer_pwa_icon_url: null });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message || 'Server error', code: 'CUSTOMER_PWA_ICON_DELETE_ERROR' });
+  }
+});
+
+router.post('/admin/brand/driver-icon', requireAuth(['owner', 'brand_manager']), async (req, res) => {
+  try {
+    const { image_base64, mime_type, original_filename, crop_spec } = req.body || {};
+    if (!image_base64) {
+      return res.status(400).json({ success: false, error: 'Data icon Driver PWA wajib diunggah.', code: 'MISSING_IMAGE_DATA' });
+    }
+
+    const oldMediaId = latestAttachedMediaId(req.brand_id, 'brand_driver_pwa_icon', req.brand_id);
+    const asset = await processCanonicalImage({
+      brandId: req.brand_id,
+      tenantId: req.brand ? req.brand.organization_id : null,
+      userId: req.user ? req.user.id : null,
+      imageBase64: image_base64,
+      mimeType: mime_type,
+      originalFilename: original_filename,
+      assetType: 'pwa_icon',
+      cropSpec: crop_spec || null
+    });
+
+    const iconUrl = pickPreviewUrl(asset, 320);
+    await bindBrandMediaAtomically({
+      asset,
+      oldMediaId,
+      brandId: req.brand_id,
+      entityType: 'brand_driver_pwa_icon',
+      entityId: req.brand_id,
+      persistReference: function () { coreBrandRepo.updateDriverPwaIcon(req.brand_id, { iconUrl, mediaId: asset.media_id }); }
+    });
+    if (req.brand) req.brand.driver_pwa_icon_url = iconUrl;
+    res.status(201).json({
+      success: true,
+      message: 'Icon Driver PWA berhasil diproses dan diperbarui.',
+      media_id: asset.media_id,
+      preview_url: iconUrl,
+      driver_pwa_icon_url: iconUrl
+    });
+  } catch (err) {
+    const statusCode = err.code === 'UNAUTHORIZED_TENANT' ? 403 : 400;
+    res.status(statusCode).json({ success: false, error: err.message || 'Gagal menyimpan icon Driver PWA.', code: err.code || 'DRIVER_PWA_ICON_UPLOAD_ERROR' });
+  }
+});
+
+router.delete('/admin/brand/driver-icon', requireAuth(['owner', 'brand_manager']), async (req, res) => {
+  try {
+    const oldMediaId = latestAttachedMediaId(req.brand_id, 'brand_driver_pwa_icon', req.brand_id);
+    if (oldMediaId) {
+      await unlinkBrandMediaAtomically({
+        mediaId: oldMediaId,
+        brandId: req.brand_id,
+        clearReference: function () { coreBrandRepo.removeDriverPwaIcon(req.brand_id); }
+      });
+    } else {
+      coreBrandRepo.removeDriverPwaIcon(req.brand_id);
+    }
+    if (req.brand) req.brand.driver_pwa_icon_url = null;
+    res.json({ success: true, message: 'Icon Driver PWA berhasil dihapus.', driver_pwa_icon_url: null });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message || 'Server error', code: 'DRIVER_PWA_ICON_DELETE_ERROR' });
   }
 });
 

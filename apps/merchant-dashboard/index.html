@@ -681,20 +681,42 @@
               <!-- Installed App Identity (PWA Launcher Icon Overrides) in Brand Tab -->
               <div style="margin-top:12px;padding-top:16px;border-top:1px solid var(--border-color);">
                 <div style="margin-bottom:14px;">
-                  <h4 style="margin:0 0 4px;font-size:14px;font-weight:700;color:var(--text-main);">Installed App Identity</h4>
-                  <p style="margin:0;font-size:12px;color:var(--text-muted);">Icon aplikasi setelah di-install di perangkat. Pengaturan ini tidak mengubah tema atau logo di dalam aplikasi.</p>
+                  <h4 style="margin:0 0 4px;font-size:14px;font-weight:700;color:var(--text-main);">Nama dan Icon Aplikasi</h4>
+                  <p style="margin:0;font-size:12px;color:var(--text-muted);">Gunakan nama yang singkat, icon yang jelas dan berbeda satu sama lain.</p>
                 </div>
 
-                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:16px;align-items:start;">
-                  <!-- Field 1: Merchant / Owner PWA -->
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:16px;align-items:start;">
+                  <!-- Field 1: Owner -->
                   <div class="x-form-group">
-                    <label style="font-weight:600;font-size:13px;">Merchant / Owner PWA</label>
+                    <label style="font-weight:600;font-size:13px;">Owner</label>
+                    <div style="margin-bottom:8px;">
+                      <input type="text" id="brand-tab-owner-pwa-name" class="x-input" placeholder="Nama aplikasi (kosong = nama brand)" style="font-size:12px;">
+                    </div>
+                    <div class="x-image-upload-control">
+                      <div class="x-image-upload-preview-box" id="brand-tab-owner-icon-preview-box" style="width:72px;height:72px;border-radius:14px;">
+                        <img id="brand-tab-owner-icon-preview" src="/assets/pwa/icon-192.png" alt="Owner App Icon" style="width:100%;height:100%;object-fit:cover;border-radius:14px;">
+                      </div>
+                      <div class="x-image-upload-info">
+                        <div class="x-image-upload-actions">
+                          <button type="button" class="x-btn-secondary" id="btn-brand-tab-owner-icon-pick" style="font-size:12px;padding:6px 12px;">📁 Unggah Icon</button>
+                          <button type="button" class="x-btn-secondary" id="btn-brand-tab-owner-icon-remove" style="font-size:12px;padding:6px 12px;color:#ef4444;display:none;">Hapus</button>
+                        </div>
+                        <input type="file" id="input-brand-tab-owner-icon-file" accept="image/jpeg,image/png,image/webp" class="x-file-input-hidden">
+                        <input type="hidden" id="brand-tab-owner-icon" value="">
+                        <div class="x-image-specs-text" style="font-size:11px;color:var(--text-muted);margin-top:4px;">JPG, PNG, atau WebP · Maks. 10 MB · Rasio 1:1. Icon aplikasi Owner Dashboard setelah di-install.</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Field 2: Merchant -->
+                  <div class="x-form-group">
+                    <label style="font-weight:600;font-size:13px;">Merchant</label>
                     <div style="margin-bottom:8px;">
                       <input type="text" id="brand-tab-merchant-pwa-name" class="x-input" placeholder="Nama aplikasi (kosong = nama brand + ' Merchant')" style="font-size:12px;">
                     </div>
                     <div class="x-image-upload-control">
                       <div class="x-image-upload-preview-box" id="brand-tab-merchant-icon-preview-box" style="width:72px;height:72px;border-radius:14px;">
-                        <img id="brand-tab-merchant-icon-preview" src="/merchant-app/assets/icons/icon-192.png" alt="Merchant PWA Icon" style="width:100%;height:100%;object-fit:cover;border-radius:14px;">
+                        <img id="brand-tab-merchant-icon-preview" src="/merchant-app/assets/icons/icon-192.png" alt="Merchant App Icon" style="width:100%;height:100%;object-fit:cover;border-radius:14px;">
                       </div>
                       <div class="x-image-upload-info">
                         <div class="x-image-upload-actions">
@@ -703,20 +725,20 @@
                         </div>
                         <input type="file" id="input-brand-tab-merchant-icon-file" accept="image/jpeg,image/png,image/webp" class="x-file-input-hidden">
                         <input type="hidden" id="brand-tab-merchant-icon" value="">
-                        <div class="x-image-specs-text" style="font-size:11px;color:var(--text-muted);margin-top:4px;">JPG, PNG, atau WebP · Maks. 10 MB · Rasio 1:1. Digunakan sebagai icon aplikasi Merchant/Owner setelah PWA di-install.</div>
+                        <div class="x-image-specs-text" style="font-size:11px;color:var(--text-muted);margin-top:4px;">JPG, PNG, atau WebP · Maks. 10 MB · Rasio 1:1. Icon aplikasi Merchant setelah di-install.</div>
                       </div>
                     </div>
                   </div>
 
-                  <!-- Field 2: POS PWA -->
+                  <!-- Field 3: POS Kasir -->
                   <div class="x-form-group">
-                    <label style="font-weight:600;font-size:13px;">POS PWA</label>
+                    <label style="font-weight:600;font-size:13px;">POS Kasir</label>
                     <div style="margin-bottom:8px;">
                       <input type="text" id="brand-tab-pos-pwa-name" class="x-input" placeholder="Nama aplikasi (kosong = nama brand)" style="font-size:12px;">
                     </div>
                     <div class="x-image-upload-control">
                       <div class="x-image-upload-preview-box" id="brand-tab-pos-icon-preview-box" style="width:72px;height:72px;border-radius:14px;">
-                        <img id="brand-tab-pos-icon-preview" src="/pos/assets/icons/icon-192.png" alt="POS PWA Icon" style="width:100%;height:100%;object-fit:cover;border-radius:14px;">
+                        <img id="brand-tab-pos-icon-preview" src="/pos/assets/icons/icon-192.png" alt="POS Kasir Icon" style="width:100%;height:100%;object-fit:cover;border-radius:14px;">
                       </div>
                       <div class="x-image-upload-info">
                         <div class="x-image-upload-actions">
@@ -725,7 +747,51 @@
                         </div>
                         <input type="file" id="input-brand-tab-pos-icon-file" accept="image/jpeg,image/png,image/webp" class="x-file-input-hidden">
                         <input type="hidden" id="brand-tab-pos-icon" value="">
-                        <div class="x-image-specs-text" style="font-size:11px;color:var(--text-muted);margin-top:4px;">JPG, PNG, atau WebP · Maks. 10 MB · Rasio 1:1. Digunakan sebagai icon aplikasi POS setelah PWA di-install.</div>
+                        <div class="x-image-specs-text" style="font-size:11px;color:var(--text-muted);margin-top:4px;">JPG, PNG, atau WebP · Maks. 10 MB · Rasio 1:1. Icon aplikasi POS Kasir setelah di-install.</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Field 4: Belanja -->
+                  <div class="x-form-group">
+                    <label style="font-weight:600;font-size:13px;">Belanja</label>
+                    <div style="margin-bottom:8px;">
+                      <input type="text" id="brand-tab-customer-pwa-name" class="x-input" placeholder="Nama aplikasi (kosong = nama brand)" style="font-size:12px;">
+                    </div>
+                    <div class="x-image-upload-control">
+                      <div class="x-image-upload-preview-box" id="brand-tab-customer-icon-preview-box" style="width:72px;height:72px;border-radius:14px;">
+                        <img id="brand-tab-customer-icon-preview" src="/assets/pwa/icon-192.png" alt="Belanja Icon" style="width:100%;height:100%;object-fit:cover;border-radius:14px;">
+                      </div>
+                      <div class="x-image-upload-info">
+                        <div class="x-image-upload-actions">
+                          <button type="button" class="x-btn-secondary" id="btn-brand-tab-customer-icon-pick" style="font-size:12px;padding:6px 12px;">📁 Unggah Icon</button>
+                          <button type="button" class="x-btn-secondary" id="btn-brand-tab-customer-icon-remove" style="font-size:12px;padding:6px 12px;color:#ef4444;display:none;">Hapus</button>
+                        </div>
+                        <input type="file" id="input-brand-tab-customer-icon-file" accept="image/jpeg,image/png,image/webp" class="x-file-input-hidden">
+                        <input type="hidden" id="brand-tab-customer-icon" value="">
+                        <div class="x-image-specs-text" style="font-size:11px;color:var(--text-muted);margin-top:4px;">JPG, PNG, atau WebP · Maks. 10 MB · Rasio 1:1. Icon aplikasi Belanja pelanggan setelah di-install.</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Field 5: Driver -->
+                  <div class="x-form-group">
+                    <label style="font-weight:600;font-size:13px;">Driver</label>
+                    <div style="margin-bottom:8px;">
+                      <input type="text" id="brand-tab-driver-pwa-name" class="x-input" placeholder="Nama aplikasi (kosong = nama brand + ' Driver')" style="font-size:12px;">
+                    </div>
+                    <div class="x-image-upload-control">
+                      <div class="x-image-upload-preview-box" id="brand-tab-driver-icon-preview-box" style="width:72px;height:72px;border-radius:14px;">
+                        <img id="brand-tab-driver-icon-preview" src="/driver-app/assets/icons/icon-192.png" alt="Driver Icon" style="width:100%;height:100%;object-fit:cover;border-radius:14px;">
+                      </div>
+                      <div class="x-image-upload-info">
+                        <div class="x-image-upload-actions">
+                          <button type="button" class="x-btn-secondary" id="btn-brand-tab-driver-icon-pick" style="font-size:12px;padding:6px 12px;">📁 Unggah Icon</button>
+                          <button type="button" class="x-btn-secondary" id="btn-brand-tab-driver-icon-remove" style="font-size:12px;padding:6px 12px;color:#ef4444;display:none;">Hapus</button>
+                        </div>
+                        <input type="file" id="input-brand-tab-driver-icon-file" accept="image/jpeg,image/png,image/webp" class="x-file-input-hidden">
+                        <input type="hidden" id="brand-tab-driver-icon" value="">
+                        <div class="x-image-specs-text" style="font-size:11px;color:var(--text-muted);margin-top:4px;">JPG, PNG, atau WebP · Maks. 10 MB · Rasio 1:1. Icon aplikasi Driver pengantar setelah di-install.</div>
                       </div>
                     </div>
                   </div>
@@ -3863,18 +3929,41 @@
 
                   <!-- Installed App Identity -->
                   <div style="border-top:1px solid #e2e8f0;padding-top:16px;margin-top:8px;">
-                    <div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:4px;">Icon Aplikasi Setelah Di-Install</div>
-                    <p style="font-size:12px;color:#64748b;margin:0 0 14px;">Override icon launcher PWA setelah di-install. Tidak mempengaruhi tampilan di dalam aplikasi.</p>
-                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;">
-                      <!-- Merchant/Owner PWA -->
+                    <div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:4px;">Nama dan Icon Aplikasi</div>
+                    <p style="font-size:12px;color:#64748b;margin:0 0 14px;">Gunakan nama yang singkat, icon yang jelas dan berbeda satu sama lain.</p>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;">
+                      <!-- Field 1: Owner -->
                       <div class="x-form-group" style="margin:0;">
-                        <label style="font-size:12px;font-weight:600;color:#334155;">Merchant / Owner PWA</label>
+                        <label style="font-size:12px;font-weight:600;color:#334155;">Owner</label>
+                        <div style="margin:6px 0 8px;">
+                          <input type="text" id="set-profile-owner-pwa-name" class="x-input" placeholder="Nama aplikasi (kosong = nama brand)" style="font-size:12px;">
+                        </div>
+                        <div class="x-image-upload-control" style="margin-top:6px;">
+                          <div class="x-image-upload-preview-box" id="set-profile-owner-icon-preview-box" onclick="document.getElementById('input-set-profile-owner-icon-file').click()" style="cursor:pointer;" title="Klik untuk pilih icon">
+                            <img id="set-profile-owner-icon-preview" src="/assets/pwa/icon-192.png" alt="Owner App Icon">
+                            <div id="set-profile-owner-icon-empty" class="x-image-upload-empty" style="display:none;">👑</div>
+                          </div>
+                          <div class="x-image-upload-info">
+                            <div class="x-image-upload-actions">
+                              <button type="button" class="x-btn-secondary" id="btn-set-profile-owner-icon-pick" style="font-size:12px;padding:6px 12px;">📁 Unggah</button>
+                              <button type="button" class="x-btn-secondary" id="btn-set-profile-owner-icon-remove" style="font-size:12px;padding:6px 12px;color:#ef4444;display:none;">Hapus</button>
+                            </div>
+                            <input type="file" id="input-set-profile-owner-icon-file" accept="image/jpeg,image/png,image/webp" style="display:none;">
+                            <input type="hidden" id="set-profile-owner-icon" value="">
+                            <div class="x-image-specs-text">JPG, PNG, atau WebP · Maks. 10 MB · Rasio 1:1. Icon aplikasi Owner Dashboard setelah di-install.</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Field 2: Merchant -->
+                      <div class="x-form-group" style="margin:0;">
+                        <label style="font-size:12px;font-weight:600;color:#334155;">Merchant</label>
                         <div style="margin:6px 0 8px;">
                           <input type="text" id="set-profile-merchant-pwa-name" class="x-input" placeholder="Nama aplikasi (kosong = nama brand + ' Merchant')" style="font-size:12px;">
                         </div>
                         <div class="x-image-upload-control" style="margin-top:6px;">
                           <div class="x-image-upload-preview-box" id="set-profile-merchant-icon-preview-box" onclick="document.getElementById('input-set-profile-merchant-icon-file').click()" style="cursor:pointer;" title="Klik untuk pilih icon">
-                            <img id="set-profile-merchant-icon-preview" src="/merchant-app/assets/icons/icon-192.png" alt="Merchant PWA Icon">
+                            <img id="set-profile-merchant-icon-preview" src="/merchant-app/assets/icons/icon-192.png" alt="Merchant App Icon">
                             <div id="set-profile-merchant-icon-empty" class="x-image-upload-empty" style="display:none;">📱</div>
                           </div>
                           <div class="x-image-upload-info">
@@ -3884,19 +3973,20 @@
                             </div>
                             <input type="file" id="input-set-profile-merchant-icon-file" accept="image/jpeg,image/png,image/webp" style="display:none;">
                             <input type="hidden" id="set-profile-merchant-icon" value="">
-                            <div class="x-image-specs-text">JPG, PNG, atau WebP · Maks. 10 MB · Rasio 1:1. Digunakan sebagai icon aplikasi Merchant/Owner setelah PWA di-install.</div>
+                            <div class="x-image-specs-text">JPG, PNG, atau WebP · Maks. 10 MB · Rasio 1:1. Icon aplikasi Merchant setelah di-install.</div>
                           </div>
                         </div>
                       </div>
-                      <!-- POS PWA -->
+
+                      <!-- Field 3: POS Kasir -->
                       <div class="x-form-group" style="margin:0;">
-                        <label style="font-size:12px;font-weight:600;color:#334155;">POS PWA</label>
+                        <label style="font-size:12px;font-weight:600;color:#334155;">POS Kasir</label>
                         <div style="margin:6px 0 8px;">
                           <input type="text" id="set-profile-pos-pwa-name" class="x-input" placeholder="Nama aplikasi (kosong = nama brand)" style="font-size:12px;">
                         </div>
                         <div class="x-image-upload-control" style="margin-top:6px;">
                           <div class="x-image-upload-preview-box" id="set-profile-pos-icon-preview-box" onclick="document.getElementById('input-set-profile-pos-icon-file').click()" style="cursor:pointer;" title="Klik untuk pilih icon">
-                            <img id="set-profile-pos-icon-preview" src="/assets/pos/icon-192.png" onerror="this.src='/assets/pwa/icon-192.png'" alt="POS PWA Icon">
+                            <img id="set-profile-pos-icon-preview" src="/pos/assets/icons/icon-192.png" alt="POS Kasir Icon">
                             <div id="set-profile-pos-icon-empty" class="x-image-upload-empty" style="display:none;">🖥️</div>
                           </div>
                           <div class="x-image-upload-info">
@@ -3906,7 +3996,53 @@
                             </div>
                             <input type="file" id="input-set-profile-pos-icon-file" accept="image/jpeg,image/png,image/webp" style="display:none;">
                             <input type="hidden" id="set-profile-pos-icon" value="">
-                            <div class="x-image-specs-text">JPG, PNG, atau WebP · Maks. 10 MB · Rasio 1:1. Digunakan sebagai icon aplikasi POS setelah PWA di-install.</div>
+                            <div class="x-image-specs-text">JPG, PNG, atau WebP · Maks. 10 MB · Rasio 1:1. Icon aplikasi POS Kasir setelah di-install.</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Field 4: Belanja -->
+                      <div class="x-form-group" style="margin:0;">
+                        <label style="font-size:12px;font-weight:600;color:#334155;">Belanja</label>
+                        <div style="margin:6px 0 8px;">
+                          <input type="text" id="set-profile-customer-pwa-name" class="x-input" placeholder="Nama aplikasi (kosong = nama brand)" style="font-size:12px;">
+                        </div>
+                        <div class="x-image-upload-control" style="margin-top:6px;">
+                          <div class="x-image-upload-preview-box" id="set-profile-customer-icon-preview-box" onclick="document.getElementById('input-set-profile-customer-icon-file').click()" style="cursor:pointer;" title="Klik untuk pilih icon">
+                            <img id="set-profile-customer-icon-preview" src="/assets/pwa/icon-192.png" alt="Belanja Icon">
+                            <div id="set-profile-customer-icon-empty" class="x-image-upload-empty" style="display:none;">🛍️</div>
+                          </div>
+                          <div class="x-image-upload-info">
+                            <div class="x-image-upload-actions">
+                              <button type="button" class="x-btn-secondary" id="btn-set-profile-customer-icon-pick" style="font-size:12px;padding:6px 12px;">📁 Unggah</button>
+                              <button type="button" class="x-btn-secondary" id="btn-set-profile-customer-icon-remove" style="font-size:12px;padding:6px 12px;color:#ef4444;display:none;">Hapus</button>
+                            </div>
+                            <input type="file" id="input-set-profile-customer-icon-file" accept="image/jpeg,image/png,image/webp" style="display:none;">
+                            <input type="hidden" id="set-profile-customer-icon" value="">
+                            <div class="x-image-specs-text">JPG, PNG, atau WebP · Maks. 10 MB · Rasio 1:1. Icon aplikasi Belanja pelanggan setelah di-install.</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Field 5: Driver -->
+                      <div class="x-form-group" style="margin:0;">
+                        <label style="font-size:12px;font-weight:600;color:#334155;">Driver</label>
+                        <div style="margin:6px 0 8px;">
+                          <input type="text" id="set-profile-driver-pwa-name" class="x-input" placeholder="Nama aplikasi (kosong = nama brand + ' Driver')" style="font-size:12px;">
+                        </div>
+                        <div class="x-image-upload-control" style="margin-top:6px;">
+                          <div class="x-image-upload-preview-box" id="set-profile-driver-icon-preview-box" onclick="document.getElementById('input-set-profile-driver-icon-file').click()" style="cursor:pointer;" title="Klik untuk pilih icon">
+                            <img id="set-profile-driver-icon-preview" src="/driver-app/assets/icons/icon-192.png" alt="Driver Icon">
+                            <div id="set-profile-driver-icon-empty" class="x-image-upload-empty" style="display:none;">🛵</div>
+                          </div>
+                          <div class="x-image-upload-info">
+                            <div class="x-image-upload-actions">
+                              <button type="button" class="x-btn-secondary" id="btn-set-profile-driver-icon-pick" style="font-size:12px;padding:6px 12px;">📁 Unggah</button>
+                              <button type="button" class="x-btn-secondary" id="btn-set-profile-driver-icon-remove" style="font-size:12px;padding:6px 12px;color:#ef4444;display:none;">Hapus</button>
+                            </div>
+                            <input type="file" id="input-set-profile-driver-icon-file" accept="image/jpeg,image/png,image/webp" style="display:none;">
+                            <input type="hidden" id="set-profile-driver-icon" value="">
+                            <div class="x-image-specs-text">JPG, PNG, atau WebP · Maks. 10 MB · Rasio 1:1. Icon aplikasi Driver pengantar setelah di-install.</div>
                           </div>
                         </div>
                       </div>

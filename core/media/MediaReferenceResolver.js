@@ -57,7 +57,7 @@ class MediaReferenceResolver {
     const mediaIdPattern = `%${mediaId}%`;
 
     // 2. Check Brand logo & banners
-    let brandSql = 'SELECT id, logo_url, logo_media_id, merchant_pwa_icon_url, merchant_pwa_icon_media_id, pos_pwa_icon_url, pos_pwa_icon_media_id, banners FROM brands';
+    let brandSql = 'SELECT id, logo_url, logo_media_id, owner_pwa_icon_url, owner_pwa_icon_media_id, merchant_pwa_icon_url, merchant_pwa_icon_media_id, pos_pwa_icon_url, pos_pwa_icon_media_id, customer_pwa_icon_url, customer_pwa_icon_media_id, driver_pwa_icon_url, driver_pwa_icon_media_id, banners FROM brands';
     const brandParams = [];
     if (brandId) {
       brandSql += ' WHERE id = ?';
@@ -70,7 +70,11 @@ class MediaReferenceResolver {
       if (b.logo_media_id === mediaId || (b.logo_url && (b.logo_url.includes(mediaId) || (storageKey && b.logo_url.includes(storageKey))))) {
         references.push({ type: 'brand_logo', id: b.id, field: 'logo_url' });
       }
-      // Check installed Merchant/Owner and POS PWA icon media references too.
+      // Check installed App Identity icon media references (Owner, Merchant, POS, Belanja, Driver)
+      if (b.owner_pwa_icon_media_id === mediaId ||
+          (b.owner_pwa_icon_url && (b.owner_pwa_icon_url.includes(mediaId) || (storageKey && b.owner_pwa_icon_url.includes(storageKey))))) {
+        references.push({ type: 'brand_owner_pwa_icon', id: b.id, field: 'owner_pwa_icon_url' });
+      }
       if (b.merchant_pwa_icon_media_id === mediaId ||
           (b.merchant_pwa_icon_url && (b.merchant_pwa_icon_url.includes(mediaId) || (storageKey && b.merchant_pwa_icon_url.includes(storageKey))))) {
         references.push({ type: 'brand_merchant_pwa_icon', id: b.id, field: 'merchant_pwa_icon_url' });
@@ -78,6 +82,14 @@ class MediaReferenceResolver {
       if (b.pos_pwa_icon_media_id === mediaId ||
           (b.pos_pwa_icon_url && (b.pos_pwa_icon_url.includes(mediaId) || (storageKey && b.pos_pwa_icon_url.includes(storageKey))))) {
         references.push({ type: 'brand_pos_pwa_icon', id: b.id, field: 'pos_pwa_icon_url' });
+      }
+      if (b.customer_pwa_icon_media_id === mediaId ||
+          (b.customer_pwa_icon_url && (b.customer_pwa_icon_url.includes(mediaId) || (storageKey && b.customer_pwa_icon_url.includes(storageKey))))) {
+        references.push({ type: 'brand_customer_pwa_icon', id: b.id, field: 'customer_pwa_icon_url' });
+      }
+      if (b.driver_pwa_icon_media_id === mediaId ||
+          (b.driver_pwa_icon_url && (b.driver_pwa_icon_url.includes(mediaId) || (storageKey && b.driver_pwa_icon_url.includes(storageKey))))) {
+        references.push({ type: 'brand_driver_pwa_icon', id: b.id, field: 'driver_pwa_icon_url' });
       }
 
       // Check banners JSON array

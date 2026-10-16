@@ -2453,14 +2453,22 @@ function initSchema(targetDb) {
   // Legacy image_url/logo_url columns are preserved for backward compatibility.
   // Idempotent — safe on existing databases.
   try { targetDb.exec('ALTER TABLE brands ADD COLUMN logo_media_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL;'); } catch (e) {}
-  // Installed PWA Identity Override columns (launcher icon overrides for Merchant/POS PWA)
+  // Installed App Identity columns (Owner, Merchant, POS Kasir, Belanja, Driver)
+  try { targetDb.exec('ALTER TABLE brands ADD COLUMN owner_pwa_icon_url TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE brands ADD COLUMN owner_pwa_icon_media_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE brands ADD COLUMN owner_pwa_name TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE brands ADD COLUMN merchant_pwa_icon_url TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE brands ADD COLUMN merchant_pwa_icon_media_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE brands ADD COLUMN merchant_pwa_name TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE brands ADD COLUMN pos_pwa_icon_url TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE brands ADD COLUMN pos_pwa_icon_media_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL;'); } catch (e) {}
-  // Custom PWA app name overrides — fallback to brand.name when null
-  try { targetDb.exec('ALTER TABLE brands ADD COLUMN merchant_pwa_name TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE brands ADD COLUMN pos_pwa_name TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE brands ADD COLUMN customer_pwa_icon_url TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE brands ADD COLUMN customer_pwa_icon_media_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE brands ADD COLUMN customer_pwa_name TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE brands ADD COLUMN driver_pwa_icon_url TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE brands ADD COLUMN driver_pwa_icon_media_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE brands ADD COLUMN driver_pwa_name TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE products ADD COLUMN media_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE categories ADD COLUMN media_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE categories ADD COLUMN description TEXT;'); } catch (e) {}

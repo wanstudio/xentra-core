@@ -63,10 +63,16 @@ router.get('/admin/settings/business/profile', requireAuth(['owner', 'brand_mana
         primary_color: brand.primary_color || '#b6ff00',
         custom_domain: brand.custom_domain || '',
         banners: Array.isArray(banners) ? banners : [],
+        owner_pwa_icon_url: brand.owner_pwa_icon_url || null,
+        owner_pwa_name: brand.owner_pwa_name || null,
         merchant_pwa_icon_url: brand.merchant_pwa_icon_url || null,
-        pos_pwa_icon_url: brand.pos_pwa_icon_url || null,
         merchant_pwa_name: brand.merchant_pwa_name || null,
-        pos_pwa_name: brand.pos_pwa_name || null
+        pos_pwa_icon_url: brand.pos_pwa_icon_url || null,
+        pos_pwa_name: brand.pos_pwa_name || null,
+        customer_pwa_icon_url: brand.customer_pwa_icon_url || null,
+        customer_pwa_name: brand.customer_pwa_name || null,
+        driver_pwa_icon_url: brand.driver_pwa_icon_url || null,
+        driver_pwa_name: brand.driver_pwa_name || null
       }
     });
   } catch (err) {
@@ -77,15 +83,28 @@ router.get('/admin/settings/business/profile', requireAuth(['owner', 'brand_mana
 // 2.2 Brand Profile (PUT - Owner/Brand Manager only)
 router.put('/admin/settings/business/profile', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
-    const { name, tagline, primary_color, merchant_pwa_name, pos_pwa_name, banners } = req.body;
+    const {
+      name,
+      tagline,
+      primary_color,
+      owner_pwa_name,
+      merchant_pwa_name,
+      pos_pwa_name,
+      customer_pwa_name,
+      driver_pwa_name,
+      banners
+    } = req.body;
     // Media URLs are read-only here. Logo/icon/banner changes must go through
     // the canonical Media System upload/delete endpoints.
     coreBrandRepo.updateBrandProfile(req.brand_id, {
       name,
       tagline,
       primary_color,
+      owner_pwa_name,
       merchant_pwa_name,
       pos_pwa_name,
+      customer_pwa_name,
+      driver_pwa_name,
       banners
     });
 
@@ -101,10 +120,16 @@ router.put('/admin/settings/business/profile', requireAuth(['owner', 'brand_mana
         logo_url: updated.logo_url,
         primary_color: updated.primary_color,
         custom_domain: updated.custom_domain,
+        owner_pwa_icon_url: updated.owner_pwa_icon_url || null,
+        owner_pwa_name: updated.owner_pwa_name || null,
         merchant_pwa_icon_url: updated.merchant_pwa_icon_url || null,
-        pos_pwa_icon_url: updated.pos_pwa_icon_url || null,
         merchant_pwa_name: updated.merchant_pwa_name || null,
-        pos_pwa_name: updated.pos_pwa_name || null
+        pos_pwa_icon_url: updated.pos_pwa_icon_url || null,
+        pos_pwa_name: updated.pos_pwa_name || null,
+        customer_pwa_icon_url: updated.customer_pwa_icon_url || null,
+        customer_pwa_name: updated.customer_pwa_name || null,
+        driver_pwa_icon_url: updated.driver_pwa_icon_url || null,
+        driver_pwa_name: updated.driver_pwa_name || null
       }
     });
   } catch (err) {

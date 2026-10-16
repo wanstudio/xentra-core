@@ -344,11 +344,16 @@ app.get(['/manifest.json', '/pwa/manifest.json'], async (req, res) => {
         data.short_name = 'Xentra Business';
         data.description = 'Portal Bisnis Xentra untuk Owner & Merchant';
       } else if (brand && brand.name) {
-        data.name = brand.merchant_pwa_name || (isDashboard ? brand.name : brand.name + ' Merchant');
-        data.short_name = (brand.merchant_pwa_name || brand.name).substring(0, 12);
+        if (isOwner) {
+          data.name = brand.owner_pwa_name || brand.name;
+          data.short_name = (brand.owner_pwa_name || brand.name).substring(0, 12);
+        } else {
+          data.name = brand.merchant_pwa_name || (isDashboard ? brand.name : brand.name + ' Merchant');
+          data.short_name = (brand.merchant_pwa_name || brand.name).substring(0, 12);
+        }
       }
 
-      const iconOverride = brand ? (brand.merchant_pwa_icon_url || brand.logo_url || null) : null;
+      const iconOverride = brand ? ((isOwner ? brand.owner_pwa_icon_url : brand.merchant_pwa_icon_url) || brand.logo_url || null) : null;
       data.icons = buildPwaIcons(iconOverride, '/merchant-app/assets/icons/icon-192.png', '/merchant-app/assets/icons/icon-512.png');
       return res.json(data);
     } catch (_) {
@@ -362,6 +367,13 @@ app.get(['/manifest.json', '/pwa/manifest.json'], async (req, res) => {
       data.id = '/';
       data.start_url = '/';
       data.scope = '/';
+      const brand = await resolveBrandForManifest(req);
+      if (brand && brand.name) {
+        data.name = brand.driver_pwa_name || (brand.name + ' Driver');
+        data.short_name = (brand.driver_pwa_name || brand.name).substring(0, 12);
+      }
+      const iconOverride = brand ? (brand.driver_pwa_icon_url || brand.logo_url || null) : null;
+      data.icons = buildPwaIcons(iconOverride, '/driver-app/assets/icons/icon-192.png', '/driver-app/assets/icons/icon-512.png');
       return res.json(data);
     } catch (_) {
       return res.sendFile(manifestPath);
@@ -389,6 +401,13 @@ app.get(['/manifest.json', '/pwa/manifest.json'], async (req, res) => {
 
   try {
     const data = applyCanonicalPwaTheme(JSON.parse(fs.readFileSync(path.join(__dirname, '../apps/customer-pwa/assets/pwa/manifest.json'), 'utf8')));
+    const brand = await resolveBrandForManifest(req);
+    if (brand && brand.name) {
+      data.name = brand.customer_pwa_name || brand.name;
+      data.short_name = (brand.customer_pwa_name || brand.name).substring(0, 12);
+    }
+    const iconOverride = brand ? (brand.customer_pwa_icon_url || brand.logo_url || null) : null;
+    data.icons = buildPwaIcons(iconOverride, '/assets/pwa/icon-192.png', '/assets/pwa/icon-512.png');
     return res.json(data);
   } catch (_) {
     return res.sendFile(path.join(__dirname, '../apps/customer-pwa/assets/pwa/manifest.json'));
@@ -509,10 +528,10 @@ app.get(['/belanja/manifest.json', '/purchasing/manifest.json', '/purchasing-app
     const data = applyCanonicalPwaTheme(JSON.parse(fs.readFileSync(manifestPath, 'utf8')));
     const brand = await resolveBrandForManifest(req);
     if (brand && brand.name) {
-      data.name = brand.name + ' Belanja';
-      data.short_name = (brand.name + ' Belanja').substring(0, 12);
+      data.name = brand.customer_pwa_name || (brand.name + ' Belanja');
+      data.short_name = (brand.customer_pwa_name || brand.name + ' Belanja').substring(0, 12);
     }
-    const iconOverride = brand ? (brand.logo_url || null) : null;
+    const iconOverride = brand ? (brand.customer_pwa_icon_url || brand.logo_url || null) : null;
     data.icons = buildPwaIcons(iconOverride, '/belanja/assets/icons/icon-192.png', '/belanja/assets/icons/icon-512.png');
     return res.json(data);
   } catch (_) {
@@ -766,10 +785,23 @@ app.use(['/driver/assets', '/driver-app/assets'], express.static(path.join(__dir
 }));
 
 // Driver PWA manifest & service worker
-app.get(['/driver/manifest.json', '/driver-app/manifest.json'], (req, res) => {
+app.get(['/driver/manifest.json', '/driver-app/manifest.json'], async (req, res) => {
   res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.sendFile(path.join(__dirname, '../apps/driver-app/manifest.json'));
+  const manifestPath = path.join(__dirname, '../apps/driver-app/manifest.json');
+  try {
+    const data = applyCanonicalPwaTheme(JSON.parse(fs.readFileSync(manifestPath, 'utf8')));
+    const brand = await resolveBrandForManifest(req);
+    if (brand && brand.name) {
+      data.name = brand.driver_pwa_name || (brand.name + ' Driver');
+      data.short_name = (brand.driver_pwa_name || brand.name + ' Driver').substring(0, 12);
+    }
+    const iconOverride = brand ? (brand.driver_pwa_icon_url || brand.logo_url || null) : null;
+    data.icons = buildPwaIcons(iconOverride, '/driver-app/assets/icons/icon-192.png', '/driver-app/assets/icons/icon-512.png');
+    return res.json(data);
+  } catch (_) {
+    return res.sendFile(manifestPath);
+  }
 });
 
 app.get(['/driver/sw.js', '/driver-app/sw.js', '/driver/service-worker.js', '/driver-app/service-worker.js'], (req, res) => {

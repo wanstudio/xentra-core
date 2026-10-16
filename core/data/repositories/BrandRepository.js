@@ -108,7 +108,7 @@ class BrandRepository {
     return this.db.queryOne('SELECT * FROM brands WHERE id = ? LIMIT 1', [brandId]);
   }
 
-  updateBrandProfile(brandId, { name, tagline, primary_color, merchant_pwa_name, pos_pwa_name, banners }) {
+  updateBrandProfile(brandId, { name, tagline, primary_color, owner_pwa_name, merchant_pwa_name, pos_pwa_name, customer_pwa_name, driver_pwa_name, banners }) {
     if (name !== undefined && (typeof name !== 'string' || !name.trim())) {
       throw new Error('Nama brand harus berupa teks yang valid.');
     }
@@ -146,15 +146,21 @@ class BrandRepository {
     // must be created/replaced through the canonical Media System endpoints.
     clearDomainCache();
     return this.db.execute(
-      "UPDATE brands SET name = COALESCE(?, name), tagline = COALESCE(?, tagline), primary_color = COALESCE(?, primary_color), merchant_pwa_name = CASE WHEN ? = 1 THEN ? ELSE merchant_pwa_name END, pos_pwa_name = CASE WHEN ? = 1 THEN ? ELSE pos_pwa_name END, updated_at = datetime('now') WHERE id = ?",
+      "UPDATE brands SET name = COALESCE(?, name), tagline = COALESCE(?, tagline), primary_color = COALESCE(?, primary_color), owner_pwa_name = CASE WHEN ? = 1 THEN ? ELSE owner_pwa_name END, merchant_pwa_name = CASE WHEN ? = 1 THEN ? ELSE merchant_pwa_name END, pos_pwa_name = CASE WHEN ? = 1 THEN ? ELSE pos_pwa_name END, customer_pwa_name = CASE WHEN ? = 1 THEN ? ELSE customer_pwa_name END, driver_pwa_name = CASE WHEN ? = 1 THEN ? ELSE driver_pwa_name END, updated_at = datetime('now') WHERE id = ?",
       [
         name !== undefined ? name.trim() : null,
         tagline !== undefined ? (typeof tagline === 'string' ? tagline.trim() : '') : null,
         normalizedPrimaryColor !== undefined ? normalizedPrimaryColor : null,
+        owner_pwa_name !== undefined ? 1 : 0,
+        owner_pwa_name !== undefined ? (typeof owner_pwa_name === 'string' ? owner_pwa_name.trim() || null : null) : null,
         merchant_pwa_name !== undefined ? 1 : 0,
         merchant_pwa_name !== undefined ? (typeof merchant_pwa_name === 'string' ? merchant_pwa_name.trim() || null : null) : null,
         pos_pwa_name !== undefined ? 1 : 0,
         pos_pwa_name !== undefined ? (typeof pos_pwa_name === 'string' ? pos_pwa_name.trim() || null : null) : null,
+        customer_pwa_name !== undefined ? 1 : 0,
+        customer_pwa_name !== undefined ? (typeof customer_pwa_name === 'string' ? customer_pwa_name.trim() || null : null) : null,
+        driver_pwa_name !== undefined ? 1 : 0,
+        driver_pwa_name !== undefined ? (typeof driver_pwa_name === 'string' ? driver_pwa_name.trim() || null : null) : null,
         brandId
       ]
     );
@@ -213,6 +219,19 @@ class BrandRepository {
   // These affect only the PWA launcher icon after install. They do not change
   // branding, RBAC, routing, or Customer PWA behavior.
 
+  updateOwnerPwaIcon(brandId, { iconUrl, mediaId }) {
+    clearDomainCache();
+    this.db.execute(
+      'UPDATE brands SET owner_pwa_icon_url = ?, owner_pwa_icon_media_id = ?, updated_at = datetime(\'now\') WHERE id = ?',
+      [iconUrl || null, mediaId || null, brandId]
+    );
+  }
+
+  removeOwnerPwaIcon(brandId) {
+    clearDomainCache();
+    this.db.execute('UPDATE brands SET owner_pwa_icon_url = NULL, owner_pwa_icon_media_id = NULL WHERE id = ?', [brandId]);
+  }
+
   updateMerchantPwaIcon(brandId, { iconUrl, mediaId }) {
     clearDomainCache();
     this.db.execute(
@@ -237,6 +256,32 @@ class BrandRepository {
   removePosPwaIcon(brandId) {
     clearDomainCache();
     this.db.execute('UPDATE brands SET pos_pwa_icon_url = NULL, pos_pwa_icon_media_id = NULL WHERE id = ?', [brandId]);
+  }
+
+  updateCustomerPwaIcon(brandId, { iconUrl, mediaId }) {
+    clearDomainCache();
+    this.db.execute(
+      'UPDATE brands SET customer_pwa_icon_url = ?, customer_pwa_icon_media_id = ?, updated_at = datetime(\'now\') WHERE id = ?',
+      [iconUrl || null, mediaId || null, brandId]
+    );
+  }
+
+  removeCustomerPwaIcon(brandId) {
+    clearDomainCache();
+    this.db.execute('UPDATE brands SET customer_pwa_icon_url = NULL, customer_pwa_icon_media_id = NULL WHERE id = ?', [brandId]);
+  }
+
+  updateDriverPwaIcon(brandId, { iconUrl, mediaId }) {
+    clearDomainCache();
+    this.db.execute(
+      'UPDATE brands SET driver_pwa_icon_url = ?, driver_pwa_icon_media_id = ?, updated_at = datetime(\'now\') WHERE id = ?',
+      [iconUrl || null, mediaId || null, brandId]
+    );
+  }
+
+  removeDriverPwaIcon(brandId) {
+    clearDomainCache();
+    this.db.execute('UPDATE brands SET driver_pwa_icon_url = NULL, driver_pwa_icon_media_id = NULL WHERE id = ?', [brandId]);
   }
 
   findBySlug(slug) {

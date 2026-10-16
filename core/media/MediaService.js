@@ -23,8 +23,11 @@ const MediaReferenceResolver = require('./MediaReferenceResolver');
 
 const ENTITY_MEDIA_ASSET_TYPES = Object.freeze({
   brand_logo: ['logo'],
+  brand_owner_pwa_icon: ['pwa_icon'],
   brand_merchant_pwa_icon: ['pwa_icon'],
   brand_pos_pwa_icon: ['pwa_icon'],
+  brand_customer_pwa_icon: ['pwa_icon'],
+  brand_driver_pwa_icon: ['pwa_icon'],
   product: ['product'],
   menu: ['menu'],
   category: ['category'],

@@ -124,43 +124,42 @@
         if ($('set-profile-color-hex')) $('set-profile-color-hex').value = p.primary_color || '#b6ff00';
         if ($('set-profile-domain')) $('set-profile-domain').textContent = p.custom_domain || window.location.host || '-';
 
-        // Installed PWA Identity Override
-        var merchantIconUrl = p.merchant_pwa_icon_url || null;
-        var posIconUrl = p.pos_pwa_icon_url || null;
-        var defaultMerchantIcon = '/merchant-app/assets/icons/icon-192.png';
-        var defaultPosIcon = '/assets/pwa/icon-192.png';
+        // Installed PWA Identity Override for all 5 roles
+        var pwaRoles = [
+          { key: 'owner', nameKey: 'owner_pwa_name', iconKey: 'owner_pwa_icon_url', defaultIcon: '/assets/pwa/icon-192.png' },
+          { key: 'merchant', nameKey: 'merchant_pwa_name', iconKey: 'merchant_pwa_icon_url', defaultIcon: '/merchant-app/assets/icons/icon-192.png' },
+          { key: 'pos', nameKey: 'pos_pwa_name', iconKey: 'pos_pwa_icon_url', defaultIcon: '/pos/assets/icons/icon-192.png' },
+          { key: 'customer', nameKey: 'customer_pwa_name', iconKey: 'customer_pwa_icon_url', defaultIcon: '/assets/pwa/icon-192.png' },
+          { key: 'driver', nameKey: 'driver_pwa_name', iconKey: 'driver_pwa_icon_url', defaultIcon: '/driver-app/assets/icons/icon-192.png' }
+        ];
 
-        if ($('set-profile-merchant-icon')) $('set-profile-merchant-icon').value = merchantIconUrl || '';
-        if ($('set-profile-merchant-icon-preview')) {
-          $('set-profile-merchant-icon-preview').src = merchantIconUrl || defaultMerchantIcon;
-          $('set-profile-merchant-icon-preview').style.display = 'block';
-        }
-        if ($('set-profile-merchant-icon-empty')) $('set-profile-merchant-icon-empty').style.display = 'none';
-        if ($('btn-set-profile-merchant-icon-remove')) $('btn-set-profile-merchant-icon-remove').style.display = merchantIconUrl ? 'inline-block' : 'none';
+        pwaRoles.forEach(function (r) {
+          var iconUrl = p[r.iconKey] || null;
+          var pwaName = p[r.nameKey] || '';
+          var effectiveIcon = iconUrl || r.defaultIcon;
+          var hasCustom = Boolean(iconUrl);
 
-        if ($('set-profile-pos-icon')) $('set-profile-pos-icon').value = posIconUrl || '';
-        if ($('set-profile-pos-icon-preview')) {
-          $('set-profile-pos-icon-preview').src = posIconUrl || defaultPosIcon;
-          $('set-profile-pos-icon-preview').style.display = 'block';
-        }
-        if ($('set-profile-pos-icon-empty')) $('set-profile-pos-icon-empty').style.display = 'none';
-        if ($('btn-set-profile-pos-icon-remove')) $('btn-set-profile-pos-icon-remove').style.display = posIconUrl ? 'inline-block' : 'none';
+          // Settings Modal
+          if ($('set-profile-' + r.key + '-pwa-name')) $('set-profile-' + r.key + '-pwa-name').value = pwaName;
+          if ($('set-profile-' + r.key + '-icon')) $('set-profile-' + r.key + '-icon').value = iconUrl || '';
+          if ($('set-profile-' + r.key + '-icon-preview')) {
+            $('set-profile-' + r.key + '-icon-preview').src = effectiveIcon;
+            $('set-profile-' + r.key + '-icon-preview').style.display = 'block';
+          }
+          if ($('set-profile-' + r.key + '-icon-empty')) $('set-profile-' + r.key + '-icon-empty').style.display = 'none';
+          if ($('btn-set-profile-' + r.key + '-icon-remove')) $('btn-set-profile-' + r.key + '-icon-remove').style.display = hasCustom ? 'inline-block' : 'none';
+          if ($('btn-set-profile-' + r.key + '-icon-pick')) $('btn-set-profile-' + r.key + '-icon-pick').textContent = hasCustom ? '📁 Ganti' : '📁 Unggah';
 
-        // Sync brand tab previews too
-        if ($('brand-tab-merchant-icon')) $('brand-tab-merchant-icon').value = merchantIconUrl || '';
-        if ($('brand-tab-merchant-icon-preview')) $('brand-tab-merchant-icon-preview').src = merchantIconUrl || defaultMerchantIcon;
-        if ($('btn-brand-tab-merchant-icon-remove')) $('btn-brand-tab-merchant-icon-remove').style.display = merchantIconUrl ? 'inline-block' : 'none';
-        if ($('brand-tab-pos-icon')) $('brand-tab-pos-icon').value = posIconUrl || '';
-        if ($('brand-tab-pos-icon-preview')) $('brand-tab-pos-icon-preview').src = posIconUrl || defaultPosIcon;
-        if ($('btn-brand-tab-pos-icon-remove')) $('btn-brand-tab-pos-icon-remove').style.display = posIconUrl ? 'inline-block' : 'none';
-
-        // Sync PWA custom name inputs across Settings and Brand tabs
-        var merchantPwaName = p.merchant_pwa_name || '';
-        var posPwaName = p.pos_pwa_name || '';
-        if ($('set-profile-merchant-pwa-name')) $('set-profile-merchant-pwa-name').value = merchantPwaName;
-        if ($('set-profile-pos-pwa-name')) $('set-profile-pos-pwa-name').value = posPwaName;
-        if ($('brand-tab-merchant-pwa-name')) $('brand-tab-merchant-pwa-name').value = merchantPwaName;
-        if ($('brand-tab-pos-pwa-name')) $('brand-tab-pos-pwa-name').value = posPwaName;
+          // Brand Tab
+          if ($('brand-tab-' + r.key + '-pwa-name')) $('brand-tab-' + r.key + '-pwa-name').value = pwaName;
+          if ($('brand-tab-' + r.key + '-icon')) $('brand-tab-' + r.key + '-icon').value = iconUrl || '';
+          if ($('brand-tab-' + r.key + '-icon-preview')) {
+            $('brand-tab-' + r.key + '-icon-preview').src = effectiveIcon;
+            $('brand-tab-' + r.key + '-icon-preview').style.display = 'block';
+          }
+          if ($('btn-brand-tab-' + r.key + '-icon-remove')) $('btn-brand-tab-' + r.key + '-icon-remove').style.display = hasCustom ? 'inline-block' : 'none';
+          if ($('btn-brand-tab-' + r.key + '-icon-pick')) $('btn-brand-tab-' + r.key + '-icon-pick').textContent = hasCustom ? '📁 Ganti Icon' : '📁 Unggah Icon';
+        });
       } catch (err) {
         console.warn('[Load Settings Profile Warn]:', err);
       }
@@ -283,79 +282,56 @@
         });
       }
 
-      // Settings Panel — Merchant Icon Upload
-      var spMerchantPickBtn = $('btn-set-profile-merchant-icon-pick');
-      var spMerchantFileInput = $('input-set-profile-merchant-icon-file');
-      var spMerchantRemoveBtn = $('btn-set-profile-merchant-icon-remove');
-      if (spMerchantPickBtn && spMerchantFileInput) {
-        spMerchantPickBtn.addEventListener('click', function () { spMerchantFileInput.click(); });
-      }
-      if (spMerchantFileInput) {
-        spMerchantFileInput.addEventListener('change', async function () {
-          var file = spMerchantFileInput.files && spMerchantFileInput.files[0];
-          if (!file) return;
-          await doUploadPwaLauncherIcon(file, '/admin/brand/merchant-icon',
-            $('set-profile-merchant-icon-preview'), $('set-profile-merchant-icon'),
-            spMerchantRemoveBtn, $('btn-set-profile-merchant-icon-pick'));
-          spMerchantFileInput.value = '';
-        });
-      }
-      if (spMerchantRemoveBtn) {
-        spMerchantRemoveBtn.addEventListener('click', async function () {
-          if (!await confirmFeatureAction('remove-merchant-pwa-override', 'Hapus Override Icon', 'Hapus override icon Merchant PWA?', 'Hapus')) return;
-          try {
-            var res = await adminFetch(API_BASE + '/admin/brand/merchant-icon', { method: 'DELETE', headers: getAuthHeaders() });
-            var data = await res.json();
-            if (res.ok && data.success) {
-              showToast('✅ Icon Merchant PWA dihapus.');
-              var defaultMerchantIcon = '/merchant-app/assets/icons/icon-192.png';
-              if ($('set-profile-merchant-icon')) $('set-profile-merchant-icon').value = '';
-              if ($('set-profile-merchant-icon-preview')) $('set-profile-merchant-icon-preview').src = defaultMerchantIcon;
-              spMerchantRemoveBtn.style.display = 'none';
-              if ($('brand-tab-merchant-icon')) $('brand-tab-merchant-icon').value = '';
-              if ($('brand-tab-merchant-icon-preview')) $('brand-tab-merchant-icon-preview').src = defaultMerchantIcon;
-              if ($('btn-brand-tab-merchant-icon-remove')) $('btn-brand-tab-merchant-icon-remove').style.display = 'none';
-            } else { showToast('❌ Gagal menghapus icon.'); }
-          } catch (err) { showToast('❌ Kesalahan jaringan.'); }
-        });
-      }
+      // Settings Panel — PWA Icon Uploads for Owner, Merchant, POS Kasir, Belanja, Driver
+      var pwaSettingsRoles = [
+        { key: 'owner', label: 'Owner PWA', endpoint: '/admin/brand/owner-icon', defaultIcon: '/assets/pwa/icon-192.png' },
+        { key: 'merchant', label: 'Merchant PWA', endpoint: '/admin/brand/merchant-icon', defaultIcon: '/merchant-app/assets/icons/icon-192.png' },
+        { key: 'pos', label: 'POS Kasir PWA', endpoint: '/admin/brand/pos-icon', defaultIcon: '/pos/assets/icons/icon-192.png' },
+        { key: 'customer', label: 'Belanja PWA', endpoint: '/admin/brand/customer-icon', defaultIcon: '/assets/pwa/icon-192.png' },
+        { key: 'driver', label: 'Driver PWA', endpoint: '/admin/brand/driver-icon', defaultIcon: '/driver-app/assets/icons/icon-192.png' }
+      ];
 
-      // Settings Panel — POS Icon Upload
-      var spPosPickBtn = $('btn-set-profile-pos-icon-pick');
-      var spPosFileInput = $('input-set-profile-pos-icon-file');
-      var spPosRemoveBtn = $('btn-set-profile-pos-icon-remove');
-      if (spPosPickBtn && spPosFileInput) {
-        spPosPickBtn.addEventListener('click', function () { spPosFileInput.click(); });
-      }
-      if (spPosFileInput) {
-        spPosFileInput.addEventListener('change', async function () {
-          var file = spPosFileInput.files && spPosFileInput.files[0];
-          if (!file) return;
-          await doUploadPwaLauncherIcon(file, '/admin/brand/pos-icon',
-            $('set-profile-pos-icon-preview'), $('set-profile-pos-icon'),
-            spPosRemoveBtn, $('btn-set-profile-pos-icon-pick'));
-          spPosFileInput.value = '';
-        });
-      }
-      if (spPosRemoveBtn) {
-        spPosRemoveBtn.addEventListener('click', async function () {
-          if (!await confirmFeatureAction('remove-pos-pwa-override', 'Hapus Override Icon', 'Hapus override icon POS PWA?', 'Hapus')) return;
-          try {
-            var res = await adminFetch(API_BASE + '/admin/brand/pos-icon', { method: 'DELETE', headers: getAuthHeaders() });
-            var data = await res.json();
-            if (res.ok && data.success) {
-              showToast('✅ Icon POS PWA dihapus.');
-              var defaultPosIcon = '/assets/pwa/icon-192.png';
-              if ($('set-profile-pos-icon')) $('set-profile-pos-icon').value = '';
-              if ($('set-profile-pos-icon-preview')) $('set-profile-pos-icon-preview').src = defaultPosIcon;
-              spPosRemoveBtn.style.display = 'none';
-              if ($('brand-tab-pos-icon')) $('brand-tab-pos-icon').value = '';
-              if ($('brand-tab-pos-icon-preview')) $('brand-tab-pos-icon-preview').src = defaultPosIcon;
-              if ($('btn-brand-tab-pos-icon-remove')) $('btn-brand-tab-pos-icon-remove').style.display = 'none';
-            } else { showToast('❌ Gagal menghapus icon.'); }
-          } catch (err) { showToast('❌ Kesalahan jaringan.'); }
-        });
-      }
+      pwaSettingsRoles.forEach(function (roleCfg) {
+        var rKey = roleCfg.key;
+        var rLabel = roleCfg.label;
+        var pickBtn = $('btn-set-profile-' + rKey + '-icon-pick');
+        var fileInput = $('input-set-profile-' + rKey + '-icon-file');
+        var removeBtn = $('btn-set-profile-' + rKey + '-icon-remove');
+
+        if (pickBtn && fileInput) {
+          pickBtn.addEventListener('click', function () { fileInput.click(); });
+        }
+        if (fileInput) {
+          fileInput.addEventListener('change', async function () {
+            var file = fileInput.files && fileInput.files[0];
+            if (!file) return;
+            await doUploadPwaLauncherIcon(file, roleCfg.endpoint,
+              $('set-profile-' + rKey + '-icon-preview'), $('set-profile-' + rKey + '-icon'),
+              removeBtn, pickBtn);
+            fileInput.value = '';
+          });
+        }
+        if (removeBtn) {
+          removeBtn.addEventListener('click', async function () {
+            if (!await confirmFeatureAction('remove-' + rKey + '-pwa-override', 'Hapus Override Icon', 'Hapus override icon ' + rLabel + '?', 'Hapus')) return;
+            try {
+              var res = await adminFetch(API_BASE + roleCfg.endpoint, { method: 'DELETE', headers: getAuthHeaders() });
+              var data = await res.json();
+              if (res.ok && data.success) {
+                showToast('✅ Icon ' + rLabel + ' dihapus.');
+                if ($('set-profile-' + rKey + '-icon')) $('set-profile-' + rKey + '-icon').value = '';
+                if ($('set-profile-' + rKey + '-icon-preview')) $('set-profile-' + rKey + '-icon-preview').src = roleCfg.defaultIcon;
+                removeBtn.style.display = 'none';
+                if ($('btn-set-profile-' + rKey + '-icon-pick')) $('btn-set-profile-' + rKey + '-icon-pick').textContent = '📁 Unggah';
+                if ($('brand-tab-' + rKey + '-icon')) $('brand-tab-' + rKey + '-icon').value = '';
+                if ($('brand-tab-' + rKey + '-icon-preview')) $('brand-tab-' + rKey + '-icon-preview').src = roleCfg.defaultIcon;
+                if ($('btn-brand-tab-' + rKey + '-icon-remove')) $('btn-brand-tab-' + rKey + '-icon-remove').style.display = 'none';
+                if ($('btn-brand-tab-' + rKey + '-icon-pick')) $('btn-brand-tab-' + rKey + '-icon-pick').textContent = '📁 Unggah Icon';
+              } else { showToast('❌ Gagal menghapus icon.'); }
+            } catch (err) { showToast('❌ Kesalahan jaringan.'); }
+          });
+        }
+      });
     }
 
 
@@ -382,18 +358,21 @@
         }
         rawHex = rawHex.toUpperCase();
 
-        var merchantPwaVal = ($('set-profile-merchant-icon') && $('set-profile-merchant-icon').value.trim()) || null;
-        var posPwaVal = ($('set-profile-pos-icon') && $('set-profile-pos-icon').value.trim()) || null;
-
         var payload = {
           name: $('set-profile-name').value.trim(),
           tagline: $('set-profile-tagline').value.trim(),
           logo_url: $('set-profile-logo').value.trim(),
           primary_color: rawHex,
-          merchant_pwa_icon_url: merchantPwaVal,
-          pos_pwa_icon_url: posPwaVal,
+          owner_pwa_icon_url: ($('set-profile-owner-icon') && $('set-profile-owner-icon').value.trim()) || null,
+          merchant_pwa_icon_url: ($('set-profile-merchant-icon') && $('set-profile-merchant-icon').value.trim()) || null,
+          pos_pwa_icon_url: ($('set-profile-pos-icon') && $('set-profile-pos-icon').value.trim()) || null,
+          customer_pwa_icon_url: ($('set-profile-customer-icon') && $('set-profile-customer-icon').value.trim()) || null,
+          driver_pwa_icon_url: ($('set-profile-driver-icon') && $('set-profile-driver-icon').value.trim()) || null,
+          owner_pwa_name: $('set-profile-owner-pwa-name') ? $('set-profile-owner-pwa-name').value.trim() : undefined,
           merchant_pwa_name: $('set-profile-merchant-pwa-name') ? $('set-profile-merchant-pwa-name').value.trim() : undefined,
-          pos_pwa_name: $('set-profile-pos-pwa-name') ? $('set-profile-pos-pwa-name').value.trim() : undefined
+          pos_pwa_name: $('set-profile-pos-pwa-name') ? $('set-profile-pos-pwa-name').value.trim() : undefined,
+          customer_pwa_name: $('set-profile-customer-pwa-name') ? $('set-profile-customer-pwa-name').value.trim() : undefined,
+          driver_pwa_name: $('set-profile-driver-pwa-name') ? $('set-profile-driver-pwa-name').value.trim() : undefined
         };
 
         var res = await adminFetch(API_BASE + '/admin/settings/business/profile', {
