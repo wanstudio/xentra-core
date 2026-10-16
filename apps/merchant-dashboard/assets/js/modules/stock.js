@@ -299,9 +299,16 @@
       var th = Number(it.low_stock_threshold || 5);
       var isOut = cur <= 0;
       var isLow = cur > 0 && cur <= th;
+      var isDirect = (it.inventory_type || '').toUpperCase() === 'DIRECT';
 
       var statusText = isOut ? 'Habis' : (isLow ? 'Menipis' : 'Aman');
       var statusClass = isOut ? 'danger' : (isLow ? 'warning' : 'good');
+
+      var actionBtn = isDirect
+        ? '<button type="button" class="x-btn-secondary" style="margin-top:6px; font-size:11px; padding:4px 9px; border-radius:6px; font-weight:600; display:inline-flex; align-items:center; gap:4px;" onclick="event.stopPropagation(); openProductStockOpnameModal(\'' + escapeHtml(it.branch_id) + '\', \'' + escapeHtml(it.product_id) + '\', \'' + escapeHtml(it.product_name || '').replace(/'/g, "\\'") + '\', \'' + escapeHtml(it.branch_name || '').replace(/'/g, "\\'") + '\', \'' + escapeHtml(it.sku || '').replace(/'/g, "\\'") + '\', ' + cur + ', ' + th + ')">' +
+            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg> Atur' +
+          '</button>'
+        : '';
 
       return (
         '<div class="x-owner-stock-item-card ' + (isOut ? 'is-out' : '') + '">' +
@@ -309,6 +316,7 @@
             '<div class="x-owner-stock-item-card-top">' +
               '<span class="x-owner-stock-branch-badge ' + statusClass + '">' + statusText + '</span>' +
               '<span class="x-owner-stock-item-card-branch">' + escapeHtml(it.branch_name || '-') + '</span>' +
+              (isDirect ? '<span class="x-badge" style="background:#F1F5F9; color:#475569; font-size:10px; font-weight:700; padding:1px 6px; border-radius:4px;">Barang Jadi</span>' : '') +
             '</div>' +
             '<strong class="x-owner-stock-item-card-title">' + escapeHtml(it.product_name || '-') + '</strong>' +
             '<div class="x-owner-stock-item-card-sub">' +
@@ -321,6 +329,7 @@
               '<strong>' + formatUnitCount(cur) + '</strong> <small>unit</small>' +
             '</div>' +
             '<div class="x-owner-stock-item-card-min">Min. ' + formatUnitCount(th) + '</div>' +
+            actionBtn +
           '</div>' +
         '</div>'
       );
@@ -331,24 +340,35 @@
       var th = Number(it.low_stock_threshold || 5);
       var isOut = cur <= 0;
       var isLow = cur > 0 && cur <= th;
+      var isDirect = (it.inventory_type || '').toUpperCase() === 'DIRECT';
 
       var statusText = isOut ? 'Habis' : (isLow ? 'Menipis' : 'Aman');
       var statusClass = isOut ? 'danger' : (isLow ? 'warning' : 'good');
+
+      var deskAction = isDirect
+        ? '<button type="button" class="x-btn-secondary" style="font-size:11.5px; padding:4px 10px; border-radius:6px; font-weight:600; display:inline-flex; align-items:center; gap:4px;" onclick="event.stopPropagation(); openProductStockOpnameModal(\'' + escapeHtml(it.branch_id) + '\', \'' + escapeHtml(it.product_id) + '\', \'' + escapeHtml(it.product_name || '').replace(/'/g, "\\'") + '\', \'' + escapeHtml(it.branch_name || '').replace(/'/g, "\\'") + '\', \'' + escapeHtml(it.sku || '').replace(/'/g, "\\'") + '\', ' + cur + ', ' + th + ')">' +
+            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg> Atur' +
+          '</button>'
+        : '<span class="text-muted" style="font-size:11px;">Resep</span>';
 
       return (
         '<tr class="x-owner-stock-table-tr">' +
           '<td class="x-owner-stock-table-td main-col">' +
             '<div class="x-owner-stock-td-title">' + escapeHtml(it.product_name || '-') + '</div>' +
-            '<div class="x-owner-stock-td-sub">' + (it.sku ? 'SKU: ' + escapeHtml(it.sku) : '') + (it.category_name ? ' • ' + escapeHtml(it.category_name) : '') + '</div>' +
+            '<div class="x-owner-stock-td-sub">' +
+              (isDirect ? '<span class="x-badge" style="background:#F1F5F9; color:#475569; font-size:10px; font-weight:700; padding:1px 5px; border-radius:4px; margin-right:4px;">Barang Jadi</span>' : '') +
+              (it.sku ? 'SKU: ' + escapeHtml(it.sku) : '') + (it.category_name ? ' • ' + escapeHtml(it.category_name) : '') +
+            '</div>' +
           '</td>' +
           '<td class="x-owner-stock-table-td">' + escapeHtml(it.branch_name || '-') + '</td>' +
           '<td class="x-owner-stock-table-td text-center">' +
             '<strong class="' + (isOut ? 'text-danger' : (isLow ? 'text-warning' : '')) + '">' + formatUnitCount(cur) + '</strong> <small class="text-muted">unit</small>' +
           '</td>' +
           '<td class="x-owner-stock-table-td text-center text-muted">' + formatUnitCount(th) + ' unit</td>' +
-          '<td class="x-owner-stock-table-td text-right">' +
+          '<td class="x-owner-stock-table-td text-center">' +
             '<span class="x-owner-stock-branch-badge ' + statusClass + '">' + statusText + '</span>' +
           '</td>' +
+          '<td class="x-owner-stock-table-td text-right">' + deskAction + '</td>' +
         '</tr>'
       );
     }).join('');
@@ -363,7 +383,8 @@
               '<th style="text-align:left;">Cabang</th>' +
               '<th style="text-align:center;">Sisa Stok</th>' +
               '<th style="text-align:center;">Batas Min.</th>' +
-              '<th style="text-align:right;">Status</th>' +
+              '<th style="text-align:center;">Status</th>' +
+              '<th style="text-align:right;">Aksi</th>' +
             '</tr>' +
           '</thead>' +
           '<tbody>' + desktopRows + '</tbody>' +
@@ -2451,7 +2472,198 @@
 
     container.innerHTML = summaryHeader + cards;
   }
-  window.renderOwnerPurchasingHistoryList = renderOwnerPurchasingHistoryList;
+  /* ==========================================================================
+     BRANCH PRODUCT DIRECT STOCK OPNAME & ADJUSTMENT MODAL
+     ========================================================================== */
+  function openProductStockOpnameModal(branchId, productId, prodName, branchName, sku, currentStock, threshold) {
+    if ($('opname-prod-branch-id')) $('opname-prod-branch-id').value = branchId;
+    if ($('opname-prod-product-id')) $('opname-prod-product-id').value = productId;
+    if ($('opname-prod-current-val')) $('opname-prod-current-val').value = currentStock;
+
+    if ($('opname-prod-name-display')) $('opname-prod-name-display').textContent = prodName || 'Produk';
+    if ($('opname-prod-branch-display')) $('opname-prod-branch-display').textContent = 'Cabang: ' + (branchName || '-');
+    if ($('opname-prod-sku-display')) $('opname-prod-sku-display').textContent = 'SKU: ' + (sku || '-');
+    if ($('opname-prod-current-display')) $('opname-prod-current-display').textContent = formatUnitCount(currentStock);
+
+    if ($('opname-new-stock')) $('opname-new-stock').value = currentStock;
+    if ($('opname-add-qty')) $('opname-add-qty').value = '';
+    if ($('opname-threshold')) $('opname-threshold').value = threshold || 5;
+    if ($('opname-notes')) $('opname-notes').value = '';
+
+    onOpnameModeChange('set');
+
+    if (window.XentraUI && window.XentraUI.Modal) {
+      window.XentraUI.Modal.open('modal-product-stock-opname');
+    } else {
+      var modal = $('modal-product-stock-opname');
+      if (modal) modal.style.display = 'flex';
+    }
+  }
+
+  function closeProductStockOpnameModal() {
+    if (window.XentraUI && window.XentraUI.Modal) {
+      window.XentraUI.Modal.close('modal-product-stock-opname');
+    } else {
+      var modal = $('modal-product-stock-opname');
+      if (modal) modal.style.display = 'none';
+    }
+  }
+
+  function onOpnameModeChange(mode) {
+    var isSet = mode === 'set';
+    var grpSet = $('group-opname-mode-set');
+    var grpAdd = $('group-opname-mode-add');
+    var lblSet = $('lbl-opname-mode-set');
+    var lblAdd = $('lbl-opname-mode-add');
+
+    if (grpSet) grpSet.style.display = isSet ? 'block' : 'none';
+    if (grpAdd) grpAdd.style.display = isSet ? 'none' : 'block';
+
+    if (lblSet) {
+      lblSet.style.borderColor = isSet ? '#10B981' : '#CBD5E1';
+      lblSet.style.background = isSet ? '#F0FDF4' : '#FFFFFF';
+    }
+    if (lblAdd) {
+      lblAdd.style.borderColor = !isSet ? '#10B981' : '#CBD5E1';
+      lblAdd.style.background = !isSet ? '#F0FDF4' : '#FFFFFF';
+    }
+
+    var radios = document.getElementsByName('opname-mode');
+    for (var i = 0; i < radios.length; i++) {
+      if (radios[i].value === mode) radios[i].checked = true;
+    }
+
+    updateOpnamePreview();
+  }
+
+  function updateOpnamePreview() {
+    var cur = Number($('opname-prod-current-val') ? $('opname-prod-current-val').value : 0) || 0;
+    var mode = 'set';
+    var radios = document.getElementsByName('opname-mode');
+    for (var i = 0; i < radios.length; i++) {
+      if (radios[i].checked) { mode = radios[i].value; break; }
+    }
+
+    var deltaEl = $('opname-delta-preview');
+    var addEl = $('opname-add-preview');
+
+    if (mode === 'set') {
+      var newVal = Number($('opname-new-stock') ? $('opname-new-stock').value : cur);
+      var delta = newVal - cur;
+      if (deltaEl) {
+        if (delta === 0) {
+          deltaEl.textContent = 'Stok tidak berubah (selisih: 0 unit)';
+          deltaEl.style.color = '#059669';
+        } else if (delta > 0) {
+          deltaEl.textContent = 'Audit bertambah: +' + delta + ' unit (Stok akhir: ' + newVal + ')';
+          deltaEl.style.color = '#2563EB';
+        } else {
+          deltaEl.textContent = 'Audit berkurang (selisih/waste): ' + delta + ' unit (Stok akhir: ' + newVal + ')';
+          deltaEl.style.color = '#DC2626';
+        }
+      }
+    } else {
+      var addQty = Number($('opname-add-qty') ? $('opname-add-qty').value : 0) || 0;
+      var finalVal = cur + addQty;
+      if (addEl) {
+        if (addQty > 0) {
+          addEl.textContent = 'Stok akhir menjadi: ' + finalVal + ' unit (+ ' + addQty + ' unit baru)';
+          addEl.style.color = '#2563EB';
+        } else {
+          addEl.textContent = 'Masukkan jumlah unit yang masuk';
+          addEl.style.color = '#64748B';
+        }
+      }
+    }
+  }
+
+  async function submitProductStockOpnameForm(e) {
+    if (e && e.preventDefault) e.preventDefault();
+
+    var branchId = $('opname-prod-branch-id') ? $('opname-prod-branch-id').value : '';
+    var productId = $('opname-prod-product-id') ? $('opname-prod-product-id').value : '';
+    var cur = Number($('opname-prod-current-val') ? $('opname-prod-current-val').value : 0) || 0;
+    var threshold = Number($('opname-threshold') ? $('opname-threshold').value : 5);
+    var notes = $('opname-notes') ? $('opname-notes').value.trim() : '';
+
+    if (!branchId || !productId) {
+      showToast('Data cabang/produk tidak valid.', 'error');
+      return;
+    }
+
+    var mode = 'set';
+    var radios = document.getElementsByName('opname-mode');
+    for (var i = 0; i < radios.length; i++) {
+      if (radios[i].checked) { mode = radios[i].value; break; }
+    }
+
+    var delta = 0;
+    var movementType = 'audit_adjustment';
+
+    if (mode === 'set') {
+      var targetStock = Number($('opname-new-stock') ? $('opname-new-stock').value : cur);
+      if (isNaN(targetStock) || targetStock < 0) {
+        showToast('Jumlah stok fisik riil tidak boleh negatif.', 'warning');
+        return;
+      }
+      delta = targetStock - cur;
+    } else {
+      var addQty = Number($('opname-add-qty') ? $('opname-add-qty').value : 0);
+      if (isNaN(addQty) || addQty <= 0) {
+        showToast('Jumlah unit restock harus lebih dari 0.', 'warning');
+        return;
+      }
+      delta = addQty;
+    }
+
+    var btnSave = $('btn-save-product-opname');
+    if (btnSave) {
+      btnSave.disabled = true;
+      btnSave.textContent = 'Menyimpan...';
+    }
+
+    try {
+      var payload = {
+        movement_type: movementType,
+        low_stock_threshold: threshold,
+        notes: notes || (mode === 'set' ? 'Stock opname fisik cabang' : 'Penambahan restock unit')
+      };
+      if (delta !== 0) {
+        payload.quantity = delta;
+      }
+
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/inventory/' + encodeURIComponent(productId), {
+        method: 'PATCH',
+        headers: Object.assign({}, getAuthHeaders(), { 'Content-Type': 'application/json' }),
+        body: JSON.stringify(payload)
+      });
+      var data = await res.json();
+
+      if (!res.ok || !data.success) {
+        var errMsg = data.message || data.error || 'Gagal menyimpan penyesuaian stok.';
+        showToast('❌ ' + errMsg, 'error');
+        return;
+      }
+
+      showToast('✅ Stok produk cabang berhasil diperbarui!', 'success');
+      closeProductStockOpnameModal();
+      loadOwnerStockOverview();
+    } catch (err) {
+      console.error('[Stock Opname Error]:', err);
+      showToast('❌ Terjadi kesalahan jaringan saat menyimpan stok.', 'error');
+    } finally {
+      if (btnSave) {
+        btnSave.disabled = false;
+        btnSave.textContent = 'Simpan Perubahan';
+      }
+    }
+  }
+
+  window.openProductStockOpnameModal = openProductStockOpnameModal;
+  window.closeProductStockOpnameModal = closeProductStockOpnameModal;
+  window.onOpnameModeChange = onOpnameModeChange;
+  window.updateOpnamePreview = updateOpnamePreview;
+  window.submitProductStockOpnameForm = submitProductStockOpnameForm;
 
   // Export to window for inline HTML onclick handlers & dashboard orchestration
   window.loadOwnerStockOverview = loadOwnerStockOverview;
