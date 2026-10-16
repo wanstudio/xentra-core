@@ -50,18 +50,17 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: pos-v1.1.0
-          name: "Mybangjo POS App v1.1.0"
+          tag_name: pos-v1.1.1
+          name: "Mybangjo POS App v1.1.1"
           make_latest: false
           body: |
-            ### Mybangjo POS App v1.1.0 (Full Parity Native POS Shell)
+            ### Mybangjo POS App v1.1.1 (Official POS Icon & Full Parity)
             - Download langsung file `mybangjo-pos.apk` di bawah tanpa ekstrak ZIP.
-            - **Fitur Baru & Paritas Lengkap v1.1.0**:
-              - **Floating Assistive Ball (Bola Melayang 24/7)**: Bola pintar kasir tetap aktif di layar Android saat membuka aplikasi lain, menampilkan badge counter pesanan baru, dan sekali ketuk langsung membuka kasir.
-              - **Top Bar / Status Bar HP Dinamis Adaptif**: Warna status bar Android (jam, baterai, sinyal) otomatis berubah mengikuti tema dan background halaman kasir yang sedang aktif.
-              - **Background Order Monitor & Sirene Audio**: Memantau pesanan masuk secara real-time di latar belakang lengkap dengan nada panggil suara kasir dan notifikasi popup kartu order.
-              - **Direct Thermal Bluetooth Printing**: Cetak struk kasir otomatis (silent print ESC/POS) langsung ke printer bluetooth.
-              - **Auto Cash Drawer Kick**: Pemicu otomatis pembuka laci kasir (RJ11) saat pembayaran tunai selesai.
-              - **Screen Always On (Kiosk Mode)**: Layar tablet/HP kasir tetap terjaga menyala selama jam operasional shift kasir.
+            - **Pembaruan v1.1.1**:
+              - **Ikon Resmi POS Sesuai Upload Owner**: Ikon aplikasi di homescreen dan bola melayang (assistive ball) kini menggunakan logo POS resmi yang di-upload dari dashboard Owner (`/owner` POS PWA).
+              - **Floating Assistive Ball (Bola Melayang 24/7)**: Bola pintar kasir dengan logo resmi POS, menampilkan counter pesanan baru, dan membuka kasir saat diklik.
+              - **Top Bar / Status Bar HP Dinamis Adaptif**: Mengikuti warna halaman aktif.
+              - **Background Order Monitor & Sirene Audio**: Memantau pesanan masuk secara real-time.
+              - **Direct Thermal Bluetooth Printing & Auto Cash Drawer Kick**.
           files: build-output/mybangjo-pos.apk
 
