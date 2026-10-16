@@ -304,19 +304,23 @@
       var statusText = isOut ? 'Habis' : (isLow ? 'Menipis' : 'Aman');
       var statusClass = isOut ? 'danger' : (isLow ? 'warning' : 'good');
 
-      var actionBtn = isDirect
-        ? '<button type="button" class="x-btn-secondary" style="margin-top:6px; font-size:11px; padding:4px 9px; border-radius:6px; font-weight:600; display:inline-flex; align-items:center; gap:4px;" onclick="event.stopPropagation(); openProductStockOpnameModal(\'' + escapeHtml(it.branch_id) + '\', \'' + escapeHtml(it.product_id) + '\', \'' + escapeHtml(it.product_name || '').replace(/'/g, "\\'") + '\', \'' + escapeHtml(it.branch_name || '').replace(/'/g, "\\'") + '\', \'' + escapeHtml(it.sku || '').replace(/'/g, "\\'") + '\', ' + cur + ', ' + th + ')">' +
-            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg> Atur' +
-          '</button>'
-        : '';
+      var typeBadge = isDirect
+        ? '<span class="x-badge" style="background:#F1F5F9; color:#475569; font-size:10px; font-weight:700; padding:1px 6px; border-radius:4px;">Barang Jadi</span>'
+        : '<span class="x-badge" style="background:#EFF6FF; color:#1D4ED8; font-size:10px; font-weight:700; padding:1px 6px; border-radius:4px;">Menu Olahan</span>';
+
+      var modalArgs = '\'' + escapeHtml(it.branch_id) + '\', \'' + escapeHtml(it.product_id) + '\', \'' + escapeHtml(it.product_name || '').replace(/'/g, "\\'") + '\', \'' + escapeHtml(it.branch_name || '').replace(/'/g, "\\'") + '\', \'' + escapeHtml(it.sku || '').replace(/'/g, "\\'") + '\', ' + cur + ', ' + th;
+
+      var actionBtn = '<button type="button" class="x-btn-secondary" style="margin-top:6px; font-size:11px; padding:5px 10px; border-radius:6px; font-weight:700; display:inline-flex; align-items:center; gap:4px; background:#FFFFFF; color:#0F172A; border:1px solid #CBD5E1; cursor:pointer;" onclick="event.stopPropagation(); openProductStockOpnameModal(' + modalArgs + ')">' +
+          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg> Atur' +
+        '</button>';
 
       return (
-        '<div class="x-owner-stock-item-card ' + (isOut ? 'is-out' : '') + '">' +
+        '<div class="x-owner-stock-item-card ' + (isOut ? 'is-out' : '') + '" onclick="openProductStockOpnameModal(' + modalArgs + ')" style="cursor:pointer;">' +
           '<div class="x-owner-stock-item-card-main">' +
             '<div class="x-owner-stock-item-card-top">' +
               '<span class="x-owner-stock-branch-badge ' + statusClass + '">' + statusText + '</span>' +
               '<span class="x-owner-stock-item-card-branch">' + escapeHtml(it.branch_name || '-') + '</span>' +
-              (isDirect ? '<span class="x-badge" style="background:#F1F5F9; color:#475569; font-size:10px; font-weight:700; padding:1px 6px; border-radius:4px;">Barang Jadi</span>' : '') +
+              typeBadge +
             '</div>' +
             '<strong class="x-owner-stock-item-card-title">' + escapeHtml(it.product_name || '-') + '</strong>' +
             '<div class="x-owner-stock-item-card-sub">' +
@@ -345,18 +349,22 @@
       var statusText = isOut ? 'Habis' : (isLow ? 'Menipis' : 'Aman');
       var statusClass = isOut ? 'danger' : (isLow ? 'warning' : 'good');
 
-      var deskAction = isDirect
-        ? '<button type="button" class="x-btn-secondary" style="font-size:11.5px; padding:4px 10px; border-radius:6px; font-weight:600; display:inline-flex; align-items:center; gap:4px;" onclick="event.stopPropagation(); openProductStockOpnameModal(\'' + escapeHtml(it.branch_id) + '\', \'' + escapeHtml(it.product_id) + '\', \'' + escapeHtml(it.product_name || '').replace(/'/g, "\\'") + '\', \'' + escapeHtml(it.branch_name || '').replace(/'/g, "\\'") + '\', \'' + escapeHtml(it.sku || '').replace(/'/g, "\\'") + '\', ' + cur + ', ' + th + ')">' +
-            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg> Atur' +
-          '</button>'
-        : '<span class="text-muted" style="font-size:11px;">Resep</span>';
+      var deskModalArgs = '\'' + escapeHtml(it.branch_id) + '\', \'' + escapeHtml(it.product_id) + '\', \'' + escapeHtml(it.product_name || '').replace(/'/g, "\\'") + '\', \'' + escapeHtml(it.branch_name || '').replace(/'/g, "\\'") + '\', \'' + escapeHtml(it.sku || '').replace(/'/g, "\\'") + '\', ' + cur + ', ' + th;
+
+      var deskAction = '<button type="button" class="x-btn-secondary" style="font-size:11.5px; padding:5px 12px; border-radius:6px; font-weight:700; display:inline-flex; align-items:center; gap:5px; background:#FFFFFF; color:#0F172A; border:1px solid #CBD5E1; cursor:pointer;" onclick="event.stopPropagation(); openProductStockOpnameModal(' + deskModalArgs + ')">' +
+          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg> Atur' +
+        '</button>';
+
+      var deskTypeBadge = isDirect
+        ? '<span class="x-badge" style="background:#F1F5F9; color:#475569; font-size:10px; font-weight:700; padding:1px 5px; border-radius:4px; margin-right:4px;">Barang Jadi</span>'
+        : '<span class="x-badge" style="background:#EFF6FF; color:#1D4ED8; font-size:10px; font-weight:700; padding:1px 5px; border-radius:4px; margin-right:4px;">Menu Olahan</span>';
 
       return (
         '<tr class="x-owner-stock-table-tr">' +
           '<td class="x-owner-stock-table-td main-col">' +
             '<div class="x-owner-stock-td-title">' + escapeHtml(it.product_name || '-') + '</div>' +
             '<div class="x-owner-stock-td-sub">' +
-              (isDirect ? '<span class="x-badge" style="background:#F1F5F9; color:#475569; font-size:10px; font-weight:700; padding:1px 5px; border-radius:4px; margin-right:4px;">Barang Jadi</span>' : '') +
+              deskTypeBadge +
               (it.sku ? 'SKU: ' + escapeHtml(it.sku) : '') + (it.category_name ? ' • ' + escapeHtml(it.category_name) : '') +
             '</div>' +
           '</td>' +
