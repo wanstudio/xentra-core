@@ -62,69 +62,13 @@
     }
 
     try {
-      // 1. Cek apakah ada mandat belanja resmi yang dirilis oleh Branch Manager
-      var mandateRes = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/mandates?status=RELEASED', {
-        headers: getAuthHeaders()
-      });
-      var mandateData = await mandateRes.json();
-      var activeMandate = (mandateData.success && mandateData.mandates && mandateData.mandates.length > 0)
-        ? mandateData.mandates[0]
-        : null;
-
-      var pendingItems = (activeMandate && activeMandate.items)
-        ? activeMandate.items.filter(function (itm) { return !itm.is_purchased; })
-        : [];
-
-      if (activeMandate && pendingItems.length > 0) {
-        _purchasingState.activeMandateId = activeMandate.id;
-        _purchasingState.cashAdvance = Number(activeMandate.cash_advance || 0);
-        var cashAdvanceInput = $('input-purchasing-cash-advance');
-        if (cashAdvanceInput) {
-          cashAdvanceInput.value = _purchasingState.cashAdvance > 0 ? formatNumberWithDots(_purchasingState.cashAdvance) : '';
-          cashAdvanceInput.readOnly = true; // Staf melihat uang modal dari manager
-        }
-
-        _purchasingState.items = pendingItems.map(function (itm) {
-          return {
-            material_id: itm.material_id,
-            material_name: itm.material_name,
-            material_code: itm.material_code,
-            base_uom_name: itm.base_uom_name,
-            base_uom_code: itm.base_uom_code,
-            current_stock: 0,
-            minimum_quantity: 0,
-            is_low: true,
-            suggested_qty: itm.target_quantity,
-            buyQty: itm.target_quantity, // Fixed kuota dari manager!
-            estimated_price: itm.estimated_unit_price,
-            actualUnitPrice: itm.actual_unit_price || itm.estimated_unit_price,
-            has_price_update: Boolean(itm.actual_unit_price && itm.actual_unit_price !== itm.estimated_unit_price),
-            checked: false
-          };
-        });
-
-        var estBudgetEl = $('label-purchasing-est-budget');
-        if (estBudgetEl) estBudgetEl.textContent = formatMoney(activeMandate.total_planned_budget || 0);
-
-        var badgeEl = $('badge-purchasing-low-count');
-        if (badgeEl) {
-          badgeEl.textContent = '#' + activeMandate.mandate_number;
-          badgeEl.className = 'x-badge x-badge-primary';
-        }
-
-        renderPurchasingList();
-        recalculatePurchasingSummary();
-        return;
-      }
-
-      // 2. Fallback: Jika belum ada mandat resmi RELEASED, muat rekomendasi checklist bahan menipis cabang
       _purchasingState.activeMandateId = null;
       var chkRes = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/checklist', {
         headers: getAuthHeaders()
       });
       var chkData = await chkRes.json();
 
-      if (chkRes.ok && chkData.success && chkData.items && chkData.items.length > 0) {
+      if (chkRes.ok && chkData.success && chkData.items) {
         _purchasingState.dailyPettyCashLimit = (chkData.daily_petty_cash_limit != null) ? Number(chkData.daily_petty_cash_limit) : 500000;
         _purchasingState.allItems = chkData.items || [];
         var limitEl = $('label-purchasing-daily-limit');
