@@ -50,11 +50,11 @@ public class OrderOverlayService extends Service {
         int pad = dp(6);
         root.setPadding(pad, pad, pad, pad);
 
-        // Circular background (Dark Slate with Emerald green accent)
+        // Circular background (Dark Slate with Driver Red accent)
         GradientDrawable bg = new GradientDrawable();
         bg.setShape(GradientDrawable.OVAL);
         bg.setColor(Color.parseColor("#0f172a")); // Dark Slate
-        bg.setStroke(dp(2.5f), Color.parseColor("#059669")); // Emerald green accent
+        bg.setStroke(dp(2.5f), Color.parseColor("#dc2626")); // Driver Red accent
         bg.setSize(dp(54), dp(54));
 
         FrameLayout ball = new FrameLayout(this);

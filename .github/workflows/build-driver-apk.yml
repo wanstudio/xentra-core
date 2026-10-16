@@ -50,14 +50,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: driver-v1.0.1
-          name: "Mybangjo Driver App v1.0.1"
+          tag_name: driver-v1.0.2
+          name: "Mybangjo Driver App v1.0.2"
           make_latest: false
           body: |
-            ### Mybangjo Driver App v1.0.1 (Proportional Floating Overlay & Full Parity)
+            ### Mybangjo Driver App v1.0.2 (Proportional Floating Overlay with Driver Brand Red Accent)
             - Download langsung file `mybangjo-driver.apk` di bawah tanpa ekstrak ZIP.
-            - **Pembaruan v1.0.1**:
-              - **Floating Order Overlay Seragam & Proporsional**: Desain bola melayang diselaraskan dengan formula Merchant (Dark Slate `#0f172a` dengan aksen Emerald Green, icon bulat `ic_launcher_round` proporsional dengan padding 7dp).
+            - **Pembaruan v1.0.2**:
+              - **Floating Order Overlay Beraksen Merah Khas Driver**: Desain bola melayang diselaraskan dengan formula Merchant (Dark Slate `#0f172a` dengan aksen Crimson Red khas Driver `#dc2626`, icon bulat `ic_launcher_round` proporsional dengan padding 7dp). Tampilan sangat proporsional, elegan, dan identik dengan warna brand Driver.
               - **Real-time GPS Tracking Engine**: Dual-rate pinging (5 detik saat aktif pengantaran, 25 detik saat standby) langsung terhubung ke server Xentra.
               - **Android Native Foreground Service (Gojek Reference)**: Berjalan di background dengan notifikasi status bar permanen dan Partial WakeLock, tidak mati saat layar HP terkunci atau saat membuka Google Maps.
               - **Satu Ketuk Buka Navigasi Google Maps**: Deep-link native `google.navigation:q=lat,lng&mode=d` langsung ke mode navigasi belokan demi belokan.
