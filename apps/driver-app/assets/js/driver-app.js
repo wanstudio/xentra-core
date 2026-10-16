@@ -32,7 +32,98 @@
     lastCompleted: null,
     loading: true,
     error: null,
-    busy: false
+    busy: false,
+    isOnline: false
+  };
+
+  var driverLocationService = {
+    globalWatchId: null,
+    heartbeatTimer: null,
+    lastPingAt: 0,
+    lastPosition: null,
+
+    start: function () {
+      if (!navigator.geolocation || this.globalWatchId != null) return;
+      var self = this;
+
+      function onPosition(pos) {
+        if (!pos || !pos.coords) return;
+        self.lastPosition = {
+          latitude: Number(pos.coords.latitude),
+          longitude: Number(pos.coords.longitude),
+          accuracy: Number(pos.coords.accuracy || 0),
+          heading: Number.isFinite(pos.coords.heading) ? Number(pos.coords.heading) : null,
+          speed: Number.isFinite(pos.coords.speed) ? Number(pos.coords.speed) : null
+        };
+        mapState.currentPosition = self.lastPosition;
+        if (state.page === 'map') {
+          var task = selectedTask();
+          if (task) applyDriverPosition(pos, task);
+        }
+        self.maybePing();
+      }
+
+      function onError(err) {
+        console.warn('[Driver GPS]:', err && err.message);
+      }
+
+      navigator.geolocation.getCurrentPosition(onPosition, onError, { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 });
+
+      this.globalWatchId = navigator.geolocation.watchPosition(onPosition, onError, {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 5000
+      });
+
+      if (!this.heartbeatTimer) {
+        this.heartbeatTimer = setInterval(function () {
+          self.maybePing(true);
+        }, 10000);
+      }
+    },
+
+    stop: function () {
+      if (this.globalWatchId != null && navigator.geolocation) {
+        try { navigator.geolocation.clearWatch(this.globalWatchId); } catch (_) {}
+      }
+      this.globalWatchId = null;
+      if (this.heartbeatTimer) {
+        clearInterval(this.heartbeatTimer);
+        this.heartbeatTimer = null;
+      }
+    },
+
+    maybePing: async function (fromTimer) {
+      if (!state.isOnline || !token() || !this.lastPosition) return;
+      var now = Date.now();
+      var hasActiveDelivery = state.tasks && state.tasks.some(function (t) {
+        return ['picked_up', 'on_delivery'].includes(t.delivery_status);
+      });
+      // In-flight active delivery: ping every 5 seconds. Standby idle: ping every 25 seconds.
+      var thresholdMs = hasActiveDelivery ? 5000 : 25000;
+      if (fromTimer && (now - this.lastPingAt < thresholdMs)) return;
+
+      this.lastPingAt = now;
+      try {
+        var payload = {
+          latitude: this.lastPosition.latitude,
+          longitude: this.lastPosition.longitude,
+          accuracy: this.lastPosition.accuracy,
+          heading: this.lastPosition.heading,
+          speed: this.lastPosition.speed
+        };
+        if (navigator.getBattery) {
+          try {
+            var b = await navigator.getBattery();
+            payload.battery_level = Math.round(b.level * 100);
+          } catch (_) {}
+        }
+        await api('/driver/location', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+      } catch (_) {}
+    }
   };
 
   function rupiah(value) {
@@ -542,7 +633,28 @@
     var acceptedAssigned = state.tasks.filter(isAcceptedAssigned);
 
     var body = '<h1 class="screen-title">Tugas</h1><div class="screen-subtitle">Pengantaran yang ditugaskan kepada Anda.</div>' +
-      '<div class="status-card"><div class="status-dot">✓</div><div><div class="status-title">Tersedia</div><div class="status-copy">Status availability akan dihubungkan pada tahap berikutnya.</div></div></div>';
+      (state.isOnline
+        ? '<div class="status-card" data-action="toggle-availability" style="cursor:pointer;border-left:4px solid #10b981;background:#f0fdf4;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:12px;margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">' +
+            '<div style="display:flex;align-items:center;gap:10px;min-width:0;">' +
+              '<div style="width:28px;height:28px;border-radius:50%;background:#10b981;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;">✓</div>' +
+              '<div style="min-width:0;">' +
+                '<div style="color:#047857;font-weight:700;font-size:14px;">ONLINE (Siap Antar)</div>' +
+                '<div style="color:#065f46;font-size:12px;">GPS aktif, siap menerima tugas. Ketuk untuk Istirahat.</div>' +
+              '</div>' +
+            '</div>' +
+            '<span style="background:#10b981;color:#fff;font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;letter-spacing:0.04em;">ON</span>' +
+          '</div>'
+        : '<div class="status-card" data-action="toggle-availability" style="cursor:pointer;border-left:4px solid #94a3b8;background:#f8fafc;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:12px;margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">' +
+            '<div style="display:flex;align-items:center;gap:10px;min-width:0;">' +
+              '<div style="width:28px;height:28px;border-radius:50%;background:#94a3b8;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;">○</div>' +
+              '<div style="min-width:0;">' +
+                '<div style="color:#475569;font-weight:700;font-size:14px;">OFFLINE (Istirahat)</div>' +
+                '<div style="color:#64748b;font-size:12px;">Tidak menerima tugas baru. Ketuk untuk Online.</div>' +
+              '</div>' +
+            '</div>' +
+            '<span style="background:#cbd5e1;color:#334155;font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;letter-spacing:0.04em;">OFF</span>' +
+          '</div>'
+      );
 
     if (activeTasks.length) {
       body += '<div class="section-head"><div class="section-title">Tugas Aktif</div><span class="badge-count">' + activeTasks.length + '</span></div>';
@@ -1274,6 +1386,16 @@
       state.driver = data.driver || null;
       state.brand = data.brand || null;
       persistUser();
+
+      try {
+        var avail = await api('/driver/availability');
+        state.isOnline = Boolean(avail && avail.is_online);
+      } catch (_) {
+        state.isOnline = false;
+      }
+      if (state.isOnline) {
+        driverLocationService.start();
+      }
     } catch (err) {
       if (err.status === 401) return;
       state.loading = false;
@@ -1533,11 +1655,42 @@
       if (!destination || destination.latitude == null || destination.longitude == null) {
         return toast('Koordinat tujuan belum tersedia');
       }
-      window.location.href = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(destination.latitude + ',' + destination.longitude);
+      var destCoords = destination.latitude + ',' + destination.longitude;
+      // Android Native Turn-by-Turn intent with fallback to web Google Maps
+      var isAndroid = /Android/i.test(navigator.userAgent);
+      if (isAndroid) {
+        window.location.href = 'google.navigation:q=' + encodeURIComponent(destCoords) + '&mode=d';
+        setTimeout(function () {
+          window.location.href = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(destCoords);
+        }, 1200);
+      } else {
+        window.location.href = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(destCoords);
+      }
       return;
     }
 
-    if (action === 'availability') return toast('Availability Driver akan dihubungkan setelah API availability diterapkan.');
+    if (action === 'toggle-availability' || action === 'availability') {
+      state.isOnline = !state.isOnline;
+      render();
+      try {
+        await api('/driver/availability', {
+          method: 'POST',
+          body: JSON.stringify({ is_online: state.isOnline })
+        });
+        if (state.isOnline) {
+          driverLocationService.start();
+          toast('🟢 Status Anda sekarang ONLINE (Siap terima tugas)');
+        } else {
+          driverLocationService.stop();
+          toast('⚪ Status Anda sekarang OFFLINE (Sedang istirahat)');
+        }
+      } catch (err) {
+        state.isOnline = !state.isOnline;
+        render();
+        toast('Gagal memperbarui status: ' + (err.message || 'Kesalahan jaringan'));
+      }
+      return;
+    }
     if (action === 'next-stage-info') return toast('Tahap berikutnya mengikuti state Delivery dari server.');
 
     if (action === 'logout') {

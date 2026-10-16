@@ -1251,6 +1251,41 @@ function initSchema(targetDb) {
       FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS driver_locations (
+      driver_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      brand_id TEXT NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+      branch_id TEXT REFERENCES branches(id) ON DELETE SET NULL,
+      is_online INTEGER NOT NULL DEFAULT 0,
+      latitude REAL,
+      longitude REAL,
+      accuracy REAL,
+      heading REAL,
+      speed REAL,
+      battery_level REAL,
+      is_mock INTEGER DEFAULT 0,
+      active_order_id TEXT REFERENCES orders(id) ON DELETE SET NULL,
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS driver_location_logs (
+      id TEXT PRIMARY KEY,
+      driver_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      order_id TEXT REFERENCES orders(id) ON DELETE CASCADE,
+      latitude REAL NOT NULL,
+      longitude REAL NOT NULL,
+      accuracy REAL,
+      heading REAL,
+      speed REAL,
+      is_mock INTEGER DEFAULT 0,
+      battery_level REAL,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_driver_locations_brand ON driver_locations (brand_id, is_online);
+    CREATE INDEX IF NOT EXISTS idx_driver_locations_branch ON driver_locations (branch_id, is_online);
+    CREATE INDEX IF NOT EXISTS idx_driver_location_logs_order ON driver_location_logs (order_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_driver_location_logs_driver ON driver_location_logs (driver_id, created_at);
+
     CREATE TABLE IF NOT EXISTS order_payments (
       id TEXT PRIMARY KEY,
       order_id TEXT UNIQUE NOT NULL,
@@ -2995,6 +3030,44 @@ function bootstrapEssentialTenant(targetDb) {
   try { targetDb.exec("ALTER TABLE order_deliveries ADD COLUMN driver_assignment_responded_at TEXT;"); } catch (_) {}
   try { targetDb.exec("ALTER TABLE order_deliveries ADD COLUMN driver_assignment_rejection_reason TEXT;"); } catch (_) {}
   try { targetDb.exec("CREATE INDEX IF NOT EXISTS idx_order_deliveries_driver_id ON order_deliveries(driver_id);"); } catch (_) {}
+
+  // Driver Realtime GPS Location & Tracking tables
+  try {
+    targetDb.exec(`
+      CREATE TABLE IF NOT EXISTS driver_locations (
+        driver_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        brand_id TEXT NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+        branch_id TEXT REFERENCES branches(id) ON DELETE SET NULL,
+        is_online INTEGER NOT NULL DEFAULT 0,
+        latitude REAL,
+        longitude REAL,
+        accuracy REAL,
+        heading REAL,
+        speed REAL,
+        battery_level REAL,
+        is_mock INTEGER DEFAULT 0,
+        active_order_id TEXT REFERENCES orders(id) ON DELETE SET NULL,
+        updated_at TEXT DEFAULT (datetime('now'))
+      );
+      CREATE TABLE IF NOT EXISTS driver_location_logs (
+        id TEXT PRIMARY KEY,
+        driver_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        order_id TEXT REFERENCES orders(id) ON DELETE CASCADE,
+        latitude REAL NOT NULL,
+        longitude REAL NOT NULL,
+        accuracy REAL,
+        heading REAL,
+        speed REAL,
+        is_mock INTEGER DEFAULT 0,
+        battery_level REAL,
+        created_at TEXT DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_driver_locations_brand ON driver_locations (brand_id, is_online);
+      CREATE INDEX IF NOT EXISTS idx_driver_locations_branch ON driver_locations (branch_id, is_online);
+      CREATE INDEX IF NOT EXISTS idx_driver_location_logs_order ON driver_location_logs (order_id, created_at);
+      CREATE INDEX IF NOT EXISTS idx_driver_location_logs_driver ON driver_location_logs (driver_id, created_at);
+    `);
+  } catch (_) {}
 }
 
 /**

@@ -170,12 +170,26 @@ router.get('/orders/:id', (req, res) => {
     })()
   }));
 
+  let liveDriverLocation = null;
+  if (delivery && delivery.driver_id && ['picked_up', 'on_delivery'].includes(delivery.status)) {
+    try {
+      liveDriverLocation = db.prepare(`
+        SELECT latitude, longitude, heading, speed, accuracy, updated_at
+        FROM driver_locations
+        WHERE driver_id = ?
+      `).get(delivery.driver_id);
+    } catch (_) {}
+  }
+
   const safeDelivery = delivery ? {
     destination_address: delivery.destination_address,
+    destination_latitude: delivery.destination_latitude ? Number(delivery.destination_latitude) : null,
+    destination_longitude: delivery.destination_longitude ? Number(delivery.destination_longitude) : null,
     actual_road_distance_meters: delivery.actual_road_distance_meters,
     delivery_fee_calculated: delivery.delivery_fee_calculated,
     driver_name: delivery.driver_name || null,
     driver_phone: delivery.driver_phone || null,
+    driver_location: liveDriverLocation || null,
     tracking_url: delivery.tracking_url || null,
     status: delivery.status || null
   } : null;
@@ -201,6 +215,66 @@ router.get('/orders/:id', (req, res) => {
     payment: safePayment,
     logs
   });
+});
+
+router.get('/customer/orders/:orderNumber/live-tracking', (req, res) => {
+  try {
+    const orderNumber = req.params.orderNumber;
+    const order = db.prepare('SELECT id, branch_id, status FROM orders WHERE order_number = ? OR id = ?').get(orderNumber, orderNumber);
+    if (!order) {
+      return res.status(404).json({ success: false, code: 'ORDER_NOT_FOUND', error: 'Pesanan tidak ditemukan.' });
+    }
+
+    const delivery = db.prepare(`
+      SELECT d.driver_id, d.driver_name, d.driver_phone, d.status as delivery_status,
+             d.destination_address, d.destination_latitude, d.destination_longitude,
+             b.name as branch_name, b.lat as branch_latitude, b.lng as branch_longitude
+      FROM order_deliveries d
+      JOIN orders o ON o.id = d.order_id
+      LEFT JOIN branches b ON b.id = o.branch_id
+      WHERE d.order_id = ?
+    `).get(order.id);
+
+    if (!delivery) {
+      return res.status(404).json({ success: false, code: 'DELIVERY_NOT_FOUND', error: 'Data pengantaran tidak ditemukan.' });
+    }
+
+    let driverLocation = null;
+    if (delivery.driver_id) {
+      try {
+        driverLocation = db.prepare(`
+          SELECT latitude, longitude, heading, speed, accuracy, is_online, updated_at
+          FROM driver_locations
+          WHERE driver_id = ?
+        `).get(delivery.driver_id);
+      } catch (_) {}
+    }
+
+    res.json({
+      success: true,
+      order_id: order.id,
+      order_status: order.status,
+      delivery_status: delivery.delivery_status,
+      driver: delivery.driver_id ? {
+        id: delivery.driver_id,
+        name: delivery.driver_name,
+        phone: delivery.driver_phone,
+        location: driverLocation || null
+      } : null,
+      destination: {
+        address: delivery.destination_address,
+        latitude: delivery.destination_latitude ? Number(delivery.destination_latitude) : null,
+        longitude: delivery.destination_longitude ? Number(delivery.destination_longitude) : null
+      },
+      pickup: {
+        branch_name: delivery.branch_name,
+        latitude: delivery.branch_latitude ? Number(delivery.branch_latitude) : null,
+        longitude: delivery.branch_longitude ? Number(delivery.branch_longitude) : null
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, code: 'LIVE_TRACKING_ERROR', error: err.message });
+  }
 });
 
 

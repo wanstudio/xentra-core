@@ -483,6 +483,149 @@ function registerDriverRoutes(router, deps = {}) {
       DeliveryModel.STATUS.DELIVERED,
       hasTendered ? { cod_amount_tendered: Number(rawTendered) } : {}
     );
+    try {
+      db.prepare("UPDATE driver_locations SET active_order_id = NULL WHERE driver_id = ? AND active_order_id = ?").run(actorId(req), req.params.orderId);
+    } catch (_) {}
+  });
+
+  // ── Driver Availability (Online / Offline Toggle) ─────────────────────────
+  router.get('/driver/availability', driverAuth, (req, res) => {
+    try {
+      const driverId = actorId(req);
+      const row = db.prepare('SELECT is_online, updated_at FROM driver_locations WHERE driver_id = ?').get(driverId);
+      res.json({
+        success: true,
+        is_online: Boolean(row && row.is_online)
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, code: 'DRIVER_AVAILABILITY_ERROR', error: err.message });
+    }
+  });
+
+  router.post('/driver/availability', driverAuth, (req, res) => {
+    try {
+      const driverId = actorId(req);
+      const { is_online } = req.body || {};
+      const onlineStatus = is_online === true || is_online === 1 || is_online === 'true' ? 1 : 0;
+      const branchId = req.user.branchId || req.user.branch_id;
+      const brandId = req.brand_id;
+
+      db.prepare(`
+        INSERT INTO driver_locations (driver_id, brand_id, branch_id, is_online, updated_at)
+        VALUES (?, ?, ?, ?, datetime('now'))
+        ON CONFLICT(driver_id) DO UPDATE SET
+          brand_id = excluded.brand_id,
+          branch_id = excluded.branch_id,
+          is_online = excluded.is_online,
+          updated_at = datetime('now')
+      `).run(driverId, brandId, branchId, onlineStatus);
+
+      res.json({
+        success: true,
+        is_online: Boolean(onlineStatus)
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, code: 'DRIVER_AVAILABILITY_UPDATE_ERROR', error: err.message });
+    }
+  });
+
+  // ── Driver Realtime GPS Location Ping (APK Foreground Service / PWA) ───────
+  router.post('/driver/location', driverAuth, (req, res) => {
+    try {
+      const driverId = actorId(req);
+      const branchId = req.user.branchId || req.user.branch_id;
+      const brandId = req.brand_id;
+      const { latitude, longitude, accuracy, heading, speed, battery_level, is_mock } = req.body || {};
+
+      const lat = Number(latitude);
+      const lng = Number(longitude);
+
+      if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lng) || lng < -180 || lng > 180) {
+        return res.status(400).json({
+          success: false,
+          code: 'INVALID_COORDINATES',
+          error: 'Koordinat GPS tidak valid. Latitude harus antara -90 s/d 90, Longitude antara -180 s/d 180.'
+        });
+      }
+
+      const acc = accuracy !== undefined && accuracy !== null && Number.isFinite(Number(accuracy)) ? Number(accuracy) : null;
+      const head = heading !== undefined && heading !== null && Number.isFinite(Number(heading)) ? Number(heading) : null;
+      const spd = speed !== undefined && speed !== null && Number.isFinite(Number(speed)) ? Number(speed) : null;
+      const bat = battery_level !== undefined && battery_level !== null && Number.isFinite(Number(battery_level)) ? Number(battery_level) : null;
+      const mock = is_mock === true || is_mock === 1 || is_mock === 'true' ? 1 : 0;
+
+      // Check if driver has an active delivery in progress (picked_up or on_delivery)
+      const activeDelivery = db.prepare(`
+        SELECT d.order_id
+        FROM order_deliveries d
+        JOIN orders o ON o.id = d.order_id
+        WHERE d.driver_id = ? AND o.brand_id = ? AND d.status IN (?, ?)
+        ORDER BY datetime(d.updated_at) DESC
+        LIMIT 1
+      `).get(driverId, brandId, DeliveryModel.STATUS.PICKED_UP, DeliveryModel.STATUS.ON_DELIVERY);
+
+      const activeOrderId = activeDelivery ? activeDelivery.order_id : null;
+
+      // Upsert into driver_locations (last known state)
+      db.prepare(`
+        INSERT INTO driver_locations (
+          driver_id, brand_id, branch_id, is_online, latitude, longitude,
+          accuracy, heading, speed, battery_level, is_mock, active_order_id, updated_at
+        ) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        ON CONFLICT(driver_id) DO UPDATE SET
+          brand_id = excluded.brand_id,
+          branch_id = excluded.branch_id,
+          is_online = 1,
+          latitude = excluded.latitude,
+          longitude = excluded.longitude,
+          accuracy = excluded.accuracy,
+          heading = excluded.heading,
+          speed = excluded.speed,
+          battery_level = excluded.battery_level,
+          is_mock = excluded.is_mock,
+          active_order_id = excluded.active_order_id,
+          updated_at = datetime('now')
+      `).run(driverId, brandId, branchId, lat, lng, acc, head, spd, bat, mock, activeOrderId);
+
+      // If on active delivery, record breadcrumb trace
+      if (activeOrderId) {
+        const crypto = require('crypto');
+        const logId = 'dll_' + Date.now().toString(36) + '_' + crypto.randomBytes(4).toString('hex');
+        db.prepare(`
+          INSERT INTO driver_location_logs (
+            id, driver_id, order_id, latitude, longitude,
+            accuracy, heading, speed, is_mock, battery_level, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        `).run(logId, driverId, activeOrderId, lat, lng, acc, head, spd, mock, bat);
+      }
+
+      res.json({
+        success: true,
+        recorded_at: new Date().toISOString(),
+        active_order_id: activeOrderId,
+        is_mock: Boolean(mock)
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, code: 'LOCATION_UPDATE_ERROR', error: err.message });
+    }
+  });
+
+  router.get('/driver/location', driverAuth, (req, res) => {
+    try {
+      const driverId = actorId(req);
+      const row = db.prepare(`
+        SELECT driver_id, is_online, latitude, longitude, accuracy, heading, speed, battery_level, is_mock, active_order_id, updated_at
+        FROM driver_locations
+        WHERE driver_id = ?
+      `).get(driverId);
+
+      res.json({
+        success: true,
+        location: row || null
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, code: 'GET_LOCATION_ERROR', error: err.message });
+    }
   });
 }
 
