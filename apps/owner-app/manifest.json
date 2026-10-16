@@ -1,0 +1,43 @@
+{
+  "id": "/owner/",
+  "name": "Mybangjo Owner",
+  "short_name": "Owner",
+  "description": "Aplikasi Bisnis & Manajemen Owner Mybangjo",
+  "start_url": "/owner/",
+  "scope": "/owner/",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "orientation": "portrait",
+  "theme_color": "#ffffff",
+  "background_color": "#ffffff",
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/owner/assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/owner/assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/owner/assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/owner/assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

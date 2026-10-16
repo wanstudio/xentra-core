@@ -694,7 +694,46 @@ app.get(['/dashboard/login', '/dashboard/login/'], (req, res) => {
   res.redirect(301, '/login' + qs);
 });
 
-app.get([/^\/dashboard(\/.*)?$/, /^\/owner(\/.*)?$/], async (req, res) => {
+// Owner App Assets (standalone Owner mobile operating surface & APK)
+app.use(['/owner-app/assets', '/owner/assets'], express.static(path.join(__dirname, '../apps/owner-app/assets'), {
+  maxAge: 0,
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  }
+}));
+
+app.get(['/owner/manifest.json', '/owner-app/manifest.json'], (req, res) => {
+  res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, '../apps/owner-app/manifest.json'));
+});
+
+app.get(['/owner/sw.js', '/owner-app/sw.js'], (req, res) => {
+  res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, '../apps/owner-app/sw.js'));
+});
+
+// Dedicated Owner Mobile Surface (/owner/) -> apps/owner-app/index.html
+app.get(/^\/owner(\/.*)?$/, async (req, res) => {
+  if (!isSaaSHost(req)) {
+    const cleanHost = (req.headers.host || '').split(':')[0].trim().toLowerCase();
+    await brandRepository.ready();
+    const brand = brandRepository.findByCustomDomain(cleanHost);
+    if (!brand) {
+      return res.status(404).json({
+        success: false,
+        error: 'TENANT_NOT_FOUND',
+        message: 'Brand/Tenant tidak ditemukan untuk host yang diberikan.'
+      });
+    }
+  }
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, '../apps/owner-app/index.html'));
+});
+
+// Dedicated Owner Desktop Command Center (/dashboard/) -> apps/merchant-dashboard/index.html
+app.get(/^\/dashboard(\/.*)?$/, async (req, res) => {
   if (!isSaaSHost(req)) {
     const cleanHost = (req.headers.host || '').split(':')[0].trim().toLowerCase();
     await brandRepository.ready();
@@ -708,16 +747,6 @@ app.get([/^\/dashboard(\/.*)?$/, /^\/owner(\/.*)?$/], async (req, res) => {
     }
 
     const subType = getRequestSubdomainType(req);
-    // If on owner.*, redirect to m.* managerial domain
-    if (subType === 'owner') {
-      if (process.env.NODE_ENV !== 'test') {
-        const base = getBaseTenantDomain(req);
-        if (base) {
-          const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
-          return res.redirect(302, `${proto}://m.${base}/dashboard/`);
-        }
-      }
-    }
     // If on customer (app.) or pos, redirect to managerial m.* domain
     if (process.env.NODE_ENV !== 'test') {
       const base = getBaseTenantDomain(req);

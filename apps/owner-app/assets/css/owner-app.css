@@ -1,0 +1,87 @@
+/* ==========================================================================
+   MYBANGJO OWNER MOBILE APP — DEDICATED STYLESHEET
+   Mobile-first, touch-optimized, self-contained shell for APK & Mobile PWA.
+   ========================================================================== */
+
+:root {
+  --owner-theme-primary: #485868;
+  --owner-theme-accent: #64748b;
+  --owner-bg: #f8fafc;
+  --owner-surface: #ffffff;
+}
+
+body.x-owner-mobile-app {
+  margin: 0;
+  padding: 0;
+  background-color: var(--owner-bg);
+  color: #0f172a;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  overflow-x: hidden;
+  padding-bottom: 72px; /* Space for fixed bottom nav */
+}
+
+/* 1. Never show desktop sidebar in mobile app */
+body.x-owner-mobile-app .x-dash-sidebar,
+body.x-owner-mobile-app #x-dash-sidebar {
+  display: none !important;
+}
+
+/* 2. Never show desktop horizontal data tables in mobile app */
+body.x-owner-mobile-app .bm-orders-desktop-table,
+body.x-owner-mobile-app .x-desktop-table-view {
+  display: none !important;
+}
+
+/* 3. Always display mobile bottom navigation bar */
+body.x-owner-mobile-app .x-owner-bottom-nav {
+  position: fixed !important;
+  display: grid !important;
+  grid-template-columns: repeat(5, 1fr) !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 100% !important;
+  margin: 0 !important;
+  z-index: 200 !important;
+  min-height: 58px !important;
+  background: #ffffff !important;
+  border-top: 1px solid #e2e8f0 !important;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* 4. Always display canonical mobile child header back chevron */
+body.x-owner-mobile-app .x-owner-child-mobile-header .x-owner-mobile-page-back,
+body.x-owner-mobile-app .x-title-back-btn.x-owner-mobile-page-back {
+  display: inline-flex !important;
+}
+
+/* 5. Touch-friendly mobile cards stack */
+body.x-owner-mobile-app .bm-orders-mobile-cards {
+  display: block !important;
+}
+
+/* 6. Mobile container full width */
+body.x-owner-mobile-app .x-dash-main {
+  margin: 0 !important;
+  padding: 0 12px 24px 12px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* 7. Dedicated mobile topbar */
+body.x-owner-mobile-app .x-owner-mobile-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
