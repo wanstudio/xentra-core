@@ -50,17 +50,18 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.2.8
-          name: "Mybangjo Merchant App v1.2.8"
-          make_latest: true
+          tag_name: merchant-v1.2.9
+          name: "Mybangjo Merchant App v1.2.9"
+          make_latest: false
           body: |
-            ### Mybangjo Merchant App v1.2.8 (Signed Release)
+            ### Mybangjo Merchant App v1.2.9 (Official Custom Launcher Icon & Parity)
             - Download langsung file `mybangjo-merchant.apk` di bawah tanpa ekstrak ZIP.
-            - **Pembaruan Penting v1.2.8**:
-              - **Status Bar Putih Adaptif (Seamless Full White Header - GoBiz Parity)**: Area status bar HP (jam, sinyal, baterai) kini otomatis berubah putih menyatu dengan top bar aplikasi, dengan ikon jam/baterai hitam kontras yang elegan.
+            - **Pembaruan Penting v1.2.9**:
+              - **Ikon Resmi Merchant Sesuai Upload Owner**: Ikon aplikasi di homescreen dan bola melayang (floating overlay) kini menggunakan logo Merchant resmi yang di-upload dari dashboard Owner.
+              - **Status Bar Putih Adaptif (Seamless Full White Header - GoBiz Parity)**: Area status bar HP (jam, sinyal, baterai) otomatis berubah putih menyatu dengan top bar aplikasi, dengan ikon jam/baterai hitam kontras yang elegan.
               - **Floating Icon 100% Konsisten (Self-Healing 24/7)**: Bola melayang dijamin selalu aktif di layar dan otomatis pulih kembali jika sempat tertutup.
               - **Notifikasi Android Hening (Tanpa Suara Bawaan)**: Notifikasi status bar sistem dibuat 100% senyap tanpa nada dering "ding/ting" bawaan HP. Suara hanya berasal dari suara sirene aplikasi (`ada_pesanan_baru`).
               - **Optimasi Play Protect**: Menghapus izin berisiko tinggi sehingga ramah Google Play Protect.
-              - **Catatan Pemasangan**: Copot pemasangan (uninstall) versi lama terlebih dahulu sebelum memasang versi baru agar cache sistem dan channel notifikasi ter-reset bersih.
+              - **Catatan Pemasangan**: Copot pemasangan (uninstall) versi lama terlebih dahulu sebelum memasang versi baru jika diperlukan.
           files: build-output/mybangjo-merchant.apk
 
