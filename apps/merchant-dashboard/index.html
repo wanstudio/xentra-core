@@ -1305,6 +1305,11 @@
               <input type="text" inputmode="numeric" data-input-type="currency" id="branch-promo-discount" class="x-input" placeholder="10.000">
             </div>
             <div class="x-form-group">
+              <label for="branch-petty-cash-limit">Kasbon Harian (Rp) <span style="color:#dc2626;">*</span></label>
+              <input type="text" inputmode="numeric" data-input-type="currency" id="branch-petty-cash-limit" class="x-input" placeholder="500.000" required>
+              <small class="text-muted" style="font-size:11.5px; margin-top:3px; display:block;">Batas kasbon belanja harian yang boleh dieksekusi langsung oleh cabang tanpa persetujuan Owner.</small>
+            </div>
+            <div class="x-form-group">
               <label class="x-checkbox-label">
                 <input type="checkbox" id="branch-open-override" checked>
                 <span>Cabang sedang Buka Operasional</span>
@@ -6182,9 +6187,26 @@
         </div>
       </section>
 
-      <button type="button" class="x-mobile-account-logout" id="btn-mobile-account-logout">Keluar</button>
-    </main>
-  </section>
+  <!-- Notifications Bottom Sheet / Modal for Owner -->
+  <div id="sheet-notifications" class="x-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="sheet-notif-title" style="display:none; z-index:12080;" onclick="if(event.target === this) closeOwnerNotificationsSheet()">
+    <div class="x-modal-card" style="max-width:500px; width:100%; margin:auto; background:var(--card-bg, #fff); border-radius:16px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.1); overflow:hidden; display:flex; flex-direction:column; max-height:85vh; position:relative; z-index:12081;">
+      <div class="x-modal-header" style="padding:16px 20px; border-bottom:1px solid var(--border-color, #e2e8f0); display:flex; justify-content:space-between; align-items:center;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <h3 id="sheet-notif-title" style="margin:0; font-size:16px; font-weight:800; color:var(--text-main, #0f172a);">Pusat Notifikasi</h3>
+          <span class="x-badge" id="notif-unread-pill" style="display:none; font-size:11px; padding:2px 8px; border-radius:10px; background:#ef4444; color:#fff; font-weight:700;">0 Baru</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <button type="button" class="x-btn-text" id="btn-mark-all-read" onclick="markAllOwnerNotificationsAsRead()" style="font-size:12px; color:#2563eb; background:transparent; border:none; cursor:pointer; font-weight:600;">Tandai Dibaca</button>
+          <button type="button" class="x-btn-close" onclick="closeOwnerNotificationsSheet()" aria-label="Tutup" style="background:transparent; border:none; font-size:20px; cursor:pointer; color:var(--text-muted, #64748b);">&times;</button>
+        </div>
+      </div>
+      <div id="notif-list-container" style="padding:12px 16px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:8px;">
+        <div style="text-align:center; padding:32px 16px; color:var(--text-muted, #64748b); font-size:13px;">
+          Memuat notifikasi...
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Dashboard JavaScript -->
   <!-- Shared merchant infrastructure (auth, toast, action-menu, crop editor) — must load first -->
@@ -6204,7 +6226,7 @@
   <script src="/merchant-dashboard/assets/js/modules/overview.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/orders.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/stock.js?v=2.4.2"></script>
-  <script src="/merchant-dashboard/assets/js/modules/branches.js?v=1.0.0"></script>
+  <script src="/merchant-dashboard/assets/js/modules/branches.js?v=1.0.1"></script>
   <script src="/merchant-dashboard/assets/js/modules/reports.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/team.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/customers.js?v=1.0.0"></script>
@@ -6216,7 +6238,7 @@
   <script src="/merchant-dashboard/assets/js/modules/brand.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/catalog-reference.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/catalog.js?v=1.0.1"></script>
-  <script src="/dashboard/assets/js/dashboard.js?v=3.0.90"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=3.0.91"></script>
   <script src="/merchant-dashboard/assets/js/owner-master-menu-inline.js?v=1.0.2"></script>
 </body>
 </html>  

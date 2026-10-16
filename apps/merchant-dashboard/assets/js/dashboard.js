@@ -2094,6 +2094,9 @@
     // Standardize all filter selects into floating dropdown templates
     initOwnerFloatingDropdowns();
 
+    // Owner Notification Center wiring
+    initOwnerNotifications();
+
     if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
       window.Xentra.hideSplash();
     }
@@ -2114,6 +2117,158 @@
       var sel = $(id);
       if (sel) enhanceFn(sel);
     });
+  }
+
+  /* =========================================================================
+     OWNER NOTIFICATIONS CENTER (Bell Icon Wiring)
+     ========================================================================= */
+  async function openOwnerNotificationsSheet() {
+    var sheet = $('sheet-notifications');
+    if (!sheet) return;
+    sheet.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    await loadOwnerNotificationsList();
+  }
+  window.openOwnerNotificationsSheet = openOwnerNotificationsSheet;
+
+  function closeOwnerNotificationsSheet() {
+    var sheet = $('sheet-notifications');
+    if (!sheet) return;
+    sheet.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+  window.closeOwnerNotificationsSheet = closeOwnerNotificationsSheet;
+
+  async function loadOwnerNotificationsList() {
+    var container = $('notif-list-container');
+    if (!container) return;
+    container.innerHTML = '<div style="text-align:center;padding:28px 16px;color:#64748b;font-size:13px;">Memuat notifikasi...</div>';
+
+    try {
+      var res = await adminFetch(API_BASE + '/notifications?limit=30', { headers: getAuthHeaders() });
+      var data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Gagal memuat notifikasi');
+      }
+
+      var items = data.notifications || [];
+      if (!items.length) {
+        container.innerHTML = '<div style="text-align:center;padding:32px 16px;color:#64748b;font-size:13px;">Tidak ada notifikasi saat ini.</div>';
+        updateOwnerNotificationBadge(0);
+        return;
+      }
+
+      updateOwnerNotificationBadge(data.unread_count || 0);
+
+      var html = '';
+      items.forEach(function (n) {
+        var isUnread = !n.read_at;
+        var icon = n.source_type === 'CASH_ADVANCE_REQUEST' ? '💵' : (n.source_type === 'order' ? '🛒' : '🔔');
+        var timeStr = n.created_at ? new Date(n.created_at).toLocaleDateString('id-ID', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }) : '';
+        
+        var actionBtn = '';
+        if (n.action_url) {
+          actionBtn = '<div style="margin-top:6px;"><button type="button" class="x-btn-secondary" style="font-size:11px; font-weight:700; padding:4px 10px; border-radius:6px; color:#2563eb; background:#eff6ff; border:1px solid #bfdbfe; cursor:pointer;">Buka Pengaturan & Setujui ↗</button></div>';
+        }
+
+        html += '<div onclick="handleOwnerNotificationClick(\'' + esc(n.id) + '\', \'' + esc(n.action_url || '') + '\')" style="cursor:pointer; display:flex; gap:10px; padding:12px; border-radius:10px; background:' + (isUnread ? '#f0f9ff' : '#ffffff') + '; border:1px solid ' + (isUnread ? '#bae6fd' : '#f1f5f9') + '; margin-bottom:8px; transition:all 0.15s ease;">';
+        html += '<div style="font-size:20px; line-height:1; flex-shrink:0; padding-top:2px;">' + icon + '</div>';
+        html += '<div style="flex:1; min-width:0;">';
+        html += '<div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2px;">';
+        html += '<strong style="font-size:13px; color:#0f172a; font-weight:700;">' + esc(n.title) + '</strong>';
+        html += '<span style="font-size:10.5px; color:#94a3b8; margin-left:6px; flex-shrink:0;">' + esc(timeStr) + '</span>';
+        html += '</div>';
+        html += '<p style="margin:0; font-size:12px; color:#475569; line-height:1.45;">' + esc(n.body) + '</p>';
+        html += actionBtn;
+        html += '</div>';
+        if (isUnread) {
+          html += '<div style="width:7px; height:7px; border-radius:50%; background:#0284c7; flex-shrink:0; margin-top:6px;"></div>';
+        }
+        html += '</div>';
+      });
+
+      container.innerHTML = html;
+    } catch (err) {
+      container.innerHTML = '<div style="text-align:center;padding:28px 16px;color:#ef4444;font-size:13px;">Error: ' + esc(err.message) + '</div>';
+    }
+  }
+
+  async function handleOwnerNotificationClick(id, actionUrl) {
+    try {
+      await adminFetch(API_BASE + '/notifications/' + encodeURIComponent(id) + '/read', { method: 'POST', headers: getAuthHeaders() });
+      fetchOwnerUnreadNotificationCount();
+    } catch (_) {}
+
+    closeOwnerNotificationsSheet();
+
+    if (actionUrl) {
+      if (actionUrl.startsWith('#')) {
+        window.location.hash = actionUrl;
+      } else {
+        window.location.href = actionUrl;
+      }
+    }
+  }
+  window.handleOwnerNotificationClick = handleOwnerNotificationClick;
+
+  async function markAllOwnerNotificationsAsRead() {
+    try {
+      await adminFetch(API_BASE + '/notifications/read-all', { method: 'POST', headers: getAuthHeaders() });
+      if (typeof showToast === 'function') showToast('Semua notifikasi telah ditandai dibaca.');
+      loadOwnerNotificationsList();
+      fetchOwnerUnreadNotificationCount();
+    } catch (err) {
+      if (typeof showToast === 'function') showToast('Gagal menandai notifikasi: ' + err.message);
+    }
+  }
+  window.markAllOwnerNotificationsAsRead = markAllOwnerNotificationsAsRead;
+
+  async function fetchOwnerUnreadNotificationCount() {
+    try {
+      var res = await adminFetch(API_BASE + '/notifications/unread-count', { headers: getAuthHeaders() });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        updateOwnerNotificationBadge(data.unread_count || 0);
+      }
+    } catch (_) {}
+  }
+
+  function updateOwnerNotificationBadge(count) {
+    var btn = $('btn-notifications');
+    var pill = $('notif-unread-pill');
+    if (pill) {
+      if (count > 0) {
+        pill.textContent = count + ' Baru';
+        pill.style.display = 'inline-block';
+      } else {
+        pill.style.display = 'none';
+      }
+    }
+    if (btn) {
+      var badge = btn.querySelector('.x-notif-badge');
+      if (count > 0) {
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.className = 'x-notif-badge';
+          badge.style.cssText = 'position:absolute; top:-2px; right:-2px; background:#ef4444; color:#fff; font-size:10px; font-weight:800; border-radius:10px; padding:1px 5px; min-width:16px; text-align:center; border:2px solid #fff; line-height:1.2;';
+          btn.style.position = 'relative';
+          btn.appendChild(badge);
+        }
+        badge.textContent = count > 99 ? '99+' : count;
+        badge.style.display = 'inline-block';
+      } else if (badge) {
+        badge.style.display = 'none';
+      }
+    }
+  }
+
+  function initOwnerNotifications() {
+    var btn = $('btn-notifications');
+    if (btn) {
+      btn.onclick = openOwnerNotificationsSheet;
+    }
+    fetchOwnerUnreadNotificationCount();
+    setInterval(fetchOwnerUnreadNotificationCount, 15000);
   }
 
   if (document.readyState === 'loading') {

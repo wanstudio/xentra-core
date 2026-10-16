@@ -590,7 +590,7 @@ router.get('/admin/branches/:id/purchasing/checklist', requireAuth(['owner', 'br
       }
     }
 
-    const branch = db.prepare('SELECT b.id, b.name, b.brand_id, br.organization_id FROM branches b JOIN brands br ON br.id = b.brand_id WHERE b.id = ? AND b.brand_id = ?').get(req.params.id, req.brand_id);
+    const branch = db.prepare('SELECT b.id, b.name, b.brand_id, b.daily_petty_cash_limit, br.organization_id FROM branches b JOIN brands br ON br.id = b.brand_id WHERE b.id = ? AND b.brand_id = ?').get(req.params.id, req.brand_id);
     if (!branch) {
       return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
     }
@@ -712,6 +712,7 @@ router.get('/admin/branches/:id/purchasing/checklist', requireAuth(['owner', 'br
       success: true,
       branch_id: req.params.id,
       branch_name: branch.name,
+      daily_petty_cash_limit: branch.daily_petty_cash_limit != null ? Number(branch.daily_petty_cash_limit) : 500000,
       stock_location_id: locationId,
       total_estimated_budget: Math.round(totalEstimatedBudget),
       items
@@ -996,7 +997,7 @@ router.post('/admin/branches/:id/purchasing/settle', requireAuth(['owner', 'bran
       }
     }
 
-    const branch = db.prepare('SELECT b.id, b.name, b.brand_id, br.organization_id FROM branches b JOIN brands br ON br.id = b.brand_id WHERE b.id = ? AND b.brand_id = ?').get(req.params.id, req.brand_id);
+    const branch = db.prepare('SELECT b.id, b.name, b.brand_id, b.daily_petty_cash_limit, br.organization_id FROM branches b JOIN brands br ON br.id = b.brand_id WHERE b.id = ? AND b.brand_id = ?').get(req.params.id, req.brand_id);
     if (!branch) {
       return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
     }
@@ -1009,6 +1010,7 @@ router.post('/admin/branches/:id/purchasing/settle', requireAuth(['owner', 'bran
     const cashAdvance = Number(req.body && req.body.cash_advance || 0); // Uang kasbon dari owner/kasir
     const items = req.body && req.body.items;
     const notes = (req.body && req.body.notes) ? String(req.body.notes).trim() : '';
+    const receiptPhotoUrl = (req.body && req.body.receipt_photo_url) ? String(req.body.receipt_photo_url).trim() : null;
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ success: false, error: 'ITEMS_REQUIRED', message: 'Minimal harus ada satu item belanjaan.' });
@@ -1018,12 +1020,33 @@ router.post('/admin/branches/:id/purchasing/settle', requireAuth(['owner', 'bran
     const parsedLines = [];
 
     for (const line of items) {
-      const materialId = line.material_id;
+      let materialId = line.material_id;
       const qty = Number(line.quantity);
       const actualUnitPrice = Number(line.unit_price);
 
       if (!materialId || qty <= 0 || actualUnitPrice < 0) {
         return res.status(400).json({ success: false, error: 'INVALID_LINE', message: 'Jumlah dan harga per item harus valid.' });
+      }
+
+      // Resolve ad-hoc material if not existing in materials
+      let existingMat = db.prepare('SELECT id FROM materials WHERE id = ?').get(materialId);
+      if (!existingMat) {
+        const matName = String(line.name || line.material_name || '').trim();
+        if (matName) {
+          const matchByName = db.prepare('SELECT id FROM materials WHERE organization_id = ? AND lower(trim(name)) = lower(?)').get(branch.organization_id, matName);
+          if (matchByName) {
+            materialId = matchByName.id;
+          } else {
+            const newMatId = 'mat_' + crypto.randomBytes(6).toString('hex');
+            const matCode = 'MAT-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+            const uomId = line.base_uom_id || 'uom_pcs';
+            db.prepare(`
+              INSERT INTO materials (id, organization_id, material_code, name, base_uom_id, status)
+              VALUES (?, ?, ?, ?, ?, 'ACTIVE')
+            `).run(newMatId, branch.organization_id, matCode, matName, uomId);
+            materialId = newMatId;
+          }
+        }
       }
 
       const lineTotal = Math.round(qty * actualUnitPrice);
@@ -1033,6 +1056,19 @@ router.post('/admin/branches/:id/purchasing/settle', requireAuth(['owner', 'bran
         quantity: qty,
         unit_price: actualUnitPrice,
         total_price: lineTotal
+      });
+    }
+
+    // P1 GOVERNANCE: Check against branch daily petty cash limit
+    const isOwnerOrBM = ['owner', 'brand_manager'].includes(req.user.role);
+    const branchPettyCashLimit = branch.daily_petty_cash_limit != null ? Number(branch.daily_petty_cash_limit) : 500000;
+    if (!isOwnerOrBM && totalRealExpenditure > branchPettyCashLimit) {
+      return res.status(400).json({
+        success: false,
+        error: 'EXCEEDS_PETTY_CASH_LIMIT',
+        message: `Total belanja (Rp ${totalRealExpenditure.toLocaleString('id-ID')}) melebihi kasbon harian cabang (Rp ${branchPettyCashLimit.toLocaleString('id-ID')}). Silakan pangkas kuantitas belanjaan atau ajukan kenaikan kasbon ke Owner.`,
+        daily_petty_cash_limit: branchPettyCashLimit,
+        total_real_expenditure: totalRealExpenditure
       });
     }
 
@@ -1090,16 +1126,17 @@ router.post('/admin/branches/:id/purchasing/settle', requireAuth(['owner', 'bran
         // Ledger entry in material_stock_movements (posting_mutation_id must be globally unique per movement)
         const movId = 'mov_' + crypto.randomBytes(8).toString('hex');
         const movMutationId = postingId + '_' + line.material_id;
+        const movementNotes = receiptPhotoUrl ? JSON.stringify({ notes: notes || 'Belanja Pasar', receipt_photo_url: receiptPhotoUrl }) : (notes || 'Belanja Pasar');
         db.prepare(`
           INSERT INTO material_stock_movements (
             id, stock_location_id, material_id, movement_type, quantity_base,
             previous_quantity, current_quantity, unit_cost, total_cost, currency_code,
             valuation_method, cost_basis_type, source_type, source_reference,
-            posting_mutation_id, valuation_version, posting_timestamp, actor_id, resolver_version
-          ) VALUES (?, ?, ?, 'PURCHASE_RECEIPT', ?, ?, ?, ?, ?, 'IDR', 'MOVING_AVERAGE', 'PURCHASE_RECEIPT', 'PURCHASING_CHECKLIST', ?, ?, ?, ?, ?, 'v1')
+            posting_mutation_id, valuation_version, posting_timestamp, actor_id, resolver_version, notes
+          ) VALUES (?, ?, ?, 'PURCHASE_RECEIPT', ?, ?, ?, ?, ?, 'IDR', 'MOVING_AVERAGE', 'PURCHASE_RECEIPT', 'PURCHASING_CHECKLIST', ?, ?, ?, ?, ?, 'v1', ?)
         `).run(
           movId, location.id, line.material_id, line.quantity, prevQty, newQty,
-          line.unit_price, line.total_price, postingId, movMutationId, newVer, now, actorId
+          line.unit_price, line.total_price, postingId, movMutationId, newVer, now, actorId, movementNotes
         );
       }
 
@@ -1131,6 +1168,29 @@ router.post('/admin/branches/:id/purchasing/settle', requireAuth(['owner', 'bran
         `).run(newStatus, isFullyDone ? actorId : null, isFullyDone ? now : null, now, mandateId, req.params.id);
       }
 
+      // INTEGRASI LACI KAS KASIR (POS Cash Drawer Movements):
+      // Jika ada shift kasir yang sedang aktif di cabang ini, catat kasbon keluar & sisa kembalian masuk
+      try {
+        const activeShift = db.prepare("SELECT id FROM pos_shifts WHERE branch_id = ? AND status = 'open' ORDER BY opened_at DESC LIMIT 1").get(req.params.id);
+        if (activeShift) {
+          const movOutId = 'csh_out_' + crypto.randomBytes(6).toString('hex');
+          db.prepare(`
+            INSERT INTO pos_cash_movements (id, shift_id, type, amount, reason, created_at)
+            VALUES (?, ?, 'out', ?, ?, ?)
+          `).run(movOutId, activeShift.id, totalRealExpenditure, 'Kasbon Belanja Pasar (' + settleCode + ')', now);
+
+          if (changeDue > 0 && cashAdvance > totalRealExpenditure) {
+            const movInId = 'csh_in_' + crypto.randomBytes(6).toString('hex');
+            db.prepare(`
+              INSERT INTO pos_cash_movements (id, shift_id, type, amount, reason, created_at)
+              VALUES (?, ?, 'in', ?, ?, ?)
+            `).run(movInId, activeShift.id, changeDue, 'Sisa Kembalian Belanja Pasar (' + settleCode + ')', now);
+          }
+        }
+      } catch (cashErr) {
+        console.warn('[Purchasing] Cash movement log notice (shift may not be active):', cashErr.message);
+      }
+
       db.exec('COMMIT;');
     } catch (txErr) {
       db.exec('ROLLBACK;');
@@ -1146,10 +1206,76 @@ router.post('/admin/branches/:id/purchasing/settle', requireAuth(['owner', 'bran
       total_real_expenditure: totalRealExpenditure,
       change_due: changeDue,
       items_recorded: parsedLines.length,
-      notes: notes || 'Belanja Pasar'
+      notes: notes || 'Belanja Pasar',
+      receipt_photo_url: receiptPhotoUrl
     });
   } catch (err) {
     console.error('[API Error POST /admin/branches/:id/purchasing/settle]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /admin/branches/:id/purchasing/request-advance
+// Staff requests Owner to raise the daily petty cash limit when total shopping exceeds limit
+router.post('/admin/branches/:id/purchasing/request-advance', requireAuth(['owner', 'brand_manager', 'branch_manager', 'purchasing']), (req, res) => {
+  try {
+    const branch = db.prepare('SELECT b.id, b.name, b.brand_id, b.daily_petty_cash_limit FROM branches b WHERE b.id = ? AND b.brand_id = ?').get(req.params.id, req.brand_id);
+    if (!branch) {
+      return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
+    }
+
+    const requestedAmount = Number(req.body && req.body.requested_amount || 0);
+    const currentLimit = Number(branch.daily_petty_cash_limit || 500000);
+    const reason = (req.body && req.body.reason) ? String(req.body.reason).trim() : 'Kebutuhan belanja harian pasar melebihi kasbon harian.';
+
+    if (requestedAmount <= 0) {
+      return res.status(400).json({ success: false, error: 'INVALID_AMOUNT', message: 'Nominal pengajuan kasbon harus lebih dari 0.' });
+    }
+
+    const notifId = 'notif_' + crypto.randomBytes(8).toString('hex');
+    const title = 'Pengajuan Kenaikan Kasbon Harian: ' + branch.name;
+    const formattedReq = 'Rp ' + requestedAmount.toLocaleString('id-ID');
+    const formattedCur = 'Rp ' + currentLimit.toLocaleString('id-ID');
+    const body = `Cabang ${branch.name} mengajukan kenaikan kasbon menjadi ${formattedReq} (Kasbon saat ini: ${formattedCur}). Alasan: ${reason}`;
+    const now = new Date().toISOString();
+
+    db.prepare(`
+      INSERT INTO notifications (id, brand_id, branch_id, source_type, source_actor_id, title, body, priority, target_role, related_entity_type, related_entity_id, action_url, created_at)
+      VALUES (?, ?, ?, 'CASH_ADVANCE_REQUEST', ?, ?, ?, 'high', 'owner', 'branch', ?, ?, ?)
+    `).run(
+      notifId,
+      req.brand_id,
+      req.params.id,
+      req.user ? (req.user.id || req.user.userId || 'staff') : 'staff',
+      title,
+      body,
+      req.params.id,
+      '#branches/' + req.params.id + '/edit?suggested_advance=' + requestedAmount,
+      now
+    );
+
+    // Resolve owner recipients for the notification
+    const owners = db.prepare("SELECT id FROM users WHERE role = 'owner' AND (status != 'deleted' OR status IS NULL)").all();
+    if (owners && owners.length > 0) {
+      const insertRecipient = db.prepare(`
+        INSERT OR IGNORE INTO notification_recipients (id, notification_id, user_id, read_at, created_at)
+        VALUES (?, ?, ?, NULL, ?)
+      `);
+      for (const ow of owners) {
+        insertRecipient.run('rcp_' + crypto.randomBytes(6).toString('hex'), notifId, ow.id, now);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Pengajuan kenaikan kasbon harian berhasil dikirim ke Owner.',
+      notification_id: notifId,
+      branch_id: req.params.id,
+      current_limit: currentLimit,
+      requested_amount: requestedAmount
+    });
+  } catch (err) {
+    console.error('[API Error POST /admin/branches/:id/purchasing/request-advance]:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -1208,6 +1334,7 @@ router.get('/admin/branches/:id/purchasing/history', requireAuth(['owner', 'bran
         sm.total_cost,
         sm.posting_timestamp,
         sm.actor_id,
+        sm.notes,
         usr.full_name AS actor_name
       FROM material_stock_movements sm
       JOIN materials m ON m.id = sm.material_id
@@ -1223,16 +1350,27 @@ router.get('/admin/branches/:id/purchasing/history', requireAuth(['owner', 'bran
     const sessionMap = new Map();
     for (const r of rows) {
       const pId = r.source_reference || r.posting_mutation_id || r.id;
+      let receiptPhoto = null;
+      if (r.notes) {
+        try {
+          const parsed = JSON.parse(r.notes);
+          if (parsed && parsed.receipt_photo_url) receiptPhoto = parsed.receipt_photo_url;
+        } catch (_) {}
+      }
       if (!sessionMap.has(pId)) {
         sessionMap.set(pId, {
           posting_id: pId,
           timestamp: r.posting_timestamp,
           actor_name: r.actor_name || 'Petugas Belanja',
           total_spend: 0,
+          receipt_photo_url: receiptPhoto,
           items: []
         });
       }
       const session = sessionMap.get(pId);
+      if (!session.receipt_photo_url && receiptPhoto) {
+        session.receipt_photo_url = receiptPhoto;
+      }
       session.total_spend += Number(r.total_cost || 0);
       session.items.push({
         material_id: r.material_id,

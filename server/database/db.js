@@ -893,6 +893,7 @@ function initSchema(targetDb) {
       payment_config_override TEXT,
       is_archived INTEGER DEFAULT 0,
       timezone TEXT NOT NULL DEFAULT 'Asia/Jakarta',
+      daily_petty_cash_limit REAL NOT NULL DEFAULT 500000,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
@@ -2281,6 +2282,7 @@ function initSchema(targetDb) {
   // Tidak dihitung dari denah meja: meja berbeda-beda (2/4/12 orang), jadi
   // menjumlahkan kapasitas meja itu pukul rata dan hasilnya bukan kapasitas nyata.
   try { targetDb.exec('ALTER TABLE branches ADD COLUMN reservation_max_guests INTEGER;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE branches ADD COLUMN daily_petty_cash_limit REAL NOT NULL DEFAULT 500000;'); } catch (e) {}
 
   // Penanda akun customer yang sudah dihapus (dari sudut pandang tamu). Barisnya
   // SENGAJA tidak di-DELETE: catatan transaksi resto tetap merujuk padanya, dan

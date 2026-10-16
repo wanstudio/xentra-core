@@ -224,6 +224,10 @@
     $('branch-radius').value = b ? (b.max_radius_km != null ? b.max_radius_km : 10) : 10;
     $('branch-promo-minorder').value = b ? (b.promo_min_order != null ? b.promo_min_order : 50000) : 50000;
     $('branch-promo-discount').value = b ? (b.promo_delivery_discount != null ? b.promo_delivery_discount : 0) : 0;
+    var hashParams = new URLSearchParams(window.location.hash.indexOf('?') !== -1 ? window.location.hash.substring(window.location.hash.indexOf('?') + 1) : '');
+    var suggestedAdvance = hashParams.get('suggested_advance');
+    var pettyCashLimit = suggestedAdvance ? Number(suggestedAdvance) : (b && b.daily_petty_cash_limit != null ? Number(b.daily_petty_cash_limit) : 500000);
+    if ($('branch-petty-cash-limit')) $('branch-petty-cash-limit').value = pettyCashLimit.toLocaleString('id-ID');
     $('branch-open-override').checked = b ? !(b.is_open_override === 0 || b.is_open_override === false) : true;
     $('branch-editor-title').textContent = b ? ('Edit Cabang: ' + (b.name || '')) : 'Tambah Cabang';
     $('branch-editor-breadcrumb').textContent = b ? 'Edit Cabang' : 'Tambah Cabang';
@@ -478,6 +482,9 @@
           max_radius_km: $('branch-radius').value !== '' ? Number($('branch-radius').value) : 10,
           promo_min_order: $('branch-promo-minorder').value !== '' ? Number($('branch-promo-minorder').value) : 50000,
           promo_delivery_discount: $('branch-promo-discount').value !== '' ? Number($('branch-promo-discount').value) : 0,
+          daily_petty_cash_limit: ($('branch-petty-cash-limit') && $('branch-petty-cash-limit').value)
+            ? Number(String($('branch-petty-cash-limit').value).replace(/[^0-9]/g, ''))
+            : 500000,
           is_open_override: $('branch-open-override').checked ? 1 : 0
         };
 

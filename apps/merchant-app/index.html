@@ -1078,27 +1078,39 @@
         <div id="purchasing-view-tasks" class="purchasing-subview active">
           <!-- Kasbon Card Input -->
           <div class="purchasing-kasbon-card">
-            <div class="purchasing-kasbon-header">
-              <span class="purchasing-kasbon-title">💵 Uang Belanja</span>
-              <span id="badge-purchasing-low-count" class="x-badge x-badge-warning">0 menipis</span>
+            <div class="purchasing-kasbon-header" style="display:flex; justify-content:space-between; align-items:center;">
+              <span class="purchasing-kasbon-title" style="font-size:14px; font-weight:800; color:#0f172a;">💵 Kasbon Harian</span>
+              <span id="badge-purchasing-limit-pill" class="x-badge x-badge-neutral" style="font-size:11.5px; font-weight:700; color:#334155; background:#f1f5f9; border:1px solid #cbd5e1; padding:3px 8px; border-radius:8px;">
+                Maks: <strong id="label-purchasing-daily-limit" style="color:#0f172a;">Rp 500.000</strong>
+              </span>
             </div>
             <div class="purchasing-kasbon-input-wrap">
               <span class="purchasing-kasbon-currency">Rp</span>
               <input type="text" id="input-purchasing-cash-advance" class="purchasing-kasbon-input" placeholder="0" inputmode="numeric" pattern="[0-9]*" autocomplete="off" oninput="onPurchasingCashAdvanceInput(this)">
             </div>
-            <div class="purchasing-kasbon-footer">
-              <span class="purchasing-kasbon-caption">Estimasi kebutuhan belanja:</span>
-              <strong id="label-purchasing-est-budget" class="purchasing-kasbon-est">Rp 0</strong>
+            <div class="purchasing-kasbon-footer" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+              <div>
+                <span class="purchasing-kasbon-caption">Estimasi belanja:</span>
+                <strong id="label-purchasing-est-budget" class="purchasing-kasbon-est">Rp 0</strong>
+              </div>
+              <div id="badge-purchasing-status-wrap">
+                <span id="badge-purchasing-status" class="x-badge x-badge-success" style="font-size:11px; font-weight:700; padding:2px 8px; border-radius:6px;">✓ Dalam Batas Kasbon</span>
+              </div>
             </div>
           </div>
-          <!-- Item Count & List Title -->
+          <!-- Item Count & List Title & Add Other Items Button -->
           <div class="purchasing-section-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; padding:0 2px;">
-            <div style="font-size:13px; font-weight:800; color:#0f172a;" id="purchasing-list-title">
-              Daftar Belanja
+            <div style="display:flex; align-items:center; gap:6px;">
+              <div style="font-size:13.5px; font-weight:800; color:#0f172a;" id="purchasing-list-title">
+                Daftar Belanja
+              </div>
+              <span style="font-size:12px; font-weight:700; color:#64748b;">
+                (<span id="purchasing-item-count">0</span> item)
+              </span>
             </div>
-            <div style="font-size:12px; font-weight:700; color:#64748b;">
-              <span id="purchasing-item-count">0</span> item
-            </div>
+            <button type="button" class="x-btn-secondary" onclick="openPurchasingAddCustomItemModal()" style="font-size:12px; font-weight:700; padding:5px 10px; border-radius:8px; display:inline-flex; align-items:center; gap:5px; height:32px; background:#fff; border:1px solid #cbd5e1; color:#0f172a; cursor:pointer;">
+              <span style="font-size:14px; line-height:1; color:#2563eb;">➕</span> Tambah Belanjaan Lain
+            </button>
           </div>
 
           <!-- Checklist List Items Container -->
@@ -2097,6 +2109,33 @@
             <span id="settle-confirm-change-label" style="color:#166534; font-weight:700;">Sisa Kembalian:</span>
             <strong id="settle-confirm-change-due" style="color:#059669; font-weight:800; font-size:16px;">Rp 0</strong>
           </div>
+          <div style="font-size:11px; color:#166534; font-weight:600; text-align:right;">
+            * Sisa kembalian dimasukkan kembali ke laci kas kasir
+          </div>
+        </div>
+
+        <!-- Peringatan Item Tidak Tercentang -->
+        <div id="settle-confirm-unchecked-warning" style="display:none; background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:10px 14px; font-size:12px; color:#92400e; line-height:1.45;">
+          ⚠️ <strong>Peringatan:</strong> Ada <strong id="settle-confirm-unchecked-count">0</strong> item yang tidak tercentang. Item tersebut <strong>tidak akan masuk ke dalam laporan stok belanja hari ini</strong> dan tetap tercatat butuh belanja.
+        </div>
+
+        <!-- Foto Struk / Nota (Opsional) -->
+        <div style="background:#f8fafc; border:1px dashed #cbd5e1; border-radius:12px; padding:12px 14px; display:flex; flex-direction:column; gap:8px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:12px; font-weight:700; color:#334155;">📷 Foto Nota / Struk (Opsional):</span>
+            <span id="label-purchasing-receipt-status" style="font-size:11px; color:#64748b;">Belum ada foto</span>
+          </div>
+          <input type="file" id="input-purchasing-receipt-photo" accept="image/*" capture="environment" style="display:none;" onchange="onPurchasingReceiptPhotoSelected(this)">
+          
+          <div id="preview-purchasing-receipt" style="display:none; align-items:center; gap:10px; background:#fff; padding:6px 10px; border-radius:8px; border:1px solid #e2e8f0;">
+            <img id="img-purchasing-receipt-preview" src="" alt="Nota" style="width:48px; height:48px; object-fit:cover; border-radius:6px; border:1px solid #cbd5e1;">
+            <div style="flex:1; font-size:12px; color:#334155; font-weight:600;">Foto struk terlampir</div>
+            <button type="button" onclick="clearPurchasingReceiptPhoto()" style="font-size:11.5px; color:#dc2626; background:none; border:none; cursor:pointer; font-weight:700;">Hapus</button>
+          </div>
+
+          <button type="button" id="btn-purchasing-snap-receipt" class="x-btn-secondary" onclick="$('input-purchasing-receipt-photo').click()" style="font-size:12px; font-weight:700; padding:8px 14px; border-radius:10px; width:100%; justify-content:center; display:flex; align-items:center; gap:6px;">
+            <span>📷</span> Ambil Foto / Upload Nota
+          </button>
         </div>
 
         <!-- Status Item Terbeli & Belum -->
@@ -2123,6 +2162,119 @@
         </button>
         <button type="button" class="x-btn-primary" id="btn-purchasing-confirm-settle-ok" onclick="executePurchasingSettle()" style="background:#059669; border-color:#059669; font-size:13px; font-weight:800; padding:10px 18px; border-radius:12px; display:flex; align-items:center; justify-content:center; gap:6px; box-shadow:0 4px 12px rgba(5,150,105,0.3); text-align:center;">
           <span>✓</span> Ya, Selesai Belanja
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: PENGAJUAN KENAIKAN KASBON HARIAN (REQUEST ADVANCE) -->
+  <div id="modal-purchasing-request-advance" class="x-modal-backdrop" style="display:none; z-index: 12025;" role="dialog" aria-modal="true" aria-labelledby="purchasing-advance-title" onclick="if(event.target === this) closePurchasingRequestAdvanceModal()">
+    <div class="x-modal-card purchasing-confirm-modal-card" style="max-width:440px; width:92%; max-height:90vh; display:flex; flex-direction:column;">
+      <div class="x-modal-header purchasing-confirm-modal-header" style="padding:16px 18px; border-bottom:1px solid #e2e8f0;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="font-size:22px; line-height:1;">🔒</span>
+          <div>
+            <h3 id="purchasing-advance-title" style="font-size:16px; font-weight:800; margin:0; color:#0f172a;">Kasbon Melebihi Batas</h3>
+            <p style="font-size:11.5px; color:#64748b; margin:2px 0 0;">Butuh persetujuan Owner untuk melanjutkan</p>
+          </div>
+        </div>
+        <button type="button" class="x-modal-close" onclick="closePurchasingRequestAdvanceModal()" aria-label="Tutup">✕</button>
+      </div>
+
+      <div class="purchasing-confirm-modal-body" style="padding:16px 18px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:12px;">
+        <div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:12px; padding:12px 14px; font-size:12.5px; color:#9a3412; line-height:1.5;">
+          Total belanjaan saat ini melebihi kasbon harian cabang. Anda dapat <strong>memangkas kuantitas item</strong> agar muat dalam batas kasbon, atau <strong>mengajukan kenaikan kasbon ke Owner</strong>.
+        </div>
+
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px; display:flex; flex-direction:column; gap:8px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px;">
+            <span style="color:#64748b; font-weight:600;">Kasbon Harian Saat Ini:</span>
+            <strong id="modal-advance-cur-limit" style="color:#0f172a; font-weight:800;">Rp 0</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px;">
+            <span style="color:#64748b; font-weight:600;">Total Belanja Riil:</span>
+            <strong id="modal-advance-total-real" style="color:#ea580c; font-weight:800;">Rp 0</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px; border-top:1px dashed #cbd5e1; padding-top:8px;">
+            <span style="color:#dc2626; font-weight:700;">Kekurangan Kasbon:</span>
+            <strong id="modal-advance-deficit" style="color:#dc2626; font-weight:800;">Rp 0</strong>
+          </div>
+        </div>
+
+        <div>
+          <label for="input-purchasing-request-advance-amount" style="display:block; font-size:12px; font-weight:700; color:#334155; margin-bottom:4px;">Nominal Kasbon yang Diajukan (Rp):</label>
+          <div class="purchasing-modal-input-wrap">
+            <span class="purchasing-modal-currency-prefix">Rp</span>
+            <input type="text" id="input-purchasing-request-advance-amount" class="purchasing-modal-input-price" placeholder="0" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
+          </div>
+        </div>
+
+        <div>
+          <label for="input-purchasing-request-advance-reason" style="display:block; font-size:12px; font-weight:700; color:#334155; margin-bottom:4px;">Alasan Pengajuan (Opsional):</label>
+          <input type="text" id="input-purchasing-request-advance-reason" class="x-input" placeholder="Contoh: Belanja daging sapi & ayam melonjak di pasar" style="width:100%; font-size:13px; padding:9px 12px; border-radius:10px; border:1px solid #cbd5e1;">
+        </div>
+      </div>
+
+      <div class="x-modal-footer" style="padding:14px 18px; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:10px;">
+        <button type="button" class="x-btn-secondary" onclick="closePurchasingRequestAdvanceModal()" style="font-size:13px; font-weight:700; padding:10px 16px; border-radius:12px;">
+          Batal (Pangkas Item)
+        </button>
+        <button type="button" class="x-btn-primary" id="btn-purchasing-submit-advance" onclick="submitPurchasingRequestAdvance()" style="background:#ea580c; border-color:#ea580c; font-size:13px; font-weight:800; padding:10px 18px; border-radius:12px; display:inline-flex; align-items:center; gap:6px;">
+          <span>🔔</span> Ajukan ke Owner
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: TAMBAH BELANJAAN LAIN (CUSTOM AD-HOC ITEMS) -->
+  <div id="modal-purchasing-add-custom-item" class="x-modal-backdrop" style="display:none; z-index: 12022;" role="dialog" aria-modal="true" aria-labelledby="purchasing-add-custom-title" onclick="if(event.target === this) closePurchasingAddCustomItemModal()">
+    <div class="x-modal-card purchasing-confirm-modal-card" style="max-width:440px; width:92%; max-height:90vh; display:flex; flex-direction:column;">
+      <div class="x-modal-header purchasing-confirm-modal-header" style="padding:16px 18px; border-bottom:1px solid #e2e8f0;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:20px; line-height:1;">➕</span>
+          <div>
+            <h3 id="purchasing-add-custom-title" style="font-size:16px; font-weight:800; margin:0; color:#0f172a;">Tambah Belanjaan Lain</h3>
+            <p style="font-size:11.5px; color:#64748b; margin:2px 0 0;">Catat kebutuhan tak terduga (gas, sabun, kantong, dsb)</p>
+          </div>
+        </div>
+        <button type="button" class="x-modal-close" onclick="closePurchasingAddCustomItemModal()" aria-label="Tutup">✕</button>
+      </div>
+
+      <div class="purchasing-confirm-modal-body" style="padding:16px 18px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:12px;">
+        <div>
+          <label for="input-purchasing-add-name" style="display:block; font-size:12px; font-weight:700; color:#334155; margin-bottom:4px;">Nama Barang / Belanjaan:</label>
+          <input type="text" id="input-purchasing-add-name" class="x-input" placeholder="Contoh: Gas LPG 3kg / Sabun Cuci" style="width:100%; font-size:13px; padding:9px 12px; border-radius:10px; border:1px solid #cbd5e1;" list="datalist-purchasing-materials">
+          <datalist id="datalist-purchasing-materials">
+            <!-- Dynamically populated from catalog materials -->
+          </datalist>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+          <div>
+            <label for="input-purchasing-add-qty" style="display:block; font-size:12px; font-weight:700; color:#334155; margin-bottom:4px;">Jumlah (Qty):</label>
+            <input type="number" id="input-purchasing-add-qty" class="x-input" placeholder="1" min="0.01" step="any" value="1" style="width:100%; font-size:13px; padding:9px 12px; border-radius:10px; border:1px solid #cbd5e1;">
+          </div>
+          <div>
+            <label for="input-purchasing-add-uom" style="display:block; font-size:12px; font-weight:700; color:#334155; margin-bottom:4px;">Satuan:</label>
+            <input type="text" id="input-purchasing-add-uom" class="x-input" placeholder="Pcs / Kg / Tabung" value="Pcs" style="width:100%; font-size:13px; padding:9px 12px; border-radius:10px; border:1px solid #cbd5e1;">
+          </div>
+        </div>
+
+        <div>
+          <label for="input-purchasing-add-price" style="display:block; font-size:12px; font-weight:700; color:#334155; margin-bottom:4px;">Harga Beli Satuan (Rp):</label>
+          <div class="purchasing-modal-input-wrap">
+            <span class="purchasing-modal-currency-prefix">Rp</span>
+            <input type="text" id="input-purchasing-add-price" class="purchasing-modal-input-price" placeholder="0" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
+          </div>
+        </div>
+      </div>
+
+      <div class="x-modal-footer" style="padding:14px 18px; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:10px;">
+        <button type="button" class="x-btn-secondary" onclick="closePurchasingAddCustomItemModal()" style="font-size:13px; font-weight:700; padding:10px 16px; border-radius:12px;">
+          Batal
+        </button>
+        <button type="button" class="x-btn-primary" onclick="confirmPurchasingAddCustomItem()" style="background:#0284c7; border-color:#0284c7; font-size:13px; font-weight:800; padding:10px 18px; border-radius:12px;">
+          <span>✓</span> Tambah ke Belanjaan
         </button>
       </div>
     </div>
@@ -2642,7 +2794,7 @@
   <script src="/merchant-app/assets/js/reports.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/tables.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/stock.js?v=1.1.0"></script>
-  <script src="/merchant-app/assets/js/purchasing.js?v=1.1.4"></script>
+  <script src="/merchant-app/assets/js/purchasing.js?v=1.2.0"></script>
   <script src="/merchant-app/assets/js/promotions.js?v=1.0.2"></script>
   <script src="/merchant-app/assets/js/staff.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/orders.js?v=1.0.26"></script>

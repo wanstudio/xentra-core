@@ -23,10 +23,14 @@
 
   var _purchasingState = {
     items: [],
+    allItems: [],
     filterMode: 'low', // 'low' or 'all'
     cashAdvance: 0,
+    dailyPettyCashLimit: 500000,
     activeEditItem: null,
-    activeMandateId: null
+    activeMandateId: null,
+    receiptPhotoUrl: null,
+    pollInterval: null
   };
 
   function showPurchasingBottomBar() {
@@ -121,6 +125,13 @@
       var chkData = await chkRes.json();
 
       if (chkRes.ok && chkData.success && chkData.items && chkData.items.length > 0) {
+        _purchasingState.dailyPettyCashLimit = (chkData.daily_petty_cash_limit != null) ? Number(chkData.daily_petty_cash_limit) : 500000;
+        _purchasingState.allItems = chkData.items || [];
+        var limitEl = $('label-purchasing-daily-limit');
+        if (limitEl) limitEl.textContent = formatMoney(_purchasingState.dailyPettyCashLimit);
+        populateMaterialsDatalist(_purchasingState.allItems);
+        startPettyCashPolling(branchId);
+
         var rawItems = chkData.items;
         var lowItems = rawItems.filter(function (itm) { return itm.is_low; });
         var targetList = lowItems.length > 0 ? lowItems : rawItems;
@@ -457,8 +468,10 @@
     _purchasingState.cashAdvance = cashAdvance;
 
     var totalReal = 0;
+    var hasChecked = false;
     _purchasingState.items.forEach(function (itm) {
       if (itm.checked) {
+        hasChecked = true;
         totalReal += Math.round(itm.buyQty * itm.actualUnitPrice);
       }
     });
@@ -479,14 +492,281 @@
       }
     }
 
+    var limit = Number(_purchasingState.dailyPettyCashLimit || 500000);
+    var limitLabel = $('label-purchasing-daily-limit');
+    if (limitLabel) limitLabel.textContent = formatMoney(limit);
+
+    var statusBadge = $('badge-purchasing-status');
+    var isOverLimit = totalReal > limit;
+
+    if (statusBadge) {
+      if (isOverLimit) {
+        var overAmount = totalReal - limit;
+        statusBadge.className = 'x-badge x-badge-danger';
+        statusBadge.style.background = '#fef2f2';
+        statusBadge.style.color = '#dc2626';
+        statusBadge.style.borderColor = '#fecaca';
+        statusBadge.textContent = '⚠️ Lebih Kasbon ' + formatMoney(overAmount);
+      } else {
+        statusBadge.className = 'x-badge x-badge-success';
+        statusBadge.style.background = '#ecfdf5';
+        statusBadge.style.color = '#059669';
+        statusBadge.style.borderColor = '#a7f3d0';
+        statusBadge.textContent = '✓ Dalam Batas Kasbon';
+      }
+    }
+
     var submitBtn = $('btn-purchasing-submit-settle');
     if (submitBtn) {
-      var hasChecked = _purchasingState.items.some(function (i) { return i.checked; });
-      submitBtn.disabled = !hasChecked || totalReal <= 0;
-      submitBtn.style.opacity = (!hasChecked || totalReal <= 0) ? '0.5' : '1';
+      if (isOverLimit) {
+        submitBtn.disabled = false;
+        submitBtn.style.opacity = '1';
+        submitBtn.style.background = '#ea580c';
+        submitBtn.style.borderColor = '#ea580c';
+        submitBtn.style.boxShadow = '0 4px 14px rgba(234, 88, 12, 0.4)';
+        submitBtn.innerHTML = '<span>🔒</span> Terkunci - Minta Persetujuan Owner';
+        submitBtn.onclick = function () {
+          openPurchasingRequestAdvanceModal(totalReal, limit);
+        };
+      } else {
+        submitBtn.style.background = '#059669';
+        submitBtn.style.borderColor = '#059669';
+        submitBtn.style.boxShadow = '0 4px 14px rgba(5, 150, 105, 0.35)';
+        submitBtn.innerHTML = '<span>✓</span> Selesai Belanja';
+        submitBtn.disabled = !hasChecked || totalReal <= 0;
+        submitBtn.style.opacity = (!hasChecked || totalReal <= 0) ? '0.5' : '1';
+        submitBtn.onclick = submitPurchasingSettle;
+      }
     }
   }
   window.recalculatePurchasingSummary = recalculatePurchasingSummary;
+
+  /* =========================================================================
+     PENGAJUAN KENAIKAN KASBON HARIAN (REQUEST ADVANCE)
+     ========================================================================= */
+  function openPurchasingRequestAdvanceModal(totalReal, currentLimit) {
+    var modal = $('modal-purchasing-request-advance');
+    if (!modal) return;
+    if ($('modal-advance-cur-limit')) $('modal-advance-cur-limit').textContent = formatMoney(currentLimit);
+    if ($('modal-advance-total-real')) $('modal-advance-total-real').textContent = formatMoney(totalReal);
+    var deficit = Math.max(0, totalReal - currentLimit);
+    if ($('modal-advance-deficit')) $('modal-advance-deficit').textContent = formatMoney(deficit);
+    var amountInput = $('input-purchasing-request-advance-amount');
+    if (amountInput) {
+      amountInput.value = totalReal > 0 ? formatNumberWithDots(totalReal) : '';
+      setTimeout(function () { amountInput.focus(); }, 60);
+    }
+    modal.style.display = 'flex';
+  }
+  window.openPurchasingRequestAdvanceModal = openPurchasingRequestAdvanceModal;
+
+  function closePurchasingRequestAdvanceModal() {
+    var modal = $('modal-purchasing-request-advance');
+    if (modal) modal.style.display = 'none';
+  }
+  window.closePurchasingRequestAdvanceModal = closePurchasingRequestAdvanceModal;
+
+  async function submitPurchasingRequestAdvance() {
+    var user = getStoredUser();
+    var branchId = user ? (user.branch_id || user.branchId) : null;
+    if (!branchId) return;
+
+    var amountInput = $('input-purchasing-request-advance-amount');
+    var rawDigits = amountInput ? String(amountInput.value || '').replace(/\D/g, '') : '';
+    var requestedAmount = parseInt(rawDigits, 10) || 0;
+
+    if (requestedAmount <= 0) {
+      showToast('⚠️ Masukkan nominal kasbon yang diajukan.');
+      return;
+    }
+
+    var reasonInput = $('input-purchasing-request-advance-reason');
+    var reason = reasonInput ? reasonInput.value.trim() : '';
+
+    var btn = $('btn-purchasing-submit-advance');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span>⏳</span> Mengirim...';
+    }
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/request-advance', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          requested_amount: requestedAmount,
+          reason: reason || 'Total belanja melebihi kasbon harian'
+        })
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        closePurchasingRequestAdvanceModal();
+        showToast('🔔 Pengajuan kasbon (Rp ' + formatNumberWithDots(requestedAmount) + ') terkirim ke Owner. Tombol hijau akan otomatis terbuka setelah Owner menyetujui.');
+      } else {
+        showToast('Gagal mengajukan kasbon: ' + (data.message || data.error || 'Terjadi kesalahan'));
+      }
+    } catch (err) {
+      showToast('Gangguan jaringan saat mengajukan kasbon.');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<span>🔔</span> Ajukan ke Owner';
+      }
+    }
+  }
+  window.submitPurchasingRequestAdvance = submitPurchasingRequestAdvance;
+
+  function startPettyCashPolling(branchId) {
+    if (_purchasingState.pollInterval) clearInterval(_purchasingState.pollInterval);
+    _purchasingState.pollInterval = setInterval(async function () {
+      if (!branchId || document.visibilityState === 'hidden') return;
+      try {
+        var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/checklist', {
+          headers: getAuthHeaders()
+        });
+        var data = await res.json();
+        if (res.ok && data.success && data.daily_petty_cash_limit != null) {
+          var newLimit = Number(data.daily_petty_cash_limit);
+          var prevLimit = Number(_purchasingState.dailyPettyCashLimit || 500000);
+          if (newLimit !== prevLimit) {
+            _purchasingState.dailyPettyCashLimit = newLimit;
+            recalculatePurchasingSummary();
+            if (newLimit > prevLimit) {
+              showToast('🎉 Kasbon harian telah disetujui Owner menjadi Rp ' + formatMoney(newLimit) + '! Tombol selesai belanja otomatis terbuka.');
+            }
+          }
+        }
+      } catch (_) {}
+    }, 10000);
+  }
+
+  /* =========================================================================
+     TAMBAH BELANJAAN LAIN (CUSTOM AD-HOC ITEMS)
+     ========================================================================= */
+  function populateMaterialsDatalist(allItems) {
+    var datalist = $('datalist-purchasing-materials');
+    if (!datalist || !allItems) return;
+    datalist.innerHTML = allItems.map(function (itm) {
+      return '<option value="' + esc(itm.material_name) + '">';
+    }).join('');
+  }
+
+  function openPurchasingAddCustomItemModal() {
+    var modal = $('modal-purchasing-add-custom-item');
+    if (!modal) return;
+    var nameIn = $('input-purchasing-add-name');
+    var qtyIn = $('input-purchasing-add-qty');
+    var uomIn = $('input-purchasing-add-uom');
+    var priceIn = $('input-purchasing-add-price');
+    if (nameIn) nameIn.value = '';
+    if (qtyIn) qtyIn.value = '1';
+    if (uomIn) uomIn.value = 'Pcs';
+    if (priceIn) priceIn.value = '';
+    modal.style.display = 'flex';
+    setTimeout(function () { if (nameIn) nameIn.focus(); }, 60);
+  }
+  window.openPurchasingAddCustomItemModal = openPurchasingAddCustomItemModal;
+
+  function closePurchasingAddCustomItemModal() {
+    var modal = $('modal-purchasing-add-custom-item');
+    if (modal) modal.style.display = 'none';
+  }
+  window.closePurchasingAddCustomItemModal = closePurchasingAddCustomItemModal;
+
+  function confirmPurchasingAddCustomItem() {
+    var nameIn = $('input-purchasing-add-name');
+    var qtyIn = $('input-purchasing-add-qty');
+    var uomIn = $('input-purchasing-add-uom');
+    var priceIn = $('input-purchasing-add-price');
+
+    var name = nameIn ? nameIn.value.trim() : '';
+    var qty = qtyIn ? parseFloat(qtyIn.value || 0) : 0;
+    var uom = uomIn ? uomIn.value.trim() || 'Pcs' : 'Pcs';
+    var rawPriceDigits = priceIn ? String(priceIn.value || '').replace(/\D/g, '') : '';
+    var price = parseFloat(rawPriceDigits || 0);
+
+    if (!name) {
+      showToast('⚠️ Masukkan nama barang belanjaan.');
+      return;
+    }
+    if (qty <= 0) {
+      showToast('⚠️ Kuantitas harus lebih dari 0.');
+      return;
+    }
+    if (price < 0) {
+      showToast('⚠️ Harga satuan tidak boleh negatif.');
+      return;
+    }
+
+    // Match against all catalog materials if exists
+    var matched = (_purchasingState.allItems || []).find(function (m) {
+      return m.material_name && m.material_name.toLowerCase() === name.toLowerCase();
+    });
+
+    var matId = matched ? matched.material_id : ('mat_adhoc_' + Date.now());
+    var matCode = matched ? matched.material_code : 'ADHOC';
+
+    _purchasingState.items.push({
+      material_id: matId,
+      material_name: name,
+      material_code: matCode,
+      base_uom_name: uom,
+      base_uom_code: uom,
+      current_stock: matched ? (matched.current_stock || 0) : 0,
+      minimum_quantity: 0,
+      is_low: false,
+      is_adhoc: !matched,
+      suggested_qty: qty,
+      buyQty: qty,
+      estimated_price: price,
+      actualUnitPrice: price,
+      has_price_update: false,
+      checked: true
+    });
+
+    closePurchasingAddCustomItemModal();
+    renderPurchasingList();
+    recalculatePurchasingSummary();
+    showToast('✓ "' + name + '" ditambahkan ke belanjaan.');
+  }
+  window.confirmPurchasingAddCustomItem = confirmPurchasingAddCustomItem;
+
+  /* =========================================================================
+     RECEIPT PHOTO (NOTA / STRUK) HANDLERS
+     ========================================================================= */
+  function onPurchasingReceiptPhotoSelected(inputEl) {
+    if (!inputEl || !inputEl.files || !inputEl.files[0]) return;
+    var file = inputEl.files[0];
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      _purchasingState.receiptPhotoUrl = e.target.result;
+      var previewWrap = $('preview-purchasing-receipt');
+      var previewImg = $('img-purchasing-receipt-preview');
+      var statusLabel = $('label-purchasing-receipt-status');
+      if (previewImg) previewImg.src = e.target.result;
+      if (previewWrap) previewWrap.style.display = 'flex';
+      if (statusLabel) {
+        statusLabel.textContent = '✓ Foto siap';
+        statusLabel.style.color = '#059669';
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+  window.onPurchasingReceiptPhotoSelected = onPurchasingReceiptPhotoSelected;
+
+  function clearPurchasingReceiptPhoto() {
+    _purchasingState.receiptPhotoUrl = null;
+    var fileInput = $('input-purchasing-receipt-photo');
+    if (fileInput) fileInput.value = '';
+    var previewWrap = $('preview-purchasing-receipt');
+    if (previewWrap) previewWrap.style.display = 'none';
+    var statusLabel = $('label-purchasing-receipt-status');
+    if (statusLabel) {
+      statusLabel.textContent = 'Belum ada foto';
+      statusLabel.style.color = '#64748b';
+    }
+  }
+  window.clearPurchasingReceiptPhoto = clearPurchasingReceiptPhoto;
 
   var _pendingSettlePayload = null;
 
@@ -509,7 +789,10 @@
       return {
         material_id: itm.material_id,
         quantity: itm.buyQty,
-        unit_price: itm.actualUnitPrice
+        unit_price: itm.actualUnitPrice,
+        material_name: itm.material_name,
+        name: itm.material_name,
+        base_uom_name: itm.base_uom_name
       };
     });
 
@@ -544,6 +827,18 @@
     if (changeEl) {
       changeEl.textContent = changeDue >= 0 ? formatMoney(changeDue) : '- ' + formatMoney(Math.abs(changeDue));
       changeEl.style.color = changeDue >= 0 ? '#059669' : '#dc2626';
+    }
+
+    // Peringatan jika ada item yang tidak tercentang
+    var uncheckedWarning = $('settle-confirm-unchecked-warning');
+    var uncheckedCountEl = $('settle-confirm-unchecked-count');
+    if (uncheckedWarning && uncheckedCountEl) {
+      if (unboughtCount > 0) {
+        uncheckedCountEl.textContent = unboughtCount;
+        uncheckedWarning.style.display = 'block';
+      } else {
+        uncheckedWarning.style.display = 'none';
+      }
     }
 
     if (sumEl) {
@@ -606,13 +901,15 @@
           mandate_id: payload.mandate_id,
           cash_advance: payload.cash_advance,
           items: payload.items,
-          notes: payload.notes || 'Belanja Pasar'
+          notes: payload.notes || 'Belanja Pasar',
+          receipt_photo_url: _purchasingState.receiptPhotoUrl
         })
       });
       var data = await res.json();
 
       if (res.ok && data.success) {
         closePurchasingSettleConfirmModal();
+        clearPurchasingReceiptPhoto();
         if (typeof showToast === 'function') {
           showToast('🛒 Belanja berhasil dicatat! Stok bahan baku telah ditambahkan.');
         }
@@ -1772,6 +2069,16 @@
     var modalPriceInput = $('input-purchasing-modal-price');
     if (modalPriceInput) {
       setupCurrencyInputAutoDot(modalPriceInput);
+    }
+
+    var advanceAmountInput = $('input-purchasing-request-advance-amount');
+    if (advanceAmountInput) {
+      setupCurrencyInputAutoDot(advanceAmountInput);
+    }
+
+    var addCustomPriceInput = $('input-purchasing-add-price');
+    if (addCustomPriceInput) {
+      setupCurrencyInputAutoDot(addCustomPriceInput);
     }
 
     loadBrandLogoForPurchasing();

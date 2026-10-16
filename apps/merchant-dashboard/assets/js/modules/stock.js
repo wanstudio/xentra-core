@@ -2483,6 +2483,13 @@
             '</tbody>' +
           '</table>' +
         '</div>' +
+        (sess.receipt_photo_url ?
+          '<div style="margin-top:10px; padding-top:10px; border-top:1px dashed #E2E8F0; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">' +
+            '<span style="font-size:12px; font-weight:700; color:#475569;">📷 Bukti Struk / Nota:</span>' +
+            '<a href="' + escapeHtml(sess.receipt_photo_url) + '" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:700; color:#2563EB; text-decoration:none; background:#EFF6FF; border:1px solid #BFDBFE; padding:4px 10px; border-radius:6px;">' +
+              '<span>Lihat Foto Struk</span> ↗' +
+            '</a>' +
+          '</div>' : '') +
       '</div>';
     }).join('');
 
