@@ -554,10 +554,12 @@
             if (prefix === 'm' || prefix === 'merchant') return '/merchant/';
             return protocol + '//m.' + baseDomain + '/merchant/';
           }
-          // Owner / Brand Manager -> Owner Dashboard
+          // Owner / Brand Manager -> Dedicated Owner Surface (/owner/) on Mobile / APK, /dashboard/ on Desktop
           if (role === 'owner' || role === 'brand_manager') {
-            if (prefix === 'm' || prefix === 'merchant') return '/dashboard/';
-            return protocol + '//m.' + baseDomain + '/dashboard/';
+            var isMobile = window.innerWidth <= 1024 || !!(window.XentraNative || window.XentraOwnerBridge || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent));
+            var targetOwnerPath = isMobile ? '/owner/' : '/dashboard/';
+            if (prefix === 'owner' || prefix === 'm' || prefix === 'merchant') return targetOwnerPath;
+            return protocol + '//m.' + baseDomain + targetOwnerPath;
           }
           // Driver -> Driver App
           if (role === 'driver') {
@@ -1144,6 +1146,7 @@
           googleStatus.style.display = 'block';
         }
 
+        var loginSucceeded = false;
         fetch('/api/v1/auth/google', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1151,6 +1154,7 @@
         }).then(function (res) {
           return res.json().then(function (data) {
             if (res.ok && data && data.success && data.token) {
+              loginSucceeded = true;
               var validation = validateSubdomainRole(data.user);
               if (!validation.allowed) {
                 showRoleMismatchError(validation);
@@ -1162,18 +1166,29 @@
                 localStorage.setItem(USER_KEY, JSON.stringify(data.user));
                 localStorage.setItem('user', JSON.stringify(data.user));
               }
+
+              // Synchronize token to Native Android Bridge if present
+              if (window.XentraOwnerBridge && typeof window.XentraOwnerBridge.syncAuth === 'function') {
+                window.XentraOwnerBridge.syncAuth(data.token, (data.user && data.user.branch_id) || '');
+              }
+              if (window.XentraNative && typeof window.XentraNative.syncAuth === 'function') {
+                window.XentraNative.syncAuth(data.token, (data.user && data.user.branch_id) || '');
+              }
+
               if (googleStatus) {
-                googleStatus.textContent = 'Login Google berhasil! Mengalihkan...';
+                googleStatus.textContent = 'Login Google berhasil! Mengalihkan ke Home...';
                 googleStatus.style.color = '#166534';
+                googleStatus.style.display = 'block';
               }
               setTimeout(function () {
-                window.location.href = postLoginTarget(data, data.redirect_url || data.landing || '/dashboard/');
+                window.location.href = postLoginTarget(data, data.redirect_url || data.landing || '/owner/');
               }, 250);
               return;
             }
             var msg;
             if (res.status === 404 && data && data.code === 'ACCOUNT_NOT_LINKED') {
-              msg = '⚠️ Akun Google ini belum terhubung ke akun Mybangjo. Silakan hubungi administrator atau masuk menggunakan username dan password.';
+              var attemptedEmail = (data && data.google && data.google.email) ? ' (' + data.google.email + ')' : '';
+              msg = '⚠️ Akun Google' + attemptedEmail + ' belum terdaftar atau terhubung di Mybangjo. Silakan masuk menggunakan username dan password terlebih dahulu, atau hubungi Owner.';
             } else if (res.status === 403 && data && data.code === 'ACCOUNT_DISABLED') {
               msg = '❌ Akun ini telah dinonaktifkan. Hubungi administrator.';
             } else {
@@ -1187,7 +1202,7 @@
           errorBox.style.display = 'block';
         }).finally(function () {
           isGoogleAuthenticating = false;
-          if (googleStatus) googleStatus.style.display = 'none';
+          if (googleStatus && !loginSucceeded) googleStatus.style.display = 'none';
         });
       }
 
@@ -1226,7 +1241,8 @@
           if (!isPlatform) {
             e.preventDefault();
             var currentOrigin = window.location.origin;
-            var returnUrl = currentOrigin + '/login' + (posTerminalSetupRequested ? '?pos_terminal_setup=1' : '');
+            var returnUrl = currentOrigin + '/login';
+            if (posTerminalSetupRequested) returnUrl += '?pos_terminal_setup=1';
             var redirectTarget = 'https://xentra.cloud/auth/broker?return_to=' + encodeURIComponent(returnUrl);
             if (claimDomain) {
               redirectTarget += '&claim_domain=' + encodeURIComponent(claimDomain);
@@ -1245,17 +1261,19 @@
         // Platform Web context: render Google Web GSI button
         if (btnGoogleLogin) btnGoogleLogin.style.display = 'none';
 
+        function handlePlatformGoogleCredential(response) {
+          if (response && response.credential) {
+            handleGoogleCredential(response.credential);
+          }
+        }
+
         function initPlatformGoogleSignIn(clientId) {
           cachedGoogleClientId = clientId;
           if (!clientId || !window.google || !window.google.accounts || !window.google.accounts.id) return;
           try {
             window.google.accounts.id.initialize({
               client_id: clientId,
-              callback: function (response) {
-                if (response && response.credential) {
-                  handleGoogleCredential(response.credential);
-                }
-              },
+              callback: handlePlatformGoogleCredential,
               auto_select: false,
               cancel_on_tap_outside: true
             });

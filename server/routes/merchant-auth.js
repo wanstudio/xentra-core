@@ -982,7 +982,7 @@ module.exports = function registerMerchantAuthRoutes(router, deps) {
         return res.status(404).json({
           success: false,
           code: 'ACCOUNT_NOT_LINKED',
-          error: 'Akun Google belum terhubung ke akun Xentra.',
+          error: `Akun Google (${verifiedClaims.email || 'tersebut'}) belum terhubung ke akun Mybangjo. Silakan masuk menggunakan username & password terlebih dahulu, lalu hubungkan akun Google di menu profil.`,
           google: {
             sub: verifiedClaims.sub,
             email: verifiedClaims.email,
@@ -1091,6 +1091,7 @@ module.exports = function registerMerchantAuthRoutes(router, deps) {
       const responsePayload = {
         success: true,
         token,
+        landing: resolveLanding(user.role),
         expires_at: new Date(expiresAt).toISOString(),
         user: {
           id: user.id,
