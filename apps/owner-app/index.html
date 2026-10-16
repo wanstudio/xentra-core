@@ -2757,10 +2757,10 @@
               Stok Menu di Cabang
             </button>
             <button type="button" class="x-subnav-tab" id="btn-subtab-stock-replenishment" data-subtab="replenishment" onclick="switchStockSubtab('replenishment')">
-              ⚡ Saran Belanja (Pengadaan)
+              📊 Monitoring Kebutuhan Cabang
             </button>
             <button type="button" class="x-subnav-tab" id="btn-subtab-stock-mandates" data-subtab="mandates" onclick="switchStockSubtab('mandates')">
-              📋 Tugas Belanja
+              📑 Approval PO Supplier
             </button>
             <button type="button" class="x-subnav-tab" id="btn-subtab-stock-recipes" data-subtab="recipes" onclick="switchStockSubtab('recipes')">
               Resep Masakan
@@ -2844,36 +2844,43 @@
             </div>
           </div>
 
-          <!-- SUBTAB CONTENT: SARAN BELANJA (PENGADAAN OTOMATIS BERBASIS RESEP) -->
+          <!-- SUBTAB CONTENT: MONITORING KEBUTUHAN BAHAN CABANG -->
           <div id="subtab-content-stock-replenishment" style="display:none;">
             <div style="margin-bottom:16px;">
-              <h3 style="margin:0 0 4px 0; font-size:16px; font-weight:700; color:#0F172A;">Rekomendasi Pembelian Bahan Baku</h3>
-              <p style="margin:0; font-size:13px; color:#64748B;">Daftar bahan baku yang perlu segera dibeli berdasarkan sisa stok dan kebutuhan menu.</p>
+              <h3 style="margin:0 0 4px 0; font-size:16px; font-weight:700; color:#0F172A;">Monitoring Kebutuhan Bahan Cabang</h3>
+              <p style="margin:0; font-size:13px; color:#64748B;">Pantau ringkasan bahan baku yang menipis atau habis di cabang. Belanja segar harian dieksekusi mandiri oleh tim cabang lewat menu Belanja Pasar di Merchant App menggunakan Kasbon Harian.</p>
+            </div>
+
+            <div style="background:#EFF6FF; border:1px solid #BFDBFE; border-radius:12px; padding:12px 16px; margin-bottom:14px; display:flex; align-items:flex-start; gap:12px;">
+              <span style="font-size:20px; line-height:1;">💡</span>
+              <div style="font-size:12.5px; color:#1E40AF; line-height:1.5;">
+                <strong>Operasional Mandiri Cabang:</strong> Daftar kebutuhan bahan segar harian otomatis masuk ke <em>Checklist Belanja Pasar</em> di <strong>Merchant App</strong> cabang masing-masing. Staf cabang berbelanja langsung di pasar menggunakan <strong>Kasbon Harian</strong> (pagu Rp 500.000). Owner cukup memantau rekap defisit bahan di sini atau menyetujui jika ada pengajuan over-kasbon lewat notifikasi lonceng.
+              </div>
             </div>
 
             <div class="x-owner-stock-panel" style="background:#FFFFFF; border-radius:12px; border:1px solid #E2E8F0; padding:16px;">
               <div style="margin-bottom:14px;">
-                <input type="search" id="input-search-replenishment" class="x-input" placeholder="🔍 Cari bahan yang mau dibeli..." oninput="onReplenishmentSearchInput(this.value)" autocomplete="off" style="width:100%; font-size:13px; padding:9px 14px; border-radius:8px;">
+                <input type="search" id="input-search-replenishment" class="x-input" placeholder="🔍 Cari nama bahan yang menipis..." oninput="onReplenishmentSearchInput(this.value)" autocomplete="off" style="width:100%; font-size:13px; padding:9px 14px; border-radius:8px;">
               </div>
               <div id="owner-replenishment-suggestions-container">
-                <div class="x-owner-stock-loading">Memuat rekomendasi belanja...</div>
+                <div class="x-owner-stock-loading">Memeriksa stok bahan belanjaan...</div>
               </div>
             </div>
           </div>
 
-          <!-- SUBTAB CONTENT: TUGAS BELANJA (PENGADAAN PASAR CABANG) -->
+          <!-- SUBTAB CONTENT: APPROVAL PO SUPPLIER -->
           <div id="subtab-content-stock-mandates" style="display:none;">
             <div style="margin-bottom:16px;">
-              <h3 style="margin:0 0 4px 0; font-size:16px; font-weight:700; color:#0F172A;">Daftar Tugas Belanja</h3>
-              <p style="margin:0; font-size:13px; color:#64748B;">Pantau dan atur daftar belanjaan serta uang yang dibawa staf ke pasar.</p>
+              <h3 style="margin:0 0 4px 0; font-size:16px; font-weight:700; color:#0F172A;">Approval Purchase Order (PO) Supplier</h3>
+              <p style="margin:0; font-size:13px; color:#64748B;">Review dan persetujuan pesanan bahan kering / partai besar dari cabang ke distributor & vendor resmi.</p>
             </div>
 
             <div class="x-owner-stock-panel" style="background:#FFFFFF; border-radius:12px; border:1px solid #E2E8F0; padding:16px;">
               <div style="margin-bottom:14px;">
-                <input type="search" id="input-search-mandates" class="x-input" placeholder="🔍 Cari nomor tugas, catatan, atau item belanja..." oninput="onMandatesSearchInput(this.value)" autocomplete="off" style="width:100%; font-size:13px; padding:9px 14px; border-radius:8px;">
+                <input type="search" id="input-search-mandates" class="x-input" placeholder="🔍 Cari nomor PO, supplier, atau cabang tujuan..." oninput="onMandatesSearchInput(this.value)" autocomplete="off" style="width:100%; font-size:13px; padding:9px 14px; border-radius:8px;">
               </div>
               <div id="owner-mandates-list-container">
-                <div class="x-owner-stock-loading">Memuat daftar tugas belanja...</div>
+                <div class="x-owner-stock-loading">Memuat daftar PO supplier...</div>
               </div>
             </div>
           </div>

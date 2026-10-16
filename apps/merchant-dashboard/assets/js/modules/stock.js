@@ -598,15 +598,11 @@
       return;
     }
 
-    var selectedItems = allSuggestions.filter(function (s) {
-      return _selectedReplenishmentIds.has(s.material_id);
-    });
-    var currentSelectedCost = selectedItems.reduce(function (sum, s) {
+    var totalCost = suggestions.reduce(function (sum, s) {
       return sum + Number(s.estimated_cost || 0);
     }, 0);
 
     var cardsHtml = suggestions.map(function (s) {
-      var isChecked = _selectedReplenishmentIds.has(s.material_id);
       var purchaseQty = s.recommended_purchase_packs || 1;
       var purchaseUnit = escapeHtml(s.purchase_uom_name || s.base_uom_name || 'Unit');
       var retailCost = Number(s.estimated_cost || 0);
@@ -616,21 +612,22 @@
         ? '<span style="font-size:11px; font-weight:800; background:#FEE2E2; color:#991B1B; padding:3px 8px; border-radius:6px;">🚨 Habis</span>'
         : '<span style="font-size:11px; font-weight:700; background:#FEF3C7; color:#92400E; padding:3px 8px; border-radius:6px;">🟡 Menipis</span>';
 
-      return '<div style="background:#FFFFFF; border:1.5px solid ' + (isChecked ? '#059669' : '#E2E8F0') + '; border-radius:12px; padding:14px 16px; margin-bottom:10px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; box-shadow:' + (isChecked ? '0 2px 8px rgba(5,150,105,0.08)' : 'none') + ';" onclick="toggleReplenishmentItem(\'' + escapeHtml(s.material_id) + '\')">' +
+      return '<div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:12px; padding:14px 18px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; box-shadow:0 1px 3px rgba(0,0,0,0.02);">' +
         '<div style="display:flex; align-items:center; gap:12px;">' +
-          '<div style="width:22px; height:22px; border-radius:6px; border:2px solid ' + (isChecked ? '#059669' : '#cbd5e1') + '; background:' + (isChecked ? '#059669' : '#ffffff') + '; display:flex; align-items:center; justify-content:center;">' +
-            '<svg viewBox="0 0 12 12" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:13px; height:13px; display:' + (isChecked ? 'block' : 'none') + ';"><polyline points="2 6 4.5 9 10 3"></polyline></svg>' +
+          '<div style="width:38px; height:38px; border-radius:10px; background:#F8FAFC; border:1px solid #E2E8F0; display:flex; align-items:center; justify-content:center; font-size:20px;">' +
+            (isDirectOut ? '🚨' : '🥬') +
           '</div>' +
           '<div>' +
             '<div style="display:flex; align-items:center; gap:8px;">' +
               '<strong style="font-size:15px; color:#0F172A;">' + escapeHtml(s.material_name) + '</strong>' +
               priorityBadge +
             '</div>' +
+            '<div style="font-size:12px; color:#64748B; margin-top:2px;">Sisa stok: <strong style="color:#0F172A;">' + (s.current_stock || 0) + ' ' + purchaseUnit + '</strong> (Batas min: ' + (s.minimum_stock || 0) + ' ' + purchaseUnit + ')</div>' +
           '</div>' +
         '</div>' +
         '<div style="display:flex; align-items:center; gap:16px;">' +
           '<div style="text-align:right;">' +
-            '<div style="font-size:11px; color:#64748B; font-weight:600; text-transform:uppercase;">Saran Belanja:</div>' +
+            '<div style="font-size:11px; color:#64748B; font-weight:600; text-transform:uppercase;">Kebutuhan Belanja:</div>' +
             '<strong style="font-size:17px; color:#059669;">' + purchaseQty + ' ' + purchaseUnit + '</strong>' +
           '</div>' +
           (retailCost > 0 ? (
@@ -643,27 +640,14 @@
       '</div>';
     }).join('');
 
-    var isAllSelected = selectedItems.length === suggestions.length && suggestions.length > 0;
-    var summaryHeader = '<div style="background:#F1F5F9; border-radius:12px; padding:12px 16px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">' +
-      '<div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">' +
-        '<div onclick="toggleAllReplenishmentItems(' + (!isAllSelected) + ')" style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; font-weight:700; color:#1E293B;">' +
-          '<div style="width:22px; height:22px; border-radius:6px; border:2px solid ' + (isAllSelected ? '#059669' : '#cbd5e1') + '; background:' + (isAllSelected ? '#059669' : '#ffffff') + '; display:flex; align-items:center; justify-content:center; box-shadow:' + (isAllSelected ? '0 2px 4px rgba(5, 150, 105, 0.2)' : 'none') + '; transition:all 0.16s ease;">' +
-            '<svg viewBox="0 0 12 12" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:13px; height:13px; display:' + (isAllSelected ? 'block' : 'none') + ';">' +
-              '<polyline points="2 6 4.5 9 10 3"></polyline>' +
-            '</svg>' +
-          '</div>' +
-          '<span>Pilih Semua</span>' +
-        '</div>' +
-        '<span style="color:#CBD5E1;">|</span>' +
-        '<div>' +
-          '<div style="font-size:12px; color:#64748B;" id="replenishment-selected-count">' + selectedItems.length + ' dari ' + suggestions.length + ' bahan dipilih</div>' +
-          '<div style="font-size:16px; font-weight:800; color:#0F172A;">Estimasi Belanja: <span id="replenishment-selected-cost">' + formatMoney(currentSelectedCost) + '</span></div>' +
-        '</div>' +
+    var summaryHeader = '<div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:14px 18px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">' +
+      '<div>' +
+        '<div style="font-size:11.5px; color:#64748B; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Ringkasan Kebutuhan Cabang</div>' +
+        '<div style="font-size:16px; font-weight:800; color:#0F172A; margin-top:2px;">' + suggestions.length + ' Bahan Baku Perlu Pengadaan</div>' +
       '</div>' +
-      '<div style="display:flex; gap:8px;">' +
-        '<button type="button" class="x-btn-primary" id="btn-release-mandate-action" onclick="releaseMandateFromSuggestions()" ' + (selectedItems.length === 0 ? 'disabled style="opacity:0.5; padding:8px 16px; font-size:13px; font-weight:700; border-radius:10px; background:#059669; border-color:#059669; cursor:not-allowed;"' : 'style="padding:8px 16px; font-size:13px; font-weight:700; border-radius:10px; background:#059669; border-color:#059669; cursor:pointer;"') + '>' +
-          '📋 Rilis Tugas Belanja ke Staf (' + selectedItems.length + ' Bahan)' +
-        '</button>' +
+      '<div style="text-align:right;">' +
+        '<div style="font-size:11.5px; color:#64748B; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Estimasi Total Belanja</div>' +
+        '<div style="font-size:18px; font-weight:800; color:#059669; margin-top:2px;">' + formatMoney(totalCost) + '</div>' +
       '</div>' +
     '</div>';
 
@@ -744,6 +728,7 @@
   /* =========================================================================
      MANDAT BELANJA (PURCHASING MANDATES): LIST, EDIT, ARCHIVE, DELETE
      ========================================================================= */
+  var _ownerPurchaseOrders = [];
   var _ownerMandatesList = [];
   var _ownerMandatesQuery = '';
 
@@ -765,31 +750,40 @@
   window.onMandatesSearchInput = onMandatesSearchInput;
 
   function applyMandatesFilterAndRender() {
-    // Tab ini murni hanya menampilkan tugas yang sedang berjalan atau masih ada item belum dibeli.
-    // Tugas yang 100% tuntas langsung berpindah ke Laporan & Riwayat Belanja.
-    var list = _ownerMandatesList.filter(function (m) {
+    var query = _ownerMandatesQuery || '';
+    var filteredPos = _ownerPurchaseOrders;
+    if (query) {
+      filteredPos = _ownerPurchaseOrders.filter(function (po) {
+        var num = (po.po_number || '').toLowerCase();
+        var sup = (po.supplier_name || '').toLowerCase();
+        var dest = (po.destination_name || '').toLowerCase();
+        var st = (po.status || '').toLowerCase();
+        return num.includes(query) || sup.includes(query) || dest.includes(query) || st.includes(query);
+      });
+    }
+
+    var filteredMandates = _ownerMandatesList.filter(function (m) {
       return isMandateActive(m);
     });
-
-    if (_ownerMandatesQuery) {
-      list = list.filter(function (m) {
+    if (query) {
+      filteredMandates = filteredMandates.filter(function (m) {
         var num = (m.mandate_number || '').toLowerCase();
         var notes = (m.notes || '').toLowerCase();
         var status = (m.status || '').toLowerCase();
         var itemsMatch = (m.items || []).some(function (itm) {
-          return (itm.material_name || '').toLowerCase().includes(_ownerMandatesQuery);
+          return (itm.material_name || '').toLowerCase().includes(query);
         });
-        return num.includes(_ownerMandatesQuery) || notes.includes(_ownerMandatesQuery) || status.includes(_ownerMandatesQuery) || itemsMatch;
+        return num.includes(query) || notes.includes(query) || status.includes(query) || itemsMatch;
       });
     }
 
-    renderOwnerMandatesList(list);
+    renderOwnerMandatesList(filteredPos, filteredMandates);
   }
 
   async function loadOwnerMandates() {
     var container = $('owner-mandates-list-container');
     if (container) {
-      container.innerHTML = '<div class="x-owner-stock-loading">Memuat daftar mandat belanja...</div>';
+      container.innerHTML = '<div class="x-owner-stock-loading">Memuat daftar Purchase Order (PO) supplier...</div>';
     }
 
     var branchId = getEffectiveBranchId();
@@ -798,129 +792,201 @@
     }
 
     try {
-      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/mandates', {
+      var poPromise = adminFetch(API_BASE + '/admin/inventory-workflow/context', {
         headers: getAuthHeaders()
-      });
-      var data = await res.json();
+      }).then(function (r) { return r.json(); }).catch(function () { return null; });
 
-      if (res.ok && data.success) {
-        _ownerMandatesList = data.mandates || [];
-        applyMandatesFilterAndRender();
+      var mandPromise = adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/mandates', {
+        headers: getAuthHeaders()
+      }).then(function (r) { return r.json(); }).catch(function () { return null; });
+
+      var results = await Promise.all([poPromise, mandPromise]);
+      var poData = results[0];
+      var mandData = results[1];
+
+      if (poData && poData.success && poData.data) {
+        _ownerPurchaseOrders = poData.data.purchase_orders || [];
       } else {
-        if (container) {
-          container.innerHTML = '<div class="x-owner-stock-error" style="color:#DC2626; padding:16px;">Gagal memuat mandat: ' + escapeHtml(data.error || 'Server error') + '</div>';
-        }
+        _ownerPurchaseOrders = [];
       }
+
+      if (mandData && mandData.success) {
+        _ownerMandatesList = mandData.mandates || [];
+      } else {
+        _ownerMandatesList = [];
+      }
+
+      applyMandatesFilterAndRender();
     } catch (err) {
       if (container) {
-        container.innerHTML = '<div class="x-owner-stock-error" style="color:#DC2626; padding:16px;">Gangguan jaringan saat memuat mandat belanja.</div>';
+        container.innerHTML = '<div class="x-owner-stock-error" style="color:#DC2626; padding:16px;">Gangguan jaringan saat memuat daftar PO supplier.</div>';
       }
     }
   }
   window.loadOwnerMandates = loadOwnerMandates;
 
-  function renderOwnerMandatesList(mandates) {
+  async function approvePurchaseOrder(poId) {
+    if (!confirm('Setujui Purchase Order ini dan teruskan ke vendor?')) return;
+    try {
+      var res = await adminFetch(API_BASE + '/admin/inventory-workflow/purchase-orders/' + encodeURIComponent(poId) + '/order', {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        showToast('✅ Purchase Order #' + (data.purchase_order ? (data.purchase_order.po_number || poId) : poId) + ' berhasil disetujui & dipesan ke vendor!', 'success');
+        loadOwnerMandates();
+      } else {
+        showToast('Gagal menyetujui PO: ' + (data.message || data.error || 'Terjadi kesalahan'), 'error');
+      }
+    } catch (err) {
+      showToast('Gangguan jaringan saat memproses approval PO.', 'error');
+    }
+  }
+  window.approvePurchaseOrder = approvePurchaseOrder;
+
+  function renderOwnerMandatesList(purchaseOrders, mandates) {
     var container = $('owner-mandates-list-container');
     if (!container) return;
 
-    if (!mandates || !mandates.length) {
+    var pos = purchaseOrders || [];
+    var mands = mandates || [];
+
+    if (!pos.length && !mands.length) {
       if (_ownerMandatesQuery) {
         container.innerHTML = '<div class="text-center py-10 text-muted" style="padding:32px 16px;">' +
           '<div style="font-size:32px; margin-bottom:8px;">🔍</div>' +
-          '<div style="font-size:15px; font-weight:700; color:#1E293B;">Tidak Ada Tugas yang Cocok</div>' +
-          '<p style="font-size:13px; color:#64748B; margin-top:4px;">Tidak ditemukan tugas belanja aktif dengan kata kunci "' + escapeHtml(_ownerMandatesQuery) + '"</p>' +
+          '<div style="font-size:15px; font-weight:700; color:#1E293B;">Tidak Ditemukan</div>' +
+          '<p style="font-size:13px; color:#64748B; margin-top:4px;">Tidak ditemukan data pesanan atau PO dengan kata kunci "' + escapeHtml(_ownerMandatesQuery) + '"</p>' +
         '</div>';
         return;
       }
 
       container.innerHTML = '<div class="text-center py-10 text-muted" style="padding:36px 16px; background:#F8FAFC; border-radius:12px; border:1px dashed #CBD5E1;">' +
-        '<div style="font-size:36px; margin-bottom:8px;">🎉</div>' +
-        '<div style="font-size:16px; font-weight:700; color:#0F172A;">Tidak Ada Tugas Belanja Berjalan</div>' +
+        '<div style="font-size:36px; margin-bottom:8px;">📦</div>' +
+        '<div style="font-size:16px; font-weight:700; color:#0F172A;">Belum Ada Purchase Order (PO) Supplier</div>' +
         '<p style="font-size:13px; max-width:480px; margin:6px auto 16px auto; color:#64748B; line-height:1.5;">' +
-          'Semua daftar belanja yang selesai otomatis tercatat di <strong>Laporan &amp; Riwayat Belanja</strong>. ' +
-          'Belanjaan baru dapat ditugaskan melalui tab <strong>Saran Belanja</strong>.' +
+          'Pesanan bahan kering partai besar diajukan oleh cabang melalui tab PO Supplier di Merchant App. Di sini Owner meninjau dan memberikan persetujuan (approval) sebelum diteruskan ke vendor resmi.' +
         '</p>' +
         '<div style="display:flex; justify-content:center; gap:8px; flex-wrap:wrap;">' +
-          '<button type="button" class="x-btn-primary" onclick="switchStockSubtab(\'history\')" style="padding:8px 16px; font-size:13px; font-weight:600; border-radius:8px; cursor:pointer;">' +
-            '🧾 Buka Laporan &amp; Riwayat Belanja' +
-          '</button>' +
-          '<button type="button" class="x-btn-secondary" onclick="switchStockSubtab(\'replenishment\')" style="padding:8px 16px; font-size:13px; font-weight:600; border-radius:8px; cursor:pointer;">' +
-            '⚡ Buat Tugas Belanja Baru' +
+          '<button type="button" class="x-btn-primary" onclick="switchStockSubtab(\'suppliers\')" style="padding:8px 16px; font-size:13px; font-weight:600; border-radius:8px; cursor:pointer;">' +
+            '🏢 Kelola Bank Data Supplier' +
           '</button>' +
         '</div>' +
       '</div>';
       return;
     }
 
-    var html = mandates.map(function (m) {
-      var statusBadge = '';
-      var hasUnpurchased = mandateHasUnpurchasedItems(m);
-      if (m.status === 'RELEASED') {
-        statusBadge = '<span class="x-badge" style="background:#FEF3C7; color:#92400E; font-weight:700;">AKTIF (DI PASAR)</span>';
-      } else if (m.status === 'COMPLETED') {
-        if (hasUnpurchased) {
-          statusBadge = '<span class="x-badge" style="background:#FEF3C7; color:#B45309; font-weight:700;">SELESAI SEBAGIAN (ADA SISA BELUM DIBELI)</span>';
-        } else {
-          statusBadge = '<span class="x-badge" style="background:#D1FAE5; color:#065F46; font-weight:700;">100% SELESAI BELANJA</span>';
-        }
-      } else if (m.status === 'ARCHIVED') {
-        statusBadge = '<span class="x-badge" style="background:#F1F5F9; color:#64748B; font-weight:700;">DIARSIPKAN</span>';
-      } else {
-        statusBadge = '<span class="x-badge" style="background:#E2E8F0; color:#334155; font-weight:700;">' + escapeHtml(m.status) + '</span>';
-      }
+    var posHtml = '';
+    if (pos.length > 0) {
+      posHtml = '<div style="margin-bottom:20px;">' +
+        '<div style="font-size:13px; font-weight:700; color:#334155; margin-bottom:10px; display:flex; align-items:center; gap:6px;">' +
+          '<span>📑 Purchase Order Supplier (' + pos.length + ')</span>' +
+        '</div>' +
+        pos.map(function (po) {
+          var statusBadge = '';
+          var isDraft = po.status === 'DRAFT';
+          if (isDraft) {
+            statusBadge = '<span class="x-badge" style="background:#FEF3C7; color:#92400E; font-weight:800; padding:4px 8px; border-radius:6px;">⏳ Menunggu Approval Owner</span>';
+          } else if (po.status === 'APPROVED') {
+            statusBadge = '<span class="x-badge" style="background:#E0E7FF; color:#3730A3; font-weight:800; padding:4px 8px; border-radius:6px;">✓ Disetujui (Siap Kirim)</span>';
+          } else if (po.status === 'ORDERED') {
+            statusBadge = '<span class="x-badge" style="background:#DBEAFE; color:#1E40AF; font-weight:800; padding:4px 8px; border-radius:6px;">🚚 Dipesan ke Vendor</span>';
+          } else if (po.status === 'PARTIALLY_RECEIVED') {
+            statusBadge = '<span class="x-badge" style="background:#FED7AA; color:#9A3412; font-weight:800; padding:4px 8px; border-radius:6px;">📦 Sebagian Diterima</span>';
+          } else if (po.status === 'COMPLETED') {
+            statusBadge = '<span class="x-badge" style="background:#D1FAE5; color:#065F46; font-weight:800; padding:4px 8px; border-radius:6px;">✓ Selesai Diterima Cabang</span>';
+          } else {
+            statusBadge = '<span class="x-badge" style="background:#F1F5F9; color:#475569; font-weight:800; padding:4px 8px; border-radius:6px;">' + escapeHtml(po.status || '') + '</span>';
+          }
 
-      var itemsListHtml = (m.items || []).map(function (itm) {
-        var isPurchased = Boolean(itm.is_purchased);
-        return '<div style="display:flex; align-items:center; gap:8px; font-size:12.5px; padding:6px 8px; border-bottom:1px dashed #E2E8F0;' + (isPurchased ? ' opacity:0.85;' : ' background:#FFFBEB; border-radius:6px; margin:2px 0;') + '">' +
-          (isPurchased
-            ? '<span style="color:#059669; font-weight:800; font-size:15px; width:20px; text-align:center; flex-shrink:0;">✓</span>'
-            : '<span style="color:#D97706; font-weight:800; font-size:15px; width:20px; text-align:center; flex-shrink:0;">⚠️</span>') +
-          '<div style="flex:1; min-width:0;">' +
-            '<strong style="' + (isPurchased ? 'text-decoration:line-through; color:#475569;' : 'color:#0F172A;') + '">' + escapeHtml(itm.material_name) + '</strong>' +
-            ' <span style="color:#64748B;">(' + itm.target_quantity + ' ' + escapeHtml(itm.base_uom_code || '') + ')</span>' +
-          '</div>' +
-          '<div style="flex-shrink:0;">' +
-            (isPurchased
-              ? '<span style="color:#059669; font-weight:700; font-size:11.5px;">✓ Terbeli (' + itm.purchased_quantity + ' ' + escapeHtml(itm.base_uom_code || '') + ')</span>'
-              : '<span style="color:#B45309; background:#FEF3C7; padding:2px 6px; border-radius:4px; font-weight:700; font-size:11px;">⚠️ Belum Dibeli</span>') +
-          '</div>' +
-        '</div>';
-      }).join('');
+          var actionBtn = '';
+          if (isDraft) {
+            actionBtn = '<div style="margin-top:12px; display:flex; justify-content:flex-end;">' +
+              '<button type="button" class="x-btn-primary" onclick="approvePurchaseOrder(\'' + po.id + '\')" style="background:#059669; border-color:#059669; font-weight:800; font-size:12.5px; padding:7px 16px; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">' +
+                '<span>✓</span> Setujui &amp; Order ke Vendor' +
+              '</button>' +
+            '</div>';
+          }
 
-      var canEdit = m.status === 'RELEASED';
-      var actionButtons = '<div style="display:flex; gap:6px; margin-top:12px; flex-wrap:wrap;">';
-      if (canEdit) {
-        actionButtons += '<button type="button" class="x-btn-secondary" onclick="openEditMandateModal(\'' + m.id + '\')" style="padding:5px 10px; font-size:12px; font-weight:600; border-radius:6px; cursor:pointer;">✏️ Edit Tugas</button>';
-      }
-      if (m.status !== 'ARCHIVED') {
-        actionButtons += '<button type="button" class="x-btn-secondary" onclick="archiveMandate(\'' + m.id + '\')" style="padding:5px 10px; font-size:12px; font-weight:600; border-radius:6px; cursor:pointer;">📁 Arsipkan</button>';
-      }
-      actionButtons += '<button type="button" class="x-btn-secondary" onclick="deleteMandate(\'' + m.id + '\')" style="padding:5px 10px; font-size:12px; font-weight:600; border-radius:6px; color:#DC2626; border-color:#FCA5A5; cursor:pointer;">🗑️ Hapus Permanen</button>';
-      actionButtons += '</div>';
-
-      return '<div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:12px; padding:16px; margin-bottom:12px;">' +
-        '<div style="display:flex; justify-content:space-between; align-items:start; flex-wrap:wrap; gap:8px;">' +
-        '<div>' +
-            '<div style="display:flex; align-items:center; gap:8px;">' +
-              '<strong style="font-size:15px; color:#0F172A;">Tugas #' + escapeHtml(m.mandate_number) + '</strong>' +
-              statusBadge +
+          return '<div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:12px; padding:16px; margin-bottom:12px; box-shadow:0 1px 3px rgba(0,0,0,0.02);">' +
+            '<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">' +
+              '<div>' +
+                '<div style="display:flex; align-items:center; gap:8px;">' +
+                  '<strong style="font-size:15px; color:#0F172A;">PO #' + escapeHtml(po.po_number || po.id) + '</strong>' +
+                  statusBadge +
+                '</div>' +
+                '<div style="font-size:13px; color:#334155; margin-top:4px;">Vendor: <strong>' + escapeHtml(po.supplier_name || 'Supplier') + '</strong> | Tujuan: <strong>' + escapeHtml(po.destination_name || 'Cabang') + '</strong></div>' +
+                '<div style="font-size:11.5px; color:#64748B; margin-top:2px;">Diajukan: ' + (po.created_at ? new Date(po.created_at).toLocaleString('id-ID') : '—') + ' (' + (po.line_count || 1) + ' jenis bahan)</div>' +
+              '</div>' +
+              '<div style="text-align:right;">' +
+                '<div style="font-size:11px; color:#64748B; font-weight:600; text-transform:uppercase;">Total Nilai PO:</div>' +
+                '<strong style="font-size:16px; color:#059669;">' + formatMoney(po.ordered_value || 0) + '</strong>' +
+              '</div>' +
             '</div>' +
-            '<div style="font-size:12px; color:#64748B; margin-top:4px;">Dibuat: ' + (m.created_at ? new Date(m.created_at).toLocaleString('id-ID') : '—') + (m.notes ? ' | ' + escapeHtml(m.notes) : '') + '</div>' +
-          '</div>' +
-          '<div style="text-align:right;">' +
-            '<div style="font-size:11px; color:#64748B;">Uang Belanja:</div>' +
-            '<strong style="font-size:15px; color:#059669;">' + formatMoney(m.cash_advance || 0) + '</strong>' +
-          '</div>' +
-        '</div>' +
-        '<div style="margin-top:10px; background:#F8FAFC; border-radius:8px; padding:8px 12px;">' +
-          '<div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase; margin-bottom:4px;">Rincian Bahan Baku Ditugaskan:</div>' +
-          itemsListHtml +
-        '</div>' +
-        actionButtons +
+            actionBtn +
+          '</div>';
+        }).join('') +
       '</div>';
-    }).join('');
+    }
 
-    container.innerHTML = html;
+    var mandsHtml = '';
+    if (mands.length > 0) {
+      mandsHtml = '<div style="margin-top:' + (pos.length > 0 ? '24px' : '0') + ';">' +
+        '<div style="font-size:13px; font-weight:700; color:#64748B; margin-bottom:10px; display:flex; align-items:center; gap:6px;">' +
+          '<span>📋 Riwayat Tugas Belanja Mandat Cabang (' + mands.length + ')</span>' +
+        '</div>' +
+        mands.map(function (m) {
+          var statusBadge = '';
+          var hasUnpurchased = mandateHasUnpurchasedItems(m);
+          if (m.status === 'RELEASED') {
+            statusBadge = '<span class="x-badge" style="background:#FEF3C7; color:#92400E; font-weight:700;">AKTIF (DI PASAR)</span>';
+          } else if (m.status === 'COMPLETED') {
+            if (hasUnpurchased) {
+              statusBadge = '<span class="x-badge" style="background:#FEF3C7; color:#B45309; font-weight:700;">SELESAI SEBAGIAN</span>';
+            } else {
+              statusBadge = '<span class="x-badge" style="background:#D1FAE5; color:#065F46; font-weight:700;">100% SELESAI</span>';
+            }
+          } else if (m.status === 'ARCHIVED') {
+            statusBadge = '<span class="x-badge" style="background:#F1F5F9; color:#64748B; font-weight:700;">DIARSIPKAN</span>';
+          } else {
+            statusBadge = '<span class="x-badge" style="background:#E2E8F0; color:#334155; font-weight:700;">' + escapeHtml(m.status) + '</span>';
+          }
+
+          var itemsListHtml = (m.items || []).map(function (itm) {
+            var isPurchased = Boolean(itm.is_purchased);
+            return '<div style="display:flex; align-items:center; gap:8px; font-size:12px; padding:4px 6px; border-bottom:1px dashed #E2E8F0;' + (isPurchased ? ' opacity:0.85;' : ' background:#FFFBEB; border-radius:6px; margin:2px 0;') + '">' +
+              (isPurchased
+                ? '<span style="color:#059669; font-weight:800; font-size:13px; width:16px; text-align:center;">✓</span>'
+                : '<span style="color:#D97706; font-weight:800; font-size:13px; width:16px; text-align:center;">⚠️</span>') +
+              '<div style="flex:1; min-width:0;">' +
+                '<strong style="' + (isPurchased ? 'text-decoration:line-through; color:#475569;' : 'color:#0F172A;') + '">' + escapeHtml(itm.material_name) + '</strong>' +
+                ' <span style="color:#64748B;">(' + itm.target_quantity + ' ' + escapeHtml(itm.base_uom_code || '') + ')</span>' +
+              '</div>' +
+            '</div>';
+          }).join('');
+
+          return '<div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:12px; padding:14px; margin-bottom:10px;">' +
+            '<div style="display:flex; justify-content:space-between; align-items:start; flex-wrap:wrap; gap:8px;">' +
+              '<div>' +
+                '<div style="display:flex; align-items:center; gap:8px;">' +
+                  '<strong style="font-size:14px; color:#0F172A;">Tugas #' + escapeHtml(m.mandate_number) + '</strong>' +
+                  statusBadge +
+                '</div>' +
+                '<div style="font-size:11.5px; color:#64748B; margin-top:2px;">' + (m.created_at ? new Date(m.created_at).toLocaleString('id-ID') : '—') + (m.notes ? ' | ' + escapeHtml(m.notes) : '') + '</div>' +
+              '</div>' +
+              '<div style="text-align:right;">' +
+                '<div style="font-size:11px; color:#64748B;">Uang Kasbon:</div>' +
+                '<strong style="font-size:14px; color:#059669;">' + formatMoney(m.cash_advance || 0) + '</strong>' +
+              '</div>' +
+            '</div>' +
+            (itemsListHtml ? '<div style="margin-top:8px; background:#F8FAFC; border-radius:6px; padding:6px 10px;">' + itemsListHtml + '</div>' : '') +
+          '</div>';
+        }).join('') +
+      '</div>';
+    }
+
+    container.innerHTML = posHtml + mandsHtml;
   }
 
   // Open Edit Mandate Modal
