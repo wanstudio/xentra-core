@@ -28,9 +28,23 @@
     activePrepareItem: null
   };
 
-  async function loadBMStock() {
+  function getStockBranchId() {
     var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
+    var fromBM = (typeof window.getBMTargetBranchId === 'function' ? window.getBMTargetBranchId() : null);
+    var fromUser = user ? (user.branch_id || user.branchId || (user.branch && user.branch.id)) : null;
+    var fromStorage = null;
+    try {
+      fromStorage = localStorage.getItem('xentra_branch_id') ||
+                    localStorage.getItem('xentra_active_branch_id') ||
+                    localStorage.getItem('selected_branch_id') ||
+                    sessionStorage.getItem('xentra_branch_id');
+    } catch (_) {}
+    return fromBM || fromUser || fromStorage || null;
+  }
+  window.getStockBranchId = getStockBranchId;
+
+  async function loadBMStock() {
+    var branchId = getStockBranchId();
     if (!branchId) return;
 
     var container = $('bm-stock-quick-container');
@@ -275,8 +289,7 @@
     var item = (_bmStockState.inventory || []).find(function (it) { return it.product_id === productId; });
     if (!item) return;
 
-    var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
+    var branchId = getStockBranchId();
     if (!branchId) return;
 
     var cur = (item.stock == null || item.stock === '') ? 0 : Number(item.stock);
@@ -304,6 +317,8 @@
       if (!res.ok || !data.success) {
         showToast('Gagal update porsi: ' + (data.message || data.error || 'Terjadi kesalahan'));
         loadBMStock();
+      } else {
+        window.dispatchEvent(new CustomEvent('xentra:inventory:updated', { detail: { productId: productId } }));
       }
     } catch (err) {
       showToast('Gagal terhubung ke server.');
@@ -313,8 +328,7 @@
   window.quickAdjustBMStockStep = quickAdjustBMStockStep;
 
   async function toggleBMStockItemAvailability(productId, nextVal) {
-    var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
+    var branchId = getStockBranchId();
     if (!branchId) return;
 
     // Optimistic UI update
@@ -395,8 +409,7 @@
 
   async function submitBMStockAdjustment(e) {
     if (e && typeof e.preventDefault === 'function') e.preventDefault();
-    var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
+    var branchId = getStockBranchId();
     if (!branchId) return;
 
     var item = _bmStockState.activeAdjustItem;
@@ -456,6 +469,7 @@
         showToast('Sisa porsi dan batas warning berhasil diperbarui!');
         closeBMStockAdjustModal();
         loadBMStock();
+        window.dispatchEvent(new CustomEvent('xentra:inventory:updated', { detail: { productId: productId } }));
       } else {
         showToast('Gagal memperbarui porsi: ' + (data.message || data.error || 'Terjadi kesalahan'));
       }
@@ -602,8 +616,7 @@
 
   async function submitBMStockPrepare(e) {
     if (e && typeof e.preventDefault === 'function') e.preventDefault();
-    var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
+    var branchId = getStockBranchId();
     if (!branchId) return;
 
     var item = _bmStockState.activePrepareItem;
@@ -638,6 +651,7 @@
         showToast('🍳 Berhasil! ' + portions + ' porsi siap jual ditambahkan dan bahan baku telah dipotong.');
         closeBMStockPrepareModal();
         loadBMStock();
+        window.dispatchEvent(new CustomEvent('xentra:inventory:updated', { detail: { productId: productId } }));
       } else {
         showToast('Gagal mencatat masak: ' + (data.message || data.error || 'Terjadi kesalahan'));
       }
@@ -648,8 +662,7 @@
     }
   }
   async function notifyOwnerMaterialShortage() {
-    var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
+    var branchId = getStockBranchId();
     if (!branchId) return;
 
     var item = _bmStockState.activePrepareItem;
@@ -705,6 +718,7 @@
 
       if (res.ok && data.success) {
         showToast('✅ Berhasil mengirim peringatan ke Owner! Bahan telah dicatat ke rekomendasi belanja.');
+        window.dispatchEvent(new CustomEvent('xentra:inventory:updated', { detail: { productId: item.product_id } }));
         if (btn) {
           btn.textContent = '✅ Peringatan Terkirim ke Owner';
           btn.style.background = '#f0fdf4';

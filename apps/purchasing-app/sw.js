@@ -1,4 +1,4 @@
-const CACHE_NAME = 'xentra-purchasing-shell-v7';
+const CACHE_NAME = 'xentra-purchasing-shell-v8';
 const APP_SHELL = [
   '/belanja/',
   '/belanja/manifest.json',

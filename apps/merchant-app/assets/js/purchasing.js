@@ -51,9 +51,23 @@
   }
   window.hidePurchasingBottomBar = hidePurchasingBottomBar;
 
-  async function loadPurchasingChecklist() {
+  function getPurchasingTargetBranchId() {
     var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
+    var fromBM = (typeof window.getBMTargetBranchId === 'function' ? window.getBMTargetBranchId() : null);
+    var fromUser = user ? (user.branch_id || user.branchId || (user.branch && user.branch.id)) : null;
+    var fromStorage = null;
+    try {
+      fromStorage = localStorage.getItem('xentra_branch_id') ||
+                    localStorage.getItem('xentra_active_branch_id') ||
+                    localStorage.getItem('selected_branch_id') ||
+                    sessionStorage.getItem('xentra_branch_id');
+    } catch (_) {}
+    return fromBM || fromUser || fromStorage || null;
+  }
+  window.getPurchasingTargetBranchId = getPurchasingTargetBranchId;
+
+  async function loadPurchasingChecklist() {
+    var branchId = getPurchasingTargetBranchId();
     if (!branchId) return;
 
     var container = $('purchasing-checklist-container');
@@ -514,8 +528,7 @@
   window.closePurchasingRequestAdvanceModal = closePurchasingRequestAdvanceModal;
 
   async function submitPurchasingRequestAdvance() {
-    var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
+    var branchId = getPurchasingTargetBranchId();
     if (!branchId) return;
 
     var amountInput = $('input-purchasing-request-advance-amount');
@@ -718,8 +731,7 @@
   var _pendingSettlePayload = null;
 
   function submitPurchasingSettle() {
-    var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
+    var branchId = getPurchasingTargetBranchId();
     if (!branchId) return;
 
     var checkedItems = _purchasingState.items.filter(function (i) { return i.checked && i.buyQty > 0; });
@@ -968,8 +980,7 @@
   var _activeReceivePo = null;
 
   async function loadPurchasingOrders() {
-    var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
+    var branchId = getPurchasingTargetBranchId();
     if (!branchId) return;
 
     var container = $('purchasing-orders-container');
@@ -1277,8 +1288,7 @@
 
   function submitPurchasingReceive() {
     if (!_activeReceivePo) return;
-    var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
+    var branchId = getPurchasingTargetBranchId();
     if (!branchId) return;
 
     var container = $('purchasing-receive-body');
@@ -1498,8 +1508,7 @@
   var _hasUserManuallyChangedHistoryFilter = false;
 
   async function loadPurchasingHistory(startDate, endDate) {
-    var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
+    var branchId = getPurchasingTargetBranchId();
     if (!branchId) return;
 
     var container = $('purchasing-history-container');
@@ -2036,6 +2045,25 @@
   } else {
     initPurchasingInputs();
   }
+
+  // Real-time synchronization listeners: auto-reload when stock is altered or tab is focused
+  window.addEventListener('xentra:inventory:updated', function () {
+    var isBelanjaActive = document.body.classList.contains('is-belanja-active') ||
+      window.location.hash === '#belanja' ||
+      window.location.hash === '#purchasing';
+    if (isBelanjaActive) {
+      loadPurchasingChecklist();
+    }
+  });
+
+  window.addEventListener('focus', function () {
+    var isBelanjaActive = document.body.classList.contains('is-belanja-active') ||
+      window.location.hash === '#belanja' ||
+      window.location.hash === '#purchasing';
+    if (isBelanjaActive) {
+      loadPurchasingChecklist();
+    }
+  });
 
 })();
 

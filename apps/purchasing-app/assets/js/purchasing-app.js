@@ -119,9 +119,12 @@
   // State Management
   var _purchasingState = {
     items: [],
+    allItems: [],
     cashAdvance: 0,
+    dailyPettyCashLimit: 500000,
     activeMandateId: null,
-    activeEditItem: null
+    activeEditItem: null,
+    pollInterval: null
   };
 
   function showPurchasingBottomBar() {
@@ -140,12 +143,34 @@
     }
   }
 
+  function getPurchasingBranchId() {
+    var user = getStoredUser();
+    var fromUser = user ? (user.branch_id || user.branchId || (user.branch && user.branch.id)) : null;
+    var fromStorage = null;
+    try {
+      fromStorage = localStorage.getItem('xentra_branch_id') ||
+                    localStorage.getItem('xentra_active_branch_id') ||
+                    localStorage.getItem('selected_branch_id') ||
+                    sessionStorage.getItem('xentra_branch_id');
+    } catch (_) {}
+    return fromUser || fromStorage || null;
+  }
+  window.getPurchasingBranchId = getPurchasingBranchId;
+
   /* =========================================================================
      1. CHECKLIST LOADER & RENDERER (TASKS VIEW)
      ========================================================================= */
   async function loadPurchasingChecklist() {
-    var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
+    var branchId = getPurchasingBranchId();
+    if (!branchId) {
+      try {
+        var meRes = await fetch('/api/auth/merchant/me', { headers: getAuthHeaders() });
+        var meData = await meRes.json();
+        if (meData && meData.user && meData.user.branch_id) {
+          branchId = meData.user.branch_id;
+        }
+      } catch (_) {}
+    }
     if (!branchId) return;
 
     var container = $('purchasing-checklist-container');
@@ -154,14 +179,17 @@
     }
 
     try {
-      // 1. Cek Mandat Belanja Resmi dari Manager (Status: RELEASED)
-      var mandateRes = await fetch('/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/mandates?status=RELEASED', {
-        headers: getAuthHeaders()
-      });
-      var mandateData = await mandateRes.json();
-      var activeMandate = (mandateData.success && mandateData.mandates && mandateData.mandates.length > 0)
-        ? mandateData.mandates[0]
-        : null;
+      // 1. Cek Mandat Belanja Resmi dari Manager jika ada yang aktif
+      var activeMandate = null;
+      try {
+        var mandateRes = await fetch('/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/mandates?status=RELEASED', {
+          headers: getAuthHeaders()
+        });
+        var mandateData = await mandateRes.json();
+        activeMandate = (mandateData.success && mandateData.mandates && mandateData.mandates.length > 0)
+          ? mandateData.mandates[0]
+          : null;
+      } catch (_) {}
 
       var pendingItems = (activeMandate && activeMandate.items)
         ? activeMandate.items.filter(function (itm) { return !itm.is_purchased; })
@@ -174,7 +202,7 @@
         var cashAdvanceInput = $('input-purchasing-cash-advance');
         if (cashAdvanceInput) {
           cashAdvanceInput.value = _purchasingState.cashAdvance > 0 ? formatNumberWithDots(_purchasingState.cashAdvance) : '';
-          cashAdvanceInput.readOnly = true; // Staf menerima modal resmi dari manager
+          cashAdvanceInput.readOnly = true;
         }
 
         _purchasingState.items = pendingItems.map(function (itm) {
@@ -193,11 +221,10 @@
             estimated_price: itm.estimated_unit_price || itm.last_moving_avg_cost || 0,
             actualUnitPrice: initialPrice,
             has_price_update: Boolean(itm.actual_unit_price && itm.actual_unit_price !== itm.estimated_unit_price),
-            checked: true // Otomatis tercentang karena ini tugas resmi yang di-ACC manager
+            checked: true
           };
         });
 
-        // Hitung estimasi budget berdasarkan harga acuan aktual
         var totalPlanned = 0;
         _purchasingState.items.forEach(function (i) {
           totalPlanned += Math.round(i.buyQty * i.actualUnitPrice);
@@ -211,24 +238,65 @@
         return;
       }
 
-      // 2. Jika belum ada Mandat Belanja berstatus RELEASED dari Owner / Manager:
-      // Status STANDBY — Petugas belanja tidak boleh belanja mandiri tanpa penugasan dan kasbon resmi!
+      // 2. Jika belum ada mandat, muat real-time checklist stok menipis
+      _purchasingState.activeMandateId = null;
+      var chkRes = await fetch('/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/checklist', {
+        headers: getAuthHeaders()
+      });
+      var chkData = await chkRes.json();
+
+      if (chkRes.ok && chkData.success && chkData.items) {
+        _purchasingState.dailyPettyCashLimit = (chkData.daily_petty_cash_limit != null) ? Number(chkData.daily_petty_cash_limit) : 500000;
+        _purchasingState.allItems = chkData.items || [];
+        populateMaterialsDatalist(_purchasingState.allItems);
+        startPettyCashPolling(branchId);
+
+        var rawItems = chkData.items || [];
+        var lowItems = rawItems.filter(function (itm) { return itm.is_low; });
+
+        _purchasingState.items = lowItems.map(function (itm) {
+          var initialQty = (itm.suggested_qty && itm.suggested_qty > 0) ? itm.suggested_qty : 1;
+          var initialPrice = itm.last_unit_cost || 0;
+          return {
+            material_id: itm.material_id,
+            material_name: itm.material_name,
+            material_code: itm.material_code,
+            base_uom_name: itm.base_uom_name,
+            base_uom_code: itm.base_uom_code,
+            current_stock: itm.current_stock || 0,
+            minimum_quantity: itm.minimum_quantity || 0,
+            is_low: Boolean(itm.is_low),
+            suggested_qty: initialQty,
+            buyQty: initialQty,
+            estimated_price: initialPrice,
+            actualUnitPrice: initialPrice,
+            has_price_update: false,
+            checked: false
+          };
+        });
+
+        _purchasingState.cashAdvance = 0;
+        var cashAdvanceInput2 = $('input-purchasing-cash-advance');
+        if (cashAdvanceInput2) {
+          cashAdvanceInput2.value = '';
+          cashAdvanceInput2.readOnly = false;
+        }
+
+        var estBudgetEl2 = $('label-purchasing-est-budget');
+        if (estBudgetEl2) {
+          estBudgetEl2.textContent = formatMoney(chkData.total_estimated_budget || 0);
+        }
+
+        renderPurchasingList();
+        recalculatePurchasingSummary();
+        return;
+      }
+
       _purchasingState.activeMandateId = null;
       _purchasingState.items = [];
       _purchasingState.cashAdvance = 0;
-
-      var cashAdvanceInput = $('input-purchasing-cash-advance');
-      if (cashAdvanceInput) {
-        cashAdvanceInput.value = '';
-        cashAdvanceInput.readOnly = true;
-      }
-
-      var estBudgetEl = $('label-purchasing-est-budget');
-      if (estBudgetEl) estBudgetEl.textContent = formatMoney(0);
-
       renderPurchasingList();
       recalculatePurchasingSummary();
-      return;
     } catch (err) {
       console.error('[Purchasing] Fetch error:', err);
       if (container) {
@@ -253,11 +321,16 @@
     if (!items.length) {
       hidePurchasingBottomBar();
       container.innerHTML =
-        '<div style="text-align:center; padding:44px 20px; background:#ffffff; border-radius:16px; border:1px dashed #cbd5e1; margin-top:4px;">' +
-          '<div style="font-size:42px; margin-bottom:12px;">📋</div>' +
-          '<div style="font-size:15.5px; font-weight:800; color:#0f172a;">Belum Ada Tugas Belanja Aktif</div>' +
+        '<div style="text-align:center; padding:44px 20px; background:#f8fafc; border-radius:16px; border:1px dashed #cbd5e1; margin-top:4px;">' +
+          '<div style="font-size:42px; margin-bottom:12px;">✨</div>' +
+          '<div style="font-size:15.5px; font-weight:800; color:#0f172a;">Semua Stok Bahan Baku Aman</div>' +
           '<div style="font-size:12.5px; color:#64748b; margin-top:6px; max-width:320px; margin-left:auto; margin-right:auto; line-height:1.5;">' +
-            'Belum ada Mandat Belanja yang dirilis (ACC) oleh Owner atau Manager. Silakan tunggu penugasan resmi dan uang kasbon modal belanja.' +
+            'Tidak ada bahan yang berada di bawah batas minimum saat ini.' +
+          '</div>' +
+          '<div style="margin-top:16px;">' +
+            '<button type="button" class="x-btn-secondary" onclick="openPurchasingAddCustomItemModal()" style="font-size:12.5px; font-weight:700; padding:9px 18px; border-radius:10px; background:#fff; border:1px solid #cbd5e1; color:#0f172a; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">' +
+              '<span style="color:#2563eb;">➕</span> Tambah Belanjaan Lain' +
+            '</button>' +
           '</div>' +
         '</div>';
       return;
@@ -446,14 +519,121 @@
   }
   window.confirmPurchasingPriceUpdate = confirmPurchasingPriceUpdate;
 
+  function startPettyCashPolling(branchId) {
+    if (_purchasingState.pollInterval) clearInterval(_purchasingState.pollInterval);
+    _purchasingState.pollInterval = setInterval(async function () {
+      if (!branchId || document.visibilityState === 'hidden') return;
+      try {
+        var res = await fetch('/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/checklist', {
+          headers: getAuthHeaders()
+        });
+        var data = await res.json();
+        if (res.ok && data.success && data.daily_petty_cash_limit != null) {
+          var newLimit = Number(data.daily_petty_cash_limit);
+          var prevLimit = Number(_purchasingState.dailyPettyCashLimit || 500000);
+          if (newLimit !== prevLimit) {
+            _purchasingState.dailyPettyCashLimit = newLimit;
+            recalculatePurchasingSummary();
+          }
+        }
+      } catch (_) {}
+    }, 10000);
+  }
+
+  function populateMaterialsDatalist(allItems) {
+    var datalist = $('datalist-purchasing-materials');
+    if (!datalist || !allItems) return;
+    datalist.innerHTML = allItems.map(function (itm) {
+      return '<option value="' + esc(itm.material_name) + '">';
+    }).join('');
+  }
+
+  function openPurchasingAddCustomItemModal() {
+    var modal = $('modal-purchasing-add-custom-item');
+    if (!modal) return;
+    var nameIn = $('input-purchasing-add-name');
+    var qtyIn = $('input-purchasing-add-qty');
+    var uomIn = $('input-purchasing-add-uom');
+    var priceIn = $('input-purchasing-add-price');
+    if (nameIn) nameIn.value = '';
+    if (qtyIn) qtyIn.value = '1';
+    if (uomIn) uomIn.value = 'Pcs';
+    if (priceIn) priceIn.value = '';
+    modal.style.display = 'flex';
+    setTimeout(function () { if (nameIn) nameIn.focus(); }, 60);
+  }
+  window.openPurchasingAddCustomItemModal = openPurchasingAddCustomItemModal;
+
+  function closePurchasingAddCustomItemModal() {
+    var modal = $('modal-purchasing-add-custom-item');
+    if (modal) modal.style.display = 'none';
+  }
+  window.closePurchasingAddCustomItemModal = closePurchasingAddCustomItemModal;
+
+  function confirmPurchasingAddCustomItem() {
+    var nameIn = $('input-purchasing-add-name');
+    var qtyIn = $('input-purchasing-add-qty');
+    var uomIn = $('input-purchasing-add-uom');
+    var priceIn = $('input-purchasing-add-price');
+
+    var name = nameIn ? nameIn.value.trim() : '';
+    var qty = qtyIn ? parseFloat(qtyIn.value || 0) : 0;
+    var uom = uomIn ? uomIn.value.trim() || 'Pcs' : 'Pcs';
+    var rawPriceDigits = priceIn ? String(priceIn.value || '').replace(/\D/g, '') : '';
+    var price = parseFloat(rawPriceDigits || 0);
+
+    if (!name) {
+      showToast('⚠️ Masukkan nama barang belanjaan.');
+      return;
+    }
+    if (qty <= 0) {
+      showToast('⚠️ Kuantitas harus lebih dari 0.');
+      return;
+    }
+    if (price < 0) {
+      showToast('⚠️ Harga satuan tidak boleh negatif.');
+      return;
+    }
+
+    var matched = (_purchasingState.allItems || []).find(function (m) {
+      return m.material_name && m.material_name.toLowerCase() === name.toLowerCase();
+    });
+
+    var matId = matched ? matched.material_id : ('mat_adhoc_' + Date.now());
+    var matCode = matched ? matched.material_code : 'ADHOC';
+
+    _purchasingState.items.push({
+      material_id: matId,
+      material_name: name,
+      material_code: matCode,
+      base_uom_name: uom,
+      base_uom_code: uom,
+      current_stock: matched ? (matched.current_stock || 0) : 0,
+      minimum_quantity: 0,
+      is_low: false,
+      is_adhoc: !matched,
+      suggested_qty: qty,
+      buyQty: qty,
+      estimated_price: price,
+      actualUnitPrice: price,
+      has_price_update: false,
+      checked: true
+    });
+
+    closePurchasingAddCustomItemModal();
+    renderPurchasingList();
+    recalculatePurchasingSummary();
+    showToast('✓ Belanjaan lain ditambahkan: ' + name);
+  }
+  window.confirmPurchasingAddCustomItem = confirmPurchasingAddCustomItem;
+
   /* =========================================================================
      3. SETTLEMENT BELANJA PASAR
      ========================================================================= */
   var _pendingSettlePayload = null;
 
   function submitPurchasingSettle() {
-    var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
+    var branchId = getPurchasingBranchId();
     if (!branchId) return;
 
     var checkedItems = _purchasingState.items.filter(function (i) { return i.checked && i.buyQty > 0; });
@@ -634,8 +814,7 @@
   var _pendingReceiveData = null;
 
   async function loadPurchasingOrders() {
-    var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
+    var branchId = getPurchasingBranchId();
     if (!branchId) return;
 
     var container = $('purchasing-orders-container');
@@ -903,8 +1082,7 @@
 
   function submitPurchasingReceive() {
     if (!_activeReceivePo) return;
-    var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
+    var branchId = getPurchasingBranchId();
     if (!branchId) return;
 
     var container = $('purchasing-receive-body');
@@ -1097,8 +1275,7 @@
   var _customHistoryDateTo = '';
 
   async function loadPurchasingHistory(startDate, endDate) {
-    var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
+    var branchId = getPurchasingBranchId();
     if (!branchId) return;
 
     var container = $('purchasing-history-container');
@@ -1628,6 +1805,19 @@
     switchPurchasingView('tasks');
     loadPurchasingChecklist();
   }
+
+  // Real-time synchronization listeners
+  window.addEventListener('xentra:inventory:updated', function () {
+    if (_currentPurchasingView === 'tasks') {
+      loadPurchasingChecklist();
+    }
+  });
+
+  window.addEventListener('focus', function () {
+    if (_currentPurchasingView === 'tasks') {
+      loadPurchasingChecklist();
+    }
+  });
 
   document.addEventListener('DOMContentLoaded', initPurchasingApp);
 })();

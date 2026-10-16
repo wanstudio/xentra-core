@@ -53,7 +53,7 @@
           </div>
           <div class="purchasing-kasbon-input-wrap">
             <span class="purchasing-kasbon-currency">Rp</span>
-            <input type="text" id="input-purchasing-cash-advance" class="purchasing-kasbon-input" placeholder="0" inputmode="numeric" pattern="[0-9]*" autocomplete="off" readonly oninput="onPurchasingCashAdvanceInput(this)">
+            <input type="text" id="input-purchasing-cash-advance" class="purchasing-kasbon-input" placeholder="0" inputmode="numeric" pattern="[0-9]*" autocomplete="off" oninput="onPurchasingCashAdvanceInput(this)">
           </div>
           <div class="purchasing-kasbon-footer">
             <span class="purchasing-kasbon-caption">Estimasi kebutuhan belanja:</span>
@@ -378,8 +378,55 @@
     </div>
   </div>
 
+  <!-- Modal 5: Tambah Belanjaan Lain (Custom Ad-Hoc Items) -->
+  <div id="modal-purchasing-add-custom-item" class="purchasing-modal-backdrop" onclick="if(event.target === this) closePurchasingAddCustomItemModal()">
+    <div class="purchasing-modal-card" style="max-width:420px; width:92%; padding:18px 20px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:20px; line-height:1;">➕</span>
+          <h3 style="font-size:15px; font-weight:800; margin:0; color:#0f172a;">Tambah Belanjaan Lain</h3>
+        </div>
+        <button type="button" onclick="closePurchasingAddCustomItemModal()" style="background:none; border:none; font-size:18px; color:#94a3b8; cursor:pointer;" aria-label="Tutup">✕</button>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:16px;">
+        <div>
+          <label for="input-purchasing-add-name" style="display:block; font-size:12px; font-weight:700; color:#334155; margin-bottom:4px;">Nama Barang / Belanjaan:</label>
+          <input type="text" id="input-purchasing-add-name" class="purchasing-item-edit-input" placeholder="Contoh: Gas LPG 3kg / Sabun Cuci" style="width:100%; box-sizing:border-box;" list="datalist-purchasing-materials">
+          <datalist id="datalist-purchasing-materials"></datalist>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+          <div>
+            <label for="input-purchasing-add-qty" style="display:block; font-size:12px; font-weight:700; color:#334155; margin-bottom:4px;">Jumlah (Qty):</label>
+            <input type="number" id="input-purchasing-add-qty" class="purchasing-item-edit-input" placeholder="1" min="0.01" step="any" value="1" style="width:100%; box-sizing:border-box;">
+          </div>
+          <div>
+            <label for="input-purchasing-add-uom" style="display:block; font-size:12px; font-weight:700; color:#334155; margin-bottom:4px;">Satuan:</label>
+            <input type="text" id="input-purchasing-add-uom" class="purchasing-item-edit-input" placeholder="Pcs / Kg" value="Pcs" style="width:100%; box-sizing:border-box;">
+          </div>
+        </div>
+
+        <div>
+          <label for="input-purchasing-add-price" style="display:block; font-size:12px; font-weight:700; color:#334155; margin-bottom:4px;">Harga Beli Satuan (Rp):</label>
+          <div class="purchasing-modal-input-wrap">
+            <span class="purchasing-modal-currency-prefix">Rp</span>
+            <input type="text" id="input-purchasing-add-price" class="purchasing-modal-input-price" placeholder="0" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button type="button" class="x-btn-secondary" onclick="closePurchasingAddCustomItemModal()" style="font-size:12.5px; font-weight:700; padding:8px 14px; border-radius:10px;">Batal</button>
+        <button type="button" class="x-btn-primary" onclick="confirmPurchasingAddCustomItem()" style="font-size:12.5px; font-weight:800; padding:8px 16px; border-radius:10px;">
+          <span>✓</span> Tambahkan
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Standalone Purchasing Controller -->
-  <script src="/belanja/assets/js/purchasing-app.js?v=1.0.7"></script>
+  <script src="/belanja/assets/js/purchasing-app.js?v=1.1.0"></script>
 </body>
 </html>
 

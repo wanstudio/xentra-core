@@ -641,17 +641,28 @@ router.get('/admin/branches/:id/purchasing/checklist', requireAuth(['owner', 'br
         ON rp.identity_id = p.id AND rp.stock_location_id = ? AND rp.identity_type = 'PRODUCT'
       LEFT JOIN uoms u
         ON u.id = p.product_stock_uom_id
-      WHERE p.brand_id = ? AND p.is_active = 1 AND p.inventory_type = 'DIRECT'
+      WHERE p.brand_id = ? AND p.is_active = 1
+        AND (
+          p.inventory_type = 'DIRECT'
+          OR p.id NOT IN (
+            SELECT pi.output_product_id
+            FROM production_items pi
+            JOIN recipes r ON r.production_item_id = pi.id AND r.status = 'ACTIVE'
+          )
+        )
       ORDER BY p.name ASC
     `).all(branch.id, locationId, branch.brand_id);
 
     const recipeUsages = db.prepare(`
       SELECT
         rc.material_id,
-        MAX(rc.planned_quantity / rv.planned_yield_quantity) AS max_unit_usage
+        MAX((rc.planned_quantity * COALESCE(rc_u.conversion_factor, 1.0) / COALESCE(m_u.conversion_factor, 1.0)) / COALESCE(NULLIF(rv.planned_yield_quantity, 0), 1)) AS max_unit_usage
       FROM recipe_components rc
       JOIN recipe_versions rv ON rv.id = rc.recipe_version_id AND rv.status = 'PUBLISHED'
       JOIN recipes r ON r.id = rv.recipe_id AND r.status = 'ACTIVE'
+      LEFT JOIN uoms rc_u ON rc_u.id = rc.planned_uom_id
+      JOIN materials m ON m.id = rc.material_id
+      LEFT JOIN uoms m_u ON m_u.id = m.base_uom_id
       GROUP BY rc.material_id
     `).all();
 

@@ -19,8 +19,15 @@
     var fromEffective = (typeof window.getEffectiveBranchId === 'function'
       ? window.getEffectiveBranchId()
       : null);
+    var fromStorage = null;
+    try {
+      fromStorage = localStorage.getItem('xentra_branch_id') ||
+                    localStorage.getItem('xentra_active_branch_id') ||
+                    localStorage.getItem('selected_branch_id') ||
+                    sessionStorage.getItem('xentra_branch_id');
+    } catch (_) {}
 
-    var branchId = fromUser || fromManaging || fromActive || fromEffective || null;
+    var branchId = fromUser || fromManaging || fromActive || fromEffective || fromStorage || null;
     if (branchId && branchCatalog && branchCatalog.state) {
       branchCatalog.state.branchId = branchId;
     }
