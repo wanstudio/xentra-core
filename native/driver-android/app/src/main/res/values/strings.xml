@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Mybangjo Driver</string>
+    <string name="gps_service_title">Mybangjo Driver Aktif</string>
+    <string name="gps_service_desc">Memantau lokasi GPS &amp; pesanan pengantaran</string>
+</resources>

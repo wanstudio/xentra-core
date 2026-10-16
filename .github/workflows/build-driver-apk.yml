@@ -1,0 +1,67 @@
+name: Build Mybangjo Driver APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'native/driver-android/**'
+      - '.github/workflows/build-driver-apk.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    name: Build Android Driver APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        working-directory: native/driver-android
+        run: chmod +x gradlew
+
+      - name: Build Signed Release APK
+        working-directory: native/driver-android
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Rename APK Output
+        run: |
+          mkdir -p build-output
+          cp native/driver-android/app/build/outputs/apk/release/app-release.apk build-output/mybangjo-driver.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mybangjo-driver-apk
+          path: build-output/mybangjo-driver.apk
+          retention-days: 30
+
+      - name: Create or Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: driver-v1.0.0
+          name: "Mybangjo Driver App v1.0.0"
+          make_latest: false
+          body: |
+            ### Mybangjo Driver App v1.0.0 (Realtime GPS & Background Location)
+            - Download langsung file `mybangjo-driver.apk` di bawah tanpa ekstrak ZIP.
+            - **Fitur Utama v1.0.0**:
+              - **Real-time GPS Tracking Engine**: Dual-rate pinging (5 detik saat aktif pengantaran, 25 detik saat standby) langsung terhubung ke server Xentra.
+              - **Android Native Foreground Service (Gojek Reference)**: Berjalan di background dengan notifikasi status bar permanen dan Partial WakeLock, tidak mati saat layar HP terkunci atau saat membuka Google Maps.
+              - **Satu Ketuk Buka Navigasi Google Maps**: Deep-link native `google.navigation:q=lat,lng&mode=d` langsung ke mode navigasi belokan demi belokan.
+              - **Floating Order Overlay (Widget Melayang)**: Tombol melayang di atas Google Maps untuk akses instan ke status tugas pengantaran tanpa bolak-balik aplikasi.
+              - **Sirene & Getar Pesanan Baru**: Audio alert `ada_pesanan_baru` berulang saat pesanan baru ditugaskan.
+              - **Anti Fake-GPS**: Deteksi lokasi palsu (mock provider).
+              - **Status Online/Offline Interaktif**: Mengontrol ketersediaan driver secara instan.
+          files: build-output/mybangjo-driver.apk
