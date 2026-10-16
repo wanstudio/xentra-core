@@ -130,6 +130,21 @@
     if ($('bm-stock-stat-low')) $('bm-stock-stat-low').textContent = lowStock;
     if ($('bm-stock-stat-out')) $('bm-stock-stat-out').textContent = outOfStock;
     if ($('bm-stock-stat-untracked')) $('bm-stock-stat-untracked').textContent = byOrder > 0 ? (byOrder + ' By Order') : untracked;
+
+    var hubPortionBadge = $('bm-stock-hub-portion-badge');
+    if (hubPortionBadge) {
+      hubPortionBadge.textContent = total + ' Menu' + (outOfStock > 0 ? (' (' + outOfStock + ' Habis)') : '');
+      if (outOfStock > 0) {
+        hubPortionBadge.style.background = '#fee2e2';
+        hubPortionBadge.style.color = '#dc2626';
+      } else if (lowStock > 0) {
+        hubPortionBadge.style.background = '#fef3c7';
+        hubPortionBadge.style.color = '#b45309';
+      } else {
+        hubPortionBadge.style.background = '#e0f2fe';
+        hubPortionBadge.style.color = '#0369a1';
+      }
+    }
   }
 
   function onBMStockFilterChange() {
@@ -854,6 +869,385 @@
 
   window.submitBMStockPrepare = submitBMStockPrepare;
   window.notifyOwnerMaterialShortage = notifyOwnerMaterialShortage;
+
+  /* ========================================================================
+   * BM INVENTORY — HIERARCHICAL GOBIZ SUB-VIEW ROUTING & RAW MATERIALS
+   * ======================================================================== */
+
+  var _bmMaterialsState = {
+    materials: [],
+    searchQuery: '',
+    statusFilter: 'all',
+    fetchSeq: 0,
+    activeAdjustItem: null,
+    activeReorderItem: null
+  };
+
+  function switchBMStockSubView(viewName) {
+    var hubEl = $('bm-stock-hub-view');
+    var portionsEl = $('bm-stock-portions-view');
+    var materialsEl = $('bm-stock-materials-view');
+
+    if (hubEl) hubEl.hidden = (viewName !== 'hub');
+    if (portionsEl) portionsEl.hidden = (viewName !== 'portions');
+    if (materialsEl) materialsEl.hidden = (viewName !== 'materials');
+
+    if (viewName === 'portions') {
+      loadBMStock();
+    } else if (viewName === 'materials') {
+      loadBMMaterials();
+    } else {
+      // Hub view — update both summaries in background
+      loadBMStock();
+      loadBMMaterials(true);
+    }
+  }
+  window.switchBMStockSubView = switchBMStockSubView;
+
+  function openBMKitchenPrepDirect() {
+    if (_bmStockState.recipes && _bmStockState.recipes.length) {
+      openBMStockPrepareModal(_bmStockState.recipes[0].output_product_id);
+    } else {
+      switchBMStockSubView('portions');
+      showToast('ℹ️ Pilih menu yang memiliki resep terhubung untuk memasak.');
+    }
+  }
+  window.openBMKitchenPrepDirect = openBMKitchenPrepDirect;
+
+  async function loadBMMaterials(silent) {
+    var branchId = getStockBranchId();
+    if (!branchId) return;
+
+    var container = $('bm-materials-quick-container');
+    if (container && !silent && (!_bmMaterialsState.materials || !_bmMaterialsState.materials.length)) {
+      container.innerHTML = '<div class="text-center py-6 text-muted">Memuat daftar bahan baku dapur cabang...</div>';
+    }
+
+    var currentSeq = ++_bmMaterialsState.fetchSeq;
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/inventory/materials', {
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (currentSeq !== _bmMaterialsState.fetchSeq) return;
+
+      if (res.ok && data.success && Array.isArray(data.materials)) {
+        _bmMaterialsState.materials = data.materials;
+        updateBMMaterialsStats(data.materials);
+        renderBMMaterials();
+      } else {
+        var errText = esc(data.error || 'Terjadi kesalahan');
+        if (container && !silent) {
+          container.innerHTML = '<div class="text-center py-6 text-danger">Gagal memuat bahan baku: ' + errText + '</div>';
+        }
+      }
+    } catch (err) {
+      if (currentSeq !== _bmMaterialsState.fetchSeq) return;
+      console.warn('[BM Materials Load Error]:', err);
+      if (container && !silent) {
+        container.innerHTML = '<div class="text-center py-6 text-danger">Kesalahan jaringan saat memuat bahan baku.</div>';
+      }
+    }
+  }
+  window.loadBMMaterials = loadBMMaterials;
+
+  function updateBMMaterialsStats(items) {
+    var total = (items || []).length;
+    var outOfStock = 0;
+    var lowStock = 0;
+    var safeStock = 0;
+
+    (items || []).forEach(function (m) {
+      if (m.current_stock <= 0) {
+        outOfStock++;
+      } else if (m.current_stock <= m.minimum_quantity) {
+        lowStock++;
+      } else {
+        safeStock++;
+      }
+    });
+
+    if ($('bm-mat-stat-total')) $('bm-mat-stat-total').textContent = total;
+    if ($('bm-mat-stat-safe')) $('bm-mat-stat-safe').textContent = safeStock;
+    if ($('bm-mat-stat-low')) $('bm-mat-stat-low').textContent = lowStock;
+    if ($('bm-mat-stat-out')) $('bm-mat-stat-out').textContent = outOfStock;
+
+    var hubMatBadge = $('bm-stock-hub-material-badge');
+    if (hubMatBadge) {
+      var alertCount = lowStock + outOfStock;
+      hubMatBadge.textContent = total + ' Bahan' + (alertCount > 0 ? (' (' + alertCount + ' Menipis)') : '');
+      if (alertCount > 0) {
+        hubMatBadge.style.background = '#fef3c7';
+        hubMatBadge.style.color = '#b45309';
+      } else {
+        hubMatBadge.style.background = '#dcfce7';
+        hubMatBadge.style.color = '#15803d';
+      }
+    }
+  }
+
+  function onBMMaterialsFilterChange() {
+    var searchEl = $('bm-materials-search');
+    var filterEl = $('bm-materials-filter-status');
+    if (searchEl) _bmMaterialsState.searchQuery = searchEl.value.trim().toLowerCase();
+    if (filterEl) _bmMaterialsState.statusFilter = filterEl.value;
+    renderBMMaterials();
+  }
+  window.onBMMaterialsFilterChange = onBMMaterialsFilterChange;
+
+  function renderBMMaterials() {
+    var container = $('bm-materials-quick-container');
+    if (!container) return;
+
+    var items = _bmMaterialsState.materials || [];
+    var q = _bmMaterialsState.searchQuery;
+    var f = _bmMaterialsState.statusFilter;
+
+    var filtered = items.filter(function (m) {
+      var name = (m.name || '').toLowerCase();
+      var code = (m.material_code || '').toLowerCase();
+      var matchesSearch = !q || name.indexOf(q) !== -1 || code.indexOf(q) !== -1;
+      if (!matchesSearch) return false;
+
+      var isOut = m.current_stock <= 0;
+      var isLow = !isOut && m.current_stock <= m.minimum_quantity;
+      var isSafe = !isOut && !isLow;
+
+      if (f === 'low') return isLow || isOut;
+      if (f === 'out') return isOut;
+      if (f === 'safe') return isSafe;
+      return true;
+    });
+
+    if (!filtered.length) {
+      container.innerHTML = '<div class="text-center py-6 text-muted">Tidak ada bahan baku yang sesuai dengan filter pencarian.</div>';
+      return;
+    }
+
+    container.innerHTML = filtered.map(function (m) {
+      var isOut = m.current_stock <= 0;
+      var isLow = !isOut && m.current_stock <= m.minimum_quantity;
+
+      var badgeClass = isOut ? 'x-badge-danger' : isLow ? 'x-badge-warning' : 'x-badge-success';
+      var statusText = isOut ? 'HABIS' : isLow ? 'STOK MENIPIS' : 'STOK AMAN';
+
+      var uom = esc(m.base_uom_name || m.base_uom_code || 'Satuan');
+      var stockVal = Number(m.current_stock.toFixed(2));
+      var minVal = Number(m.minimum_quantity.toFixed(2));
+      var targetVal = Number(m.target_quantity.toFixed(2));
+
+      return '<div class="x-stock-item-card" style="padding:16px; border:1px solid #e2e8f0; border-radius:14px; background:#ffffff; box-shadow:0 1px 3px rgba(0,0,0,0.04);">' +
+        '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">' +
+          '<div>' +
+            '<div style="font-size:15px; font-weight:800; color:#0f172a;">' + esc(m.name) + '</div>' +
+            '<div style="font-size:11px; font-weight:700; color:#64748b; margin-top:2px;">KODE: ' + esc(m.material_code) + '</div>' +
+          '</div>' +
+          '<span class="' + badgeClass + '" style="font-size:10px; font-weight:800; text-transform:uppercase; padding:3px 8px; border-radius:6px;">' + statusText + '</span>' +
+        '</div>' +
+
+        '<div style="display:flex; align-items:baseline; gap:6px; margin:10px 0 12px 0;">' +
+          '<span style="font-size:24px; font-weight:900; color:' + (isOut ? '#dc2626' : isLow ? '#d97706' : '#15803d') + ';">' + stockVal + '</span>' +
+          '<span style="font-size:13px; font-weight:700; color:#64748b;">' + uom + ' di dapur</span>' +
+        '</div>' +
+
+        '<div style="background:#f8fafc; padding:8px 10px; border-radius:8px; font-size:11.5px; color:#475569; margin-bottom:12px; display:flex; justify-content:space-between;">' +
+          '<span>Batas Minimum (Par): <b>' + minVal + ' ' + uom + '</b></span>' +
+          '<span>Target Belanja: <b>' + targetVal + ' ' + uom + '</b></span>' +
+        '</div>' +
+
+        '<div style="display:flex; gap:8px;">' +
+          '<button type="button" class="x-btn-secondary" style="flex:1; font-size:12px; font-weight:700; padding:7px 10px; display:inline-flex; align-items:center; justify-content:center; gap:4px;" onclick="openBMMaterialAdjustModal(\'' + esc(m.id) + '\')">' +
+            '<span>⚖️</span><span>Opname Fisik</span>' +
+          '</button>' +
+          '<button type="button" class="x-btn-secondary" style="flex:1; font-size:12px; font-weight:700; padding:7px 10px; display:inline-flex; align-items:center; justify-content:center; gap:4px;" onclick="openBMMaterialReorderModal(\'' + esc(m.id) + '\')">' +
+            '<span>⚙️</span><span>Batas Belanja</span>' +
+          '</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function openBMMaterialAdjustModal(materialId) {
+    var m = (_bmMaterialsState.materials || []).find(function (it) { return it.id === materialId; });
+    if (!m) return;
+    _bmMaterialsState.activeAdjustItem = m;
+
+    var modal = $('modal-bm-material-adjust');
+    if (!modal) return;
+
+    if ($('bm-mat-adjust-material-id')) $('bm-mat-adjust-material-id').value = m.id;
+    if ($('bm-mat-adjust-name')) $('bm-mat-adjust-name').textContent = m.name;
+    var uom = m.base_uom_name || m.base_uom_code || '';
+    if ($('bm-mat-adjust-uom')) $('bm-mat-adjust-uom').textContent = uom;
+    if ($('bm-mat-adjust-input-uom')) $('bm-mat-adjust-input-uom').textContent = uom;
+    if ($('bm-mat-adjust-current-stock')) $('bm-mat-adjust-current-stock').textContent = Number(m.current_stock.toFixed(2));
+    if ($('bm-mat-adjust-qty')) $('bm-mat-adjust-qty').value = Number(m.current_stock.toFixed(2));
+    if ($('bm-mat-adjust-notes')) $('bm-mat-adjust-notes').value = '';
+
+    modal.style.display = 'flex';
+  }
+  window.openBMMaterialAdjustModal = openBMMaterialAdjustModal;
+
+  function closeBMMaterialAdjustModal() {
+    var modal = $('modal-bm-material-adjust');
+    if (modal) modal.style.display = 'none';
+    _bmMaterialsState.activeAdjustItem = null;
+  }
+  window.closeBMMaterialAdjustModal = closeBMMaterialAdjustModal;
+
+  function addBMMaterialAdjustDelta(delta) {
+    var input = $('bm-mat-adjust-qty');
+    if (!input) return;
+    var cur = Number(input.value) || 0;
+    input.value = Math.max(0, Number((cur + delta).toFixed(2)));
+  }
+  window.addBMMaterialAdjustDelta = addBMMaterialAdjustDelta;
+
+  function setBMMaterialAdjustQuick(val) {
+    var input = $('bm-mat-adjust-qty');
+    if (!input) return;
+    input.value = Math.max(0, val);
+  }
+  window.setBMMaterialAdjustQuick = setBMMaterialAdjustQuick;
+
+  async function submitBMMaterialAdjustment(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    var m = _bmMaterialsState.activeAdjustItem;
+    if (!m) return;
+
+    var branchId = getStockBranchId();
+    var input = $('bm-mat-adjust-qty');
+    var typeEl = $('bm-mat-adjust-type');
+    var notesEl = $('bm-mat-adjust-notes');
+    var btn = $('btn-bm-submit-mat-adjust');
+
+    var countedQty = input ? Number(input.value) : null;
+    if (countedQty === null || !Number.isFinite(countedQty) || countedQty < 0) {
+      showToast('⚠️ Masukkan angka fisik riil yang valid (>= 0).');
+      return;
+    }
+
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Menyimpan...';
+    }
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/inventory/materials/' + encodeURIComponent(m.id) + '/adjust', {
+        method: 'POST',
+        headers: Object.assign({}, getAuthHeaders(), { 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          counted_quantity: countedQty,
+          adjustment_type: typeEl ? typeEl.value : 'AUDIT',
+          notes: notesEl ? notesEl.value : ''
+        })
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        showToast('✅ ' + (data.message || 'Koreksi fisik bahan berhasil disimpan.'));
+        closeBMMaterialAdjustModal();
+        await loadBMMaterials();
+        window.dispatchEvent(new CustomEvent('xentra:inventory:updated', { detail: { branch_id: branchId } }));
+      } else {
+        showToast('❌ Gagal koreksi fisik: ' + (data.error || data.message || 'Terjadi kesalahan'));
+      }
+    } catch (err) {
+      console.error('[Submit Material Adjust Error]:', err);
+      showToast('❌ Kesalahan jaringan saat menyimpan koreksi.');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Simpan Koreksi';
+      }
+    }
+  }
+  window.submitBMMaterialAdjustment = submitBMMaterialAdjustment;
+
+  function openBMMaterialReorderModal(materialId) {
+    var m = (_bmMaterialsState.materials || []).find(function (it) { return it.id === materialId; });
+    if (!m) return;
+    _bmMaterialsState.activeReorderItem = m;
+
+    var modal = $('modal-bm-material-reorder');
+    if (!modal) return;
+
+    if ($('bm-mat-reorder-material-id')) $('bm-mat-reorder-material-id').value = m.id;
+    if ($('bm-mat-reorder-name')) $('bm-mat-reorder-name').textContent = m.name;
+    var uom = m.base_uom_name || m.base_uom_code || '';
+    if ($('bm-mat-reorder-uom')) $('bm-mat-reorder-uom').textContent = uom;
+    if ($('bm-mat-reorder-min')) $('bm-mat-reorder-min').value = Number(m.minimum_quantity.toFixed(2));
+    if ($('bm-mat-reorder-target')) $('bm-mat-reorder-target').value = Number(m.target_quantity.toFixed(2));
+
+    modal.style.display = 'flex';
+  }
+  window.openBMMaterialReorderModal = openBMMaterialReorderModal;
+
+  function closeBMMaterialReorderModal() {
+    var modal = $('modal-bm-material-reorder');
+    if (modal) modal.style.display = 'none';
+    _bmMaterialsState.activeReorderItem = null;
+  }
+  window.closeBMMaterialReorderModal = closeBMMaterialReorderModal;
+
+  async function submitBMMaterialReorder(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    var m = _bmMaterialsState.activeReorderItem;
+    if (!m) return;
+
+    var branchId = getStockBranchId();
+    var minInput = $('bm-mat-reorder-min');
+    var targetInput = $('bm-mat-reorder-target');
+    var btn = $('btn-bm-submit-mat-reorder');
+
+    var minQty = minInput ? Number(minInput.value) : 0;
+    var targetQty = targetInput ? Number(targetInput.value) : 0;
+
+    if (!Number.isFinite(minQty) || minQty < 0 || !Number.isFinite(targetQty) || targetQty < minQty) {
+      showToast('⚠️ Target belanja harus lebih besar atau sama dengan batas minimum (>= 0).');
+      return;
+    }
+
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Menyimpan...';
+    }
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/inventory/materials/' + encodeURIComponent(m.id) + '/reorder-policy', {
+        method: 'PUT',
+        headers: Object.assign({}, getAuthHeaders(), { 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          minimum_quantity: minQty,
+          target_quantity: targetQty
+        })
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        showToast('✅ ' + (data.message || 'Batas belanja berhasil diperbarui.'));
+        closeBMMaterialReorderModal();
+        await loadBMMaterials();
+        window.dispatchEvent(new CustomEvent('xentra:inventory:updated', { detail: { branch_id: branchId } }));
+      } else {
+        showToast('❌ Gagal simpan batas belanja: ' + (data.error || data.message || 'Terjadi kesalahan'));
+      }
+    } catch (err) {
+      console.error('[Submit Material Reorder Error]:', err);
+      showToast('❌ Kesalahan jaringan saat menyimpan batas belanja.');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Simpan Batas Belanja';
+      }
+    }
+  }
+  window.submitBMMaterialReorder = submitBMMaterialReorder;
+
+  // Listen to cross-app updates (e.g. from Belanja Settle or POS cook)
+  window.addEventListener('xentra:inventory:updated', function () {
+    loadBMStock();
+    loadBMMaterials(true);
+  });
 
 })();
 

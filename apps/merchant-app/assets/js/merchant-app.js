@@ -41,7 +41,7 @@
     "meja":             { title: "Meja",             sub: "Status dan ketersediaan meja makan (dine-in)",   tab: "bm-meja" },
     "menu":             { title: "Menu",             sub: "Katalog menu dan pengaturan etalase",            tab: "bm-menu" },
     "promo":            { title: "Promo",            sub: "Daftar promosi dan diskon yang sedang aktif",    tab: "bm-promo" },
-    "stok":             { title: "Stok Porsi",       sub: "Pantau dan atur sisa porsi menu yang siap disajikan", tab: "bm-stok" },
+    "stok":             { title: "Inventaris",       sub: "Sisa porsi menu dan bahan baku dapur cabang",    tab: "bm-stok" },
     "belanja":          { title: "Belanja Pasar",    sub: "Catatan belanja bahan baku dan kasbon",          tab: "bm-belanja" },
     "purchasing":       { title: "Belanja Pasar",    sub: "Catatan belanja bahan baku dan kasbon",          tab: "bm-belanja" },
     "staff":            { title: "Staff",            sub: "Daftar akun kasir dan staf resto",               tab: "bm-staff" },
@@ -170,7 +170,11 @@
 
     if (tabId === 'bm-meja' && typeof loadBMTables === 'function') loadBMTables();
     if (tabId === 'bm-menu' && typeof loadBMMenu === 'function') loadBMMenu();
-    if (tabId === 'bm-stok' && typeof loadBMStock === 'function') loadBMStock();
+    if (tabId === 'bm-stok') {
+      if (typeof switchBMStockSubView === 'function') switchBMStockSubView('hub');
+      if (typeof loadBMStock === 'function') loadBMStock();
+      if (typeof loadBMMaterials === 'function') loadBMMaterials(true);
+    }
     if (tabId === 'bm-belanja') {
       document.body.classList.add('is-belanja-active');
       if (typeof loadPurchasingChecklist === 'function') loadPurchasingChecklist();

@@ -808,59 +808,163 @@
         </div>
       </section>
 
-      <!-- TAB: BM-STOK -->
+      <!-- TAB: BM-STOK — LOCKED HIERARCHICAL INVENTORY IA (GoBiz Style) -->
       <section id="tab-bm-stok" class="x-tab-content" data-tab="bm-stok">
-        <div class="x-card-panel x-merchant-op-panel">
-          <div class="x-merchant-screen-head">
+        <!-- Stock Hub Layer 0 -->
+        <div id="bm-stock-hub-view" class="x-menu-view is-active">
+          <div class="x-menu-native-head">
             <div>
-              <h3>Stok Porsi</h3>
-              <p>Pantau dan atur sisa porsi menu yang siap disajikan hari ini.</p>
+              <h3>Inventaris Cabang</h3>
+              <p>Kelola sisa porsi menu kasir, bahan baku dapur, dan kebutuhan belanja.</p>
             </div>
           </div>
 
-          <div class="x-stock-summary" aria-label="Ringkasan ketersediaan menu">
-            <div class="x-stock-summary-item"><span>Tersedia</span><strong id="bm-stock-stat-tracked" style="color:#16a34a;">0</strong></div>
-            <div class="x-stock-summary-item"><span>Menipis</span><strong id="bm-stock-stat-low" style="color:#f59e0b;">0</strong></div>
-            <div class="x-stock-summary-item"><span>Habis</span><strong id="bm-stock-stat-out" style="color:#dc2626;">0</strong></div>
-            <div class="x-stock-summary-item"><span>By Order</span><strong id="bm-stock-stat-untracked">0</strong></div>
+          <div class="x-menu-hub-card">
+            <!-- Row 1: Stok Porsi Menu -->
+            <button type="button" class="x-menu-hub-row" id="btn-bm-stock-open-portions" onclick="switchBMStockSubView('portions')">
+              <span class="x-menu-hub-icon" aria-hidden="true">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>
+              </span>
+              <span class="x-menu-hub-copy">
+                <strong>Stok Porsi Menu (Kasir)</strong>
+                <small>Pantau dan atur sisa porsi menu siap saji hari ini.</small>
+              </span>
+              <span id="bm-stock-hub-portion-badge" class="x-menu-coming-soon" style="background:#e0f2fe; color:#0369a1; font-size:11px;">0 Menu</span>
+              <svg class="x-menu-hub-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+
+            <!-- Row 2: Stok Bahan Baku Dapur -->
+            <button type="button" class="x-menu-hub-row" id="btn-bm-stock-open-materials" onclick="switchBMStockSubView('materials')">
+              <span class="x-menu-hub-icon" aria-hidden="true">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+              </span>
+              <span class="x-menu-hub-copy">
+                <strong>Stok Bahan Baku (Dapur & Kulkas)</strong>
+                <small>Pantau sisa fisik bahan mentah hasil belanja dan opname.</small>
+              </span>
+              <span id="bm-stock-hub-material-badge" class="x-menu-coming-soon" style="background:#dcfce7; color:#15803d; font-size:11px;">0 Bahan</span>
+              <svg class="x-menu-hub-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+
+            <!-- Row 3: Masak Dapur (Prep Resep) -->
+            <button type="button" class="x-menu-hub-row" id="btn-bm-stock-open-kitchen-prep" onclick="openBMKitchenPrepDirect()">
+              <span class="x-menu-hub-icon" aria-hidden="true">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </span>
+              <span class="x-menu-hub-copy">
+                <strong>Masak & Persiapan Dapur</strong>
+                <small>Catat masak batch resep untuk menambah porsi menu kasir.</small>
+              </span>
+              <span class="x-menu-coming-soon" style="background:#fef3c7; color:#92400e; font-size:11px;">Resep</span>
+              <svg class="x-menu-hub-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
           </div>
-          <span id="bm-stock-stat-total" hidden>0</span>
-          <span id="bm-stock-stat-safe" hidden>0</span>
+
+          <div class="x-menu-tip-card">
+            <span aria-hidden="true">💡</span>
+            <div>
+              <strong>Pemisahan Tugas Lapangan</strong>
+              <small>Gunakan <b>Stok Porsi Menu</b> untuk etalase kasir dan <b>Stok Bahan Baku</b> untuk cek kulkas/dapur hasil belanja pasar.</small>
+            </div>
+          </div>
         </div>
 
-        <div class="x-card-panel x-merchant-list-panel">
-          <div class="x-merchant-list-tools">
-            <input type="search" id="bm-stock-search" class="x-input" placeholder="Cari menu..." oninput="onBMStockFilterChange()" aria-label="Cari menu stok">
-            <select id="bm-stock-filter-status" class="x-input" onchange="onBMStockFilterChange()" aria-label="Filter status stok">
-              <option value="all">Semua Menu</option>
-              <option value="safe">Tersedia (Aman)</option>
-              <option value="low">Porsi Menipis</option>
-              <option value="out">Habis</option>
-              <option value="untracked">By Order</option>
-            </select>
+        <!-- Layer 1: Stok Porsi Menu View -->
+        <div id="bm-stock-portions-view" class="x-menu-view" hidden>
+          <div class="x-menu-native-head">
+            <button type="button" class="x-menu-back-btn" id="btn-bm-stock-portions-back" onclick="switchBMStockSubView('hub')" aria-label="Kembali ke Inventaris">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <div class="x-menu-native-head-copy">
+              <h3>Stok Porsi Menu</h3>
+              <p>Pantau dan atur sisa porsi menu yang siap disajikan kasir hari ini.</p>
+            </div>
           </div>
 
-          <!-- Quick Stock Item Cards Container -->
-          <div id="bm-stock-quick-container" class="x-stock-quick-grid" style="margin-bottom:14px;">
-            <div class="text-center py-6 text-muted">Memuat ketersediaan stok cabang...</div>
+          <div class="x-card-panel x-merchant-op-panel">
+            <div class="x-stock-summary" aria-label="Ringkasan ketersediaan menu">
+              <div class="x-stock-summary-item"><span>Tersedia</span><strong id="bm-stock-stat-tracked" style="color:#16a34a;">0</strong></div>
+              <div class="x-stock-summary-item"><span>Menipis</span><strong id="bm-stock-stat-low" style="color:#f59e0b;">0</strong></div>
+              <div class="x-stock-summary-item"><span>Habis</span><strong id="bm-stock-stat-out" style="color:#dc2626;">0</strong></div>
+              <div class="x-stock-summary-item"><span>By Order</span><strong id="bm-stock-stat-untracked">0</strong></div>
+            </div>
+            <span id="bm-stock-stat-total" hidden>0</span>
+            <span id="bm-stock-stat-safe" hidden>0</span>
           </div>
 
-          <!-- Legacy / Fallback table container (hidden by default or kept accessible for screen readers / tests) -->
-          <div class="table-responsive x-merchant-mobile-list" style="display:none;" id="bm-stock-table-wrap">
-            <table class="x-table x-merchant-mobile-table">
-              <thead>
-                <tr>
-                  <th>Produk</th>
-                  <th>Stok</th>
-                  <th>Batas Minimum</th>
-                  <th>Status</th>
-                  <th style="text-align:right;">Aksi</th>
-                </tr>
-              </thead>
-              <tbody id="bm-stock-tbody">
-                <tr><td colspan="5" class="text-center py-6 text-muted">Memuat inventaris cabang...</td></tr>
-              </tbody>
-            </table>
+          <div class="x-card-panel x-merchant-list-panel">
+            <div class="x-merchant-list-tools">
+              <input type="search" id="bm-stock-search" class="x-input" placeholder="Cari menu..." oninput="onBMStockFilterChange()" aria-label="Cari menu stok">
+              <select id="bm-stock-filter-status" class="x-input" onchange="onBMStockFilterChange()" aria-label="Filter status stok">
+                <option value="all">Semua Menu</option>
+                <option value="safe">Tersedia (Aman)</option>
+                <option value="low">Porsi Menipis</option>
+                <option value="out">Habis</option>
+                <option value="untracked">By Order</option>
+              </select>
+            </div>
+
+            <!-- Quick Stock Item Cards Container -->
+            <div id="bm-stock-quick-container" class="x-stock-quick-grid" style="margin-bottom:14px;">
+              <div class="text-center py-6 text-muted">Memuat ketersediaan stok cabang...</div>
+            </div>
+
+            <!-- Legacy / Fallback table container (hidden by default or kept accessible for screen readers / tests) -->
+            <div class="table-responsive x-merchant-mobile-list" style="display:none;" id="bm-stock-table-wrap">
+              <table class="x-table x-merchant-mobile-table">
+                <thead>
+                  <tr>
+                    <th>Produk</th>
+                    <th>Stok</th>
+                    <th>Batas Minimum</th>
+                    <th>Status</th>
+                    <th style="text-align:right;">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="bm-stock-tbody">
+                  <tr><td colspan="5" class="text-center py-6 text-muted">Memuat inventaris cabang...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Layer 1: Stok Bahan Baku Dapur View -->
+        <div id="bm-stock-materials-view" class="x-menu-view" hidden>
+          <div class="x-menu-native-head">
+            <button type="button" class="x-menu-back-btn" id="btn-bm-stock-materials-back" onclick="switchBMStockSubView('hub')" aria-label="Kembali ke Inventaris">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <div class="x-menu-native-head-copy">
+              <h3>Stok Bahan Baku Cabang</h3>
+              <p>Sisa fisik bahan mentah dapur hasil belanja pasar dan opname.</p>
+            </div>
+          </div>
+
+          <div class="x-card-panel x-merchant-op-panel">
+            <div class="x-stock-summary" aria-label="Ringkasan bahan baku cabang">
+              <div class="x-stock-summary-item"><span>Total Bahan</span><strong id="bm-mat-stat-total" style="color:#0284c7;">0</strong></div>
+              <div class="x-stock-summary-item"><span>Aman</span><strong id="bm-mat-stat-safe" style="color:#16a34a;">0</strong></div>
+              <div class="x-stock-summary-item"><span>Menipis</span><strong id="bm-mat-stat-low" style="color:#f59e0b;">0</strong></div>
+              <div class="x-stock-summary-item"><span>Habis</span><strong id="bm-mat-stat-out" style="color:#dc2626;">0</strong></div>
+            </div>
+          </div>
+
+          <div class="x-card-panel x-merchant-list-panel">
+            <div class="x-merchant-list-tools">
+              <input type="search" id="bm-materials-search" class="x-input" placeholder="Cari bahan baku..." oninput="onBMMaterialsFilterChange()" aria-label="Cari bahan baku">
+              <select id="bm-materials-filter-status" class="x-input" onchange="onBMMaterialsFilterChange()" aria-label="Filter status bahan baku">
+                <option value="all">Semua Bahan</option>
+                <option value="low">Menipis & Habis</option>
+                <option value="safe">Stok Aman</option>
+                <option value="out">Habis Saja</option>
+              </select>
+            </div>
+
+            <!-- Quick Materials List Container -->
+            <div id="bm-materials-quick-container" class="x-stock-quick-grid" style="margin-bottom:14px;">
+              <div class="text-center py-6 text-muted">Memuat daftar bahan baku dapur cabang...</div>
+            </div>
           </div>
         </div>
       </section>
@@ -1020,6 +1124,114 @@
           <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px; flex-shrink:0;" id="bm-stock-detail-footer">
             <button type="button" class="x-btn-secondary" onclick="closeBMStockDetailModal()" style="font-size:13px; padding:9px 18px; font-weight:600;">Tutup</button>
           </div>
+        </div>
+      </div>
+
+      <!-- MODAL: BM Material Physical Adjustment (Opname / Waste) -->
+      <div id="modal-bm-material-adjust" class="x-modal" style="display:none; position:fixed; z-index:9999; inset:0; background:rgba(0,0,0,0.5); align-items:center; justify-content:center;">
+        <div class="x-card-panel" style="max-width:440px; width:92%; padding:22px; border-radius:16px; background:#ffffff; box-shadow:0 12px 30px rgba(0,0,0,0.18);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:20px;">⚖️</span>
+              <h4 style="font-size:16px; font-weight:800; margin:0;" id="bm-mat-adjust-modal-title">Koreksi Stok Fisik Dapur</h4>
+            </div>
+            <button type="button" onclick="closeBMMaterialAdjustModal()" style="background:none; border:none; font-size:22px; cursor:pointer; color:var(--text-muted); line-height:1;">&times;</button>
+          </div>
+          <form id="form-bm-material-adjust" onsubmit="submitBMMaterialAdjustment(event)">
+            <input type="hidden" id="bm-mat-adjust-material-id">
+            <div style="margin-bottom:14px; background:#f8fafc; padding:12px; border-radius:10px; border:1px solid #e2e8f0;">
+              <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-muted); margin-bottom:2px;">Bahan Baku Dapur</div>
+              <div id="bm-mat-adjust-name" style="font-size:15px; font-weight:800; color:var(--text-main);">-</div>
+              <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">
+                Catatan sistem saat ini: <strong id="bm-mat-adjust-current-stock" style="color:var(--text-main);">0</strong> <span id="bm-mat-adjust-uom">-</span>
+              </div>
+            </div>
+
+            <div style="margin-bottom:14px;">
+              <label for="bm-mat-adjust-qty" style="display:block; font-size:12px; font-weight:700; margin-bottom:6px; color:var(--text-main);">Fisik Riil di Kulkas / Gudang Cabang</label>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <input type="number" id="bm-mat-adjust-qty" step="any" min="0" class="x-input" style="flex:1; font-size:18px; font-weight:800; padding:10px;" placeholder="0" required>
+                <span id="bm-mat-adjust-input-uom" style="font-size:13px; font-weight:700; color:var(--text-muted); min-width:40px;">-</span>
+                <button type="button" class="x-btn-secondary" style="font-size:12px; font-weight:700; color:#dc2626; border-color:#fca5a5;" onclick="setBMMaterialAdjustQuick(0)">Set 0</button>
+              </div>
+              <div style="display:flex; gap:6px; margin-top:8px;">
+                <button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="addBMMaterialAdjustDelta(-1)">-1</button>
+                <button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="addBMMaterialAdjustDelta(-0.5)">-0.5</button>
+                <button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="addBMMaterialAdjustDelta(0.5)">+0.5</button>
+                <button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="addBMMaterialAdjustDelta(1)">+1</button>
+                <button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="addBMMaterialAdjustDelta(5)">+5</button>
+              </div>
+            </div>
+
+            <div style="margin-bottom:12px;">
+              <label for="bm-mat-adjust-type" style="display:block; font-size:12px; font-weight:700; margin-bottom:4px; color:var(--text-main);">Jenis Koreksi</label>
+              <select id="bm-mat-adjust-type" class="x-input" style="width:100%; font-size:12.5px;">
+                <option value="AUDIT">Stok Opname Rutin Cabang (Hitung Ulang)</option>
+                <option value="WASTE">Bahan Rusak / Basi / Susut Dapur (Waste)</option>
+              </select>
+            </div>
+
+            <div style="margin-bottom:16px;">
+              <label for="bm-mat-adjust-notes" style="display:block; font-size:11.5px; font-weight:700; margin-bottom:4px; color:var(--text-muted);">Catatan (Opsional)</label>
+              <input type="text" id="bm-mat-adjust-notes" class="x-input" style="width:100%; font-size:12px;" placeholder="Mis. Opname pagi, cabe busuk disortir">
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+              <button type="button" class="x-btn-secondary" onclick="closeBMMaterialAdjustModal()" style="font-size:13px; padding:9px 15px;">Batal</button>
+              <button type="submit" class="x-btn-primary" id="btn-bm-submit-mat-adjust" style="font-size:13px; padding:9px 20px; font-weight:700;">Simpan Koreksi</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- MODAL: BM Material Branch Reorder Policy (Batas Belanja Par Level) -->
+      <div id="modal-bm-material-reorder" class="x-modal" style="display:none; position:fixed; z-index:9999; inset:0; background:rgba(0,0,0,0.5); align-items:center; justify-content:center;">
+        <div class="x-card-panel" style="max-width:440px; width:92%; padding:22px; border-radius:16px; background:#ffffff; box-shadow:0 12px 30px rgba(0,0,0,0.18);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:20px;">⚙️</span>
+              <h4 style="font-size:16px; font-weight:800; margin:0;">Atur Batas Belanja Cabang</h4>
+            </div>
+            <button type="button" onclick="closeBMMaterialReorderModal()" style="background:none; border:none; font-size:22px; cursor:pointer; color:var(--text-muted); line-height:1;">&times;</button>
+          </div>
+          <p style="font-size:12px; color:var(--text-muted); margin-bottom:14px; line-height:1.45;">
+            Tentukan batas minimum stok di dapur cabang untuk memicu rekomendasi belanja pasar harian.
+          </p>
+          <form id="form-bm-material-reorder" onsubmit="submitBMMaterialReorder(event)">
+            <input type="hidden" id="bm-mat-reorder-material-id">
+            <div style="margin-bottom:14px; background:#f0f9ff; padding:12px; border-radius:10px; border:1px solid #bae6fd;">
+              <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:#0369a1; margin-bottom:2px;">Bahan Baku</div>
+              <div id="bm-mat-reorder-name" style="font-size:15px; font-weight:800; color:#0c4a6e;">-</div>
+              <div style="font-size:12px; color:#0369a1; margin-top:2px;">
+                Satuan Ukur: <strong id="bm-mat-reorder-uom">-</strong>
+              </div>
+            </div>
+
+            <div style="margin-bottom:14px;">
+              <label for="bm-mat-reorder-min" style="display:block; font-size:12.5px; font-weight:700; margin-bottom:4px; color:var(--text-main);">
+                Batas Minimum (Par Level)
+              </label>
+              <input type="number" id="bm-mat-reorder-min" step="any" min="0" class="x-input" style="width:100%; font-size:16px; font-weight:700; padding:10px;" required placeholder="Mis. 5">
+              <small style="font-size:11px; color:var(--text-muted); display:block; margin-top:4px;">
+                Saat stok di bawah angka ini, bahan baku akan otomatis ditandai <b>Menipis</b> dan masuk checklist Belanja Pasar.
+              </small>
+            </div>
+
+            <div style="margin-bottom:16px;">
+              <label for="bm-mat-reorder-target" style="display:block; font-size:12.5px; font-weight:700; margin-bottom:4px; color:var(--text-main);">
+                Target Belanja (Kebutuhan Aman)
+              </label>
+              <input type="number" id="bm-mat-reorder-target" step="any" min="0" class="x-input" style="width:100%; font-size:16px; font-weight:700; padding:10px;" required placeholder="Mis. 15">
+              <small style="font-size:11px; color:var(--text-muted); display:block; margin-top:4px;">
+                Jumlah stok ideal yang ingin dicapai setelah staf selesai belanja.
+              </small>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+              <button type="button" class="x-btn-secondary" onclick="closeBMMaterialReorderModal()" style="font-size:13px; padding:9px 15px;">Batal</button>
+              <button type="submit" class="x-btn-primary" id="btn-bm-submit-mat-reorder" style="font-size:13px; padding:9px 20px; font-weight:700;">Simpan Batas Belanja</button>
+            </div>
+          </form>
         </div>
       </div>
 

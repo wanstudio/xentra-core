@@ -224,6 +224,270 @@ router.patch('/admin/branches/:id/inventory/:productId', requireAuth(['owner', '
   }
 });
 
+// GET /admin/branches/:id/inventory/materials
+// Returns raw materials for the branch's organization with current physical stock balances at this branch,
+// base UOM, branch reorder policy (minimum & target quantity), and cost status.
+router.get('/admin/branches/:id/inventory/materials', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    if (req.user.role === 'branch_manager') {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (assignedBranchId && assignedBranchId !== req.params.id) {
+        return res.status(403).json({
+          success: false,
+          error: 'FORBIDDEN_BRANCH_SCOPE',
+          message: 'Branch Manager hanya memiliki kewenangan pada cabang yang ditugaskan.'
+        });
+      }
+    }
+
+    const branch = db.prepare('SELECT b.id, b.name, b.brand_id, br.organization_id FROM branches b JOIN brands br ON br.id = b.brand_id WHERE b.id = ? AND b.brand_id = ?').get(req.params.id, req.brand_id);
+    if (!branch) {
+      return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
+    }
+
+    const location = db.prepare("SELECT id FROM stock_locations WHERE branch_id = ? AND is_active = 1 LIMIT 1").get(req.params.id);
+    if (!location) {
+      return res.status(400).json({ success: false, error: 'Lokasi gudang persediaan cabang belum aktif.' });
+    }
+
+    const rows = db.prepare(`
+      SELECT
+        m.id,
+        m.material_code,
+        m.name,
+        m.description,
+        m.base_uom_id,
+        u.name AS base_uom_name,
+        u.code AS base_uom_code,
+        COALESCE(msb.quantity_base, 0) AS current_stock,
+        COALESCE(msb.moving_average_unit_cost, 0) AS moving_average_unit_cost,
+        msb.cost_availability_status,
+        COALESCE(rp.minimum_quantity, 5) AS minimum_quantity,
+        COALESCE(rp.target_quantity, 15) AS target_quantity
+      FROM materials m
+      JOIN uoms u ON u.id = m.base_uom_id
+      LEFT JOIN material_stock_balances msb
+        ON msb.material_id = m.id AND msb.stock_location_id = ?
+      LEFT JOIN inventory_reorder_policies rp
+        ON rp.identity_id = m.id AND rp.stock_location_id = ? AND rp.identity_type = 'MATERIAL'
+      WHERE m.organization_id = ? AND m.status = 'ACTIVE'
+      ORDER BY m.name ASC
+    `).all(location.id, location.id, branch.organization_id);
+
+    const materials = rows.map(r => {
+      let status = 'SAFE';
+      if (r.current_stock <= 0) {
+        status = 'OUT_OF_STOCK';
+      } else if (r.current_stock <= r.minimum_quantity) {
+        status = 'LOW_STOCK';
+      }
+      return {
+        id: r.id,
+        material_code: r.material_code,
+        name: r.name,
+        description: r.description,
+        base_uom_id: r.base_uom_id,
+        base_uom_name: r.base_uom_name,
+        base_uom_code: r.base_uom_code,
+        current_stock: Number(r.current_stock),
+        moving_average_unit_cost: Number(r.moving_average_unit_cost),
+        cost_availability_status: r.cost_availability_status || 'UNAVAILABLE',
+        minimum_quantity: Number(r.minimum_quantity),
+        target_quantity: Number(r.target_quantity),
+        status
+      };
+    });
+
+    res.json({
+      success: true,
+      branch_id: branch.id,
+      stock_location_id: location.id,
+      materials
+    });
+  } catch (err) {
+    console.error('[API Error GET /admin/branches/:id/inventory/materials]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /admin/branches/:id/inventory/materials/:materialId/adjust
+// Allows Branch Manager to record physical stock opname (audit adjustment) or waste/spoilage for raw materials.
+router.post('/admin/branches/:id/inventory/materials/:materialId/adjust', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    if (req.user.role === 'branch_manager') {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (assignedBranchId && assignedBranchId !== req.params.id) {
+        return res.status(403).json({
+          success: false,
+          error: 'FORBIDDEN_BRANCH_SCOPE',
+          message: 'Branch Manager hanya memiliki kewenangan pada cabang yang ditugaskan.'
+        });
+      }
+    }
+
+    const branch = db.prepare('SELECT b.id, b.name, b.brand_id, br.organization_id FROM branches b JOIN brands br ON br.id = b.brand_id WHERE b.id = ? AND b.brand_id = ?').get(req.params.id, req.brand_id);
+    if (!branch) {
+      return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
+    }
+
+    const location = db.prepare("SELECT id FROM stock_locations WHERE branch_id = ? AND is_active = 1 LIMIT 1").get(req.params.id);
+    if (!location) {
+      return res.status(400).json({ success: false, error: 'Lokasi gudang persediaan cabang belum aktif.' });
+    }
+
+    const material = db.prepare("SELECT id, name, base_uom_id FROM materials WHERE id = ? AND organization_id = ? AND status = 'ACTIVE'").get(req.params.materialId, branch.organization_id);
+    if (!material) {
+      return res.status(404).json({ success: false, error: 'Bahan baku tidak ditemukan atau tidak aktif.' });
+    }
+
+    const countedQty = req.body.counted_quantity !== undefined ? Number(req.body.counted_quantity) : null;
+    const adjustmentType = req.body.adjustment_type || 'AUDIT'; // 'AUDIT' or 'WASTE'
+    const notes = String(req.body.notes || '').trim() || (adjustmentType === 'WASTE' ? 'Catatan Bahan Rusak/Susut Cabang' : 'Stok Opname Cabang');
+    const actorId = req.user.userId || req.user.id || req.user.username || 'branch_manager';
+
+    if (countedQty === null || !Number.isFinite(countedQty) || countedQty < 0) {
+      return res.status(400).json({ success: false, error: 'INVALID_QUANTITY', message: 'Jumlah fisik hasil opname harus berupa angka non-negatif (>= 0).' });
+    }
+
+    const now = new Date().toISOString();
+    const balance = db.prepare(`
+      SELECT quantity_base, carrying_value, moving_average_unit_cost, valuation_version
+      FROM material_stock_balances
+      WHERE stock_location_id = ? AND material_id = ?
+    `).get(location.id, material.id);
+
+    const prevQty = balance ? Number(balance.quantity_base) : 0;
+    const unitCost = balance ? Number(balance.moving_average_unit_cost) : 0;
+    const qtyDiff = countedQty - prevQty;
+
+    if (Math.abs(qtyDiff) < 0.000001) {
+      return res.json({
+        success: true,
+        message: 'Stok fisik sesuai dengan catatan sistem. Tidak ada perubahan stok.',
+        material_id: material.id,
+        current_stock: countedQty
+      });
+    }
+
+    const maxMovVer = db.prepare(`
+      SELECT MAX(valuation_version) AS max_v
+      FROM material_stock_movements
+      WHERE stock_location_id = ? AND material_id = ?
+    `).get(location.id, material.id);
+    const newVer = ((maxMovVer && maxMovVer.max_v != null) ? Number(maxMovVer.max_v) : 0) + 1;
+
+    let movType;
+    let costBasis;
+    if (qtyDiff > 0) {
+      movType = 'ADJUSTMENT_IN';
+      costBasis = 'COUNT_CORRECTION';
+    } else {
+      movType = (adjustmentType === 'WASTE') ? 'WASTE' : 'ADJUSTMENT_OUT';
+      costBasis = 'CURRENT_MOVING_AVERAGE';
+    }
+
+    const totalCostDelta = Number((qtyDiff * unitCost).toFixed(4));
+    const newCarryingVal = Math.max(0, Number(((balance ? Number(balance.carrying_value) : 0) + totalCostDelta).toFixed(4)));
+
+    if (balance) {
+      db.prepare(`
+        UPDATE material_stock_balances
+        SET quantity_base = ?, carrying_value = ?, valuation_version = ?, updated_at = ?
+        WHERE stock_location_id = ? AND material_id = ?
+      `).run(countedQty, newCarryingVal, newVer, now, location.id, material.id);
+    } else {
+      db.prepare(`
+        INSERT INTO material_stock_balances (
+          stock_location_id, material_id, quantity_base, carrying_value,
+          moving_average_unit_cost, cost_availability_status, valuation_version, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, 'AVAILABLE', 1, ?, ?)
+      `).run(location.id, material.id, countedQty, newCarryingVal, unitCost, now, now);
+    }
+
+    const movId = 'mov_' + crypto.randomBytes(8).toString('hex');
+    const mutationId = 'adj_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex');
+    db.prepare(`
+      INSERT INTO material_stock_movements (
+        id, stock_location_id, material_id, movement_type, quantity_base,
+        previous_quantity, current_quantity, unit_cost, total_cost, currency_code,
+        valuation_method, cost_basis_type, source_type, source_reference,
+        posting_mutation_id, valuation_version, posting_timestamp, actor_id, resolver_version, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'IDR', 'MOVING_AVERAGE', ?, 'STOCK_OPNAME', ?, ?, ?, ?, ?, 'v1', ?)
+    `).run(
+      movId, location.id, material.id, movType, qtyDiff, prevQty, countedQty,
+      unitCost, totalCostDelta, costBasis, 'BRANCH_OPNAME_' + branch.id, mutationId,
+      newVer, now, actorId, notes
+    );
+
+    res.json({
+      success: true,
+      message: 'Penyesuaian stok bahan fisik berhasil dicatat.',
+      material_id: material.id,
+      previous_quantity: prevQty,
+      current_stock: countedQty,
+      adjustment_quantity: qtyDiff,
+      movement_type: movType
+    });
+  } catch (err) {
+    console.error('[API Error POST /admin/branches/:id/inventory/materials/:materialId/adjust]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// PUT /admin/branches/:id/inventory/materials/:materialId/reorder-policy
+// Allows Branch Manager to set their branch's own minimum par-level and target replenishment quantity.
+router.put('/admin/branches/:id/inventory/materials/:materialId/reorder-policy', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    if (req.user.role === 'branch_manager') {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (assignedBranchId && assignedBranchId !== req.params.id) {
+        return res.status(403).json({
+          success: false,
+          error: 'FORBIDDEN_BRANCH_SCOPE',
+          message: 'Branch Manager hanya memiliki kewenangan pada cabang yang ditugaskan.'
+        });
+      }
+    }
+
+    const branch = db.prepare('SELECT b.id, b.name, b.brand_id, br.organization_id FROM branches b JOIN brands br ON br.id = b.brand_id WHERE b.id = ? AND b.brand_id = ?').get(req.params.id, req.brand_id);
+    if (!branch) {
+      return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
+    }
+
+    const location = db.prepare("SELECT id FROM stock_locations WHERE branch_id = ? AND is_active = 1 LIMIT 1").get(req.params.id);
+    if (!location) {
+      return res.status(400).json({ success: false, error: 'Lokasi gudang persediaan cabang belum aktif.' });
+    }
+
+    const minQty = Math.max(0, Number(req.body.minimum_quantity) || 0);
+    const targetQty = Math.max(minQty, Number(req.body.target_quantity) || minQty);
+    const actorId = req.user.userId || req.user.id || req.user.username || 'branch_manager';
+    const now = new Date().toISOString();
+
+    db.prepare(`
+      INSERT INTO inventory_reorder_policies (
+        stock_location_id, identity_type, identity_id, minimum_quantity, target_quantity, updated_by, created_at, updated_at
+      ) VALUES (?, 'MATERIAL', ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(stock_location_id, identity_type, identity_id) DO UPDATE SET
+        minimum_quantity = excluded.minimum_quantity,
+        target_quantity = excluded.target_quantity,
+        updated_by = excluded.updated_by,
+        updated_at = excluded.updated_at
+    `).run(location.id, req.params.materialId, minQty, targetQty, actorId, now, now);
+
+    res.json({
+      success: true,
+      message: 'Batas belanja (Par Level) cabang berhasil diperbarui.',
+      material_id: req.params.materialId,
+      minimum_quantity: minQty,
+      target_quantity: targetQty
+    });
+  } catch (err) {
+    console.error('[API Error PUT /admin/branches/:id/inventory/materials/:materialId/reorder-policy]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // GET /admin/branches/:id/inventory/recipes
 // Lists active recipes applicable to the branch's products, including real-time material stock availability.
 router.get('/admin/branches/:id/inventory/recipes', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {

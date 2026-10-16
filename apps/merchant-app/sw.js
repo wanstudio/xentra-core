@@ -13,7 +13,7 @@
  */
 
 var APP_CACHE_PREFIX = "xentra-merchant-";
-var APP_VERSION = "v1.4.20";
+var APP_VERSION = "v1.4.21";
 var FALLBACK_CACHE_NAME = "xentra-merchant-live";
 
 var STATIC_ASSETS = [
