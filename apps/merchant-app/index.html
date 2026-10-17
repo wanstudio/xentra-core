@@ -847,7 +847,7 @@
             </button>
 
             <!-- Row 3: Masak Dapur (Prep Resep) -->
-            <button type="button" class="x-menu-hub-row" id="btn-bm-stock-open-kitchen-prep" onclick="openBMKitchenPrepDirect()">
+            <button type="button" class="x-menu-hub-row" id="btn-bm-stock-open-kitchen-prep" onclick="if (typeof openBMRecipePickerModal === 'function') { openBMRecipePickerModal(); } else if (typeof openBMKitchenPrepDirect === 'function') { openBMKitchenPrepDirect(); } else { window.location.reload(); }">
               <span class="x-menu-hub-icon" aria-hidden="true">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
               </span>
@@ -855,7 +855,7 @@
                 <strong>Masak & Persiapan Dapur</strong>
                 <small>Catat masak batch resep untuk menambah porsi menu kasir.</small>
               </span>
-              <span class="x-menu-coming-soon" style="background:#fef3c7; color:#92400e; font-size:11px;">Resep</span>
+              <span id="bm-stock-hub-recipe-badge" class="x-menu-coming-soon" style="background:#fef3c7; color:#92400e; font-size:11px;">0 Resep</span>
               <svg class="x-menu-hub-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
             </button>
           </div>
@@ -881,51 +881,47 @@
             </div>
           </div>
 
-          <div class="x-card-panel x-merchant-op-panel">
-            <div class="x-stock-summary" aria-label="Ringkasan ketersediaan menu">
-              <div class="x-stock-summary-item"><span>Tersedia</span><strong id="bm-stock-stat-tracked" style="color:#16a34a;">0</strong></div>
-              <div class="x-stock-summary-item"><span>Menipis</span><strong id="bm-stock-stat-low" style="color:#f59e0b;">0</strong></div>
-              <div class="x-stock-summary-item"><span>Habis</span><strong id="bm-stock-stat-out" style="color:#dc2626;">0</strong></div>
-              <div class="x-stock-summary-item"><span>By Order</span><strong id="bm-stock-stat-untracked">0</strong></div>
-            </div>
-            <span id="bm-stock-stat-total" hidden>0</span>
-            <span id="bm-stock-stat-safe" hidden>0</span>
+          <div class="x-stock-summary" aria-label="Ringkasan ketersediaan menu" style="margin-top:0; margin-bottom:16px;">
+            <div class="x-stock-summary-item"><span>Tersedia</span><strong id="bm-stock-stat-tracked" style="color:#16a34a;">0</strong></div>
+            <div class="x-stock-summary-item"><span>Menipis</span><strong id="bm-stock-stat-low" style="color:#f59e0b;">0</strong></div>
+            <div class="x-stock-summary-item"><span>Habis</span><strong id="bm-stock-stat-out" style="color:#dc2626;">0</strong></div>
+            <div class="x-stock-summary-item"><span>Belum dilacak</span><strong id="bm-stock-stat-untracked">0</strong></div>
+          </div>
+          <span id="bm-stock-stat-total" hidden>0</span>
+          <span id="bm-stock-stat-safe" hidden>0</span>
+
+          <div class="x-merchant-list-tools" style="margin-bottom:14px;">
+            <input type="search" id="bm-stock-search" class="x-input" placeholder="Cari menu..." oninput="onBMStockFilterChange()" aria-label="Cari menu stok">
+            <select id="bm-stock-filter-status" class="x-input" onchange="onBMStockFilterChange()" aria-label="Filter status stok">
+              <option value="all">Semua Menu</option>
+              <option value="safe">Tersedia (Aman)</option>
+              <option value="low">Porsi Menipis</option>
+              <option value="out">Habis</option>
+              <option value="untracked">Belum dilacak</option>
+            </select>
           </div>
 
-          <div class="x-card-panel x-merchant-list-panel">
-            <div class="x-merchant-list-tools">
-              <input type="search" id="bm-stock-search" class="x-input" placeholder="Cari menu..." oninput="onBMStockFilterChange()" aria-label="Cari menu stok">
-              <select id="bm-stock-filter-status" class="x-input" onchange="onBMStockFilterChange()" aria-label="Filter status stok">
-                <option value="all">Semua Menu</option>
-                <option value="safe">Tersedia (Aman)</option>
-                <option value="low">Porsi Menipis</option>
-                <option value="out">Habis</option>
-                <option value="untracked">By Order</option>
-              </select>
-            </div>
+          <!-- Quick Stock Item Cards Container -->
+          <div id="bm-stock-quick-container" class="x-stock-quick-grid" style="margin-bottom:14px;">
+            <div class="text-center py-6 text-muted">Memuat ketersediaan stok cabang...</div>
+          </div>
 
-            <!-- Quick Stock Item Cards Container -->
-            <div id="bm-stock-quick-container" class="x-stock-quick-grid" style="margin-bottom:14px;">
-              <div class="text-center py-6 text-muted">Memuat ketersediaan stok cabang...</div>
-            </div>
-
-            <!-- Legacy / Fallback table container (hidden by default or kept accessible for screen readers / tests) -->
-            <div class="table-responsive x-merchant-mobile-list" style="display:none;" id="bm-stock-table-wrap">
-              <table class="x-table x-merchant-mobile-table">
-                <thead>
-                  <tr>
-                    <th>Produk</th>
-                    <th>Stok</th>
-                    <th>Batas Minimum</th>
-                    <th>Status</th>
-                    <th style="text-align:right;">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody id="bm-stock-tbody">
-                  <tr><td colspan="5" class="text-center py-6 text-muted">Memuat inventaris cabang...</td></tr>
-                </tbody>
-              </table>
-            </div>
+          <!-- Legacy / Fallback table container (hidden by default or kept accessible for screen readers / tests) -->
+          <div class="table-responsive x-merchant-mobile-list" style="display:none;" id="bm-stock-table-wrap">
+            <table class="x-table x-merchant-mobile-table">
+              <thead>
+                <tr>
+                  <th>Produk</th>
+                  <th>Stok</th>
+                  <th>Batas Minimum</th>
+                  <th>Status</th>
+                  <th style="text-align:right;">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="bm-stock-tbody">
+                <tr><td colspan="5" class="text-center py-6 text-muted">Memuat inventaris cabang...</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -941,30 +937,26 @@
             </div>
           </div>
 
-          <div class="x-card-panel x-merchant-op-panel">
-            <div class="x-stock-summary" aria-label="Ringkasan bahan baku cabang">
-              <div class="x-stock-summary-item"><span>Total Bahan</span><strong id="bm-mat-stat-total" style="color:#0284c7;">0</strong></div>
-              <div class="x-stock-summary-item"><span>Aman</span><strong id="bm-mat-stat-safe" style="color:#16a34a;">0</strong></div>
-              <div class="x-stock-summary-item"><span>Menipis</span><strong id="bm-mat-stat-low" style="color:#f59e0b;">0</strong></div>
-              <div class="x-stock-summary-item"><span>Habis</span><strong id="bm-mat-stat-out" style="color:#dc2626;">0</strong></div>
-            </div>
+          <div class="x-stock-summary" aria-label="Ringkasan bahan baku cabang" style="margin-top:0; margin-bottom:16px;">
+            <div class="x-stock-summary-item"><span>Total Bahan</span><strong id="bm-mat-stat-total" style="color:#0284c7;">0</strong></div>
+            <div class="x-stock-summary-item"><span>Aman</span><strong id="bm-mat-stat-safe" style="color:#16a34a;">0</strong></div>
+            <div class="x-stock-summary-item"><span>Menipis</span><strong id="bm-mat-stat-low" style="color:#f59e0b;">0</strong></div>
+            <div class="x-stock-summary-item"><span>Habis</span><strong id="bm-mat-stat-out" style="color:#dc2626;">0</strong></div>
           </div>
 
-          <div class="x-card-panel x-merchant-list-panel">
-            <div class="x-merchant-list-tools">
-              <input type="search" id="bm-materials-search" class="x-input" placeholder="Cari bahan baku..." oninput="onBMMaterialsFilterChange()" aria-label="Cari bahan baku">
-              <select id="bm-materials-filter-status" class="x-input" onchange="onBMMaterialsFilterChange()" aria-label="Filter status bahan baku">
-                <option value="all">Semua Bahan</option>
-                <option value="low">Menipis & Habis</option>
-                <option value="safe">Stok Aman</option>
-                <option value="out">Habis Saja</option>
-              </select>
-            </div>
+          <div class="x-merchant-list-tools" style="margin-bottom:14px;">
+            <input type="search" id="bm-materials-search" class="x-input" placeholder="Cari bahan baku..." oninput="onBMMaterialsFilterChange()" aria-label="Cari bahan baku">
+            <select id="bm-materials-filter-status" class="x-input" onchange="onBMMaterialsFilterChange()" aria-label="Filter status bahan baku">
+              <option value="all">Semua Bahan</option>
+              <option value="low">Menipis & Habis</option>
+              <option value="safe">Stok Aman</option>
+              <option value="out">Habis Saja</option>
+            </select>
+          </div>
 
-            <!-- Quick Materials List Container -->
-            <div id="bm-materials-quick-container" class="x-stock-quick-grid" style="margin-bottom:14px;">
-              <div class="text-center py-6 text-muted">Memuat daftar bahan baku dapur cabang...</div>
-            </div>
+          <!-- Quick Materials List Container -->
+          <div id="bm-materials-quick-container" class="x-stock-quick-grid" style="margin-bottom:14px;">
+            <div class="text-center py-6 text-muted">Memuat daftar bahan baku dapur cabang...</div>
           </div>
         </div>
       </section>
@@ -1035,9 +1027,43 @@
         </div>
       </div>
 
+      <!-- MODAL: BM Recipe Picker (Pilih Menu Masakan Dapur) -->
+      <div id="modal-bm-recipe-picker" class="x-modal" style="display:none; position:fixed; z-index:12050; inset:0; background:rgba(0,0,0,0.55); align-items:center; justify-content:center;" onclick="if(event.target === this) closeBMRecipePickerModal()">
+        <div class="x-modal-card x-card-panel" style="max-width:500px; width:92%; padding:20px; border-radius:16px; background:#ffffff; box-shadow:0 12px 30px rgba(0,0,0,0.22); max-height:88vh; display:flex; flex-direction:column; position:relative; z-index:12051;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:22px;">🍳</span>
+              <div>
+                <h4 style="font-size:16px; font-weight:800; margin:0;">Pilih Menu Dapur</h4>
+                <p style="font-size:11.5px; color:var(--text-muted); margin:2px 0 0 0;">Pilih menu beresep yang ingin dimasak hari ini.</p>
+              </div>
+            </div>
+            <button type="button" onclick="closeBMRecipePickerModal()" style="background:none; border:none; font-size:22px; cursor:pointer; color:var(--text-muted); line-height:1;" aria-label="Tutup">&times;</button>
+          </div>
+
+          <!-- Quick Search Filter -->
+          <div style="margin-bottom:12px;">
+            <div style="position:relative;">
+              <input type="text" id="bm-recipe-picker-search" class="x-input" placeholder="Cari nama menu atau resep..." style="width:100%; font-size:12.5px; padding:8px 12px 8px 32px;" oninput="filterBMRecipePicker()">
+              <span style="position:absolute; left:10px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:13px;">🔍</span>
+            </div>
+          </div>
+
+          <!-- List Container -->
+          <div id="bm-recipe-picker-list" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding-right:2px; min-height:140px; max-height:58vh;">
+            <!-- Dinamis via JS -->
+          </div>
+
+          <div style="margin-top:14px; padding-top:12px; border-top:1px solid #f1f5f9; display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:11px; color:var(--text-muted);">Resep standar diatur oleh Owner</span>
+            <button type="button" class="x-btn-secondary" onclick="closeBMRecipePickerModal()" style="font-size:12.5px; padding:7px 16px;">Tutup</button>
+          </div>
+        </div>
+      </div>
+
       <!-- MODAL: BM Cooking / Preparation Batch (Catat Hasil Masak) -->
-      <div id="modal-bm-stock-prepare" class="x-modal" style="display:none; position:fixed; z-index:9999; inset:0; background:rgba(0,0,0,0.5); align-items:center; justify-content:center;">
-        <div class="x-card-panel" style="max-width:480px; width:92%; padding:22px; border-radius:16px; background:#ffffff; box-shadow:0 12px 30px rgba(0,0,0,0.18); max-height:90vh; overflow-y:auto;">
+      <div id="modal-bm-stock-prepare" class="x-modal" style="display:none; position:fixed; z-index:12055; inset:0; background:rgba(0,0,0,0.55); align-items:center; justify-content:center;" onclick="if(event.target === this) closeBMStockPrepareModal()">
+        <div class="x-modal-card x-card-panel" style="max-width:480px; width:92%; padding:22px; border-radius:16px; background:#ffffff; box-shadow:0 12px 30px rgba(0,0,0,0.22); max-height:90vh; overflow-y:auto; position:relative; z-index:12056;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
             <div style="display:flex; align-items:center; gap:8px;">
               <span style="font-size:20px;">🍳</span>
@@ -3005,7 +3031,7 @@
   <script src="/merchant-app/assets/js/jam-operasional.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/reports.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/tables.js?v=1.0.0"></script>
-  <script src="/merchant-app/assets/js/stock.js?v=1.1.1"></script>
+  <script src="/merchant-app/assets/js/stock.js?v=1.2.1"></script>
   <script src="/merchant-app/assets/js/purchasing.js?v=1.3.1"></script>
   <script src="/merchant-app/assets/js/promotions.js?v=1.0.2"></script>
   <script src="/merchant-app/assets/js/staff.js?v=1.0.0"></script>

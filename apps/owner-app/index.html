@@ -3270,8 +3270,8 @@
           <div class="x-modal-handle"></div>
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
             <div>
-              <h3 id="edit-mat-modal-title" style="margin:0; font-size:16px; font-weight:700; color:#0F172A;">Edit Bahan & Stok</h3>
-              <p style="margin:2px 0 0 0; font-size:12px; color:#64748B;">Atur stok fisik saat ini, harga pasar, dan batas peringatan belanja.</p>
+              <h3 id="edit-mat-modal-title" style="margin:0; font-size:16px; font-weight:700; color:#0F172A;">Edit Master Bahan Baku</h3>
+              <p style="margin:2px 0 0 0; font-size:12px; color:#64748B;">Kelola identitas bahan master, satuan dasar, dan standar harga acuan.</p>
             </div>
             <button type="button" onclick="closeEditMaterialModal()" style="background:none; border:none; cursor:pointer; color:#64748B;">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -3302,34 +3302,14 @@
               </div>
             </div>
 
-            <!-- Bagian Stok & Harga Pasar -->
-            <!-- Bagian Stok & Harga Pasar -->
+            <!-- Standar Harga Acuan Master -->
             <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:14px; margin-bottom:14px;">
-              <div style="font-size:12px; font-weight:700; color:#0F172A; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
-                <span>📦 Stok Fisik & Harga Beli</span>
-              </div>
-              <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:6px;">
-                <div>
-                  <label for="edit-mat-current-stock" style="display:block; font-size:11.5px; font-weight:600; color:#475569; margin-bottom:4px;">Sisa Stok Fisik Saat Ini</label>
-                  <input type="number" id="edit-mat-current-stock" step="any" min="0" placeholder="0" style="width:100%; box-sizing:border-box; padding:9px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px; font-weight:700; color:#0F172A;">
-                  <span id="edit-mat-stock-hint" style="font-size:11px; color:#64748B; margin-top:2px; display:block;">Jumlah riil yang ada saat ini</span>
-                </div>
-                <div>
-                  <label for="edit-mat-unit-cost" style="display:block; font-size:11.5px; font-weight:600; color:#475569; margin-bottom:4px;">Harga Pasar / Beli (Rp)</label>
-                  <input type="text" id="edit-mat-unit-cost" data-input-type="currency" inputmode="numeric" placeholder="0" style="width:100%; box-sizing:border-box; padding:9px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px;">
-                  <span style="font-size:11px; color:#64748B; margin-top:2px; display:block;">Per satuan dasar</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Bagian Target Stok Belanja -->
-            <div style="background:#F0FDF4; border:1px solid #BBF7D0; border-radius:12px; padding:14px; margin-bottom:18px;">
-              <label for="edit-mat-target-qty" style="display:block; font-size:12px; font-weight:700; color:#166534; margin-bottom:4px;">🎯 Target Stok Resto (Batas Belanja):</label>
+              <label for="edit-mat-unit-cost" style="display:block; font-size:12px; font-weight:700; color:#0F172A; margin-bottom:4px;">💵 Standar Harga Acuan / Estimasi Beli (Rp)</label>
               <div style="display:flex; align-items:center; gap:8px;">
-                <input type="number" id="edit-mat-target-qty" step="any" min="0" placeholder="0" style="flex:1; box-sizing:border-box; padding:9px 12px; border:1px solid #86EFAC; border-radius:8px; font-size:13px; font-weight:700; background:#FFFFFF; color:#0F172A;">
-                <span id="edit-mat-target-unit-label" style="font-size:13px; font-weight:800; color:#166534; background:#DCFCE7; padding:8px 12px; border-radius:8px; border:1px solid #86EFAC;">Satuan</span>
+                <input type="text" id="edit-mat-unit-cost" data-input-type="currency" inputmode="numeric" placeholder="0" style="flex:1; box-sizing:border-box; padding:9px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px; font-weight:700;">
+                <span id="edit-mat-base-uom-suffix" style="font-size:12px; font-weight:700; color:#64748B; background:#F1F5F9; padding:8px 12px; border-radius:8px; border:1px solid #CBD5E1;">per Satuan</span>
               </div>
-              <span id="edit-mat-target-hint" style="font-size:11px; color:#15803D; margin-top:4px; display:block;">Jumlah stok yang idealnya selalu siap sedia di resto. Jika stok fisik kurang dari target ini, sistem otomatis sarankan belanja.</span>
+              <span style="font-size:11px; color:#64748B; margin-top:4px; display:block;">Digunakan sebagai acuan HPP master dan patokan belanja. Sisa fisik riil dan batas minimum belanja cabang dikelola langsung oleh Branch Manager di aplikasi merchant cabang.</span>
             </div>
 
             <div style="margin-bottom:18px;">
@@ -6223,7 +6203,7 @@
   <script src="/merchant-dashboard/assets/js/modules/auth.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/overview.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/orders.js?v=1.0.0"></script>
-  <script src="/merchant-dashboard/assets/js/modules/stock.js?v=2.5.0"></script>
+  <script src="/merchant-dashboard/assets/js/modules/stock.js?v=2.5.1"></script>
   <script src="/merchant-dashboard/assets/js/modules/branches.js?v=1.0.1"></script>
   <script src="/merchant-dashboard/assets/js/modules/reports.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/team.js?v=1.0.0"></script>

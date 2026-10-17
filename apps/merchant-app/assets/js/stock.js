@@ -145,6 +145,19 @@
         hubPortionBadge.style.color = '#0369a1';
       }
     }
+
+    var hubRecipeBadge = $('bm-stock-hub-recipe-badge');
+    if (hubRecipeBadge) {
+      var rCount = (_bmStockState.recipes || []).length;
+      hubRecipeBadge.textContent = rCount + ' Resep';
+      if (rCount > 0) {
+        hubRecipeBadge.style.background = '#fef3c7';
+        hubRecipeBadge.style.color = '#92400e';
+      } else {
+        hubRecipeBadge.style.background = '#f1f5f9';
+        hubRecipeBadge.style.color = '#64748b';
+      }
+    }
   }
 
   function onBMStockFilterChange() {
@@ -498,16 +511,24 @@
 
   /* Cooking / Preparation Batch Modal Handlers */
   function openBMStockPrepareModal(productId) {
-    var item = (_bmStockState.inventory || []).find(function (it) { return it.product_id === productId; });
     var recipe = (_bmStockState.recipes || []).find(function (r) { return r.output_product_id === productId; });
-    if (!item || !recipe) {
+    if (!recipe) {
       showToast('Resep masakan untuk menu ini belum terdaftar.');
-      return;
+      return false;
+    }
+
+    var item = (_bmStockState.inventory || []).find(function (it) { return it.product_id === productId; });
+    if (!item) {
+      item = {
+        product_id: recipe.output_product_id,
+        product_name: recipe.output_product_name || recipe.recipe_name,
+        stock: 0
+      };
     }
 
     _bmStockState.activePrepareItem = item;
     var modal = $('modal-bm-stock-prepare');
-    if (!modal) return;
+    if (!modal) return false;
 
     var yieldQty = Math.max(1, Number(recipe.planned_yield_quantity) || 10);
 
@@ -523,6 +544,7 @@
     renderBMPrepareBatchButtons(yieldQty);
     updateBMPrepareMaterialsPreview();
     modal.style.display = 'flex';
+    return true;
   }
   window.openBMStockPrepareModal = openBMStockPrepareModal;
 
@@ -883,36 +905,163 @@
     activeReorderItem: null
   };
 
-  function switchBMStockSubView(viewName) {
-    var hubEl = $('bm-stock-hub-view');
-    var portionsEl = $('bm-stock-portions-view');
-    var materialsEl = $('bm-stock-materials-view');
+  function switchBMStockSubView(viewName, options) {
+    options = options || {};
+    var views = {
+      hub: $('bm-stock-hub-view'),
+      portions: $('bm-stock-portions-view'),
+      materials: $('bm-stock-materials-view')
+    };
 
-    if (hubEl) hubEl.hidden = (viewName !== 'hub');
-    if (portionsEl) portionsEl.hidden = (viewName !== 'portions');
-    if (materialsEl) materialsEl.hidden = (viewName !== 'materials');
+    Object.keys(views).forEach(function (key) {
+      var el = views[key];
+      if (!el) return;
+      var active = (key === viewName);
+      el.hidden = !active;
+      el.classList.toggle('is-active', active);
+    });
 
     if (viewName === 'portions') {
+      if (!options.fromNav && window.XentraNav && typeof window.XentraNav.push === 'function') {
+        window.XentraNav.push(function () { switchBMStockSubView('hub', { fromNav: true }); }, 'stock-portions');
+      }
       loadBMStock();
     } else if (viewName === 'materials') {
+      if (!options.fromNav && window.XentraNav && typeof window.XentraNav.push === 'function') {
+        window.XentraNav.push(function () { switchBMStockSubView('hub', { fromNav: true }); }, 'stock-materials');
+      }
       loadBMMaterials();
     } else {
-      // Hub view — update both summaries in background
+      if (!options.fromNav && window.XentraNav) {
+        if (typeof window.XentraNav.hasOpen === 'function' && window.XentraNav.hasOpen('stock-portions')) {
+          window.XentraNav.pop('stock-portions');
+        }
+        if (typeof window.XentraNav.hasOpen === 'function' && window.XentraNav.hasOpen('stock-materials')) {
+          window.XentraNav.pop('stock-materials');
+        }
+      }
       loadBMStock();
       loadBMMaterials(true);
     }
   }
   window.switchBMStockSubView = switchBMStockSubView;
 
-  function openBMKitchenPrepDirect() {
-    if (_bmStockState.recipes && _bmStockState.recipes.length) {
-      openBMStockPrepareModal(_bmStockState.recipes[0].output_product_id);
-    } else {
-      switchBMStockSubView('portions');
-      showToast('ℹ️ Pilih menu yang memiliki resep terhubung untuk memasak.');
+  async function openBMRecipePickerModal() {
+    var modal = $('modal-bm-recipe-picker');
+    if (!modal) return;
+
+    var searchInput = $('bm-recipe-picker-search');
+    if (searchInput) searchInput.value = '';
+
+    modal.style.display = 'flex';
+
+    if (!_bmStockState.recipes || !_bmStockState.recipes.length) {
+      var container = $('bm-recipe-picker-list');
+      if (container) {
+        container.innerHTML = '<div style="text-align:center; padding:32px 16px; color:#64748b; font-size:13px;">Memuat daftar resep dapur cabang...</div>';
+      }
+      try {
+        await loadBMStock();
+      } catch (e) {
+        console.warn('[Recipe Picker Load Error]:', e);
+      }
+    }
+
+    renderBMRecipePickerList(_bmStockState.recipes || []);
+  }
+  window.openBMRecipePickerModal = openBMRecipePickerModal;
+  window.openBMKitchenPrepDirect = openBMRecipePickerModal;
+
+  function closeBMRecipePickerModal() {
+    var modal = $('modal-bm-recipe-picker');
+    if (modal) modal.style.display = 'none';
+  }
+  window.closeBMRecipePickerModal = closeBMRecipePickerModal;
+
+  function filterBMRecipePicker() {
+    var searchInput = $('bm-recipe-picker-search');
+    var query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+    var list = _bmStockState.recipes || [];
+
+    if (!query) {
+      renderBMRecipePickerList(list);
+      return;
+    }
+
+    var filtered = list.filter(function (r) {
+      var prodName = (r.output_product_name || '').toLowerCase();
+      var recName = (r.recipe_name || '').toLowerCase();
+      return prodName.indexOf(query) !== -1 || recName.indexOf(query) !== -1;
+    });
+
+    renderBMRecipePickerList(filtered);
+  }
+  window.filterBMRecipePicker = filterBMRecipePicker;
+
+  function renderBMRecipePickerList(recipes) {
+    var container = $('bm-recipe-picker-list');
+    if (!container) return;
+
+    if (!recipes || !recipes.length) {
+      container.innerHTML = '<div style="text-align:center; padding:36px 16px; color:#64748b; font-size:13px; background:#f8fafc; border-radius:12px; border:1px dashed #cbd5e1;">' +
+        '<div style="font-size:28px; margin-bottom:8px;">🍳</div>' +
+        '<div style="font-weight:700; color:#334155; margin-bottom:4px;">Tidak Ada Menu Resep Dapur</div>' +
+        '<div>Menu masakan yang memiliki resep belum terdaftar untuk cabang ini atau tidak cocok dengan pencarian.</div>' +
+      '</div>';
+      return;
+    }
+
+    container.innerHTML = recipes.map(function (r) {
+      var item = (_bmStockState.inventory || []).find(function (it) { return it.product_id === r.output_product_id; });
+      var prodName = esc(r.output_product_name || (item ? item.product_name : r.recipe_name));
+      var recName = esc(r.recipe_name);
+      var yieldQty = Number(r.planned_yield_quantity) || 1;
+      var yieldUom = esc(r.yield_uom_name || 'porsi');
+
+      var curStock = (item && item.stock != null) ? (item.stock + ' Porsi') : '0 Porsi';
+
+      // Material availability check for 1 batch
+      var hasShortage = (r.components || []).some(function (c) {
+        return Number(c.branch_material_stock || 0) < Number(c.planned_quantity || 0);
+      });
+
+      var badgeHtml = hasShortage
+        ? '<span style="font-size:10.5px; font-weight:700; color:#b91c1c; background:#fee2e2; border:1px solid #fecaca; padding:2px 8px; border-radius:6px; white-space:nowrap;">⚠️ Bahan Kurang</span>'
+        : '<span style="font-size:10.5px; font-weight:700; color:#15803d; background:#dcfce7; border:1px solid #bbf7d0; padding:2px 8px; border-radius:6px; white-space:nowrap;">✓ Bahan Siap</span>';
+
+      return '<div class="x-recipe-picker-card" style="border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px; background:#ffffff; transition:all 0.15s ease; cursor:pointer;" onclick="selectBMRecipeForCooking(\'' + esc(r.output_product_id) + '\')">' +
+        '<div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:4px;">' +
+          '<div style="font-size:14px; font-weight:800; color:var(--text-main, #0f172a); line-height:1.3;">' + prodName + '</div>' +
+          '<div>' + badgeHtml + '</div>' +
+        '</div>' +
+        '<div style="font-size:11.5px; color:#64748b; margin-bottom:10px;">' +
+          'Resep: <strong>' + recName + '</strong> • Standar: ' + yieldQty + ' ' + yieldUom + '/batch' +
+        '</div>' +
+        '<div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #f1f5f9; padding-top:8px; margin-top:2px;">' +
+          '<div style="font-size:11.5px; color:var(--text-muted);">' +
+            'Sisa etalase: <strong style="color:var(--text-main); font-weight:700;">' + curStock + '</strong>' +
+          '</div>' +
+          '<button type="button" class="x-btn-primary" style="font-size:12px; font-weight:700; padding:5px 14px; background:#16a34a; border-color:#16a34a; border-radius:8px;" onclick="event.stopPropagation(); selectBMRecipeForCooking(\'' + esc(r.output_product_id) + '\')">' +
+            '🍳 Masak' +
+          '</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+  window.renderBMRecipePickerList = renderBMRecipePickerList;
+
+  function selectBMRecipeForCooking(productId) {
+    var ok = openBMStockPrepareModal(productId);
+    if (ok !== false) {
+      closeBMRecipePickerModal();
     }
   }
-  window.openBMKitchenPrepDirect = openBMKitchenPrepDirect;
+  window.selectBMRecipeForCooking = selectBMRecipeForCooking;
+
+  function openBMKitchenPrepDirect() {
+    openBMRecipePickerModal();
+  }
+  window.openBMKitchenPrepDirect = openBMRecipePickerModal;
 
   async function loadBMMaterials(silent) {
     var branchId = getStockBranchId();
@@ -1037,32 +1186,35 @@
       var minVal = Number(m.minimum_quantity.toFixed(2));
       var targetVal = Number(m.target_quantity.toFixed(2));
 
-      return '<div class="x-stock-item-card" style="padding:16px; border:1px solid #e2e8f0; border-radius:14px; background:#ffffff; box-shadow:0 1px 3px rgba(0,0,0,0.04);">' +
-        '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">' +
-          '<div>' +
-            '<div style="font-size:15px; font-weight:800; color:#0f172a;">' + esc(m.name) + '</div>' +
-            '<div style="font-size:11px; font-weight:700; color:#64748b; margin-top:2px;">KODE: ' + esc(m.material_code) + '</div>' +
+      return '<div class="x-stock-item-card" data-material-id="' + esc(m.id) + '">' +
+        '<div class="x-stock-item-main">' +
+          '<div class="x-stock-item-title-row">' +
+            '<span class="x-stock-item-name">' + esc(m.name) + '</span>' +
+            '<span class="x-badge ' + badgeClass + '" style="font-size:11px;">' + statusText + '</span>' +
           '</div>' +
-          '<span class="' + badgeClass + '" style="font-size:10px; font-weight:800; text-transform:uppercase; padding:3px 8px; border-radius:6px;">' + statusText + '</span>' +
+          '<div class="x-stock-item-meta">' +
+            '<div class="x-stock-item-meta-row">' +
+              '<span>Kode: <b>' + esc(m.material_code) + '</b></span>' +
+              '<span style="color:#cbd5e1;">•</span>' +
+              '<span>Batas Minimum (Par): <b>' + minVal + ' ' + uom + '</b></span>' +
+              '<span style="color:#cbd5e1;">•</span>' +
+              '<span>Target Belanja: <b>' + targetVal + ' ' + uom + '</b></span>' +
+            '</div>' +
+          '</div>' +
         '</div>' +
-
-        '<div style="display:flex; align-items:baseline; gap:6px; margin:10px 0 12px 0;">' +
-          '<span style="font-size:24px; font-weight:900; color:' + (isOut ? '#dc2626' : isLow ? '#d97706' : '#15803d') + ';">' + stockVal + '</span>' +
-          '<span style="font-size:13px; font-weight:700; color:#64748b;">' + uom + ' di dapur</span>' +
-        '</div>' +
-
-        '<div style="background:#f8fafc; padding:8px 10px; border-radius:8px; font-size:11.5px; color:#475569; margin-bottom:12px; display:flex; justify-content:space-between;">' +
-          '<span>Batas Minimum (Par): <b>' + minVal + ' ' + uom + '</b></span>' +
-          '<span>Target Belanja: <b>' + targetVal + ' ' + uom + '</b></span>' +
-        '</div>' +
-
-        '<div style="display:flex; gap:8px;">' +
-          '<button type="button" class="x-btn-secondary" style="flex:1; font-size:12px; font-weight:700; padding:7px 10px; display:inline-flex; align-items:center; justify-content:center; gap:4px;" onclick="openBMMaterialAdjustModal(\'' + esc(m.id) + '\')">' +
-            '<span>⚖️</span><span>Opname Fisik</span>' +
-          '</button>' +
-          '<button type="button" class="x-btn-secondary" style="flex:1; font-size:12px; font-weight:700; padding:7px 10px; display:inline-flex; align-items:center; justify-content:center; gap:4px;" onclick="openBMMaterialReorderModal(\'' + esc(m.id) + '\')">' +
-            '<span>⚙️</span><span>Batas Belanja</span>' +
-          '</button>' +
+        '<div class="x-stock-item-controls">' +
+          '<div style="text-align:center; padding:5px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; min-width:70px;">' +
+            '<div style="font-size:18px; font-weight:800; line-height:1.2; color:' + (isOut ? '#dc2626' : isLow ? '#d97706' : '#15803d') + ';">' + stockVal + '</div>' +
+            '<div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">' + uom + '</div>' +
+          '</div>' +
+          '<div style="display:flex; gap:6px;">' +
+            '<button type="button" class="x-btn-secondary" style="font-size:12px; font-weight:700; padding:6px 10px; display:inline-flex; align-items:center; gap:4px;" onclick="openBMMaterialAdjustModal(\'' + esc(m.id) + '\')">' +
+              '<span>⚖️</span><span>Opname</span>' +
+            '</button>' +
+            '<button type="button" class="x-btn-secondary" style="font-size:12px; font-weight:700; padding:6px 10px; display:inline-flex; align-items:center; gap:4px;" onclick="openBMMaterialReorderModal(\'' + esc(m.id) + '\')">' +
+              '<span>⚙️</span><span>Batas</span>' +
+            '</button>' +
+          '</div>' +
         '</div>' +
       '</div>';
     }).join('');

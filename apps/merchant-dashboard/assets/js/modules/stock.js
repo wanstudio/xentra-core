@@ -1224,37 +1224,24 @@
 
     var rows = materials.map(function (m) {
       var isArchived = m.status === 'archived' || m.status === 'ARCHIVED';
-      var currentStock = Number(m.current_stock || 0);
-      var minQty = Number(m.minimum_quantity || 0);
-      var targetQty = Number(m.target_quantity || 0);
       var unitCost = Number(m.moving_average_unit_cost || m.unit_cost || 0);
-      var uomLabel = m.base_uom_name ? (m.base_uom_name + ' (' + m.base_uom_code + ')') : (m.base_uom_code || m.base_uom_id);
+      var uomLabel = m.base_uom_name ? (m.base_uom_name + ' (' + m.base_uom_code + ')') : (m.base_uom_code || m.base_uom_id || '-');
 
-      var minRecipeReq = Number(m.min_recipe_requirement || 0);
-      var effectiveLowThreshold = Math.max(minQty, minRecipeReq);
-
-      var stockStatusBadge = '';
+      var statusBadge = '';
       if (isArchived) {
-        stockStatusBadge = '<span style="background:#F1F5F9; color:#64748B; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:600;">Diarsipkan</span>';
-      } else if (currentStock <= 0) {
-        stockStatusBadge = '<span style="background:#FEF2F2; color:#DC2626; border:1px solid #FECACA; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700;">🔴 Habis</span>';
-      } else if (effectiveLowThreshold > 0 && currentStock <= effectiveLowThreshold) {
-        var reasonText = (minRecipeReq > 0 && currentStock <= minRecipeReq) ? 'Kurang untuk Masak' : ('Sisa ' + currentStock);
-        stockStatusBadge = '<span style="background:#FFFBEB; color:#B45309; border:1px solid #FDE68A; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700;">🟡 Menipis (' + reasonText + ')</span>';
+        statusBadge = '<span style="background:#F1F5F9; color:#64748B; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:600;">Diarsipkan</span>';
       } else {
-        stockStatusBadge = '<span style="background:#ECFDF5; color:#059669; border:1px solid #A7F3D0; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700;">🟢 Aman</span>';
+        statusBadge = '<span style="background:#ECFDF5; color:#059669; border:1px solid #A7F3D0; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700;">🟢 Aktif</span>';
       }
 
-      var stockDisplay = '<strong style="font-size:14px; color:' + (currentStock <= effectiveLowThreshold ? '#DC2626' : '#0F172A') + ';">' + currentStock + '</strong> <span style="font-size:11.5px; color:#64748B;">' + escapeHtml(m.base_uom_code || m.base_uom_name || '') + '</span>';
-      var costDisplay = unitCost > 0 ? ('<strong style="color:#0F172A;">' + formatMoney(unitCost) + '</strong> <span style="font-size:11px; color:#64748B;">/' + escapeHtml(m.base_uom_code || '') + '</span>') : '<span style="color:#94A3B8; font-style:italic;">Belum ada harga</span>';
-      var targetDisplay = targetQty > 0
-        ? ('<strong style="color:#0F172A;">' + targetQty + '</strong> <span style="font-size:11px; color:#64748B;">' + escapeHtml(m.base_uom_code || '') + '</span>')
-        : (minRecipeReq > 0 ? ('<span style="color:#D97706; font-size:11px; font-weight:600;">Min. ' + minRecipeReq + ' (Resep)</span>') : '<span style="color:#94A3B8; font-style:italic;">Belum diatur</span>');
+      var costDisplay = unitCost > 0
+        ? ('<strong style="color:#0F172A; font-size:13px;">' + formatMoney(unitCost) + '</strong> <span style="font-size:11px; color:#64748B;">/' + escapeHtml(m.base_uom_code || '') + '</span>')
+        : '<span style="color:#94A3B8; font-style:italic; font-size:12px;">Belum ada acuan</span>';
 
       var actionHtml = (
         '<div style="display:flex; justify-content:flex-end; gap:6px;">' +
-          '<button type="button" onclick="event.stopPropagation(); openEditMaterialModal(\'' + escapeHtml(m.id) + '\')" style="display:inline-flex; align-items:center; gap:4px; padding:5px 10px; border-radius:6px; font-size:12px; font-weight:600; background:#F1F5F9; color:#0F172A; border:1px solid #CBD5E1; cursor:pointer;" title="Atur Stok & Target Belanja">' +
-            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg> Atur' +
+          '<button type="button" onclick="event.stopPropagation(); openEditMaterialModal(\'' + escapeHtml(m.id) + '\')" style="display:inline-flex; align-items:center; gap:4px; padding:5px 10px; border-radius:6px; font-size:12px; font-weight:600; background:#F1F5F9; color:#0F172A; border:1px solid #CBD5E1; cursor:pointer;" title="Ubah Data Master">' +
+            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg> Ubah Master' +
           '</button>' +
           (!isArchived ? (
             '<button type="button" onclick="event.stopPropagation(); archiveOwnerMaterial(\'' + escapeHtml(m.id) + '\', \'' + escapeHtml(m.name).replace(/'/g, "\\'") + '\')" style="background:none; border:none; color:#94A3B8; cursor:pointer; font-size:11px; padding:4px 6px;" title="Arsipkan">' +
@@ -1270,10 +1257,9 @@
             '<div style="font-weight:700; color:#0F172A;">' + escapeHtml(m.name) + '</div>' +
             '<div style="font-size:11px; color:#64748B;">Kode: ' + escapeHtml(m.material_code) + (m.description ? ' • ' + escapeHtml(m.description) : '') + '</div>' +
           '</td>' +
-          '<td style="padding:12px 14px; font-size:13px;">' + stockDisplay + '</td>' +
+          '<td style="padding:12px 14px; font-size:13px; color:#334155; font-weight:600;">' + escapeHtml(uomLabel) + '</td>' +
           '<td style="padding:12px 14px; font-size:13px;">' + costDisplay + '</td>' +
-          '<td style="padding:12px 14px; font-size:12px;">' + targetDisplay + '</td>' +
-          '<td style="padding:12px 14px; font-size:13px;">' + stockStatusBadge + '</td>' +
+          '<td style="padding:12px 14px; font-size:13px;">' + statusBadge + '</td>' +
           '<td style="padding:12px 14px; text-align:right; font-size:13px;">' + actionHtml + '</td>' +
         '</tr>'
       );
@@ -1284,10 +1270,9 @@
         '<table style="width:100%; border-collapse:collapse; text-align:left;">' +
           '<thead>' +
             '<tr style="background:#F8FAFC; border-bottom:1px solid #E2E8F0; color:#64748B; font-size:12px; text-transform:uppercase; letter-spacing:0.025em;">' +
-              '<th style="padding:10px 14px; font-weight:600;">Bahan Baku Mentah</th>' +
-              '<th style="padding:10px 14px; font-weight:600;">Sisa Stok Fisik</th>' +
-              '<th style="padding:10px 14px; font-weight:600;">Harga Pasar / Beli</th>' +
-              '<th style="padding:10px 14px; font-weight:600;">Target Stok Resto</th>' +
+              '<th style="padding:10px 14px; font-weight:600;">Bahan Baku (Master)</th>' +
+              '<th style="padding:10px 14px; font-weight:600;">Satuan Dasar (Base UOM)</th>' +
+              '<th style="padding:10px 14px; font-weight:600;">Standar Harga Acuan</th>' +
               '<th style="padding:10px 14px; font-weight:600;">Status</th>' +
               '<th style="padding:10px 14px; font-weight:600; text-align:right;">Aksi</th>' +
             '</tr>' +
@@ -1422,16 +1407,11 @@
     }
 
     try {
-      var minQty = Number(currentMat.minimum_quantity || 0);
-
       var payload = {
         name: name,
         description: desc || null,
         base_uom_id: baseUomId,
-        current_stock: Math.max(0, currentStock),
-        unit_cost: Math.max(0, unitCost),
-        minimum_quantity: minQty,
-        target_quantity: Math.max(0, targetQty)
+        unit_cost: Math.max(0, unitCost)
       };
 
       var res = await adminFetch(API_BASE + '/admin/materials/' + encodeURIComponent(matId), {
@@ -1444,7 +1424,7 @@
         throw new Error(data.message || data.error || 'Gagal memperbarui data bahan');
       }
 
-      showToast('✅ Data bahan baku, stok fisik, & target belanja berhasil disimpan.', 'success');
+      showToast('✅ Data master bahan baku & standar harga acuan berhasil disimpan.', 'success');
       closeEditMaterialModal();
       loadOwnerMaterials();
       if (typeof loadOwnerReplenishmentSuggestions === 'function') loadOwnerReplenishmentSuggestions();
