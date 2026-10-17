@@ -146,7 +146,9 @@ class ReplenishmentService {
               repository: uomRepository
             });
             qtyInBase = Number(conv.target_quantity);
-          } catch (_) {}
+          } catch (err) {
+            throw new Error(`[UOM_CONVERSION_FAILED] Gagal konversi bahan "${comp.material_name || comp.material_id}" dari "${comp.planned_uom_id}" ke "${comp.base_uom_id}": ${err.message || err.code || err}`);
+          }
         }
 
         const unitUsage = qtyInBase / yieldQty;
@@ -220,8 +222,8 @@ class ReplenishmentService {
                   repository: uomRepository
                 });
                 qtyInBase = Number(conv.target_quantity);
-              } catch (_) {
-                // Gunakan rasio 1:1 jika fallback
+              } catch (err) {
+                throw new Error(`[UOM_CONVERSION_FAILED] Gagal konversi bahan "${comp.material_name || comp.material_id}" dari "${comp.planned_uom_id}" ke "${comp.base_uom_id}": ${err.message || err.code || err}`);
               }
             }
 

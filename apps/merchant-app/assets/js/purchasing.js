@@ -745,7 +745,10 @@
     var lines = checkedItems.map(function (itm) {
       var lineTot = Math.round(itm.buyQty * itm.actualUnitPrice);
       totalReal += lineTot;
+      var isDirectProduct = Boolean(itm.is_direct_product || itm.item_type === 'PRODUCT');
       return {
+        item_type: isDirectProduct ? 'PRODUCT' : 'MATERIAL',
+        product_id: isDirectProduct ? (itm.product_id || itm.material_id) : null,
         material_id: itm.material_id,
         quantity: itm.buyQty,
         unit_price: itm.actualUnitPrice,
@@ -759,8 +762,11 @@
     var totalItemsCount = _purchasingState.items.length;
     var unboughtCount = totalItemsCount - checkedItems.length;
 
+    var settleIdempotencyKey = 'stl_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+
     _pendingSettlePayload = {
       branchId: branchId,
+      idempotency_key: settleIdempotencyKey,
       mandate_id: _purchasingState.activeMandateId,
       cash_advance: cashAdvance,
       items: lines,
@@ -853,10 +859,16 @@
     var payload = _pendingSettlePayload;
 
     try {
+      var headers = getAuthHeaders();
+      if (payload.idempotency_key) {
+        headers['Idempotency-Key'] = payload.idempotency_key;
+      }
+
       var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(payload.branchId) + '/purchasing/settle', {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: headers,
         body: JSON.stringify({
+          idempotency_key: payload.idempotency_key,
           mandate_id: payload.mandate_id,
           cash_advance: payload.cash_advance,
           items: payload.items,
@@ -870,7 +882,7 @@
         closePurchasingSettleConfirmModal();
         clearPurchasingReceiptPhoto();
         if (typeof showToast === 'function') {
-          showToast('🛒 Belanja berhasil dicatat! Stok bahan baku telah ditambahkan.');
+          showToast('🛒 Belanja berhasil dicatat! Stok bahan baku & produk siap jual telah diperbarui.');
         }
         var cashInput = $('input-purchasing-cash-advance');
         if (cashInput) cashInput.value = '';

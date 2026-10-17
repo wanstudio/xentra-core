@@ -19,6 +19,21 @@
     return (b && b.selected !== 'all') ? b.selected : '';
   }
 
+  function resolveOwnerBranchId() {
+    var branchId = getEffectiveBranchId();
+    if (branchId && branchId !== 'all') return branchId;
+    var b = window._branchContextState;
+    if (b && Array.isArray(b.branches) && b.branches.length > 0) {
+      return b.branches[0].id || '';
+    }
+    var fromStorage = null;
+    try {
+      fromStorage = localStorage.getItem('xentra_branch_id') || localStorage.getItem('selected_branch_id');
+    } catch (_) {}
+    if (fromStorage && fromStorage !== 'all') return fromStorage;
+    return '';
+  }
+
   function adminFetch(url, options) {
     if (typeof window.adminFetch === 'function') return window.adminFetch(url, options);
     return fetch(url, options);
@@ -786,9 +801,12 @@
       container.innerHTML = '<div class="x-owner-stock-loading">Memuat daftar Purchase Order (PO) supplier...</div>';
     }
 
-    var branchId = getEffectiveBranchId();
-    if (!branchId || branchId === 'all') {
-      branchId = 'branch_1789606246242_08knv';
+    var branchId = resolveOwnerBranchId();
+    if (!branchId) {
+      if (container) {
+        container.innerHTML = '<div class="x-owner-stock-empty" style="padding:24px; text-align:center; color:#64748B;">Pilih cabang spesifik pada dropdown filter cabang untuk melihat tugas belanja (mandat) cabang.</div>';
+      }
+      return;
     }
 
     try {
@@ -1043,8 +1061,11 @@
     var cashAdvance = Number($('edit-mandate-cash-advance').value) || 0;
     var notes = $('edit-mandate-notes').value.trim();
 
-    var branchId = getEffectiveBranchId();
-    if (!branchId || branchId === 'all') branchId = 'branch_1789606246242_08knv';
+    var branchId = resolveOwnerBranchId();
+    if (!branchId) {
+      showToast('⚠️ Pilih cabang spesifik terlebih dahulu.', 'warning');
+      return;
+    }
 
     var qtyInputs = document.querySelectorAll('.edit-mandate-item-qty');
     var items = [];
@@ -1085,8 +1106,11 @@
     var ok = await confirmFeatureAction('archive-mandate-confirm', 'Arsipkan Tugas', 'Arsipkan tugas belanja ini? Tugas yang diarsipkan tidak akan muncul lagi di daftar aktif staf.', 'Arsipkan');
     if (!ok) return;
 
-    var branchId = getEffectiveBranchId();
-    if (!branchId || branchId === 'all') branchId = 'branch_1789606246242_08knv';
+    var branchId = resolveOwnerBranchId();
+    if (!branchId) {
+      showToast('⚠️ Pilih cabang spesifik terlebih dahulu.', 'warning');
+      return;
+    }
 
     try {
       var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/mandates/' + encodeURIComponent(mandateId) + '/archive', {
@@ -1111,8 +1135,11 @@
     var ok = await confirmFeatureAction('delete-mandate-confirm', 'Hapus Tugas', 'Hapus permanen tugas belanja ini? Tindakan ini tidak dapat dibatalkan.', 'Hapus Permanen');
     if (!ok) return;
 
-    var branchId = getEffectiveBranchId();
-    if (!branchId || branchId === 'all') branchId = 'branch_1789606246242_08knv';
+    var branchId = resolveOwnerBranchId();
+    if (!branchId) {
+      showToast('⚠️ Pilih cabang spesifik terlebih dahulu.', 'warning');
+      return;
+    }
 
     try {
       var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/purchasing/mandates/' + encodeURIComponent(mandateId), {
@@ -2391,9 +2418,12 @@
       container.innerHTML = '<div class="x-owner-stock-loading">Memuat riwayat dan laporan belanja cabang...</div>';
     }
 
-    var branchId = getEffectiveBranchId();
-    if (!branchId || branchId === 'all') {
-      branchId = 'branch_1789606246242_08knv';
+    var branchId = resolveOwnerBranchId();
+    if (!branchId) {
+      if (container) {
+        container.innerHTML = '<div class="x-owner-stock-empty" style="padding:24px; text-align:center; color:#64748B;">Pilih cabang spesifik pada dropdown filter cabang untuk melihat riwayat belanja cabang.</div>';
+      }
+      return;
     }
 
     try {

@@ -112,13 +112,16 @@ function aggregateComposedRequirements(items) {
 function deductComposedStock({
   order,
   items,
+  requirements: directRequirements,
   referenceId,
   actorId,
   notes,
   dbTransactionProvided = false,
   sourceType = 'ORDER'
 }) {
-  const requirements = aggregateComposedRequirements(items);
+  const requirements = (Array.isArray(directRequirements) && directRequirements.length > 0)
+    ? directRequirements
+    : aggregateComposedRequirements(items);
   if (!requirements.length) return { success: true, deducted_items: [] };
 
   const ownsTransaction = !dbTransactionProvided;
@@ -161,6 +164,24 @@ function deductComposedStock({
         currencyCode: canonicalPosting.currency_code,
         costLines: canonicalPosting.cost_lines
       });
+      if (!canonicalPosting.idempotent) {
+        const now = new Date().toISOString();
+        for (const line of (canonicalPosting.deducted_items || [])) {
+          inventoryRepository.deductBranchProduct({
+            branchId: order.branch_id,
+            productId: line.product_id,
+            quantity: line.quantity
+          });
+          if (line.current_stock !== undefined && line.current_stock !== null) {
+            inventoryRepository.updateBranchProductStock({
+              branchId: order.branch_id,
+              productId: line.product_id,
+              stock: line.current_stock,
+              updatedAt: now
+            });
+          }
+        }
+      }
       if (ownsTransaction) inventoryRepository.commitTransaction();
       return {
         success: true,
@@ -839,5 +860,7 @@ class OrderPlacementService {
     return { success: true, deducted_items: deductedItems };
   }
 }
+
+OrderPlacementService.deductComposedStock = deductComposedStock;
 
 module.exports = OrderPlacementService;

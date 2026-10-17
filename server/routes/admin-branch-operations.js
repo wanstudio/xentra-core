@@ -41,7 +41,7 @@ router.get('/admin/branches/:id/inventory', requireAuth(['owner', 'brand_manager
         CASE
           WHEN COALESCE(p.fulfillment_type, 'BY_STOCK') = 'BY_ORDER' THEN NULL
           WHEN p.sku IS NOT NULL AND trim(p.sku) <> ''
-            THEN COALESCE(bpi.stock_qty, 0)
+            THEN COALESCE(psb.quantity, bpi.stock_qty, 0)
           ELSE COALESCE(bp.stock, 0)
         END AS stock,
         CASE
@@ -61,6 +61,10 @@ router.get('/admin/branches/:id/inventory', requireAuth(['owner', 'brand_manager
           ELSE bp.is_available
         END AS is_available
       FROM products p
+      LEFT JOIN stock_locations sl
+        ON sl.branch_id = ? AND sl.is_active = 1
+      LEFT JOIN product_stock_balances psb
+        ON psb.product_id = p.id AND psb.stock_location_id = sl.id
       LEFT JOIN branch_product_inventory bpi
         ON bpi.branch_id = ? AND bpi.product_id = p.id
       LEFT JOIN branch_products bp
@@ -71,7 +75,7 @@ router.get('/admin/branches/:id/inventory', requireAuth(['owner', 'brand_manager
           OR bp.product_id IS NOT NULL
         )
       ORDER BY p.name ASC, p.id ASC
-    `).all(req.params.id, req.params.id, req.brand_id);
+    `).all(req.params.id, req.params.id, req.params.id, req.brand_id);
 
     res.json({ success: true, branch_id: req.params.id, inventory: rows || [] });
   } catch (err) {
@@ -198,6 +202,47 @@ router.patch('/admin/branches/:id/inventory/:productId', requireAuth(['owner', '
           actor_role: req.user.role || 'system',
           notes
         });
+
+        // P1.A: Synchronize product_stock_balances if canonical stock location exists
+        const branchStockLoc = db.prepare("SELECT id FROM stock_locations WHERE branch_id = ? AND is_active = 1 LIMIT 1").get(req.params.id);
+        if (branchStockLoc && canonicalStock) {
+          const nowStr = new Date().toISOString();
+          const targetBal = db.prepare('SELECT quantity, carrying_value, moving_average_unit_cost, valuation_version FROM product_stock_balances WHERE stock_location_id = ? AND product_id = ?').get(branchStockLoc.id, req.params.productId);
+          const currentQty = movement ? movement.current_stock : InventoryStockService.getStock(req.params.id, req.params.productId);
+          const unitCost = Number(product.cost_price || (targetBal ? targetBal.moving_average_unit_cost : 0) || 0);
+          const newCarryingVal = Math.round(currentQty * unitCost);
+          const maxVerRow = db.prepare('SELECT MAX(valuation_version) AS max_v FROM product_stock_movements WHERE stock_location_id = ? AND product_id = ?').get(branchStockLoc.id, req.params.productId);
+          const nextVer = ((maxVerRow && maxVerRow.max_v != null) ? Number(maxVerRow.max_v) : 0) + 1;
+
+          if (targetBal) {
+            db.prepare(`
+              UPDATE product_stock_balances
+              SET quantity = ?, carrying_value = ?, moving_average_unit_cost = ?, valuation_version = ?, updated_at = ?
+              WHERE stock_location_id = ? AND product_id = ?
+            `).run(currentQty, newCarryingVal, unitCost, nextVer, nowStr, branchStockLoc.id, req.params.productId);
+          } else {
+            db.prepare(`
+              INSERT INTO product_stock_balances (stock_location_id, product_id, quantity, carrying_value, moving_average_unit_cost, cost_availability_status, valuation_version, created_at, updated_at)
+              VALUES (?, ?, ?, ?, ?, 'AVAILABLE', 1, ?, ?)
+            `).run(branchStockLoc.id, req.params.productId, currentQty, newCarryingVal, unitCost, nowStr, nowStr);
+          }
+
+          const prodMovType = rawQuantityNum >= 0 ? 'ADJUSTMENT_IN' : 'ADJUSTMENT_OUT';
+          const pMovId = 'pmov_' + crypto.randomBytes(8).toString('hex');
+          const movMutId = mutation_id ? (mutation_id + '_bal') : ('opname_p_' + crypto.randomBytes(8).toString('hex'));
+          db.prepare(`
+            INSERT INTO product_stock_movements (
+              id, stock_location_id, product_id, movement_type, quantity,
+              previous_quantity, current_quantity, unit_cost, total_cost, currency_code,
+              valuation_method, cost_basis_type, source_type, source_reference,
+              posting_mutation_id, valuation_version, posting_timestamp, actor_id, resolver_version, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'IDR', 'MOVING_AVERAGE', 'OPENING_ACTUAL', 'STOCK_OPNAME', ?, ?, ?, ?, ?, 'v1', ?)
+          `).run(
+            pMovId, branchStockLoc.id, req.params.productId, prodMovType, rawQuantityNum,
+            movement ? movement.previous_stock : 0, currentQty, unitCost, rawQuantityNum * unitCost,
+            'BRANCH_OPNAME_' + req.params.id, movMutId, nextVer, nowStr, req.user.userId || req.user.id || 'system', notes || 'Stock adjustment'
+          );
+        }
       }
 
       const stock = InventoryStockService.getStock(req.params.id, req.params.productId);
@@ -274,11 +319,34 @@ router.get('/admin/branches/:id/inventory/materials', requireAuth(['owner', 'bra
       ORDER BY m.name ASC
     `).all(location.id, location.id, branch.organization_id);
 
+    const recipeUsages = db.prepare(`
+      SELECT
+        rc.material_id,
+        MAX((rc.planned_quantity * COALESCE(rc_u.conversion_factor, 1.0) / COALESCE(m_u.conversion_factor, 1.0)) / COALESCE(NULLIF(rv.planned_yield_quantity, 0), 1)) AS max_unit_usage
+      FROM recipe_components rc
+      JOIN recipe_versions rv ON rv.id = rc.recipe_version_id AND rv.status = 'PUBLISHED'
+      JOIN recipes r ON r.id = rv.recipe_id AND r.status = 'ACTIVE'
+      LEFT JOIN uoms rc_u ON rc_u.id = rc.planned_uom_id
+      JOIN materials m ON m.id = rc.material_id
+      LEFT JOIN uoms m_u ON m_u.id = m.base_uom_id
+      GROUP BY rc.material_id
+    `).all();
+
+    const recipeUsageMap = new Map();
+    for (const u of recipeUsages) {
+      recipeUsageMap.set(String(u.material_id), Number(u.max_unit_usage || 0));
+    }
+
     const materials = rows.map(r => {
+      const current = Number(r.current_stock);
+      const min = Number(r.minimum_quantity);
+      const worstUnitUsage = recipeUsageMap.get(String(r.id)) || 0;
+      const effectiveThreshold = Math.max(min, worstUnitUsage * 2);
+
       let status = 'SAFE';
-      if (r.current_stock <= 0) {
+      if (current <= 0) {
         status = 'OUT_OF_STOCK';
-      } else if (r.current_stock <= r.minimum_quantity) {
+      } else if (current <= effectiveThreshold) {
         status = 'LOW_STOCK';
       }
       return {
@@ -289,10 +357,11 @@ router.get('/admin/branches/:id/inventory/materials', requireAuth(['owner', 'bra
         base_uom_id: r.base_uom_id,
         base_uom_name: r.base_uom_name,
         base_uom_code: r.base_uom_code,
-        current_stock: Number(r.current_stock),
+        current_stock: current,
         moving_average_unit_cost: Number(r.moving_average_unit_cost),
         cost_availability_status: r.cost_availability_status || 'UNAVAILABLE',
-        minimum_quantity: Number(r.minimum_quantity),
+        minimum_quantity: min,
+        effective_threshold: effectiveThreshold,
         target_quantity: Number(r.target_quantity),
         status
       };
@@ -357,7 +426,26 @@ router.post('/admin/branches/:id/inventory/materials/:materialId/adjust', requir
     `).get(location.id, material.id);
 
     const prevQty = balance ? Number(balance.quantity_base) : 0;
-    const unitCost = balance ? Number(balance.moving_average_unit_cost) : 0;
+    let unitCost = balance ? Number(balance.moving_average_unit_cost) : 0;
+    let costStatus = balance ? (balance.cost_availability_status || 'AVAILABLE') : 'UNAVAILABLE';
+
+    // P2.8: Saldo baru akibat opname tanpa biaya valid diberi status ESTIMATED / UNAVAILABLE
+    if (!balance || unitCost <= 0) {
+      const lastMov = db.prepare(`
+        SELECT unit_cost FROM material_stock_movements
+        WHERE material_id = ? AND unit_cost > 0
+        ORDER BY posting_timestamp DESC LIMIT 1
+      `).get(material.id);
+
+      if (lastMov && Number(lastMov.unit_cost) > 0) {
+        unitCost = Number(lastMov.unit_cost);
+        costStatus = 'ESTIMATED';
+      } else {
+        unitCost = 0;
+        costStatus = countedQty > 0 ? 'ESTIMATED' : 'UNAVAILABLE';
+      }
+    }
+
     const qtyDiff = countedQty - prevQty;
 
     if (Math.abs(qtyDiff) < 0.000001) {
@@ -380,7 +468,7 @@ router.post('/admin/branches/:id/inventory/materials/:materialId/adjust', requir
     let costBasis;
     if (qtyDiff > 0) {
       movType = 'ADJUSTMENT_IN';
-      costBasis = 'COUNT_CORRECTION';
+      costBasis = costStatus === 'ESTIMATED' ? 'OPENING_ESTIMATE' : 'COUNT_CORRECTION';
     } else {
       movType = (adjustmentType === 'WASTE') ? 'WASTE' : 'ADJUSTMENT_OUT';
       costBasis = 'CURRENT_MOVING_AVERAGE';
@@ -400,8 +488,8 @@ router.post('/admin/branches/:id/inventory/materials/:materialId/adjust', requir
         INSERT INTO material_stock_balances (
           stock_location_id, material_id, quantity_base, carrying_value,
           moving_average_unit_cost, cost_availability_status, valuation_version, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, 'AVAILABLE', 1, ?, ?)
-      `).run(location.id, material.id, countedQty, newCarryingVal, unitCost, now, now);
+        ) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+      `).run(location.id, material.id, countedQty, newCarryingVal, unitCost, costStatus, now, now);
     }
 
     const movId = 'mov_' + crypto.randomBytes(8).toString('hex');
@@ -893,7 +981,7 @@ router.get('/admin/branches/:id/purchasing/checklist', requireAuth(['owner', 'br
         COALESCE(p.product_stock_uom_id, 'pcs') AS base_uom_id,
         COALESCE(u.name, 'Pcs') AS base_uom_name,
         COALESCE(u.code, 'pcs') AS base_uom_code,
-        COALESCE(bpi.stock_qty, 0) AS current_stock,
+        COALESCE(psb.quantity, bpi.stock_qty, 0) AS current_stock,
         COALESCE(p.cost_price, 0) AS last_unit_cost,
         COALESCE(rp.minimum_quantity, bpi.low_stock_threshold, 5) AS minimum_quantity,
         COALESCE(rp.target_quantity, 15) AS target_quantity,
@@ -901,6 +989,8 @@ router.get('/admin/branches/:id/purchasing/checklist', requireAuth(['owner', 'br
       FROM products p
       LEFT JOIN branch_product_inventory bpi
         ON bpi.product_id = p.id AND bpi.branch_id = ?
+      LEFT JOIN product_stock_balances psb
+        ON psb.product_id = p.id AND psb.stock_location_id = ?
       LEFT JOIN inventory_reorder_policies rp
         ON rp.identity_id = p.id AND rp.stock_location_id = ? AND rp.identity_type = 'PRODUCT'
       LEFT JOIN uoms u
@@ -915,7 +1005,7 @@ router.get('/admin/branches/:id/purchasing/checklist', requireAuth(['owner', 'br
           )
         )
       ORDER BY p.name ASC
-    `).all(branch.id, locationId, branch.brand_id);
+    `).all(branch.id, locationId, locationId, branch.brand_id);
 
     const recipeUsages = db.prepare(`
       SELECT
@@ -935,16 +1025,36 @@ router.get('/admin/branches/:id/purchasing/checklist', requireAuth(['owner', 'br
       recipeUsageMap.set(String(u.material_id), Number(u.max_unit_usage || 0));
     }
 
+    // P2.E: Query in-transit POs for materials to compute effective stock
+    const onOrderRows = db.prepare(`
+      SELECT 
+        sm.material_id,
+        COALESCE(SUM(MAX(0, pol.resolved_base_quantity - pol.received_base_quantity)), 0) AS on_order_base_qty
+      FROM purchase_order_lines pol
+      JOIN purchase_orders po ON po.id = pol.purchase_order_id
+      JOIN supplier_materials sm ON sm.id = pol.supplier_material_id
+      WHERE po.destination_stock_location_id = ?
+        AND po.status IN ('ORDERED', 'PARTIALLY_RECEIVED')
+      GROUP BY sm.material_id
+    `).all(locationId);
+
+    const onOrderMap = new Map();
+    for (const row of onOrderRows) {
+      onOrderMap.set(String(row.material_id), Number(row.on_order_base_qty || 0));
+    }
+
     let totalEstimatedBudget = 0;
     const materialItems = rows.map(item => {
       const current = Number(item.current_stock);
+      const onOrder = onOrderMap.get(String(item.material_id)) || 0;
+      const effectiveStock = current + onOrder;
       const min = Number(item.minimum_quantity);
       const target = Number(item.target_quantity);
       const worstUnitUsage = recipeUsageMap.get(String(item.material_id)) || 0;
       const effectiveThreshold = Math.max(min, worstUnitUsage * 2);
-      const isLow = current <= effectiveThreshold || current <= 0;
+      const isLow = effectiveStock <= effectiveThreshold || effectiveStock <= 0;
       const effectiveTarget = target > 0 ? target : Math.max(effectiveThreshold * 2, 1);
-      const suggestedQty = isLow ? Math.max(1, Math.round(effectiveTarget - current)) : 0;
+      const suggestedQty = isLow ? Math.max(1, Math.round(effectiveTarget - effectiveStock)) : 0;
       const lastCost = Number(item.last_unit_cost);
       const estimatedSubtotal = suggestedQty * lastCost;
 
@@ -954,6 +1064,11 @@ router.get('/admin/branches/:id/purchasing/checklist', requireAuth(['owner', 'br
 
       return {
         ...item,
+        item_type: 'MATERIAL',
+        material_id: item.material_id,
+        on_order_qty: onOrder,
+        effective_stock: effectiveStock,
+        is_direct_product: 0,
         is_low: isLow,
         suggested_qty: suggestedQty,
         estimated_subtotal: estimatedSubtotal
@@ -975,6 +1090,12 @@ router.get('/admin/branches/:id/purchasing/checklist', requireAuth(['owner', 'br
 
       return {
         ...item,
+        item_type: 'PRODUCT',
+        product_id: item.material_id,
+        material_id: item.material_id,
+        on_order_qty: 0,
+        effective_stock: current,
+        is_direct_product: 1,
         is_low: isLow,
         suggested_qty: suggestedQty,
         estimated_subtotal: estimatedSubtotal
@@ -1291,47 +1412,118 @@ router.post('/admin/branches/:id/purchasing/settle', requireAuth(['owner', 'bran
       return res.status(400).json({ success: false, error: 'ITEMS_REQUIRED', message: 'Minimal harus ada satu item belanjaan.' });
     }
 
+    // P1.C: Idempotency Key check to prevent double posting on client retry
+    const idempotencyKey = String(
+      (req.body && req.body.idempotency_key) ||
+      req.headers['idempotency-key'] ||
+      (req.body && req.body.mutation_id) ||
+      ''
+    ).trim();
+
+    if (idempotencyKey) {
+      const existingMaterialMov = db.prepare(
+        "SELECT source_reference, posting_timestamp FROM material_stock_movements WHERE source_type = 'PURCHASING_CHECKLIST' AND source_reference = ? LIMIT 1"
+      ).get(idempotencyKey);
+      const existingProductMov = db.prepare(
+        "SELECT source_reference, posting_timestamp FROM product_stock_movements WHERE source_type = 'PURCHASING_CHECKLIST' AND source_reference = ? LIMIT 1"
+      ).get(idempotencyKey);
+
+      if (existingMaterialMov || existingProductMov) {
+        return res.json({
+          success: true,
+          idempotent: true,
+          posting_id: idempotencyKey,
+          settle_number: idempotencyKey,
+          message: 'Belanja sudah diproses sebelumnya (idempotent).'
+        });
+      }
+    }
+
     let totalRealExpenditure = 0;
     const parsedLines = [];
 
     for (const line of items) {
-      let materialId = line.material_id;
       const qty = Number(line.quantity);
       const actualUnitPrice = Number(line.unit_price);
 
-      if (!materialId || qty <= 0 || actualUnitPrice < 0) {
+      if (qty <= 0 || actualUnitPrice < 0 || !Number.isFinite(qty) || !Number.isFinite(actualUnitPrice)) {
         return res.status(400).json({ success: false, error: 'INVALID_LINE', message: 'Jumlah dan harga per item harus valid.' });
       }
 
-      // Resolve ad-hoc material if not existing in materials
-      let existingMat = db.prepare('SELECT id FROM materials WHERE id = ?').get(materialId);
-      if (!existingMat) {
-        const matName = String(line.name || line.material_name || '').trim();
-        if (matName) {
-          const matchByName = db.prepare('SELECT id FROM materials WHERE organization_id = ? AND lower(trim(name)) = lower(?)').get(branch.organization_id, matName);
-          if (matchByName) {
-            materialId = matchByName.id;
-          } else {
-            const newMatId = 'mat_' + crypto.randomBytes(6).toString('hex');
-            const matCode = 'MAT-' + crypto.randomBytes(4).toString('hex').toUpperCase();
-            const uomId = line.base_uom_id || 'uom_pcs';
-            db.prepare(`
-              INSERT INTO materials (id, organization_id, material_code, name, base_uom_id, status)
-              VALUES (?, ?, ?, ?, ?, 'ACTIVE')
-            `).run(newMatId, branch.organization_id, matCode, matName, uomId);
-            materialId = newMatId;
-          }
+      const explicitType = String(line.item_type || '').toUpperCase();
+      const rawTargetId = String(line.product_id || line.material_id || '').trim();
+
+      let isProduct = explicitType === 'PRODUCT';
+      let productRow = null;
+
+      if (!isProduct && explicitType !== 'MATERIAL') {
+        productRow = db.prepare('SELECT id, name, sku, brand_id FROM products WHERE id = ? AND brand_id = ?').get(rawTargetId, branch.brand_id);
+        if (productRow) {
+          isProduct = true;
+        }
+      } else if (isProduct) {
+        productRow = db.prepare('SELECT id, name, sku, brand_id FROM products WHERE id = ? AND brand_id = ?').get(rawTargetId, branch.brand_id);
+        if (!productRow) {
+          return res.status(400).json({ success: false, error: 'PRODUCT_NOT_FOUND', message: `Produk siap jual (${rawTargetId}) tidak ditemukan pada brand ini.` });
         }
       }
 
       const lineTotal = Math.round(qty * actualUnitPrice);
       totalRealExpenditure += lineTotal;
-      parsedLines.push({
-        material_id: materialId,
-        quantity: qty,
-        unit_price: actualUnitPrice,
-        total_price: lineTotal
-      });
+
+      if (isProduct) {
+        parsedLines.push({
+          item_type: 'PRODUCT',
+          product_id: productRow.id,
+          product_name: productRow.name,
+          quantity: qty,
+          unit_price: actualUnitPrice,
+          total_price: lineTotal
+        });
+      } else {
+        let materialId = rawTargetId;
+        // P1.D: Cross-tenant isolation validation
+        const existingMat = db.prepare('SELECT id, organization_id, base_uom_id FROM materials WHERE id = ? AND organization_id = ?').get(materialId, branch.organization_id);
+
+        if (!existingMat) {
+          // Reject cross-organization material injection
+          const foreignMat = db.prepare('SELECT id, organization_id FROM materials WHERE id = ?').get(materialId);
+          if (foreignMat && foreignMat.organization_id !== branch.organization_id) {
+            return res.status(403).json({
+              success: false,
+              error: 'CROSS_ORGANIZATION_MATERIAL_FORBIDDEN',
+              message: 'Material ID tidak sah untuk organisasi cabang ini.'
+            });
+          }
+
+          const matName = String(line.name || line.material_name || '').trim();
+          if (matName) {
+            const matchByName = db.prepare('SELECT id FROM materials WHERE organization_id = ? AND lower(trim(name)) = lower(?)').get(branch.organization_id, matName);
+            if (matchByName) {
+              materialId = matchByName.id;
+            } else {
+              const newMatId = 'mat_' + crypto.randomBytes(6).toString('hex');
+              const matCode = 'MAT-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+              const uomId = line.base_uom_id || 'uom_pcs';
+              db.prepare(`
+                INSERT INTO materials (id, organization_id, material_code, name, base_uom_id, status)
+                VALUES (?, ?, ?, ?, ?, 'ACTIVE')
+              `).run(newMatId, branch.organization_id, matCode, matName, uomId);
+              materialId = newMatId;
+            }
+          } else {
+            return res.status(400).json({ success: false, error: 'MATERIAL_NOT_FOUND', message: `Bahan baku (${materialId}) tidak ditemukan.` });
+          }
+        }
+
+        parsedLines.push({
+          item_type: 'MATERIAL',
+          material_id: materialId,
+          quantity: qty,
+          unit_price: actualUnitPrice,
+          total_price: lineTotal
+        });
+      }
     }
 
     // P1 GOVERNANCE: Check against branch daily petty cash limit
@@ -1354,7 +1546,7 @@ router.post('/admin/branches/:id/purchasing/settle', requireAuth(['owner', 'bran
     ).get(location.id);
     const dailySeq = ((todaySettleRow && todaySettleRow.count) || 0) + 1;
     const settleCode = 'STL-' + today + '-' + String(dailySeq).padStart(4, '0');
-    const postingId = 'shop_' + crypto.randomBytes(8).toString('hex');
+    const postingId = idempotencyKey || ('shop_' + crypto.randomBytes(8).toString('hex'));
     const now = new Date().toISOString();
     const actorId = req.user.id || req.user.userId || 'system';
 
@@ -1362,57 +1554,142 @@ router.post('/admin/branches/:id/purchasing/settle', requireAuth(['owner', 'bran
     db.exec('BEGIN TRANSACTION;');
     try {
       for (const line of parsedLines) {
-        // Find existing material balance
-        const balance = db.prepare(`
-          SELECT quantity_base, carrying_value, moving_average_unit_cost, valuation_version
-          FROM material_stock_balances
-          WHERE stock_location_id = ? AND material_id = ?
-        `).get(location.id, line.material_id);
-
-        let prevQty = balance ? Number(balance.quantity_base) : 0;
-        let prevVal = balance ? Number(balance.carrying_value) : 0;
-        let newQty = prevQty + line.quantity;
-        let newVal = prevVal + line.total_price;
-        let newAvgCost = newQty > 0 ? (newVal / newQty) : line.unit_price;
-
-        const maxMovVer = db.prepare(`
-          SELECT MAX(valuation_version) AS max_v
-          FROM material_stock_movements
-          WHERE stock_location_id = ? AND material_id = ?
-        `).get(location.id, line.material_id);
-        let newVer = ((maxMovVer && maxMovVer.max_v != null) ? Number(maxMovVer.max_v) : 0) + 1;
-
-        if (balance) {
-          db.prepare(`
-            UPDATE material_stock_balances
-            SET quantity_base = ?, carrying_value = ?, moving_average_unit_cost = ?,
-                cost_availability_status = 'AVAILABLE', valuation_version = ?, updated_at = ?
-            WHERE stock_location_id = ? AND material_id = ?
-          `).run(newQty, newVal, newAvgCost, newVer, now, location.id, line.material_id);
-        } else {
-          db.prepare(`
-            INSERT INTO material_stock_balances (
-              stock_location_id, material_id, quantity_base, carrying_value,
-              moving_average_unit_cost, cost_availability_status, valuation_version, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, 'AVAILABLE', 1, ?, ?)
-          `).run(location.id, line.material_id, newQty, newVal, newAvgCost, now, now);
-        }
-
-        // Ledger entry in material_stock_movements (posting_mutation_id must be globally unique per movement)
-        const movId = 'mov_' + crypto.randomBytes(8).toString('hex');
-        const movMutationId = postingId + '_' + line.material_id;
+        const movMutationId = postingId + '_' + (line.item_type === 'PRODUCT' ? line.product_id : line.material_id);
         const movementNotes = receiptPhotoUrl ? JSON.stringify({ notes: notes || 'Belanja Pasar', receipt_photo_url: receiptPhotoUrl }) : (notes || 'Belanja Pasar');
-        db.prepare(`
-          INSERT INTO material_stock_movements (
-            id, stock_location_id, material_id, movement_type, quantity_base,
-            previous_quantity, current_quantity, unit_cost, total_cost, currency_code,
-            valuation_method, cost_basis_type, source_type, source_reference,
-            posting_mutation_id, valuation_version, posting_timestamp, actor_id, resolver_version, notes
-          ) VALUES (?, ?, ?, 'PURCHASE_RECEIPT', ?, ?, ?, ?, ?, 'IDR', 'MOVING_AVERAGE', 'PURCHASE_RECEIPT', 'PURCHASING_CHECKLIST', ?, ?, ?, ?, ?, 'v1', ?)
-        `).run(
-          movId, location.id, line.material_id, line.quantity, prevQty, newQty,
-          line.unit_price, line.total_price, postingId, movMutationId, newVer, now, actorId, movementNotes
-        );
+
+        if (line.item_type === 'PRODUCT') {
+          // P1.B: Mutate ready-to-sell retail product in branch inventory and canonical ledger
+          db.prepare(`
+            INSERT OR IGNORE INTO branch_product_inventory (branch_id, product_id, stock_qty, low_stock_threshold, created_at, updated_at)
+            VALUES (?, ?, 0, 5, ?, ?)
+          `).run(branch.id, line.product_id, now, now);
+
+          const bpiCurrent = db.prepare('SELECT stock_qty FROM branch_product_inventory WHERE branch_id = ? AND product_id = ?').get(branch.id, line.product_id);
+          const prevBpiStock = bpiCurrent ? Number(bpiCurrent.stock_qty || 0) : 0;
+          const newBpiStock = prevBpiStock + line.quantity;
+
+          db.prepare(`
+            UPDATE branch_product_inventory
+            SET stock_qty = ?, updated_at = ?
+            WHERE branch_id = ? AND product_id = ?
+          `).run(newBpiStock, now, branch.id, line.product_id);
+
+          db.prepare(`
+            UPDATE branch_products
+            SET stock = CAST(COALESCE(stock, 0) AS INTEGER) + ?, updated_at = ?
+            WHERE branch_id = ? AND product_id = ?
+          `).run(line.quantity, now, branch.id, line.product_id);
+
+          const movId = 'mov_' + crypto.randomBytes(8).toString('hex');
+          db.prepare(`
+            INSERT INTO inventory_movements (
+              id, branch_id, product_id, movement_type, quantity,
+              previous_stock, current_stock, reference_id, actor_id, notes, created_at, mutation_id
+            ) VALUES (?, ?, ?, 'purchase_in', ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            movId, branch.id, line.product_id, line.quantity,
+            prevBpiStock, newBpiStock, postingId, actorId, movementNotes, now, movMutationId
+          );
+
+          // Canonical product valuation & stock ledger
+          const balance = db.prepare(`
+            SELECT quantity, carrying_value, moving_average_unit_cost, valuation_version
+            FROM product_stock_balances
+            WHERE stock_location_id = ? AND product_id = ?
+          `).get(location.id, line.product_id);
+
+          let prevQty = balance ? Number(balance.quantity) : 0;
+          let prevVal = balance ? Number(balance.carrying_value) : 0;
+          let newQty = prevQty + line.quantity;
+          let newVal = prevVal + line.total_price;
+          let newAvgCost = newQty > 0 ? (newVal / newQty) : line.unit_price;
+
+          const maxMovVer = db.prepare(`
+            SELECT MAX(valuation_version) AS max_v
+            FROM product_stock_movements
+            WHERE stock_location_id = ? AND product_id = ?
+          `).get(location.id, line.product_id);
+          let newVer = ((maxMovVer && maxMovVer.max_v != null) ? Number(maxMovVer.max_v) : 0) + 1;
+
+          if (balance) {
+            db.prepare(`
+              UPDATE product_stock_balances
+              SET quantity = ?, carrying_value = ?, moving_average_unit_cost = ?,
+                  cost_availability_status = 'AVAILABLE', valuation_version = ?, updated_at = ?
+              WHERE stock_location_id = ? AND product_id = ?
+            `).run(newQty, newVal, newAvgCost, newVer, now, location.id, line.product_id);
+          } else {
+            db.prepare(`
+              INSERT INTO product_stock_balances (
+                stock_location_id, product_id, quantity, carrying_value,
+                moving_average_unit_cost, cost_availability_status, valuation_version, created_at, updated_at
+              ) VALUES (?, ?, ?, ?, ?, 'AVAILABLE', 1, ?, ?)
+            `).run(location.id, line.product_id, newQty, newVal, newAvgCost, now, now);
+          }
+
+          const prodMovId = 'pmov_' + crypto.randomBytes(8).toString('hex');
+          db.prepare(`
+            INSERT INTO product_stock_movements (
+              id, stock_location_id, product_id, movement_type, quantity,
+              previous_quantity, current_quantity, unit_cost, total_cost, currency_code,
+              valuation_method, cost_basis_type, source_type, source_reference,
+              posting_mutation_id, valuation_version, posting_timestamp, actor_id, resolver_version, notes
+            ) VALUES (?, ?, ?, 'ADJUSTMENT_IN', ?, ?, ?, ?, ?, 'IDR', 'MOVING_AVERAGE', 'OPENING_ACTUAL', 'PURCHASING_CHECKLIST', ?, ?, ?, ?, ?, 'v1', ?)
+          `).run(
+            prodMovId, location.id, line.product_id, line.quantity, prevQty, newQty,
+            line.unit_price, line.total_price, postingId, movMutationId, newVer, now, actorId, movementNotes
+          );
+        } else {
+          // MATERIAL
+          const balance = db.prepare(`
+            SELECT quantity_base, carrying_value, moving_average_unit_cost, valuation_version
+            FROM material_stock_balances
+            WHERE stock_location_id = ? AND material_id = ?
+          `).get(location.id, line.material_id);
+
+          let prevQty = balance ? Number(balance.quantity_base) : 0;
+          let prevVal = balance ? Number(balance.carrying_value) : 0;
+          let newQty = prevQty + line.quantity;
+          let newVal = prevVal + line.total_price;
+          let newAvgCost = newQty > 0 ? (newVal / newQty) : line.unit_price;
+
+          const maxMovVer = db.prepare(`
+            SELECT MAX(valuation_version) AS max_v
+            FROM material_stock_movements
+            WHERE stock_location_id = ? AND material_id = ?
+          `).get(location.id, line.material_id);
+          let newVer = ((maxMovVer && maxMovVer.max_v != null) ? Number(maxMovVer.max_v) : 0) + 1;
+
+          if (balance) {
+            db.prepare(`
+              UPDATE material_stock_balances
+              SET quantity_base = ?, carrying_value = ?, moving_average_unit_cost = ?,
+                  cost_availability_status = 'AVAILABLE', valuation_version = ?, updated_at = ?
+              WHERE stock_location_id = ? AND material_id = ?
+            `).run(newQty, newVal, newAvgCost, newVer, now, location.id, line.material_id);
+          } else {
+            db.prepare(`
+              INSERT INTO material_stock_balances (
+                stock_location_id, material_id, quantity_base, carrying_value,
+                moving_average_unit_cost, cost_availability_status, valuation_version, created_at, updated_at
+              ) VALUES (?, ?, ?, ?, ?, 'AVAILABLE', 1, ?, ?)
+            `).run(location.id, line.material_id, newQty, newVal, newAvgCost, now, now);
+          }
+
+          // Ledger entry in material_stock_movements (posting_mutation_id must be globally unique per movement)
+          const movId = 'mov_' + crypto.randomBytes(8).toString('hex');
+          db.prepare(`
+            INSERT INTO material_stock_movements (
+              id, stock_location_id, material_id, movement_type, quantity_base,
+              previous_quantity, current_quantity, unit_cost, total_cost, currency_code,
+              valuation_method, cost_basis_type, source_type, source_reference,
+              posting_mutation_id, valuation_version, posting_timestamp, actor_id, resolver_version, notes
+            ) VALUES (?, ?, ?, 'PURCHASE_RECEIPT', ?, ?, ?, ?, ?, 'IDR', 'MOVING_AVERAGE', 'PURCHASE_RECEIPT', 'PURCHASING_CHECKLIST', ?, ?, ?, ?, ?, 'v1', ?)
+          `).run(
+            movId, location.id, line.material_id, line.quantity, prevQty, newQty,
+            line.unit_price, line.total_price, postingId, movMutationId, newVer, now, actorId, movementNotes
+          );
+        }
       }
 
       // If tied to an official mandate, update mandate status and record items
@@ -1424,7 +1701,9 @@ router.post('/admin/branches/:id/purchasing/settle', requireAuth(['owner', 'bran
           WHERE mandate_id = ? AND material_id = ?
         `);
         for (const line of parsedLines) {
-          updateMandateItem.run(line.quantity, line.unit_price, mandateId, line.material_id);
+          if (line.item_type === 'MATERIAL') {
+            updateMandateItem.run(line.quantity, line.unit_price, mandateId, line.material_id);
+          }
         }
 
         // Check if there are still unpurchased items in this mandate
