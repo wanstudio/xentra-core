@@ -1056,6 +1056,25 @@
     }
   }
 
+  var _ownerMasterMenuStatusFilter = 'ACTIVE';
+
+  function filterMasterMenusByStatus(status) {
+    _ownerMasterMenuStatusFilter = status;
+    var pillAct = $('pill-menu-active');
+    var pillInact = $('pill-menu-inactive');
+    if (pillAct && pillInact) {
+      if (status === 'ACTIVE') {
+        pillAct.classList.add('active');
+        pillInact.classList.remove('active');
+      } else {
+        pillAct.classList.remove('active');
+        pillInact.classList.add('active');
+      }
+    }
+    renderOwnerMasterMenuList();
+  }
+  window.filterMasterMenusByStatus = filterMasterMenusByStatus;
+
   function renderOwnerMasterMenuList() {
     var box = $('master-menu-list');
     if (!box) return;
@@ -1063,6 +1082,11 @@
     var filter = String(_ownerMasterMenuState.typeFilter || 'all').toUpperCase();
 
     var menus = (_ownerMasterMenuState.menus || []).filter(function(menu) {
+      if (_ownerMasterMenuStatusFilter) {
+        var isAct = String(menu.status || 'DRAFT').toUpperCase() === 'ACTIVE';
+        if (_ownerMasterMenuStatusFilter === 'ACTIVE' && !isAct) return false;
+        if (_ownerMasterMenuStatusFilter === 'INACTIVE' && isAct) return false;
+      }
       var hay = [
         ownerMasterMenuTitle(menu),
         menu.description || '',
@@ -1074,7 +1098,7 @@
     });
 
     if (!menus.length) {
-      box.innerHTML = '<div class="x-empty-state text-center py-6 text-muted">Belum ada Menu Master yang cocok.</div>';
+      box.innerHTML = '<div class="x-empty-state text-center py-6 text-muted">Belum ada Menu Master' + (_ownerMasterMenuStatusFilter === 'INACTIVE' ? ' nonaktif' : '') + '.</div>';
       return;
     }
 
@@ -1113,22 +1137,12 @@
             '<div class="x-master-menu-card-price">' + formatMoney(menu.selling_price) + '</div>' +
           '</div>' +
         '</div>' +
-        '<div class="x-master-menu-card-right">' +
-          '<div class="x-master-menu-card-right-top">' +
-            '<label class="x-toggle' + (isActive ? ' x-toggle-on' : '') + '" title="' + (isActive ? 'Menu aktif (klik untuk nonaktifkan/arsipkan)' : 'Menu nonaktif (klik untuk aktifkan)') + '" style="margin:0;">' +
-              '<input type="checkbox" ' + (isActive ? 'checked' : '') + ' onchange="toggleOwnerMasterMenuStatus(\'' + esc(menu.id) + '\', this)" aria-label="Status menu ' + esc(title) + '">' +
-              '<span class="x-toggle-slider"></span>' +
-            '</label>' +
-          '</div>' +
-          '<div class="x-master-menu-card-right-bottom">' +
-            '<button type="button" class="x-action-menu-trigger x-master-menu-card-option-btn" aria-label="Aksi menu ' + esc(title) + '" onclick="XentraActionMenu.open(this, [' +
-              '{ label: \'Edit\', icon: \'✏️\', onClick: function() { openEditOwnerMasterMenu(\'' + esc(menu.id) + '\'); } },' +
-              '{ divider: true },' +
-              '{ label: \'Hapus\', icon: \'🗑️\', destructive: true, onClick: function() { deleteOwnerMasterMenu(\'' + esc(menu.id) + '\', \'' + esc(title).replace(/'/g, "\\'") + '\'); } }' +
-            '])">' +
-              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>' +
-            '</button>' +
-          '</div>' +
+        '<div class="x-master-menu-card-right" style="display:flex;align-items:center;gap:10px;">' +
+          '<label class="x-toggle' + (isActive ? ' x-toggle-on' : '') + '" title="' + (isActive ? 'Menu aktif (klik untuk nonaktifkan/arsipkan)' : 'Menu nonaktif (klik untuk aktifkan)') + '" style="margin:0;">' +
+            '<input type="checkbox" ' + (isActive ? 'checked' : '') + ' onchange="toggleOwnerMasterMenuStatus(\'' + esc(menu.id) + '\', this)" aria-label="Status menu ' + esc(title) + '">' +
+            '<span class="x-toggle-slider"></span>' +
+          '</label>' +
+          '<div class="x-hub-arrow" style="color:#c7c7cc;display:flex;align-items:center;margin-left:4px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg></div>' +
         '</div>' +
       '</article>';
     }).join('');

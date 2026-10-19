@@ -1018,11 +1018,11 @@
       }
     }
     if (tabId === 'tim') {
-      switchTeamSection(teamSubtab, false);
+      if (typeof switchTeamSection === 'function') switchTeamSection(teamSubtab, false);
       if (teamSubtab === 'invitations') {
-        loadInvitations();
+        if (typeof loadInvitations === 'function') loadInvitations();
       } else {
-        loadTim();
+        if (typeof loadTim === 'function') loadTim();
       }
     }
     if (tabId === 'finance') {
@@ -1830,6 +1830,13 @@
      MODUL: MARKETING, BANNERS & PROMOTIONS
      Extracted to standalone module: assets/js/modules/marketing.js
      ========================================================================= */
+  var MARKETING_VIEWS = {
+    'overview': 'marketing-view-overview',
+    'promotions': 'marketing-view-promotions',
+    'banners': 'marketing-view-banners',
+    'broadcasts': 'marketing-view-broadcasts'
+  };
+
   function switchMarketingSection(subtab, updateHash) {
     if (window.XentraMarketingModule && window.XentraMarketingModule.switchMarketingSection) {
       return window.XentraMarketingModule.switchMarketingSection(subtab, updateHash);
@@ -2002,7 +2009,7 @@
 
     // Workforce form submit
     var formUser = $('form-user');
-    if (formUser) {
+    if (formUser && typeof submitUserForm === 'function') {
       formUser.addEventListener('submit', submitUserForm);
     }
 

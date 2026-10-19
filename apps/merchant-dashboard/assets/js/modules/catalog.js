@@ -256,8 +256,32 @@
     }
   }
 
+  var _ownerMasterProductStatusFilter = 'ACTIVE';
+
+  function filterMasterProductsByStatus(status) {
+    _ownerMasterProductStatusFilter = status;
+    var pillAct = $('pill-prod-active');
+    var pillInact = $('pill-prod-inactive');
+    if (pillAct && pillInact) {
+      if (status === 'ACTIVE') {
+        pillAct.classList.add('active');
+        pillInact.classList.remove('active');
+      } else {
+        pillAct.classList.remove('active');
+        pillInact.classList.add('active');
+      }
+    }
+    renderMasterProductsTable();
+  }
+  window.filterMasterProductsByStatus = filterMasterProductsByStatus;
+
   function getFilteredMasterProducts() {
     return state.products.filter(function (p) {
+      if (_ownerMasterProductStatusFilter) {
+        var isAct = p.is_active !== 0;
+        if (_ownerMasterProductStatusFilter === 'ACTIVE' && !isAct) return false;
+        if (_ownerMasterProductStatusFilter === 'INACTIVE' && isAct) return false;
+      }
       if (!_catalogState.searchQuery) return true;
       var q = _catalogState.searchQuery.toLowerCase();
       return String(p.name || '').toLowerCase().indexOf(q) !== -1 ||
@@ -268,9 +292,45 @@
 
   function renderMasterProductsTable() {
     var tbody = $('master-products-table-body');
-    if (!tbody) return;
-
+    var cardsBox = $('master-products-cards-container');
     var filtered = getFilteredMasterProducts();
+
+    if (cardsBox) {
+      if (!filtered.length) {
+        cardsBox.innerHTML = '<div class="x-empty-state text-center py-6 text-muted">Belum ada Product' + (_ownerMasterProductStatusFilter === 'INACTIVE' ? ' nonaktif' : '') + '.</div>';
+      } else {
+        cardsBox.innerHTML = filtered.map(function(prod) {
+          var isActive = prod.is_active !== 0;
+          var toggleSwitch = '' +
+            '<label class="x-toggle' + (isActive ? ' x-toggle-on' : '') + '" title="' + (isActive ? 'Product aktif' : 'Product nonaktif') + '" style="margin:0;">' +
+              '<input type="checkbox" ' + (isActive ? 'checked' : '') + ' onchange="toggleStock(\'' + esc(prod.id) + '\', this.checked ? 1 : 0)" aria-label="Status Product ' + esc(prod.name) + '">' +
+              '<span class="x-toggle-slider"></span>' +
+            '</label>';
+
+          var chevronIcon = '<div class="x-hub-arrow" style="color:#c7c7cc;display:flex;align-items:center;margin-left:4px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg></div>';
+
+          var subInfo = prod.sku ? prod.sku : (prod.description || 'Tidak ada deskripsi');
+
+          return [
+            '<div class="x-hub-card" style="align-items:center; cursor:pointer;" onclick="if (!event.target.closest(\'.x-toggle, .x-action-menu-trigger, .x-action-menu\')) { openEditProduct(\'' + esc(prod.id) + '\'); }">',
+              '<div class="x-hub-icon bg-blue" style="width:42px;height:42px;border-radius:12px;background:#2563EB;display:flex;align-items:center;justify-content:center;flex-shrink:0;">',
+                '<img src="/merchant-dashboard/assets/icons/mdi_food-drumstick.svg" width="22" height="22" alt="" style="display:block;">',
+              '</div>',
+              '<div class="x-hub-info" style="flex:1 1 auto;min-width:0;margin-left:12px;">',
+                '<h3 style="font-size:14px;font-weight:700;color:#0f172a;margin:0 0 2px;">' + esc(prod.name) + '</h3>',
+                '<p style="font-size:11px;color:#8c8c8c;font-style:italic;margin:0;">' + esc(subInfo) + '</p>',
+              '</div>',
+              '<div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">',
+                toggleSwitch,
+                chevronIcon,
+              '</div>',
+            '</div>'
+          ].join('');
+        }).join('');
+      }
+    }
+
+    if (!tbody) return;
 
     if (!filtered.length) {
       tbody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-muted">Belum ada Product yang cocok dengan pencarian.</td></tr>';

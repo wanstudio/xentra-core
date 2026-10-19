@@ -346,6 +346,25 @@
     return '<path d="M7 4h10"></path><path d="M7 20h10"></path><path d="M9 4v16"></path><path d="M15 4v16"></path><path d="M7 8h8"></path><path d="M7 16h8"></path>';
   }
 
+  var _ownerCategoryStatusFilter = 'ACTIVE';
+
+  function filterMasterCategoriesByStatus(status) {
+    _ownerCategoryStatusFilter = status;
+    var pillAct = $('pill-cat-active');
+    var pillInact = $('pill-cat-inactive');
+    if (pillAct && pillInact) {
+      if (status === 'ACTIVE') {
+        pillAct.classList.add('active');
+        pillInact.classList.remove('active');
+      } else {
+        pillAct.classList.remove('active');
+        pillInact.classList.add('active');
+      }
+    }
+    renderMasterReferenceList('category');
+  }
+  window.filterMasterCategoriesByStatus = filterMasterCategoriesByStatus;
+
   function renderMasterReferenceList(type) {
     var listMap = {
       category: 'master-categories-page-list',
@@ -358,8 +377,15 @@
     if (!list) return;
 
     var rows = referenceRows(type);
+    if (type === 'category' && _ownerCategoryStatusFilter) {
+      rows = rows.filter(function(r) {
+        var isAct = r.is_active !== 0 && r.is_active !== null;
+        return _ownerCategoryStatusFilter === 'ACTIVE' ? isAct : !isAct;
+      });
+    }
+
     if (!rows.length) {
-      list.innerHTML = '<div class="x-empty-state text-center py-8 text-muted">Belum ada ' + referenceTypeLabel(type).toLowerCase() + '. Tambahkan data pertama.</div>';
+      list.innerHTML = '<div class="x-empty-state text-center py-8 text-muted">Belum ada ' + referenceTypeLabel(type).toLowerCase() + (_ownerCategoryStatusFilter === 'INACTIVE' ? ' nonaktif' : '') + '.</div>';
       return;
     }
 
@@ -399,12 +425,22 @@
           '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>' +
         '</button>';
 
-      rightControls = toggleSwitch + actionMenuBtn;
+      var chevronIcon = '<div class="x-hub-arrow" style="color:#c7c7cc;display:flex;align-items:center;margin-left:4px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg></div>';
+
+      rightControls = type === 'category'
+        ? toggleSwitch + chevronIcon
+        : toggleSwitch + actionMenuBtn;
 
       var iconHtml = '';
-      if (type === 'category' && (row.image_url || row.image)) {
-        var catImg = row.image_url || row.image;
-        iconHtml = '<div class="x-master-reference-icon" aria-hidden="true" style="background:#f1f5f9;"><img src="' + esc(catImg) + '" alt="' + esc(row.name) + '" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;"></div>';
+      if (type === 'category') {
+        if (row.image_url || row.image) {
+          var catImg = row.image_url || row.image;
+          iconHtml = '<div class="x-master-reference-icon" aria-hidden="true" style="background:#f1f5f9;"><img src="' + esc(catImg) + '" alt="' + esc(row.name) + '" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;"></div>';
+        } else {
+          iconHtml = '<div class="x-master-reference-icon x-master-reference-icon-category" aria-hidden="true" style="background:#16a34a;display:flex;align-items:center;justify-content:center;">' +
+            '<img src="/merchant-dashboard/assets/icons/bxs_category.svg" width="22" height="22" alt="" style="width:22px;height:22px;display:block;">' +
+          '</div>';
+        }
       } else {
         iconHtml = '<div class="x-master-reference-icon ' + referenceIconClass(type) + '" aria-hidden="true">' +
           '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">' + referenceIconSvg(type) + '</svg>' +
@@ -423,7 +459,7 @@
           '<div class="x-master-reference-card-main">',
             iconHtml,
             '<div class="x-master-reference-copy">',
-              '<strong>' + esc(row.name) + '</strong>' + (isRowActive ? '' : ' ' + referenceStatusBadge(false)),
+              '<strong>' + esc(row.name) + '</strong>',
               (type === 'category' ? description : '<span>' + esc(description) + '</span>'),
             '</div>',
           '</div>',
