@@ -206,6 +206,7 @@ body.x-owner-mobile-app .x-desktop-hub-canonical-sections,
 /* =========================================================================
    OWNER CATEGORY MOBILE PAGE (matching design reference)
    ========================================================================= */
+#tab-catalog-categories .x-owner-mobile-page-sub,
 body.x-owner-mobile-app #tab-catalog-categories .x-owner-child-mobile-header .x-owner-mobile-page-sub,
 .x-owner-mobile-app #tab-catalog-categories .x-owner-child-mobile-header .x-owner-mobile-page-sub {
   display: none !important;
@@ -270,10 +271,19 @@ body.x-owner-mobile-app .x-filter-pill.active,
   color: #ffffff !important;
 }
 
+.x-master-add-round,
+#btn-add-master-category-page,
 body.x-owner-mobile-app #btn-add-master-category-page,
 .x-owner-mobile-app #btn-add-master-category-page {
   width: 36px !important;
   height: 36px !important;
+  min-width: 36px !important;
+  max-width: 36px !important;
+  min-height: 36px !important;
+  max-height: 36px !important;
+  aspect-ratio: 1 / 1 !important;
+  padding: 0 !important;
+  margin: 0 !important;
   border-radius: 50% !important;
   background: #2b2d31 !important;
   color: #ffffff !important;
@@ -281,12 +291,31 @@ body.x-owner-mobile-app #btn-add-master-category-page,
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  padding: 0 !important;
+  flex: 0 0 36px !important;
+  box-sizing: border-box !important;
+  line-height: 1 !important;
   box-shadow: none !important;
   cursor: pointer !important;
   transition: background 0.15s ease !important;
 }
 
+.x-master-add-round svg,
+#btn-add-master-category-page svg,
+body.x-owner-mobile-app #btn-add-master-category-page svg,
+.x-owner-mobile-app #btn-add-master-category-page svg {
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  max-width: 18px !important;
+  min-height: 18px !important;
+  max-height: 18px !important;
+  display: block !important;
+  margin: auto !important;
+  flex-shrink: 0 !important;
+}
+
+.x-master-add-round:hover,
+#btn-add-master-category-page:hover,
 body.x-owner-mobile-app #btn-add-master-category-page:hover,
 .x-owner-mobile-app #btn-add-master-category-page:hover {
   background: #1e293b !important;
