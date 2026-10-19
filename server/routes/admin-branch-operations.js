@@ -691,13 +691,22 @@ router.post('/admin/branches/:id/inventory/prepare', requireAuth(['owner', 'bran
       return res.status(400).json({ success: false, error: 'INVALID_PORTIONS', message: 'Jumlah porsi masak harus bilangan positif (> 0).' });
     }
 
-    // Resolve branch stock location
-    const location = db.prepare("SELECT id FROM stock_locations WHERE branch_id = ? AND is_active = 1 LIMIT 1").get(req.params.id);
+    // Resolve branch stock location (explicit if provided, else active default)
+    let location = null;
+    const requestedLocId = req.body && req.body.stock_location_id ? String(req.body.stock_location_id).trim() : null;
+    if (requestedLocId) {
+      location = db.prepare("SELECT id FROM stock_locations WHERE id = ? AND branch_id = ? AND is_active = 1").get(requestedLocId, req.params.id);
+      if (!location) {
+        return res.status(400).json({ success: false, error: 'STOCK_LOCATION_NOT_FOUND', message: 'Lokasi gudang persediaan cabang yang dipilih tidak aktif atau tidak terdaftar pada cabang ini.' });
+      }
+    } else {
+      location = db.prepare("SELECT id FROM stock_locations WHERE branch_id = ? AND is_active = 1 LIMIT 1").get(req.params.id);
+    }
     if (!location) {
       return res.status(400).json({ success: false, error: 'STOCK_LOCATION_NOT_FOUND', message: 'Lokasi gudang persediaan cabang belum aktif.' });
     }
 
-    // Resolve recipe for this product
+    // Resolve recipe for this product tied to this stock location
     const recipe = db.prepare(`
       SELECT
         r.id AS recipe_id,
@@ -710,13 +719,15 @@ router.post('/admin/branches/:id/inventory/prepare', requireAuth(['owner', 'bran
       FROM recipes r
       JOIN production_items pi ON pi.id = r.production_item_id
       JOIN recipe_versions rv ON rv.recipe_id = r.id AND rv.status = 'PUBLISHED'
+      LEFT JOIN production_item_locations pil ON pil.production_item_id = pi.id AND pil.is_active = 1
       WHERE pi.output_product_id = ? AND r.status = 'ACTIVE' AND pi.status = 'ACTIVE'
+        AND (pil.stock_location_id = ? OR pil.stock_location_id IS NULL)
       ORDER BY rv.version_number DESC
       LIMIT 1
-    `).get(productId);
+    `).get(productId, location.id);
 
     if (!recipe) {
-      return res.status(404).json({ success: false, error: 'RECIPE_NOT_FOUND', message: 'Resep masakan aktif untuk produk ini tidak ditemukan.' });
+      return res.status(404).json({ success: false, error: 'RECIPE_NOT_FOUND', message: 'Resep masakan aktif untuk produk ini tidak ditemukan pada lokasi ini.' });
     }
 
     const components = db.prepare(`

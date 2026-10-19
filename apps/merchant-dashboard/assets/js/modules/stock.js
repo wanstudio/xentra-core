@@ -1771,12 +1771,17 @@
     if (btnSave) btnSave.textContent = 'Simpan Resep Masakan';
 
     var prodSelect = $('recipe-input-product');
+    var locSelect = $('recipe-input-location');
+    if (locSelect) locSelect.disabled = false;
+
     if (prodSelect) {
       prodSelect.disabled = false;
       prodSelect.innerHTML = '<option value="">Memuat produk...</option>';
       var products = (_ownerInventoryContext && _ownerInventoryContext.products) ? _ownerInventoryContext.products : [];
+      var locations = (_ownerInventoryContext && _ownerInventoryContext.locations) ? _ownerInventoryContext.locations : [];
       if (products.length > 0) {
         populateRecipeProducts(products);
+        populateRecipeLocations(locations);
       } else {
         adminFetch(API_BASE + '/admin/inventory-workflow/context', { headers: getAuthHeaders() })
           .then(function (res) { return res.json(); })
@@ -1784,9 +1789,11 @@
             var data = resData.data || resData;
             _ownerInventoryContext = data;
             populateRecipeProducts(data.products || []);
+            populateRecipeLocations(data.locations || []);
           })
           .catch(function () {
             prodSelect.innerHTML = '<option value="">Gagal memuat produk menu</option>';
+            if (locSelect) locSelect.innerHTML = '<option value="">Gagal memuat lokasi produksi</option>';
           });
       }
     }
@@ -1836,6 +1843,7 @@
       form.dataset.editRecipeId = recipe.recipe_id || recipe.id;
       form.dataset.editProductId = recipe.output_product_id;
       form.dataset.editRecipeName = recipe.recipe_name;
+      form.dataset.editLocationId = recipe.stock_location_id || '';
     }
 
     var prodSelect = $('recipe-input-product');
@@ -1844,6 +1852,14 @@
       populateRecipeProducts(products, recipe.output_product_id);
       prodSelect.value = recipe.output_product_id;
       prodSelect.disabled = true;
+    }
+
+    var locSelect = $('recipe-input-location');
+    if (locSelect) {
+      var locations = (_ownerInventoryContext && _ownerInventoryContext.locations) ? _ownerInventoryContext.locations : [];
+      populateRecipeLocations(locations, recipe.stock_location_id);
+      if (recipe.stock_location_id) locSelect.value = recipe.stock_location_id;
+      locSelect.disabled = true;
     }
 
     if ($('recipe-input-yield')) $('recipe-input-yield').value = recipe.planned_yield_quantity || 1;
@@ -1885,6 +1901,29 @@
     }
   };
 
+  function populateRecipeLocations(locations, selectedLocId) {
+    var locSelect = $('recipe-input-location');
+    if (!locSelect) return;
+
+    var locs = locations || (_ownerInventoryContext && _ownerInventoryContext.locations) || [];
+    if (locs.length === 0) {
+      locSelect.innerHTML = '<option value="">Tidak ada lokasi gudang/dapur aktif</option>';
+      return;
+    }
+
+    var html = '<option value="">Pilih Lokasi Dapur / Gudang Produksi...</option>';
+    locs.forEach(function (loc) {
+      var isSel = selectedLocId && String(loc.id) === String(selectedLocId) ? ' selected' : '';
+      var label = (loc.name || loc.code || loc.id) + (loc.branch_name ? ' (' + loc.branch_name + ')' : '');
+      html += '<option value="' + escapeHtml(loc.id) + '"' + isSel + '>' + escapeHtml(label) + '</option>';
+    });
+    locSelect.innerHTML = html;
+
+    if (!selectedLocId && locs.length === 1) {
+      locSelect.selectedIndex = 1;
+    }
+  }
+
   function populateRecipeProducts(products, selectedProductId) {
     var prodSelect = $('recipe-input-product');
     if (!prodSelect) return;
@@ -1917,10 +1956,13 @@
       delete form.dataset.editRecipeId;
       delete form.dataset.editProductId;
       delete form.dataset.editRecipeName;
+      delete form.dataset.editLocationId;
     }
 
     var prodSelect = $('recipe-input-product');
     if (prodSelect) prodSelect.disabled = false;
+    var locSelect = $('recipe-input-location');
+    if (locSelect) locSelect.disabled = false;
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -2049,9 +2091,16 @@
       return;
     }
 
-    var locationId = null;
-    if (_ownerInventoryContext && _ownerInventoryContext.locations && _ownerInventoryContext.locations.length > 0) {
+    var locationId = ($('recipe-input-location') ? $('recipe-input-location').value : '').trim();
+    if (!locationId && isEdit && form.dataset.editLocationId) {
+      locationId = form.dataset.editLocationId;
+    }
+    if (!locationId && _ownerInventoryContext && _ownerInventoryContext.locations && _ownerInventoryContext.locations.length === 1) {
       locationId = _ownerInventoryContext.locations[0].id;
+    }
+    if (!locationId) {
+      showToast('⚠️ Lokasi dapur / gudang produksi wajib dipilih.', 'warning');
+      return;
     }
 
     var selectedProdName = '';
