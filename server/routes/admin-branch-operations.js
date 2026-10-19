@@ -1502,17 +1502,18 @@ router.post('/admin/branches/:id/purchasing/settle', requireAuth(['owner', 'bran
             if (matchByName) {
               materialId = matchByName.id;
             } else {
-              const newMatId = 'mat_' + crypto.randomBytes(6).toString('hex');
-              const matCode = 'MAT-' + crypto.randomBytes(4).toString('hex').toUpperCase();
-              const uomId = line.base_uom_id || 'uom_pcs';
-              db.prepare(`
-                INSERT INTO materials (id, organization_id, material_code, name, base_uom_id, status)
-                VALUES (?, ?, ?, ?, ?, 'ACTIVE')
-              `).run(newMatId, branch.organization_id, matCode, matName, uomId);
-              materialId = newMatId;
+              return res.status(400).json({
+                success: false,
+                error: 'MATERIAL_NOT_FOUND',
+                message: `Bahan baku "${matName}" belum terdaftar di Master Bahan Baku. Daftarkan terlebih dahulu di menu Bahan Baku.`
+              });
             }
           } else {
-            return res.status(400).json({ success: false, error: 'MATERIAL_NOT_FOUND', message: `Bahan baku (${materialId}) tidak ditemukan.` });
+            return res.status(400).json({
+              success: false,
+              error: 'MATERIAL_NOT_FOUND',
+              message: `Bahan baku (${materialId}) tidak ditemukan di Master Bahan Baku.`
+            });
           }
         }
 

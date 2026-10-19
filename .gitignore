@@ -12,6 +12,7 @@ node_modules/
 *.db-wal
 *.db-journal
 *.db*backup*
+*.snapshot*
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
