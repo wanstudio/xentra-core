@@ -10,6 +10,10 @@
   --owner-surface: #ffffff;
 }
 
+html {
+  scroll-padding-top: max(var(--topbar-height-mobile, 68px), calc(var(--topbar-height-mobile, 68px) + env(safe-area-inset-top, 0px)));
+}
+
 body.x-owner-mobile-app {
   margin: 0;
   padding: 0;
@@ -21,6 +25,7 @@ body.x-owner-mobile-app {
   user-select: none;
   overflow-x: hidden;
   padding-bottom: 72px; /* Space for fixed bottom nav */
+  scroll-padding-top: max(var(--topbar-height-mobile, 68px), calc(var(--topbar-height-mobile, 68px) + env(safe-area-inset-top, 0px)));
 }
 
 /* 1. Never show desktop sidebar in mobile app */
@@ -65,23 +70,36 @@ body.x-owner-mobile-app .bm-orders-mobile-cards {
   display: block !important;
 }
 
-/* 6. Mobile container full width */
+/* 6. Mobile container full width with topbar and bottom nav clearance */
 body.x-owner-mobile-app .x-dash-main {
   margin: 0 !important;
-  padding: 0 12px 24px 12px !important;
+  padding-top: max(var(--topbar-height-mobile, 68px), calc(var(--topbar-height-mobile, 68px) + env(safe-area-inset-top, 0px))) !important;
+  padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px)) !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
   width: 100% !important;
   max-width: 100% !important;
+  box-sizing: border-box !important;
+  scroll-padding-top: max(var(--topbar-height-mobile, 68px), calc(var(--topbar-height-mobile, 68px) + env(safe-area-inset-top, 0px))) !important;
 }
 
-/* 7. Dedicated mobile topbar */
+/* 7. Dedicated mobile topbar (ensure fixed alignment and safe area support) */
+body.x-owner-mobile-app .x-dash-topbar,
 body.x-owner-mobile-app .x-owner-mobile-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  background: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
-  position: sticky;
-  top: 0;
-  z-index: 100;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  height: var(--topbar-height-mobile, 68px) !important;
+  min-height: var(--topbar-height-mobile, 68px) !important;
+  padding: 0 16px !important;
+  padding-top: env(safe-area-inset-top, 0px) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  background: #ffffff !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  z-index: 100 !important;
+  box-sizing: border-box !important;
 }
