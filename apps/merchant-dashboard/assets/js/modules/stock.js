@@ -1193,13 +1193,51 @@
     if (_ownerMaterialsQuery) {
       filtered = _ownerMaterials.filter(function (m) {
         var name = (m.name || '').toLowerCase();
-        var code = (m.code || '').toLowerCase();
+        var code = (m.material_code || m.code || '').toLowerCase();
         return name.includes(_ownerMaterialsQuery) || code.includes(_ownerMaterialsQuery);
       });
     }
-    renderOwnerMaterialsTable(filtered);
+    applyOwnerMaterialsFilter();
   }
   window.onMaterialsSearchInput = onMaterialsSearchInput;
+
+  var _ownerMaterialStatusFilter = 'ACTIVE';
+
+  function filterMaterialsByStatus(status) {
+    _ownerMaterialStatusFilter = status;
+    var btnActive = $('btn-mat-filter-active');
+    var btnInactive = $('btn-mat-filter-inactive');
+    if (btnActive) {
+      if (status === 'ACTIVE') btnActive.classList.add('active');
+      else btnActive.classList.remove('active');
+    }
+    if (btnInactive) {
+      if (status === 'ARCHIVED') btnInactive.classList.add('active');
+      else btnInactive.classList.remove('active');
+    }
+    applyOwnerMaterialsFilter();
+  }
+  window.filterMaterialsByStatus = filterMaterialsByStatus;
+
+  function applyOwnerMaterialsFilter() {
+    var list = _ownerMaterials || [];
+    if (_ownerMaterialStatusFilter) {
+      list = list.filter(function (m) {
+        var isArchived = m.status === 'archived' || m.status === 'ARCHIVED';
+        if (_ownerMaterialStatusFilter === 'ACTIVE') return !isArchived;
+        if (_ownerMaterialStatusFilter === 'ARCHIVED') return isArchived;
+        return true;
+      });
+    }
+    if (_ownerMaterialsQuery) {
+      list = list.filter(function (m) {
+        var name = (m.name || '').toLowerCase();
+        var code = (m.material_code || m.code || '').toLowerCase();
+        return name.includes(_ownerMaterialsQuery) || code.includes(_ownerMaterialsQuery);
+      });
+    }
+    renderOwnerMaterialsTable(list);
+  }
 
   function loadOwnerMaterials() {
     var container = $('owner-materials-table-container');
@@ -1214,7 +1252,7 @@
       })
       .then(function (data) {
         _ownerMaterials = data.materials || [];
-        renderOwnerMaterialsTable(_ownerMaterials);
+        applyOwnerMaterialsFilter();
       })
       .catch(function (err) {
         if (container) {
@@ -1222,6 +1260,28 @@
         }
       });
   }
+
+  window.toggleOwnerMaterialStatus = async function(matId, isChecked) {
+    try {
+      var newStatus = isChecked ? 'ACTIVE' : 'ARCHIVED';
+      var res = await adminFetch(API_BASE + '/admin/materials/' + encodeURIComponent(matId) + '/status', {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ status: newStatus })
+      });
+      var data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Gagal mengubah status bahan');
+      }
+      showToast(isChecked ? '🟢 Bahan baku diaktifkan' : '⚪ Bahan baku dinonaktifkan', 'success');
+      var m = (_ownerMaterials || []).find(function(item) { return String(item.id) === String(matId); });
+      if (m) m.status = newStatus;
+      applyOwnerMaterialsFilter();
+    } catch (err) {
+      showToast('❌ Gagal: ' + err.message, 'error');
+      loadOwnerMaterials();
+    }
+  };
 
   function renderOwnerMaterialsTable(materials) {
     var container = $('owner-materials-table-container');
@@ -1243,71 +1303,39 @@
           '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.5" style="margin-bottom:8px;"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/></svg>' +
           '<div style="font-size:14px; font-weight:600; color:#334155; margin-bottom:4px;">Belum ada bahan baku</div>' +
           '<p style="font-size:13px; margin:0 0 16px 0;">Tambahkan bahan baku pertama untuk menyusun resep dan procurement.</p>' +
-          '<button type="button" onclick="openAddMaterialModal()" style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:8px; font-weight:600; font-size:13px; background:#0F172A; color:#FFFFFF; border:none; cursor:pointer;">+ Tambah Bahan</button>' +
+          '<button type="button" onclick="openAddMaterialModal()" style="display:inline-flex; align-items:center; gap:6px; padding:10px 18px; border-radius:10px; font-weight:700; font-size:13px; background:#16A34A; color:#FFFFFF; border:none; cursor:pointer;">+ Tambah Bahan</button>' +
         '</div>'
       );
       return;
     }
 
-    var rows = materials.map(function (m) {
+    var cards = materials.map(function (m) {
       var isArchived = m.status === 'archived' || m.status === 'ARCHIVED';
-      var unitCost = Number(m.moving_average_unit_cost || m.unit_cost || 0);
-      var uomLabel = m.base_uom_name ? (m.base_uom_name + ' (' + m.base_uom_code + ')') : (m.base_uom_code || m.base_uom_id || '-');
-
-      var statusBadge = '';
-      if (isArchived) {
-        statusBadge = '<span style="background:#F1F5F9; color:#64748B; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:600;">Diarsipkan</span>';
-      } else {
-        statusBadge = '<span style="background:#ECFDF5; color:#059669; border:1px solid #A7F3D0; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700;">🟢 Aktif</span>';
-      }
-
-      var costDisplay = unitCost > 0
-        ? ('<strong style="color:#0F172A; font-size:13px;">' + formatMoney(unitCost) + '</strong> <span style="font-size:11px; color:#64748B;">/' + escapeHtml(m.base_uom_code || '') + '</span>')
-        : '<span style="color:#94A3B8; font-style:italic; font-size:12px;">Belum ada acuan</span>';
-
-      var actionHtml = (
-        '<div style="display:flex; justify-content:flex-end; gap:6px;">' +
-          '<button type="button" onclick="event.stopPropagation(); openEditMaterialModal(\'' + escapeHtml(m.id) + '\')" style="display:inline-flex; align-items:center; gap:4px; padding:5px 10px; border-radius:6px; font-size:12px; font-weight:600; background:#F1F5F9; color:#0F172A; border:1px solid #CBD5E1; cursor:pointer;" title="Ubah Data Master">' +
-            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg> Ubah Master' +
-          '</button>' +
-          (!isArchived ? (
-            '<button type="button" onclick="event.stopPropagation(); archiveOwnerMaterial(\'' + escapeHtml(m.id) + '\', \'' + escapeHtml(m.name).replace(/'/g, "\\'") + '\')" style="background:none; border:none; color:#94A3B8; cursor:pointer; font-size:11px; padding:4px 6px;" title="Arsipkan">' +
-              'Arsip' +
-            '</button>'
-          ) : '') +
-        '</div>'
-      );
+      var uomLabel = m.base_uom_name || m.base_uom_code || m.base_uom_id || 'Satuan';
 
       return (
-        '<tr style="border-bottom:1px solid #F1F5F9; cursor:pointer;" onclick="if (!event.target.closest(\'button, input, select\')) { openEditMaterialModal(\'' + escapeHtml(m.id) + '\'); }">' +
-          '<td style="padding:12px 14px; font-weight:600; color:#0F172A; font-size:13px;">' +
-            '<div style="font-weight:700; color:#0F172A;">' + escapeHtml(m.name) + '</div>' +
-            '<div style="font-size:11px; color:#64748B;">Kode: ' + escapeHtml(m.material_code) + (m.description ? ' • ' + escapeHtml(m.description) : '') + '</div>' +
-          '</td>' +
-          '<td style="padding:12px 14px; font-size:13px; color:#334155; font-weight:600;">' + escapeHtml(uomLabel) + '</td>' +
-          '<td style="padding:12px 14px; font-size:13px;">' + costDisplay + '</td>' +
-          '<td style="padding:12px 14px; font-size:13px;">' + statusBadge + '</td>' +
-          '<td style="padding:12px 14px; text-align:right; font-size:13px;">' + actionHtml + '</td>' +
-        '</tr>'
+        '<div class="x-material-card" onclick="openEditMaterialModal(\'' + escapeHtml(m.id) + '\')">' +
+          '<div class="x-material-card-icon">' +
+            '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2"><path d="M18 10a6 6 0 0 0-12 0c0 7 6 9 6 9s6-2 6-9Z"/><path d="M12 19v3"/></svg>' +
+          '</div>' +
+          '<div class="x-material-card-body">' +
+            '<h4 class="x-material-card-title">' + escapeHtml(m.name) + '</h4>' +
+            '<div class="x-material-card-meta">' +
+              '<span class="x-material-card-code">' + escapeHtml(m.material_code || '') + '</span>' +
+              '<span class="x-material-card-uom">' + escapeHtml(uomLabel) + '</span>' +
+            '</div>' +
+          '</div>' +
+          '<div class="x-material-card-toggle" onclick="event.stopPropagation()">' +
+            '<label class="x-toggle">' +
+              '<input type="checkbox" ' + (!isArchived ? 'checked' : '') + ' onchange="toggleOwnerMaterialStatus(\'' + escapeHtml(m.id) + '\', this.checked)">' +
+              '<span class="x-toggle-slider"></span>' +
+            '</label>' +
+          '</div>' +
+        '</div>'
       );
     }).join('');
 
-    container.innerHTML = (
-      '<div style="overflow-x:auto;">' +
-        '<table style="width:100%; border-collapse:collapse; text-align:left;">' +
-          '<thead>' +
-            '<tr style="background:#F8FAFC; border-bottom:1px solid #E2E8F0; color:#64748B; font-size:12px; text-transform:uppercase; letter-spacing:0.025em;">' +
-              '<th style="padding:10px 14px; font-weight:600;">Bahan Baku (Master)</th>' +
-              '<th style="padding:10px 14px; font-weight:600;">Satuan Dasar (Base UOM)</th>' +
-              '<th style="padding:10px 14px; font-weight:600;">Standar Harga Acuan</th>' +
-              '<th style="padding:10px 14px; font-weight:600;">Status</th>' +
-              '<th style="padding:10px 14px; font-weight:600; text-align:right;">Aksi</th>' +
-            '</tr>' +
-          '</thead>' +
-          '<tbody>' + rows + '</tbody>' +
-        '</table>' +
-      '</div>'
-    );
+    container.innerHTML = '<div class="x-material-cards-list" style="display:flex; flex-direction:column; gap:8px;">' + cards + '</div>';
   }
 
   window.openEditMaterialModal = function(matId) {
@@ -1330,6 +1358,15 @@
     if ($('edit-mat-id')) $('edit-mat-id').value = material.id;
     if ($('edit-mat-name')) $('edit-mat-name').value = material.name || '';
     if ($('edit-mat-code')) $('edit-mat-code').value = material.material_code || '';
+
+    var isArchived = material.status === 'archived' || material.status === 'ARCHIVED';
+    var statusToggle = $('edit-mat-status-toggle');
+    var statusLabel = $('edit-mat-status-label');
+    if (statusToggle) statusToggle.checked = !isArchived;
+    if (statusLabel) {
+      statusLabel.textContent = !isArchived ? 'Aktif' : 'Nonaktif';
+      statusLabel.style.color = !isArchived ? '#15803D' : '#64748B';
+    }
 
     var uomSelect = $('edit-mat-uom');
     if (uomSelect) {
@@ -1391,6 +1428,14 @@
     }
   };
 
+  window.onEditMaterialStatusToggleChange = function(isChecked) {
+    var statusLabel = $('edit-mat-status-label');
+    if (statusLabel) {
+      statusLabel.textContent = isChecked ? 'Aktif' : 'Nonaktif';
+      statusLabel.style.color = isChecked ? '#15803D' : '#64748B';
+    }
+  };
+
   window.closeEditMaterialModal = function() {
     if (window.XentraUI && window.XentraUI.Modal) {
       window.XentraUI.Modal.close('modal-edit-material');
@@ -1413,6 +1458,9 @@
     var rawCost = $('edit-mat-unit-cost') ? $('edit-mat-unit-cost').value : '0';
     var unitCost = Number(String(rawCost).replace(/\D/g, '')) || 0;
     var targetQty = $('edit-mat-target-qty') ? Number($('edit-mat-target-qty').value) : 0;
+    var statusToggle = $('edit-mat-status-toggle');
+    var isChecked = statusToggle ? statusToggle.checked : true;
+    var targetStatus = isChecked ? 'ACTIVE' : 'ARCHIVED';
 
     var btn = $('btn-save-edit-material');
 
@@ -1451,7 +1499,17 @@
         throw new Error(data.message || data.error || 'Gagal memperbarui data bahan');
       }
 
-      showToast('✅ Data master bahan baku & standar harga acuan berhasil disimpan.', 'success');
+      // Check if status changed
+      var wasArchived = currentMat.status === 'archived' || currentMat.status === 'ARCHIVED';
+      if ((!wasArchived && !isChecked) || (wasArchived && isChecked)) {
+        await adminFetch(API_BASE + '/admin/materials/' + encodeURIComponent(matId) + '/status', {
+          method: 'PUT',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ status: targetStatus })
+        });
+      }
+
+      showToast('✅ Data bahan baku berhasil disimpan.', 'success');
       closeEditMaterialModal();
       loadOwnerMaterials();
       if (typeof loadOwnerReplenishmentSuggestions === 'function') loadOwnerReplenishmentSuggestions();
@@ -1460,7 +1518,7 @@
     } finally {
       if (btn) {
         btn.disabled = false;
-        btn.textContent = 'Simpan Perubahan';
+        btn.textContent = 'Simpan';
       }
     }
   };
@@ -1497,9 +1555,13 @@
     var desc = ($('mat-input-desc') ? $('mat-input-desc').value : '').trim();
     var btn = $('btn-save-material');
 
-    if (!code || !name || !uomId) {
-      showToast('Harap lengkapi kode, nama, dan satuan dasar bahan.', 'warning');
+    if (!name || !uomId) {
+      showToast('Harap lengkapi nama dan satuan bahan.', 'warning');
       return;
+    }
+
+    if (!code) {
+      code = 'MAT-' + name.replace(/[^A-Za-z0-9]/g, '').slice(0, 6).toUpperCase() + '-' + Math.floor(100 + Math.random() * 900);
     }
 
     if (btn) {
@@ -1538,7 +1600,7 @@
       .finally(function () {
         if (btn) {
           btn.disabled = false;
-          btn.textContent = 'Simpan Bahan';
+          btn.textContent = 'Simpan';
         }
       });
   }
@@ -2000,17 +2062,15 @@
     var qtyVal = defaultQty != null ? Number(defaultQty) : '';
 
     row.innerHTML = (
-      '<div class="x-recipe-ing-top">' +
-        '<select class="recipe-ing-material x-input" required onchange="handleRecipeMaterialChange(this, \'' + rowId + '\')">' +
+      '<button type="button" class="x-recipe-ing-del-btn" onclick="removeRecipeIngredientRow(\'' + rowId + '\')" title="Hapus Bahan" style="border-radius:50%; width:36px; height:36px; background:#EF4444; color:#FFFFFF; border:none; display:flex; align-items:center; justify-content:center; flex-shrink:0; cursor:pointer;">' +
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
+      '</button>' +
+      '<div class="x-recipe-ing-fields" style="display:flex; flex:1; gap:10px; align-items:center;">' +
+        '<select class="recipe-ing-material x-input" required onchange="handleRecipeMaterialChange(this, \'' + rowId + '\')" style="flex:2; min-width:0; padding:10px 12px; font-size:13px; border-radius:8px;">' +
           matOptions +
         '</select>' +
-        '<button type="button" class="x-recipe-ing-del-btn" onclick="removeRecipeIngredientRow(\'' + rowId + '\')" title="Hapus Bahan">' +
-          '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
-        '</button>' +
-      '</div>' +
-      '<div class="x-recipe-ing-bottom">' +
-        '<input type="number" step="any" min="0.001" inputmode="decimal" placeholder="Jumlah takaran" value="' + (qtyVal !== '' ? qtyVal : '') + '" required class="recipe-ing-qty x-input">' +
-        '<select class="recipe-ing-uom x-input" required>' +
+        '<input type="number" step="any" min="0.001" inputmode="decimal" placeholder="Jumlah" value="' + (qtyVal !== '' ? qtyVal : '') + '" required class="recipe-ing-qty x-input" style="flex:1; min-width:70px; padding:10px 12px; font-size:13px; border-radius:8px;">' +
+        '<select class="recipe-ing-uom x-input" required style="flex:1.2; min-width:90px; padding:10px 12px; font-size:13px; border-radius:8px;">' +
           uomOptions +
         '</select>' +
       '</div>'
@@ -2018,6 +2078,23 @@
 
     container.appendChild(row);
   }
+
+  function handleRecipeGoalToggle(type, isChecked) {
+    var stockToggle = $('recipe-toggle-make-to-stock');
+    var orderToggle = $('recipe-toggle-make-to-order');
+
+    if (type === 'order' && isChecked) {
+      if (orderToggle) orderToggle.checked = false;
+      if (stockToggle) stockToggle.checked = true;
+      showToast('ℹ️ Mode Make-to-Order (pesanan langsung) akan aktif pada fase berikutnya. Saat ini formula resep menggunakan Make-to-Stock.', 'info');
+      return;
+    }
+    if (type === 'stock' && !isChecked) {
+      if (stockToggle) stockToggle.checked = true;
+      showToast('ℹ️ Make-to-Stock adalah jalur produksi utama Xentra untuk mencatat saldo dan HPP.', 'info');
+    }
+  }
+  window.handleRecipeGoalToggle = handleRecipeGoalToggle;
 
   function handleRecipeMaterialChange(selectElem, rowId) {
     var selectedOpt = selectElem.options[selectElem.selectedIndex];
@@ -2821,6 +2898,9 @@
   window.closeAddMaterialModal = closeAddMaterialModal;
   window.submitAddMaterialForm = submitAddMaterialForm;
   window.archiveOwnerMaterial = archiveOwnerMaterial;
+  window.filterMaterialsByStatus = filterMaterialsByStatus;
+  window.toggleOwnerMaterialStatus = toggleOwnerMaterialStatus;
+  window.handleRecipeGoalToggle = handleRecipeGoalToggle;
   window.loadOwnerMaterials = loadOwnerMaterials;
   window.loadOwnerRecipes = loadOwnerRecipes;
   window.openAddRecipeModal = openAddRecipeModal;

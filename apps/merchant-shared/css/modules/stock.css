@@ -744,4 +744,143 @@
   }
 }
 
+/* =========================================================================
+   MODERN MATERIAL CARDS & FORM STYLING (bahan baku.png)
+   ========================================================================= */
+.x-material-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+.x-material-card:hover {
+  border-color: #CBD5E1;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+.x-material-card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #EFF6FF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #2563EB;
+}
+.x-material-card-body {
+  flex: 1;
+  min-width: 0;
+}
+.x-material-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0F172A;
+  margin: 0 0 3px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.x-material-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #64748B;
+}
+.x-material-card-code {
+  color: #64748B;
+}
+.x-material-card-uom {
+  background: #F1F5F9;
+  color: #475569;
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-weight: 600;
+  font-size: 11.5px;
+}
+.x-material-card-toggle {
+  flex-shrink: 0;
+}
+
+.x-filter-pill {
+  padding: 6px 18px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid #E2E8F0;
+  background: #F8FAFC;
+  color: #64748B;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.x-filter-pill.active {
+  background: #DCFCE7;
+  color: #15803D;
+  border-color: #86EFAC;
+  font-weight: 700;
+}
+
+/* =========================================================================
+   RECIPE GOAL CARDS & SIMPAN BUTTON (resep produksi.png)
+   ========================================================================= */
+.x-recipe-goal-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  margin-bottom: 10px;
+  transition: all 0.15s ease;
+}
+.x-recipe-goal-card.active {
+  background: #FFFFFF;
+  border-color: #CBD5E1;
+}
+
+.x-recipe-ing-fields {
+  display: flex;
+  flex: 1;
+  gap: 10px;
+  align-items: center;
+}
+.x-recipe-ing-fields .recipe-ing-material {
+  flex: 2;
+  min-width: 0;
+}
+.x-recipe-ing-fields .recipe-ing-qty {
+  flex: 1;
+  min-width: 70px;
+}
+.x-recipe-ing-fields .recipe-ing-uom {
+  flex: 1.2;
+  min-width: 90px;
+}
+@media (max-width: 640px) {
+  .x-recipe-ingredient-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  .x-recipe-ing-top-mobile {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+  }
+  .x-recipe-ing-fields {
+    flex-direction: column;
+    width: 100%;
+    gap: 8px;
+  }
+}
+
 

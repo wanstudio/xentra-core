@@ -5057,6 +5057,10 @@ body.x-mobile-account-open .x-merchant-mobile-nav { display: none !important; }
   .x-hub-icon.bg-orange { background: #ea580c; }
   .x-hub-icon.bg-green  { background: #16a34a; }
   .x-hub-icon.bg-pink   { background: #db2777; }
+  .x-hub-icon.bg-amber  { background: #d97706; }
+  .x-hub-icon.bg-red    { background: #dc2626; }
+  .x-hub-icon.bg-slate  { background: #334155; }
+  .x-hub-icon.bg-teal   { background: #0d9488; }
   .x-hub-info { flex: 1 1 auto; min-width: 0; }
   .x-hub-info h3 {
     font-size: 14px;

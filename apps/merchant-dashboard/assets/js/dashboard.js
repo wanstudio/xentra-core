@@ -654,6 +654,66 @@
     navigateTo('catalog/categories', { history: 'replace' });
   };
 
+  function openBusinessSubHub(type) {
+    var mainView = $('owner-business-main-view');
+    var catHub = $('subpage-catalog-menu-hub');
+    var matHub = $('subpage-materials-production-hub');
+
+    if (mainView) mainView.style.display = 'none';
+    if (catHub) catHub.style.display = (type === 'catalog') ? 'block' : 'none';
+    if (matHub) matHub.style.display = (type === 'materials-production') ? 'block' : 'none';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  window.openBusinessSubHub = openBusinessSubHub;
+
+  function closeBusinessSubHub() {
+    var mainView = $('owner-business-main-view');
+    var catHub = $('subpage-catalog-menu-hub');
+    var matHub = $('subpage-materials-production-hub');
+
+    if (mainView) mainView.style.display = 'block';
+    if (catHub) catHub.style.display = 'none';
+    if (matHub) matHub.style.display = 'none';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  window.closeBusinessSubHub = closeBusinessSubHub;
+
+  window.openBahanBakuPage = function () {
+    navigateTo('stock');
+    setTimeout(function () {
+      if (typeof window.switchStockSubtab === 'function') {
+        window.switchStockSubtab('materials');
+      }
+    }, 50);
+  };
+
+  window.openResepProduksiPage = function () {
+    navigateTo('stock');
+    setTimeout(function () {
+      if (typeof window.switchStockSubtab === 'function') {
+        window.switchStockSubtab('recipes');
+      }
+    }, 50);
+  };
+
+  function onBusinessHubSearch(query) {
+    var q = String(query || '').trim().toLowerCase();
+    var cards = document.querySelectorAll('#owner-business-cards-container .x-hub-card');
+    cards.forEach(function (card) {
+      if (!q) {
+        card.style.display = 'flex';
+        return;
+      }
+      var text = (card.getAttribute('data-hub-item') || '') + ' ' + (card.innerText || '');
+      if (text.toLowerCase().indexOf(q) !== -1) {
+        card.style.display = 'flex';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+  }
+  window.onBusinessHubSearch = onBusinessHubSearch;
+
   // Render Platform Navigation in Sidebar
   function renderPlatformNavigation() {
     var nav = $('x-dash-nav');
@@ -927,6 +987,7 @@
       stopOrdersPolling();
     }
 
+    if (tabId === 'business') closeBusinessSubHub();
     if (tabId === 'overview') loadOverview();
     if (tabId === 'reports') loadReports(reportSubtype);
     if (tabId === 'stock') loadOwnerStockOverview();
