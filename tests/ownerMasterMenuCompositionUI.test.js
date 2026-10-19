@@ -7,7 +7,14 @@ const path = require('node:path');
 
 const ROOT = path.resolve(__dirname, '..');
 const HTML = fs.readFileSync(path.join(ROOT, 'apps/merchant-dashboard/index.html'), 'utf8');
-const JS = fs.readFileSync(path.join(ROOT, 'apps/merchant-dashboard/assets/js/dashboard.js'), 'utf8');
+const dashboardDir = path.join(ROOT, 'apps/merchant-dashboard/assets/js');
+const moduleFiles = fs.existsSync(path.join(dashboardDir, 'modules'))
+  ? fs.readdirSync(path.join(dashboardDir, 'modules')).filter(f => f.endsWith('.js')).map(f => fs.readFileSync(path.join(dashboardDir, 'modules', f), 'utf8')).join('\n')
+  : '';
+const inlineMenuJs = fs.existsSync(path.join(dashboardDir, 'owner-master-menu-inline.js'))
+  ? fs.readFileSync(path.join(dashboardDir, 'owner-master-menu-inline.js'), 'utf8')
+  : '';
+const JS = fs.readFileSync(path.join(dashboardDir, 'dashboard.js'), 'utf8') + '\n' + moduleFiles + '\n' + inlineMenuJs;
 const CSS = fs.readFileSync(path.join(ROOT, 'apps/merchant-shared/css/dashboard.css'), 'utf8');
 
 /**
@@ -230,7 +237,7 @@ test('Product Editor does not own POS commercial options', () => {
 });
 
 test('Atomic Product Editor does not block on Menu Master references', () => {
-  const start = JS.indexOf('async function loadProductEditorPage(productId)');
+  const start = JS.lastIndexOf('async function loadProductEditorPage(productId)');
   const end = JS.indexOf("window.openAddProduct = function ()", start);
   assert.ok(start >= 0 && end > start);
   const loader = JS.slice(start, end);

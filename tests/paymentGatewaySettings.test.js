@@ -69,7 +69,13 @@ test('PAYMENT GATEWAY — kredensial tersimpan & satu gateway online aktif', asy
   );
   const DASHBOARD_JS = fs.readFileSync(
     path.join(ROOT, 'apps/merchant-dashboard/assets/js/dashboard.js'), 'utf8'
-  );
+  ) + '\n' +
+  (fs.existsSync(path.join(ROOT, 'apps/merchant-dashboard/assets/js/modules/settings.js'))
+    ? fs.readFileSync(path.join(ROOT, 'apps/merchant-dashboard/assets/js/modules/settings.js'), 'utf8')
+    : '') + '\n' +
+  (fs.existsSync(path.join(ROOT, 'apps/merchant-dashboard/assets/js/modules/finance.js'))
+    ? fs.readFileSync(path.join(ROOT, 'apps/merchant-dashboard/assets/js/modules/finance.js'), 'utf8')
+    : '');
 
   let server;
   let ownerToken;

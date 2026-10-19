@@ -19,7 +19,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const HTML = fs.readFileSync(path.join(__dirname, '../apps/merchant-dashboard/index.html'), 'utf8');
-const DASHBOARD_JS = fs.readFileSync(path.join(__dirname, '../apps/merchant-dashboard/assets/js/dashboard.js'), 'utf8');
+const DASHBOARD_JS = fs.readFileSync(path.join(__dirname, '../apps/merchant-dashboard/assets/js/dashboard.js'), 'utf8') + '\n' +
+  (fs.existsSync(path.join(__dirname, '../apps/merchant-dashboard/assets/js/modules/master-menu.js'))
+    ? fs.readFileSync(path.join(__dirname, '../apps/merchant-dashboard/assets/js/modules/master-menu.js'), 'utf8')
+    : '');
 const CROP_EDITOR = fs.readFileSync(path.join(__dirname, '../apps/merchant-shared/js/crop-editor.js'), 'utf8');
 const DASHBOARD_CSS = fs.readFileSync(path.join(__dirname, '../apps/merchant-shared/css/dashboard.css'), 'utf8');
 

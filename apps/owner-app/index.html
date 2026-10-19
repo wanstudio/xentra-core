@@ -8,12 +8,12 @@
   <link rel="stylesheet" href="/merchant-shared/fonts/plus-jakarta-sans.css?v=1.0.0">
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.5">
   <link rel="stylesheet" href="/merchant-shared/css/presentation-shells.css?v=1.0.4">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.57">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.58">
   <link rel="stylesheet" href="/merchant-shared/css/modules/marketing.css?v=1.0.0">
-  <link rel="stylesheet" href="/merchant-shared/css/modules/stock.css?v=1.0.2">
+  <link rel="stylesheet" href="/merchant-shared/css/modules/stock.css?v=1.0.3">
   <link rel="stylesheet" href="/merchant-shared/css/modules/catalog.css?v=1.0.0">
   <link rel="stylesheet" href="/merchant-shared/css/ui-primitives.css?v=1.0.1">
-  <link rel="stylesheet" href="/owner/assets/css/owner-app.css?v=1.0.0">
+  <link rel="stylesheet" href="/owner/assets/css/owner-app.css?v=1.0.1">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#ffffff">
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
@@ -31,7 +31,9 @@
       'use strict';
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function () {
-          navigator.serviceWorker.register('/owner/sw.js', { scope: '/owner/' }).catch(function () {});
+          navigator.serviceWorker.register('/owner/sw.js', { scope: '/owner/' }).then(function (reg) {
+            if (reg && typeof reg.update === 'function') reg.update();
+          }).catch(function () {});
         });
       }
     })();
@@ -164,7 +166,7 @@
           <button type="button" class="x-nav-sub-item" data-route="catalog/categories" data-tab="catalog-categories">
             <span>Kategori</span>
           </button>
-          <button type="button" class="x-nav-sub-item" data-route="catalog/products" data-tab="catalog-products" style="display: none;">
+          <button type="button" class="x-nav-sub-item" data-route="catalog/products" data-tab="catalog-products">
             <span>Produk Master</span>
           </button>
           <button type="button" class="x-nav-sub-item" data-route="catalog/master-menus" data-tab="catalog-master-menus">
@@ -283,12 +285,12 @@
           </button>
           <!-- Notifications entry point -->
           <button type="button" class="x-topbar-icon-btn x-topbar-icon-btn-round" id="btn-notifications" aria-label="Notifikasi" title="Notifikasi">
-            <svg class="x-topbar-bell-icon" width="18" height="18" viewBox="0 0 17 17" aria-hidden="true"><image href="/merchant-dashboard/assets/icons/bi_bell-fill.svg" x="0" y="0" width="17" height="17"></image></svg>
+            <svg class="x-topbar-bell-icon" width="18" height="18" viewBox="0 0 17 17" aria-hidden="true"><image href="/owner/assets/icons/bi_bell-fill.svg" x="0" y="0" width="17" height="17"></image></svg>
           </button>
           <!-- User profile -->
           <div class="x-admin-profile" id="dash-user-profile" role="button" tabindex="0" aria-label="Profil Akun" style="cursor: pointer;">
             <div class="x-avatar x-avatar-stroke-round" id="dash-user-avatar" title="Profil Akun">
-              <svg class="x-topbar-user-icon" width="18" height="18" viewBox="0 0 17 17" aria-hidden="true"><image href="/merchant-dashboard/assets/icons/flowbite_user-solid.svg" x="0" y="0" width="17" height="17"></image></svg>
+              <svg class="x-topbar-user-icon" width="18" height="18" viewBox="0 0 17 17" aria-hidden="true"><image href="/owner/assets/icons/flowbite_user-solid.svg" x="0" y="0" width="17" height="17"></image></svg>
             </div>
             <div class="x-user-meta">
               <span id="dash-user-name">Pemilik Toko</span>
@@ -446,35 +448,35 @@
             </div>
             <div class="x-occ-quick-grid" aria-label="Akses cepat Owner">
               <button type="button" class="x-occ-quick-chip" onclick="navigateTo('catalog/menus')" aria-label="Buka Menu">
-                <span class="x-occ-chip-icon" aria-hidden="true"><img src="/merchant-dashboard/assets/icons/quick-access/menu.png" alt="" width="44" height="44" loading="eager" decoding="async"></span>
+                <span class="x-occ-chip-icon" aria-hidden="true"><img src="/owner/assets/icons/quick-access/menu.png" alt="" width="44" height="44" loading="eager" decoding="async"></span>
                 <span class="x-occ-chip-label">Menu</span>
               </button>
               <button type="button" class="x-occ-quick-chip" onclick="navigateTo('stock')" aria-label="Buka Stok">
-                <span class="x-occ-chip-icon" aria-hidden="true"><img src="/merchant-dashboard/assets/icons/quick-access/stock.png" alt="" width="44" height="44" loading="eager" decoding="async"></span>
+                <span class="x-occ-chip-icon" aria-hidden="true"><img src="/owner/assets/icons/quick-access/stock.png" alt="" width="44" height="44" loading="eager" decoding="async"></span>
                 <span class="x-occ-chip-label">Stok</span>
               </button>
               <button type="button" class="x-occ-quick-chip" onclick="navigateTo('branches')" aria-label="Buka Cabang">
-                <span class="x-occ-chip-icon" aria-hidden="true"><img src="/merchant-dashboard/assets/icons/quick-access/cabang.png" alt="" width="44" height="44" loading="eager" decoding="async"></span>
+                <span class="x-occ-chip-icon" aria-hidden="true"><img src="/owner/assets/icons/quick-access/cabang.png" alt="" width="44" height="44" loading="eager" decoding="async"></span>
                 <span class="x-occ-chip-label">Cabang</span>
               </button>
               <button type="button" class="x-occ-quick-chip" onclick="navigateTo('marketing/promotions')" aria-label="Buka Promo">
-                <span class="x-occ-chip-icon" aria-hidden="true"><img src="/merchant-dashboard/assets/icons/quick-access/promo.png" alt="" width="44" height="44" loading="eager" decoding="async"></span>
+                <span class="x-occ-chip-icon" aria-hidden="true"><img src="/owner/assets/icons/quick-access/promo.png" alt="" width="44" height="44" loading="eager" decoding="async"></span>
                 <span class="x-occ-chip-label">Promo</span>
               </button>
               <button type="button" class="x-occ-quick-chip" onclick="navigateTo('reports')" aria-label="Buka Laporan">
-                <span class="x-occ-chip-icon" aria-hidden="true"><img src="/merchant-dashboard/assets/icons/quick-access/laporan.png" alt="" width="44" height="44" loading="eager" decoding="async"></span>
+                <span class="x-occ-chip-icon" aria-hidden="true"><img src="/owner/assets/icons/quick-access/laporan.png" alt="" width="44" height="44" loading="eager" decoding="async"></span>
                 <span class="x-occ-chip-label">Laporan</span>
               </button>
               <button type="button" class="x-occ-quick-chip" onclick="navigateTo('finance/payment-methods')" aria-label="Buka Metode Bayar">
-                <span class="x-occ-chip-icon" aria-hidden="true"><img src="/merchant-dashboard/assets/icons/quick-access/metode bayar.png" alt="" width="44" height="44" loading="eager" decoding="async"></span>
+                <span class="x-occ-chip-icon" aria-hidden="true"><img src="/owner/assets/icons/quick-access/metode bayar.png" alt="" width="44" height="44" loading="eager" decoding="async"></span>
                 <span class="x-occ-chip-label">Metode Bayar</span>
               </button>
               <button type="button" class="x-occ-quick-chip" onclick="navigateTo('customers')" aria-label="Buka Pelanggan">
-                <span class="x-occ-chip-icon" aria-hidden="true"><img src="/merchant-dashboard/assets/icons/quick-access/pelanggan.png" alt="" width="44" height="44" loading="eager" decoding="async"></span>
+                <span class="x-occ-chip-icon" aria-hidden="true"><img src="/owner/assets/icons/quick-access/pelanggan.png" alt="" width="44" height="44" loading="eager" decoding="async"></span>
                 <span class="x-occ-chip-label">Pelanggan</span>
               </button>
               <button type="button" class="x-occ-quick-chip" onclick="navigateTo('team')" aria-label="Buka Tim dan Akses">
-                <span class="x-occ-chip-icon" aria-hidden="true"><img src="/merchant-dashboard/assets/icons/quick-access/tim & akses.png" alt="" width="44" height="44" loading="eager" decoding="async"></span>
+                <span class="x-occ-chip-icon" aria-hidden="true"><img src="/owner/assets/icons/quick-access/tim & akses.png" alt="" width="44" height="44" loading="eager" decoding="async"></span>
                 <span class="x-occ-chip-label">Tim &amp; Akses</span>
               </button>
             </div>
@@ -1787,6 +1789,10 @@
               </div>
               <button type="button" class="x-btn-primary x-master-add-round" id="btn-add-master-category-page" aria-label="Tambah Kategori"><svg class="x-master-add-round-icon" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>
             </div>
+            <div class="x-filter-pills" style="display:flex; gap:8px; margin: 12px 0 16px;">
+              <button type="button" class="x-filter-pill active" id="pill-cat-active" onclick="filterMasterCategoriesByStatus('ACTIVE')">Aktif</button>
+              <button type="button" class="x-filter-pill" id="pill-cat-inactive" onclick="filterMasterCategoriesByStatus('INACTIVE')">Nonaktif</button>
+            </div>
             <div id="master-categories-page-list" class="x-master-reference-card-list">
               <div class="x-empty-state text-center py-6 text-muted">Memuat kategori...</div>
             </div>
@@ -1937,6 +1943,15 @@
             </div>
           </div>
 
+          <!-- Filter Pills (matching product master.png) -->
+          <div class="x-filter-pills" style="display:flex; gap:8px; margin: 14px 0 16px;">
+            <button type="button" class="x-filter-pill active" id="pill-prod-active" onclick="filterMasterProductsByStatus('ACTIVE')">Aktif</button>
+            <button type="button" class="x-filter-pill" id="pill-prod-inactive" onclick="filterMasterProductsByStatus('INACTIVE')">Nonaktif</button>
+          </div>
+
+          <!-- Mobile Cards Container (Visible on Mobile matching product master.png) -->
+          <div id="master-products-cards-container" class="x-mobile-only-cards" style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;"></div>
+
           <!-- Products Table -->
           <div class="x-table-responsive mt-4">
             <table class="x-table" id="master-products-table">
@@ -2084,7 +2099,7 @@
               <input type="radio" name="prod-inventory-type" id="prod-type-cooked" value="COOKED" checked style="margin-top:3px;accent-color:var(--primary-color, #10b981);">
               <div>
                 <div style="font-weight:600;font-size:13px;color:#0f172a;">🍳 Menu Olahan Dapur (Pakai Resep)</div>
-                <div style="font-size:11px;color:#64748b;margin-top:3px;line-height:1.4;">Dimasak dari bahan mentah. Formula racikan diatur di tab Resep Makanan, bahan bakunya dipotong otomatis saat pesanan dibuat.</div>
+                <div style="font-size:11px;color:#64748b;margin-top:3px;line-height:1.4;">Dimasak dari bahan mentah di dapur. Formula racikan dipakai saat BM/Koki mencatat hasil masak, memotong bahan mentah dan menambah stok porsi siap saji.</div>
               </div>
             </label>
             <label id="label-prod-type-direct" style="display:flex;align-items:flex-start;gap:10px;padding:12px;border:1.5px solid #cbd5e1;border-radius:10px;cursor:pointer;background:#ffffff;transition:all 0.2s;">
@@ -2177,6 +2192,12 @@
               <button type="button" class="x-subnav-tab" data-menu-filter="SINGLE" role="tab" aria-selected="false">Satuan</button>
               <button type="button" class="x-subnav-tab" data-menu-filter="PACKAGE" role="tab" aria-selected="false">Paket</button>
             </div>
+          </div>
+
+          <!-- Filter Pills (matching menu master editor.png) -->
+          <div class="x-filter-pills" style="display:flex; gap:8px; margin: 14px 0 16px;">
+            <button type="button" class="x-filter-pill active" id="pill-menu-active" onclick="filterMasterMenusByStatus('ACTIVE')">Aktif</button>
+            <button type="button" class="x-filter-pill" id="pill-menu-inactive" onclick="filterMasterMenusByStatus('INACTIVE')">Nonaktif</button>
           </div>
 
           <div id="master-menu-list" class="x-master-menu-grid">
@@ -2781,7 +2802,7 @@
             <div class="x-owner-stock-kpis" aria-label="Ringkasan stok">
               <div class="x-owner-stock-kpi">
                 <span class="x-owner-stock-kpi-icon tracked" aria-hidden="true">
-                  <svg viewBox="0 0 48 48"><use href="/merchant-dashboard/assets/icons/quick-access.svg#stock"></use></svg>
+                  <svg viewBox="0 0 48 48"><use href="/owner/assets/icons/quick-access.svg#stock"></use></svg>
                 </span>
                 <div>
                   <span class="x-owner-stock-kpi-label">Item Tercatat</span>
@@ -2908,26 +2929,35 @@
             </div>
           </div>
 
-          <!-- SUBTAB CONTENT 2: BAHAN BAKU (MATERIALS) -->
+          <!-- SUBTAB CONTENT 2: BAHAN BAKU (MATERIALS - bahan baku.png) -->
           <div id="subtab-content-stock-materials" style="display:none;">
             <div class="x-stock-subtab-header" style="margin-bottom:16px;">
               <div class="x-stock-subtab-header-copy">
-                <h3 style="margin:0 0 4px 0; font-size:16px; font-weight:700; color:#0F172A;">Katalog Bahan Baku (Material Master)</h3>
+                <h3 style="margin:0 0 4px 0; font-size:16px; font-weight:700; color:#0F172A;">Bahan baku</h3>
                 <p style="margin:0; font-size:13px; color:#64748B;">Identitas bahan mentah untuk resep dapur dan pengadaan belanja.</p>
               </div>
-              <button type="button" class="x-btn-primary x-stock-subtab-cta" onclick="openAddMaterialModal()">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                <span>Tambah Bahan Baku</span>
-              </button>
             </div>
 
-            <div class="x-owner-stock-panel" style="background:#FFFFFF; border-radius:12px; border:1px solid #E2E8F0; padding:16px;">
+            <!-- Filter Pills [Aktif] [Nonaktif] (bahan baku.png) -->
+            <div class="x-material-filter-pills" style="display:flex; gap:8px; margin-bottom:14px;">
+              <button type="button" class="x-filter-pill active" id="btn-mat-filter-active" onclick="filterMaterialsByStatus('ACTIVE')">Aktif</button>
+              <button type="button" class="x-filter-pill" id="btn-mat-filter-inactive" onclick="filterMaterialsByStatus('ARCHIVED')">Nonaktif</button>
+            </div>
+
+            <div class="x-owner-stock-panel" style="background:#FFFFFF; border-radius:12px; border:1px solid #E2E8F0; padding:16px; margin-bottom:16px;">
               <div style="margin-bottom:14px;">
-                <input type="search" id="input-search-materials" class="x-input" placeholder="🔍 Cari nama bahan baku atau kode bahan..." oninput="onMaterialsSearchInput(this.value)" autocomplete="off" style="width:100%; font-size:13px; padding:9px 14px; border-radius:8px;">
+                <input type="search" id="input-search-materials" class="x-input" placeholder="🔍 Cari nama bahan baku atau kode bahan..." oninput="onMaterialsSearchInput(this.value)" autocomplete="off" style="width:100%; font-size:13px; padding:10px 14px; border-radius:10px;">
               </div>
               <div id="owner-materials-table-container">
                 <div class="x-owner-stock-loading">Memuat daftar bahan baku...</div>
               </div>
+            </div>
+
+            <!-- Bottom Full-Width CTA (bahan baku.png) -->
+            <div style="margin-top:16px;">
+              <button type="button" class="x-btn-primary" onclick="openAddMaterialModal()" style="width:100%; background:#16A34A; color:#FFFFFF; border-radius:12px; padding:14px; font-weight:700; font-size:15px; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;">
+                <span>+ Tambah bahan</span>
+              </button>
             </div>
           </div>
 
@@ -3011,26 +3041,69 @@
 
           <!-- Form Recipe Editor -->
           <form id="form-add-recipe" class="x-form x-product-editor-form" style="max-width:920px;margin:0 auto;" onsubmit="submitAddRecipeForm(event)">
-            <!-- Card 1: Target Menu & Hasil Porsi -->
+            <!-- Card 1: Pilih product -->
             <div class="x-card x-product-editor-main-card" style="margin-bottom:16px;">
-              <h4 style="margin:0 0 14px 0; font-size:15px; font-weight:700; color:#0F172A;">1. Target Menu & Hasil Olahan</h4>
+              <h4 style="margin:0 0 14px 0; font-size:15px; font-weight:700; color:#0F172A;">Pilih product</h4>
               
               <div class="x-form-group">
-                <label for="recipe-input-product">Menu Siap Saji (Produk Jadi) <span class="x-required-mark">*</span></label>
+                <label for="recipe-input-product">Product <span class="x-required-mark">*</span></label>
                 <select id="recipe-input-product" class="x-input" required>
                   <option value="">Pilih Menu Makanan / Minuman...</option>
                 </select>
                 <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Pilih produk menu olahan komersial yang ingin ditentukan standar resepnya.</small>
               </div>
 
-              <div class="x-form-row" style="margin-top:16px;">
+              <div class="x-form-group" style="margin-top:16px;">
+                <label for="recipe-input-location">Lokasi Dapur / Gudang Produksi <span class="x-required-mark">*</span></label>
+                <select id="recipe-input-location" class="x-input" required>
+                  <option value="">Pilih Lokasi Dapur / Gudang...</option>
+                </select>
+                <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Lokasi fisik tempat bahan baku disimpan dan porsi siap saji dimasak.</small>
+              </div>
+            </div>
+
+            <!-- Card 2: Tujuan product (resep produksi.png) -->
+            <div class="x-card x-product-editor-main-card" style="margin-bottom:16px;">
+              <h4 style="margin:0 0 4px 0; font-size:15px; font-weight:700; color:#0F172A;">Tujuan product</h4>
+              <p style="margin:0 0 14px 0; font-size:12px; color:#64748B;">Apakah menu ini untuk stok atau pesanan langsung?</p>
+
+              <!-- Option 1: Product untuk stock (Default ON) -->
+              <div class="x-recipe-goal-card" style="display:flex; justify-content:space-between; align-items:center; padding:14px 16px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; margin-bottom:10px;">
+                <div>
+                  <div style="font-weight:700; font-size:14px; color:#0F172A;">Product untuk stock</div>
+                  <div style="font-size:12px; color:#64748B; margin-top:2px;">Dimasak dalam jumlah banyak dan disimpan di etalase/freezer.</div>
+                </div>
+                <label class="x-toggle">
+                  <input type="checkbox" id="recipe-toggle-make-to-stock" checked onchange="handleRecipeGoalToggle('stock', this.checked)">
+                  <span class="x-toggle-slider"></span>
+                </label>
+              </div>
+
+              <!-- Option 2: Product untuk pesanan (Default OFF) -->
+              <div class="x-recipe-goal-card" style="display:flex; justify-content:space-between; align-items:center; padding:14px 16px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px;">
+                <div>
+                  <div style="font-weight:700; font-size:14px; color:#0F172A;">Product untuk pesanan</div>
+                  <div style="font-size:12px; color:#64748B; margin-top:2px;">Dimasak langsung saat ada pesanan masuk dari pelanggan.</div>
+                </div>
+                <label class="x-toggle">
+                  <input type="checkbox" id="recipe-toggle-make-to-order" onchange="handleRecipeGoalToggle('order', this.checked)">
+                  <span class="x-toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Card 3: Hasil produksi -->
+            <div class="x-card x-product-editor-main-card" style="margin-bottom:16px;">
+              <h4 style="margin:0 0 14px 0; font-size:15px; font-weight:700; color:#0F172A;">Hasil produksi</h4>
+
+              <div class="x-form-row">
                 <div class="x-form-group">
-                  <label for="recipe-input-yield">Hasil Porsi per Formula <span class="x-required-mark">*</span></label>
-                  <input type="number" id="recipe-input-yield" class="x-input" required min="1" step="1" value="1" placeholder="Misal: 1 porsi atau 10 porsi">
-                  <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Berapa porsi jadi yang dihasilkan dari takaran bahan di bawah.</small>
+                  <label for="recipe-input-yield">Jumlah jadi <span class="x-required-mark">*</span></label>
+                  <input type="number" id="recipe-input-yield" class="x-input" required min="1" step="1" value="1" placeholder="Misal: 1 atau 10">
+                  <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Berapa porsi / unit jadi yang dihasilkan dari takaran bahan resep.</small>
                 </div>
                 <div class="x-form-group">
-                  <label for="recipe-input-yield-uom">Satuan Hasil <span class="x-required-mark">*</span></label>
+                  <label for="recipe-input-yield-uom">Satuan <span class="x-required-mark">*</span></label>
                   <select id="recipe-input-yield-uom" class="x-input" required>
                     <option value="uom_pcs">Porsi / Pcs</option>
                   </select>
@@ -3038,15 +3111,15 @@
               </div>
             </div>
 
-            <!-- Card 2: Komposisi Bahan Baku (BOM) -->
+            <!-- Card 4: Bahan resep -->
             <div class="x-card x-product-editor-main-card" style="margin-bottom:16px;">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
                 <div>
-                  <h4 style="margin:0; font-size:15px; font-weight:700; color:#0F172A;">2. Komposisi Takaran Bahan Masakan</h4>
+                  <h4 style="margin:0; font-size:15px; font-weight:700; color:#0F172A;">Bahan resep</h4>
                   <p style="margin:2px 0 0; font-size:12px; color:#64748B;">Bahan mentah dan bumbu dapur yang dihabiskan untuk formula ini.</p>
                 </div>
                 <button type="button" class="x-btn-secondary" onclick="addRecipeIngredientRow()" style="min-height:36px; padding:6px 14px; font-size:12px; font-weight:700; border-radius:8px;">
-                  + Tambah Bahan
+                  + Tambah bahan
                 </button>
               </div>
 
@@ -3056,14 +3129,14 @@
 
               <div style="margin-top:16px; padding:12px 14px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; display:flex; align-items:center; gap:10px;">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                <span style="font-size:12px; color:#64748B; line-height:1.4;">Stok bahan mentah ini akan otomatis dipotong dari stok dapur/cabang saat kasir menyelesaikan transaksi penjualan menu.</span>
+                <span style="font-size:12px; color:#64748B; line-height:1.4;">Standar dapur: Saat koki/BM mencatat hasil masak di cabang, bahan mentah otomatis dipotong dan stok porsi siap saji bertambah. Kasir di POS memotong stok porsi siap saji tanpa memotong bahan dua kali.</span>
               </div>
             </div>
 
-            <!-- Actions Footer -->
+            <!-- Actions Footer (resep produksi.png) -->
             <div class="x-product-editor-actions" style="margin-top:20px;">
-              <button type="button" class="x-btn-secondary" onclick="goBackFromRecipeEditor()">Batal</button>
-              <button type="submit" id="btn-save-recipe" class="x-btn-primary">Simpan Resep Masakan</button>
+              <button type="button" class="x-btn-secondary" onclick="goBackFromRecipeEditor()" style="padding:14px 20px; font-size:14px; font-weight:600;">Batal</button>
+              <button type="submit" id="btn-save-recipe" class="x-btn-primary" style="flex:1; background:#16A34A; color:#FFFFFF; border-radius:12px; padding:14px 24px; font-weight:700; font-size:15px; border:none; cursor:pointer;">Simpan</button>
             </div>
           </form>
         </section>
@@ -3138,29 +3211,34 @@
         </div>
       </div>
 
-      <!-- MODAL: TAMBAH BAHAN BAKU (MATERIAL MODAL) -->
+      <!-- MODAL: TAMBAH BAHAN BAKU (bahan baku - tambah bahan.png) -->
       <div id="modal-add-material" class="x-modal-backdrop" style="display:none;">
-        <div class="x-modal-card" style="padding:24px; overflow-y:auto;">
+        <div class="x-modal-card" style="padding:24px; max-width:440px; width:100%; overflow-y:auto; border-radius:18px;">
           <div class="x-modal-handle"></div>
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-            <h3 style="margin:0; font-size:16px; font-weight:700; color:#0F172A;">Tambah Bahan Baku Baru</h3>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button type="button" class="x-modal-back-btn" onclick="closeAddMaterialModal()" style="border:none; background:none; cursor:pointer; padding:0; display:flex; align-items:center; color:#0F172A;" aria-label="Kembali">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><path d="m15 18-6-6 6-6"></path></svg>
+              </button>
+              <h3 style="margin:0; font-size:17px; font-weight:800; color:#0F172A;">Tambah bahan</h3>
+            </div>
             <button type="button" onclick="closeAddMaterialModal()" style="background:none; border:none; cursor:pointer; color:#64748B;">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
           </div>
           <form id="form-add-material" onsubmit="submitAddMaterialForm(event)">
-            <div style="margin-bottom:14px;">
-              <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">Kode Bahan (SKU/Code)</label>
-              <input type="text" id="mat-input-code" required placeholder="Contoh: MAT-AYAM-01" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px;">
+            <!-- Hidden / auto-generated Code -->
+            <input type="hidden" id="mat-input-code" value="">
+
+            <div style="margin-bottom:16px;">
+              <label style="display:block; font-size:13px; font-weight:700; color:#0F172A; margin-bottom:6px;">Nama bahan <span class="x-required-mark">*</span></label>
+              <input type="text" id="mat-input-name" required placeholder="Contoh: Beras Ramos" style="width:100%; box-sizing:border-box; padding:12px 14px; border:1px solid #CBD5E1; border-radius:10px; font-size:14px;">
             </div>
-            <div style="margin-bottom:14px;">
-              <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">Nama Bahan Baku</label>
-              <input type="text" id="mat-input-name" required placeholder="Contoh: Daging Ayam Broiler" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px;">
-            </div>
-            <div style="margin-bottom:14px;">
-              <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">Satuan Dasar (Base UOM)</label>
-              <select id="mat-input-uom" required style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px; background:#FFFFFF;">
-                <option value="">Pilih Satuan Dasar...</option>
+
+            <div style="margin-bottom:20px;">
+              <label style="display:block; font-size:13px; font-weight:700; color:#0F172A; margin-bottom:6px;">Satuan <span class="x-required-mark">*</span></label>
+              <select id="mat-input-uom" required style="width:100%; box-sizing:border-box; padding:12px 14px; border:1px solid #CBD5E1; border-radius:10px; font-size:14px; background:#FFFFFF;">
+                <option value="">Pilih satuan...</option>
                 <option value="uom_kg">Kilogram (kg)</option>
                 <option value="uom_g">Gram (g)</option>
                 <option value="uom_l">Liter (L)</option>
@@ -3169,13 +3247,14 @@
                 <option value="uom_pcs">Pieces (pcs)</option>
               </select>
             </div>
-            <div style="margin-bottom:20px;">
-              <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">Catatan / Deskripsi (Opsional)</label>
-              <textarea id="mat-input-desc" rows="2" placeholder="Keterangan spesifikasi..." style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px;"></textarea>
+
+            <!-- Optional details (collapsed/hidden by default) -->
+            <div style="display:none;">
+              <textarea id="mat-input-desc"></textarea>
             </div>
-            <div style="display:flex; justify-content:flex-end; gap:8px;">
-              <button type="button" onclick="closeAddMaterialModal()" style="padding:10px 16px; border:1px solid #CBD5E1; background:#FFFFFF; border-radius:8px; font-weight:600; font-size:13px; color:#475569; cursor:pointer;">Batal</button>
-              <button type="submit" id="btn-save-material" style="padding:10px 16px; border:none; background:#0F172A; border-radius:8px; font-weight:600; font-size:13px; color:#FFFFFF; cursor:pointer;">Simpan Bahan</button>
+
+            <div style="margin-top:24px;">
+              <button type="submit" id="btn-save-material" style="width:100%; padding:14px; border:none; background:#16A34A; border-radius:12px; font-weight:700; font-size:15px; color:#FFFFFF; cursor:pointer;">Simpan</button>
             </div>
           </form>
         </div>
@@ -3264,61 +3343,76 @@
         </div>
       </div>
 
-      <!-- MODAL: EDIT BAHAN BAKU & STOK / BATAS WARNING (MATERIAL EDIT MODAL) -->
+      <!-- MODAL: EDIT BAHAN BAKU (bahan baku - edit bahan.png) -->
       <div id="modal-edit-material" class="x-modal-backdrop" style="display:none;">
-        <div class="x-modal-card" style="padding:24px; overflow-y:auto;">
+        <div class="x-modal-card" style="padding:24px; max-width:440px; width:100%; overflow-y:auto; border-radius:18px;">
           <div class="x-modal-handle"></div>
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-            <div>
-              <h3 id="edit-mat-modal-title" style="margin:0; font-size:16px; font-weight:700; color:#0F172A;">Edit Master Bahan Baku</h3>
-              <p style="margin:2px 0 0 0; font-size:12px; color:#64748B;">Kelola identitas bahan master, satuan dasar, dan standar harga acuan.</p>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button type="button" class="x-modal-back-btn" onclick="closeEditMaterialModal()" style="border:none; background:none; cursor:pointer; padding:0; display:flex; align-items:center; color:#0F172A;" aria-label="Kembali">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><path d="m15 18-6-6 6-6"></path></svg>
+              </button>
+              <h3 id="edit-mat-modal-title" style="margin:0; font-size:17px; font-weight:800; color:#0F172A;">Edit bahan</h3>
             </div>
             <button type="button" onclick="closeEditMaterialModal()" style="background:none; border:none; cursor:pointer; color:#64748B;">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
           </div>
+
           <form id="form-edit-material" onsubmit="submitEditMaterialForm(event)">
             <input type="hidden" id="edit-mat-id">
-            <div style="margin-bottom:14px;">
-              <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">Nama Bahan Baku</label>
-              <input type="text" id="edit-mat-name" required style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px;">
-            </div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px;">
+
+            <!-- Status Bahan Toggle (bahan baku - edit bahan.png) -->
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; margin-bottom:16px;">
               <div>
-                <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">Kode Bahan</label>
-                <input type="text" id="edit-mat-code" disabled style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #E2E8F0; border-radius:8px; font-size:13px; background:#F8FAFC; color:#64748B;">
+                <div style="font-weight:700; font-size:13.5px; color:#0F172A;">Status bahan</div>
+                <div id="edit-mat-status-label" style="font-size:12px; color:#15803D; font-weight:600; margin-top:1px;">Aktif</div>
+              </div>
+              <label class="x-toggle">
+                <input type="checkbox" id="edit-mat-status-toggle" checked onchange="onEditMaterialStatusToggleChange(this.checked)">
+                <span class="x-toggle-slider"></span>
+              </label>
+            </div>
+
+            <div style="margin-bottom:16px;">
+              <label style="display:block; font-size:13px; font-weight:700; color:#0F172A; margin-bottom:6px;">Nama bahan <span class="x-required-mark">*</span></label>
+              <input type="text" id="edit-mat-name" required placeholder="Contoh: Ayam potong" style="width:100%; box-sizing:border-box; padding:12px 14px; border:1px solid #CBD5E1; border-radius:10px; font-size:14px;">
+            </div>
+
+            <div style="margin-bottom:16px;">
+              <label style="display:block; font-size:13px; font-weight:700; color:#0F172A; margin-bottom:6px;">Satuan <span class="x-required-mark">*</span></label>
+              <select id="edit-mat-uom" required style="width:100%; box-sizing:border-box; padding:12px 14px; border:1px solid #CBD5E1; border-radius:10px; font-size:14px; background:#FFFFFF;">
+                <option value="">Pilih satuan...</option>
+                <option value="uom_kg">Kilogram (kg)</option>
+                <option value="uom_g">Gram (g)</option>
+                <option value="uom_l">Liter (L)</option>
+                <option value="uom_ml">Milliliter (ml)</option>
+                <option value="uom_galon">Galon (galon)</option>
+                <option value="uom_pcs">Pieces (pcs)</option>
+              </select>
+            </div>
+
+            <!-- Detail / Standar Harga Acuan & Kode (Accordion / Collapsible) -->
+            <div style="margin-bottom:16px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:12px 14px;">
+              <div style="margin-bottom:10px;">
+                <label style="display:block; font-size:11.5px; font-weight:600; color:#64748B; margin-bottom:4px;">Kode Bahan</label>
+                <input type="text" id="edit-mat-code" disabled style="width:100%; box-sizing:border-box; padding:8px 10px; border:1px solid #E2E8F0; border-radius:8px; font-size:12.5px; background:#FFFFFF; color:#64748B;">
               </div>
               <div>
-                <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">Satuan Dasar (UOM)</label>
-                <select id="edit-mat-uom" required style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px; background:#FFFFFF;">
-                  <option value="">Pilih Satuan Dasar...</option>
-                  <option value="uom_kg">Kilogram (kg)</option>
-                  <option value="uom_g">Gram (g)</option>
-                  <option value="uom_l">Liter (L)</option>
-                  <option value="uom_ml">Milliliter (ml)</option>
-                  <option value="uom_galon">Galon (galon)</option>
-                  <option value="uom_pcs">Pieces (pcs)</option>
-                </select>
+                <label for="edit-mat-unit-cost" style="display:block; font-size:11.5px; font-weight:600; color:#64748B; margin-bottom:4px;">Standar Harga Acuan Master (Rp)</label>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <input type="text" id="edit-mat-unit-cost" data-input-type="currency" inputmode="numeric" placeholder="0" style="flex:1; box-sizing:border-box; padding:8px 10px; border:1px solid #CBD5E1; border-radius:8px; font-size:12.5px; font-weight:700;">
+                  <span id="edit-mat-base-uom-suffix" style="font-size:11px; font-weight:700; color:#64748B; background:#FFFFFF; padding:7px 10px; border-radius:8px; border:1px solid #CBD5E1;">per Satuan</span>
+                </div>
               </div>
             </div>
 
-            <!-- Standar Harga Acuan Master -->
-            <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:14px; margin-bottom:14px;">
-              <label for="edit-mat-unit-cost" style="display:block; font-size:12px; font-weight:700; color:#0F172A; margin-bottom:4px;">💵 Standar Harga Acuan / Estimasi Beli (Rp)</label>
-              <div style="display:flex; align-items:center; gap:8px;">
-                <input type="text" id="edit-mat-unit-cost" data-input-type="currency" inputmode="numeric" placeholder="0" style="flex:1; box-sizing:border-box; padding:9px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px; font-weight:700;">
-                <span id="edit-mat-base-uom-suffix" style="font-size:12px; font-weight:700; color:#64748B; background:#F1F5F9; padding:8px 12px; border-radius:8px; border:1px solid #CBD5E1;">per Satuan</span>
-              </div>
-              <span style="font-size:11px; color:#64748B; margin-top:4px; display:block;">Digunakan sebagai acuan HPP master dan patokan belanja. Sisa fisik riil dan batas minimum belanja cabang dikelola langsung oleh Branch Manager di aplikasi merchant cabang.</span>
+            <div style="display:none;">
+              <textarea id="edit-mat-desc"></textarea>
             </div>
 
-            <div style="margin-bottom:18px;">
-              <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">Catatan / Deskripsi (Opsional)</label>
-              <textarea id="edit-mat-desc" rows="2" placeholder="Keterangan spesifikasi..." style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px;"></textarea>
-            </div>
-            <div style="display:flex; justify-content:flex-end; gap:8px;">
-              <button type="button" onclick="closeEditMaterialModal()" style="padding:10px 16px; border:1px solid #CBD5E1; background:#FFFFFF; border-radius:8px; font-weight:600; font-size:13px; color:#475569; cursor:pointer;">Batal</button>
-              <button type="submit" id="btn-save-edit-material" style="padding:10px 18px; border:none; background:#0F172A; border-radius:8px; font-weight:600; font-size:13px; color:#FFFFFF; cursor:pointer;">Simpan Perubahan</button>
+            <div style="margin-top:20px;">
+              <button type="submit" id="btn-save-edit-material" style="width:100%; padding:14px; border:none; background:#16A34A; border-radius:12px; font-weight:700; font-size:15px; color:#FFFFFF; cursor:pointer;">Simpan</button>
             </div>
           </form>
         </div>
@@ -4558,55 +4652,203 @@
 
       <!-- TAB: BISNIS HUB (Mobile & Overview Hub) -->
       <section id="tab-business" class="x-tab-content" data-tab="business">
-        <div class="x-hub-header">
-          <h2>Bisnis</h2>
-          <p>Pusat pengelolaan katalog, operasional, pelanggan, pemasaran, tim, dan identitas brand.</p>
-        </div>
+        <!-- Main Hub View (Mobile 7 Cards & Overview Hub) -->
+        <div id="owner-business-main-view">
+          <div class="x-hub-search-wrap" style="margin-bottom:14px;">
+            <div style="position:relative;">
+              <input type="search" id="input-search-business-hub" class="x-input" placeholder="Cari menu atau fitur..." autocomplete="off" oninput="onBusinessHubSearch(this.value)" style="width:100%; box-sizing:border-box; padding:11px 14px 11px 40px; border-radius:12px; border:1px solid #E2E8F0; font-size:13px; background:#FFFFFF;">
+              <svg style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#94a3b8;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </div>
+          </div>
 
-        <div class="x-hub-section">
-          <h3 class="x-hub-section-title">Katalog</h3>
-          <div class="x-hub-grid">
-            <div class="x-hub-card" onclick="navigateTo('catalog/categories')">
-              <div class="x-hub-icon bg-purple">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+          <div class="x-hub-header">
+            <h2>Kelola bisnis</h2>
+            <p>Atur katalog, bahan, cabang, pelanggan, dan laporan dari satu tempat.</p>
+          </div>
+
+          <!-- The 7 structured cards from Xentra Owner - Bisnis.png -->
+          <div class="x-hub-grid x-owner-business-7cards" id="owner-business-cards-container" style="display:flex; flex-direction:column; gap:10px; margin-bottom:24px;">
+            <!-- 1. Katalog & Menu -->
+            <div class="x-hub-card" data-hub-item="katalog menu" onclick="openBusinessSubHub('catalog')">
+              <div class="x-hub-icon bg-green">
+                <img src="/owner/assets/icons/ion_fast-food.svg" width="22" height="22" alt="" style="display:block;">
               </div>
               <div class="x-hub-info">
-                <h3>Kategori</h3>
-                <p>Kelola taksonomi Menu pelanggan (Kategori, Sub Kategori, &amp; Rasa)</p>
+                <h3>Katalog &amp; Menu</h3>
+                <p>Master menu, kategori, item penyusun, dan pilihan item</p>
               </div>
               <div class="x-hub-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
             </div>
 
-            <div class="x-hub-card" onclick="navigateTo('catalog/products')" style="display: none;">
-              <div class="x-hub-icon bg-indigo">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>
-              </div>
-              <div class="x-hub-info">
-                <h3>Produk Master</h3>
-                <p>Kelola Product atomic, SKU, media, dan status inventory</p>
-              </div>
-              <div class="x-hub-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
-            </div>
-
-            <div class="x-hub-card" onclick="navigateTo('catalog/master-menus')">
+            <!-- 2. Bahan & Produksi -->
+            <div class="x-hub-card" data-hub-item="bahan produksi resep" onclick="openBusinessSubHub('materials-production')">
               <div class="x-hub-icon bg-blue">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                <img src="/owner/assets/icons/basil_box-solid.svg" width="22" height="22" alt="" style="display:block;">
               </div>
               <div class="x-hub-info">
-                <h3>Menu Master</h3>
-                <p>Susun Menu Satuan &amp; Menu Paket yang dijual ke pelanggan</p>
+                <h3>Bahan &amp; Produksi</h3>
+                <p>Standar baku, resep, hasil produksi, dan hubungan bahan dengan hasil produksi</p>
+              </div>
+              <div class="x-hub-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
+            </div>
+
+            <!-- 3. Cabang & Kesehatan Cabang -->
+            <div class="x-hub-card" data-hub-item="cabang outlet resto kesehatan stok" onclick="navigateTo('branches')">
+              <div class="x-hub-icon bg-amber">
+                <img src="/owner/assets/icons/dashicons_store.svg" width="22" height="22" alt="" style="display:block;">
+              </div>
+              <div class="x-hub-info">
+                <h3>Cabang &amp; Kesehatan Cabang</h3>
+                <p>Konfigurasi, penanggung jawab, performa, dan operasional yang perlu perhatian</p>
+              </div>
+              <div class="x-hub-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
+            </div>
+
+            <!-- 4. Pelanggan & Pemasaran -->
+            <div class="x-hub-card" data-hub-item="pelanggan pemasaran promo diskon" onclick="navigateTo('customers')">
+              <div class="x-hub-icon bg-red">
+                <img src="/owner/assets/icons/basil_bullhorn-solid.svg" width="22" height="22" alt="" style="display:block;">
+              </div>
+              <div class="x-hub-info">
+                <h3>Pelanggan &amp; Pemasaran</h3>
+                <p>Data pelanggan, promosi, dan kampanye pemasaran</p>
+              </div>
+              <div class="x-hub-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
+            </div>
+
+            <!-- 5. Kinerja & Laporan -->
+            <div class="x-hub-card" data-hub-item="kinerja laporan laba kotor penjualan" onclick="navigateTo('reports')">
+              <div class="x-hub-icon bg-purple">
+                <img src="/owner/assets/icons/streamline-plump_graph-bar-increase-solid.svg" width="22" height="22" alt="" style="display:block;">
+              </div>
+              <div class="x-hub-info">
+                <h3>Kinerja &amp; Laporan</h3>
+                <p>Performa, biaya produksi &amp; margin, efisiensi persediaan &amp; pembelian</p>
+              </div>
+              <div class="x-hub-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
+            </div>
+
+            <!-- 6. Tim & Akses -->
+            <div class="x-hub-card" data-hub-item="tim akses staf kasir manajer role" onclick="navigateTo('team')">
+              <div class="x-hub-icon bg-slate">
+                <img src="/owner/assets/icons/fluent_people-team-add-20-filled.svg" width="22" height="22" alt="" style="display:block;">
+              </div>
+              <div class="x-hub-info">
+                <h3>Tim &amp; Akses</h3>
+                <p>Anggota, pendaftaran anggota, jabatan, hak akses, dan cakupan cabang.</p>
+              </div>
+              <div class="x-hub-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
+            </div>
+
+            <!-- 7. Brand & Kanal Digital -->
+            <div class="x-hub-card" data-hub-item="brand kanal digital pwa online qr whatsapp" onclick="navigateTo('settings/business/profile')">
+              <div class="x-hub-icon bg-teal">
+                <img src="/owner/assets/icons/bi_palette-fill.svg" width="22" height="22" alt="" style="display:block;">
+              </div>
+              <div class="x-hub-info">
+                <h3>Brand &amp; Kanal Digital</h3>
+                <p>Identitas brand, tampilan toko, dan konfigurasi kanal penjualan milik brand</p>
               </div>
               <div class="x-hub-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
             </div>
           </div>
         </div>
 
+        <!-- SUB-HUB: KATALOG & MENU (Xentra Owner - Bisnis - Katalog & Menu.png) -->
+        <div id="subpage-catalog-menu-hub" style="display:none; margin-bottom:24px;">
+          <div class="x-owner-child-mobile-header" style="margin-bottom:16px;">
+            <h3 class="x-owner-mobile-page-title">
+              <button type="button" class="x-title-back-btn x-owner-mobile-page-back" aria-label="Kembali" onclick="closeBusinessSubHub()">
+                <svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+              </button>
+              <span>Katalog &amp; Menu</span>
+            </h3>
+            <p class="x-owner-mobile-page-sub">Kelola taksonomi menu, produk siap jual / hasil olahan, dan menu master kasir.</p>
+          </div>
+
+          <div class="x-hub-section">
+            <h3 class="x-hub-section-title">Katalog</h3>
+            <div class="x-hub-grid">
+              <div class="x-hub-card" onclick="navigateTo('catalog/categories')">
+                <div class="x-hub-icon bg-green">
+                  <img src="/owner/assets/icons/bxs_category.svg" width="22" height="22" alt="" style="display:block;">
+                </div>
+                <div class="x-hub-info">
+                  <h3>Kategori</h3>
+                  <p>Kelola kategori untuk mengelompokkan menu yang Anda jual</p>
+                </div>
+                <div class="x-hub-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
+              </div>
+
+              <div class="x-hub-card" onclick="navigateTo('catalog/products')">
+                <div class="x-hub-icon bg-blue">
+                  <img src="/owner/assets/icons/mdi_food-drumstick.svg" width="22" height="22" alt="" style="display:block;">
+                </div>
+                <div class="x-hub-info">
+                  <h3>Product Master</h3>
+                  <p>Product yang sama dapat digunakan berulang untuk menyusun menu</p>
+                </div>
+                <div class="x-hub-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
+              </div>
+
+              <div class="x-hub-card" onclick="navigateTo('catalog/master-menus')">
+                <div class="x-hub-icon bg-red">
+                  <img src="/owner/assets/icons/reicon_food-tray-filled.svg" width="22" height="22" alt="" style="display:block;">
+                </div>
+                <div class="x-hub-info">
+                  <h3>Menu Master</h3>
+                  <p>Kelola menu yang akan dijual kepada pelanggan</p>
+                </div>
+                <div class="x-hub-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUB-HUB: BAHAN & PRODUKSI (bahan dan produksi.png) -->
+        <div id="subpage-materials-production-hub" style="display:none; margin-bottom:24px;">
+          <div class="x-owner-child-mobile-header" style="margin-bottom:16px;">
+            <h3 class="x-owner-mobile-page-title">
+              <button type="button" class="x-title-back-btn x-owner-mobile-page-back" aria-label="Kembali" onclick="closeBusinessSubHub()">
+                <svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+              </button>
+              <span>Bahan &amp; Produksi</span>
+            </h3>
+            <p class="x-owner-mobile-page-sub">Kelola stok mentah dapur, resep olahan, dan formula produksi.</p>
+          </div>
+
+          <div class="x-hub-grid" style="display:flex; flex-direction:column; gap:10px;">
+            <div class="x-hub-card" onclick="openBahanBakuPage()">
+              <div class="x-hub-icon bg-blue">
+                <img src="/owner/assets/icons/mdi_food-drumstick.svg" width="22" height="22" alt="" style="display:block;">
+              </div>
+              <div class="x-hub-info">
+                <h3>Bahan Baku</h3>
+                <p>Kelola satuan bahan baku, ini akan menjadi standar acuan pembuatan resep</p>
+              </div>
+              <div class="x-hub-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
+            </div>
+
+            <div class="x-hub-card" onclick="openResepProduksiPage()">
+              <div class="x-hub-icon bg-blue">
+                <img src="/owner/assets/icons/lucide-extended_cooking-pot-filled.svg" width="22" height="22" alt="" style="display:block;">
+              </div>
+              <div class="x-hub-info">
+                <h3>Resep Produksi</h3>
+                <p>Kelola resep Anda, ini akan menjadi acuan dalam perhitungan HPP produksi</p>
+              </div>
+              <div class="x-hub-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Canonical Sections for Desktop Hub & Test Contract -->
         <div class="x-hub-section">
           <h3 class="x-hub-section-title">Operasional</h3>
           <div class="x-hub-grid">
             <div class="x-hub-card" onclick="navigateTo('stock')">
               <div class="x-hub-icon bg-green">
-                <svg width="24" height="24" viewBox="0 0 48 48" fill="none"><use href="/merchant-dashboard/assets/icons/quick-access.svg#stock"></use></svg>
+                <svg width="24" height="24" viewBox="0 0 48 48" fill="none"><use href="/owner/assets/icons/quick-access.svg#stock"></use></svg>
               </div>
               <div class="x-hub-info">
                 <h3>Stok</h3>
@@ -5071,7 +5313,7 @@
         <!-- Option 1: Menu Satuan -->
         <button type="button" class="x-menu-type-card-btn" onclick="selectMenuTypeAndProceed('SINGLE')" style="display:flex; align-items:center; width:100%; padding:14px; background:#FFFFFF; border:1px solid #E2E8F0; border-radius:18px; box-shadow:0 2px 8px rgba(0,0,0,0.04); cursor:pointer; text-align:left; transition:border-color 0.15s ease, background 0.15s ease;">
           <div style="width:64px; height:64px; min-width:64px; border:1px solid #E2E8F0; border-radius:14px; display:flex; align-items:center; justify-content:center; background:#FFFFFF; margin-right:14px;">
-            <img src="/merchant-dashboard/assets/icons/menu/menu-satuan.png" alt="Menu Satuan" style="width:48px; height:48px; object-fit:contain;">
+            <img src="/owner/assets/icons/menu/menu-satuan.png" alt="Menu Satuan" style="width:48px; height:48px; object-fit:contain;">
           </div>
           <div style="flex:1;">
             <div style="font-size:15px; font-weight:700; color:#0F172A; margin-bottom:4px;">Menu Satuan</div>
@@ -5085,7 +5327,7 @@
         <!-- Option 2: Menu Paket -->
         <button type="button" class="x-menu-type-card-btn" onclick="selectMenuTypeAndProceed('PACKAGE')" style="display:flex; align-items:center; width:100%; padding:14px; background:#FFFFFF; border:1px solid #E2E8F0; border-radius:18px; box-shadow:0 2px 8px rgba(0,0,0,0.04); cursor:pointer; text-align:left; transition:border-color 0.15s ease, background 0.15s ease;">
           <div style="width:64px; height:64px; min-width:64px; border:1px solid #E2E8F0; border-radius:14px; display:flex; align-items:center; justify-content:center; background:#FFFFFF; margin-right:14px;">
-            <img src="/merchant-dashboard/assets/icons/menu/menu-paket.png" alt="Menu Paket" style="width:48px; height:48px; object-fit:contain;">
+            <img src="/owner/assets/icons/menu/menu-paket.png" alt="Menu Paket" style="width:48px; height:48px; object-fit:contain;">
           </div>
           <div style="flex:1;">
             <div style="font-size:15px; font-weight:700; color:#0F172A; margin-bottom:4px;">Menu Paket</div>
@@ -6085,23 +6327,23 @@
   <!-- Persistent mobile application-shell navigation. Must stay outside route/page sections. -->
 <nav class="x-owner-bottom-nav" id="x-owner-bottom-nav" aria-label="Navigasi Utama Mobile Owner">
         <button type="button" class="x-owner-nav-item active" data-tab-module="beranda" data-route="overview" aria-current="page">
-          <img src="/merchant-dashboard/assets/icons/fa7-solid_home.svg" alt="" width="24" height="24" aria-hidden="true">
+          <img src="/owner/assets/icons/fa7-solid_home.svg" alt="" width="24" height="24" aria-hidden="true">
           <span>Beranda</span>
         </button>
         <button type="button" class="x-owner-nav-item" data-tab-module="bisnis" data-route="business">
-          <img src="/merchant-dashboard/assets/icons/ic_round-business-center-new.svg" alt="" width="24" height="24" aria-hidden="true">
+          <img src="/owner/assets/icons/ic_round-business-center-new.svg" alt="" width="24" height="24" aria-hidden="true">
           <span>Bisnis</span>
         </button>
         <button type="button" class="x-owner-nav-item" data-tab-module="pesanan" data-route="orders">
-          <img src="/merchant-dashboard/assets/icons/fluent_task-list-rectangle-28-filled.svg" alt="" width="24" height="24" aria-hidden="true">
+          <img src="/owner/assets/icons/fluent_task-list-rectangle-28-filled.svg" alt="" width="24" height="24" aria-hidden="true">
           <span>Pesanan</span>
         </button>
         <button type="button" class="x-owner-nav-item" data-tab-module="keuangan" data-route="finance">
-          <img src="/merchant-dashboard/assets/icons/reicon_wallet-money-filled.svg" alt="" width="24" height="24" aria-hidden="true">
+          <img src="/owner/assets/icons/reicon_wallet-money-filled.svg" alt="" width="24" height="24" aria-hidden="true">
           <span>Keuangan</span>
         </button>
         <button type="button" class="x-owner-nav-item" data-tab-module="lainnya" data-route="more">
-          <img src="/merchant-dashboard/assets/icons/reicon_menu-board-filled.svg" alt="" width="24" height="24" aria-hidden="true">
+          <img src="/owner/assets/icons/reicon_menu-board-filled.svg" alt="" width="24" height="24" aria-hidden="true">
           <span>Lainnya</span>
         </button>
       </nav>
@@ -6203,7 +6445,7 @@
   <script src="/merchant-dashboard/assets/js/modules/auth.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/overview.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/orders.js?v=1.0.0"></script>
-  <script src="/merchant-dashboard/assets/js/modules/stock.js?v=2.5.1"></script>
+  <script src="/merchant-dashboard/assets/js/modules/stock.js?v=2.5.2"></script>
   <script src="/merchant-dashboard/assets/js/modules/branches.js?v=1.0.1"></script>
   <script src="/merchant-dashboard/assets/js/modules/reports.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/team.js?v=1.0.0"></script>
@@ -6211,13 +6453,13 @@
   <script src="/merchant-dashboard/assets/js/modules/finance.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/marketing-banners.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/marketing.js?v=1.0.1"></script>
-  <script src="/merchant-dashboard/assets/js/modules/master-menu.js?v=1.0.0"></script>
+  <script src="/merchant-dashboard/assets/js/modules/master-menu.js?v=1.0.1"></script>
   <script src="/merchant-dashboard/assets/js/modules/settings.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/brand.js?v=1.0.0"></script>
-  <script src="/merchant-dashboard/assets/js/modules/catalog-reference.js?v=1.0.0"></script>
-  <script src="/merchant-dashboard/assets/js/modules/catalog.js?v=1.0.1"></script>
-  <script src="/dashboard/assets/js/dashboard.js?v=3.0.91"></script>
+  <script src="/merchant-dashboard/assets/js/modules/catalog-reference.js?v=1.0.1"></script>
+  <script src="/merchant-dashboard/assets/js/modules/catalog.js?v=1.0.2"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=3.1.0"></script>
   <script src="/merchant-dashboard/assets/js/owner-master-menu-inline.js?v=1.0.2"></script>
-  <script src="/owner/assets/js/owner-app.js?v=1.0.0"></script>
+  <script src="/owner/assets/js/owner-app.js?v=1.0.1"></script>
 </body>
 </html>  

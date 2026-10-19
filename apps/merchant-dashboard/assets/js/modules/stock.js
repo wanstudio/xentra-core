@@ -844,7 +844,8 @@
   window.loadOwnerMandates = loadOwnerMandates;
 
   async function approvePurchaseOrder(poId) {
-    if (!confirm('Setujui Purchase Order ini dan teruskan ke vendor?')) return;
+    var ok = await confirmFeatureAction('approve-po-' + poId, 'Setujui Purchase Order', 'Setujui Purchase Order ini dan teruskan ke vendor?', 'Setujui');
+    if (!ok) return;
     try {
       var res = await adminFetch(API_BASE + '/admin/inventory-workflow/purchase-orders/' + encodeURIComponent(poId) + '/order', {
         method: 'POST',

@@ -26,7 +26,10 @@ const DASHBOARD_JS_PATH = path.join(__dirname, '../apps/merchant-dashboard/asset
 
 const css = fs.readFileSync(CSS_PATH, 'utf8');
 const html = fs.readFileSync(HTML_PATH, 'utf8');
-const dashboardJs = fs.readFileSync(DASHBOARD_JS_PATH, 'utf8');
+const dashboardJs = fs.readFileSync(DASHBOARD_JS_PATH, 'utf8') + '\n' +
+  (fs.existsSync(path.join(__dirname, '../apps/merchant-dashboard/assets/js/modules/catalog.js'))
+    ? fs.readFileSync(path.join(__dirname, '../apps/merchant-dashboard/assets/js/modules/catalog.js'), 'utf8')
+    : '');
 
 function ruleBody(selectorPattern) {
   const match = css.match(selectorPattern);
