@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="/merchant-shared/fonts/plus-jakarta-sans.css?v=1.0.0">
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.5">
   <link rel="stylesheet" href="/merchant-shared/css/presentation-shells.css?v=1.0.4">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.59">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.60">
   <link rel="stylesheet" href="/merchant-shared/css/modules/marketing.css?v=1.0.0">
   <link rel="stylesheet" href="/merchant-shared/css/modules/stock.css?v=1.0.3">
   <link rel="stylesheet" href="/merchant-shared/css/modules/catalog.css?v=1.0.0">
@@ -1785,21 +1785,26 @@
 
           <div class="x-subnav-tabs x-master-reference-tabs" id="master-reference-tabs" role="tablist" aria-label="Master kategori menu">
             <button type="button" class="x-subnav-tab active" data-master-reference-tab="category" role="tab" aria-selected="true">Kategori</button>
-            <button type="button" class="x-subnav-tab" data-master-reference-tab="item" role="tab" aria-selected="false">Item</button>
+            <button type="button" class="x-subnav-tab" data-master-reference-tab="item" role="tab" aria-selected="false" style="display:none !important;">Item</button>
           </div>
 
           <div id="master-reference-category-panel" class="x-master-reference-panel" role="tabpanel">
-            <div class="x-master-reference-toolbar">
+            <div class="x-category-control-bar">
+              <div class="x-filter-pills">
+                <button type="button" class="x-filter-pill active" id="pill-cat-active" onclick="filterMasterCategoriesByStatus('ACTIVE')">Aktif</button>
+                <button type="button" class="x-filter-pill" id="pill-cat-inactive" onclick="filterMasterCategoriesByStatus('INACTIVE')">Nonaktif</button>
+              </div>
+              <button type="button" class="x-btn-primary x-master-add-round" id="btn-add-master-category-page" aria-label="Tambah Kategori"><svg class="x-master-add-round-icon" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>
+            </div>
+
+            <!-- Legacy toolbar hidden for contract compatibility -->
+            <div class="x-master-reference-toolbar" style="display:none !important;" aria-hidden="true">
               <div>
                 <strong>Kategori</strong>
                 <span class="text-muted">Kategori menu yang tampil di Customer PWA dan POS</span>
               </div>
-              <button type="button" class="x-btn-primary x-master-add-round" id="btn-add-master-category-page" aria-label="Tambah Kategori"><svg class="x-master-add-round-icon" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>
             </div>
-            <div class="x-filter-pills" style="display:flex; gap:8px; margin: 12px 0 16px;">
-              <button type="button" class="x-filter-pill active" id="pill-cat-active" onclick="filterMasterCategoriesByStatus('ACTIVE')">Aktif</button>
-              <button type="button" class="x-filter-pill" id="pill-cat-inactive" onclick="filterMasterCategoriesByStatus('INACTIVE')">Nonaktif</button>
-            </div>
+
             <div id="master-categories-page-list" class="x-master-reference-card-list">
               <div class="x-empty-state text-center py-6 text-muted">Memuat kategori...</div>
             </div>
@@ -6483,7 +6488,7 @@
   <script src="/merchant-dashboard/assets/js/modules/master-menu.js?v=1.0.1"></script>
   <script src="/merchant-dashboard/assets/js/modules/settings.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/brand.js?v=1.0.0"></script>
-  <script src="/merchant-dashboard/assets/js/modules/catalog-reference.js?v=1.0.1"></script>
+  <script src="/merchant-dashboard/assets/js/modules/catalog-reference.js?v=1.0.2"></script>
   <script src="/merchant-dashboard/assets/js/modules/catalog.js?v=1.0.2"></script>
   <script src="/dashboard/assets/js/dashboard.js?v=3.1.0"></script>
   <script src="/merchant-dashboard/assets/js/owner-master-menu-inline.js?v=1.0.2"></script>

@@ -352,13 +352,16 @@
     _ownerCategoryStatusFilter = status;
     var pillAct = $('pill-cat-active');
     var pillInact = $('pill-cat-inactive');
+    var btnAdd = $('btn-add-master-category-page');
     if (pillAct && pillInact) {
       if (status === 'ACTIVE') {
         pillAct.classList.add('active');
         pillInact.classList.remove('active');
+        if (btnAdd) btnAdd.style.display = 'inline-flex';
       } else {
         pillAct.classList.remove('active');
         pillInact.classList.add('active');
+        if (btnAdd) btnAdd.style.display = 'none';
       }
     }
     renderMasterReferenceList('category');
@@ -375,6 +378,13 @@
     };
     var list = $(listMap[type]);
     if (!list) return;
+
+    if (type === 'category') {
+      var btnAddCat = $('btn-add-master-category-page');
+      if (btnAddCat) {
+        btnAddCat.style.display = (_ownerCategoryStatusFilter === 'INACTIVE') ? 'none' : 'inline-flex';
+      }
+    }
 
     var rows = referenceRows(type);
     if (type === 'category' && _ownerCategoryStatusFilter) {
@@ -425,7 +435,7 @@
           '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>' +
         '</button>';
 
-      var chevronIcon = '<div class="x-hub-arrow" style="color:#c7c7cc;display:flex;align-items:center;margin-left:4px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg></div>';
+      var chevronIcon = '<div class="x-hub-arrow" style="color:#475569;display:flex;align-items:center;margin-left:6px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></div>';
 
       rightControls = type === 'category'
         ? toggleSwitch + chevronIcon
@@ -437,8 +447,11 @@
           var catImg = row.image_url || row.image;
           iconHtml = '<div class="x-master-reference-icon" aria-hidden="true" style="background:#f1f5f9;"><img src="' + esc(catImg) + '" alt="' + esc(row.name) + '" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;"></div>';
         } else {
-          iconHtml = '<div class="x-master-reference-icon x-master-reference-icon-category" aria-hidden="true" style="background:#16a34a;display:flex;align-items:center;justify-content:center;">' +
-            '<img src="/merchant-dashboard/assets/icons/bxs_category.svg" width="22" height="22" alt="" style="width:22px;height:22px;display:block;">' +
+          var iconPath = (typeof window !== 'undefined' && window.location && window.location.pathname && window.location.pathname.startsWith('/owner'))
+            ? '/owner/assets/icons/bxs_category.svg'
+            : '/merchant-dashboard/assets/icons/bxs_category.svg';
+          iconHtml = '<div class="x-master-reference-icon x-master-reference-icon-category" aria-hidden="true" style="background:#22c55e;display:flex;align-items:center;justify-content:center;">' +
+            '<img src="' + iconPath + '" width="22" height="22" alt="" style="width:22px;height:22px;display:block;filter:brightness(0) invert(1);">' +
           '</div>';
         }
       } else {
