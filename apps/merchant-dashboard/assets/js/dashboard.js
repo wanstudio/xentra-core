@@ -328,6 +328,8 @@
     'settings/data-refresh':       { title: 'Data Aplikasi',     sub: 'Segarkan cache dan sinkronisasi data aplikasi dari server', tab: 'settings' },
     // Owner mobile modules & hubs
     'business':                    { title: 'Bisnis',            sub: 'Pusat pengelolaan katalog, operasional, pelanggan, pemasaran, tim, dan brand', tab: 'business' },
+    'business/catalog':            { title: 'Katalog & Menu',    sub: 'Master menu, kategori, item penyusun, dan pilihan item', tab: 'business' },
+    'business/materials-production': { title: 'Bahan & Produksi', sub: 'Standar baku, resep, hasil produksi, dan hubungan bahan dengan hasil produksi', tab: 'business' },
     'more':                        { title: 'Lainnya',           sub: 'Pengaturan sistem, integrasi, keamanan, notifikasi, dan akun', tab: 'more' },
     'lainnya':                     { title: 'Lainnya',           sub: 'Pengaturan sistem, integrasi, keamanan, notifikasi, dan akun', tab: 'more' },
     // Legacy routes (internal tabs that still exist from old dashboard)
@@ -371,6 +373,9 @@
       }
       // Handle dynamic route: catalog/master-menus/:id/edit
       if (hash.indexOf('catalog/master-menus/') === 0) {
+        return hash;
+      }
+      if (hash === 'business/catalog' || hash === 'business/materials-production') {
         return hash;
       }
       // Handle dynamic route: branches/:id and branches/:id/:subtab
@@ -450,6 +455,8 @@
     'catalog/categories': 'catalog/categories',
     'catalog-master-menus': 'catalog/master-menus',
     'catalog/master-menus': 'catalog/master-menus',
+    'business/catalog': 'business/catalog',
+    'business/materials-production': 'business/materials-production',
     'branches': 'branches',
     'tim': 'team',
     'team': 'team',
@@ -489,6 +496,10 @@
 
     var current = canonicalizeOwnerRoute(route || '');
 
+    if (current === 'business/catalog' || current === 'business/materials-production') {
+      return 'business';
+    }
+
     if (current === 'catalog/products/new' ||
         /^catalog\/products\/[^/]+\/edit$/.test(current) ||
         /^catalog\/products\/[^/]+$/.test(current)) {
@@ -509,7 +520,7 @@
         current === 'catalog/categories' ||
         current === 'catalog/master-menus' ||
         current === 'catalog/menus') {
-      return 'business';
+      return 'business/catalog';
     }
 
     if (current === 'branches') return 'business';
@@ -525,7 +536,7 @@
     if (current === 'customers') return 'business';
     if (current.indexOf('customers/') === 0) return 'customers';
 
-    if (current === 'stock') return 'business';
+    if (current === 'stock') return 'business/materials-production';
 
     if (current === 'team') return 'business';
     if (current.indexOf('team/') === 0) return 'team';
@@ -547,6 +558,7 @@
       return 'business';
     }
 
+    if (current === 'settings/business/profile') return 'business';
     if (current === 'settings') return 'more';
     if (current.indexOf('settings/') === 0) return 'settings';
 
@@ -596,11 +608,17 @@
   window.goBackFromCategory = window.goBackFromChildPage;
   window.goBackFromCatalogChild = window.goBackFromChildPage;
 
-  // Editor item dibuka dari konteks Master Category, jadi kembalinya harus
-  // deterministik ke sana dengan tab Item aktif — bukan menuruni history stack
-  // (yang bisa mendarat di daftar Produk atau halaman lain).
+  // Editor item dibuka dari konteks Master Category atau Produk Master
   window.setMasterReferenceTab = setMasterReferenceTab;
   window.goBackFromItemEditor = function () {
+    if (window.XentraNavigationController) {
+      var snapshot = window.XentraNavigationController.getSnapshot && window.XentraNavigationController.getSnapshot();
+      var stack = snapshot ? snapshot.stack : [];
+      if (stack.length > 1) {
+        window.XentraNavigationController.back();
+        return;
+      }
+    }
     setMasterReferenceTab('item');
     navigateTo('catalog/categories', { history: 'replace' });
   };
@@ -641,32 +659,60 @@
   }
   window.ensureOwnerFeatureMobileHeader = ensureOwnerFeatureMobileHeader;
 
-  // Editor item dibuka dari konteks Master Category, jadi kembalinya harus
-  // deterministik ke sana dengan tab Item aktif — bukan menuruni history stack
-  // (yang bisa mendarat di daftar Produk atau halaman lain).
+  // Editor item dibuka dari konteks Master Category atau Produk Master
   window.setMasterReferenceTab = setMasterReferenceTab;
   window.goBackFromItemEditor = function () {
+    if (window.XentraNavigationController) {
+      var snapshot = window.XentraNavigationController.getSnapshot && window.XentraNavigationController.getSnapshot();
+      var stack = snapshot ? snapshot.stack : [];
+      if (stack.length > 1) {
+        window.XentraNavigationController.back();
+        return;
+      }
+    }
     setMasterReferenceTab('item');
     navigateTo('catalog/categories', { history: 'replace' });
   };
   window.goBackFromCategoryEditor = function () {
     setMasterReferenceTab('category');
+    if (window.XentraNavigationController) {
+      var snapshot = window.XentraNavigationController.getSnapshot && window.XentraNavigationController.getSnapshot();
+      var stack = snapshot ? snapshot.stack : [];
+      if (stack.length > 1) {
+        window.XentraNavigationController.back();
+        return;
+      }
+    }
     navigateTo('catalog/categories', { history: 'replace' });
   };
 
   function openBusinessSubHub(type) {
-    var mainView = $('owner-business-main-view');
-    var catHub = $('subpage-catalog-menu-hub');
-    var matHub = $('subpage-materials-production-hub');
+    if (type === 'catalog') {
+      navigateTo('business/catalog');
+    } else if (type === 'materials-production') {
+      navigateTo('business/materials-production');
+    } else {
+      var mainView = $('owner-business-main-view');
+      var catHub = $('subpage-catalog-menu-hub');
+      var matHub = $('subpage-materials-production-hub');
 
-    if (mainView) mainView.style.display = 'none';
-    if (catHub) catHub.style.display = (type === 'catalog') ? 'block' : 'none';
-    if (matHub) matHub.style.display = (type === 'materials-production') ? 'block' : 'none';
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (mainView) mainView.style.display = 'none';
+      if (catHub) catHub.style.display = (type === 'catalog') ? 'block' : 'none';
+      if (matHub) matHub.style.display = (type === 'materials-production') ? 'block' : 'none';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   }
   window.openBusinessSubHub = openBusinessSubHub;
 
   function closeBusinessSubHub() {
+    if (window.XentraNavigationController) {
+      var snapshot = window.XentraNavigationController.getSnapshot && window.XentraNavigationController.getSnapshot();
+      var stack = snapshot ? snapshot.stack : [];
+      if (stack.length > 1 && snapshot.route && snapshot.route.indexOf('business/') === 0) {
+        window.XentraNavigationController.back();
+        return;
+      }
+    }
     var mainView = $('owner-business-main-view');
     var catHub = $('subpage-catalog-menu-hub');
     var matHub = $('subpage-materials-production-hub');
@@ -987,7 +1033,24 @@
       stopOrdersPolling();
     }
 
-    if (tabId === 'business') closeBusinessSubHub();
+    if (tabId === 'business') {
+      var mainView = $('owner-business-main-view');
+      var catHub = $('subpage-catalog-menu-hub');
+      var matHub = $('subpage-materials-production-hub');
+      if (route === 'business/catalog') {
+        if (mainView) mainView.style.display = 'none';
+        if (catHub) catHub.style.display = 'block';
+        if (matHub) matHub.style.display = 'none';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else if (route === 'business/materials-production') {
+        if (mainView) mainView.style.display = 'none';
+        if (catHub) catHub.style.display = 'none';
+        if (matHub) matHub.style.display = 'block';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        closeBusinessSubHub();
+      }
+    }
     if (tabId === 'overview') loadOverview();
     if (tabId === 'reports') loadReports(reportSubtype);
     if (tabId === 'stock') loadOwnerStockOverview();
