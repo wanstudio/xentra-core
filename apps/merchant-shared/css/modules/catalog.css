@@ -396,5 +396,72 @@
   margin-top: 0 !important;
 }
 
+/* Quick Add Round Button in Item Master filter row (Item Master mockup) */
+.x-btn-round-add {
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: 50% !important;
+  background: #0F172A !important;
+  color: #FFFFFF !important;
+  border: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15) !important;
+  flex-shrink: 0 !important;
+  transition: transform 0.12s ease, background-color 0.12s ease !important;
+}
+
+.x-btn-round-add:hover {
+  background: #1E293B !important;
+  transform: scale(1.05);
+}
+
+.x-btn-round-add:active {
+  transform: scale(0.95);
+}
+
+@media (max-width: 768px) {
+  #product-list-view .x-master-products-head .x-header-buttons {
+    display: none !important;
+  }
+}
+
+/* Post-Save Item Prompt Modal (Frame 240.png) */
+.x-modal-item-saved {
+  position: fixed !important;
+  inset: 0 !important;
+  background: rgba(15, 23, 42, 0.6) !important;
+  backdrop-filter: blur(4px) !important;
+  z-index: 99999 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 20px !important;
+}
+
+.x-modal-item-saved-card {
+  background: #FFFFFF !important;
+  border-radius: 20px !important;
+  width: 100% !important;
+  max-width: 340px !important;
+  padding: 24px !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.08) !important;
+  box-sizing: border-box !important;
+  animation: xFadeScaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+@keyframes xFadeScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 
 

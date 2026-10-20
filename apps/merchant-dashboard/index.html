@@ -1950,15 +1950,20 @@
           <!-- Search -->
           <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap;align-items:center;">
             <div style="flex:1;min-width:220px;position:relative;">
-              <input type="search" id="prod-search-input" class="x-input" placeholder="Cari nama Item / SKU..." autocomplete="off" style="padding-left:36px;">
+              <input type="search" id="prod-search-input" class="x-input" placeholder="Cari nama atau kode bahan" autocomplete="off" style="padding-left:36px;">
               <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
             </div>
           </div>
 
           <!-- Filter Pills (matching product master.png) -->
-          <div class="x-filter-pills" style="display:flex; gap:8px; margin: 14px 0 16px;">
-            <button type="button" class="x-filter-pill active" id="pill-prod-active" onclick="filterMasterProductsByStatus('ACTIVE')">Aktif</button>
-            <button type="button" class="x-filter-pill" id="pill-prod-inactive" onclick="filterMasterProductsByStatus('INACTIVE')">Nonaktif</button>
+          <div class="x-filter-pills" style="display:flex; gap:8px; margin: 14px 0 16px; align-items:center; justify-content:space-between;">
+            <div style="display:flex; gap:8px;">
+              <button type="button" class="x-filter-pill active" id="pill-prod-active" onclick="filterMasterProductsByStatus('ACTIVE')">Aktif</button>
+              <button type="button" class="x-filter-pill" id="pill-prod-inactive" onclick="filterMasterProductsByStatus('INACTIVE')">Nonaktif</button>
+            </div>
+            <button type="button" class="x-btn-round-add" id="btn-add-item-round" onclick="window.openAddProduct()" aria-label="Tambah Item Baru">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            </button>
           </div>
 
           <!-- Mobile Cards Container (Visible on Mobile matching product master.png) -->
@@ -2119,9 +2124,14 @@
 
         <!-- Row 1: Pakai Resep -->
         <div id="row-prod-type-cooked" class="x-type-toggle-row" style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #F1F5F9;cursor:pointer;">
-          <div style="flex:1;padding-right:16px;">
-            <div style="font-weight:700;font-size:14px;color:#0F172A;">Pakai Resep</div>
-            <div style="font-size:11.5px;color:#64748B;margin-top:2px;line-height:1.35;">Dimasak dari bahan mentah di dapur, yang berkurang adalah bahan mentahnya</div>
+          <div style="display:flex;align-items:center;gap:12px;flex:1;padding-right:16px;">
+            <div style="width:38px;height:38px;border-radius:10px;background:#4285F4;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <img src="/merchant-dashboard/assets/icons/lucide-extended_cooking-pot-filled.svg" width="20" height="20" alt="Pakai Resep" style="display:block;">
+            </div>
+            <div>
+              <div style="font-weight:700;font-size:14px;color:#0F172A;">Pakai Resep</div>
+              <div style="font-size:11.5px;color:#64748B;margin-top:2px;line-height:1.35;">Dimasak dari bahan mentah di dapur, yang berkurang adalah bahan mentahnya</div>
+            </div>
           </div>
           <label class="x-toggle x-toggle-cooked" style="margin:0;">
             <input type="checkbox" id="toggle-prod-type-cooked" checked aria-label="Tipe Pakai Resep">
@@ -2131,9 +2141,14 @@
 
         <!-- Row 2: Siap Jual (Non-Resep) -->
         <div id="row-prod-type-direct" class="x-type-toggle-row" style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;cursor:pointer;">
-          <div style="flex:1;padding-right:16px;">
-            <div style="font-weight:700;font-size:14px;color:#0F172A;">Siap Jual (Non-Resep)</div>
-            <div style="font-size:11.5px;color:#64748B;margin-top:2px;line-height:1.35;">Bahan mentah, seperti air kemasan, kerupuk, dll</div>
+          <div style="display:flex;align-items:center;gap:12px;flex:1;padding-right:16px;">
+            <div style="width:38px;height:38px;border-radius:10px;background:#EA4335;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <img src="/merchant-dashboard/assets/icons/reicon_food-tray-filled.svg" width="20" height="20" alt="Siap Jual" style="display:block;">
+            </div>
+            <div>
+              <div style="font-weight:700;font-size:14px;color:#0F172A;">Siap Jual (Non-Resep)</div>
+              <div style="font-size:11.5px;color:#64748B;margin-top:2px;line-height:1.35;">Bahan mentah, seperti air kemasan, kerupuk, dll</div>
+            </div>
           </div>
           <label class="x-toggle x-toggle-direct" style="margin:0;">
             <input type="checkbox" id="toggle-prod-type-direct" aria-label="Tipe Siap Jual Non-Resep">
@@ -2214,8 +2229,24 @@
         <button type="submit" class="x-btn-primary" id="btn-save-product-editor" style="width:100% !important;flex:none !important;height:46px !important;border-radius:12px !important;font-weight:700 !important;font-size:15px !important;background:#00A637 !important;border:none !important;color:#FFFFFF !important;cursor:pointer !important;transition:all 0.15s ease !important;display:flex !important;align-items:center !important;justify-content:center !important;">Simpan</button>
       </div>
     </form>
-
   </section>
+
+      <!-- MODAL POST-SAVE ITEM: "Item Tersimpan" (Frame 240.png) -->
+      <div id="modal-item-saved-prompt" class="x-modal-item-saved" style="display:none;">
+        <div class="x-modal-item-saved-card">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+            <div style="width:26px;height:26px;border-radius:50%;background:#DCFCE7;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#00A637" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </div>
+            <h3 style="margin:0;font-size:16px;font-weight:700;color:#0F172A;">Item Tersimpan</h3>
+          </div>
+          <p style="margin:0 0 22px;font-size:13px;line-height:1.5;color:#64748B;">Item berhasil disimpan! Apakah Anda ingin langsung menjadikannya menu jual?</p>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <button type="button" id="btn-modal-saved-later" style="flex:1;height:42px;border-radius:12px;font-size:13px;font-weight:600;background:#F1F5F9;border:1px solid #E2E8F0;color:#64748B;cursor:pointer;">Nanti saja</button>
+            <button type="button" id="btn-modal-saved-create-menu" style="flex:1.2;height:42px;border-radius:12px;font-size:13px;font-weight:700;background:#E6F7EB;border:1px solid #7FD29B;color:#00A637;cursor:pointer;">Buat menu jual</button>
+          </div>
+        </div>
+      </div>
       </section>
 
       <!-- TAB: CATALOG / MASTER MENUS (Owner commercial catalog) -->

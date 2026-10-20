@@ -309,16 +309,23 @@
 
           var chevronIcon = '<div class="x-hub-arrow" style="color:#c7c7cc;display:flex;align-items:center;margin-left:4px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg></div>';
 
-          var subInfo = prod.sku ? prod.sku : (prod.description || 'Tidak ada deskripsi');
+          var isDirect = prod.inventory_type === 'DIRECT';
+          var iconBg = isDirect ? '#EA4335' : '#4285F4';
+          var iconSrc = isDirect ? '/merchant-dashboard/assets/icons/reicon_food-tray-filled.svg' : '/merchant-dashboard/assets/icons/lucide-extended_cooking-pot-filled.svg';
+          var iconAlt = isDirect ? 'Siap Jual' : 'Pakai Resep';
+
+          var skuText = prod.sku ? prod.sku : (prod.description || 'Belum ada SKU');
+          var costText = formatMoney(prod.cost_price || 0);
 
           return [
             '<div class="x-hub-card" style="align-items:center; cursor:pointer;" onclick="if (!event.target.closest(\'.x-toggle, .x-action-menu-trigger, .x-action-menu\')) { openEditProduct(\'' + esc(prod.id) + '\'); }">',
-              '<div class="x-hub-icon bg-blue" style="width:42px;height:42px;border-radius:12px;background:#2563EB;display:flex;align-items:center;justify-content:center;flex-shrink:0;">',
-                '<img src="/merchant-dashboard/assets/icons/mdi_food-drumstick.svg" width="22" height="22" alt="" style="display:block;">',
+              '<div class="x-hub-icon" style="width:42px;height:42px;border-radius:12px;background:' + iconBg + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;">',
+                '<img src="' + iconSrc + '" width="22" height="22" alt="' + iconAlt + '" style="display:block;">',
               '</div>',
               '<div class="x-hub-info" style="flex:1 1 auto;min-width:0;margin-left:12px;">',
-                '<h3 style="font-size:14px;font-weight:700;color:#0f172a;margin:0 0 2px;">' + esc(prod.name) + '</h3>',
-                '<p style="font-size:11px;color:#8c8c8c;margin:0;">' + esc(subInfo) + '</p>',
+                '<h3 style="font-size:14px;font-weight:700;color:#0f172a;margin:0 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(prod.name) + '</h3>',
+                '<div style="font-size:11px;color:#94a3b8;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(skuText) + '</div>',
+                '<div style="font-size:12px;font-weight:700;color:#0f172a;">' + costText + '</div>',
               '</div>',
               '<div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">',
                 toggleSwitch,
@@ -1552,6 +1559,38 @@ async function loadMenusView() {
     if (btnAddProd) btnAddProd.addEventListener('click', window.openAddProduct);
     var btnAddProdMain = $('btn-add-product-main');
     if (btnAddProdMain) btnAddProdMain.addEventListener('click', window.openAddProduct);
+    var btnAddProdRound = $('btn-add-item-round');
+    if (btnAddProdRound) btnAddProdRound.addEventListener('click', window.openAddProduct);
+
+    // Post-Save Item Prompt Modal actions (Frame 240.png)
+    var btnSavedLater = $('btn-modal-saved-later');
+    if (btnSavedLater && !btnSavedLater.dataset.bound) {
+      btnSavedLater.dataset.bound = 'true';
+      btnSavedLater.addEventListener('click', function () {
+        hideItemSavedPromptModal();
+        if (typeof window.goBackFromItemEditor === 'function') {
+          window.goBackFromItemEditor();
+        } else {
+          navigateTo('catalog/categories', { history: 'replace' });
+        }
+      });
+    }
+
+    var btnSavedCreateMenu = $('btn-modal-saved-create-menu');
+    if (btnSavedCreateMenu && !btnSavedCreateMenu.dataset.bound) {
+      btnSavedCreateMenu.dataset.bound = 'true';
+      btnSavedCreateMenu.addEventListener('click', function () {
+        var idToUse = _pendingSavedProductId;
+        hideItemSavedPromptModal();
+        if (idToUse && typeof window.createMenuFromProduct === 'function') {
+          window.createMenuFromProduct(idToUse);
+        } else if (typeof window.goBackFromItemEditor === 'function') {
+          window.goBackFromItemEditor();
+        } else {
+          navigateTo('catalog/categories', { history: 'replace' });
+        }
+      });
+    }
 
     // Search and filter controls for Master Products
     // Filter client-side: dataset produk sudah ada di memori, jadi tanpa debounce.
@@ -1887,13 +1926,37 @@ async function loadMenusView() {
 
           showToast('✅ Item berhasil disimpan.');
           await loadMasterProducts();
-          navigateTo('catalog/categories', { history: 'replace' });
+          showItemSavedPromptModal(savedId);
         } catch (err) {
           showToast('❌ ' + ((err && err.message) || 'Gagal menyimpan Item.'));
         }
       });
     }
   }
+
+  var _pendingSavedProductId = null;
+
+  function showItemSavedPromptModal(productId) {
+    _pendingSavedProductId = productId;
+    var modal = $('modal-item-saved-prompt');
+    if (!modal) {
+      if (typeof window.goBackFromItemEditor === 'function') {
+        window.goBackFromItemEditor();
+      } else {
+        navigateTo('catalog/categories', { history: 'replace' });
+      }
+      return;
+    }
+    modal.style.display = 'flex';
+  }
+
+  function hideItemSavedPromptModal() {
+    var modal = $('modal-item-saved-prompt');
+    if (modal) modal.style.display = 'none';
+  }
+
+  window.showItemSavedPromptModal = showItemSavedPromptModal;
+  window.hideItemSavedPromptModal = hideItemSavedPromptModal;
 
   window.loadMasterProducts = loadMasterProducts;
   window.loadCatalog = loadCatalog;
