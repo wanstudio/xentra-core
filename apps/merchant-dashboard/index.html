@@ -8,10 +8,10 @@
   <link rel="stylesheet" href="/merchant-shared/fonts/plus-jakarta-sans.css?v=1.0.0">
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.5">
   <link rel="stylesheet" href="/merchant-shared/css/presentation-shells.css?v=1.0.4">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.63">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.64">
   <link rel="stylesheet" href="/merchant-shared/css/modules/marketing.css?v=1.0.0">
   <link rel="stylesheet" href="/merchant-shared/css/modules/stock.css?v=1.0.3">
-  <link rel="stylesheet" href="/merchant-shared/css/modules/catalog.css?v=1.0.2">
+  <link rel="stylesheet" href="/merchant-shared/css/modules/catalog.css?v=1.0.3">
   <link rel="stylesheet" href="/merchant-shared/css/ui-primitives.css?v=1.0.1">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#ffffff">
@@ -1939,19 +1939,21 @@
             </div>
           </div>
 
-          <!-- Filter Pills & Add CTA (1 Row) -->
-          <div class="x-filter-pills x-master-products-filter-row" style="display:flex !important; flex-direction:row !important; gap:8px; margin: 14px 0 16px; align-items:center !important; justify-content:space-between !important; flex-wrap:nowrap !important; width:100%; box-sizing:border-box;">
-            <div class="x-filter-pills-group" style="display:flex !important; flex-direction:row !important; gap:8px; align-items:center !important; flex-wrap:nowrap !important; flex:0 0 auto !important; width:auto !important; margin-bottom:0 !important;">
-              <button type="button" class="x-filter-pill active" id="pill-prod-active" onclick="filterMasterProductsByStatus('ACTIVE')">Aktif</button>
-              <button type="button" class="x-filter-pill" id="pill-prod-inactive" onclick="filterMasterProductsByStatus('INACTIVE')">Nonaktif</button>
+          <!-- Container Card Panel (Konsisten Sama Persis dengan Kategori) -->
+          <div id="master-products-card-panel" class="x-master-reference-panel" style="margin-top:16px; margin-bottom:24px;">
+            <div class="x-category-control-bar" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+              <div class="x-filter-pills" style="display:flex; align-items:center; gap:8px;">
+                <button type="button" class="x-filter-pill active" id="pill-prod-active" onclick="filterMasterProductsByStatus('ACTIVE')">Aktif</button>
+                <button type="button" class="x-filter-pill" id="pill-prod-inactive" onclick="filterMasterProductsByStatus('INACTIVE')">Nonaktif</button>
+              </div>
+              <button type="button" class="x-master-add-round x-btn-round-add" id="btn-add-item-round" onclick="window.openAddProduct()" aria-label="Tambah Item Baru">
+                <svg class="x-master-add-round-icon" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              </button>
             </div>
-            <button type="button" class="x-btn-round-add" id="btn-add-item-round" onclick="window.openAddProduct()" aria-label="Tambah Item Baru" style="display:inline-flex !important; flex-shrink:0 !important; margin:0 !important; margin-left:auto !important;">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            </button>
-          </div>
 
-          <!-- Mobile Cards Container (Visible on Mobile matching product master.png) -->
-          <div id="master-products-cards-container" class="x-mobile-only-cards" style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;"></div>
+            <!-- Mobile Cards Container (Visible on Mobile matching Kategori) -->
+            <div id="master-products-cards-container" class="x-mobile-only-cards x-master-reference-card-list"></div>
+          </div>
 
           <!-- Products Table -->
           <div class="x-table-responsive mt-4">

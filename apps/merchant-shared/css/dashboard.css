@@ -7498,46 +7498,68 @@ body.x-mobile-account-open .x-merchant-mobile-nav { display: none !important; }
     border-radius: 12px !important;
   }
 
-  /* Kartu daftar item di mobile: diberi gap dan margin-bottom eksplisit antar kartu */
+  /* Container Card Panel Item Master: Konsisten Sama Persis dengan Kategori */
+  #master-products-card-panel.x-master-reference-panel {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 20px !important;
+    padding: 16px !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.02) !important;
+    margin-top: 16px !important;
+    margin-bottom: 24px !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+  }
+
+  #master-products-card-panel .x-category-control-bar {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    margin-bottom: 16px !important;
+    width: 100% !important;
+  }
+
   #master-products-cards-container {
     display: flex !important;
     flex-direction: column !important;
     gap: 12px !important;
-    margin-top: 0 !important;
-    margin-bottom: 24px !important;
+    margin: 0 !important;
+    padding: 0 !important;
     width: 100% !important;
   }
+
+  #master-products-cards-container .x-master-reference-card,
   #master-products-cards-container .x-hub-card {
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 12px !important;
+    background: #ffffff !important;
+    padding: 12px 14px !important;
+    box-shadow: none !important;
     display: flex !important;
     align-items: center !important;
-    margin-bottom: 12px !important;
+    justify-content: space-between !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
     width: 100% !important;
     box-sizing: border-box !important;
-  }
-  #master-products-cards-container .x-hub-card:last-child {
     margin-bottom: 0 !important;
   }
 
-  /* Filter Pills & Add Round CTA: Terkunci 1 Row penuh tanpa wrap */
-  #product-list-view .x-filter-pills {
-    display: flex !important;
-    flex-direction: row !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    flex-wrap: nowrap !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-    margin: 14px 0 16px !important;
+  #master-products-cards-container .x-master-reference-card:hover,
+  #master-products-cards-container .x-master-reference-card:active,
+  #master-products-cards-container .x-hub-card:hover,
+  #master-products-cards-container .x-hub-card:active {
+    background: #f8fafc !important;
+    border-color: #cbd5e1 !important;
   }
-  #product-list-view .x-filter-pills > div,
-  #product-list-view .x-filter-pills .x-filter-pills-group {
+
+  #master-products-cards-container .x-master-reference-card-main {
     display: flex !important;
-    flex-direction: row !important;
     align-items: center !important;
-    gap: 8px !important;
-    width: auto !important;
+    gap: 12px !important;
     min-width: 0 !important;
-    margin-bottom: 0 !important;
+    flex: 1 !important;
+  }
     flex: 0 0 auto !important;
     flex-wrap: nowrap !important;
   }
