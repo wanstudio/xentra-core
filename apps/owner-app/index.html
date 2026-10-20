@@ -8,12 +8,12 @@
   <link rel="stylesheet" href="/merchant-shared/fonts/plus-jakarta-sans.css?v=1.0.0">
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.5">
   <link rel="stylesheet" href="/merchant-shared/css/presentation-shells.css?v=1.0.4">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.61">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.62">
   <link rel="stylesheet" href="/merchant-shared/css/modules/marketing.css?v=1.0.0">
   <link rel="stylesheet" href="/merchant-shared/css/modules/stock.css?v=1.0.3">
-  <link rel="stylesheet" href="/merchant-shared/css/modules/catalog.css?v=1.0.0">
+  <link rel="stylesheet" href="/merchant-shared/css/modules/catalog.css?v=1.0.1">
   <link rel="stylesheet" href="/merchant-shared/css/ui-primitives.css?v=1.0.1">
-  <link rel="stylesheet" href="/owner/assets/css/owner-app.css?v=1.0.5">
+  <link rel="stylesheet" href="/owner/assets/css/owner-app.css?v=1.0.6">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#ffffff">
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
@@ -1925,20 +1925,20 @@
           </div>
 
           <!-- Search -->
-          <div style="display:flex;gap:12px;margin-top:16px;align-items:center;">
-            <div style="flex:1;position:relative;">
+          <div class="x-master-products-search-wrap" style="display:flex;gap:12px;margin-top:18px;margin-bottom:14px;align-items:center;width:100%;">
+            <div style="flex:1;position:relative;width:100%;">
               <input type="search" id="prod-search-input" class="x-input" placeholder="Cari nama atau kode bahan" autocomplete="off" style="width:100%;height:44px;border-radius:12px;padding:0 14px 0 38px;font-size:13.5px;box-sizing:border-box;">
               <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#94a3b8;pointer-events:none;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
             </div>
           </div>
 
           <!-- Filter Pills & Add CTA (1 Row) -->
-          <div class="x-filter-pills" style="display:flex; gap:8px; margin: 14px 0 16px; align-items:center; justify-content:space-between; flex-wrap:nowrap;">
-            <div style="display:flex; gap:8px; align-items:center;">
+          <div class="x-filter-pills x-master-products-filter-row" style="display:flex !important; flex-direction:row !important; gap:8px; margin: 14px 0 16px; align-items:center !important; justify-content:space-between !important; flex-wrap:nowrap !important; width:100%; box-sizing:border-box;">
+            <div class="x-filter-pills-group" style="display:flex !important; flex-direction:row !important; gap:8px; align-items:center !important; flex-wrap:nowrap !important; flex:0 0 auto !important; width:auto !important; margin-bottom:0 !important;">
               <button type="button" class="x-filter-pill active" id="pill-prod-active" onclick="filterMasterProductsByStatus('ACTIVE')">Aktif</button>
               <button type="button" class="x-filter-pill" id="pill-prod-inactive" onclick="filterMasterProductsByStatus('INACTIVE')">Nonaktif</button>
             </div>
-            <button type="button" class="x-btn-round-add" id="btn-add-item-round" onclick="window.openAddProduct()" aria-label="Tambah Item Baru">
+            <button type="button" class="x-btn-round-add" id="btn-add-item-round" onclick="window.openAddProduct()" aria-label="Tambah Item Baru" style="display:inline-flex !important; flex-shrink:0 !important; margin:0 !important; margin-left:auto !important;">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             </button>
           </div>
@@ -4847,7 +4847,6 @@
                 </div>
                 <div class="x-subhub-item-text">
                   <h4>Item Master</h4>
-                  <p>Item satuan yang dipakai dan dihitung dalam stok</p>
                 </div>
               </div>
               <div class="x-subhub-item-arrow">

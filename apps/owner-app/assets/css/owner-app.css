@@ -279,6 +279,53 @@ body.x-owner-mobile-app #master-reference-category-panel,
   gap: 8px !important;
 }
 
+#product-list-view .x-master-products-head {
+  margin-bottom: 18px !important;
+}
+
+#product-list-view .x-master-products-search-wrap {
+  margin-top: 18px !important;
+  margin-bottom: 14px !important;
+  width: 100% !important;
+}
+
+#product-list-view .x-filter-pills {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-wrap: nowrap !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  margin: 14px 0 16px !important;
+}
+
+#product-list-view .x-filter-pills > div,
+#product-list-view .x-filter-pills .x-filter-pills-group {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 8px !important;
+  width: auto !important;
+  min-width: 0 !important;
+  margin-bottom: 0 !important;
+  flex: 0 0 auto !important;
+  flex-wrap: nowrap !important;
+}
+
+#product-list-view .x-filter-pills .x-filter-pill {
+  flex: 0 0 auto !important;
+  white-space: nowrap !important;
+}
+
+#product-list-view .x-btn-round-add,
+#product-list-view #btn-add-item-round {
+  display: inline-flex !important;
+  flex-shrink: 0 !important;
+  margin: 0 !important;
+  margin-left: auto !important;
+}
+
 body.x-owner-mobile-app .x-filter-pill,
 .x-owner-mobile-app .x-filter-pill {
   padding: 6px 18px !important;
