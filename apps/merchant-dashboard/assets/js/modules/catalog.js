@@ -619,6 +619,57 @@
     return 'ITM-' + prefix + '-' + randDigits;
   }
 
+  function updateProductEditorCtaState() {
+    var isAdd = !$('prod-id') || !$('prod-id').value;
+    var nameInput = $('prod-name');
+    var nameVal = nameInput ? String(nameInput.value || '').trim() : '';
+    var manageStock = $('prod-manage-stock-toggle') ? $('prod-manage-stock-toggle').checked : false;
+    var skuInput = $('prod-sku');
+    var skuVal = skuInput ? String(skuInput.value || '').trim() : '';
+
+    var isDataFilled = nameVal.length > 0 && (!manageStock || skuVal.length > 0);
+
+    // 1. Simpan CTA
+    var btnSave = $('btn-save-product-editor');
+    if (btnSave) {
+      if (isDataFilled) {
+        btnSave.disabled = false;
+        btnSave.style.background = 'var(--primary-color, #10B981)';
+        btnSave.style.color = '#FFFFFF';
+        btnSave.style.cursor = 'pointer';
+        btnSave.style.opacity = '1';
+        btnSave.style.boxShadow = '0 2px 8px rgba(16, 185, 129, 0.25)';
+      } else {
+        btnSave.disabled = true;
+        btnSave.style.background = '#E2E8F0';
+        btnSave.style.color = '#94A3B8';
+        btnSave.style.cursor = 'not-allowed';
+        btnSave.style.opacity = '0.85';
+        btnSave.style.boxShadow = 'none';
+      }
+    }
+
+    // 2. Hapus CTA
+    var btnDelete = $('btn-delete-item-editor');
+    if (btnDelete) {
+      if (isAdd) {
+        btnDelete.disabled = true;
+        btnDelete.style.background = '#F1F5F9';
+        btnDelete.style.color = '#94A3B8';
+        btnDelete.style.cursor = 'not-allowed';
+        btnDelete.style.opacity = '0.45';
+        btnDelete.style.pointerEvents = 'none';
+      } else {
+        btnDelete.disabled = false;
+        btnDelete.style.background = '#FEE2E2';
+        btnDelete.style.color = '#EF4444';
+        btnDelete.style.cursor = 'pointer';
+        btnDelete.style.opacity = '1';
+        btnDelete.style.pointerEvents = 'auto';
+      }
+    }
+  }
+
   function updateProductStockManageUI(hasStockManagement) {
     var toggle = $('prod-manage-stock-toggle');
     var container = $('prod-sku-container');
@@ -640,6 +691,7 @@
         ? 'data item ini digunakan sebagai acuan inventaris di tiap cabang'
         : 'item non-stock tetap bisa di pakai untuk membuat menu';
     }
+    updateProductEditorCtaState();
   }
 
   function updateProductInventoryTypeUI(type) {
@@ -691,8 +743,6 @@
     $('prod-editor-subtitle').textContent = 'Item satuan yang dipakai dan dihitung dalam stok — seperti ayam, ikan, bumbu, dan lainnya.';
     if ($('product-editor-mobile-title')) $('product-editor-mobile-title').textContent = 'Tambah Item';
     if ($('product-editor-mobile-subtitle')) $('product-editor-mobile-subtitle').textContent = 'Item satuan yang dipakai dan dihitung dalam stok — seperti ayam, ikan, bumbu, dan lainnya.';
-    var btnDelete = $('btn-delete-item-editor');
-    if (btnDelete) btnDelete.style.display = 'none';
 
     $('prod-id').value = '';
     $('prod-name').value = '';
@@ -718,6 +768,7 @@
     var fileInput = $('prod-image-file');
     if (fileInput) fileInput.value = '';
     setProductImagePreview('', false);
+    updateProductEditorCtaState();
   }
 
   function populateProductEditorForm(prod) {
@@ -727,8 +778,6 @@
     $('prod-editor-subtitle').textContent = 'Perbarui data item. Menu tetap dikelola di workspace Master Menu.';
     if ($('product-editor-mobile-title')) $('product-editor-mobile-title').textContent = itemTitle;
     if ($('product-editor-mobile-subtitle')) $('product-editor-mobile-subtitle').textContent = 'Perbarui item tanpa mengubah identitas komersial Menu.';
-    var btnDelete = $('btn-delete-item-editor');
-    if (btnDelete) btnDelete.style.display = 'inline-flex';
 
     $('prod-id').value = prod.id;
     $('prod-name').value = prod.name || '';
@@ -780,6 +829,7 @@
     if (fileInput) fileInput.value = '';
     var existingImage = prod.image_url || prod.image || '';
     setProductImagePreview(existingImage, existingImage !== '');
+    updateProductEditorCtaState();
   }
 
   async function loadProductEditorPage(productId) {
@@ -1604,6 +1654,27 @@ async function loadMenusView() {
       });
     }
 
+    var prodNameInput = $('prod-name');
+    if (prodNameInput && !prodNameInput.dataset.bound) {
+      prodNameInput.dataset.bound = 'true';
+      prodNameInput.addEventListener('input', function () {
+        var stockToggle = $('prod-manage-stock-toggle');
+        var skuInput = $('prod-sku');
+        if (stockToggle && stockToggle.checked && skuInput && !skuInput.value.trim()) {
+          skuInput.value = generateSmartItemSku(prodNameInput.value);
+        }
+        updateProductEditorCtaState();
+      });
+    }
+
+    var prodSkuInput = $('prod-sku');
+    if (prodSkuInput && !prodSkuInput.dataset.bound) {
+      prodSkuInput.dataset.bound = 'true';
+      prodSkuInput.addEventListener('input', function () {
+        updateProductEditorCtaState();
+      });
+    }
+
     var stockManageToggle = $('prod-manage-stock-toggle');
     if (stockManageToggle && !stockManageToggle.dataset.bound) {
       stockManageToggle.dataset.bound = 'true';
@@ -1628,6 +1699,19 @@ async function loadMenusView() {
           if (typeof showToast === 'function') {
             showToast('✨ SKU otomatis dibuat: ' + skuInput.value);
           }
+          updateProductEditorCtaState();
+        }
+      });
+    }
+
+    var btnDeleteItem = $('btn-delete-item-editor');
+    if (btnDeleteItem && !btnDeleteItem.dataset.bound) {
+      btnDeleteItem.dataset.bound = 'true';
+      btnDeleteItem.addEventListener('click', function () {
+        if (btnDeleteItem.disabled) return;
+        var id = $('prod-id') ? $('prod-id').value : '';
+        if (id && typeof window.deleteProduct === 'function') {
+          window.deleteProduct(id);
         }
       });
     }
@@ -1643,6 +1727,10 @@ async function loadMenusView() {
     if (formProduct) {
       formProduct.addEventListener('submit', async function (e) {
         e.preventDefault();
+
+        if ($('btn-save-product-editor') && $('btn-save-product-editor').disabled) {
+          return;
+        }
 
         var id = $('prod-id').value;
         var manageStock = $('prod-manage-stock-toggle') ? $('prod-manage-stock-toggle').checked : false;
