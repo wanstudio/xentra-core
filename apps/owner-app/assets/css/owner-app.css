@@ -59,6 +59,15 @@ body.x-owner-mobile-app .x-owner-bottom-nav {
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.04) !important;
 }
 
+body.x-owner-mobile-app.x-hide-bottom-nav .x-owner-bottom-nav,
+body.x-owner-mobile-app .x-owner-bottom-nav.x-nav-hidden {
+  display: none !important;
+}
+
+body.x-owner-mobile-app.x-hide-bottom-nav .x-dash-main {
+  padding-bottom: 24px !important;
+}
+
 /* 4. Always display canonical mobile child header back chevron */
 body.x-owner-mobile-app .x-owner-child-mobile-header .x-owner-mobile-page-back,
 body.x-owner-mobile-app .x-title-back-btn.x-owner-mobile-page-back {

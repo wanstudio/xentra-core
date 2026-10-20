@@ -4815,6 +4815,16 @@ body.x-mobile-account-open .x-merchant-mobile-nav { display: none !important; }
     overflow: visible;
   }
 
+  body.x-hide-bottom-nav .x-owner-bottom-nav,
+  .x-owner-bottom-nav.x-nav-hidden {
+    display: none !important;
+  }
+
+  body.x-hide-bottom-nav .x-dash-main,
+  body.x-hide-bottom-nav:not(.x-merchant-app) .x-dash-main {
+    padding-bottom: 24px !important;
+  }
+
   .x-owner-nav-item {
     position: relative !important;
     min-width: 0 !important;

@@ -40,6 +40,27 @@
     'settings/security': 'lainnya'
   };
 
+  var ROOT_HUB_ROUTES = {
+    '': true,
+    'overview': true,
+    'beranda': true,
+    'business': true,
+    'bisnis': true,
+    'orders': true,
+    'pesanan': true,
+    'finance': true,
+    'finance/overview': true,
+    'keuangan': true,
+    'more': true,
+    'lainnya': true
+  };
+
+  function isRootHubRoute(rawRoute) {
+    if (!rawRoute) return true;
+    var clean = String(rawRoute).trim().replace(/^#\/?/, '').split('?')[0].replace(/\/+$/, '');
+    return !!ROOT_HUB_ROUTES[clean];
+  }
+
   function resolveModule(route) {
     if (MODULE_MAP[route]) return MODULE_MAP[route];
 
@@ -59,10 +80,20 @@
   }
 
   function syncOwnerBottomNavActive(route) {
-    var module = resolveModule(route || 'overview');
+    var cleanRoute = String(route || '').trim().replace(/^#\/?/, '').split('?')[0].replace(/\/+$/, '');
+    var isRoot = isRootHubRoute(cleanRoute);
     var nav = document.getElementById('x-owner-bottom-nav');
     if (!nav) return;
 
+    if (isRoot) {
+      nav.classList.remove('x-nav-hidden');
+      if (document.body) document.body.classList.remove('x-hide-bottom-nav');
+    } else {
+      nav.classList.add('x-nav-hidden');
+      if (document.body) document.body.classList.add('x-hide-bottom-nav');
+    }
+
+    var module = resolveModule(cleanRoute || 'overview');
     nav.querySelectorAll('.x-owner-nav-item[data-tab-module]').forEach(function (btn) {
       var active = btn.dataset.tabModule === module;
       btn.classList.toggle('active', active);
@@ -72,6 +103,18 @@
         btn.removeAttribute('aria-current');
       }
     });
+  }
+
+  function setOwnerBottomNavVisible(visible) {
+    var nav = document.getElementById('x-owner-bottom-nav');
+    if (!nav) return;
+    if (visible) {
+      nav.classList.remove('x-nav-hidden');
+      if (document.body) document.body.classList.remove('x-hide-bottom-nav');
+    } else {
+      nav.classList.add('x-nav-hidden');
+      if (document.body) document.body.classList.add('x-hide-bottom-nav');
+    }
   }
 
   function initOwnerBottomNav() {
@@ -91,5 +134,6 @@
 
   window.initOwnerBottomNav = initOwnerBottomNav;
   window.syncOwnerBottomNavActive = syncOwnerBottomNavActive;
+  window.setOwnerBottomNavVisible = setOwnerBottomNavVisible;
   window.ownerBottomNavResolveModule = resolveModule;
 })();
