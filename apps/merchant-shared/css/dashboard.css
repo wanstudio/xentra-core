@@ -4827,12 +4827,23 @@ body.x-mobile-account-open .x-merchant-mobile-nav { display: none !important; }
 
   body.x-hide-bottom-nav .x-dash-main,
   body.x-hide-bottom-nav:not(.x-merchant-app) .x-dash-main {
-    padding-bottom: 16px !important;
+    padding-bottom: 5px !important;
+  }
+
+  body.x-hide-bottom-nav .x-tab-content,
+  body.x-hide-bottom-nav:not(.x-merchant-app) .x-tab-content {
+    padding-bottom: 5px !important;
   }
 
   body.x-hide-bottom-nav .x-owner-child-page-shell,
   body.x-hide-bottom-nav .x-card-panel.x-owner-child-page-shell {
-    padding-bottom: 10px !important;
+    padding-bottom: 5px !important;
+    margin-bottom: 0 !important;
+  }
+
+  body.x-hide-bottom-nav .x-owner-child-page-shell > *:last-child,
+  body.x-hide-bottom-nav .x-tab-content > *:last-child {
+    margin-bottom: 5px !important;
   }
 
   .x-owner-nav-item {
@@ -9390,7 +9401,7 @@ body:not(.x-merchant-app) .x-owner-mobile-page-sub {
 
 @media (max-width: 768px) {
   #master-menu-editor-view {
-    padding: 12px 12px 16px !important;
+    padding: 12px 12px 5px !important;
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;

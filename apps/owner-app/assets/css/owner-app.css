@@ -69,7 +69,22 @@ body.x-owner-mobile-app.x-hide-bottom-nav {
 }
 
 body.x-owner-mobile-app.x-hide-bottom-nav .x-dash-main {
-  padding-bottom: 16px !important;
+  padding-bottom: 5px !important;
+}
+
+body.x-owner-mobile-app.x-hide-bottom-nav .x-tab-content {
+  padding-bottom: 5px !important;
+}
+
+body.x-owner-mobile-app.x-hide-bottom-nav .x-owner-child-page-shell,
+body.x-owner-mobile-app.x-hide-bottom-nav .x-card-panel.x-owner-child-page-shell {
+  padding-bottom: 5px !important;
+  margin-bottom: 0 !important;
+}
+
+body.x-owner-mobile-app.x-hide-bottom-nav .x-owner-child-page-shell > *:last-child,
+body.x-owner-mobile-app.x-hide-bottom-nav .x-tab-content > *:last-child {
+  margin-bottom: 5px !important;
 }
 
 /* 4. Always display canonical mobile child header back chevron */
