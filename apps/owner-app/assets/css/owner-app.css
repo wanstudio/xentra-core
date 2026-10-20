@@ -64,8 +64,12 @@ body.x-owner-mobile-app .x-owner-bottom-nav.x-nav-hidden {
   display: none !important;
 }
 
+body.x-owner-mobile-app.x-hide-bottom-nav {
+  padding-bottom: 0 !important;
+}
+
 body.x-owner-mobile-app.x-hide-bottom-nav .x-dash-main {
-  padding-bottom: 24px !important;
+  padding-bottom: 16px !important;
 }
 
 /* 4. Always display canonical mobile child header back chevron */

@@ -643,7 +643,7 @@
   background: transparent;
   border: none;
   box-shadow: none;
-  padding: 0 0 60px 0;
+  padding: 0 0 16px 0;
 }
 
 #recipe-editor-view .x-product-editor-main-card {
@@ -719,7 +719,7 @@
 
 @media (max-width: 640px) {
   #recipe-editor-view {
-    padding: 0 0 100px 0 !important;
+    padding: 0 0 16px 0 !important;
   }
   #recipe-editor-view .x-product-editor-main-card {
     padding: 16px !important;
