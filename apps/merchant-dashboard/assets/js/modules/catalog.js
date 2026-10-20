@@ -649,6 +649,11 @@
     if (radioCooked) radioCooked.checked = !isDirect;
     if (radioDirect) radioDirect.checked = isDirect;
 
+    var toggleCooked = $('toggle-prod-type-cooked');
+    var toggleDirect = $('toggle-prod-type-direct');
+    if (toggleCooked) toggleCooked.checked = !isDirect;
+    if (toggleDirect) toggleDirect.checked = isDirect;
+
     var lblCooked = $('label-prod-type-cooked');
     var lblDirect = $('label-prod-type-direct');
     if (lblCooked) {
@@ -660,22 +665,22 @@
       lblDirect.style.background = isDirect ? '#f8fafc' : '#ffffff';
     }
 
+    var costCard = $('card-prod-cost-price');
     var costGroup = $('group-prod-cost-price');
-    if (costGroup) {
-      costGroup.style.display = isDirect ? 'block' : 'none';
-    }
+    if (costCard) costCard.style.display = isDirect ? 'block' : 'none';
+    if (costGroup) costGroup.style.display = isDirect ? 'block' : 'none';
 
-    var recipeCostGroup = $('group-prod-recipe-cost-info');
-    if (recipeCostGroup) {
-      recipeCostGroup.style.display = isDirect ? 'none' : 'block';
-    }
+    var recipeCard = $('card-prod-recipe-cost-info');
+    var recipeGroup = $('group-prod-recipe-cost-info');
+    if (recipeCard) recipeCard.style.display = isDirect ? 'none' : 'block';
+    if (recipeGroup) recipeGroup.style.display = isDirect ? 'none' : 'block';
 
     var stockNote = $('prod-stock-note');
     if (stockNote) {
       if (isDirect) {
         stockNote.textContent = 'Barang dagang siap jual dipantau stok fisiknya dan otomatis masuk Ceklist Belanja saat menipis.';
       } else {
-        stockNote.textContent = 'Item olahan dikurangi otomatis lewat formula resep di tab Resep Makanan.';
+        stockNote.textContent = 'item non-stock tetap bisa di pakai untuk membuat menu';
       }
     }
   }
@@ -686,6 +691,9 @@
     $('prod-editor-subtitle').textContent = 'Item satuan yang dipakai dan dihitung dalam stok — seperti ayam, ikan, bumbu, dan lainnya.';
     if ($('product-editor-mobile-title')) $('product-editor-mobile-title').textContent = 'Tambah Item';
     if ($('product-editor-mobile-subtitle')) $('product-editor-mobile-subtitle').textContent = 'Item satuan yang dipakai dan dihitung dalam stok — seperti ayam, ikan, bumbu, dan lainnya.';
+    var btnDelete = $('btn-delete-item-editor');
+    if (btnDelete) btnDelete.style.display = 'none';
+
     $('prod-id').value = '';
     $('prod-name').value = '';
     $('prod-sku').value = '';
@@ -694,12 +702,12 @@
       if (window.XentraCurrencyInput) window.XentraCurrencyInput.setValue($('prod-cost-price'), '');
       else $('prod-cost-price').value = '';
     }
-    if ($('prod-recipe-status-text')) $('prod-recipe-status-text').textContent = 'Belum Ada Resep Masakan';
+    if ($('prod-recipe-status-text')) $('prod-recipe-status-text').textContent = 'Belum Ada Resep';
     if ($('prod-recipe-subtext')) $('prod-recipe-subtext').textContent = 'Formula bahan dapat ditambahkan setelah item disimpan di tab Resep Makanan';
     if ($('prod-recipe-cost-display')) $('prod-recipe-cost-display').textContent = 'Rp0';
     if ($('prod-recipe-components-preview')) {
-      $('prod-recipe-components-preview').innerHTML = '';
-      $('prod-recipe-components-preview').style.display = 'none';
+      $('prod-recipe-components-preview').innerHTML = '<div style="color:#64748B;font-size:11px;">Belum ada resep terkait item ini</div>';
+      $('prod-recipe-components-preview').style.display = 'block';
     }
     updateProductInventoryTypeUI('COOKED');
     updateProductStockManageUI(false);
@@ -713,11 +721,15 @@
   }
 
   function populateProductEditorForm(prod) {
-    $('product-editor-title').textContent = 'Edit Item: ' + prod.name;
+    var itemTitle = 'Item: ' + (prod.name || '');
+    $('product-editor-title').textContent = itemTitle;
     $('prod-editor-breadcrumb').textContent = prod.name;
     $('prod-editor-subtitle').textContent = 'Perbarui data item. Menu tetap dikelola di workspace Master Menu.';
-    if ($('product-editor-mobile-title')) $('product-editor-mobile-title').textContent = 'Edit Item';
+    if ($('product-editor-mobile-title')) $('product-editor-mobile-title').textContent = itemTitle;
     if ($('product-editor-mobile-subtitle')) $('product-editor-mobile-subtitle').textContent = 'Perbarui item tanpa mengubah identitas komersial Menu.';
+    var btnDelete = $('btn-delete-item-editor');
+    if (btnDelete) btnDelete.style.display = 'inline-flex';
+
     $('prod-id').value = prod.id;
     $('prod-name').value = prod.name || '';
     updateProductInventoryTypeUI(prod.inventory_type || 'COOKED');
@@ -733,30 +745,30 @@
 
     var recipe = prod.recipe;
     var previewEl = $('prod-recipe-components-preview');
-    if (recipe && recipe.cost_per_unit > 0) {
+    if (recipe && (recipe.cost_per_unit > 0 || (recipe.components && recipe.components.length > 0))) {
       if ($('prod-recipe-status-text')) $('prod-recipe-status-text').textContent = recipe.name || 'Resep Terdaftar';
       if ($('prod-recipe-subtext')) $('prod-recipe-subtext').textContent = 'Formula bahan baku otomatis (' + (recipe.yield_quantity || 1) + ' ' + (recipe.yield_uom_name || 'porsi') + ')';
-      if ($('prod-recipe-cost-display')) $('prod-recipe-cost-display').textContent = formatMoney(recipe.cost_per_unit);
+      if ($('prod-recipe-cost-display')) $('prod-recipe-cost-display').textContent = formatMoney(recipe.cost_per_unit || 0);
       if (previewEl && Array.isArray(recipe.components) && recipe.components.length > 0) {
-        var compList = recipe.components.slice(0, 4).map(function(c) {
-          return '<span>• ' + esc(c.material_name) + ' (' + c.planned_quantity + ' ' + esc(c.uom_name) + ')</span>';
-        }).join('<br>');
-        if (recipe.components.length > 4) {
-          compList += '<br><span style="color:#94a3b8;font-size:11px;">+ ' + (recipe.components.length - 4) + ' bahan lainnya...</span>';
+        var compList = recipe.components.slice(0, 3).map(function(c) {
+          return '<div style="margin-bottom:3px;">+ ' + esc(c.material_name) + ' (' + c.planned_quantity + ' ' + esc(c.uom_name) + ')</div>';
+        }).join('');
+        if (recipe.components.length > 3) {
+          compList += '<div style="color:#64748B;font-size:11px;margin-top:2px;">+ dan bahan lainnya</div>';
         }
         previewEl.innerHTML = compList;
         previewEl.style.display = 'block';
       } else if (previewEl) {
-        previewEl.innerHTML = '';
-        previewEl.style.display = 'none';
+        previewEl.innerHTML = '<div style="color:#64748B;font-size:11px;">Belum ada rincian bahan</div>';
+        previewEl.style.display = 'block';
       }
     } else {
-      if ($('prod-recipe-status-text')) $('prod-recipe-status-text').textContent = 'Resep Belum Dibuat / Belum Ada';
+      if ($('prod-recipe-status-text')) $('prod-recipe-status-text').textContent = 'Belum Ada Resep';
       if ($('prod-recipe-subtext')) $('prod-recipe-subtext').textContent = 'Atur komposisi bahan di tab Resep Makanan untuk menghitung HPP otomatis';
       if ($('prod-recipe-cost-display')) $('prod-recipe-cost-display').textContent = formatMoney(prod.cost_price || 0);
       if (previewEl) {
-        previewEl.innerHTML = '';
-        previewEl.style.display = 'none';
+        previewEl.innerHTML = '<div style="color:#64748B;font-size:11px;">Belum ada resep terkait item ini</div>';
+        previewEl.style.display = 'block';
       }
     }
 
@@ -871,7 +883,9 @@
         return;
       }
       showToast('Product Master diarsipkan.');
-      if (_catalogState.activeDetailProductId === id) {
+      if ($('product-editor-view') && $('product-editor-view').style.display !== 'none') {
+        goBackFromItemEditor();
+      } else if (_catalogState.activeDetailProductId === id) {
         navigateTo('catalog/products');
       } else {
         loadMasterProducts();
@@ -1366,11 +1380,22 @@ async function loadMenusView() {
       });
     }
 
+    function selectProductInventoryType(type) {
+      updateProductInventoryTypeUI(type);
+      if (String(type).toUpperCase() === 'DIRECT') {
+        var stockToggle = $('prod-manage-stock-toggle');
+        if (stockToggle && !stockToggle.checked) {
+          stockToggle.checked = true;
+          updateProductStockManageUI(true);
+        }
+      }
+    }
+
     var radioCooked = $('prod-type-cooked');
     if (radioCooked && !radioCooked.dataset.bound) {
       radioCooked.dataset.bound = 'true';
       radioCooked.addEventListener('change', function () {
-        updateProductInventoryTypeUI('COOKED');
+        selectProductInventoryType('COOKED');
       });
     }
 
@@ -1378,11 +1403,54 @@ async function loadMenusView() {
     if (radioDirect && !radioDirect.dataset.bound) {
       radioDirect.dataset.bound = 'true';
       radioDirect.addEventListener('change', function () {
-        updateProductInventoryTypeUI('DIRECT');
-        var stockToggle = $('prod-manage-stock-toggle');
-        if (stockToggle && !stockToggle.checked) {
-          stockToggle.checked = true;
-          updateProductStockManageUI(true);
+        selectProductInventoryType('DIRECT');
+      });
+    }
+
+    var toggleCooked = $('toggle-prod-type-cooked');
+    if (toggleCooked && !toggleCooked.dataset.bound) {
+      toggleCooked.dataset.bound = 'true';
+      toggleCooked.addEventListener('change', function () {
+        selectProductInventoryType('COOKED');
+      });
+    }
+
+    var rowCooked = $('row-prod-type-cooked');
+    if (rowCooked && !rowCooked.dataset.bound) {
+      rowCooked.dataset.bound = 'true';
+      rowCooked.addEventListener('click', function (e) {
+        if (e.target && e.target.closest && e.target.closest('label.x-toggle')) return;
+        selectProductInventoryType('COOKED');
+      });
+    }
+
+    var toggleDirect = $('toggle-prod-type-direct');
+    if (toggleDirect && !toggleDirect.dataset.bound) {
+      toggleDirect.dataset.bound = 'true';
+      toggleDirect.addEventListener('change', function () {
+        selectProductInventoryType('DIRECT');
+      });
+    }
+
+    var rowDirect = $('row-prod-type-direct');
+    if (rowDirect && !rowDirect.dataset.bound) {
+      rowDirect.dataset.bound = 'true';
+      rowDirect.addEventListener('click', function (e) {
+        if (e.target && e.target.closest && e.target.closest('label.x-toggle')) return;
+        selectProductInventoryType('DIRECT');
+      });
+    }
+
+    var linkGotoRecipe = $('link-goto-recipe');
+    if (linkGotoRecipe && !linkGotoRecipe.dataset.bound) {
+      linkGotoRecipe.dataset.bound = 'true';
+      linkGotoRecipe.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (typeof window.switchOwnerBusinessTab === 'function') {
+          window.switchOwnerBusinessTab('stock', 'recipes');
+        } else if (typeof window.switchStockSubtab === 'function') {
+          if (typeof window.switchTab === 'function') window.switchTab('stock');
+          window.switchStockSubtab('recipes');
         }
       });
     }
@@ -1586,7 +1654,7 @@ async function loadMenusView() {
           return;
         }
         var sku = manageStock ? rawSku : null;
-        var invType = ($('prod-type-direct') && $('prod-type-direct').checked) ? 'DIRECT' : 'COOKED';
+        var invType = (($('prod-type-direct') && $('prod-type-direct').checked) || ($('toggle-prod-type-direct') && $('toggle-prod-type-direct').checked)) ? 'DIRECT' : 'COOKED';
         var costPrice = null;
         if (invType === 'DIRECT' && $('prod-cost-price')) {
           var rawCost = window.XentraCurrencyInput ? window.XentraCurrencyInput.getValue($('prod-cost-price')) : $('prod-cost-price').value.replace(/\D/g, '');
