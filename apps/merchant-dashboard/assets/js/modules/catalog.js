@@ -605,6 +605,20 @@
   var _productEditorLoadSeq = 0;
   var _productEditorActiveState = 1;
 
+  function generateSmartItemSku(name) {
+    var raw = String(name || '').trim().toUpperCase();
+    var words = raw.replace(/[^A-Z0-9\s]+/g, '').split(/\s+/).filter(Boolean);
+    var prefix = '';
+    if (words.length === 1) {
+      prefix = words[0].slice(0, 6);
+    } else if (words.length > 1) {
+      prefix = words[0].slice(0, 4) + '-' + words[1].slice(0, 4);
+    }
+    if (!prefix) prefix = 'ITEM';
+    var randDigits = Math.floor(1000 + Math.random() * 9000);
+    return 'ITM-' + prefix + '-' + randDigits;
+  }
+
   function updateProductStockManageUI(hasStockManagement) {
     var toggle = $('prod-manage-stock-toggle');
     var container = $('prod-sku-container');
@@ -614,7 +628,12 @@
     if (container) container.style.display = hasStockManagement ? 'block' : 'none';
     if (skuInput) {
       skuInput.required = !!hasStockManagement;
-      if (!hasStockManagement) skuInput.value = '';
+      if (!hasStockManagement) {
+        skuInput.value = '';
+      } else if (!skuInput.value.trim()) {
+        var nameInput = $('prod-name');
+        skuInput.value = generateSmartItemSku(nameInput ? nameInput.value : '');
+      }
     }
     if (note) {
       note.textContent = hasStockManagement
@@ -1525,6 +1544,22 @@ async function loadMenusView() {
         if (stockManageToggle.checked) {
           var skuInput = $('prod-sku');
           if (skuInput) skuInput.focus();
+        }
+      });
+    }
+
+    var btnGenSku = $('btn-generate-sku');
+    if (btnGenSku && !btnGenSku.dataset.bound) {
+      btnGenSku.dataset.bound = 'true';
+      btnGenSku.addEventListener('click', function () {
+        var skuInput = $('prod-sku');
+        var nameInput = $('prod-name');
+        if (skuInput) {
+          skuInput.value = generateSmartItemSku(nameInput ? nameInput.value : '');
+          skuInput.focus();
+          if (typeof showToast === 'function') {
+            showToast('✨ SKU otomatis dibuat: ' + skuInput.value);
+          }
         }
       });
     }

@@ -2144,10 +2144,15 @@
             <input type="checkbox" id="prod-manage-stock-toggle" style="width:16px;height:16px;cursor:pointer;">
             <span>Kelola stock (SKU)</span>
           </label>
-          <div id="prod-sku-container" style="display:none;margin-top:6px;">
-            <label for="prod-sku" style="font-size:12px;font-weight:500;">SKU <span class="x-required-mark">*</span></label>
-            <input type="text" id="prod-sku" class="x-input" maxlength="120" autocomplete="off">
-            <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">item ini akan dicatat dalam stok dan jumlahnya berkurang setiap kali terjual (SKU unik dalam Brand).</small>
+          <div id="prod-sku-container" style="display:none;margin-top:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <label for="prod-sku" style="font-size:12px;font-weight:600;margin:0;">SKU <span class="x-required-mark">*</span></label>
+              <button type="button" id="btn-generate-sku" class="x-btn-secondary" style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+                <span>🔄 Buat Otomatis</span>
+              </button>
+            </div>
+            <input type="text" id="prod-sku" class="x-input" maxlength="120" autocomplete="off" placeholder="Contoh: ITM-AYAM-4821 atau nomor barcode">
+            <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Kode unik stok fisik atau barcode kemasan (SKU unik dalam Brand, otomatis dibuat sistem, tetap bisa diedit).</small>
           </div>
           <small id="prod-stock-note" class="text-muted" style="display:block;margin-top:4px;font-size:11px;">item non-stock tetap bisa di pakai untuk membuat menu</small>
         </div>
