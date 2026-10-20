@@ -1730,7 +1730,7 @@
           );
         }).join('');
       } else {
-        componentsHtml = '<div style="font-size:12px; color:#94A3B8; font-style:italic;">Tidak ada daftar rincian bahan</div>';
+        componentsHtml = '<div style="font-size:12px; color:#94A3B8;">Tidak ada daftar rincian bahan</div>';
       }
 
       var yieldBadge = (recipe.planned_yield_quantity || 1) + ' ' + (recipe.yield_uom_name || 'porsi');

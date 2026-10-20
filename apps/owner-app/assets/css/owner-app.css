@@ -184,7 +184,7 @@ body.x-owner-mobile-app .x-subhub-item-card:active,
 .x-subhub-item-text p {
   margin: 3px 0 0 0;
   font-size: 11.5px;
-  font-style: italic;
+  font-style: normal;
   color: #64748b;
   line-height: 1.35;
 }
@@ -398,7 +398,7 @@ body.x-owner-mobile-app #master-categories-page-list .x-master-reference-copy st
 body.x-owner-mobile-app #master-categories-page-list .x-master-category-menu-list,
 .x-owner-mobile-app #master-categories-page-list .x-master-category-menu-list {
   font-size: 11.5px !important;
-  font-style: italic !important;
+  font-style: normal !important;
   color: #64748b !important;
   margin-top: 3px !important;
   display: block !important;

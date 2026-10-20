@@ -318,7 +318,7 @@
               '</div>',
               '<div class="x-hub-info" style="flex:1 1 auto;min-width:0;margin-left:12px;">',
                 '<h3 style="font-size:14px;font-weight:700;color:#0f172a;margin:0 0 2px;">' + esc(prod.name) + '</h3>',
-                '<p style="font-size:11px;color:#8c8c8c;font-style:italic;margin:0;">' + esc(subInfo) + '</p>',
+                '<p style="font-size:11px;color:#8c8c8c;margin:0;">' + esc(subInfo) + '</p>',
               '</div>',
               '<div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">',
                 toggleSwitch,
