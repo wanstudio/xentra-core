@@ -759,6 +759,13 @@
       $('prod-recipe-components-preview').innerHTML = '<div style="color:#64748B;font-size:11px;">Belum ada resep terkait item ini</div>';
       $('prod-recipe-components-preview').style.display = 'block';
     }
+    var linkContainer = $('container-link-goto-recipe');
+    var linkGoto = $('link-goto-recipe');
+    if (linkContainer) linkContainer.style.display = 'none';
+    if (linkGoto) {
+      linkGoto.style.display = 'none';
+      delete linkGoto.dataset.recipeId;
+    }
     updateProductInventoryTypeUI('COOKED');
     updateProductStockManageUI(false);
     _productEditorActiveState = 1;
@@ -794,6 +801,9 @@
 
     var recipe = prod.recipe;
     var previewEl = $('prod-recipe-components-preview');
+    var linkContainer = $('container-link-goto-recipe');
+    var linkGoto = $('link-goto-recipe');
+
     if (recipe && (recipe.cost_per_unit > 0 || (recipe.components && recipe.components.length > 0))) {
       if ($('prod-recipe-status-text')) $('prod-recipe-status-text').textContent = recipe.name || 'Resep Terdaftar';
       if ($('prod-recipe-subtext')) $('prod-recipe-subtext').textContent = 'Formula bahan baku otomatis (' + (recipe.yield_quantity || 1) + ' ' + (recipe.yield_uom_name || 'porsi') + ')';
@@ -811,6 +821,20 @@
         previewEl.innerHTML = '<div style="color:#64748B;font-size:11px;">Belum ada rincian bahan</div>';
         previewEl.style.display = 'block';
       }
+
+      if (recipe.id) {
+        if (linkContainer) linkContainer.style.display = 'block';
+        if (linkGoto) {
+          linkGoto.style.display = 'inline-flex';
+          linkGoto.dataset.recipeId = recipe.id;
+        }
+      } else {
+        if (linkContainer) linkContainer.style.display = 'none';
+        if (linkGoto) {
+          linkGoto.style.display = 'none';
+          delete linkGoto.dataset.recipeId;
+        }
+      }
     } else {
       if ($('prod-recipe-status-text')) $('prod-recipe-status-text').textContent = 'Belum Ada Resep';
       if ($('prod-recipe-subtext')) $('prod-recipe-subtext').textContent = 'Atur komposisi bahan di tab Resep Makanan untuk menghitung HPP otomatis';
@@ -818,6 +842,11 @@
       if (previewEl) {
         previewEl.innerHTML = '<div style="color:#64748B;font-size:11px;">Belum ada resep terkait item ini</div>';
         previewEl.style.display = 'block';
+      }
+      if (linkContainer) linkContainer.style.display = 'none';
+      if (linkGoto) {
+        linkGoto.style.display = 'none';
+        delete linkGoto.dataset.recipeId;
       }
     }
 
@@ -1496,7 +1525,13 @@ async function loadMenusView() {
       linkGotoRecipe.dataset.bound = 'true';
       linkGotoRecipe.addEventListener('click', function (e) {
         e.preventDefault();
-        if (typeof window.switchOwnerBusinessTab === 'function') {
+        var recipeId = linkGotoRecipe.dataset.recipeId;
+        var prodId = $('prod-id') ? $('prod-id').value : '';
+        if (recipeId && typeof window.openEditRecipeForProduct === 'function') {
+          window.openEditRecipeForProduct(prodId, recipeId);
+        } else if (recipeId && typeof window.openEditRecipeModal === 'function') {
+          window.openEditRecipeModal(recipeId);
+        } else if (typeof window.switchOwnerBusinessTab === 'function') {
           window.switchOwnerBusinessTab('stock', 'recipes');
         } else if (typeof window.switchStockSubtab === 'function') {
           if (typeof window.switchTab === 'function') window.switchTab('stock');

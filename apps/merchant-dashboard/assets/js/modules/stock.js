@@ -1868,13 +1868,45 @@
     }
   }
 
-  window.openEditRecipeModal = function(recipeId) {
+  var _cameFromProductEditorId = null;
+
+  window.openEditRecipeForProduct = async function(productId, recipeId) {
+    _cameFromProductEditorId = productId;
+    if ($('product-editor-view')) $('product-editor-view').style.display = 'none';
+    await window.openEditRecipeModal(recipeId);
+  };
+
+  window.openEditRecipeModal = async function(recipeId) {
+    if (!_ownerRecipes || _ownerRecipes.length === 0) {
+      try {
+        var res = await adminFetch(API_BASE + '/admin/inventory-workflow/context', {
+          headers: getAuthHeaders()
+        });
+        if (res.ok) {
+          var resData = await res.json();
+          var data = resData.data || resData;
+          _ownerInventoryContext = data;
+          _ownerRecipes = data.recipes || [];
+          if (data.materials) _ownerMaterials = data.materials;
+          if (data.uoms) _ownerUoms = data.uoms;
+        }
+      } catch (e) {
+        console.error('Failed to load recipe context', e);
+      }
+    }
     var recipe = (_ownerRecipes || []).find(function(r) {
       return String(r.recipe_id || r.id) === String(recipeId);
     });
     if (!recipe) {
       showToast('Resep tidak ditemukan', 'warning');
       return;
+    }
+
+    if (typeof window.switchTab === 'function') {
+      window.switchTab('stock');
+    }
+    if (typeof switchStockSubtab === 'function') {
+      switchStockSubtab('recipes');
     }
 
     var mainView = $('owner-stock-main-view');
@@ -2011,6 +2043,16 @@
     var mainView = $('owner-stock-main-view');
     var editorView = $('recipe-editor-view');
     if (editorView) editorView.style.display = 'none';
+
+    if (_cameFromProductEditorId) {
+      var returnProdId = _cameFromProductEditorId;
+      _cameFromProductEditorId = null;
+      if (typeof window.openEditProduct === 'function') {
+        window.openEditProduct(returnProdId);
+        return;
+      }
+    }
+
     if (mainView) mainView.style.display = 'block';
 
     var form = $('form-add-recipe');
