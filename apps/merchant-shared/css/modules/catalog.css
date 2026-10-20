@@ -396,28 +396,5 @@
   margin-top: 0 !important;
 }
 
-#btn-prod-image-refresh {
-  width: 40px !important;
-  min-width: 40px !important;
-  height: 40px !important;
-  border-radius: 50% !important;
-  border: 1.5px solid #CBD5E1 !important;
-  background: #FFFFFF !important;
-  color: #334155 !important;
-  padding: 0 !important;
-  box-sizing: border-box !important;
-  cursor: pointer !important;
-  flex-shrink: 0 !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-
-#btn-prod-image-refresh:hover {
-  border-color: #94A3B8 !important;
-  background: #F8FAFC !important;
-  color: #0F172A !important;
-}
-
 
 

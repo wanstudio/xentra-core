@@ -1696,22 +1696,6 @@ async function loadMenusView() {
       });
     }
 
-    var btnRefreshProd = $('btn-prod-image-refresh');
-    if (btnRefreshProd && !btnRefreshProd.dataset.bound) {
-      btnRefreshProd.dataset.bound = 'true';
-      btnRefreshProd.addEventListener('click', function () {
-        _productImageFile = null;
-        _productCropSpec = null;
-        _productImageRemoved = false;
-        if (prodFileInput) prodFileInput.value = '';
-        var orig = _productOriginalImage || '';
-        setProductImagePreview(orig, orig !== '');
-        if (typeof showToast === 'function') {
-          showToast(orig ? '✓ Foto dikembalikan ke semula.' : '✓ Foto di-reset.');
-        }
-      });
-    }
-
     var prodNameInput = $('prod-name');
     if (prodNameInput && !prodNameInput.dataset.bound) {
       prodNameInput.dataset.bound = 'true';
