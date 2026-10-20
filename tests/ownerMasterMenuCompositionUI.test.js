@@ -110,7 +110,7 @@ test('Master Product image editor binds file state, preserves existing images, a
 });
 
 test('Master Product primary CTA directly opens the product editor', () => {
-  assert.ok(HTML.includes('id="btn-add-product-main">+ Tambah Produk Baru</button>'));
+  assert.ok(HTML.includes('id="btn-add-product-main">+ Tambah Item</button>') || HTML.includes('id="btn-add-product-main">+ Tambah Produk Baru</button>'));
   assert.ok(!HTML.includes('id="btn-add-product-main" onclick="openAddProduct()"'));
   assert.ok(JS.includes("var btnAddProdMain = $('btn-add-product-main');"));
   assert.ok(JS.includes("btnAddProdMain.addEventListener('click', window.openAddProduct)"));

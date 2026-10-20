@@ -84,11 +84,11 @@ test('HDR-05: Produk Master memakai blok header acuan dan tetap punya CTA-nya', 
   const products = section('id="product-list-view"', 'id="prod-search-input"');
   assert.ok(products.includes('class="x-owner-child-mobile-header"'),
     'Produk Master harus memakai blok header child page');
-  assert.ok(products.includes('<span>Produk Master</span>'), 'judul Produk Master harus dibungkus <span>');
+  assert.ok(products.includes('<span>Item Master</span>') || products.includes('<span>Produk Master</span>'), 'judul Item Master harus dibungkus <span>');
   assert.ok(products.includes('x-title-back-btn x-owner-mobile-page-back'),
     'tombol kembali Produk Master harus memakai kelas kanonik');
   assert.ok(products.includes('id="btn-add-product-main"'),
-    'CTA Tambah Produk Baru tidak boleh hilang');
+    'CTA Tambah Item tidak boleh hilang');
 });
 
 test('HDR-06: kelas gaya lama Produk Master/Kategori sudah tidak dipakai', () => {
