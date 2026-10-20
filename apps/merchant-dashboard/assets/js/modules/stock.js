@@ -452,6 +452,18 @@
 
   function switchStockSubtab(subtab) {
     if (!subtab) subtab = 'branches';
+    if (subtab === 'materials') {
+      if (typeof window.navigateTo === 'function') {
+        window.navigateTo('business/materials');
+        return;
+      }
+    }
+    if (subtab === 'recipes') {
+      if (typeof window.navigateTo === 'function') {
+        window.navigateTo('business/recipes');
+        return;
+      }
+    }
     var branchContent = $('subtab-content-stock-branches');
     var replContent = $('subtab-content-stock-replenishment');
     var mandatesContent = $('subtab-content-stock-mandates');
@@ -1802,7 +1814,7 @@
   }
 
   function openAddRecipeModal() {
-    var mainView = $('owner-stock-main-view');
+    var mainView = $('recipe-list-view') || $('owner-stock-main-view');
     var editorView = $('recipe-editor-view');
     if (!editorView) return;
 
@@ -2040,7 +2052,7 @@
   }
 
   function closeRecipeEditorPage() {
-    var mainView = $('owner-stock-main-view');
+    var mainView = $('recipe-list-view') || $('owner-stock-main-view');
     var editorView = $('recipe-editor-view');
     if (editorView) editorView.style.display = 'none';
 

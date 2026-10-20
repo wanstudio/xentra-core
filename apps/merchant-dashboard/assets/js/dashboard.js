@@ -330,6 +330,10 @@
     'business':                    { title: 'Bisnis',            sub: 'Pusat pengelolaan katalog, operasional, pelanggan, pemasaran, tim, dan brand', tab: 'business' },
     'business/catalog':            { title: 'Katalog & Menu',    sub: 'Master menu, kategori, item penyusun, dan pilihan item', tab: 'business' },
     'business/materials-production': { title: 'Bahan & Produksi', sub: 'Standar baku, resep, hasil produksi, dan hubungan bahan dengan hasil produksi', tab: 'business' },
+    'business/materials':          { title: 'Bahan Baku',        sub: 'Identitas bahan mentah untuk resep dapur dan pengadaan belanja', tab: 'materials' },
+    'materials':                   { title: 'Bahan Baku',        sub: 'Identitas bahan mentah untuk resep dapur dan pengadaan belanja', tab: 'materials' },
+    'business/recipes':            { title: 'Resep Produksi',    sub: 'Kelola resep acuan perhitungan HPP dan pemotongan stok bahan', tab: 'recipes' },
+    'recipes':                     { title: 'Resep Produksi',    sub: 'Kelola resep acuan perhitungan HPP dan pemotongan stok bahan', tab: 'recipes' },
     'more':                        { title: 'Lainnya',           sub: 'Pengaturan sistem, integrasi, keamanan, notifikasi, dan akun', tab: 'more' },
     'lainnya':                     { title: 'Lainnya',           sub: 'Pengaturan sistem, integrasi, keamanan, notifikasi, dan akun', tab: 'more' },
     // Legacy routes (internal tabs that still exist from old dashboard)
@@ -375,7 +379,7 @@
       if (hash.indexOf('catalog/master-menus/') === 0) {
         return hash;
       }
-      if (hash === 'business/catalog' || hash === 'business/materials-production') {
+      if (hash === 'business/catalog' || hash === 'business/materials-production' || hash === 'business/materials' || hash === 'business/recipes' || hash === 'materials' || hash === 'recipes') {
         return hash;
       }
       // Handle dynamic route: branches/:id and branches/:id/:subtab
@@ -468,6 +472,10 @@
     'brand': 'brand',
     'payments': 'payments',
     'business': 'business',
+    'business/materials': 'business/materials',
+    'materials': 'business/materials',
+    'business/recipes': 'business/recipes',
+    'recipes': 'business/recipes',
     'more': 'more',
     'lainnya': 'more'
   };
@@ -498,6 +506,11 @@
 
     if (current === 'business/catalog' || current === 'business/materials-production') {
       return 'business';
+    }
+
+    if (current === 'business/materials' || current === 'materials' ||
+        current === 'business/recipes' || current === 'recipes') {
+      return 'business/materials-production';
     }
 
     if (current === 'catalog/products/new' ||
@@ -536,7 +549,7 @@
     if (current === 'customers') return 'business';
     if (current.indexOf('customers/') === 0) return 'customers';
 
-    if (current === 'stock') return 'business/materials-production';
+    if (current === 'stock') return 'overview';
 
     if (current === 'team') return 'business';
     if (current.indexOf('team/') === 0) return 'team';
@@ -725,21 +738,11 @@
   window.closeBusinessSubHub = closeBusinessSubHub;
 
   window.openBahanBakuPage = function () {
-    navigateTo('stock');
-    setTimeout(function () {
-      if (typeof window.switchStockSubtab === 'function') {
-        window.switchStockSubtab('materials');
-      }
-    }, 50);
+    navigateTo('business/materials');
   };
 
   window.openResepProduksiPage = function () {
-    navigateTo('stock');
-    setTimeout(function () {
-      if (typeof window.switchStockSubtab === 'function') {
-        window.switchStockSubtab('recipes');
-      }
-    }, 50);
+    navigateTo('business/recipes');
   };
 
   function onBusinessHubSearch(query) {
@@ -1054,6 +1057,16 @@
     if (tabId === 'overview') loadOverview();
     if (tabId === 'reports') loadReports(reportSubtype);
     if (tabId === 'stock') loadOwnerStockOverview();
+    if (tabId === 'materials') {
+      if (typeof loadOwnerMaterials === 'function') loadOwnerMaterials();
+    }
+    if (tabId === 'recipes') {
+      var rEditor = $('recipe-editor-view');
+      var rList = $('recipe-list-view');
+      if (rEditor) rEditor.style.display = 'none';
+      if (rList) rList.style.display = 'block';
+      if (typeof loadOwnerRecipes === 'function') loadOwnerRecipes();
+    }
     if (tabId === 'customers') {
       if (isCustomerDetail && customerDetailId) {
         loadCustomerDetailView(customerDetailId);

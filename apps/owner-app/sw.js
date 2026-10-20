@@ -3,7 +3,7 @@
  * Scope: /owner/
  */
 
-var CACHE_NAME = 'mybangjo-owner-v1.3.0';
+var CACHE_NAME = 'mybangjo-owner-v1.3.1';
 
 var STATIC_ASSETS = [
   '/owner/',
