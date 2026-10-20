@@ -2084,7 +2084,8 @@ input[type="file"].x-input,
   .x-topbar-icon-btn {
     display: none;
   }
-  #btn-notifications.x-topbar-icon-btn {
+  #btn-notifications.x-topbar-icon-btn,
+  #btn-messages.x-topbar-icon-btn {
     display: flex;
     width: 32px;
     height: 32px;
@@ -4972,8 +4973,12 @@ body.x-mobile-account-open .x-merchant-mobile-nav { display: none !important; }
     flex-shrink: 1 !important;
   }
 
-  .x-dash-topbar #btn-notifications {
+  .x-dash-topbar #btn-messages {
     margin-left: auto !important;
+  }
+
+  .x-dash-topbar #btn-notifications {
+    margin-left: 0 !important;
   }
 
   /* Twin circular stroke icon buttons: Notifications & User Profile */
@@ -9920,6 +9925,53 @@ body:not(.x-merchant-app) .x-owner-mobile-page-sub {
   #master-categories-page-list .x-toggle.x-toggle-on .x-toggle-slider::before {
     transform: translateX(18px) !important;
   }
+}
+
+/* ==========================================================================
+   Mobile Pull-To-Refresh Indicator
+   ========================================================================== */
+.x-pull-refresh-indicator {
+  position: fixed !important;
+  top: calc(var(--topbar-height-mobile, 68px) + 8px) !important;
+  left: 50% !important;
+  transform: translate(-50%, -60px);
+  z-index: 9999 !important;
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 50% !important;
+  background: #FFFFFF !important;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.15), 0 1px 3px rgba(15, 23, 42, 0.08) !important;
+  border: 1px solid #E2E8F0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  pointer-events: none !important;
+  opacity: 0;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease, background-color 0.2s ease !important;
+  box-sizing: border-box !important;
+}
+
+.x-pull-refresh-indicator.refreshing {
+  transform: translate(-50%, 14px) !important;
+  opacity: 1 !important;
+}
+
+.x-pull-refresh-spinner {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #0F172A !important;
+  transition: transform 0.1s linear, color 0.15s ease !important;
+}
+
+.x-pull-refresh-indicator.refreshing .x-pull-refresh-spinner {
+  animation: xPullRefreshSpin 0.75s linear infinite !important;
+  color: #00A637 !important;
+}
+
+@keyframes xPullRefreshSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 

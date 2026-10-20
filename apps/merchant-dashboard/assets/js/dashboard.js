@@ -2228,6 +2228,9 @@
     // Owner Notification Center wiring
     initOwnerNotifications();
 
+    // Owner Mobile Pull-To-Refresh wiring
+    initOwnerPullToRefresh();
+
     if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
       window.Xentra.hideSplash();
     }
@@ -2401,6 +2404,195 @@
     fetchOwnerUnreadNotificationCount();
     setInterval(fetchOwnerUnreadNotificationCount, 15000);
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // MOBILE PULL-TO-REFRESH CONTROLLER
+  // ─────────────────────────────────────────────────────────────────────────
+  function initOwnerPullToRefresh() {
+    if (window._ownerPullToRefreshInitialized) return;
+    window._ownerPullToRefreshInitialized = true;
+
+    var indicator = document.getElementById('x-pull-to-refresh');
+    if (!indicator) {
+      indicator = document.createElement('div');
+      indicator.id = 'x-pull-to-refresh';
+      indicator.className = 'x-pull-refresh-indicator';
+      indicator.setAttribute('aria-hidden', 'true');
+      indicator.innerHTML =
+        '<div class="x-pull-refresh-spinner">' +
+          '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
+            '<polyline points="23 4 23 10 17 10"></polyline>' +
+            '<path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>' +
+          '</svg>' +
+        '</div>';
+      document.body.appendChild(indicator);
+    }
+
+    var spinner = indicator.querySelector('.x-pull-refresh-spinner');
+    var startY = 0;
+    var currentY = 0;
+    var isPulling = false;
+    var isRefreshing = false;
+
+    function isEditorOrModalOpen() {
+      var active = document.activeElement;
+      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) {
+        return true;
+      }
+      var protectedIds = [
+        'product-editor-view',
+        'category-editor-view',
+        'master-menu-editor-view',
+        'branch-editor-view',
+        'modal-item-saved-prompt',
+        'modal-add-supplier',
+        'modal-owner-notifications-sheet'
+      ];
+      for (var i = 0; i < protectedIds.length; i++) {
+        var el = document.getElementById(protectedIds[i]);
+        if (el && el.style.display && el.style.display !== 'none') {
+          return true;
+        }
+      }
+      var openModals = document.querySelectorAll('.x-modal-backdrop, .x-modal');
+      for (var j = 0; j < openModals.length; j++) {
+        var m = openModals[j];
+        if (m && m.style.display && m.style.display !== 'none') {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function getScrollTop() {
+      return window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+    }
+
+    window.addEventListener('touchstart', function (e) {
+      if (isRefreshing) return;
+      if (window.innerWidth > 820) return;
+      if (getScrollTop() > 5) return;
+      if (isEditorOrModalOpen()) return;
+      if (!e.touches || e.touches.length !== 1) return;
+
+      startY = e.touches[0].clientY;
+      currentY = startY;
+      isPulling = true;
+    }, { passive: true });
+
+    window.addEventListener('touchmove', function (e) {
+      if (!isPulling || isRefreshing) return;
+      if (isEditorOrModalOpen()) {
+        isPulling = false;
+        resetIndicator();
+        return;
+      }
+
+      currentY = e.touches[0].clientY;
+      var deltaY = currentY - startY;
+
+      if (deltaY <= 0 || getScrollTop() > 5) {
+        if (deltaY < -10) {
+          isPulling = false;
+          resetIndicator();
+        }
+        return;
+      }
+
+      var pullDistance = Math.min(deltaY * 0.42, 70);
+      if (pullDistance > 10) {
+        var progress = Math.min(pullDistance / 50, 1);
+        indicator.style.transition = 'none';
+        indicator.style.opacity = String(progress);
+        indicator.style.transform = 'translate(-50%, ' + (pullDistance - 50) + 'px)';
+        if (spinner) {
+          spinner.style.transform = 'rotate(' + (pullDistance * 4.5) + 'deg)';
+          spinner.style.color = pullDistance >= 48 ? '#00A637' : '#0F172A';
+        }
+      }
+    }, { passive: true });
+
+    window.addEventListener('touchend', async function () {
+      if (!isPulling || isRefreshing) return;
+      isPulling = false;
+
+      var deltaY = currentY - startY;
+      var pullDistance = Math.min(deltaY * 0.42, 70);
+
+      if (pullDistance >= 48 && !isEditorOrModalOpen()) {
+        isRefreshing = true;
+        indicator.style.transition = 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease';
+        indicator.classList.add('refreshing');
+
+        var startTime = Date.now();
+        await triggerOwnerRefresh();
+        var elapsed = Date.now() - startTime;
+        var minWait = Math.max(0, 500 - elapsed);
+
+        setTimeout(function () {
+          indicator.classList.remove('refreshing');
+          resetIndicator();
+          setTimeout(function () {
+            isRefreshing = false;
+          }, 250);
+        }, minWait);
+      } else {
+        resetIndicator();
+      }
+    }, { passive: true });
+
+    function resetIndicator() {
+      indicator.style.transition = 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease';
+      indicator.style.transform = 'translate(-50%, -60px)';
+      indicator.style.opacity = '0';
+      if (spinner) {
+        spinner.style.transform = 'rotate(0deg)';
+        spinner.style.color = '#0F172A';
+      }
+    }
+  }
+
+  async function triggerOwnerRefresh() {
+    var route = (window.location.hash || '').replace(/^#\/?/, '') || 'overview';
+    try {
+      if (typeof loadBranchSelectorContext === 'function') {
+        loadBranchSelectorContext();
+      }
+      if (route === 'overview' || route === '') {
+        if (typeof loadOverview === 'function') await loadOverview();
+        if (typeof renderOwnerCommandCenter === 'function') renderOwnerCommandCenter();
+      } else if (route === 'catalog/products') {
+        if (typeof loadMasterProducts === 'function') await loadMasterProducts();
+      } else if (route.indexOf('catalog/categories') === 0) {
+        if (typeof window.loadMasterCategoriesPage === 'function') await window.loadMasterCategoriesPage();
+      } else if (route.indexOf('catalog/master-menus') === 0) {
+        if (typeof window.loadOwnerMasterMenus === 'function') await window.loadOwnerMasterMenus();
+      } else if (route === 'orders') {
+        if (typeof loadOrders === 'function') await loadOrders();
+      } else if (route === 'stock') {
+        if (typeof loadOwnerStockOverview === 'function') await loadOwnerStockOverview();
+      } else if (route === 'customers') {
+        if (typeof loadCustomers === 'function') await loadCustomers();
+      } else if (route === 'branches') {
+        if (typeof loadBranches === 'function') await loadBranches();
+      } else if (route.indexOf('finance') === 0) {
+        if (typeof loadFinanceOverview === 'function') await loadFinanceOverview();
+      } else if (typeof applyRoute === 'function') {
+        applyRoute(route);
+      }
+      if (typeof fetchOwnerUnreadNotificationCount === 'function') {
+        fetchOwnerUnreadNotificationCount();
+      }
+      if (typeof showToast === 'function') {
+        showToast('✅ Data diperbarui');
+      }
+    } catch (err) {
+      console.warn('[PullToRefresh] Error executing refresh:', err);
+    }
+  }
+
+  window.initOwnerPullToRefresh = initOwnerPullToRefresh;
+  window.triggerOwnerRefresh = triggerOwnerRefresh;
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initializeDashboard);
