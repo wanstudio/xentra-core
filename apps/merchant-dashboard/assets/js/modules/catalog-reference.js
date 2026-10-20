@@ -574,7 +574,7 @@
     var catName = category.name || '';
     $('category-editor-breadcrumb').textContent = 'Edit Kategori: ' + catName;
     if ($('category-editor-mobile-title')) $('category-editor-mobile-title').textContent = 'Edit Kategori';
-    if ($('category-editor-mobile-subtitle')) $('category-editor-mobile-subtitle').textContent = 'Perbarui Foto, Nama Kategori, Menu, dan Catatan.';
+    if ($('category-editor-mobile-subtitle')) $('category-editor-mobile-subtitle').textContent = 'Perbarui Nama Kategori, Menu, dan Catatan.';
     $('cat-id').value = String(category.id || '');
     $('cat-name').value = catName;
     $('cat-desc').value = category.description || '';

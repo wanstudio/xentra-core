@@ -1871,30 +1871,11 @@
 
           <form id="form-category" class="x-form x-product-editor-form" style="max-width:920px;margin:0 auto;">
             <input type="hidden" id="cat-id" value="">
+            <input type="hidden" id="cat-image-removed" value="0">
 
             <div class="x-card x-product-editor-main-card">
-              <!-- Foto Kategori (1:1 crop/editor) -->
-              <div class="x-form-group">
-                <label>Foto kategori (optional)</label>
-                <div class="x-image-upload-control">
-                  <div class="x-image-upload-preview-box" id="cat-image-preview-box" style="width:84px;height:84px;">
-                    <img id="cat-image-preview" alt="Foto Kategori" style="display:none;width:100%;height:100%;object-fit:cover;">
-                    <div id="cat-image-empty" class="x-image-upload-empty" style="font-size:24px;">📁</div>
-                  </div>
-                  <div class="x-image-upload-info">
-                    <div class="x-image-upload-actions">
-                      <button type="button" id="btn-cat-image-pick" class="x-btn-secondary" style="font-size:12px;padding:6px 12px;">📁 Pilih Foto</button>
-                      <button type="button" id="btn-cat-image-remove" class="x-btn-secondary" style="font-size:12px;padding:6px 12px;color:#ef4444;display:none;">Hapus Foto</button>
-                    </div>
-                    <input type="file" id="cat-image-file" accept="image/jpeg,image/png,image/webp" style="display:none;">
-                    <input type="hidden" id="cat-image-removed" value="0">
-                    <div class="x-image-specs-text">Foto representasi kategori di storefront. JPG, PNG, atau WebP · Rasio 1:1.</div>
-                  </div>
-                </div>
-              </div>
-
               <!-- Nama Kategori -->
-              <div class="x-form-group" style="margin-top:16px;">
+              <div class="x-form-group">
                 <label for="cat-name">Nama Kategori <span class="x-required-mark">*</span></label>
                 <input type="text" id="cat-name" class="x-input" maxlength="120" required autocomplete="off">
                 <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">contohnya; Makanan Berat, Minuman Segar, Camilan, dsb</small>
@@ -1936,7 +1917,6 @@
                   </button>
                   <span>Item Master</span>
                 </h3>
-                <p class="x-owner-mobile-page-sub">Item satuan yang dipakai dan dihitung dalam stok</p>
               </div>
               <div class="x-header-buttons">
                 <button type="button" class="x-btn-primary" id="btn-add-product-main">+ Tambah Item</button>
@@ -1945,16 +1925,16 @@
           </div>
 
           <!-- Search -->
-          <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap;align-items:center;">
-            <div style="flex:1;min-width:220px;position:relative;">
-              <input type="search" id="prod-search-input" class="x-input" placeholder="Cari nama atau kode bahan" autocomplete="off" style="padding-left:36px;">
-              <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <div style="display:flex;gap:12px;margin-top:16px;align-items:center;">
+            <div style="flex:1;position:relative;">
+              <input type="search" id="prod-search-input" class="x-input" placeholder="Cari nama atau kode bahan" autocomplete="off" style="width:100%;height:44px;border-radius:12px;padding:0 14px 0 38px;font-size:13.5px;box-sizing:border-box;">
+              <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#94a3b8;pointer-events:none;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
             </div>
           </div>
 
-          <!-- Filter Pills (matching product master.png) -->
-          <div class="x-filter-pills" style="display:flex; gap:8px; margin: 14px 0 16px; align-items:center; justify-content:space-between;">
-            <div style="display:flex; gap:8px;">
+          <!-- Filter Pills & Add CTA (1 Row) -->
+          <div class="x-filter-pills" style="display:flex; gap:8px; margin: 14px 0 16px; align-items:center; justify-content:space-between; flex-wrap:nowrap;">
+            <div style="display:flex; gap:8px; align-items:center;">
               <button type="button" class="x-filter-pill active" id="pill-prod-active" onclick="filterMasterProductsByStatus('ACTIVE')">Aktif</button>
               <button type="button" class="x-filter-pill" id="pill-prod-inactive" onclick="filterMasterProductsByStatus('INACTIVE')">Nonaktif</button>
             </div>
@@ -2083,39 +2063,15 @@
       <input type="radio" name="prod-inventory-type" id="prod-type-cooked" value="COOKED" style="display:none;" checked>
       <input type="radio" name="prod-inventory-type" id="prod-type-direct" value="DIRECT" style="display:none;">
 
-      <!-- 1. FOTO CARD -->
-      <div class="x-card x-item-editor-card" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px;">
-          <div style="flex:1;">
-            <h4 style="margin:0 0 4px 0;font-size:15px;font-weight:700;color:#0F172A;">Foto (optional)</h4>
-            <div style="font-size:11px;color:#94A3B8;line-height:1.4;">JPG, PNG, atau WebP · Maks. 20 MB · Rasio 1:1</div>
-          </div>
-          <div class="x-image-upload-preview-box" id="prod-image-preview-box" style="width:76px;height:76px;min-width:76px;border-radius:12px;background:#F1F5F9;border:1px solid #CBD5E1;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
-            <img id="prod-image-preview" alt="Foto Item" style="display:none;width:100%;height:100%;object-fit:cover;">
-            <div id="prod-image-empty" class="x-image-upload-empty" style="font-size:11px;color:#64748B;text-align:center;padding:4px;line-height:1.2;">Belum ada foto</div>
-          </div>
-        </div>
-        <div class="x-prod-image-btn-row" style="display:flex;align-items:center;gap:10px;width:100%;">
-          <button type="button" id="btn-prod-image-pick" class="x-btn-secondary" style="flex:1 1 0;height:40px;border-radius:10px;border:1px solid #CBD5E1;background:#FFFFFF;color:#0F172A;font-weight:600;font-size:13px;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;padding:0 12px;box-sizing:border-box;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
-            <span id="btn-prod-image-pick-text">Pilih foto</span>
-          </button>
-          <button type="button" id="btn-prod-image-remove" class="x-btn-secondary" style="flex:1 1 0;height:40px;border-radius:10px;border:1px solid #FEE2E2;background:#FEF2F2;color:#EF4444;font-weight:600;font-size:13px;display:none;align-items:center;justify-content:center;gap:6px;cursor:pointer;padding:0 12px;box-sizing:border-box;">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-            <span>Hapus Foto</span>
-          </button>
-          <input type="file" id="prod-image-file" accept="image/jpeg,image/png,image/webp" style="display:none;">
-          <input type="hidden" id="prod-image-removed" value="0">
-        </div>
-      </div>
+      <input type="hidden" id="prod-image-removed" value="0">
 
-      <!-- 2. NAMA CARD -->
+      <!-- 1. NAMA CARD -->
       <div class="x-card x-item-editor-card" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
         <h4 style="margin:0 0 8px 0;font-size:15px;font-weight:700;color:#0F172A;">Nama <span class="x-required-mark" aria-hidden="true">*</span></h4>
         <input type="text" id="prod-name" class="x-input" required maxlength="160" autocomplete="off" placeholder="Nama item" style="width:100%;height:44px;border-radius:12px;border:1px solid #CBD5E1;padding:0 14px;font-size:14px;box-sizing:border-box;">
       </div>
 
-      <!-- 3. TIPE ITEM & STOK CARD (RADIO-TOGGLE) -->
+      <!-- 2. TIPE ITEM & STOK CARD (RADIO-TOGGLE) -->
       <div class="x-card x-item-editor-card" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
         <h4 style="margin:0 0 14px 0;font-size:15px;font-weight:700;color:#0F172A;">Tipe item &amp; stok</h4>
 
