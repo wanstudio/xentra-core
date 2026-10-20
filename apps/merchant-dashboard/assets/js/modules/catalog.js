@@ -321,7 +321,7 @@
             '<div class="x-master-reference-card x-master-item-card-clickable" onclick="if (!event.target.closest(\'.x-toggle, .x-action-menu-trigger, .x-action-menu\')) { openEditProduct(\'' + esc(prod.id) + '\'); }">',
               '<div class="x-master-reference-card-main">',
                 '<div class="x-master-reference-icon" style="width:44px;height:44px;min-width:44px;border-radius:12px;background:' + iconBg + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;">',
-                  '<img src="' + iconSrc + '" width="22" height="22" alt="' + iconAlt + '" style="display:block;filter:brightness(0) invert(1);">',
+                  '<img src="' + iconSrc + '" width="22" height="22" alt="' + iconAlt + '" style="width:22px!important;height:22px!important;max-width:22px!important;max-height:22px!important;object-fit:contain!important;display:block;filter:brightness(0) invert(1);">',
                 '</div>',
                 '<div class="x-master-reference-copy" style="flex:1 1 auto;min-width:0;margin-left:12px;">',
                   '<strong style="font-size:14px;font-weight:700;color:#0f172a;display:block;margin:0 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(prod.name) + '</strong>',

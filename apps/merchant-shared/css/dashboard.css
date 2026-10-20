@@ -7560,6 +7560,29 @@ body.x-mobile-account-open .x-merchant-mobile-nav { display: none !important; }
     min-width: 0 !important;
     flex: 1 !important;
   }
+
+  #master-products-cards-container .x-master-reference-icon {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    border-radius: 12px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+    overflow: hidden !important;
+  }
+
+  #master-products-cards-container .x-master-reference-icon img,
+  #master-products-cards-container .x-master-reference-icon svg {
+    width: 22px !important;
+    height: 22px !important;
+    max-width: 22px !important;
+    max-height: 22px !important;
+    object-fit: contain !important;
+    display: block !important;
+    filter: brightness(0) invert(1) !important;
+  }
     flex: 0 0 auto !important;
     flex-wrap: nowrap !important;
   }
