@@ -634,11 +634,11 @@
     if (btnSave) {
       if (isDataFilled) {
         btnSave.disabled = false;
-        btnSave.style.background = 'var(--primary-color, #10B981)';
+        btnSave.style.background = '#00A637';
         btnSave.style.color = '#FFFFFF';
         btnSave.style.cursor = 'pointer';
         btnSave.style.opacity = '1';
-        btnSave.style.boxShadow = '0 2px 8px rgba(16, 185, 129, 0.25)';
+        btnSave.style.boxShadow = '0 2px 8px rgba(0, 166, 55, 0.25)';
       } else {
         btnSave.disabled = true;
         btnSave.style.background = '#E2E8F0';

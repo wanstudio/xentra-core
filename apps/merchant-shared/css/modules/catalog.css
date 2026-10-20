@@ -290,7 +290,6 @@
 
   /* Dynamic POS option editors use inline grids; collapse them on phones so
      the first text field never gets squeezed into an unusable sliver. */
-  #product-editor-view .x-product-editor-actions,
   #category-editor-view .x-product-editor-actions {
     display: flex !important;
     flex-direction: row !important;
@@ -300,7 +299,6 @@
     width: 100% !important;
   }
 
-  #product-editor-view .x-product-editor-actions button,
   #category-editor-view .x-product-editor-actions button {
     flex: 1 1 0 !important;
     width: auto !important;
@@ -310,6 +308,44 @@
     align-items: center !important;
     justify-content: center !important;
     text-align: center !important;
+  }
+
+  /* Item Editor Actions (2 Rows: Row 1 = [ Batal ] [ Hapus ], Row 2 = Full-Width [ Simpan ] #00A637) */
+  #product-editor-view .x-product-editor-actions,
+  #product-editor-view .x-item-editor-actions {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+    width: 100% !important;
+    margin-top: 20px !important;
+    margin-bottom: 32px !important;
+  }
+
+  #product-editor-view .x-item-editor-actions-row1 {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 12px !important;
+    width: 100% !important;
+  }
+
+  #product-editor-view .x-item-editor-actions-row1 button,
+  #product-editor-view .x-item-editor-actions-row1 #btn-cancel-product-editor,
+  #product-editor-view .x-item-editor-actions-row1 #btn-delete-item-editor {
+    flex: 1 1 0 !important;
+    width: 50% !important;
+    height: 46px !important;
+    min-height: 46px !important;
+  }
+
+  #product-editor-view #btn-save-product-editor {
+    width: 100% !important;
+    flex: none !important;
+    height: 46px !important;
+    min-height: 46px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: #00A637;
   }
 }
 

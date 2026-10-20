@@ -2189,16 +2189,16 @@
         <textarea id="prod-desc" class="x-input" rows="3" placeholder="Catatan internal..." style="width:100%;border-radius:12px;border:1px solid #CBD5E1;padding:10px 14px;font-size:13px;box-sizing:border-box;"></textarea>
       </div>
 
-      <!-- ACTIONS (BATAL & HAPUS SEJAJAR, DIBAWAHNYA SIMPAN) -->
-      <div class="x-product-editor-actions" style="display:flex;flex-direction:column;gap:12px;margin-top:20px;margin-bottom:32px;">
-        <div style="display:flex;gap:12px;width:100%;">
-          <button type="button" class="x-btn-secondary" id="btn-cancel-product-editor" onclick="goBackFromItemEditor()" style="flex:1;height:46px;border-radius:12px;font-weight:600;font-size:14px;background:#F8FAFC;border:1px solid #E2E8F0;color:#334155;cursor:pointer;">Batal</button>
-          <button type="button" class="x-btn-secondary" id="btn-delete-item-editor" onclick="if ($('prod-id').value) deleteProduct($('prod-id').value)" style="flex:1;height:46px;border-radius:12px;font-weight:600;font-size:14px;background:#FEE2E2;border:none;color:#EF4444;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;">
+      <!-- ACTIONS (2 ROW: ROW 1 [BATAL][HAPUS], ROW 2 [SIMPAN FULL-WIDTH HIJAU #00A637]) -->
+      <div class="x-product-editor-actions x-item-editor-actions" style="display:flex !important;flex-direction:column !important;gap:12px !important;margin-top:20px !important;margin-bottom:32px !important;width:100% !important;">
+        <div class="x-item-editor-actions-row1" style="display:flex !important;flex-direction:row !important;gap:12px !important;width:100% !important;">
+          <button type="button" class="x-btn-secondary" id="btn-cancel-product-editor" onclick="goBackFromItemEditor()" style="flex:1 1 0 !important;width:50% !important;height:46px !important;border-radius:12px !important;font-weight:600 !important;font-size:14px !important;background:#F8FAFC !important;border:1px solid #E2E8F0 !important;color:#334155 !important;cursor:pointer !important;display:inline-flex !important;align-items:center !important;justify-content:center !important;">Batal</button>
+          <button type="button" class="x-btn-secondary" id="btn-delete-item-editor" onclick="if ($('prod-id').value) deleteProduct($('prod-id').value)" style="flex:1 1 0 !important;width:50% !important;height:46px !important;border-radius:12px !important;font-weight:600 !important;font-size:14px !important;background:#FEE2E2 !important;border:none !important;color:#EF4444 !important;cursor:pointer !important;display:inline-flex !important;align-items:center !important;justify-content:center !important;gap:6px !important;">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
             <span>Hapus</span>
           </button>
         </div>
-        <button type="submit" class="x-btn-primary" id="btn-save-product-editor" style="width:100%;height:46px;border-radius:12px;font-weight:700;font-size:15px;background:#10B981;border:none;color:#FFFFFF;cursor:pointer;transition:all 0.15s ease;">Simpan</button>
+        <button type="submit" class="x-btn-primary" id="btn-save-product-editor" style="width:100% !important;flex:none !important;height:46px !important;border-radius:12px !important;font-weight:700 !important;font-size:15px !important;background:#00A637 !important;border:none !important;color:#FFFFFF !important;cursor:pointer !important;transition:all 0.15s ease !important;display:flex !important;align-items:center !important;justify-content:center !important;">Simpan</button>
       </div>
     </form>
 
