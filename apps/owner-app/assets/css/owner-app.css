@@ -326,6 +326,27 @@ body.x-owner-mobile-app #master-reference-category-panel,
   margin-left: auto !important;
 }
 
+#master-products-cards-container {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  margin-top: 0 !important;
+  margin-bottom: 24px !important;
+  width: 100% !important;
+}
+
+#master-products-cards-container .x-hub-card {
+  display: flex !important;
+  align-items: center !important;
+  margin-bottom: 12px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+#master-products-cards-container .x-hub-card:last-child {
+  margin-bottom: 0 !important;
+}
+
 body.x-owner-mobile-app .x-filter-pill,
 .x-owner-mobile-app .x-filter-pill {
   padding: 6px 18px !important;

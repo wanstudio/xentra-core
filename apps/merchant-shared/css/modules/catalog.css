@@ -474,7 +474,20 @@
   #master-products-cards-container {
     display: flex !important;
     flex-direction: column !important;
-    gap: 10px !important;
+    gap: 12px !important;
+    margin-top: 0 !important;
+    margin-bottom: 24px !important;
+    width: 100% !important;
+  }
+  #master-products-cards-container .x-hub-card {
+    display: flex !important;
+    align-items: center !important;
+    margin-bottom: 12px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  #master-products-cards-container .x-hub-card:last-child {
+    margin-bottom: 0 !important;
   }
 }
 

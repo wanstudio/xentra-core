@@ -7479,16 +7479,14 @@ body.x-mobile-account-open .x-merchant-mobile-nav { display: none !important; }
      warna, atau offset khusus per halaman di sini — satu gaya untuk semua. */
 
   /* Pencarian ditumpuk penuh lebar dengan jarak atas 18px dari header */
-  #product-list-view > .x-master-products-search-wrap,
-  #product-list-view > div[style*="display:flex"]:not(.x-filter-pills) {
+  #product-list-view > .x-master-products-search-wrap {
     display: block !important;
     margin-top: 18px !important;
     margin-bottom: 14px !important;
     width: 100% !important;
   }
   /* Kolom pencarian */
-  #product-list-view > .x-master-products-search-wrap > div,
-  #product-list-view > div[style*="display:flex"]:not(.x-filter-pills) > div {
+  #product-list-view > .x-master-products-search-wrap > div {
     min-width: 0 !important;
     width: 100% !important;
     margin-bottom: 0 !important;
@@ -7498,6 +7496,26 @@ body.x-mobile-account-open .x-merchant-mobile-nav { display: none !important; }
     width: 100% !important;
     height: 44px !important;
     border-radius: 12px !important;
+  }
+
+  /* Kartu daftar item di mobile: diberi gap dan margin-bottom eksplisit antar kartu */
+  #master-products-cards-container {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+    margin-top: 0 !important;
+    margin-bottom: 24px !important;
+    width: 100% !important;
+  }
+  #master-products-cards-container .x-hub-card {
+    display: flex !important;
+    align-items: center !important;
+    margin-bottom: 12px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  #master-products-cards-container .x-hub-card:last-child {
+    margin-bottom: 0 !important;
   }
 
   /* Filter Pills & Add Round CTA: Terkunci 1 Row penuh tanpa wrap */

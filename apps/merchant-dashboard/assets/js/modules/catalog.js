@@ -318,7 +318,7 @@
           var costText = formatMoney(prod.cost_price || 0);
 
           return [
-            '<div class="x-hub-card" style="align-items:center; cursor:pointer;" onclick="if (!event.target.closest(\'.x-toggle, .x-action-menu-trigger, .x-action-menu\')) { openEditProduct(\'' + esc(prod.id) + '\'); }">',
+            '<div class="x-hub-card" style="align-items:center; cursor:pointer; margin-bottom:12px;" onclick="if (!event.target.closest(\'.x-toggle, .x-action-menu-trigger, .x-action-menu\')) { openEditProduct(\'' + esc(prod.id) + '\'); }">',
               '<div class="x-hub-icon" style="width:42px;height:42px;border-radius:12px;background:' + iconBg + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;">',
                 '<img src="' + iconSrc + '" width="22" height="22" alt="' + iconAlt + '" style="display:block;">',
               '</div>',
