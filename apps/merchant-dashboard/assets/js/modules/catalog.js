@@ -578,6 +578,7 @@
   var _productImageFile = null;
   var _productCropSpec = null;
   var _productImageRemoved = false;
+  var _productOriginalImage = '';
 
   // Product Actions
   function setProductImagePreview(src, hasImage) {
@@ -590,14 +591,18 @@
       previewImg.src = src;
       previewImg.style.display = 'block';
       emptyBox.style.display = 'none';
-      if (btnRemove) btnRemove.style.display = 'inline-block';
-      if (btnPick) btnPick.textContent = '\ud83d\udcc1 Ganti Foto';
+      if (btnRemove) btnRemove.style.display = 'inline-flex';
+      var pickText = $('btn-prod-image-pick-text');
+      if (pickText) pickText.textContent = 'Ganti Foto';
+      else if (btnPick) btnPick.textContent = '\ud83d\udcc1 Ganti Foto';
     } else {
       previewImg.removeAttribute('src');
       previewImg.style.display = 'none';
       emptyBox.style.display = 'flex';
       if (btnRemove) btnRemove.style.display = 'none';
-      if (btnPick) btnPick.textContent = '\ud83d\udcc1 Pilih Foto';
+      var pickText = $('btn-prod-image-pick-text');
+      if (pickText) pickText.textContent = 'Pilih foto';
+      else if (btnPick) btnPick.textContent = '\ud83d\udcc1 Pilih Foto';
     }
     renderMasterMenuCustomerPreview();
   }
@@ -772,6 +777,7 @@
     _productImageFile = null;
     _productCropSpec = null;
     _productImageRemoved = false;
+    _productOriginalImage = '';
     var fileInput = $('prod-image-file');
     if (fileInput) fileInput.value = '';
     setProductImagePreview('', false);
@@ -857,6 +863,7 @@
     var fileInput = $('prod-image-file');
     if (fileInput) fileInput.value = '';
     var existingImage = prod.image_url || prod.image || '';
+    _productOriginalImage = existingImage;
     setProductImagePreview(existingImage, existingImage !== '');
     updateProductEditorCtaState();
   }
@@ -1686,6 +1693,22 @@ async function loadMenusView() {
         _productImageRemoved = true;
         if (prodFileInput) prodFileInput.value = '';
         setProductImagePreview('', false);
+      });
+    }
+
+    var btnRefreshProd = $('btn-prod-image-refresh');
+    if (btnRefreshProd && !btnRefreshProd.dataset.bound) {
+      btnRefreshProd.dataset.bound = 'true';
+      btnRefreshProd.addEventListener('click', function () {
+        _productImageFile = null;
+        _productCropSpec = null;
+        _productImageRemoved = false;
+        if (prodFileInput) prodFileInput.value = '';
+        var orig = _productOriginalImage || '';
+        setProductImagePreview(orig, orig !== '');
+        if (typeof showToast === 'function') {
+          showToast(orig ? '✓ Foto dikembalikan ke semula.' : '✓ Foto di-reset.');
+        }
       });
     }
 
