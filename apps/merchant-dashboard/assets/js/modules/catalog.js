@@ -114,27 +114,27 @@
     var listView = $('product-list-view');
     var detailView = $('product-detail-view');
     var editorView = $('product-editor-view');
-    if (listView) listView.style.display = 'block';
-    if (detailView) detailView.style.display = 'none';
-    if (editorView) editorView.style.display = 'none';
+    if (listView) listView.style.setProperty('display', 'block', 'important');
+    if (detailView) detailView.style.setProperty('display', 'none', 'important');
+    if (editorView) editorView.style.setProperty('display', 'none', 'important');
   }
 
   function showProductDetailSection() {
     var listView = $('product-list-view');
     var detailView = $('product-detail-view');
     var editorView = $('product-editor-view');
-    if (listView) listView.style.display = 'none';
-    if (detailView) detailView.style.display = 'block';
-    if (editorView) editorView.style.display = 'none';
+    if (listView) listView.style.setProperty('display', 'none', 'important');
+    if (detailView) detailView.style.setProperty('display', 'block', 'important');
+    if (editorView) editorView.style.setProperty('display', 'none', 'important');
   }
 
   function showProductEditorSection() {
     var listView = $('product-list-view');
     var detailView = $('product-detail-view');
     var editorView = $('product-editor-view');
-    if (listView) listView.style.display = 'none';
-    if (detailView) detailView.style.display = 'none';
-    if (editorView) editorView.style.display = 'block';
+    if (listView) listView.style.setProperty('display', 'none', 'important');
+    if (detailView) detailView.style.setProperty('display', 'none', 'important');
+    if (editorView) editorView.style.setProperty('display', 'block', 'important');
   }
 
   async function loadMasterProducts() {
@@ -1947,12 +1947,16 @@ async function loadMenusView() {
       }
       return;
     }
-    modal.style.display = 'flex';
+    modal.classList.add('open');
+    modal.style.setProperty('display', 'flex', 'important');
   }
 
   function hideItemSavedPromptModal() {
     var modal = $('modal-item-saved-prompt');
-    if (modal) modal.style.display = 'none';
+    if (modal) {
+      modal.classList.remove('open');
+      modal.style.setProperty('display', 'none', 'important');
+    }
   }
 
   window.showItemSavedPromptModal = showItemSavedPromptModal;

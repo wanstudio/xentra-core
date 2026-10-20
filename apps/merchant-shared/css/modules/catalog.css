@@ -426,19 +426,43 @@
   #product-list-view .x-master-products-head .x-header-buttons {
     display: none !important;
   }
+  /* On mobile, ONLY show the mobile cards container; hide desktop table */
+  #product-list-view .x-table-responsive {
+    display: none !important;
+  }
+  #master-products-cards-container {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
 }
 
-/* Post-Save Item Prompt Modal (Frame 240.png) */
+@media (min-width: 769px) {
+  /* On desktop, hide mobile cards; show desktop table */
+  #master-products-cards-container {
+    display: none !important;
+  }
+  #product-list-view .x-table-responsive {
+    display: block !important;
+  }
+}
+
+/* Post-Save Item Prompt Modal (Frame 240.png) - Hidden by default */
 .x-modal-item-saved {
   position: fixed !important;
   inset: 0 !important;
   background: rgba(15, 23, 42, 0.6) !important;
   backdrop-filter: blur(4px) !important;
   z-index: 99999 !important;
-  display: flex !important;
+  display: none !important;
   align-items: center !important;
   justify-content: center !important;
   padding: 20px !important;
+}
+
+.x-modal-item-saved.open,
+.x-modal-item-saved.active {
+  display: flex !important;
 }
 
 .x-modal-item-saved-card {

@@ -9942,13 +9942,18 @@ body:not(.x-merchant-app) .x-owner-mobile-page-sub {
   background: #FFFFFF !important;
   box-shadow: 0 4px 14px rgba(15, 23, 42, 0.15), 0 1px 3px rgba(15, 23, 42, 0.08) !important;
   border: 1px solid #E2E8F0 !important;
-  display: flex !important;
+  display: none !important;
   align-items: center !important;
   justify-content: center !important;
   pointer-events: none !important;
   opacity: 0;
   transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease, background-color 0.2s ease !important;
   box-sizing: border-box !important;
+}
+
+.x-pull-refresh-indicator.pulling,
+.x-pull-refresh-indicator.refreshing {
+  display: flex !important;
 }
 
 .x-pull-refresh-indicator.refreshing {
