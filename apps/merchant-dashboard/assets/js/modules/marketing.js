@@ -101,6 +101,7 @@
       'promotions': 'marketing-view-promotions',
       'discounts': 'marketing-view-discounts',
       'banners': 'marketing-view-banners',
+      'affiliate': 'marketing-view-affiliate',
       'campaigns': 'marketing-view-campaigns',
       'loyalty': 'marketing-view-loyalty'
     };
@@ -114,6 +115,7 @@
     if (subtab === 'overview') loadMarketingOverview();
     else if (subtab === 'promotions') loadMarketingPromotions();
     else if (subtab === 'banners') renderMarketingBannersSkeleton();
+    else if (subtab === 'affiliate') loadMarketingAffiliate();
   }
   window.switchMarketingSection = switchMarketingSection;
 
@@ -1087,12 +1089,317 @@
     }
   }
   window.deleteMarketingPromotion = deleteMarketingPromotion;
+
+  /* =========================================================================
+     MARKETING — AFFILIATE & B2C REFERRAL MANAGEMENT
+     ========================================================================= */
+  async function loadMarketingAffiliate() {
+    try {
+      var res = await adminFetch(API_BASE + '/admin/affiliate/program', {
+        headers: getAuthHeaders()
+      });
+      var json = await res.json();
+      if (res.ok && json.success && json.program) {
+        var p = json.program;
+        if ($('mkt-aff-status')) $('mkt-aff-status').value = p.is_active ? '1' : '0';
+        if ($('mkt-aff-rate')) $('mkt-aff-rate').value = p.commission_rate != null ? p.commission_rate : 5;
+        if ($('mkt-aff-min-payout')) $('mkt-aff-min-payout').value = p.min_payout_amount != null ? p.min_payout_amount : 50000;
+        if ($('mkt-aff-cookie-days')) $('mkt-aff-cookie-days').value = p.cookie_days != null ? p.cookie_days : 14;
+      }
+    } catch (err) {
+      console.error('[Load Affiliate Program Error]:', err);
+    }
+    loadMarketingAffiliateMembers();
+    loadMarketingAffiliatePayouts();
+  }
+  window.loadMarketingAffiliate = loadMarketingAffiliate;
+
+  async function saveMarketingAffiliateProgram() {
+    var btn = $('btn-save-affiliate-program');
+    if (btn) btn.disabled = true;
+
+    try {
+      var statusVal = $('mkt-aff-status') ? $('mkt-aff-status').value === '1' : true;
+      var rateVal = $('mkt-aff-rate') ? Number($('mkt-aff-rate').value) : 5;
+      var minPayoutVal = $('mkt-aff-min-payout') ? Number($('mkt-aff-min-payout').value) : 50000;
+      var cookieDaysVal = $('mkt-aff-cookie-days') ? Number($('mkt-aff-cookie-days').value) : 14;
+
+      var res = await adminFetch(API_BASE + '/admin/affiliate/program', {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          is_active: statusVal,
+          commission_rate: rateVal,
+          min_payout_amount: minPayoutVal,
+          cookie_days: cookieDaysVal
+        })
+      });
+      var json = await res.json();
+      if (!res.ok || !json.success) throw new Error((json && json.error) || 'Gagal menyimpan konfigurasi affiliate.');
+
+      showToast('Konfigurasi program affiliate berhasil disimpan!');
+    } catch (err) {
+      console.error('[Save Affiliate Program Error]:', err);
+      showToast(err.message || 'Gagal menyimpan konfigurasi.');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+  window.saveMarketingAffiliateProgram = saveMarketingAffiliateProgram;
+
+  async function loadMarketingAffiliatePayouts() {
+    var tbody = $('tbody-mkt-aff-payouts');
+    if (!tbody) return;
+
+    var filter = $('mkt-aff-payout-filter') ? $('mkt-aff-payout-filter').value : '';
+    var url = API_BASE + '/admin/affiliate/payouts' + (filter ? '?status=' + encodeURIComponent(filter) : '');
+
+    try {
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-muted">Memuat data pencairan komisi...</td></tr>';
+      var res = await adminFetch(url, { headers: getAuthHeaders() });
+      var json = await res.json();
+
+      var payouts = (json && json.payouts) || [];
+      if (payouts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-muted">Tidak ada permintaan pencairan dana yang sesuai filter.</td></tr>';
+        return;
+      }
+
+      var rows = payouts.map(function (p) {
+        var statusBadge = '';
+        if (p.status === 'PAID') {
+          statusBadge = '<span class="x-badge x-badge-success" style="background:#dcfce7;color:#15803d;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;">Sudah Ditransfer</span>';
+        } else if (p.status === 'REJECTED') {
+          statusBadge = '<span class="x-badge x-badge-danger" style="background:#fee2e2;color:#b91c1c;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;">Ditolak</span>';
+        } else {
+          statusBadge = '<span class="x-badge x-badge-warning" style="background:#fef3c7;color:#b45309;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;">Menunggu Transfer</span>';
+        }
+
+        var customerInfo = '<strong>' + esc(p.customer_name || 'Pelanggan') + '</strong><br><small class="text-muted">' + esc(p.customer_phone || '-') + '</small>';
+        var bankInfo = '<strong>' + esc(p.bank_name || '-') + '</strong> · ' + esc(p.bank_account_number || '-') + '<br><small class="text-muted">a.n. ' + esc(p.bank_account_holder || '-') + '</small>';
+        var dateFormatted = p.created_at ? new Date(p.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+
+        var infoNotes = '';
+        if (p.status === 'PAID') {
+          infoNotes = '<span style="font-size:11.5px;color:#15803d;">Ref: ' + esc(p.transfer_reference || '-') + '</span>';
+        } else if (p.status === 'REJECTED') {
+          infoNotes = '<span style="font-size:11.5px;color:#b91c1c;">Alasan: ' + esc(p.rejection_reason || '-') + '</span>';
+        } else {
+          infoNotes = '<span style="font-size:11.5px;color:#64748b;">' + esc(p.notes || '-') + '</span>';
+        }
+
+        var actions = '—';
+        if (p.status === 'REQUESTED') {
+          actions =
+            '<div style="display:flex;gap:6px;justify-content:flex-end;">' +
+            '  <button type="button" class="x-btn-xs" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11.5px;font-weight:700;cursor:pointer;" onclick="approveMarketingAffiliatePayout(\'' + esc(p.id) + '\')">Tandai Transfer</button>' +
+            '  <button type="button" class="x-btn-xs" style="background:#ef4444;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11.5px;font-weight:700;cursor:pointer;" onclick="rejectMarketingAffiliatePayout(\'' + esc(p.id) + '\')">Tolak</button>' +
+            '</div>';
+        }
+
+        return (
+          '<tr>' +
+          '  <td>' + customerInfo + '</td>' +
+          '  <td>' + bankInfo + '</td>' +
+          '  <td><strong style="color:var(--text-main);font-size:13.5px;">' + formatMoney(p.amount) + '</strong></td>' +
+          '  <td><span style="font-size:12px;color:var(--text-muted);">' + dateFormatted + '</span></td>' +
+          '  <td>' + statusBadge + '</td>' +
+          '  <td>' + infoNotes + '</td>' +
+          '  <td class="text-right">' + actions + '</td>' +
+          '</tr>'
+        );
+      }).join('');
+
+      tbody.innerHTML = rows;
+    } catch (err) {
+      console.error('[Load Affiliate Payouts Error]:', err);
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-danger">Gagal memuat data pencairan komisi: ' + esc(err.message) + '</td></tr>';
+    }
+  }
+  window.loadMarketingAffiliatePayouts = loadMarketingAffiliatePayouts;
+
+  async function approveMarketingAffiliatePayout(payoutId) {
+    var refNo = prompt('Masukkan Nomor Referensi Transfer / Resi Bank (Opsional):', 'TRF-' + Date.now().toString().slice(-6));
+    if (refNo === null) return; // User cancelled prompt
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/affiliate/payouts/' + encodeURIComponent(payoutId), {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          action: 'APPROVE',
+          transfer_reference: refNo.trim() || undefined
+        })
+      });
+      var json = await res.json();
+      if (!res.ok || !json.success) throw new Error((json && json.error) || 'Gagal menyetujui pencairan.');
+
+      showToast('Status pencairan berhasil ditandai SUDAH DITRANSFER.');
+      loadMarketingAffiliatePayouts();
+    } catch (err) {
+      console.error('[Approve Payout Error]:', err);
+      showToast(err.message || 'Gagal memproses persetujuan pencairan.');
+    }
+  }
+  window.approveMarketingAffiliatePayout = approveMarketingAffiliatePayout;
+
+  async function rejectMarketingAffiliatePayout(payoutId) {
+    var reason = prompt('Masukkan alasan penolakan pencairan (dana akan dikembalikan ke saldo mitra):', 'Data nomor rekening tidak valid');
+    if (reason === null) return; // User cancelled prompt
+    if (!reason.trim()) {
+      showToast('Alasan penolakan wajib diisi.');
+      return;
+    }
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/affiliate/payouts/' + encodeURIComponent(payoutId), {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          action: 'REJECT',
+          rejection_reason: reason.trim()
+        })
+      });
+      var json = await res.json();
+      if (!res.ok || !json.success) throw new Error((json && json.error) || 'Gagal menolak pencairan.');
+
+      showToast('Pencairan komisi berhasil DITOLAK. Saldo telah dikembalikan ke mitra.');
+      loadMarketingAffiliatePayouts();
+    } catch (err) {
+      console.error('[Reject Payout Error]:', err);
+      showToast(err.message || 'Gagal memproses penolakan pencairan.');
+    }
+  }
+  window.rejectMarketingAffiliatePayout = rejectMarketingAffiliatePayout;
+
+  async function loadMarketingAffiliateMembers() {
+    var tbody = $('tbody-mkt-aff-members');
+    if (!tbody) return;
+
+    var filter = $('mkt-aff-member-filter') ? $('mkt-aff-member-filter').value : '';
+    var url = API_BASE + '/admin/affiliate/members' + (filter ? '?status=' + encodeURIComponent(filter) : '');
+
+    try {
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-muted">Memuat data mitra affiliate...</td></tr>';
+      var res = await adminFetch(url, { headers: getAuthHeaders() });
+      var json = await res.json();
+
+      var members = (json && json.members) || [];
+      if (members.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-muted">Tidak ada data pendaftaran mitra yang sesuai filter.</td></tr>';
+        return;
+      }
+
+      var rows = members.map(function (m) {
+        var statusBadge = '';
+        if (m.status === 'ACTIVE') {
+          statusBadge = '<span class="x-badge bg-green">Aktif</span>';
+        } else if (m.status === 'REJECTED') {
+          statusBadge = '<span class="x-badge bg-red" title="' + (m.rejection_reason || '') + '">Ditolak</span>';
+        } else {
+          statusBadge = '<span class="x-badge bg-amber">Menunggu Review</span>';
+        }
+
+        var dateStr = m.created_at ? new Date(m.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
+
+        var actions = '';
+        if (m.status === 'PENDING') {
+          actions =
+            '<div style="display:flex;gap:6px;justify-content:flex-end;">' +
+            '  <button type="button" class="x-btn-primary" onclick="approveMarketingAffiliateMember(\'' + m.id + '\')" style="padding:4px 10px;font-size:11.5px;background:#16a34a;">Setujui</button>' +
+            '  <button type="button" class="x-btn-secondary" onclick="rejectMarketingAffiliateMember(\'' + m.id + '\')" style="padding:4px 10px;font-size:11.5px;color:#ef4444;border-color:#fca5a5;">Tolak</button>' +
+            '</div>';
+        } else if (m.status === 'ACTIVE') {
+          actions =
+            '<div style="display:flex;gap:6px;justify-content:flex-end;">' +
+            '  <button type="button" class="x-btn-secondary" onclick="rejectMarketingAffiliateMember(\'' + m.id + '\')" style="padding:4px 10px;font-size:11.5px;color:#64748b;">Tangguhkan</button>' +
+            '</div>';
+        } else if (m.status === 'REJECTED') {
+          actions =
+            '<div style="display:flex;gap:6px;justify-content:flex-end;">' +
+            '  <button type="button" class="x-btn-primary" onclick="approveMarketingAffiliateMember(\'' + m.id + '\')" style="padding:4px 10px;font-size:11.5px;background:#16a34a;">Setujui Ulang</button>' +
+            '</div>';
+        }
+
+        var custName = m.customer_name || 'Pelanggan';
+        var custPhone = m.customer_phone || '-';
+        var bankInfo = (m.bank_name || '-') + ' ' + (m.bank_account_number || '-') + '<div style="font-size:11px;color:var(--text-muted);">a.n. ' + (m.bank_account_holder || '-') + '</div>';
+        var socialInfo = m.social_media ? ('<b>' + m.social_media + '</b>') : '-';
+        if (m.notes) socialInfo += '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">"' + m.notes + '"</div>';
+
+        return '<tr>' +
+          '<td><strong>' + custName + '</strong><div style="font-size:11px;color:var(--text-muted);">' + custPhone + '</div></td>' +
+          '<td>' + socialInfo + '</td>' +
+          '<td>' + bankInfo + '</td>' +
+          '<td><span style="font-family:monospace;font-weight:700;color:#0284c7;">' + (m.referral_code || '-') + '</span></td>' +
+          '<td>' + dateStr + '</td>' +
+          '<td>' + statusBadge + '</td>' +
+          '<td class="text-right">' + actions + '</td>' +
+        '</tr>';
+      }).join('');
+
+      tbody.innerHTML = rows;
+    } catch (err) {
+      console.error('[Load Affiliate Members Error]:', err);
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-muted">Gagal memuat data mitra.</td></tr>';
+    }
+  }
+  window.loadMarketingAffiliateMembers = loadMarketingAffiliateMembers;
+
+  async function approveMarketingAffiliateMember(id) {
+    if (!confirm('Setujui calon mitra affiliate ini? Mereka akan mendapatkan link referral aktif dan dapat mulai mengumpulkan komisi.')) return;
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/affiliate/members/' + id + '/approve', {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      var json = await res.json();
+      if (!res.ok || !json.success) throw new Error((json && json.error) || 'Gagal menyetujui mitra.');
+
+      showToast('Mitra affiliate berhasil DISETUJUI!');
+      loadMarketingAffiliateMembers();
+    } catch (err) {
+      console.error('[Approve Member Error]:', err);
+      showToast(err.message || 'Gagal menyetujui pendaftaran mitra.');
+    }
+  }
+  window.approveMarketingAffiliateMember = approveMarketingAffiliateMember;
+
+  async function rejectMarketingAffiliateMember(id) {
+    var reason = prompt('Masukkan alasan penolakan / penangguhan pendaftaran kemitraan:');
+    if (reason === null) return;
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/affiliate/members/' + id + '/reject', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ rejection_reason: reason.trim() || 'Pengajuan belum memenuhi syarat' })
+      });
+      var json = await res.json();
+      if (!res.ok || !json.success) throw new Error((json && json.error) || 'Gagal menolak mitra.');
+
+      showToast('Pendaftaran mitra berhasil ditolak / ditangguhkan.');
+      loadMarketingAffiliateMembers();
+    } catch (err) {
+      console.error('[Reject Member Error]:', err);
+      showToast(err.message || 'Gagal memproses penolakan.');
+    }
+  }
+  window.rejectMarketingAffiliateMember = rejectMarketingAffiliateMember;
+
   window.XentraMarketingModule = {
     switchMarketingSection: switchMarketingSection,
     loadMarketingCurrentSubtab: loadMarketingCurrentSubtab,
     loadMarketingBanners: loadMarketingBanners,
     loadMarketingOverview: loadMarketingOverview,
     loadMarketingPromotions: loadMarketingPromotions,
+    loadMarketingAffiliate: loadMarketingAffiliate,
+    saveMarketingAffiliateProgram: saveMarketingAffiliateProgram,
+    loadMarketingAffiliatePayouts: loadMarketingAffiliatePayouts,
+    loadMarketingAffiliateMembers: loadMarketingAffiliateMembers,
+    approveMarketingAffiliateMember: approveMarketingAffiliateMember,
+    rejectMarketingAffiliateMember: rejectMarketingAffiliateMember,
     mountPromotionEditorPage: mountPromotionEditorPage,
     unmountPromotionEditorPage: unmountPromotionEditorPage
   };

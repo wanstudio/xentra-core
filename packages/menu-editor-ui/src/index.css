@@ -13,17 +13,20 @@
 }
 
 #modern-menu-editor-root button,
-#modern-business-hub-root button {
+#modern-business-hub-root button,
+#modern-catalog-subhub-root button {
   border-style: solid;
   outline: none;
 }
 
-#modern-business-hub-root .hub-inset-stroke {
+#modern-business-hub-root .hub-inset-stroke,
+#modern-catalog-subhub-root .hub-inset-stroke {
   box-shadow: inset 0 0 0 1px #CBD5E1;
   border: none !important;
 }
 
-#modern-business-hub-root .hub-card:hover {
+#modern-business-hub-root .hub-card:hover,
+#modern-catalog-subhub-root .hub-card:hover {
   box-shadow: inset 0 0 0 1px #94A3B8;
 }
 

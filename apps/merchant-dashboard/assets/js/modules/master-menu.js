@@ -149,13 +149,60 @@
     var editor = $('master-menu-editor-view');
     if (list) list.style.display = 'block';
     if (editor) editor.style.display = 'none';
+
+    var mount = $('modern-menu-editor-mount');
+    if (mount && typeof window.unmountMenuEditor === 'function') {
+      window.unmountMenuEditor(mount);
+      mount.style.display = 'none';
+    }
   }
 
-  function showOwnerMasterMenuEditor() {
+  function showOwnerMasterMenuEditor(menuId) {
     var list = $('master-menu-list-view');
     var editor = $('master-menu-editor-view');
     if (list) list.style.display = 'none';
     if (editor) editor.style.display = 'block';
+
+    var mount = $('modern-menu-editor-mount');
+    var legacyForm = $('form-master-menu');
+    var legacyHeader = editor ? editor.querySelector('.x-product-editor-header') : null;
+    var legacyBreadcrumb = editor ? editor.querySelector('.x-product-editor-breadcrumb-row') : null;
+
+    if (mount && typeof window.mountMenuEditor === 'function') {
+      mount.style.display = 'block';
+      if (legacyForm) legacyForm.style.display = 'none';
+      if (legacyHeader) legacyHeader.style.display = 'none';
+      if (legacyBreadcrumb) legacyBreadcrumb.style.display = 'none';
+
+      window.mountMenuEditor(mount, {
+        menuId: menuId || null,
+        apiBase: API_BASE || '/api/v1',
+        token: localStorage.getItem('xentra_merchant_token'),
+        onSaveSuccess: function() {
+          showToast('✅ Menu berhasil disimpan.');
+          if (typeof goBackFromChildPage === 'function') {
+            goBackFromChildPage();
+          } else {
+            window.location.hash = '#catalog/master-menus';
+          }
+          if (typeof window.loadOwnerMasterMenusList === 'function') window.loadOwnerMasterMenusList();
+        },
+        onCancel: function() {
+          if (typeof goBackFromChildPage === 'function') {
+            goBackFromChildPage();
+          } else {
+            window.location.hash = '#catalog/master-menus';
+          }
+        }
+      });
+      return;
+    }
+
+    if (mount) mount.style.display = 'none';
+    if (legacyForm) legacyForm.style.display = 'block';
+    if (legacyHeader) legacyHeader.style.display = '';
+    if (legacyBreadcrumb) legacyBreadcrumb.style.display = '';
+
     if (window.XentraDropdown && typeof window.XentraDropdown.refresh === 'function') {
       window.XentraDropdown.refresh();
     }
@@ -200,6 +247,13 @@
     $('master-menu-editor-mobile-subtitle').textContent = nextType === 'PACKAGE'
       ? 'Susun nama paket, Product penyusun, taxonomy, dan harga Menu.'
       : 'Pilih Item penyusun, Judul, Rasa, Kategori, dan harga Menu.';
+
+    var headerDel = $('btn-delete-master-menu-header');
+    if (headerDel) headerDel.style.display = 'none';
+    var actionDel = $('btn-delete-master-menu-action');
+    if (actionDel) actionDel.style.display = 'none';
+    var cancelBtn = $('btn-cancel-master-menu');
+    if (cancelBtn) cancelBtn.style.width = '100%';
 
     resetOwnerMasterMenuImageState('');
     renderOwnerMasterMenuEditorForm();
@@ -500,32 +554,130 @@
           esc(label) + '</option>';
       });
 
+      if (!selectedProduct && (item.name || item.options_config)) {
+        selectedProduct = {
+          id: item.product_id,
+          name: item.name || 'Item',
+          options_config: item.options_config
+        };
+      } else if (selectedProduct && item.options_config && !selectedProduct.options_config) {
+        selectedProduct.options_config = item.options_config;
+      }
+
       var displayText = selectedProduct ? selectedProduct.name : 'Pilih Item';
       var qty = Math.max(1, parseInt(item.quantity, 10) || 1);
 
-      return '<div class="x-composed-menu-component-row" data-cm-item-index="' + index + '" style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:12px;">' +
-        '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">' +
-          '<div style="flex:1;min-width:0;cursor:pointer;" onclick="openPickItemSheet(' + index + ')" title="Klik untuk ganti item">' +
-            '<div style="font-size:14px;font-weight:700;color:#0F172A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;">' +
+      var variantDisplayHtml = '';
+      if (selectedProduct && selectedProduct.options_config) {
+        var optConfig = null;
+        if (typeof selectedProduct.options_config === 'object') optConfig = selectedProduct.options_config;
+        else {
+          try { optConfig = JSON.parse(selectedProduct.options_config); } catch (_) {}
+        }
+        if (optConfig && Array.isArray(optConfig.variants)) {
+          var activeVars = optConfig.variants.filter(function(v) { return !!v.active; });
+          if (activeVars.length > 0) {
+            var modeLabel = (optConfig.mode === 'MERCHANT') ? 'Kamu mengatur' : 'Pelanggan memilih';
+            var varBlocks = activeVars.map(function(v) {
+              var isPedas = (v.name === 'Pedas' || v.type === 'level');
+              var isSuhu = (v.name === 'Suhu (Panas/Dingin)' || v.type === 'radio');
+
+              if (isPedas) {
+                var selectedLvl = Number(v.level) || 4;
+                var chipColors = [
+                  { bg: '#FEE2E2', border: '#FECACA' },
+                  { bg: '#FCA5A5', border: '#F87171' },
+                  { bg: '#F87171', border: '#EF4444' },
+                  { bg: '#EF4444', border: '#DC2626' },
+                  { bg: '#FFFFFF', border: '#CBD5E1' }
+                ];
+                var chipsHtml = [1, 2, 3, 4, 5].map(function(lvl) {
+                  var isFilled = (lvl <= selectedLvl);
+                  var style = isFilled
+                    ? 'background:' + chipColors[lvl - 1].bg + ';border:1px solid ' + chipColors[lvl - 1].border + ';'
+                    : 'background:#FFFFFF;border:1px solid #CBD5E1;';
+                  return '<div style="width:32px;height:32px;border-radius:8px;flex:none;' + style + '"></div>';
+                }).join('');
+
+                return '<div class="x-cm-item-variant-block" style="border-top:1px solid #F1F5F9;padding-top:14px;width:100%;display:flex;flex-direction:column;gap:10px;">' +
+                  '<div style="font-size:13px;font-weight:700;color:#0F172A;text-align:left;width:100%;">' + esc(modeLabel) + ': Pedas</div>' +
+                  '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;">' +
+                    '<div style="display:flex;gap:6px;align-items:center;">' +
+                      chipsHtml +
+                    '</div>' +
+                    '<button type="button" class="x-btn-secondary x-composed-menu-component-remove" data-cm-item-remove="' + index + '" aria-label="Hapus Item" title="Hapus Item" style="width:36px;height:36px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:10px;border:1px solid #FECACA;background:#FFFFFF;color:#EF4444;cursor:pointer;flex-shrink:0;">' +
+                      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+                        '<polyline points="3 6 5 6 21 6"></polyline>' +
+                        '<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>' +
+                        '<line x1="10" y1="11" x2="10" y2="17"></line>' +
+                        '<line x1="14" y1="11" x2="14" y2="17"></line>' +
+                      '</svg>' +
+                    '</button>' +
+                  '</div>' +
+                  '<button type="button" class="x-btn-edit-item-variant" data-product-id="' + esc(selectedProduct.id) + '" style="width:100%;height:38px;border-radius:10px;border:1px solid #E2E8F0;background:#F1F5F9;font-size:13px;font-weight:700;color:#0F172A;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:background 0.15s ease;">' +
+                    '<span>Atur item</span>' +
+                  '</button>' +
+                '</div>';
+              } else {
+                var choices = Array.isArray(v.choices) && v.choices.length > 0 ? v.choices : (isSuhu ? ['Panas', 'Dingin'] : ['Manis', 'Tawar']);
+                var choicesHtml = choices.map(function(c, cIdx) {
+                  return '<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;">' +
+                    '<span style="font-size:13px;font-weight:700;color:#0F172A;">' + esc(c) + '</span>' +
+                    '<span style="width:16px;height:16px;border-radius:50%;border:1.5px solid #94A3B8;display:inline-block;box-sizing:border-box;"></span>' +
+                  '</div>';
+                }).join('');
+
+                return '<div class="x-cm-item-variant-block" style="border-top:1px solid #F1F5F9;padding-top:14px;width:100%;display:flex;flex-direction:column;gap:8px;">' +
+                  '<div style="font-size:13px;font-weight:700;color:#0F172A;text-align:left;width:100%;">' + esc(modeLabel) + ': ' + esc(v.name) + '</div>' +
+                  '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;width:100%;">' +
+                    '<div style="width:170px;background:#FFFFFF;border:1px solid #CBD5E1;border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;gap:4px;box-sizing:border-box;">' +
+                      choicesHtml +
+                    '</div>' +
+                    '<button type="button" class="x-btn-secondary x-composed-menu-component-remove" data-cm-item-remove="' + index + '" aria-label="Hapus Item" title="Hapus Item" style="width:36px;height:36px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:10px;border:1px solid #FECACA;background:#FFFFFF;color:#EF4444;cursor:pointer;flex-shrink:0;">' +
+                      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+                        '<polyline points="3 6 5 6 21 6"></polyline>' +
+                        '<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>' +
+                        '<line x1="10" y1="11" x2="10" y2="17"></line>' +
+                        '<line x1="14" y1="11" x2="14" y2="17"></line>' +
+                      '</svg>' +
+                    '</button>' +
+                  '</div>' +
+                  '<div style="font-size:11.5px;color:#64748B;line-height:1.4;margin-top:2px;text-align:left;width:100%;">pilihan akan muncul pada saat checkout</div>' +
+                  '<button type="button" class="x-btn-edit-item-variant" data-product-id="' + esc(selectedProduct.id) + '" style="width:100%;height:38px;border-radius:10px;border:1px solid #E2E8F0;background:#F1F5F9;font-size:13px;font-weight:700;color:#0F172A;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:background 0.15s ease;">' +
+                    '<span>Atur item</span>' +
+                  '</button>' +
+                '</div>';
+              }
+            }).join('');
+
+            variantDisplayHtml = varBlocks;
+          }
+        }
+      }
+
+      return '<div class="x-composed-menu-component-row" data-cm-item-index="' + index + '" style="background:#FFFFFF;border:1px solid #CBD5E1;border-radius:16px;padding:14px 14px;display:flex;flex-direction:column;gap:12px;width:100%;box-sizing:border-box;">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;">' +
+          '<div style="flex:1;min-width:0;cursor:pointer;text-align:left;" onclick="openPickItemSheet(' + index + ')" title="Klik untuk ganti item">' +
+            '<div style="font-size:14px;font-weight:700;color:#0F172A;line-height:1.3;text-align:left;word-break:break-word;">' +
               esc(displayText) +
             '</div>' +
-            '<div style="font-size:11px;color:#0284C7;font-weight:600;margin-top:2px;display:flex;align-items:center;gap:3px;">' +
+            '<div style="font-size:12px;color:#0284C7;font-weight:600;margin-top:3px;display:inline-flex;align-items:center;gap:3px;text-align:left;">' +
               '<span>Ganti item</span>' +
               '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 18 6-6-6-6"></path></svg>' +
             '</div>' +
           '</div>' +
-          '<div style="display:flex;align-items:center;gap:8px;">' +
-            '<div style="display:inline-flex;align-items:center;border:1px solid #CBD5E1;border-radius:8px;overflow:hidden;background:#FFFFFF;">' +
-              '<button type="button" class="x-stepper-btn-minus" data-cm-stepper-minus="' + index + '" aria-label="Kurangi Jumlah" title="Kurangi Jumlah" style="width:30px;height:30px;border:none;background:#F8FAFC;color:#0F172A;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;">' +
-                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
+          '<div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-shrink:0;">' +
+            '<div style="display:inline-flex;align-items:center;border:1px solid #CBD5E1;border-radius:10px;background:#FFFFFF;height:36px;padding:0;">' +
+              '<button type="button" class="x-stepper-btn-minus" data-cm-stepper-minus="' + index + '" aria-label="Kurangi Jumlah" title="Kurangi Jumlah" style="width:26px;height:34px;border:none;background:transparent;color:#0F172A;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;">' +
+                '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
               '</button>' +
-              '<input type="number" class="x-input" min="1" step="1" inputmode="numeric" value="' + esc(qty) + '" data-cm-item-qty style="width:40px;height:30px;border:none;border-left:1px solid #CBD5E1;border-right:1px solid #CBD5E1;text-align:center;padding:0;font-size:13px;font-weight:600;border-radius:0;">' +
-              '<button type="button" class="x-stepper-btn-plus" data-cm-stepper-plus="' + index + '" aria-label="Tambah Jumlah" title="Tambah Jumlah" style="width:30px;height:30px;border:none;background:#F8FAFC;color:#0F172A;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;">' +
-                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
+              '<input type="number" class="x-input" min="1" step="1" inputmode="numeric" value="' + esc(qty) + '" data-cm-item-qty style="width:26px;height:34px;border:none;background:transparent;text-align:center;padding:0;font-size:14px;font-weight:700;color:#0F172A;border-radius:0;">' +
+              '<button type="button" class="x-stepper-btn-plus" data-cm-stepper-plus="' + index + '" aria-label="Tambah Jumlah" title="Tambah Jumlah" style="width:26px;height:34px;border:none;background:transparent;color:#0F172A;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;">' +
+                '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
               '</button>' +
             '</div>' +
-            '<button type="button" class="x-btn-secondary x-composed-menu-component-remove" data-cm-item-remove="' + index + '" aria-label="Hapus Item" title="Hapus Item" style="width:30px;height:30px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid #CBD5E1;color:#EF4444;background:#FFFFFF;cursor:pointer;">' +
-              '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+            '<button type="button" class="x-btn-secondary x-composed-menu-component-remove" data-cm-item-remove="' + index + '" aria-label="Hapus Item" title="Hapus Item" style="width:36px;height:36px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:10px;border:1px solid #FECACA;color:#EF4444;background:#FFFFFF;cursor:pointer;flex-shrink:0;">' +
+              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
                 '<polyline points="3 6 5 6 21 6"></polyline>' +
                 '<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>' +
                 '<line x1="10" y1="11" x2="10" y2="17"></line>' +
@@ -534,6 +686,7 @@
             '</button>' +
           '</div>' +
         '</div>' +
+        variantDisplayHtml +
         '<div class="x-cm-combobox" style="display:none;">' +
           '<input type="text" class="x-input x-cm-combobox-input" data-cm-item-input="' + index + '" value="' + esc(displayText) + '">' +
           '<div class="x-cm-combobox-menu" data-cm-item-menu="' + index + '"></div>' +
@@ -640,6 +793,20 @@
         _ownerMasterMenuState.packageComponents.splice(index, 1);
         renderOwnerMasterMenuItems();
         renderOwnerMasterMenuPreview();
+      });
+    });
+
+    box.querySelectorAll('.x-btn-edit-item-variant').forEach(function(button) {
+      button.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var prodId = button.dataset.productId;
+        if (prodId) {
+          if (typeof window.openEditProduct === 'function') {
+            window.openEditProduct(prodId);
+          } else if (typeof window.editProduct === 'function') {
+            window.editProduct(prodId);
+          }
+        }
       });
     });
 
@@ -796,14 +963,14 @@
       previewImg.src = src;
       previewImg.style.display = 'block';
       emptyBox.style.display = 'none';
-      if (btnRemove) btnRemove.style.display = 'inline-block';
-      if (btnPick) btnPick.textContent = '\ud83d\udcc1 Ganti Foto';
+      if (btnRemove) btnRemove.style.display = 'inline-flex';
+      if (btnPick) btnPick.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg> <span>Ganti foto</span>';
     } else {
       previewImg.removeAttribute('src');
       previewImg.style.display = 'none';
       emptyBox.style.display = 'flex';
       if (btnRemove) btnRemove.style.display = 'none';
-      if (btnPick) btnPick.textContent = '\ud83d\udcc1 Pilih Foto';
+      if (btnPick) btnPick.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg> <span>Pilih foto</span>';
     }
   }
 
@@ -983,11 +1150,11 @@
       var isPriceValid = (getOwnerMasterMenuMoney('cm-price') > 0) || (getOwnerMasterMenuMoney('cm-price-min') > 0 && getOwnerMasterMenuMoney('cm-price-max') > 0);
       var isFormReady = isTitleValid && isCatValid && isPriceValid;
       if (isFormReady) {
-        btnSaveActive.style.background = '#059669';
+        btnSaveActive.style.background = '#00A637';
         btnSaveActive.style.color = '#FFFFFF';
-        btnSaveActive.style.boxShadow = '0 2px 6px rgba(5,150,105,0.2)';
+        btnSaveActive.style.boxShadow = '0 2px 8px rgba(0, 166, 55, 0.25)';
       } else {
-        btnSaveActive.style.background = '#F1F5F9';
+        btnSaveActive.style.background = '#E2E8F0';
         btnSaveActive.style.color = '#94A3B8';
         btnSaveActive.style.boxShadow = 'none';
       }
@@ -1149,7 +1316,7 @@
   }
 
   async function loadOwnerMasterMenuEditor(menuId) {
-    showOwnerMasterMenuEditor();
+    showOwnerMasterMenuEditor(menuId);
 
     if (!menuId) {
       ownerMasterMenuResetEditor(_ownerMasterMenuState.createType);
@@ -1185,10 +1352,20 @@
       _ownerMasterMenuState.editingType = type;
       _ownerMasterMenuState.createType = type;
       _ownerMasterMenuState.menuItems = (menu.components || []).map(function(item) {
-        return { product_id: String(item.product_id), quantity: Number(item.quantity) };
+        return {
+          product_id: String(item.product_id),
+          quantity: Number(item.quantity),
+          name: item.product_name,
+          options_config: item.options_config
+        };
       });
       _ownerMasterMenuState.packageComponents = (menu.components || []).map(function(item) {
-        return { product_id: String(item.product_id), quantity: Number(item.quantity) };
+        return {
+          product_id: String(item.product_id),
+          quantity: Number(item.quantity),
+          name: item.product_name,
+          options_config: item.options_config
+        };
       });
 
       $('master-menu-id').value = String(menu.id);
@@ -1212,10 +1389,30 @@
         if (spiceEnabled) setOwnerMasterMenuSpiceLevel(spiceLevel);
       }
 
+      var menuTitle = ownerMasterMenuTitle(menu);
       $('master-menu-editor-title').textContent = 'Edit Menu';
-      $('master-menu-editor-breadcrumb').textContent = ownerMasterMenuTitle(menu);
-      $('master-menu-editor-mobile-title').textContent = 'Edit Menu';
+      $('master-menu-editor-breadcrumb').textContent = menuTitle;
+      $('master-menu-editor-mobile-title').textContent = 'Menu: ' + (menuTitle || 'Edit Menu');
       $('master-menu-editor-mobile-subtitle').textContent = 'Perbarui Judul, Kategori, Komposisi Item, Harga, dan Status.';
+
+      var headerDel = $('btn-delete-master-menu-header');
+      if (headerDel) {
+        headerDel.style.display = 'inline-flex';
+        headerDel.onclick = function(e) {
+          if (e) e.preventDefault();
+          deleteOwnerMasterMenu(menu.id, menuTitle);
+        };
+      }
+      var actionDel = $('btn-delete-master-menu-action');
+      if (actionDel) {
+        actionDel.style.display = 'inline-flex';
+        actionDel.onclick = function(e) {
+          if (e) e.preventDefault();
+          deleteOwnerMasterMenu(menu.id, menuTitle);
+        };
+      }
+      var cancelBtn = $('btn-cancel-master-menu');
+      if (cancelBtn) cancelBtn.style.width = '50%';
 
       var categoryVal = menu.category_id || (menu.category && menu.category.id) || '';
       var titleVal = menu.title_id || (menu.title_ref && menu.title_ref.id) || '';
@@ -1263,6 +1460,11 @@
     var isToggleActive = activeToggle ? activeToggle.checked : true;
     var status = statusOverride || (isToggleActive ? 'ACTIVE' : 'DRAFT');
     var price = getOwnerMasterMenuMoney('cm-price');
+    var priceMin = getOwnerMasterMenuMoney('cm-price-min');
+    var priceMax = getOwnerMasterMenuMoney('cm-price-max');
+    if ((!Number.isFinite(price) || price <= 0) && (priceMin > 0 || priceMax > 0)) {
+      price = priceMin > 0 ? priceMin : priceMax;
+    }
     if (!Number.isFinite(price) || price < 0) {
       showToast('❌ Harga Menu tidak valid.');
       return;
@@ -1319,44 +1521,46 @@
     }
 
     if (!titleId) {
-      showToast('❌ Judul Menu wajib diisi.');
-      return;
+      // Backend auto-resolves title if omitted but title_name is passed
+      titleId = null;
     }
 
-    // Collect items composition directly from DOM rows first, falling back to state
+    // Read items primarily from state, falling back to DOM or package components
     var itemsList = [];
-    var itemsBox = $('cm-items-container');
-    if (itemsBox) {
-      var domRows = itemsBox.querySelectorAll('[data-cm-item-index]');
-      if (domRows && domRows.length > 0) {
-        domRows.forEach(function(row) {
-          var sel = row.querySelector('[data-cm-item-product]');
-          var txt = row.querySelector('.x-cm-combobox-input');
-          var qtyInput = row.querySelector('[data-cm-item-qty]');
-          var prodId = (sel && sel.value) ? String(sel.value).trim() : '';
-          if (!prodId && txt && txt.value.trim()) {
-            var query = txt.value.trim().toLowerCase();
-            var matched = _ownerMasterMenuState.products.find(function(p) {
-              var active = p.is_active !== 0 && p.is_active !== false;
-              return active && (p.name || '').trim().toLowerCase() === query;
-            }) || _ownerMasterMenuState.products.find(function(p) {
-              var active = p.is_active !== 0 && p.is_active !== false;
-              return active && (p.name || '').toLowerCase().includes(query);
-            });
-            if (matched) prodId = String(matched.id);
-          }
-          var qty = qtyInput ? (parseInt(qtyInput.value, 10) || 1) : 1;
-          if (prodId) {
-            itemsList.push({ product_id: prodId, quantity: qty });
-          }
-        });
+    if (_ownerMasterMenuState.menuItems && _ownerMasterMenuState.menuItems.length > 0) {
+      itemsList = _ownerMasterMenuState.menuItems;
+    } else {
+      var itemsBox = $('cm-items-container');
+      if (itemsBox) {
+        var domRows = itemsBox.querySelectorAll('[data-cm-item-index]');
+        if (domRows && domRows.length > 0) {
+          domRows.forEach(function(row) {
+            var sel = row.querySelector('[data-cm-item-product]');
+            var txt = row.querySelector('.x-cm-combobox-input');
+            var qtyInput = row.querySelector('[data-cm-item-qty]');
+            var prodId = (sel && sel.value) ? String(sel.value).trim() : '';
+            if (!prodId && txt && txt.value.trim()) {
+              var query = txt.value.trim().toLowerCase();
+              var matched = _ownerMasterMenuState.products.find(function(p) {
+                var active = p.is_active !== 0 && p.is_active !== false;
+                return active && (p.name || '').trim().toLowerCase() === query;
+              }) || _ownerMasterMenuState.products.find(function(p) {
+                var active = p.is_active !== 0 && p.is_active !== false;
+                return active && (p.name || '').toLowerCase().includes(query);
+              });
+              if (matched) prodId = String(matched.id);
+            }
+            var qty = qtyInput ? (parseInt(qtyInput.value, 10) || 1) : 1;
+            if (prodId) {
+              itemsList.push({ product_id: prodId, quantity: qty });
+            }
+          });
+        }
       }
     }
 
     if (!itemsList.length) {
-      itemsList = (_ownerMasterMenuState.menuItems && _ownerMasterMenuState.menuItems.length)
-        ? _ownerMasterMenuState.menuItems
-        : (_ownerMasterMenuState.packageComponents || []);
+      itemsList = _ownerMasterMenuState.packageComponents || [];
     }
     if (!itemsList.length && $('cm-product') && $('cm-product').value) {
       itemsList = [{ product_id: $('cm-product').value, quantity: 1 }];
@@ -1392,16 +1596,32 @@
 
       var payload = {
         category_id: categoryId,
+        categoryId: categoryId,
         title_id: titleId,
+        titleId: titleId,
+        title_name: titleInputText,
+        titleName: titleInputText,
         package_name: titleInputText,
+        packageName: titleInputText,
         rasa_id: rasaId,
+        rasaId: rasaId,
         description: ($('cm-description-input') && $('cm-description-input').value.trim()) || null,
         spice_enabled: spiceEnabled,
+        spiceEnabled: spiceEnabled,
         spice_level: spiceLevel,
+        spiceLevel: spiceLevel,
         selling_price: price,
+        sellingPrice: price,
+        price: price,
+        min_price: priceMin || price,
+        max_price: priceMax || price,
         cost_price: cost,
+        costPrice: cost,
+        cost: cost,
         items: validItems,
-        status: status
+        status: status,
+        is_active: status === 'ACTIVE',
+        isActive: status === 'ACTIVE'
       };
 
       var res = await adminFetch(endpoint, {
@@ -1610,7 +1830,15 @@
       var data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Gagal menghapus Menu Master.');
       showToast('✅ Menu "' + title + '" berhasil dihapus permanen.');
-      loadOwnerMasterMenus();
+      if ($('master-menu-editor-view') && $('master-menu-editor-view').style.display !== 'none') {
+        if (typeof goBackFromChildPage === 'function') {
+          goBackFromChildPage();
+        } else {
+          navigateTo('catalog/master-menus');
+        }
+      } else {
+        loadOwnerMasterMenus();
+      }
     } catch (err) {
       showToast('❌ ' + (err.message || 'Gagal menghapus Menu Master.'));
     }
@@ -1885,6 +2113,27 @@
     var desktopBack = $('btn-master-menu-editor-desktop-back');
     if (cancel) cancel.addEventListener('click', function() { navigateTo('catalog/master-menus'); });
     if (desktopBack) desktopBack.addEventListener('click', function() { goBackFromChildPage(); });
+
+    var headerDel = $('btn-delete-master-menu-header');
+    if (headerDel && !headerDel.dataset.bound) {
+      headerDel.dataset.bound = 'true';
+      headerDel.addEventListener('click', function(e) {
+        e.preventDefault();
+        var id = $('master-menu-id') ? $('master-menu-id').value : '';
+        var title = $('cm-title-input') ? $('cm-title-input').value : '';
+        if (id) deleteOwnerMasterMenu(id, title);
+      });
+    }
+    var actionDel = $('btn-delete-master-menu-action');
+    if (actionDel && !actionDel.dataset.bound) {
+      actionDel.dataset.bound = 'true';
+      actionDel.addEventListener('click', function(e) {
+        e.preventDefault();
+        var id = $('master-menu-id') ? $('master-menu-id').value : '';
+        var title = $('cm-title-input') ? $('cm-title-input').value : '';
+        if (id) deleteOwnerMasterMenu(id, title);
+      });
+    }
   }
 
   function switchPricePolicyMode(mode) {

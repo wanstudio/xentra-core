@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="/merchant-shared/css/modules/stock.css?v=1.0.3">
   <link rel="stylesheet" href="/merchant-shared/css/modules/catalog.css?v=1.0.4">
   <link rel="stylesheet" href="/merchant-shared/css/ui-primitives.css?v=1.0.1">
-  <link rel="stylesheet" href="/owner/assets/css/owner-app.css?v=1.0.15">
+  <link rel="stylesheet" href="/owner/assets/css/owner-app.css?v=1.0.16">
   <link rel="stylesheet" href="/owner/assets/bundles/menu-editor.css?v=1.0.3">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#ffffff">
@@ -4819,7 +4819,8 @@
 
         <!-- SUB-HUB: KATALOG & MENU (Xentra Owner - Bisnis - Katalog & Menu.png) -->
         <div id="subpage-catalog-menu-hub" style="display:none; margin-bottom:24px;">
-          <div class="x-owner-child-mobile-header" style="margin-bottom:16px;">
+          <div id="modern-catalog-subhub-mount"></div>
+          <div class="x-owner-child-mobile-header" style="display:none !important; margin-bottom:16px;">
             <h3 class="x-owner-mobile-page-title">
               <button type="button" class="x-title-back-btn x-owner-mobile-page-back" aria-label="Kembali" onclick="closeBusinessSubHub()">
                 <svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
@@ -4831,7 +4832,7 @@
           <!-- Hidden title for test contract compatibility -->
           <div style="display:none !important;"><h3 class="x-hub-section-title">Katalog</h3></div>
 
-          <div class="x-subhub-card-container">
+          <div class="x-subhub-card-container" style="display:none !important;">
             <div class="x-subhub-item-card" onclick="navigateTo('catalog/categories')">
               <div class="x-subhub-item-left">
                 <div class="x-subhub-item-icon bg-green">
@@ -6541,7 +6542,7 @@
   <script src="/merchant-dashboard/assets/js/modules/brand.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/catalog-reference.js?v=1.0.2"></script>
   <script src="/merchant-dashboard/assets/js/modules/catalog.js?v=1.0.2"></script>
-  <script src="/dashboard/assets/js/dashboard.js?v=3.1.2"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=3.1.3"></script>
   <script src="/merchant-dashboard/assets/js/owner-master-menu-inline.js?v=1.0.2"></script>
   <script src="/owner/assets/js/owner-app.js?v=1.0.1"></script>
 </body>

@@ -38,7 +38,7 @@
         'business', 'business/profile', 'business/info', 'business/legal',
         'locations',
         'commerce', 'commerce/orders', 'commerce/payments', 'commerce/fulfillment',
-        'channels', 'channels/website', 'channels/customer-app', 'channels/pos', 'channels/kiosk',
+        'channels', 'channels/website', 'channels/customer-app', 'channels/pos', 'channels/kiosk', 'channels/delivery',
         'integrations',
         'notifications',
         'security',
@@ -93,6 +93,7 @@
       else if (sec === 'channels/website') loadSettingsWebsite();
       else if (sec === 'channels/customer-app') loadSettingsCustomerApp();
       else if (sec === 'channels/pos') loadSettingsPos();
+      else if (sec === 'channels/delivery') loadSettingsDeliveryChannels();
       else if (sec === 'integrations') loadSettingsIntegrations();
       else if (sec === 'security') loadSettingsSecurity();
     }
@@ -356,12 +357,12 @@
         });
       }
 
-      // Settings Panel — PWA Icon Uploads for Owner, Merchant, POS Kasir, Belanja, Driver
+      // Settings Panel — PWA Icon Uploads for Owner, Merchant, POS Kasir, Pelanggan, Driver
       var pwaSettingsRoles = [
         { key: 'owner', label: 'Owner PWA', endpoint: '/admin/brand/owner-icon', defaultIcon: '/assets/pwa/icon-192.png' },
         { key: 'merchant', label: 'Merchant PWA', endpoint: '/admin/brand/merchant-icon', defaultIcon: '/merchant-app/assets/icons/icon-192.png' },
         { key: 'pos', label: 'POS Kasir PWA', endpoint: '/admin/brand/pos-icon', defaultIcon: '/pos/assets/icons/icon-192.png' },
-        { key: 'customer', label: 'Belanja PWA', endpoint: '/admin/brand/customer-icon', defaultIcon: '/assets/pwa/icon-192.png' },
+        { key: 'customer', label: 'Pelanggan PWA', endpoint: '/admin/brand/customer-icon', defaultIcon: '/assets/pwa/icon-192.png' },
         { key: 'driver', label: 'Driver PWA', endpoint: '/admin/brand/driver-icon', defaultIcon: '/driver-app/assets/icons/icon-192.png' }
       ];
 
@@ -926,6 +927,135 @@
       }
     }
     window.loadSettingsPos = loadSettingsPos;
+
+    // Delivery Integrations (GoFood, GrabFood, ShopeeFood)
+    async function loadSettingsDeliveryChannels() {
+      try {
+        var branchId = getEffectiveBranchId();
+        if (!branchId || branchId === 'all') {
+          if (window._branchContextState && Array.isArray(window._branchContextState.branches) && window._branchContextState.branches.length > 0) {
+            branchId = window._branchContextState.branches[0].id;
+          }
+        }
+        if (!branchId) return;
+
+        var res = await adminFetch(API_BASE + '/integrations/channel-settings?branch_id=' + encodeURIComponent(branchId), {
+          headers: getAuthHeaders()
+        });
+        if (!res.ok) return;
+        var json = await res.json();
+        if (!json.success || !Array.isArray(json.data)) return;
+
+        json.data.forEach(function (ch) {
+          var name = (ch.channel || '').toLowerCase();
+          var toggle = $('ojol-set-' + name + '-active');
+          var rate = $('ojol-set-' + name + '-rate');
+          var fee = $('ojol-set-' + name + '-fee');
+
+          if (toggle) toggle.checked = ch.is_active === true;
+          if (rate) rate.value = ch.commission_percent !== undefined ? ch.commission_percent : Math.round((ch.commission_rate || 0.20) * 100);
+          if (fee) fee.value = ch.platform_fee !== undefined ? ch.platform_fee : 1000;
+        });
+
+        updateOjolCalculator();
+      } catch (err) {
+        console.warn('[Load Delivery Channels Error]:', err);
+      }
+    }
+    window.loadSettingsDeliveryChannels = loadSettingsDeliveryChannels;
+
+    function updateOjolCalculator() {
+      var sampleInput = $('ojol-calc-sample-input');
+      var gross = Number(sampleInput ? sampleInput.value : 100000) || 100000;
+
+      ['gofood', 'grabfood', 'shopeefood'].forEach(function (ch) {
+        var toggle = $('ojol-set-' + ch + '-active');
+        var rateInput = $('ojol-set-' + ch + '-rate');
+        var feeInput = $('ojol-set-' + ch + '-fee');
+        var previewEl = $('ojol-calc-preview-' + ch);
+        var subEl = $('ojol-calc-sub-' + ch);
+
+        var isActive = toggle ? toggle.checked : true;
+        var ratePercent = Number(rateInput ? rateInput.value : 20) || 0;
+        var fee = Number(feeInput ? feeInput.value : 1000) || 0;
+
+        if (!isActive) {
+          if (previewEl) previewEl.textContent = 'Nonaktif';
+          if (subEl) subEl.textContent = 'Saluran dimatikan';
+          return;
+        }
+
+        var commAmount = Math.round(gross * (ratePercent / 100));
+        var totalFee = commAmount + fee;
+        var net = Math.max(0, gross - totalFee);
+
+        if (previewEl) previewEl.textContent = formatMoney(net);
+        if (subEl) subEl.textContent = 'Potongan: ' + formatMoney(totalFee) + ' (' + ratePercent + '% + ' + formatMoney(fee) + ')';
+      });
+    }
+    window.updateOjolCalculator = updateOjolCalculator;
+
+    async function saveOjolChannelSettings() {
+      var btn = $('btn-save-ojol-settings');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Menyimpan...';
+      }
+
+      try {
+        var branchId = getEffectiveBranchId();
+        if (!branchId || branchId === 'all') {
+          if (window._branchContextState && Array.isArray(window._branchContextState.branches) && window._branchContextState.branches.length > 0) {
+            branchId = window._branchContextState.branches[0].id;
+          }
+        }
+
+        if (!branchId) {
+          showToast('Pilih cabang terlebih dahulu untuk menyimpan pengaturan saluran.');
+          return;
+        }
+
+        var channels = ['gofood', 'grabfood', 'shopeefood'];
+        var payload = channels.map(function (ch) {
+          var toggle = $('ojol-set-' + ch + '-active');
+          var rate = $('ojol-set-' + ch + '-rate');
+          var fee = $('ojol-set-' + ch + '-fee');
+
+          return {
+            channel: ch,
+            is_active: toggle ? toggle.checked : true,
+            commission_percent: Number(rate ? rate.value : 20) || 20,
+            commission_rate: (Number(rate ? rate.value : 20) || 20) / 100,
+            platform_fee: Number(fee ? fee.value : 1000) || 1000,
+            auto_accept: true
+          };
+        });
+
+        var res = await adminFetch(API_BASE + '/integrations/channel-settings', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            branch_id: branchId,
+            settings: payload
+          })
+        });
+
+        var json = await res.json();
+        if (json.success) {
+          showToast('Pengaturan saluran ojol berhasil disimpan!');
+        } else {
+          showToast(json.error || 'Gagal menyimpan pengaturan saluran ojol.');
+        }
+      } catch (e) {
+        showToast('Terjadi kesalahan jaringan saat menyimpan.');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<span>💾</span><span>Simpan Pengaturan</span>';
+        }
+      }
+    }
+    window.saveOjolChannelSettings = saveOjolChannelSettings;
 
     // 8. Integrations
     async function loadSettingsIntegrations() {

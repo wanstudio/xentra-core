@@ -133,6 +133,11 @@ body.x-owner-mobile-app .x-owner-mobile-topbar {
 }
 
 /* 8. Sub-hub Cards Container (Katalog & Menu, Bahan & Produksi) matching design mockups */
+#subpage-catalog-menu-hub > .x-subhub-card-container,
+#subpage-catalog-menu-hub > .x-owner-child-mobile-header {
+  display: none !important;
+}
+
 body.x-owner-mobile-app .x-subhub-card-container,
 .x-subhub-card-container {
   background: #ffffff !important;
@@ -593,4 +598,134 @@ body.x-owner-mobile-app #master-categories-page-list .x-master-category-menu-lis
 #master-categories-page-list .x-toggle.x-toggle-on .x-toggle-slider::before {
   transform: translateX(18px) !important;
 }
+
+/* Master Menu Page & Editor Normalization (Strictly Matching Item Editor Reference) */
+body.x-owner-mobile-app #master-menu-editor-view,
+body.x-owner-mobile-app #master-menu-list-view,
+.x-owner-mobile-app #master-menu-editor-view,
+.x-owner-mobile-app #master-menu-list-view {
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+body.x-owner-mobile-app #form-master-menu,
+.x-owner-mobile-app #form-master-menu {
+  max-width: 920px !important;
+  width: 100% !important;
+  margin: 0 auto !important;
+  box-sizing: border-box !important;
+}
+
+body.x-owner-mobile-app #cm-items-container .x-composed-menu-component-row,
+.x-owner-mobile-app #cm-items-container .x-composed-menu-component-row {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  background: #FFFFFF !important;
+  border: 1px solid #CBD5E1 !important;
+  border-radius: 16px !important;
+  padding: 14px 16px !important;
+  gap: 12px !important;
+  grid-template-columns: none !important;
+  align-items: stretch !important;
+}
+
+body.x-owner-mobile-app #cm-items-container .x-cm-item-variant-block,
+.x-owner-mobile-app #cm-items-container .x-cm-item-variant-block {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+body.x-owner-mobile-app #master-menu-editor-view .x-card,
+body.x-owner-mobile-app #master-menu-editor-view .x-item-editor-card,
+.x-owner-mobile-app #master-menu-editor-view .x-card,
+.x-owner-mobile-app #master-menu-editor-view .x-item-editor-card {
+  width: 100% !important;
+  background: #FFFFFF !important;
+  border-radius: 18px !important;
+  border: 1px solid #E2E8F0 !important;
+  padding: 20px !important;
+  margin-bottom: 14px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02) !important;
+  box-sizing: border-box !important;
+}
+
+body.x-owner-mobile-app #master-menu-editor-view .x-item-editor-actions,
+.x-owner-mobile-app #master-menu-editor-view .x-item-editor-actions {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  width: 100% !important;
+  margin-top: 20px !important;
+  margin-bottom: 24px !important;
+}
+
+body.x-owner-mobile-app #master-menu-editor-view .x-item-editor-actions-row1,
+.x-owner-mobile-app #master-menu-editor-view .x-item-editor-actions-row1 {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 12px !important;
+  width: 100% !important;
+}
+
+body.x-owner-mobile-app #master-menu-editor-view .x-item-editor-actions-row1 button,
+.x-owner-mobile-app #master-menu-editor-view .x-item-editor-actions-row1 button {
+  flex: 1 1 0 !important;
+  height: 46px !important;
+  min-height: 46px !important;
+}
+
+body.x-owner-mobile-app #btn-save-master-menu-active,
+.x-owner-mobile-app #btn-save-master-menu-active {
+  width: 100% !important;
+  flex: none !important;
+  height: 46px !important;
+  min-height: 46px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: #00A637 !important;
+  border: none !important;
+  color: #FFFFFF !important;
+  border-radius: 12px !important;
+  font-weight: 700 !important;
+  font-size: 15px !important;
+}
+
+@media (max-width: 768px) {
+  body.x-owner-mobile-app #master-menu-editor-view.x-card-panel,
+  body.x-owner-mobile-app #master-menu-editor-view,
+  .x-owner-mobile-app #master-menu-editor-view.x-card-panel,
+  .x-owner-mobile-app #master-menu-editor-view {
+    padding: 4px 0 10px !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  body.x-owner-mobile-app #form-master-menu,
+  .x-owner-mobile-app #form-master-menu {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+  }
+
+  body.x-owner-mobile-app #master-menu-editor-view .x-card,
+  body.x-owner-mobile-app #master-menu-editor-view .x-item-editor-card,
+  .x-owner-mobile-app #master-menu-editor-view .x-card,
+  .x-owner-mobile-app #master-menu-editor-view .x-item-editor-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 16px !important;
+    border-radius: 16px !important;
+    margin-bottom: 12px !important;
+    box-sizing: border-box !important;
+  }
+}
+
 

@@ -672,12 +672,12 @@
       });
     }
 
-    // Brand Tab PWA Launcher Icon Listeners for Owner, Merchant, POS Kasir, Belanja, Driver
+    // Brand Tab PWA Launcher Icon Listeners for Owner, Merchant, POS Kasir, Pelanggan, Driver
     var pwaRoleConfig = [
       { key: 'owner', label: 'Owner PWA', endpoint: '/admin/brand/owner-icon', defaultIcon: '/assets/pwa/icon-192.png', iconKey: 'owner_pwa_icon_url' },
       { key: 'merchant', label: 'Merchant PWA', endpoint: '/admin/brand/merchant-icon', defaultIcon: '/merchant-app/assets/icons/icon-192.png', iconKey: 'merchant_pwa_icon_url' },
       { key: 'pos', label: 'POS Kasir PWA', endpoint: '/admin/brand/pos-icon', defaultIcon: '/pos/assets/icons/icon-192.png', iconKey: 'pos_pwa_icon_url' },
-      { key: 'customer', label: 'Belanja PWA', endpoint: '/admin/brand/customer-icon', defaultIcon: '/assets/pwa/icon-192.png', iconKey: 'customer_pwa_icon_url' },
+      { key: 'customer', label: 'Pelanggan PWA', endpoint: '/admin/brand/customer-icon', defaultIcon: '/assets/pwa/icon-192.png', iconKey: 'customer_pwa_icon_url' },
       { key: 'driver', label: 'Driver PWA', endpoint: '/admin/brand/driver-icon', defaultIcon: '/driver-app/assets/icons/icon-192.png', iconKey: 'driver_pwa_icon_url' }
     ];
 

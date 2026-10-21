@@ -29,18 +29,22 @@
     'marketing/promotions': 'bisnis',
     'marketing/banners': 'bisnis',
     'marketing/discounts': 'bisnis',
+    'marketing/affiliate': 'bisnis',
     'orders': 'pesanan',
     'finance': 'keuangan',
     'finance/overview': 'keuangan',
     'finance/transactions': 'keuangan',
     'finance/payouts': 'keuangan',
+    'finance/reconciliation': 'keuangan',
     'finance/payment-methods': 'keuangan',
+    'finance/channels': 'keuangan',
     'more': 'lainnya',
     'lainnya': 'lainnya',
     'team': 'lainnya',
     'settings': 'lainnya',
     'reports': 'lainnya',
     'settings/business/profile': 'lainnya',
+    'settings/channels/delivery': 'lainnya',
     'settings/security': 'lainnya'
   };
 

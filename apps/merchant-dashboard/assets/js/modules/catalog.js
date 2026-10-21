@@ -13,6 +13,7 @@
   var API_BASE = S.API_BASE || '/api/v1';
 
   function adminFetch(url, options) {
+    if (S && typeof S.adminFetch === 'function') return S.adminFetch(url, options);
     if (typeof window.adminFetch === 'function') return window.adminFetch(url, options);
     return fetch(url, options);
   }
@@ -143,9 +144,17 @@
       var prodRes = await adminFetch(API_BASE + '/admin/composed/products?active_only=0', { headers: authHeaders });
       var prodData = await prodRes.json();
 
-      if (prodData.success) state.products = prodData.products || [];
+      if (prodData.success) {
+        state.products = prodData.products || [];
+        if (window._ownerMasterMenuState) {
+          window._ownerMasterMenuState.products = prodData.products || [];
+        }
+      }
 
       renderMasterProductsTable();
+      if (typeof window.renderMasterItemsList === 'function') {
+        window.renderMasterItemsList();
+      }
     } catch (err) {
       console.error('[Master Products Load Error]:', err);
     }
@@ -751,6 +760,270 @@
     }
   }
 
+  var _productVariantState = {
+    mode: null,
+    variants: [
+      { name: 'Pedas', active: false, isPreset: true, type: 'level', level: 1 },
+      { name: 'Suhu (Panas/Dingin)', active: false, isPreset: true, type: 'radio' },
+      { name: 'Opsi lain', active: false, isPreset: false, type: 'checkbox', choices: ['pilihan 1'] }
+    ]
+  };
+
+  function selectVariantRadio(idx) {
+    if (!_productVariantState.variants || !_productVariantState.variants[idx]) return;
+    var currentlyActive = !!_productVariantState.variants[idx].active;
+    _productVariantState.variants.forEach(function (v, i) {
+      if (i === idx) {
+        v.active = !currentlyActive;
+        if (v.active) {
+          if (v.name === 'Pedas' && !v.level) {
+            v.level = 1;
+          }
+          if (!v.isPreset) {
+            if (!v.choices || !v.choices.length) {
+              v.choices = ['pilihan 1'];
+            }
+          }
+        }
+      } else {
+        v.active = false;
+      }
+    });
+    renderProductVariantChecklist();
+  }
+
+  function renderProductVariantChecklist() {
+    var container = $('prod-variant-checklist-items');
+    if (!container) return;
+
+    // Filter visible variants based on selected mode:
+    // "Kamu mengatur" (MERCHANT mode) does NOT include "Suhu (Panas/Dingin)"
+    var visibleVariants = (_productVariantState.variants || []).filter(function (v) {
+      if (_productVariantState.mode === 'MERCHANT' && v.name === 'Suhu (Panas/Dingin)') {
+        return false;
+      }
+      return true;
+    });
+
+    if (!visibleVariants.length) {
+      container.innerHTML = '<div style="font-size:12px;color:#94A3B8;padding:8px 0;">Belum ada pilihan varian.</div>';
+      return;
+    }
+
+    container.innerHTML = visibleVariants.map(function (v) {
+      var idx = _productVariantState.variants.indexOf(v);
+      var isAct = !!v.active;
+      var isPedas = (v.name === 'Pedas' || v.type === 'level');
+      var isCustom = !v.isPreset;
+      var choices = Array.isArray(v.choices) ? v.choices : [];
+
+      var pedasBuilderHtml = '';
+      if (isPedas && isAct) {
+        var currentLevel = Number(v.level) || 1;
+        var levelBoxesHtml = [1, 2, 3, 4, 5].map(function (lvl) {
+          var isSelected = (lvl === currentLevel);
+          return '<button type="button" class="x-pedas-level-box" data-variant-index="' + idx + '" data-level="' + lvl + '" style="flex:1;height:38px;border-radius:10px;border:' + (isSelected ? '1.5px solid #0F172A' : '1px solid #CBD5E1') + ';background:' + (isSelected ? '#0F172A' : '#FFFFFF') + ';color:' + (isSelected ? '#FFFFFF' : '#0F172A') + ';font-weight:700;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all 0.15s ease;">' + lvl + '</button>';
+        }).join('');
+
+        pedasBuilderHtml = '<div class="x-variant-pedas-builder" data-variant-index="' + idx + '" style="margin-top:10px;padding:12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;display:flex;flex-direction:column;gap:8px;">' +
+          '<div style="font-size:12px;font-weight:600;color:#0F172A;display:flex;align-items:center;justify-content:space-between;">' +
+            '<span>Tentukan Level Pedas:</span>' +
+            '<span style="font-size:11px;color:#64748B;font-weight:600;">Level ' + currentLevel + '</span>' +
+          '</div>' +
+          '<div class="x-pedas-level-selector" style="display:flex;gap:8px;">' +
+            levelBoxesHtml +
+          '</div>' +
+        '</div>';
+      }
+
+      var checkboxBuilderHtml = '';
+      if (isCustom && isAct) {
+        var choicesRowsHtml = choices.map(function (choiceText, choiceIdx) {
+          return '<div class="x-variant-choice-row" data-variant-index="' + idx + '" data-choice-index="' + choiceIdx + '" style="display:flex;align-items:center;gap:8px;">' +
+            '<input type="text" class="x-variant-choice-input" data-variant-index="' + idx + '" data-choice-index="' + choiceIdx + '" value="' + esc(choiceText) + '" placeholder="pilihan ' + (choiceIdx + 1) + '..." style="flex:1;height:36px;border-radius:10px;border:1px solid #CBD5E1;padding:0 12px;font-size:13px;background:#FFFFFF;color:#0F172A;outline:none;box-sizing:border-box;">' +
+            '<button type="button" class="x-btn-delete-choice" data-variant-index="' + idx + '" data-choice-index="' + choiceIdx + '" title="Hapus pilihan" aria-label="Hapus pilihan" style="width:36px;height:36px;border-radius:10px;border:1px solid #FECACA;background:#FEE2E2;color:#EF4444;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;padding:0;transition:all 0.15s ease;">' +
+              '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<polyline points="3 6 5 6 21 6"></polyline>' +
+                '<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>' +
+                '<line x1="10" y1="11" x2="10" y2="17"></line>' +
+                '<line x1="14" y1="11" x2="14" y2="17"></line>' +
+              '</svg>' +
+            '</button>' +
+          '</div>';
+        }).join('');
+
+        checkboxBuilderHtml = '<div class="x-variant-checkbox-builder" data-variant-index="' + idx + '" style="margin-top:10px;padding:12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;display:flex;flex-direction:column;gap:8px;">' +
+          '<div class="x-variant-choices-list" data-variant-index="' + idx + '" style="display:flex;flex-direction:column;gap:8px;">' +
+            choicesRowsHtml +
+          '</div>' +
+          '<button type="button" class="x-btn-add-choice" data-variant-index="' + idx + '" style="align-self:flex-start;margin-top:4px;height:36px;padding:0 14px;background:#FFFFFF;border:1px solid #CBD5E1;border-radius:10px;font-size:13px;font-weight:600;color:#0F172A;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all 0.15s ease;">' +
+            '<span style="font-size:16px;font-weight:700;line-height:1;">+</span>' +
+            '<span>Tambah pilihan</span>' +
+          '</button>' +
+        '</div>';
+      }
+
+      return '<div class="x-variant-item-row" data-variant-name="' + esc(v.name) + '" data-variant-index="' + idx + '" style="display:flex;flex-direction:column;border:1px solid ' + (isAct ? '#10B981' : '#E2E8F0') + ';border-radius:12px;background:' + (isAct ? '#F0FDF4' : '#FFFFFF') + ';padding:12px 14px;transition:all 0.15s ease;margin-bottom:8px;">' +
+        '<div class="x-variant-item-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;">' +
+          (isCustom
+            ? '<input type="text" class="x-variant-name-edit" data-variant-index="' + idx + '" value="' + esc(v.name) + '" placeholder="Opsi lain..." style="flex:1;border:none;border-bottom:1.5px solid #0F172A;border-radius:0;background:transparent;font-size:14px;font-weight:700;color:#0F172A;outline:none;padding:2px 0;">'
+            : '<span style="font-size:14px;font-weight:700;color:#0F172A;flex:1;">' + esc(v.name) + '</span>'
+          ) +
+          '<div class="x-variant-check-indicator' + (isAct ? ' active' : '') + '" data-variant-index="' + idx + '" role="radio" aria-checked="' + (isAct ? 'true' : 'false') + '" style="width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all 0.15s ease;' + (isAct ? 'background:#FFFFFF;border:2px solid #10B981;' : 'background:#FFFFFF;border:2px solid #CBD5E1;') + '">' +
+            (isAct ? '<span style="width:10px;height:10px;border-radius:50%;background:#10B981;display:inline-block;"></span>' : '') +
+          '</div>' +
+        '</div>' +
+        pedasBuilderHtml +
+        checkboxBuilderHtml +
+      '</div>';
+    }).join('');
+
+    container.querySelectorAll('.x-pedas-level-box').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var vIdx = Number(btn.dataset.variantIndex);
+        var chosenLevel = Number(btn.dataset.level) || 1;
+        if (_productVariantState.variants[vIdx]) {
+          _productVariantState.variants[vIdx].level = chosenLevel;
+          _productVariantState.variants[vIdx].active = true;
+          renderProductVariantChecklist();
+        }
+      });
+    });
+
+    container.querySelectorAll('.x-variant-check-indicator').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var idx = Number(btn.dataset.variantIndex);
+        selectVariantRadio(idx);
+      });
+    });
+
+    container.querySelectorAll('.x-variant-item-row').forEach(function (row) {
+      row.addEventListener('click', function (e) {
+        if (e.target.closest('.x-variant-name-edit') || e.target.closest('.x-variant-checkbox-builder') || e.target.closest('.x-variant-pedas-builder')) return;
+        var idx = Number(row.dataset.variantIndex);
+        selectVariantRadio(idx);
+      });
+    });
+
+    container.querySelectorAll('.x-variant-name-edit').forEach(function (input) {
+      input.addEventListener('input', function () {
+        var idx = Number(input.dataset.variantIndex);
+        if (_productVariantState.variants[idx]) {
+          _productVariantState.variants[idx].name = input.value;
+          var parentRow = input.closest('.x-variant-item-row');
+          if (parentRow) parentRow.dataset.variantName = input.value;
+        }
+      });
+      input.addEventListener('change', function () {
+        var idx = Number(input.dataset.variantIndex);
+        if (_productVariantState.variants[idx]) {
+          _productVariantState.variants[idx].name = input.value.trim() || 'Opsi lain';
+        }
+      });
+    });
+
+    container.querySelectorAll('.x-variant-choice-input').forEach(function (input) {
+      input.addEventListener('input', function () {
+        var vIdx = Number(input.dataset.variantIndex);
+        var cIdx = Number(input.dataset.choiceIndex);
+        if (_productVariantState.variants[vIdx] && Array.isArray(_productVariantState.variants[vIdx].choices)) {
+          _productVariantState.variants[vIdx].choices[cIdx] = input.value;
+        }
+      });
+    });
+
+    container.querySelectorAll('.x-btn-delete-choice').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var vIdx = Number(btn.dataset.variantIndex);
+        var cIdx = Number(btn.dataset.choiceIndex);
+        if (_productVariantState.variants[vIdx] && Array.isArray(_productVariantState.variants[vIdx].choices)) {
+          _productVariantState.variants[vIdx].choices.splice(cIdx, 1);
+          renderProductVariantChecklist();
+        }
+      });
+    });
+
+    container.querySelectorAll('.x-btn-add-choice').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var vIdx = Number(btn.dataset.variantIndex);
+        if (_productVariantState.variants[vIdx]) {
+          if (!Array.isArray(_productVariantState.variants[vIdx].choices)) {
+            _productVariantState.variants[vIdx].choices = [];
+          }
+          var nextNum = _productVariantState.variants[vIdx].choices.length + 1;
+          _productVariantState.variants[vIdx].choices.push('pilihan ' + nextNum);
+          renderProductVariantChecklist();
+          var newInputs = container.querySelectorAll('.x-variant-choice-input[data-variant-index="' + vIdx + '"]');
+          if (newInputs && newInputs.length) {
+            var lastInput = newInputs[newInputs.length - 1];
+            lastInput.focus();
+            if (typeof lastInput.select === 'function') lastInput.select();
+          }
+        }
+      });
+    });
+  }
+
+  function selectProductVariantMode(targetMode) {
+    if (_productVariantState.mode === targetMode) {
+      _productVariantState.mode = null;
+    } else {
+      _productVariantState.mode = targetMode;
+      // In MERCHANT mode ("Kamu mengatur"), Suhu is not supported
+      if (targetMode === 'MERCHANT') {
+        _productVariantState.variants.forEach(function (v) {
+          if (v.name === 'Suhu (Panas/Dingin)') {
+            v.active = false;
+          }
+        });
+      }
+    }
+    updateProductVariantUI();
+  }
+
+  function updateProductVariantUI() {
+    var toggleMerchant = $('toggle-prod-variant-merchant');
+    var toggleCustomer = $('toggle-prod-variant-customer');
+    if (toggleMerchant) toggleMerchant.checked = (_productVariantState.mode === 'MERCHANT');
+    if (toggleCustomer) toggleCustomer.checked = (_productVariantState.mode === 'CUSTOMER');
+
+    var container = $('container-prod-variant-options');
+    if (container) {
+      container.style.display = _productVariantState.mode ? 'block' : 'none';
+      if (_productVariantState.mode) {
+        renderProductVariantChecklist();
+      }
+    }
+  }
+
+  function addProductVariantOption(name) {
+    var trimmed = String(name || '').trim();
+    if (!trimmed) return;
+    var exists = _productVariantState.variants.some(function (v) {
+      return v.name.toLowerCase() === trimmed.toLowerCase();
+    });
+    if (!exists) {
+      // Radio button behavior: unselect existing variants and select new one
+      _productVariantState.variants.forEach(function (v) {
+        v.active = false;
+      });
+      _productVariantState.variants.push({
+        name: trimmed,
+        active: true,
+        isPreset: false,
+        type: 'checkbox',
+        choices: ['pilihan 1']
+      });
+      renderProductVariantChecklist();
+    }
+    var input = $('input-new-prod-variant');
+    if (input) input.value = '';
+  }
+
   function resetProductEditorForAdd() {
     $('product-editor-title').textContent = 'Tambah Item';
     $('prod-editor-breadcrumb').textContent = 'Tambah Item';
@@ -766,8 +1039,7 @@
       if (window.XentraCurrencyInput) window.XentraCurrencyInput.setValue($('prod-cost-price'), '');
       else $('prod-cost-price').value = '';
     }
-    if ($('prod-recipe-status-text')) $('prod-recipe-status-text').textContent = 'Belum Ada Resep';
-    if ($('prod-recipe-subtext')) $('prod-recipe-subtext').textContent = 'Formula bahan dapat ditambahkan setelah item disimpan di tab Resep Makanan';
+    if ($('prod-recipe-status-text')) $('prod-recipe-status-text').textContent = 'Resep: Belum Ada Resep';
     if ($('prod-recipe-cost-display')) $('prod-recipe-cost-display').textContent = 'Rp0';
     if ($('prod-recipe-components-preview')) {
       $('prod-recipe-components-preview').innerHTML = '<div style="color:#64748B;font-size:11px;">Belum ada resep terkait item ini</div>';
@@ -782,6 +1054,15 @@
     }
     updateProductInventoryTypeUI('COOKED');
     updateProductStockManageUI(false);
+    _productVariantState = {
+      mode: null,
+      variants: [
+        { name: 'Pedas', active: false, isPreset: true, type: 'level', level: 1 },
+        { name: 'Suhu (Panas/Dingin)', active: false, isPreset: true, type: 'radio' },
+        { name: 'Opsi lain', active: false, isPreset: false, type: 'checkbox', choices: ['Pilihan 1', 'Pilihan 2', 'Pilihan 3'] }
+      ]
+    };
+    updateProductVariantUI();
     _productEditorActiveState = 1;
     _productImageFile = null;
     _productCropSpec = null;
@@ -814,21 +1095,90 @@
       else $('prod-cost-price').value = costVal;
     }
 
+    var rawOpt = prod.options_config;
+    var parsedOpt = null;
+    if (rawOpt) {
+      if (typeof rawOpt === 'object') parsedOpt = rawOpt;
+      else {
+        try { parsedOpt = JSON.parse(rawOpt); } catch (_) {}
+      }
+    }
+
+    var basePedas = { name: 'Pedas', active: false, isPreset: true, type: 'level', level: 1 };
+    var baseSuhu = { name: 'Suhu (Panas/Dingin)', active: false, isPreset: true, type: 'radio' };
+    var baseCustom = { name: 'Opsi lain', active: false, isPreset: false, type: 'checkbox', choices: ['pilihan 1'] };
+
+    if (parsedOpt && parsedOpt.mode && Array.isArray(parsedOpt.variants)) {
+      var loadedPedas = parsedOpt.variants.find(function(v) { return v.name === 'Pedas' || v.type === 'level'; });
+      var loadedSuhu = parsedOpt.variants.find(function(v) { return v.name === 'Suhu (Panas/Dingin)' || (v.isPreset && v.type === 'radio'); });
+      var loadedCustoms = parsedOpt.variants.filter(function(v) {
+        return (v !== loadedPedas) && (v !== loadedSuhu) && (v.name !== 'Pedas') && (v.name !== 'Suhu (Panas/Dingin)');
+      });
+
+      if (loadedPedas) {
+        basePedas.active = !!loadedPedas.active;
+        basePedas.level = Number(loadedPedas.level) || 1;
+      }
+      if (loadedSuhu) {
+        baseSuhu.active = !!loadedSuhu.active;
+      }
+      if (loadedCustoms.length > 0) {
+        baseCustom.name = loadedCustoms[0].name || 'Opsi lain';
+        baseCustom.active = !!loadedCustoms[0].active;
+        baseCustom.choices = Array.isArray(loadedCustoms[0].choices) && loadedCustoms[0].choices.length
+          ? loadedCustoms[0].choices.map(function(c) { return typeof c === 'string' ? c : (c && c.name ? c.name : ''); }).filter(Boolean)
+          : ['pilihan 1'];
+        if (!baseCustom.choices.length) baseCustom.choices = ['pilihan 1'];
+      }
+
+      var mergedVariants = [basePedas, baseSuhu, baseCustom];
+      for (var ci = 1; ci < loadedCustoms.length; ci++) {
+        var extraC = loadedCustoms[ci];
+        mergedVariants.push({
+          name: extraC.name || ('Opsi ' + (ci + 1)),
+          active: !!extraC.active,
+          isPreset: false,
+          type: extraC.type || 'checkbox',
+          choices: Array.isArray(extraC.choices) && extraC.choices.length
+            ? extraC.choices.map(function(c) { return typeof c === 'string' ? c : (c && c.name ? c.name : ''); }).filter(Boolean)
+            : ['pilihan 1']
+        });
+      }
+
+      _productVariantState = {
+        mode: parsedOpt.mode,
+        variants: mergedVariants
+      };
+
+      if (_productVariantState.mode === 'MERCHANT') {
+        _productVariantState.variants.forEach(function (v) {
+          if (v.name === 'Suhu (Panas/Dingin)') v.active = false;
+        });
+      }
+    } else {
+      _productVariantState = {
+        mode: null,
+        variants: [basePedas, baseSuhu, baseCustom]
+      };
+    }
+    updateProductVariantUI();
+
     var recipe = prod.recipe;
     var previewEl = $('prod-recipe-components-preview');
     var linkContainer = $('container-link-goto-recipe');
     var linkGoto = $('link-goto-recipe');
 
     if (recipe && (recipe.cost_per_unit > 0 || (recipe.components && recipe.components.length > 0))) {
-      if ($('prod-recipe-status-text')) $('prod-recipe-status-text').textContent = recipe.name || 'Resep Terdaftar';
-      if ($('prod-recipe-subtext')) $('prod-recipe-subtext').textContent = 'Formula bahan baku otomatis (' + (recipe.yield_quantity || 1) + ' ' + (recipe.yield_uom_name || 'porsi') + ')';
+      var rName = recipe.name || 'Resep Terdaftar';
+      if (!rName.toLowerCase().startsWith('resep:')) rName = 'Resep: ' + rName;
+      if ($('prod-recipe-status-text')) $('prod-recipe-status-text').textContent = rName;
       if ($('prod-recipe-cost-display')) $('prod-recipe-cost-display').textContent = formatMoney(recipe.cost_per_unit || 0);
       if (previewEl && Array.isArray(recipe.components) && recipe.components.length > 0) {
         var compList = recipe.components.slice(0, 3).map(function(c) {
-          return '<div style="margin-bottom:3px;">+ ' + esc(c.material_name) + ' (' + c.planned_quantity + ' ' + esc(c.uom_name) + ')</div>';
+          return '<div style="margin-bottom:3px;">• ' + esc(c.material_name) + ' (' + c.planned_quantity + ' ' + esc(c.uom_name) + ')</div>';
         }).join('');
         if (recipe.components.length > 3) {
-          compList += '<div style="color:#64748B;font-size:11px;margin-top:2px;">+ dan bahan lainnya</div>';
+          compList += '<div style="color:#64748B;font-size:11px;margin-top:2px;">• dan bahan lainnya...</div>';
         }
         previewEl.innerHTML = compList;
         previewEl.style.display = 'block';
@@ -851,8 +1201,7 @@
         }
       }
     } else {
-      if ($('prod-recipe-status-text')) $('prod-recipe-status-text').textContent = 'Belum Ada Resep';
-      if ($('prod-recipe-subtext')) $('prod-recipe-subtext').textContent = 'Atur komposisi bahan di tab Resep Makanan untuk menghitung HPP otomatis';
+      if ($('prod-recipe-status-text')) $('prod-recipe-status-text').textContent = 'Resep: Belum Ada Resep';
       if ($('prod-recipe-cost-display')) $('prod-recipe-cost-display').textContent = formatMoney(prod.cost_price || 0);
       if (previewEl) {
         previewEl.innerHTML = '<div style="color:#64748B;font-size:11px;">Belum ada resep terkait item ini</div>';
@@ -1536,6 +1885,41 @@ async function loadMenusView() {
       });
     }
 
+    // Product Variant Radio-Toggle event listeners
+    var toggleVarMerchant = $('toggle-prod-variant-merchant');
+    if (toggleVarMerchant && !toggleVarMerchant.dataset.bound) {
+      toggleVarMerchant.dataset.bound = 'true';
+      toggleVarMerchant.addEventListener('change', function () {
+        selectProductVariantMode('MERCHANT');
+      });
+    }
+
+    var rowVarMerchant = $('row-prod-variant-merchant');
+    if (rowVarMerchant && !rowVarMerchant.dataset.bound) {
+      rowVarMerchant.dataset.bound = 'true';
+      rowVarMerchant.addEventListener('click', function (e) {
+        if (e.target && e.target.closest && e.target.closest('label.x-toggle')) return;
+        selectProductVariantMode('MERCHANT');
+      });
+    }
+
+    var toggleVarCustomer = $('toggle-prod-variant-customer');
+    if (toggleVarCustomer && !toggleVarCustomer.dataset.bound) {
+      toggleVarCustomer.dataset.bound = 'true';
+      toggleVarCustomer.addEventListener('change', function () {
+        selectProductVariantMode('CUSTOMER');
+      });
+    }
+
+    var rowVarCustomer = $('row-prod-variant-customer');
+    if (rowVarCustomer && !rowVarCustomer.dataset.bound) {
+      rowVarCustomer.dataset.bound = 'true';
+      rowVarCustomer.addEventListener('click', function (e) {
+        if (e.target && e.target.closest && e.target.closest('label.x-toggle')) return;
+        selectProductVariantMode('CUSTOMER');
+      });
+    }
+
     var linkGotoRecipe = $('link-goto-recipe');
     if (linkGotoRecipe && !linkGotoRecipe.dataset.bound) {
       linkGotoRecipe.dataset.bound = 'true';
@@ -1831,13 +2215,66 @@ async function loadMenusView() {
           var rawCost = window.XentraCurrencyInput ? window.XentraCurrencyInput.getValue($('prod-cost-price')) : $('prod-cost-price').value.replace(/\D/g, '');
           costPrice = rawCost !== '' && !isNaN(Number(rawCost)) ? Number(rawCost) : null;
         }
+        var isMerchant = $('toggle-prod-variant-merchant') ? $('toggle-prod-variant-merchant').checked : false;
+        var isCustomer = $('toggle-prod-variant-customer') ? $('toggle-prod-variant-customer').checked : false;
+        var activeMode = isMerchant ? 'MERCHANT' : (isCustomer ? 'CUSTOMER' : null);
+        if (_productVariantState) {
+          _productVariantState.mode = activeMode;
+        }
+
+        var containerChecklist = $('prod-variant-checklist-items');
+        if (containerChecklist && _productVariantState && Array.isArray(_productVariantState.variants)) {
+          containerChecklist.querySelectorAll('.x-variant-name-edit').forEach(function (input) {
+            var idx = Number(input.dataset.variantIndex);
+            if (_productVariantState.variants[idx]) {
+              var val = input.value.trim();
+              if (val) _productVariantState.variants[idx].name = val;
+            }
+          });
+          containerChecklist.querySelectorAll('.x-variant-choice-input').forEach(function (input) {
+            var vIdx = Number(input.dataset.variantIndex);
+            var cIdx = Number(input.dataset.choiceIndex);
+            if (_productVariantState.variants[vIdx] && Array.isArray(_productVariantState.variants[vIdx].choices)) {
+              _productVariantState.variants[vIdx].choices[cIdx] = input.value.trim();
+            }
+          });
+        }
+
+        var optionsConfig = null;
+        if (activeMode && _productVariantState) {
+          optionsConfig = {
+            mode: activeMode,
+            variants: (_productVariantState.variants || []).filter(function (v) {
+              if (activeMode === 'MERCHANT' && v.name === 'Suhu (Panas/Dingin)') {
+                return false;
+              }
+              return true;
+            }).map(function (v) {
+              return {
+                name: v.name,
+                active: !!v.active,
+                isPreset: !!v.isPreset,
+                type: v.type || (v.isPreset ? (v.name === 'Pedas' ? 'level' : 'radio') : 'checkbox'),
+                level: (v.name === 'Pedas' ? (Number(v.level) || 1) : undefined),
+                choices: Array.isArray(v.choices) ? v.choices.map(function (c) {
+                  return typeof c === 'string' ? c.trim() : (c && c.name ? c.name.trim() : '');
+                }).filter(Boolean) : []
+              };
+            })
+          };
+        }
         var payload = {
           name: $('prod-name').value.trim(),
           sku: sku || null,
           cost_price: costPrice,
+          costPrice: costPrice,
           inventory_type: invType,
+          inventoryType: invType,
           description: $('prod-desc').value,
-          is_active: id ? _productEditorActiveState : 1
+          options_config: optionsConfig,
+          optionsConfig: optionsConfig,
+          is_active: id ? _productEditorActiveState : 1,
+          isActive: id ? !!_productEditorActiveState : true
         };
 
         if (!payload.name) {
@@ -1928,6 +2365,20 @@ async function loadMenusView() {
 
           showToast('✅ Item berhasil disimpan.');
           await loadMasterProducts();
+          if (window._ownerMasterMenuState) {
+            if (data.product) {
+              var mIdx = (_ownerMasterMenuState.products || []).findIndex(function(p) { return String(p.id) === String(savedId); });
+              if (mIdx >= 0) {
+                _ownerMasterMenuState.products[mIdx] = Object.assign({}, _ownerMasterMenuState.products[mIdx], data.product);
+              }
+            }
+          }
+          if (typeof window.renderOwnerMasterMenuItems === 'function') {
+            window.renderOwnerMasterMenuItems();
+          }
+          if (typeof window.renderMasterItemsList === 'function') {
+            window.renderMasterItemsList();
+          }
           showItemSavedPromptModal(savedId);
         } catch (err) {
           showToast('❌ ' + ((err && err.message) || 'Gagal menyimpan Item.'));

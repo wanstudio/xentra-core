@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="/merchant-shared/fonts/plus-jakarta-sans.css?v=1.0.0">
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.5">
   <link rel="stylesheet" href="/merchant-shared/css/presentation-shells.css?v=1.0.4">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.65">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.72">
   <link rel="stylesheet" href="/merchant-shared/css/modules/marketing.css?v=1.0.0">
   <link rel="stylesheet" href="/merchant-shared/css/modules/stock.css?v=1.0.3">
   <link rel="stylesheet" href="/merchant-shared/css/modules/catalog.css?v=1.0.4">
@@ -756,15 +756,15 @@
                     </div>
                   </div>
 
-                  <!-- Field 4: Belanja -->
+                  <!-- Field 4: Pelanggan (Customer PWA) -->
                   <div class="x-form-group">
-                    <label style="font-weight:600;font-size:13px;">Belanja</label>
+                    <label style="font-weight:600;font-size:13px;">Pelanggan (Pesan Menu)</label>
                     <div style="margin-bottom:8px;">
-                      <input type="text" id="brand-tab-customer-pwa-name" class="x-input" placeholder="Nama aplikasi (kosong = nama brand)" style="font-size:12px;">
+                      <input type="text" id="brand-tab-customer-pwa-name" class="x-input" placeholder="Nama aplikasi (contoh: MyBangjo)" style="font-size:12px;">
                     </div>
                     <div class="x-image-upload-control">
                       <div class="x-image-upload-preview-box" id="brand-tab-customer-icon-preview-box" style="width:72px;height:72px;border-radius:14px;">
-                        <img id="brand-tab-customer-icon-preview" src="/assets/pwa/icon-192.png" alt="Belanja Icon" style="width:100%;height:100%;object-fit:cover;border-radius:14px;">
+                        <img id="brand-tab-customer-icon-preview" src="/assets/pwa/icon-192.png" alt="Pelanggan Icon" style="width:100%;height:100%;object-fit:cover;border-radius:14px;">
                       </div>
                       <div class="x-image-upload-info">
                         <div class="x-image-upload-actions">
@@ -773,7 +773,7 @@
                         </div>
                         <input type="file" id="input-brand-tab-customer-icon-file" accept="image/jpeg,image/png,image/webp" class="x-file-input-hidden">
                         <input type="hidden" id="brand-tab-customer-icon" value="">
-                        <div class="x-image-specs-text" style="font-size:11px;color:var(--text-muted);margin-top:4px;">JPG, PNG, atau WebP · Maks. 10 MB · Rasio 1:1. Icon aplikasi Belanja pelanggan setelah di-install.</div>
+                        <div class="x-image-specs-text" style="font-size:11px;color:var(--text-muted);margin-top:4px;">JPG, PNG, atau WebP · Maks. 10 MB · Rasio 1:1. Icon aplikasi belanja/pesan menu pelanggan setelah di-install.</div>
                       </div>
                     </div>
                   </div>
@@ -2132,13 +2132,13 @@
         <div id="group-prod-recipe-cost-info">
           <h4 style="margin:0 0 10px 0;font-size:15px;font-weight:700;color:#0F172A;">HPP bahan</h4>
           <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:14px;padding:16px;">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
-              <div>
-                <div id="prod-recipe-status-text" style="font-size:13px;font-weight:700;color:#0F172A;">Resep: Belum Ada Resep</div>
-                <div id="prod-recipe-subtext" style="font-size:11px;color:#64748B;margin-top:2px;">HPP per porsi</div>
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px;">
+              <div style="flex:1;min-width:0;">
+                <div id="prod-recipe-status-text" style="font-size:14px;font-weight:700;color:#0F172A;line-height:1.35;word-break:break-word;">Resep: Belum Ada Resep</div>
               </div>
-              <div style="text-align:right;">
-                <div id="prod-recipe-cost-display" style="font-size:18px;font-weight:800;color:#0F172A;">Rp0</div>
+              <div style="flex-shrink:0;text-align:right;">
+                <div id="prod-recipe-cost-display" style="font-size:16px;font-weight:800;color:#16A34A;line-height:1.2;">Rp0</div>
+                <div id="prod-recipe-subtext" style="font-size:11px;color:#64748B;margin-top:3px;">HPP item/pcs</div>
               </div>
             </div>
             <div id="prod-recipe-components-preview" style="font-size:12px;color:#475569;line-height:1.6;border-top:1px dashed #E2E8F0;padding-top:10px;display:none;"></div>
@@ -2173,7 +2173,59 @@
         <small id="prod-stock-note" class="text-muted" style="display:block;margin-top:6px;font-size:11px;color:#64748B;">item non-stock tetap bisa di pakai untuk membuat menu</small>
       </div>
 
-      <!-- 6. CATATAN CARD -->
+      <!-- 6. VARIAN CARD (RADIO-TOGGLE) -->
+      <div class="x-card x-item-editor-card" id="card-prod-variants" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+        <h4 style="margin:0 0 14px 0;font-size:15px;font-weight:700;color:#0F172A;">Varian</h4>
+
+        <!-- Row 1: Kamu mengatur -->
+        <div id="row-prod-variant-merchant" class="x-variant-toggle-row" style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #F1F5F9;cursor:pointer;">
+          <div style="display:flex;align-items:center;gap:12px;flex:1;padding-right:16px;">
+            <div style="width:38px;height:38px;border-radius:10px;background:#4285F4;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5z"></path>
+                <path d="M9 16v5a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-5"></path>
+              </svg>
+            </div>
+            <div>
+              <div style="font-weight:700;font-size:14px;color:#0F172A;">Kamu mengatur</div>
+              <div style="font-size:11.5px;color:#64748B;margin-top:2px;line-height:1.35;">Tentukan varian pada menu yang kamu jual</div>
+            </div>
+          </div>
+          <label class="x-toggle x-toggle-variant-merchant" style="margin:0;">
+            <input type="checkbox" id="toggle-prod-variant-merchant" aria-label="Kamu mengatur varian">
+            <span class="x-toggle-slider"></span>
+          </label>
+        </div>
+
+        <!-- Row 2: Pelanggan memilih -->
+        <div id="row-prod-variant-customer" class="x-variant-toggle-row" style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;cursor:pointer;">
+          <div style="display:flex;align-items:center;gap:12px;flex:1;padding-right:16px;">
+            <div style="width:38px;height:38px;border-radius:10px;background:#EA4335;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+            </div>
+            <div>
+              <div style="font-weight:700;font-size:14px;color:#0F172A;">Pelanggan memilih</div>
+              <div style="font-size:11.5px;color:#64748B;margin-top:2px;line-height:1.35;">Buat varian buat pelangganmu agar bisa memilih</div>
+            </div>
+          </div>
+          <label class="x-toggle x-toggle-variant-customer" style="margin:0;">
+            <input type="checkbox" id="toggle-prod-variant-customer" aria-label="Pelanggan memilih varian">
+            <span class="x-toggle-slider"></span>
+          </label>
+        </div>
+
+        <!-- Sub-container: Variants checklist -->
+        <div id="container-prod-variant-options" style="display:none;margin-top:14px;padding-top:14px;border-top:1px dashed #E2E8F0;">
+          <div id="prod-variant-checklist-items" style="display:flex;flex-direction:column;gap:10px;"></div>
+        </div>
+      </div>
+
+      <!-- 7. CATATAN CARD -->
       <div class="x-card x-item-editor-card" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
         <h4 style="margin:0 0 8px 0;font-size:15px;font-weight:700;color:#0F172A;">Catatan</h4>
         <textarea id="prod-desc" class="x-input" rows="3" placeholder="Catatan internal..." style="width:100%;border-radius:12px;border:1px solid #CBD5E1;padding:10px 14px;font-size:13px;box-sizing:border-box;"></textarea>
@@ -2239,221 +2291,216 @@
 
         <!-- PAGE: ADD / EDIT COMPOSED MENU -->
         <section id="master-menu-editor-view" class="x-card-panel x-owner-child-page-shell" style="display:none;">
-          <div class="x-owner-child-mobile-header">
-            <h3 class="x-owner-mobile-page-title">
-              <button type="button" class="x-title-back-btn x-owner-mobile-page-back" id="btn-master-menu-editor-back" aria-label="Kembali" onclick="goBackFromChildPage()">
-                <svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg>
+          <div class="x-owner-child-mobile-header" id="master-menu-editor-mobile-header">
+            <h3 class="x-owner-mobile-page-title" style="display:flex;align-items:center;justify-content:space-between;width:100%;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <button type="button" class="x-title-back-btn x-owner-mobile-page-back" id="btn-master-menu-editor-back" aria-label="Kembali" onclick="goBackFromChildPage()">
+                  <svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+                </button>
+                <span id="master-menu-editor-mobile-title">Tambah Menu</span>
+                <span id="master-menu-editor-title" style="display:none;" aria-hidden="true">Tambah Menu</span>
+              </div>
+              <button type="button" id="btn-delete-master-menu-header" class="x-item-editor-delete-btn" style="display:none;color:#ef4444;background:none;border:none;cursor:pointer;padding:6px;" aria-label="Hapus Menu">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
               </button>
-              <span id="master-menu-editor-mobile-title">Tambah Menu</span>
             </h3>
-            <p class="x-owner-mobile-page-sub" id="master-menu-editor-mobile-subtitle">Menu adalah entitas komersial customer; Product adalah unit komposisi internal.</p>
+            <p class="x-owner-mobile-page-sub" id="master-menu-editor-mobile-subtitle" style="display:none;">Menu adalah entitas komersial customer; Product adalah unit komposisi internal.</p>
           </div>
 
           <div class="x-product-editor-breadcrumb-row x-owner-child-legacy-nav" style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
-            <button type="button" class="x-btn-secondary" id="btn-master-menu-editor-desktop-back" style="padding:6px 12px;font-size:13px;">
-              <svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg> Kembali ke Menu Master
+            <button type="button" class="x-btn-secondary" id="btn-master-menu-editor-desktop-back" style="padding:6px 12px;font-size:13px;" onclick="goBackFromChildPage()">
+              <svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg> Kembali ke Menu Master
             </button>
             <span class="text-muted" style="font-size:13px;">/</span>
             <span id="master-menu-editor-breadcrumb" style="font-weight:600;font-size:14px;">Tambah Menu</span>
           </div>
 
-          <form id="form-master-menu" class="x-form" style="margin:0;">
+          <form id="form-master-menu" class="x-form x-product-editor-form" style="max-width:920px;margin:0 auto;width:100%;">
             <input type="hidden" id="master-menu-id" value="">
             <input type="hidden" id="master-menu-type" value="SINGLE">
-            <span id="master-menu-editor-title" style="display:none;"></span>
 
-            <div class="x-menu-editor-workspace">
-              <!-- PANE KIRI (MAIN FORM): Kartu-kartu komposisi menu -->
-              <div class="x-menu-editor-main">
-                <!-- 1. FOTO CARD -->
-                <div class="x-card" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
-                  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px;">
-                    <div style="flex:1;">
-                      <h4 style="margin:0 0 6px 0;font-size:16px;font-weight:700;color:#0F172A;">Foto</h4>
-                      <p style="margin:0 0 4px 0;font-size:12px;color:#64748B;line-height:1.45;">Upload foto yang menarik dan menggugah selera, supaya membuat pelangganmu tertarik.</p>
-                      <div style="font-size:11px;color:#94A3B8;line-height:1.4;">JPG, PNG, atau WebP · Maks. 20 MB · Rasio 1:1</div>
-                    </div>
-                    <div class="x-image-upload-preview-box" id="cm-image-preview-box" style="width:84px;height:84px;min-width:84px;border-radius:14px;background:#D9D9D9;border:1px solid #CBD5E1;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
-                      <img id="cm-image-preview" alt="Foto Menu" style="display:none;width:100%;height:100%;object-fit:cover;">
-                      <div id="cm-image-empty" class="x-image-upload-empty" style="font-size:11px;color:#64748B;text-align:center;padding:8px;line-height:1.2;">Belum ada foto</div>
-                    </div>
-                  </div>
-                  <div>
-                    <button type="button" id="btn-cm-image-pick" class="x-btn-secondary" style="width:100%;height:44px;border-radius:12px;border:1px solid #CBD5E1;background:#FFFFFF;color:#0F172A;font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
-                      <span>Pilih foto</span>
-                    </button>
-                    <button type="button" id="btn-cm-image-remove" class="x-btn-secondary" style="display:none;margin-top:8px;width:100%;padding:10px;border-radius:12px;border:1px solid #FCA5A5;background:#FEF2F2;color:#DC2626;font-weight:600;font-size:13px;cursor:pointer;">Hapus foto</button>
-                  </div>
-                  <input type="file" id="cm-image-file" accept="image/jpeg,image/png,image/webp" style="display:none;">
-                  <input type="hidden" id="cm-image-removed" value="0">
+            <!-- 1. FOTO CARD -->
+            <div class="x-card x-item-editor-card" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px;">
+                <div style="flex:1;">
+                  <h4 style="margin:0 0 6px 0;font-size:15px;font-weight:700;color:#0F172A;">Foto</h4>
+                  <p style="margin:0 0 4px 0;font-size:12px;color:#64748B;line-height:1.45;">Upload foto yang menarik dan menggugah selera, supaya pelangganmu tertarik.</p>
+                  <div style="font-size:11px;color:#94A3B8;line-height:1.4;">JPG, PNG, atau WebP · Maks. 20 MB · Rasio 1:1</div>
                 </div>
-
-                <!-- 2. KATEGORI CARD -->
-                <div class="x-card" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
-                  <h4 style="margin:0 0 4px 0;font-size:16px;font-weight:700;color:#0F172A;">Kategori</h4>
-                  <p style="margin:0 0 14px 0;font-size:12px;color:#64748B;">Pilih, atau tambahkan kategori sesuai dengan menu yang ingin kamu buat.</p>
-                  <div style="display:flex;gap:8px;">
-                    <div style="position:relative;flex:1;">
-                      <select id="cm-category" class="x-input" required style="width:100%;height:44px;border-radius:12px;border:1px solid #CBD5E1;padding:0 14px;font-size:13px;background:#FFFFFF;appearance:none;-webkit-appearance:none;box-sizing:border-box;color:#0F172A;"></select>
-                    </div>
-                    <button type="button" id="btn-quick-add-category" class="x-btn-secondary" style="width:44px;height:44px;min-width:44px;border-radius:12px;border:1px solid #CBD5E1;background:#FFFFFF;display:flex;align-items:center;justify-content:center;color:#475569;cursor:pointer;" title="Tambah Kategori">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                    </button>
-                  </div>
+                <div class="x-image-upload-preview-box" id="cm-image-preview-box" style="width:84px;height:84px;min-width:84px;border-radius:14px;background:#D9D9D9;border:1px solid #CBD5E1;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
+                  <img id="cm-image-preview" alt="Foto Menu" style="display:none;width:100%;height:100%;object-fit:cover;">
+                  <div id="cm-image-empty" class="x-image-upload-empty" style="font-size:11px;color:#64748B;text-align:center;padding:8px;line-height:1.2;">Belum ada foto</div>
                 </div>
+              </div>
+              <div id="cm-image-buttons-row" style="display:flex;gap:10px;">
+                <button type="button" id="btn-cm-image-pick" class="x-btn-secondary" style="flex:1;height:40px;border-radius:10px;border:1px solid #CBD5E1;background:#FFFFFF;color:#0F172A;font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                  <span id="btn-cm-image-pick-text">Pilih foto</span>
+                </button>
+                <button type="button" id="btn-cm-image-remove" class="x-btn-secondary" style="display:none;flex:1;height:40px;border-radius:10px;border:1px solid #FECACA;background:#FFF1F2;color:#EF4444;font-weight:600;font-size:13px;align-items:center;justify-content:center;gap:6px;cursor:pointer;">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                  <span>Hapus foto</span>
+                </button>
+              </div>
+              <input type="file" id="cm-image-file" accept="image/jpeg,image/png,image/webp" style="display:none;">
+              <input type="hidden" id="cm-image-removed" value="0">
+            </div>
 
-                <!-- 3. JUDUL CARD -->
-                <div class="x-card" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
-                  <h4 style="margin:0 0 4px 0;font-size:16px;font-weight:700;color:#0F172A;">Judul</h4>
-                  <p style="margin:0 0 14px 0;font-size:12px;color:#64748B;">Nama yang jelas, singkat dan menarik akan sangat membantu pelanggan kamu untuk memilih menu.</p>
-                  <input type="text" id="cm-title-input" class="x-input" maxlength="150" placeholder="Cth: Ayam Tulang Lunak Lombok Ijo" style="width:100%;height:44px;border-radius:12px;border:1px solid #CBD5E1;padding:0 14px;font-size:13px;box-sizing:border-box;color:#0F172A;">
-                  <div style="text-align:right;font-size:11px;color:#94A3B8;margin-top:6px;">
-                    <span id="cm-title-char-count">0</span>/150
-                  </div>
-                  <!-- Hidden select for compatibility with title repository/tests -->
-                  <select id="cm-title" data-no-enhance="1" hidden style="display:none !important;"></select>
-                  <button type="button" id="btn-quick-add-title" style="display:none;">+</button>
+            <!-- 2. KATEGORI CARD -->
+            <div class="x-card x-item-editor-card" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+              <h4 style="margin:0 0 4px 0;font-size:15px;font-weight:700;color:#0F172A;">Kategori</h4>
+              <p style="margin:0 0 14px 0;font-size:12px;color:#64748B;">Pilih, atau tambahkan kategori sesuai dengan menu yang ingin kamu buat.</p>
+              <div style="display:flex;gap:8px;">
+                <div style="position:relative;flex:1;">
+                  <select id="cm-category" class="x-input" required style="width:100%;height:44px;border-radius:12px;border:1px solid #CBD5E1;padding:0 14px;font-size:14px;background:#FFFFFF;appearance:none;-webkit-appearance:none;box-sizing:border-box;color:#0F172A;"></select>
                 </div>
+                <button type="button" id="btn-quick-add-category" class="x-btn-secondary" style="width:44px;height:44px;min-width:44px;border-radius:12px;border:1px solid #CBD5E1;background:#FFFFFF;display:flex;align-items:center;justify-content:center;color:#0F172A;cursor:pointer;font-size:20px;" title="Tambah Kategori">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </button>
+              </div>
+            </div>
 
-                <!-- 4. MENU ITEMS CARD -->
-                <div class="x-card" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
-                  <h4 style="margin:0 0 4px 0;font-size:16px;font-weight:700;color:#0F172A;">Menu items</h4>
-                  <p style="margin:0 0 14px 0;font-size:12px;color:#64748B;">Masukkan item yang akan dijual, sesuaikan dengan judul menu yang sedang kamu buat.</p>
-                  
-                  <!-- Container dynamic items list -->
-                  <div id="cm-items-container" style="display:flex;flex-direction:column;gap:12px;margin-bottom:12px;"></div>
-                  
-                  <button type="button" id="btn-cm-add-item" style="width:100%;height:44px;border-radius:12px;border:1px solid #E2E8F0;background:#F1F5F9;color:#0F172A;font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;transition:background 0.15s ease;">
-                    <span style="font-size:16px;font-weight:700;">+</span>
-                    <span>Tambah item</span>
-                  </button>
+            <!-- 3. JUDUL CARD -->
+            <div class="x-card x-item-editor-card" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+              <h4 style="margin:0 0 4px 0;font-size:15px;font-weight:700;color:#0F172A;">Judul</h4>
+              <p style="margin:0 0 14px 0;font-size:12px;color:#64748B;">Nama yang jelas, singkat dan menarik akan sangat membantu pelanggan kamu untuk memilih menu.</p>
+              <input type="text" id="cm-title-input" class="x-input" maxlength="150" placeholder="Ayam Tulang Lunak Geprek + Nasi + Es Teh" style="width:100%;height:44px;border-radius:12px;border:1px solid #CBD5E1;padding:0 14px;font-size:14px;font-weight:600;box-sizing:border-box;color:#0F172A;">
+              <div style="text-align:right;font-size:11px;color:#94A3B8;margin-top:6px;">
+                <span id="cm-title-char-count">0</span>/150
+              </div>
+              <select id="cm-title" data-no-enhance="1" hidden style="display:none !important;"></select>
+              <button type="button" id="btn-quick-add-title" style="display:none;">+</button>
+            </div>
 
-                  <!-- Hidden backward compatibility elements -->
-                  <div id="master-menu-single-fields" style="display:none;"><select id="cm-product" data-no-enhance="1" hidden style="display:none !important;"></select></div>
-                  <div id="master-menu-package-fields" style="display:none;"><input type="text" id="cm-package-name"><div id="cm-package-components"></div><button type="button" id="btn-cm-add-component"></button></div>
-                  <div style="display:none;"><select id="cm-rasa" data-no-enhance="1" hidden style="display:none !important;"></select><button type="button" id="btn-quick-add-rasa"></button><input type="checkbox" id="cm-spice-toggle"><input type="hidden" id="cm-spice-level-val"><div id="cm-spice-scale-wrapper"><div id="cm-spice-dots-row"></div></div></div>
+            <!-- 4. MENU ITEMS CARD -->
+            <div class="x-card x-item-editor-card" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+              <h4 style="margin:0 0 4px 0;font-size:15px;font-weight:700;color:#0F172A;">Menu items</h4>
+              <p style="margin:0 0 14px 0;font-size:12px;color:#64748B;">Masukkan item yang akan dijual, sesuaikan dengan judul menu yang sedang kamu buat.</p>
+              
+              <div id="cm-items-container" style="display:flex;flex-direction:column;gap:12px;margin-bottom:12px;"></div>
+              
+              <button type="button" id="btn-cm-add-item" style="width:100%;height:44px;border-radius:12px;border:1px solid #E2E8F0;background:#F1F5F9;color:#0F172A;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;transition:background 0.15s ease;">
+                <span style="font-size:16px;font-weight:700;">+</span>
+                <span>Tambah item</span>
+              </button>
+
+              <div id="master-menu-single-fields" style="display:none;"><select id="cm-product" data-no-enhance="1" hidden style="display:none !important;"></select></div>
+              <div id="master-menu-package-fields" style="display:none;"><input type="text" id="cm-package-name"><div id="cm-package-components"></div><button type="button" id="btn-cm-add-component"></button></div>
+              <div style="display:none;"><select id="cm-rasa" data-no-enhance="1" hidden style="display:none !important;"></select><button type="button" id="btn-quick-add-rasa"></button><input type="checkbox" id="cm-spice-toggle"><input type="hidden" id="cm-spice-level-val"><div id="cm-spice-scale-wrapper"><div id="cm-spice-dots-row"></div></div></div>
+            </div>
+
+            <!-- 4b. KETERANGAN ISI (DESKRIPSI) CARD -->
+            <div class="x-card x-item-editor-card" id="cm-desc-card" style="display:none !important;background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+              <h4 style="margin:0 0 4px 0;font-size:15px;font-weight:700;color:#0F172A;">Keterangan isi</h4>
+              <p style="margin:0 0 12px 0;font-size:12px;color:#64748B;">Komposisi item yang dilihat customer kamu, ini terisi otomatis, edit jika memang diperlukan.</p>
+              <input type="text" id="cm-description-input" class="x-input" placeholder="contoh: Ayam Tulang Lunak + Nasi + Tempe" style="width:100%;height:44px;border-radius:12px;border:1px solid #CBD5E1;padding:0 14px;font-size:14px;color:#0F172A;box-sizing:border-box;">
+            </div>
+
+            <!-- 5. HPP (MODAL MENU) CARD -->
+            <div class="x-card x-item-editor-card" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+              <h4 style="margin:0 0 4px 0;font-size:15px;font-weight:700;color:#0F172A;">HPP (modal menu)</h4>
+              <p style="margin:0 0 14px 0;font-size:12px;color:#64748B;">Jumlah total modal yang digunakan untuk menu ini.</p>
+              
+              <div id="cm-hpp-breakdown-box" style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:14px;padding:16px;">
+                <div id="cm-hpp-items-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;"></div>
+                <div style="border-top:1px solid #E2E8F0;padding-top:12px;display:flex;justify-content:space-between;align-items:center;">
+                  <span style="font-size:14px;font-weight:700;color:#0F172A;">Total HPP</span>
+                  <strong id="cm-hpp-total-display" style="font-size:15px;font-weight:800;color:#0F172A;">Rp0</strong>
                 </div>
+              </div>
+              <input type="hidden" id="cm-cost" data-input-type="currency" value="0" style="display:none !important;" hidden>
+            </div>
 
-                <!-- 4b. KETERANGAN ISI (DESKRIPSI) CARD -->
-                <div class="x-card" id="cm-desc-card" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
-                  <div style="margin-bottom:4px;">
-                    <h4 style="margin:0;font-size:16px;font-weight:700;color:#0F172A;">Keterangan isi</h4>
+            <!-- 6. HARGA JUAL CARD -->
+            <div class="x-card x-item-editor-card" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+              <h4 style="margin:0 0 4px 0;font-size:15px;font-weight:700;color:#0F172A;">
+                Harga jual (Rp) <span style="font-size:12px;font-weight:400;color:#64748B;">termasuk pajak</span>
+              </h4>
+              <p style="margin:0 0 14px 0;font-size:12px;color:#64748B;line-height:1.45;">
+                Tentukan harga jual menu ini, kamu bisa pilih harga tetap (Fixed) atau rentang harga (Range) sesuai kebutuhanmu.
+              </p>
+
+              <!-- Tabs: Fixed vs Range -->
+              <div style="display:flex;border-bottom:1px solid #E2E8F0;margin-bottom:14px;">
+                <button type="button" id="tab-price-fixed" onclick="switchPricePolicyMode('FIXED')" style="flex:1;padding:10px;font-size:14px;font-weight:700;border:none;background:none;cursor:pointer;color:#0F172A;border-bottom:2px solid #0F172A;">Fixed</button>
+                <button type="button" id="tab-price-range" onclick="switchPricePolicyMode('RANGE')" style="flex:1;padding:10px;font-size:14px;font-weight:600;border:none;background:none;cursor:pointer;color:#94A3B8;border-bottom:2px solid transparent;">Range</button>
+              </div>
+
+              <!-- Fixed Mode Input -->
+              <div id="price-mode-fixed-container">
+                <input type="text" id="cm-price" class="x-input" data-input-type="currency" inputmode="numeric" required placeholder="0" style="width:100%;height:44px;border-radius:12px;border:1px solid #CBD5E1;padding:0 14px;font-size:15px;font-weight:700;color:#0F172A;box-sizing:border-box;">
+              </div>
+
+              <!-- Range Mode Input -->
+              <div id="price-mode-range-container" style="display:none;">
+                <p style="margin:0 0 10px 0;font-size:12px;color:#64748B;">cabang yang kamu miliki, bisa menjual menu di range harga ini</p>
+                <div style="display:flex;gap:12px;align-items:center;">
+                  <div style="flex:1;">
+                    <label style="display:block;font-size:11px;font-weight:600;color:#64748B;margin-bottom:4px;">Min (Rp)</label>
+                    <input type="text" id="cm-price-min" class="x-input" data-input-type="currency" inputmode="numeric" placeholder="0" style="width:100%;height:44px;border-radius:12px;border:1px solid #CBD5E1;padding:0 14px;font-size:14px;box-sizing:border-box;">
                   </div>
-                  <p style="margin:0 0 12px 0;font-size:12px;color:#64748B;">Komposisi item yang dilihat customer kamu, ini terisi otomatis, edit jika memang diperlukan.</p>
-                  <input type="text" id="cm-description-input" class="x-input" placeholder="contoh: Ayam Tulang Lunak + Nasi + Tempe" style="width:100%;height:44px;border-radius:12px;border:1px solid #CBD5E1;padding:0 14px;font-size:14px;color:#0F172A;box-sizing:border-box;">
-                </div>
-
-                <!-- 5. HPP (MODAL MENU) CARD -->
-                <div class="x-card" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
-                  <h4 style="margin:0 0 4px 0;font-size:16px;font-weight:700;color:#0F172A;">HPP (modal menu)</h4>
-                  <p style="margin:0 0 14px 0;font-size:12px;color:#64748B;">Jumlah total modal yang digunakan untuk menu ini.</p>
-                  
-                  <div id="cm-hpp-breakdown-box" style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:14px;padding:16px;">
-                    <div id="cm-hpp-items-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;"></div>
-                    <div style="border-top:1px solid #E2E8F0;padding-top:12px;display:flex;justify-content:space-between;align-items:center;">
-                      <span style="font-size:14px;font-weight:700;color:#0F172A;">Total HPP</span>
-                      <strong id="cm-hpp-total-display" style="font-size:15px;font-weight:700;color:#0F172A;">Rp0</strong>
-                    </div>
-                  </div>
-                  <!-- Hidden cost input for backward compatibility with form submit -->
-                  <input type="hidden" id="cm-cost" data-input-type="currency" value="0" style="display:none !important;" hidden>
-                </div>
-
-                <!-- 6. HARGA JUAL CARD -->
-                <div class="x-card" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
-                  <h4 style="margin:0 0 4px 0;font-size:16px;font-weight:700;color:#0F172A;">
-                    Harga jual (Rp) <span style="font-size:13px;font-weight:400;color:#64748B;">termasuk pajak</span>
-                  </h4>
-                  <p style="margin:0 0 14px 0;font-size:12px;color:#64748B;line-height:1.45;">
-                    Tentukan harga jual menu ini, kamu bisa pilih harga tetap (Fixed) atau rentang harga (Range) sesuai kebutuhanmu.
-                  </p>
-
-                  <!-- Tabs: Fixed vs Range -->
-                  <div style="display:flex;border-bottom:1px solid #E2E8F0;margin-bottom:14px;">
-                    <button type="button" id="tab-price-fixed" onclick="switchPricePolicyMode('FIXED')" style="flex:1;padding:10px;font-size:14px;font-weight:700;border:none;background:none;cursor:pointer;color:#0F172A;border-bottom:2px solid #0F172A;">Fixed</button>
-                    <button type="button" id="tab-price-range" onclick="switchPricePolicyMode('RANGE')" style="flex:1;padding:10px;font-size:14px;font-weight:600;border:none;background:none;cursor:pointer;color:#94A3B8;border-bottom:2px solid transparent;">Range</button>
-                  </div>
-
-                  <!-- Fixed Mode Input -->
-                  <div id="price-mode-fixed-container">
-                    <input type="text" id="cm-price" class="x-input" data-input-type="currency" inputmode="numeric" required placeholder="0" style="width:100%;height:44px;border-radius:12px;border:1px solid #CBD5E1;padding:0 14px;font-size:14px;font-weight:600;color:#0F172A;box-sizing:border-box;">
-                  </div>
-
-                  <!-- Range Mode Input -->
-                  <div id="price-mode-range-container" style="display:none;">
-                    <p style="margin:0 0 10px 0;font-size:12px;color:#64748B;">cabang yang kamu miliki, bisa menjual menu di range harga ini</p>
-                    <div style="display:flex;gap:12px;align-items:center;">
-                      <div style="flex:1;">
-                        <label style="display:block;font-size:11px;font-weight:600;color:#64748B;margin-bottom:4px;">Min (Rp)</label>
-                        <input type="text" id="cm-price-min" class="x-input" data-input-type="currency" inputmode="numeric" placeholder="0" style="width:100%;height:44px;border-radius:12px;border:1px solid #CBD5E1;padding:0 14px;font-size:14px;box-sizing:border-box;">
-                      </div>
-                      <span style="color:#94A3B8;margin-top:16px;">—</span>
-                      <div style="flex:1;">
-                        <label style="display:block;font-size:11px;font-weight:600;color:#64748B;margin-bottom:4px;">Max (Rp)</label>
-                        <input type="text" id="cm-price-max" class="x-input" data-input-type="currency" inputmode="numeric" placeholder="0" style="width:100%;height:44px;border-radius:12px;border:1px solid #CBD5E1;padding:0 14px;font-size:14px;box-sizing:border-box;">
-                      </div>
-                    </div>
+                  <span style="color:#94A3B8;margin-top:16px;">—</span>
+                  <div style="flex:1;">
+                    <label style="display:block;font-size:11px;font-weight:600;color:#64748B;margin-bottom:4px;">Max (Rp)</label>
+                    <input type="text" id="cm-price-max" class="x-input" data-input-type="currency" inputmode="numeric" placeholder="0" style="width:100%;height:44px;border-radius:12px;border:1px solid #CBD5E1;padding:0 14px;font-size:14px;box-sizing:border-box;">
                   </div>
                 </div>
               </div>
+            </div>
 
-              <!-- PANE KANAN (SIDEBAR / PREVIEW & STATUS): Sticky di Desktop, mengalir di Mobile -->
-              <div class="x-menu-editor-sidebar">
-                <!-- 7. PREVIEW CARD -->
-                <div class="x-card" id="composed-menu-customer-preview" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
-                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                    <h4 style="margin:0;font-size:16px;font-weight:700;color:#0F172A;">Preview Customer</h4>
-                    <span class="x-badge x-badge-info" style="font-size:11px;">Live</span>
-                  </div>
-                  <p style="margin:0 0 14px 0;font-size:12px;color:#64748B;">Seperti inilah yang akan pelanggan kamu lihat di aplikasi customer.</p>
+            <!-- 7. PREVIEW CARD -->
+            <div class="x-card x-item-editor-card" id="composed-menu-customer-preview" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+              <h4 style="margin:0 0 4px 0;font-size:15px;font-weight:700;color:#0F172A;">Preview</h4>
+              <p style="margin:0 0 14px 0;font-size:12px;color:#64748B;">Seperti inilah yang akan pelanggan kamu lihat, cek kembali apakah sudah sesuai dengan menu yang ingin kamu jual.</p>
 
-                  <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:16px;padding:16px;display:flex;justify-content:space-between;align-items:stretch;gap:14px;">
-                    <div style="flex:1;display:flex;flex-direction:column;justify-content:space-between;">
-                      <div>
-                        <div id="cm-preview-title" style="font-size:15px;font-weight:700;color:#0F172A;line-height:1.35;margin-bottom:4px;">Judul Menu</div>
-                        <div id="cm-preview-items-list" style="font-size:12px;color:#64748B;line-height:1.4;">list item dalam menu</div>
-                        <div id="cm-preview-subtitle" style="display:none;"></div>
-                        <div id="cm-preview-detail" style="display:none;"></div>
-                        <div id="cm-preview-indicator" style="display:none;"></div>
-                      </div>
-                      <div id="cm-preview-price" style="font-size:15px;font-weight:700;color:#0F172A;margin-top:14px;">Rp0</div>
-                    </div>
-                    <div style="width:84px;height:84px;min-width:84px;border-radius:12px;background:#D9D9D9;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
-                      <img id="cm-preview-image" alt="Preview Menu" style="display:none;width:100%;height:100%;object-fit:cover;">
-                      <div id="cm-preview-image-empty" style="display:flex;align-items:center;justify-content:center;color:#94A3B8;">
-                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect><circle cx="9" cy="9" r="2"></circle><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path></svg>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 8. AKTIFKAN MENU TOGGLE CARD -->
-                <div class="x-card" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.02);display:flex;justify-content:space-between;align-items:center;gap:16px;">
+              <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:16px;padding:16px;display:flex;justify-content:space-between;align-items:stretch;gap:14px;">
+                <div style="flex:1;display:flex;flex-direction:column;justify-content:space-between;">
                   <div>
-                    <h4 style="margin:0 0 4px 0;font-size:16px;font-weight:700;color:#0F172A;">Aktifkan menu</h4>
-                    <p style="margin:0;font-size:12px;color:#64748B;line-height:1.4;">Menu aktif akan langsung dapat dipesan oleh pelanggan.</p>
+                    <div id="cm-preview-title" style="font-size:15px;font-weight:700;color:#0F172A;line-height:1.35;margin-bottom:4px;">Judul Menu</div>
+                    <div id="cm-preview-items-list" style="font-size:12px;color:#64748B;line-height:1.4;">list item dalam menu</div>
+                    <div id="cm-preview-subtitle" style="display:none;"></div>
+                    <div id="cm-preview-detail" style="display:none;"></div>
+                    <div id="cm-preview-indicator" style="display:none;"></div>
                   </div>
-                  <label class="x-toggle x-toggle-on" id="cm-toggle-active-wrap" style="flex-shrink:0;margin:0;">
-                    <input type="checkbox" id="cm-toggle-active" checked>
-                    <span class="x-toggle-slider"></span>
-                  </label>
-                  <select id="cm-status" data-no-enhance="1" hidden style="display:none !important;">
-                    <option value="ACTIVE" selected>Aktif</option>
-                    <option value="DRAFT">Draft</option>
-                    <option value="ARCHIVED">Arsip</option>
-                  </select>
+                  <div id="cm-preview-price" style="font-size:15px;font-weight:800;color:#0F172A;margin-top:14px;">Rp0</div>
                 </div>
-
-                <!-- 9. ACTION: SIMPAN & BATAL -->
-                <div style="display:flex;flex-direction:column;gap:10px;">
-                  <button type="submit" class="x-btn-primary" id="btn-save-master-menu-active" style="width:100%;height:46px;border-radius:12px;background:#F1F5F9;color:#94A3B8;border:none;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.2s, color 0.2s;">
-                    Simpan Menu
-                  </button>
-                  <button type="button" class="x-btn-secondary" id="btn-cancel-master-menu" style="width:100%;height:42px;border-radius:12px;border:1px solid #CBD5E1;background:#FFFFFF;color:#475569;font-weight:600;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;">Batal</button>
-                  <button type="button" class="x-btn-secondary" id="btn-save-master-menu-draft" style="display:none;">Simpan Draft</button>
+                <div style="width:84px;height:84px;min-width:84px;border-radius:12px;background:#D9D9D9;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
+                  <img id="cm-preview-image" alt="Preview Menu" style="display:none;width:100%;height:100%;object-fit:cover;">
+                  <div id="cm-preview-image-empty" style="display:flex;align-items:center;justify-content:center;color:#94A3B8;">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect><circle cx="9" cy="9" r="2"></circle><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path></svg>
+                  </div>
                 </div>
               </div>
+            </div>
+
+            <!-- 8. AKTIFKAN MENU TOGGLE CARD -->
+            <div class="x-card x-item-editor-card" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,0.02);display:flex;justify-content:space-between;align-items:center;gap:16px;">
+              <div>
+                <h4 style="margin:0 0 4px 0;font-size:15px;font-weight:700;color:#0F172A;">Aktifkan menu</h4>
+                <p style="margin:0;font-size:12px;color:#64748B;line-height:1.4;">Menu aktif akan muncul di aplikasi customer kamu dan bisa langsung dipesan oleh pelanggan.</p>
+              </div>
+              <label class="x-toggle x-toggle-on" id="cm-toggle-active-wrap" style="flex-shrink:0;margin:0;">
+                <input type="checkbox" id="cm-toggle-active" checked>
+                <span class="x-toggle-slider"></span>
+              </label>
+              <select id="cm-status" data-no-enhance="1" hidden style="display:none !important;">
+                <option value="ACTIVE" selected>Aktif</option>
+                <option value="DRAFT">Draft</option>
+                <option value="ARCHIVED">Arsip</option>
+              </select>
+            </div>
+
+            <!-- 9. ACTION BUTTONS: 2 ROWS MATCHING ITEM EDITOR & DESIGN REFERENCE -->
+            <div class="x-product-editor-actions x-item-editor-actions" style="display:flex !important;flex-direction:column !important;gap:12px !important;margin-top:20px !important;margin-bottom:24px !important;width:100% !important;">
+              <div class="x-item-editor-actions-row1" style="display:flex !important;flex-direction:row !important;gap:12px !important;width:100% !important;">
+                <button type="button" class="x-btn-secondary" id="btn-cancel-master-menu" onclick="goBackFromChildPage()" style="flex:1 1 0 !important;width:100% !important;height:46px !important;border-radius:12px !important;font-weight:600 !important;font-size:14px !important;background:#F8FAFC !important;border:1px solid #E2E8F0 !important;color:#334155 !important;cursor:pointer !important;display:inline-flex !important;align-items:center !important;justify-content:center !important;">Batal</button>
+                <button type="button" class="x-btn-secondary" id="btn-delete-master-menu-action" style="display:none;flex:1 1 0 !important;width:50% !important;height:46px !important;border-radius:12px !important;font-weight:600 !important;font-size:14px !important;background:#FEE2E2 !important;border:none !important;color:#EF4444 !important;cursor:pointer !important;align-items:center !important;justify-content:center !important;gap:6px !important;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                  <span>Hapus</span>
+                </button>
+              </div>
+              <button type="submit" class="x-btn-primary" id="btn-save-master-menu-active" style="width:100% !important;flex:none !important;height:46px !important;border-radius:12px !important;font-weight:700 !important;font-size:15px !important;background:#00A637 !important;border:none !important;color:#FFFFFF !important;cursor:pointer !important;transition:all 0.15s ease !important;display:flex !important;align-items:center !important;justify-content:center !important;">Simpan</button>
+              <button type="button" class="x-btn-secondary" id="btn-save-master-menu-draft" style="display:none;">Simpan Draft</button>
             </div>
           </form>
         </section>
@@ -2753,6 +2800,7 @@
           <button type="button" class="x-subnav-tab" data-report="customers">Customers</button>
           <button type="button" class="x-subnav-tab" data-report="branches">Branches</button>
           <button type="button" class="x-subnav-tab" data-report="operations">Operations</button>
+          <button type="button" class="x-subnav-tab" data-report="affiliate">Afiliasi</button>
         </div>
 
         <!-- Filter Bar: Date Range + Global Branch Indicator -->
@@ -3540,6 +3588,7 @@
           <button type="button" class="x-subnav-tab" data-subtab="payouts" onclick="navigateTo('finance/payouts')">Payouts</button>
           <button type="button" class="x-subnav-tab" data-subtab="reconciliation" onclick="navigateTo('finance/reconciliation')">Reconciliation</button>
           <button type="button" class="x-subnav-tab" data-subtab="payment-methods" onclick="navigateTo('finance/payment-methods')">Payment Methods</button>
+          <button type="button" class="x-subnav-tab" data-subtab="channels" onclick="navigateTo('finance/channels')">Rekonsiliasi Ojol</button>
         </div>
 
 
@@ -3776,6 +3825,170 @@
             </div>
           </div>
         </div>
+
+        <!-- 6. Finance: Rekonsiliasi Ojol (GoFood, GrabFood, ShopeeFood) Subtab -->
+        <div id="finance-view-channels" class="x-finance-subview" style="display:none;">
+          <!-- Filter Bar -->
+          <div class="x-card" style="margin-bottom:20px;padding:16px 20px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;">
+              <div>
+                <h3 style="font-size:16px;font-weight:800;margin:0 0 4px;color:#0f172a;">Rekonsiliasi Saluran Ojol</h3>
+                <p style="font-size:12.5px;color:#64748b;margin:0;">Laporan pembukuan otomatis, komisi platform, dan pencairan bersih (settlement).</p>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <select id="ojol-filter-channel" onchange="loadFinanceChannels()" style="padding:8px 14px;border-radius:var(--radius-sm);border:1px solid var(--border-color);font-size:13px;font-weight:600;background:#ffffff;color:#1e293b;cursor:pointer;">
+                  <option value="all">Semua Saluran Ojol</option>
+                  <option value="gofood">GoFood (GoBiz)</option>
+                  <option value="grabfood">GrabFood (GrabMerchant)</option>
+                  <option value="shopeefood">ShopeeFood (Shopee Partner)</option>
+                </select>
+                <input type="date" id="ojol-filter-start" onchange="loadFinanceChannels()" style="padding:7px 12px;border-radius:var(--radius-sm);border:1px solid var(--border-color);font-size:13px;background:#ffffff;color:#1e293b;">
+                <span style="font-size:12px;color:#94a3b8;">s/d</span>
+                <input type="date" id="ojol-filter-end" onchange="loadFinanceChannels()" style="padding:7px 12px;border-radius:var(--radius-sm);border:1px solid var(--border-color);font-size:13px;background:#ffffff;color:#1e293b;">
+                <button type="button" class="x-btn-secondary" onclick="exportOjolLedgerCSV()" style="display:flex;align-items:center;gap:6px;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer;">
+                  <span>📥</span><span>Export CSV</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- KPI Metric Cards -->
+          <div class="x-metrics-grid" style="margin-bottom:20px;">
+            <div class="x-metric-card" style="border-left:4px solid #10b981;">
+              <div class="x-metric-icon bg-green">💰</div>
+              <div class="x-metric-info">
+                <span class="x-metric-label">Total Omzet Kotor (Gross)</span>
+                <h3 id="ojol-kpi-gross" class="x-metric-value">Rp 0</h3>
+                <div class="x-stat-sub" style="font-size:11px;color:#64748b;margin-top:2px;">Total belanja customer ojol</div>
+              </div>
+            </div>
+            <div class="x-metric-card" style="border-left:4px solid #f59e0b;">
+              <div class="x-metric-icon bg-amber">🏷️</div>
+              <div class="x-metric-info">
+                <span class="x-metric-label">Beban Komisi Ojol</span>
+                <h3 id="ojol-kpi-fee" class="x-metric-value" style="color:#d97706;">Rp 0</h3>
+                <div id="ojol-kpi-fee-sub" class="x-stat-sub" style="font-size:11px;color:#64748b;margin-top:2px;">Potongan komisi + handling</div>
+              </div>
+            </div>
+            <div class="x-metric-card" style="border-left:4px solid #3b82f6;">
+              <div class="x-metric-icon bg-blue">🏦</div>
+              <div class="x-metric-info">
+                <span class="x-metric-label">Pendapatan Bersih (Net)</span>
+                <h3 id="ojol-kpi-net" class="x-metric-value" style="color:#2563eb;">Rp 0</h3>
+                <div class="x-stat-sub" style="font-size:11px;color:#64748b;margin-top:2px;">Uang riil masuk kas/rekening</div>
+              </div>
+            </div>
+            <div class="x-metric-card" style="border-left:4px solid #6366f1;">
+              <div class="x-metric-icon bg-blue">🛵</div>
+              <div class="x-metric-info">
+                <span class="x-metric-label">Total Pesanan Ojol</span>
+                <h3 id="ojol-kpi-orders" class="x-metric-value">0</h3>
+                <div class="x-stat-sub" style="font-size:11px;color:#64748b;margin-top:2px;">Transaksi dibukukan</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Channel Share Comparison Cards -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:16px;margin-bottom:20px;">
+            <!-- GoFood Card -->
+            <div class="x-card" style="padding:18px;border-top:4px solid #00aa13;border-radius:var(--radius-md);">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="font-size:20px;">🟢</span>
+                  <span style="font-weight:800;font-size:15px;color:#0f172a;">GoFood</span>
+                </div>
+                <span id="card-gf-orders" class="x-badge" style="background:#ecfdf5;color:#065f46;font-weight:700;">0 Pesanan</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
+                <div style="display:flex;justify-content:space-between;color:#64748b;">
+                  <span>Omzet Kotor:</span><strong id="card-gf-gross" style="color:#0f172a;">Rp 0</strong>
+                </div>
+                <div style="display:flex;justify-content:space-between;color:#64748b;">
+                  <span>Potongan Komisi:</span><strong id="card-gf-fee" style="color:#ef4444;">- Rp 0</strong>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding-top:6px;border-top:1px dashed #e2e8f0;font-weight:800;">
+                  <span>Net Cair:</span><span id="card-gf-net" style="color:#059669;font-size:14px;">Rp 0</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- GrabFood Card -->
+            <div class="x-card" style="padding:18px;border-top:4px solid #00b14f;border-radius:var(--radius-md);">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="font-size:20px;">🟢</span>
+                  <span style="font-weight:800;font-size:15px;color:#0f172a;">GrabFood</span>
+                </div>
+                <span id="card-grb-orders" class="x-badge" style="background:#ecfdf5;color:#065f46;font-weight:700;">0 Pesanan</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
+                <div style="display:flex;justify-content:space-between;color:#64748b;">
+                  <span>Omzet Kotor:</span><strong id="card-grb-gross" style="color:#0f172a;">Rp 0</strong>
+                </div>
+                <div style="display:flex;justify-content:space-between;color:#64748b;">
+                  <span>Potongan Komisi:</span><strong id="card-grb-fee" style="color:#ef4444;">- Rp 0</strong>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding-top:6px;border-top:1px dashed #e2e8f0;font-weight:800;">
+                  <span>Net Cair:</span><span id="card-grb-net" style="color:#059669;font-size:14px;">Rp 0</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- ShopeeFood Card -->
+            <div class="x-card" style="padding:18px;border-top:4px solid #ee4d2d;border-radius:var(--radius-md);">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="font-size:20px;">🟠</span>
+                  <span style="font-weight:800;font-size:15px;color:#0f172a;">ShopeeFood</span>
+                </div>
+                <span id="card-spf-orders" class="x-badge" style="background:#fff7ed;color:#c2410c;font-weight:700;">0 Pesanan</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
+                <div style="display:flex;justify-content:space-between;color:#64748b;">
+                  <span>Omzet Kotor:</span><strong id="card-spf-gross" style="color:#0f172a;">Rp 0</strong>
+                </div>
+                <div style="display:flex;justify-content:space-between;color:#64748b;">
+                  <span>Potongan Komisi:</span><strong id="card-spf-fee" style="color:#ef4444;">- Rp 0</strong>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding-top:6px;border-top:1px dashed #e2e8f0;font-weight:800;">
+                  <span>Net Cair:</span><span id="card-spf-net" style="color:#ea580c;font-size:14px;">Rp 0</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Transaction Ledger Table -->
+          <div class="x-card" style="margin-bottom:20px;">
+            <div class="x-card-header" style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border-color);">
+              <div>
+                <h3 style="font-size:15px;font-weight:700;margin:0 0 2px;">Daftar Transaksi Rekonsiliasi Ojol</h3>
+                <p style="font-size:12px;color:#64748b;margin:0;">Rincian transaksi otomatis per pesanan dari aplikasi ojol mitra.</p>
+              </div>
+              <button type="button" class="x-btn-secondary" onclick="loadFinanceChannels()" style="font-size:12px;padding:6px 12px;cursor:pointer;">🔄 Refresh</button>
+            </div>
+            <div class="x-card-body" style="padding:0;">
+              <div class="x-table-responsive">
+                <table class="x-data-table">
+                  <thead>
+                    <tr>
+                      <th>Waktu</th>
+                      <th>Saluran (Channel)</th>
+                      <th>ID Pesanan Ojol</th>
+                      <th>Driver / Catatan</th>
+                      <th style="text-align:right;">Nilai Kotor (Gross)</th>
+                      <th style="text-align:right;">Potongan Komisi</th>
+                      <th style="text-align:right;">Net Masuk Rekening</th>
+                      <th style="text-align:center;">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbody-ojol-orders">
+                    <tr><td colspan="8" class="text-center py-6 text-muted">Memuat data pesanan ojol...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
       <!-- MARKETING TAB -->
@@ -3794,6 +4007,7 @@
           <button type="button" class="x-subnav-tab active" data-subtab="promotions" onclick="navigateTo('marketing/promotions')">Promotions</button>
           <button type="button" class="x-subnav-tab" data-subtab="discounts" onclick="navigateTo('marketing/discounts')">Discounts</button>
           <button type="button" class="x-subnav-tab" data-subtab="banners" onclick="navigateTo('marketing/banners')">Banners</button>
+          <button type="button" class="x-subnav-tab" data-subtab="affiliate" onclick="navigateTo('marketing/affiliate')">Affiliate</button>
           <button type="button" class="x-subnav-tab" data-subtab="campaigns" onclick="navigateTo('marketing/campaigns')">Campaigns</button>
           <button type="button" class="x-subnav-tab" data-subtab="loyalty" onclick="navigateTo('marketing/loyalty')">Loyalty</button>
         </div>
@@ -3977,6 +4191,126 @@
           </div>
         </div>
 
+        <!-- 4b. Marketing: Affiliate Subtab -->
+        <div id="marketing-view-affiliate" class="x-marketing-subview" style="display:none;">
+          <!-- Program Settings Card -->
+          <div class="x-card" style="margin-bottom:20px;">
+            <div class="x-card-header" style="padding:16px 20px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+              <div>
+                <h3 style="font-size:16px;font-weight:700;margin:0;">Konfigurasi Program Affiliate & Kemitraan B2C</h3>
+                <p class="text-muted" style="font-size:12px;margin:2px 0 0;">Atur komisi customer-to-customer, masa aktif cookie referral, dan batas minimum pencairan.</p>
+              </div>
+              <button type="button" class="x-btn-primary" id="btn-save-affiliate-program" onclick="saveMarketingAffiliateProgram()" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:8px 16px;">
+                Simpan Konfigurasi
+              </button>
+            </div>
+            <div class="x-card-body" style="padding:20px;">
+              <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:16px;">
+                <div>
+                  <label class="x-label" style="font-size:12px;font-weight:700;color:var(--text-main);margin-bottom:6px;display:block;">Status Program</label>
+                  <select id="mkt-aff-status" class="x-input" style="width:100%;">
+                    <option value="1">Aktif (Pelanggan dapat membagikan menu & earn komisi)</option>
+                    <option value="0">Nonaktif (Program dijeda sementara)</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="x-label" style="font-size:12px;font-weight:700;color:var(--text-main);margin-bottom:6px;display:block;">Persentase Komisi (%)</label>
+                  <input type="number" id="mkt-aff-rate" class="x-input" style="width:100%;" min="1" max="50" step="0.5" value="5">
+                  <small class="text-muted" style="font-size:11px;">Dihitung dari subtotal menu yang memenuhi syarat.</small>
+                </div>
+                <div>
+                  <label class="x-label" style="font-size:12px;font-weight:700;color:var(--text-main);margin-bottom:6px;display:block;">Minimal Penarikan (Rp)</label>
+                  <input type="number" id="mkt-aff-min-payout" class="x-input" style="width:100%;" min="10000" step="5000" value="50000">
+                  <small class="text-muted" style="font-size:11px;">Batas minimal saldo komisi yang dapat dicairkan.</small>
+                </div>
+                <div>
+                  <label class="x-label" style="font-size:12px;font-weight:700;color:var(--text-main);margin-bottom:6px;display:block;">Masa Berlaku Cookie (Hari)</label>
+                  <input type="number" id="mkt-aff-cookie-days" class="x-input" style="width:100%;" min="1" max="90" value="14">
+                  <small class="text-muted" style="font-size:11px;">Durasi atribusi last-click dari link yang dibagikan.</small>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Affiliate Applicants & Partners Card -->
+          <div class="x-card" style="margin-bottom:20px;">
+            <div class="x-card-header" style="padding:16px 20px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+              <div>
+                <h3 style="font-size:16px;font-weight:700;margin:0;">Daftar Pengajuan &amp; Mitra Affiliator</h3>
+                <p class="text-muted" style="font-size:12px;margin:2px 0 0;">Verifikasi pendaftaran calon affiliator, kelola status mitra, dan review akun promosi.</p>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <select id="mkt-aff-member-filter" class="x-input" onchange="loadMarketingAffiliateMembers()" style="font-size:12px;padding:6px 10px;">
+                  <option value="">Semua Status</option>
+                  <option value="PENDING" selected>Menunggu Review (Pending)</option>
+                  <option value="ACTIVE">Mitra Aktif (Disetujui)</option>
+                  <option value="REJECTED">Ditolak</option>
+                </select>
+                <button type="button" class="x-btn-secondary" onclick="loadMarketingAffiliateMembers()" style="font-size:12px;padding:6px 12px;">Refresh</button>
+              </div>
+            </div>
+            <div class="x-card-body" style="padding:0;">
+              <div class="x-table-responsive">
+                <table class="x-table" id="table-mkt-aff-members">
+                  <thead>
+                    <tr>
+                      <th>Nama &amp; Kontak</th>
+                      <th>Akun Media Sosial</th>
+                      <th>Rekening Bank / E-Wallet</th>
+                      <th>Kode Referral</th>
+                      <th>Tgl Daftar</th>
+                      <th>Status</th>
+                      <th class="text-right">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbody-mkt-aff-members">
+                    <tr><td colspan="7" class="text-center py-6 text-muted">Memuat daftar mitra affiliate...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Payout Requests Card -->
+          <div class="x-card">
+            <div class="x-card-header" style="padding:16px 20px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+              <div>
+                <h3 style="font-size:16px;font-weight:700;margin:0;">Permintaan Pencairan Dana (Payouts)</h3>
+                <p class="text-muted" style="font-size:12px;margin:2px 0 0;">Review dan konfirmasi transfer komisi tunai ke rekening bank/e-wallet pelanggan.</p>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <select id="mkt-aff-payout-filter" class="x-input" onchange="loadMarketingAffiliatePayouts()" style="font-size:12px;padding:6px 10px;">
+                  <option value="">Semua Status</option>
+                  <option value="REQUESTED" selected>Menunggu Transfer (Pending)</option>
+                  <option value="PAID">Sudah Ditransfer</option>
+                  <option value="REJECTED">Ditolak</option>
+                </select>
+                <button type="button" class="x-btn-secondary" onclick="loadMarketingAffiliatePayouts()" style="font-size:12px;padding:6px 12px;">Refresh</button>
+              </div>
+            </div>
+            <div class="x-card-body" style="padding:0;">
+              <div class="x-table-responsive">
+                <table class="x-table" id="table-mkt-aff-payouts">
+                  <thead>
+                    <tr>
+                      <th>Mitra / Pelanggan</th>
+                      <th>Rekening Tujuan</th>
+                      <th>Nominal</th>
+                      <th>Waktu Pengajuan</th>
+                      <th>Status</th>
+                      <th>Info Transfer / Catatan</th>
+                      <th class="text-right">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbody-mkt-aff-payouts">
+                    <tr><td colspan="7" class="text-center py-6 text-muted">Memuat daftar pencairan komisi...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- 5. Marketing: Campaigns Subtab (Honest Empty State) -->
         <div id="marketing-view-campaigns" class="x-marketing-subview" style="display:none;">
           <div class="x-card" style="padding:48px 24px;text-align:center;">
@@ -4065,8 +4399,8 @@
               <button type="button" class="settings-nav-btn" data-settings-section="channels/pos" onclick="switchSettingsSection('channels/pos', true)" style="display:none;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);border:none;background:transparent;color:#334155;font-size:13px;font-weight:600;cursor:pointer;text-align:left;width:100%;">
                 <span>🖥️</span><span>Point of Sale (POS)</span>
               </button>
-              <button type="button" class="settings-nav-btn" data-settings-section="channels/kiosk" onclick="switchSettingsSection('channels/kiosk', true)" style="display:none;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);border:none;background:transparent;color:#334155;font-size:13px;font-weight:600;cursor:pointer;text-align:left;width:100%;">
-                <span>📟</span><span>Kiosk Terminal</span>
+              <button type="button" class="settings-nav-btn" data-settings-section="channels/delivery" onclick="switchSettingsSection('channels/delivery', true)" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);border:none;background:transparent;color:#334155;font-size:13px;font-weight:600;cursor:pointer;text-align:left;width:100%;">
+                <span>🛵</span><span>Ojol (GoFood, Grab, Shopee)</span>
               </button>
             </div>
 
@@ -4226,15 +4560,15 @@
                         </div>
                       </div>
 
-                      <!-- Field 4: Belanja -->
+                      <!-- Field 4: Pelanggan (Customer PWA) -->
                       <div class="x-form-group" style="margin:0;">
-                        <label style="font-size:12px;font-weight:600;color:#334155;">Belanja</label>
+                        <label style="font-size:12px;font-weight:600;color:#334155;">Pelanggan (Pesan Menu)</label>
                         <div style="margin:6px 0 8px;">
-                          <input type="text" id="set-profile-customer-pwa-name" class="x-input" placeholder="Nama aplikasi (kosong = nama brand)" style="font-size:12px;">
+                          <input type="text" id="set-profile-customer-pwa-name" class="x-input" placeholder="Nama aplikasi (contoh: MyBangjo)" style="font-size:12px;">
                         </div>
                         <div class="x-image-upload-control" style="margin-top:6px;">
                           <div class="x-image-upload-preview-box" id="set-profile-customer-icon-preview-box" onclick="document.getElementById('input-set-profile-customer-icon-file').click()" style="cursor:pointer;" title="Klik untuk pilih icon">
-                            <img id="set-profile-customer-icon-preview" src="/assets/pwa/icon-192.png" alt="Belanja Icon">
+                            <img id="set-profile-customer-icon-preview" src="/assets/pwa/icon-192.png" alt="Pelanggan Icon">
                             <div id="set-profile-customer-icon-empty" class="x-image-upload-empty" style="display:none;">🛍️</div>
                           </div>
                           <div class="x-image-upload-info">
@@ -4244,7 +4578,7 @@
                             </div>
                             <input type="file" id="input-set-profile-customer-icon-file" accept="image/jpeg,image/png,image/webp" style="display:none;">
                             <input type="hidden" id="set-profile-customer-icon" value="">
-                            <div class="x-image-specs-text">JPG, PNG, atau WebP · Maks. 10 MB · Rasio 1:1. Icon aplikasi Belanja pelanggan setelah di-install.</div>
+                            <div class="x-image-specs-text">JPG, PNG, atau WebP · Maks. 10 MB · Rasio 1:1. Icon aplikasi belanja/pesan menu pelanggan setelah di-install.</div>
                           </div>
                         </div>
                       </div>
@@ -4644,6 +4978,159 @@
               </div>
             </div>
 
+            <!-- CHANNELS: DELIVERY INTEGRATIONS (GoFood, GrabFood, ShopeeFood) -->
+            <div id="settings-panel-channels-delivery" class="settings-panel" style="display:none;">
+              <div class="x-card" style="padding:24px;border:1px solid var(--border-color);border-radius:var(--radius-lg);background:#ffffff;margin-bottom:20px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+                  <div>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                      <span class="x-badge" style="background:#ecfdf5;color:#047857;font-weight:700;">Listener Service Aktif</span>
+                      <h3 style="margin:0;font-size:16px;font-weight:800;">Integrasi Pesanan Saluran Ojol</h3>
+                    </div>
+                    <p style="font-size:13px;color:#64748b;margin:4px 0 0;">
+                      Konfigurasi status aktif, persentase potongan komisi mitra, dan biaya penanganan platform untuk perhitungan pembukuan otomatis.
+                    </p>
+                  </div>
+                  <button type="button" id="btn-save-ojol-settings" onclick="saveOjolChannelSettings()" class="x-btn-primary" style="display:flex;align-items:center;gap:6px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;">
+                    <span>💾</span><span>Simpan Pengaturan</span>
+                  </button>
+                </div>
+
+                <!-- 3 Channel Settings Cards -->
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(300px, 1fr));gap:16px;margin-bottom:24px;">
+                  <!-- GoFood Config Card -->
+                  <div style="border:1px solid #e2e8f0;border-top:4px solid #00aa13;border-radius:var(--radius-md);padding:18px;background:#ffffff;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+                      <div style="display:flex;align-items:center;gap:8px;">
+                        <span style="font-size:20px;">🟢</span>
+                        <div>
+                          <strong style="font-size:15px;color:#0f172a;display:block;">GoFood</strong>
+                          <span style="font-size:11px;color:#64748b;">Aplikasi GoBiz Merchant</span>
+                        </div>
+                      </div>
+                      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:700;color:#0f172a;">
+                        <input type="checkbox" id="ojol-set-gofood-active" checked onchange="updateOjolCalculator()" style="width:18px;height:18px;cursor:pointer;">
+                        <span>Aktif</span>
+                      </label>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:12px;">
+                      <div>
+                        <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:4px;">Komisi Mitra GoFood (%)</label>
+                        <div style="display:flex;align-items:center;">
+                          <input type="number" id="ojol-set-gofood-rate" value="20" min="0" max="50" step="0.5" oninput="updateOjolCalculator()" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px 0 0 8px;font-size:13px;font-weight:700;">
+                          <span style="padding:8px 12px;background:#f1f5f9;border:1px solid #cbd5e1;border-left:none;border-radius:0 8px 8px 0;font-size:13px;font-weight:700;color:#64748b;">%</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:4px;">Biaya Penanganan Tetap (Rp)</label>
+                        <div style="display:flex;align-items:center;">
+                          <span style="padding:8px 10px;background:#f1f5f9;border:1px solid #cbd5e1;border-right:none;border-radius:8px 0 0 8px;font-size:13px;font-weight:700;color:#64748b;">Rp</span>
+                          <input type="number" id="ojol-set-gofood-fee" value="1000" min="0" step="500" oninput="updateOjolCalculator()" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:0 8px 8px 0;font-size:13px;font-weight:700;">
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- GrabFood Config Card -->
+                  <div style="border:1px solid #e2e8f0;border-top:4px solid #00b14f;border-radius:var(--radius-md);padding:18px;background:#ffffff;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+                      <div style="display:flex;align-items:center;gap:8px;">
+                        <span style="font-size:20px;">🟢</span>
+                        <div>
+                          <strong style="font-size:15px;color:#0f172a;display:block;">GrabFood</strong>
+                          <span style="font-size:11px;color:#64748b;">Aplikasi GrabMerchant</span>
+                        </div>
+                      </div>
+                      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:700;color:#0f172a;">
+                        <input type="checkbox" id="ojol-set-grabfood-active" checked onchange="updateOjolCalculator()" style="width:18px;height:18px;cursor:pointer;">
+                        <span>Aktif</span>
+                      </label>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:12px;">
+                      <div>
+                        <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:4px;">Komisi Mitra GrabFood (%)</label>
+                        <div style="display:flex;align-items:center;">
+                          <input type="number" id="ojol-set-grabfood-rate" value="20" min="0" max="50" step="0.5" oninput="updateOjolCalculator()" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px 0 0 8px;font-size:13px;font-weight:700;">
+                          <span style="padding:8px 12px;background:#f1f5f9;border:1px solid #cbd5e1;border-left:none;border-radius:0 8px 8px 0;font-size:13px;font-weight:700;color:#64748b;">%</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:4px;">Biaya Penanganan Tetap (Rp)</label>
+                        <div style="display:flex;align-items:center;">
+                          <span style="padding:8px 10px;background:#f1f5f9;border:1px solid #cbd5e1;border-right:none;border-radius:8px 0 0 8px;font-size:13px;font-weight:700;color:#64748b;">Rp</span>
+                          <input type="number" id="ojol-set-grabfood-fee" value="1000" min="0" step="500" oninput="updateOjolCalculator()" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:0 8px 8px 0;font-size:13px;font-weight:700;">
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- ShopeeFood Config Card -->
+                  <div style="border:1px solid #e2e8f0;border-top:4px solid #ee4d2d;border-radius:var(--radius-md);padding:18px;background:#ffffff;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+                      <div style="display:flex;align-items:center;gap:8px;">
+                        <span style="font-size:20px;">🟠</span>
+                        <div>
+                          <strong style="font-size:15px;color:#0f172a;display:block;">ShopeeFood</strong>
+                          <span style="font-size:11px;color:#64748b;">Aplikasi Shopee Partner</span>
+                        </div>
+                      </div>
+                      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:700;color:#0f172a;">
+                        <input type="checkbox" id="ojol-set-shopeefood-active" checked onchange="updateOjolCalculator()" style="width:18px;height:18px;cursor:pointer;">
+                        <span>Aktif</span>
+                      </label>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:12px;">
+                      <div>
+                        <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:4px;">Komisi Mitra ShopeeFood (%)</label>
+                        <div style="display:flex;align-items:center;">
+                          <input type="number" id="ojol-set-shopeefood-rate" value="20" min="0" max="50" step="0.5" oninput="updateOjolCalculator()" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px 0 0 8px;font-size:13px;font-weight:700;">
+                          <span style="padding:8px 12px;background:#f1f5f9;border:1px solid #cbd5e1;border-left:none;border-radius:0 8px 8px 0;font-size:13px;font-weight:700;color:#64748b;">%</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:4px;">Biaya Penanganan Tetap (Rp)</label>
+                        <div style="display:flex;align-items:center;">
+                          <span style="padding:8px 10px;background:#f1f5f9;border:1px solid #cbd5e1;border-right:none;border-radius:8px 0 0 8px;font-size:13px;font-weight:700;color:#64748b;">Rp</span>
+                          <input type="number" id="ojol-set-shopeefood-fee" value="1000" min="0" step="500" oninput="updateOjolCalculator()" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:0 8px 8px 0;font-size:13px;font-weight:700;">
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Live Simulation Calculator -->
+                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:var(--radius-md);padding:18px;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
+                    <div>
+                      <strong style="font-size:13.5px;color:#0f172a;">Simulasi Kalkulasi Pembukuan Real-Time</strong>
+                      <div style="font-size:12px;color:#64748b;">Uji coba perhitungan uang bersih yang diterima berdasarkan pengaturan di atas.</div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                      <span style="font-size:12.5px;font-weight:700;color:#475569;">Nilai Belanja Customer:</span>
+                      <input type="number" id="ojol-calc-sample-input" value="100000" step="10000" oninput="updateOjolCalculator()" style="width:120px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;font-weight:700;text-align:right;">
+                    </div>
+                  </div>
+                  <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:12px;font-size:12.5px;">
+                    <div style="background:#ffffff;padding:12px;border-radius:8px;border:1px solid #e2e8f0;">
+                      <div style="font-weight:700;color:#00aa13;margin-bottom:4px;">GoFood Net Settlement:</div>
+                      <div id="ojol-calc-preview-gofood" style="font-size:16px;font-weight:800;color:#0f172a;">Rp 79.000</div>
+                      <div id="ojol-calc-sub-gofood" style="font-size:11px;color:#64748b;margin-top:2px;">Potongan: Rp 21.000</div>
+                    </div>
+                    <div style="background:#ffffff;padding:12px;border-radius:8px;border:1px solid #e2e8f0;">
+                      <div style="font-weight:700;color:#00b14f;margin-bottom:4px;">GrabFood Net Settlement:</div>
+                      <div id="ojol-calc-preview-grabfood" style="font-size:16px;font-weight:800;color:#0f172a;">Rp 79.000</div>
+                      <div id="ojol-calc-sub-grabfood" style="font-size:11px;color:#64748b;margin-top:2px;">Potongan: Rp 21.000</div>
+                    </div>
+                    <div style="background:#ffffff;padding:12px;border-radius:8px;border:1px solid #e2e8f0;">
+                      <div style="font-weight:700;color:#ee4d2d;margin-bottom:4px;">ShopeeFood Net Settlement:</div>
+                      <div id="ojol-calc-preview-shopeefood" style="font-size:16px;font-weight:800;color:#0f172a;">Rp 79.000</div>
+                      <div id="ojol-calc-sub-shopeefood" style="font-size:11px;color:#64748b;margin-top:2px;">Potongan: Rp 21.000</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <!-- 9. INTEGRATIONS PANEL -->
             <div id="settings-panel-integrations" class="settings-panel" style="display:none;">
               <div class="x-card" style="padding:24px;border:1px solid var(--border-color);border-radius:var(--radius-lg);background:#ffffff;">
@@ -4821,6 +5308,7 @@
 
         <!-- SUB-HUB: KATALOG & MENU (Xentra Owner - Bisnis - Katalog & Menu.png) -->
         <div id="subpage-catalog-menu-hub" style="display:none; margin-bottom:24px;">
+          <div id="modern-catalog-subhub-mount"></div>
           <div class="x-owner-child-mobile-header" style="margin-bottom:16px;">
             <h3 class="x-owner-mobile-page-title">
               <button type="button" class="x-title-back-btn x-owner-mobile-page-back" aria-label="Kembali" onclick="closeBusinessSubHub()">
@@ -6531,18 +7019,18 @@
   <script src="/merchant-dashboard/assets/js/modules/orders.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/stock.js?v=2.5.2"></script>
   <script src="/merchant-dashboard/assets/js/modules/branches.js?v=1.0.1"></script>
-  <script src="/merchant-dashboard/assets/js/modules/reports.js?v=1.0.0"></script>
+  <script src="/merchant-dashboard/assets/js/modules/reports.js?v=1.1.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/team.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/customers.js?v=1.0.0"></script>
-  <script src="/merchant-dashboard/assets/js/modules/finance.js?v=1.0.0"></script>
+  <script src="/merchant-dashboard/assets/js/modules/finance.js?v=1.1.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/marketing-banners.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/marketing.js?v=1.0.1"></script>
-  <script src="/merchant-dashboard/assets/js/modules/master-menu.js?v=1.0.1"></script>
-  <script src="/merchant-dashboard/assets/js/modules/settings.js?v=1.0.0"></script>
+  <script src="/merchant-dashboard/assets/js/modules/master-menu.js?v=1.0.11"></script>
+  <script src="/merchant-dashboard/assets/js/modules/settings.js?v=1.1.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/brand.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/catalog-reference.js?v=1.0.2"></script>
-  <script src="/merchant-dashboard/assets/js/modules/catalog.js?v=1.0.2"></script>
-  <script src="/dashboard/assets/js/dashboard.js?v=3.1.1"></script>
+  <script src="/merchant-dashboard/assets/js/modules/catalog.js?v=1.0.3"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=3.2.0"></script>
   <script src="/merchant-dashboard/assets/js/owner-master-menu-inline.js?v=1.0.2"></script>
 </body>
 </html>  

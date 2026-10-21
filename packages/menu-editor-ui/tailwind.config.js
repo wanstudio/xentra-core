@@ -3,7 +3,7 @@ export default {
   content: [
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
-  important: ':is(#modern-menu-editor-root, #modern-menu-portal-root, #modern-business-hub-root)',
+  important: ':is(#modern-menu-editor-root, #modern-menu-portal-root, #modern-business-hub-root, #modern-catalog-subhub-root)',
   corePlugins: {
     preflight: false,
   },

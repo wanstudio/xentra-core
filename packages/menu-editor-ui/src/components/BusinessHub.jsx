@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import CatalogSubHub from './CatalogSubHub';
 
 const businessItems = [
   {
@@ -92,9 +93,25 @@ const businessItems = [
   },
 ];
 
-export default function BusinessHub({ onNavigate }) {
+export default function BusinessHub({ onNavigate, initialSubHub = null }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBusiness, setSelectedBusiness] = useState('');
+  const [activeSubHub, setActiveSubHub] = useState(initialSubHub);
+
+  if (activeSubHub === 'catalog') {
+    return (
+      <CatalogSubHub
+        onBack={() => setActiveSubHub(null)}
+        onNavigate={(route, id) => {
+          if (typeof onNavigate === 'function') {
+            onNavigate(route, id);
+          } else {
+            window.location.hash = route;
+          }
+        }}
+      />
+    );
+  }
 
   const filteredBusinessItems = businessItems.filter((item) => {
     const searchValue = searchTerm.trim().toLowerCase();
@@ -106,10 +123,13 @@ export default function BusinessHub({ onNavigate }) {
 
   const handleCardClick = (item) => {
     setSelectedBusiness(item.title);
-    if (typeof onNavigate === 'function') {
+    if (item.id === 'catalog') {
+      setActiveSubHub('catalog');
+      if (typeof onNavigate === 'function') {
+        onNavigate('business/catalog', item.id);
+      }
+    } else if (typeof onNavigate === 'function') {
       onNavigate(item.route, item.id);
-    } else if (item.id === 'catalog' && typeof window.openBusinessSubHub === 'function') {
-      window.openBusinessSubHub('catalog');
     } else if (item.id === 'materials-production' && typeof window.openBusinessSubHub === 'function') {
       window.openBusinessSubHub('materials-production');
     } else {

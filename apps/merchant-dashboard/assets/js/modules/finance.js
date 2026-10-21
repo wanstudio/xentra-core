@@ -163,7 +163,8 @@
       'transactions': 'finance-view-transactions',
       'payouts': 'finance-view-payouts',
       'reconciliation': 'finance-view-reconciliation',
-      'payment-methods': 'finance-view-payment-methods'
+      'payment-methods': 'finance-view-payment-methods',
+      'channels': 'finance-view-channels'
     };
 
     Object.keys(views).forEach(function (key) {
@@ -176,6 +177,7 @@
     else if (subtab === 'transactions') loadFinanceTransactions();
     else if (subtab === 'reconciliation') loadFinanceReconciliation();
     else if (subtab === 'payment-methods') loadFinancePaymentMethods();
+    else if (subtab === 'channels') loadFinanceChannels();
   }
 
   function loadFinanceCurrentSubtab() {
@@ -472,6 +474,167 @@
     }
   }
 
+  /* =========================================================================
+     REKONSILIASI SALURAN OJOL (GoFood, GrabFood, ShopeeFood)
+     ========================================================================= */
+  var _cachedOjolOrders = [];
+
+  async function loadFinanceChannels() {
+    var tbody = $('tbody-ojol-orders');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="text-center py-6 text-muted">Memuat data rekonsiliasi ojol...</td></tr>';
+
+    try {
+      var branchId = getEffectiveBranchId();
+      var channelFilter = $('ojol-filter-channel') ? $('ojol-filter-channel').value : 'all';
+      var startDate = $('ojol-filter-start') ? $('ojol-filter-start').value : '';
+      var endDate = $('ojol-filter-end') ? $('ojol-filter-end').value : '';
+
+      var queryParams = [];
+      if (branchId && branchId !== 'all') queryParams.push('branch_id=' + encodeURIComponent(branchId));
+      if (startDate) queryParams.push('start_date=' + encodeURIComponent(startDate));
+      if (endDate) queryParams.push('end_date=' + encodeURIComponent(endDate));
+      var qs = queryParams.length > 0 ? '?' + queryParams.join('&') : '';
+
+      // 1. Fetch channel financial summary
+      var sumRes = await adminFetch(API_BASE + '/integrations/channel-summary' + qs, { headers: getAuthHeaders() });
+      var sumJson = await sumRes.json();
+
+      var summaryList = (sumJson.success && Array.isArray(sumJson.data)) ? sumJson.data : [];
+
+      var totalGross = 0;
+      var totalFee = 0;
+      var totalNet = 0;
+      var totalOrders = 0;
+
+      var chMap = { gofood: null, grabfood: null, shopeefood: null };
+
+      summaryList.forEach(function (row) {
+        var ch = (row.channel || '').toLowerCase();
+        var g = Number(row.total_gross || 0);
+        var f = Number(row.total_commission_fee || 0);
+        var n = Number(row.total_net_payout || 0);
+        var o = Number(row.total_orders || 0);
+
+        totalGross += g;
+        totalFee += f;
+        totalNet += n;
+        totalOrders += o;
+
+        chMap[ch] = { gross: g, fee: f, net: n, orders: o };
+      });
+
+      // Update KPI cards
+      if ($('ojol-kpi-gross')) $('ojol-kpi-gross').textContent = formatMoney(totalGross);
+      if ($('ojol-kpi-fee')) $('ojol-kpi-fee').textContent = '- ' + formatMoney(totalFee);
+      if ($('ojol-kpi-net')) $('ojol-kpi-net').textContent = formatMoney(totalNet);
+      if ($('ojol-kpi-orders')) $('ojol-kpi-orders').textContent = totalOrders + ' Pesanan';
+
+      // Update channel cards
+      ['gofood', 'grabfood', 'shopeefood'].forEach(function (ch) {
+        var prefix = ch === 'gofood' ? 'gf' : (ch === 'grabfood' ? 'grb' : 'spf');
+        var data = chMap[ch] || { gross: 0, fee: 0, net: 0, orders: 0 };
+        if ($('card-' + prefix + '-orders')) $('card-' + prefix + '-orders').textContent = data.orders + ' Pesanan';
+        if ($('card-' + prefix + '-gross')) $('card-' + prefix + '-gross').textContent = formatMoney(data.gross);
+        if ($('card-' + prefix + '-fee')) $('card-' + prefix + '-fee').textContent = '- ' + formatMoney(data.fee);
+        if ($('card-' + prefix + '-net')) $('card-' + prefix + '-net').textContent = formatMoney(data.net);
+      });
+
+      // 2. Fetch detailed order ledger
+      var orderParams = [].concat(queryParams);
+      if (channelFilter && channelFilter !== 'all') {
+        orderParams.push('channel=' + encodeURIComponent(channelFilter));
+      }
+      var ledgerQs = orderParams.length > 0 ? '?' + orderParams.join('&') : '';
+      var ledgerRes = await adminFetch(API_BASE + '/integrations/channel-orders' + ledgerQs, { headers: getAuthHeaders() });
+      var ledgerJson = await ledgerRes.json();
+
+      _cachedOjolOrders = (ledgerJson.success && Array.isArray(ledgerJson.data)) ? ledgerJson.data : [];
+
+      if (!tbody) return;
+
+      if (_cachedOjolOrders.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-6 text-muted">Belum ada pesanan ojol yang dibukukan untuk periode ini.</td></tr>';
+        return;
+      }
+
+      var html = '';
+      _cachedOjolOrders.forEach(function (item) {
+        var ch = (item.channel || '').toLowerCase();
+        var badgeStyle = 'background:#f1f5f9;color:#334155;';
+        var badgeLabel = ch.toUpperCase();
+        if (ch === 'gofood') {
+          badgeStyle = 'background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;';
+          badgeLabel = '🟢 GoFood';
+        } else if (ch === 'grabfood') {
+          badgeStyle = 'background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;';
+          badgeLabel = '🟢 GrabFood';
+        } else if (ch === 'shopeefood') {
+          badgeStyle = 'background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;';
+          badgeLabel = '🟠 ShopeeFood';
+        }
+
+        var createdAt = item.created_at || '';
+        var fee = Number(item.commission_amount || 0) + Number(item.platform_fee || 0);
+
+        html += '<tr>' +
+          '<td style="white-space:nowrap;font-size:12px;color:#64748b;">' + esc(createdAt) + '</td>' +
+          '<td><span class="x-badge" style="' + badgeStyle + 'font-weight:700;">' + badgeLabel + '</span></td>' +
+          '<td><strong style="color:#0f172a;">#' + esc(item.external_order_id) + '</strong><br><span style="font-size:11px;color:#94a3b8;">Xentra: ' + esc(item.order_number) + '</span></td>' +
+          '<td><span style="font-size:13px;font-weight:600;color:#1e293b;">' + esc(item.driver_name || item.customer_name || '-') + '</span></td>' +
+          '<td style="text-align:right;font-weight:700;color:#0f172a;">' + formatMoney(item.gross_amount) + '</td>' +
+          '<td style="text-align:right;font-weight:600;color:#ef4444;">- ' + formatMoney(fee) + '</td>' +
+          '<td style="text-align:right;font-weight:800;color:#059669;font-size:13.5px;">' + formatMoney(item.net_amount) + '</td>' +
+          '<td style="text-align:center;"><span class="x-badge" style="background:#ecfdf5;color:#047857;font-weight:700;">Settled</span></td>' +
+        '</tr>';
+      });
+
+      tbody.innerHTML = html;
+    } catch (e) {
+      console.warn('[Finance Channels Error]:', e);
+      if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="text-center py-6 text-red-500">Gagal memuat rekonsiliasi saluran ojol.</td></tr>';
+    }
+  }
+
+  function exportOjolLedgerCSV() {
+    if (!_cachedOjolOrders || _cachedOjolOrders.length === 0) {
+      showToast('Tidak ada data transaksi ojol untuk diekspor.');
+      return;
+    }
+
+    var csvRows = [
+      ['Waktu', 'Saluran', 'ID Pesanan Ojol', 'No Pesanan Xentra', 'Driver/Customer', 'Gross Belanja', 'Potongan Komisi', 'Net Settlement', 'Status']
+    ];
+
+    _cachedOjolOrders.forEach(function (r) {
+      var fee = Number(r.commission_amount || 0) + Number(r.platform_fee || 0);
+      csvRows.push([
+        r.created_at || '',
+        r.channel || '',
+        r.external_order_id || '',
+        r.order_number || '',
+        r.driver_name || r.customer_name || '',
+        Number(r.gross_amount || 0),
+        fee,
+        Number(r.net_amount || 0),
+        'Settled'
+      ]);
+    });
+
+    var csvContent = 'data:text/csv;charset=utf-8,' + csvRows.map(function (e) {
+      return e.map(function (val) {
+        return '"' + String(val).replace(/"/g, '""') + '"';
+      }).join(',');
+    }).join('\n');
+
+    var encodedUri = encodeURI(csvContent);
+    var link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', 'rekonsiliasi_ojol_' + new Date().toISOString().slice(0, 10) + '.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
   // Global window bindings for inline HTML handlers & dashboard routing
   window.toggleFinanceDropdown = toggleFinanceDropdown;
   window.pickFinanceSection = pickFinanceSection;
@@ -483,6 +646,8 @@
   window.loadFinanceTransactions = loadFinanceTransactions;
   window.loadFinanceReconciliation = loadFinanceReconciliation;
   window.loadFinancePaymentMethods = loadFinancePaymentMethods;
+  window.loadFinanceChannels = loadFinanceChannels;
+  window.exportOjolLedgerCSV = exportOjolLedgerCSV;
   window.togglePaymentMethodType = togglePaymentMethodType;
   window.togglePaymentProvider = togglePaymentProvider;
 
@@ -492,7 +657,9 @@
     loadFinanceOverview: loadFinanceOverview,
     loadFinanceTransactions: loadFinanceTransactions,
     loadFinanceReconciliation: loadFinanceReconciliation,
-    loadFinancePaymentMethods: loadFinancePaymentMethods
+    loadFinancePaymentMethods: loadFinancePaymentMethods,
+    loadFinanceChannels: loadFinanceChannels,
+    exportOjolLedgerCSV: exportOjolLedgerCSV
   };
 
 })(window, document);

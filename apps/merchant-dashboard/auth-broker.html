@@ -127,19 +127,66 @@
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
+
+    /* Customer White-Label Theme: Clean light card matching Customer PWA */
+    body.customer-theme {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --primary: #10b981;
+      --radius: 20px;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+    body.customer-theme .x-broker-card {
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.06), 0 8px 10px -6px rgba(0, 0, 0, 0.02);
+      border: 1px solid #e2e8f0;
+    }
+    body.customer-theme .x-brand-logo-img {
+      max-height: 60px;
+      max-width: 200px;
+      object-fit: contain;
+      border-radius: 10px;
+    }
+    body.customer-theme .x-spinner {
+      border: 3px solid #f1f5f9;
+      border-top-color: var(--primary);
+    }
+    body.customer-theme .x-alert-error {
+      background: #fef2f2;
+      border-color: #fecaca;
+      color: #b91c1c;
+    }
+    body.customer-theme .x-btn-return {
+      background: #f1f5f9;
+      border-color: #cbd5e1;
+      color: #334155;
+    }
+    body.customer-theme .x-btn-return:hover {
+      background: #e2e8f0;
+    }
+    body.customer-theme .x-footer-note {
+      color: #94a3b8;
+      text-transform: none;
+      letter-spacing: normal;
+      font-size: 12px;
+    }
   </style>
 </head>
 <body>
   <div class="x-broker-card">
-    <div class="x-logo-wrap">
-      <div class="x-logo-badge">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <div class="x-logo-wrap" id="logo-wrap">
+      <div class="x-logo-badge" id="logo-badge">
+        <svg id="default-shield-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
         </svg>
       </div>
+      <img id="brand-logo-img" class="x-brand-logo-img" src="" alt="Brand Logo" style="display:none;" />
     </div>
 
-    <h1 class="x-title">Xentra Single Sign-On</h1>
+    <h1 class="x-title" id="broker-title">Xentra Single Sign-On</h1>
     <p class="x-subtitle" id="broker-subtitle">Connecting to Google Authentication Services...</p>
 
     <div id="broker-error" class="x-alert-error"></div>
@@ -156,7 +203,7 @@
       <a id="btn-return-client" href="#" class="x-btn-return">&larr; Return to Dashboard Login</a>
     </div>
 
-    <div class="x-footer-note">XENTRA CLOUD &bull; CENTRALIZED IDENTITY BROKER</div>
+    <div class="x-footer-note" id="broker-footer-note">XENTRA CLOUD &bull; CENTRALIZED IDENTITY BROKER</div>
   </div>
 
   <script>
@@ -177,8 +224,9 @@
       var allowedHosts = ['xentra.cloud', 'localhost', '127.0.0.1'];
       var currentHostname = window.location.hostname.toLowerCase();
       var isControlPlane = allowedHosts.indexOf(currentHostname) !== -1 || currentHostname.endsWith('.xentra.cloud');
+      var isCustomerMode = urlParams.get('mode') === 'customer';
 
-      if (!isControlPlane) {
+      if (!isControlPlane && !isCustomerMode) {
         showFatalError('Centralized tenant auth broker can only run on the Xentra control-plane domain (xentra.cloud).');
         return;
       }
@@ -222,8 +270,65 @@
       var isLinkMode = urlParams.get('mode') === 'link' && Boolean(linkToken);
       // Customer mode: broker handles Google auth for customer tenant (app.mybangjo.com etc.)
       // instead of merchant dashboard. Credential goes to /customer/auth/broker/google.
-      var isCustomerMode = urlParams.get('mode') === 'customer';
       var customerBrandId = urlParams.get('brand_id') || '';
+      var brandName = urlParams.get('brand_name') || '';
+      var brandLogo = urlParams.get('brand_logo') || '';
+      var brandColor = urlParams.get('brand_color') || '';
+
+      var titleEl = document.getElementById('broker-title');
+      var footerNoteEl = document.getElementById('broker-footer-note');
+      var brandLogoImg = document.getElementById('brand-logo-img');
+      var logoBadge = document.getElementById('logo-badge');
+      var displayName = brandName || 'MyBangjo';
+
+      if (isCustomerMode) {
+        document.body.classList.add('customer-theme');
+        document.title = displayName + ' \u2022 Masuk dengan Google';
+
+        function updateCustomerBrandVisuals(bName, bLogo, bColor) {
+          if (bName) {
+            displayName = bName;
+            document.title = displayName + ' \u2022 Masuk dengan Google';
+            if (titleEl) titleEl.textContent = 'Masuk ke ' + displayName;
+            if (btnReturn) btnReturn.innerHTML = '&larr; Kembali ke ' + displayName;
+            if (subtitleEl) subtitleEl.textContent = 'Lanjutkan dengan akun Google untuk memesan menu & mengakses promo di ' + displayName + '.';
+          }
+          if (bLogo && brandLogoImg) {
+            brandLogoImg.src = bLogo;
+            brandLogoImg.alt = displayName;
+            brandLogoImg.style.display = 'block';
+            if (logoBadge) logoBadge.style.display = 'none';
+          } else if (logoBadge) {
+            logoBadge.style.display = 'flex';
+            logoBadge.style.background = (bColor && /^#[0-9A-Fa-f]{3,8}$/.test(bColor)) ? bColor : '#10b981';
+            logoBadge.innerHTML = '<span style="font-size:22px;font-weight:700;color:#fff;">' + (displayName.charAt(0) || 'M') + '</span>';
+          }
+          if (bColor && /^#[0-9A-Fa-f]{3,8}$/.test(bColor)) {
+            document.documentElement.style.setProperty('--primary', bColor);
+          }
+        }
+
+        updateCustomerBrandVisuals(brandName, brandLogo, brandColor);
+
+        if (footerNoteEl) {
+          footerNoteEl.textContent = 'Autentikasi Aman Akun Google';
+        }
+        if (btnReturn) {
+          btnReturn.innerHTML = '&larr; Kembali ke ' + displayName;
+        }
+
+        // If brand_name or brand_logo wasn't supplied in query string, fetch from API
+        if ((!brandName || !brandLogo) && customerBrandId) {
+          fetch('/api/v1/customer/auth/brand-info?brand_id=' + encodeURIComponent(customerBrandId))
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+              if (res && res.success && res.brand) {
+                updateCustomerBrandVisuals(res.brand.name, res.brand.logo_url, res.brand.primary_color);
+              }
+            })
+            .catch(function () {});
+        }
+      }
 
       function handleGoogleCredential(credentialResponse) {
         if (!credentialResponse || !credentialResponse.credential) {
@@ -383,7 +488,7 @@
           // Render explicit Google button in case One Tap is closed or blocked
           googleBtnSlot.style.display = 'flex';
           window.google.accounts.id.renderButton(googleBtnSlot, {
-            theme: 'filled_blue',
+            theme: isCustomerMode ? 'outline' : 'filled_blue',
             size: 'large',
             type: 'standard',
             text: 'continue_with',
@@ -392,16 +497,28 @@
             width: 320
           });
 
+          // Button rendered: dismiss loading spinner immediately so user is never stuck
+          loadingEl.style.display = 'none';
+          subtitleEl.textContent = isCustomerMode
+            ? 'Pilih akun Google untuk masuk ke ' + displayName + ':'
+            : 'Select your Google account to continue to your dashboard:';
+
           // Trigger One Tap prompt
           window.google.accounts.id.prompt(function (notification) {
             if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-              // One Tap didn't display or was skipped; explicit button is visible for manual click
               loadingEl.style.display = 'none';
-              subtitleEl.textContent = isCustomerMode
-                ? 'Pilih akun Google untuk masuk ke akunmu:'
-                : 'Select your Google account to continue to your dashboard:';
             }
           });
+
+          // Safety check: verify Google GSI injected the button iframe within 4.5 seconds.
+          // If not injected, origin is usually not authorized in Google Cloud Console.
+          setTimeout(function () {
+            var hasIframe = googleBtnSlot.querySelector('iframe');
+            if (!hasIframe && !isNativeBridge) {
+              loadingEl.style.display = 'none';
+              showFatalError('Google Sign-In tidak dapat dimuat di domain ini (' + window.location.origin + '). Pastikan ' + window.location.origin + ' telah didaftarkan ke "Authorized JavaScript origins" di Google Cloud Console untuk Client ID ini.');
+            }
+          }, 4500);
         } catch (err) {
           console.error('[Broker GSI Init Error]:', err);
           showFatalError('Failed to initialize Google Sign-In.');

@@ -288,6 +288,7 @@
     'reports/customers':  { title: 'Customers Report', sub: 'Laporan analitik pelanggan dan retensi', tab: 'reports' },
     'reports/branches':   { title: 'Branches Report', sub: 'Laporan perbandingan kinerja antar cabang', tab: 'reports' },
     'reports/operations': { title: 'Operations Report', sub: 'Laporan operasional dan pergerakan stok', tab: 'reports' },
+    'reports/affiliate':  { title: 'Affiliate Report',  sub: 'Laporan performa omzet referral, ranking mitra, dan menu terlaris', tab: 'reports' },
     'stock':               { title: 'Stok',         sub: 'Kesehatan persediaan dan perhatian stok seluruh cabang', tab: 'stock' },
     'team':               { title: 'Team',         sub: 'Kelola akun staf, role, dan hak akses', tab: 'tim' },
     'team/members':       { title: 'Team Members', sub: 'Daftar staf dan akun operator', tab: 'tim' },
@@ -300,6 +301,7 @@
     'finance/payouts':             { title: 'Payouts',         sub: 'Pencairan dana settlement gateway ke rekening merchant', tab: 'finance' },
     'finance/reconciliation':      { title: 'Reconciliation',  sub: 'Status rekonsiliasi dan verifikasi gateway pembayaran', tab: 'finance' },
     'finance/payment-methods':     { title: 'Payment Methods', sub: 'Metode pembayaran terverifikasi untuk checkout dan kasir', tab: 'finance' },
+    'finance/channels':            { title: 'Rekonsiliasi Ojol', sub: 'Rekonsiliasi omzet dan pencairan GoFood, GrabFood, ShopeeFood', tab: 'finance' },
     'marketing':                   { title: 'Marketing',        sub: 'Program promosi, insentif konversi, dan performa retensi', tab: 'marketing' },
     'marketing/overview':          { title: 'Marketing Overview', sub: 'Metrik retensi pelanggan dan performa promosi aktif', tab: 'marketing' },
     'marketing/promotions':        { title: 'Promotions',       sub: 'Daftar program promosi dan aturan insentif brand', tab: 'marketing' },
@@ -322,6 +324,7 @@
     'settings/channels/customer-app': { title: 'Customer App',   sub: 'Status Progressive Web App (PWA) aplikasi pelanggan', tab: 'settings' },
     'settings/channels/pos':       { title: 'Channel POS',       sub: 'Status kasir Point of Sale native dan shift aktif', tab: 'settings' },
     'settings/channels/kiosk':     { title: 'Channel Kiosk',     sub: 'Status terminal pemesanan mandiri self-service kiosk', tab: 'settings' },
+    'settings/channels/delivery':  { title: 'Integrasi Saluran Ojol', sub: 'Konfigurasi komisi dan listener GoFood, GrabFood, ShopeeFood', tab: 'settings' },
     'settings/integrations':       { title: 'Integrations',      sub: 'Modul integrasi payment gateway, POS, dan Xentra ecosystem', tab: 'settings' },
     'settings/notifications':      { title: 'Notifications',     sub: 'Preferensi notifikasi multi-channel WhatsApp, Email & Push', tab: 'settings' },
     'settings/security':           { title: 'Security & RBAC',   sub: 'Model otorisasi, sesi pengguna, dan jejak audit keamanan', tab: 'settings' },
@@ -733,6 +736,25 @@
     if (mainView) mainView.style.display = 'block';
     if (catHub) catHub.style.display = 'none';
     if (matHub) matHub.style.display = 'none';
+
+    var modernMount = $('modern-business-hub-mount');
+    var legacyContent = $('legacy-business-main-content');
+    if (modernMount && typeof window.mountBusinessHub === 'function') {
+      modernMount.style.display = 'block';
+      if (legacyContent) legacyContent.style.display = 'none';
+      window.mountBusinessHub(modernMount, {
+        onNavigate: function(targetRoute, id) {
+          if (id === 'catalog') {
+            openBusinessSubHub('catalog');
+          } else if (id === 'materials-production') {
+            openBusinessSubHub('materials-production');
+          } else {
+            navigateTo(targetRoute.replace(/^#/, ''));
+          }
+        }
+      });
+    }
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
   window.closeBusinessSubHub = closeBusinessSubHub;
@@ -1042,7 +1064,22 @@
       var matHub = $('subpage-materials-production-hub');
       if (route === 'business/catalog') {
         if (mainView) mainView.style.display = 'none';
-        if (catHub) catHub.style.display = 'block';
+        if (catHub) {
+          catHub.style.display = 'block';
+          var modernCatMount = $('modern-catalog-subhub-mount');
+          if (modernCatMount && typeof window.mountCatalogSubHub === 'function') {
+            window.mountCatalogSubHub(modernCatMount, {
+              onBack: closeBusinessSubHub,
+              onNavigate: function(targetRoute) {
+                navigateTo(targetRoute.replace(/^#/, ''));
+              }
+            });
+            var legacyHeader = catHub.querySelector('.x-owner-child-mobile-header');
+            var legacyContainer = catHub.querySelector('.x-subhub-card-container');
+            if (legacyHeader) legacyHeader.style.display = 'none';
+            if (legacyContainer) legacyContainer.style.display = 'none';
+          }
+        }
         if (matHub) matHub.style.display = 'none';
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } else if (route === 'business/materials-production') {

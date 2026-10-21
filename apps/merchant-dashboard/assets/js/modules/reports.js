@@ -171,6 +171,12 @@
         renderOperationsReport(data, summaryCards, tableContainer);
         break;
 
+      case 'affiliate':
+        if (titleEl) titleEl.textContent = 'Laporan Program Afiliasi';
+        if (subEl) subEl.textContent = 'Performa omzet referral, ranking mitra, dan menu terlaris';
+        renderAffiliateReport(data, summaryCards, tableContainer);
+        break;
+
       default:
         if (tableContainer) tableContainer.innerHTML = '<div class="x-empty-state">Laporan tidak dikenali.</div>';
     }
@@ -366,6 +372,159 @@
     }
 
     if (tableEl) tableEl.innerHTML = html;
+  }
+
+  function renderAffiliateReport(data, cardsEl, tableEl) {
+    var summary = data.summary || {};
+    if (cardsEl) {
+      cardsEl.innerHTML =
+        '<div class="x-metric-card"><div class="x-metric-icon bg-green">💰</div><div class="x-metric-info"><span class="x-metric-label">Omzet Referral</span><h3 class="x-metric-value">' + formatMoney(summary.total_sales || 0) + '</h3></div></div>' +
+        '<div class="x-metric-card"><div class="x-metric-icon bg-amber">🍗</div><div class="x-metric-info"><span class="x-metric-label">Menu Terjual</span><h3 class="x-metric-value">' + (summary.total_items_sold || 0) + ' porsi</h3></div></div>' +
+        '<div class="x-metric-card"><div class="x-metric-icon bg-blue">🎁</div><div class="x-metric-info"><span class="x-metric-label">Komisi Diberikan</span><h3 class="x-metric-value">' + formatMoney(summary.total_commission || 0) + '</h3><small style="color:var(--text-muted);font-size:11px;">' + (summary.effective_commission_rate || '0.0') + '% dari omzet</small></div></div>' +
+        '<div class="x-metric-card"><div class="x-metric-icon bg-green">👥</div><div class="x-metric-info"><span class="x-metric-label">Mitra Aktif</span><h3 class="x-metric-value">' + (summary.active_affiliates_count || 0) + ' orang</h3></div></div>';
+    }
+
+    var topAffiliates = data.top_affiliates || [];
+    var topProducts = data.top_products || [];
+    var recentConversions = data.recent_conversions || [];
+
+    if (topAffiliates.length === 0 && recentConversions.length === 0) {
+      if (tableEl) tableEl.innerHTML = '<div class="x-empty-state"><div class="x-empty-state-icon">🍗</div>Belum ada transaksi dari link affiliate pada periode ini.</div>';
+      return;
+    }
+
+    var html =
+      '<div style="margin-bottom:16px;display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;" class="x-aff-report-tabs">' +
+      '  <button type="button" class="x-btn-secondary x-aff-report-tab-btn active" id="btn-tab-top-aff" style="font-size:12.5px;padding:6px 14px;border-radius:20px;font-weight:700;">🏆 Top Affiliator (' + topAffiliates.length + ')</button>' +
+      '  <button type="button" class="x-btn-secondary x-aff-report-tab-btn" id="btn-tab-top-prod" style="font-size:12.5px;padding:6px 14px;border-radius:20px;font-weight:700;">🍗 Menu Terlaris (' + topProducts.length + ')</button>' +
+      '  <button type="button" class="x-btn-secondary x-aff-report-tab-btn" id="btn-tab-conversions" style="font-size:12.5px;padding:6px 14px;border-radius:20px;font-weight:700;">📋 Log Transaksi (' + recentConversions.length + ')</button>' +
+      '</div>';
+
+    // 1. TOP AFFILIATES SECTION (Mobile Cards & Desktop Table)
+    html += '<div id="sec-top-aff">';
+    if (topAffiliates.length === 0) {
+      html += '<div class="x-empty-state">Belum ada mitra yang menghasilkan penjualan.</div>';
+    } else {
+      html += '<div class="x-mobile-card-list" style="display:flex;flex-direction:column;gap:10px;">';
+      topAffiliates.forEach(function (aff, idx) {
+        var rankBadge = idx === 0 ? '🥇 #1' : (idx === 1 ? '🥈 #2' : (idx === 2 ? '🥉 #3' : '#' + (idx + 1)));
+        var waBtn = aff.phone ? '<a href="https://wa.me/' + aff.phone.replace(/[^0-9]/g, '') + '" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;color:#16a34a;font-size:12px;font-weight:700;text-decoration:none;margin-top:2px;">💬 ' + escapeHtml(aff.phone) + '</a>' : '';
+
+        html +=
+          '<div style="background:#fff;border:1px solid var(--border-color, #e2e8f0);border-radius:12px;padding:12px 14px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">' +
+          '  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">' +
+          '    <div>' +
+          '      <span style="display:inline-block;background:#f1f5f9;color:#0f172a;font-size:11px;font-weight:800;padding:2px 8px;border-radius:6px;margin-bottom:4px;">' + rankBadge + '</span>' +
+          '      <h4 style="margin:0;font-size:14px;font-weight:800;color:var(--text-main, #0f172a);">' + escapeHtml(aff.affiliate_name) + '</h4>' +
+          '      <div style="font-size:11.5px;color:var(--text-muted, #64748b);margin-top:2px;">Kode: <strong style="color:#0284c7;">' + escapeHtml(aff.referral_code) + '</strong></div>' +
+          waBtn +
+          '    </div>' +
+          '    <div style="text-align:right;">' +
+          '      <div style="font-size:15px;font-weight:900;color:#16a34a;">' + formatMoney(aff.total_commission || 0) + '</div>' +
+          '      <div style="font-size:11px;color:var(--text-muted, #64748b);">Komisi Diterima</div>' +
+          '    </div>' +
+          '  </div>' +
+          '  <div style="margin-top:10px;padding-top:8px;border-top:1px dashed #f1f5f9;display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted, #64748b);">' +
+          '    <span>' + (aff.orders_count || 0) + ' pesanan (' + (aff.items_sold || 0) + ' menu)</span>' +
+          '    <span>Omzet: <strong style="color:var(--text-main, #0f172a);">' + formatMoney(aff.total_sales || 0) + '</strong></span>' +
+          '  </div>' +
+          '</div>';
+      });
+      html += '</div>';
+    }
+    html += '</div>';
+
+    // 2. TOP PRODUCTS SECTION
+    html += '<div id="sec-top-prod" style="display:none;">';
+    if (topProducts.length === 0) {
+      html += '<div class="x-empty-state">Belum ada rincian menu yang terjual dari link affiliate.</div>';
+    } else {
+      html += '<div style="display:flex;flex-direction:column;gap:8px;">';
+      topProducts.forEach(function (p, idx) {
+        html +=
+          '<div style="background:#fff;border:1px solid var(--border-color, #e2e8f0);border-radius:12px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;">' +
+          '  <div>' +
+          '    <div style="font-size:11px;font-weight:700;color:#64748b;">#' + (idx + 1) + ' Terlaris</div>' +
+          '    <h4 style="margin:2px 0 0;font-size:14px;font-weight:800;color:var(--text-main, #0f172a);">' + escapeHtml(p.product_name) + '</h4>' +
+          '    <div style="font-size:12px;color:#16a34a;font-weight:700;margin-top:2px;">' + (p.quantity_sold || 0) + ' porsi terjual via link</div>' +
+          '  </div>' +
+          '  <div style="text-align:right;">' +
+          '    <div style="font-size:14px;font-weight:800;color:var(--text-main, #0f172a);">' + formatMoney(p.total_sales || 0) + '</div>' +
+          '    <div style="font-size:11px;color:#64748b;">Total Omzet</div>' +
+          '  </div>' +
+          '</div>';
+      });
+      html += '</div>';
+    }
+    html += '</div>';
+
+    // 3. RECENT CONVERSIONS SECTION
+    html += '<div id="sec-conversions" style="display:none;">';
+    if (recentConversions.length === 0) {
+      html += '<div class="x-empty-state">Belum ada riwayat pesanan affiliate.</div>';
+    } else {
+      html += '<div style="display:flex;flex-direction:column;gap:8px;">';
+      recentConversions.forEach(function (c) {
+        var stBadge = c.status === 'APPROVED'
+          ? '<span style="background:#ecfdf5;color:#059669;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;">Disetujui</span>'
+          : (c.status === 'VOID'
+              ? '<span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;">Batal</span>'
+              : '<span style="background:#fef3c7;color:#b45309;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;">Tertunda</span>');
+        var dateStr = c.created_at ? new Date(c.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+
+        html +=
+          '<div style="background:#fff;border:1px solid var(--border-color, #e2e8f0);border-radius:12px;padding:12px 14px;">' +
+          '  <div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
+          '    <div>' +
+          '      <div style="font-size:13px;font-weight:800;color:var(--text-main, #0f172a);">' + escapeHtml(c.order_number) + '</div>' +
+          '      <div style="font-size:11px;color:#64748b;margin-top:2px;">' + dateStr + ' • Ref: <strong style="color:#0284c7;">' + escapeHtml(c.referral_code) + '</strong> (' + escapeHtml(c.affiliate_name) + ')</div>' +
+          '    </div>' +
+          '    <div>' + stBadge + '</div>' +
+          '  </div>' +
+          '  <div style="margin-top:8px;padding-top:8px;border-top:1px dashed #f1f5f9;display:flex;justify-content:space-between;align-items:center;font-size:12px;">' +
+          '    <span>' + (c.total_items || 1) + ' menu • Omzet: <strong>' + formatMoney(c.eligible_subtotal || 0) + '</strong></span>' +
+          '    <span style="color:#16a34a;font-weight:800;">+' + formatMoney(c.commission_amount || 0) + '</span>' +
+          '  </div>' +
+          '</div>';
+      });
+      html += '</div>';
+    }
+    html += '</div>';
+
+    if (tableEl) {
+      tableEl.innerHTML = html;
+
+      // Attach sub-tab event listeners
+      var btnTopAff = tableEl.querySelector('#btn-tab-top-aff');
+      var btnTopProd = tableEl.querySelector('#btn-tab-top-prod');
+      var btnConversions = tableEl.querySelector('#btn-tab-conversions');
+
+      var secTopAff = tableEl.querySelector('#sec-top-aff');
+      var secTopProd = tableEl.querySelector('#sec-top-prod');
+      var secConversions = tableEl.querySelector('#sec-conversions');
+
+      function switchSubTab(target) {
+        [btnTopAff, btnTopProd, btnConversions].forEach(function (b) { if (b) b.classList.remove('active'); });
+        if (secTopAff) secTopAff.style.display = 'none';
+        if (secTopProd) secTopProd.style.display = 'none';
+        if (secConversions) secConversions.style.display = 'none';
+
+        if (target === 'aff') {
+          if (btnTopAff) btnTopAff.classList.add('active');
+          if (secTopAff) secTopAff.style.display = '';
+        } else if (target === 'prod') {
+          if (btnTopProd) btnTopProd.classList.add('active');
+          if (secTopProd) secTopProd.style.display = '';
+        } else if (target === 'conv') {
+          if (btnConversions) btnConversions.classList.add('active');
+          if (secConversions) secConversions.style.display = '';
+        }
+      }
+
+      if (btnTopAff) btnTopAff.onclick = function () { switchSubTab('aff'); };
+      if (btnTopProd) btnTopProd.onclick = function () { switchSubTab('prod'); };
+      if (btnConversions) btnConversions.onclick = function () { switchSubTab('conv'); };
+    }
   }
 
   function initReportsControls() {
