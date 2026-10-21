@@ -31,6 +31,20 @@ const catalogItems = [
 ];
 
 export default function CatalogSubHub({ onBack, onNavigate }) {
+  const handleBack = () => {
+    if (typeof onBack === 'function') {
+      onBack();
+    }
+    if (window.XentraNavigationController && typeof window.XentraNavigationController.back === 'function') {
+      const snap = window.XentraNavigationController.getSnapshot ? window.XentraNavigationController.getSnapshot() : null;
+      if (snap && snap.stack && snap.stack.length > 1) {
+        window.XentraNavigationController.back();
+        return;
+      }
+    }
+    window.location.hash = '#business';
+  };
+
   const handleItemClick = (item) => {
     if (typeof onNavigate === 'function') {
       onNavigate(item.route, item.id);
@@ -45,7 +59,7 @@ export default function CatalogSubHub({ onBack, onNavigate }) {
       <div className="flex items-center gap-3 mb-6 pt-1">
         <button
           type="button"
-          onClick={onBack}
+          onClick={handleBack}
           aria-label="Kembali ke Kelola Bisnis"
           className="w-9 h-9 flex items-center justify-center -ml-2 rounded-full text-slate-900 hover:bg-slate-100 active:scale-95 transition-all border-none bg-transparent cursor-pointer shrink-0"
         >

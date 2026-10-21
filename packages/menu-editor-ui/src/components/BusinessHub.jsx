@@ -102,14 +102,29 @@ export default function BusinessHub({ onNavigate, initialSubHub = null }) {
     setActiveSubHub(initialSubHub);
   }, [initialSubHub]);
 
+  React.useEffect(() => {
+    const syncRouteFromHash = () => {
+      const hash = (window.location.hash || '').replace(/^#\/?/, '').split('?')[0];
+      if (hash === 'business/catalog') {
+        setActiveSubHub('catalog');
+      } else if (hash === 'business' || hash === '' || hash === 'bisnis') {
+        setActiveSubHub(null);
+      }
+    };
+    window.addEventListener('hashchange', syncRouteFromHash);
+    window.addEventListener('popstate', syncRouteFromHash);
+    syncRouteFromHash();
+    return () => {
+      window.removeEventListener('hashchange', syncRouteFromHash);
+      window.removeEventListener('popstate', syncRouteFromHash);
+    };
+  }, []);
+
   if (activeSubHub === 'catalog') {
     return (
       <CatalogSubHub
         onBack={() => {
           setActiveSubHub(null);
-          try {
-            window.location.hash = '#business';
-          } catch (e) {}
         }}
         onNavigate={(route, id) => {
           if (typeof onNavigate === 'function') {

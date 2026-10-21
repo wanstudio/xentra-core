@@ -54,6 +54,8 @@
     'beranda': true,
     'business': true,
     'bisnis': true,
+    'business/catalog': true,
+    'business/materials-production': true,
     'orders': true,
     'pesanan': true,
     'finance': true,
