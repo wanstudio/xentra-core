@@ -121,7 +121,7 @@ export default function BusinessHub({ onNavigate }) {
     <div id="modern-business-hub-root" className="w-full max-w-[390px] mx-auto px-4 py-2 font-sans">
       {/* 1. Search Bar */}
       <form
-        className="w-full h-11 flex items-center px-4 gap-[15px] rounded-[10px] overflow-hidden bg-white hub-inset-stroke hub-search transition-all mb-6"
+        className="w-full h-12 flex items-center px-4 gap-[15px] rounded-[14px] overflow-hidden bg-white hub-inset-stroke hub-search transition-all mb-6"
         onSubmit={(event) => event.preventDefault()}
       >
         <div className="w-[17px] h-[17px] relative flex items-center justify-center shrink-0">
@@ -146,7 +146,7 @@ export default function BusinessHub({ onNavigate }) {
           onChange={(event) => setSearchTerm(event.target.value)}
           onSearch={(event) => setSearchTerm(event.target.value)}
           placeholder="Cari menu atau pengaturan bisnis"
-          className="w-full bg-transparent border-none outline-none font-medium text-slate-800 text-xs tracking-[0] leading-[normal] placeholder:text-[#94A3B8]"
+          className="w-full bg-transparent border-none outline-none font-medium text-slate-800 text-[13px] tracking-[0] leading-[normal] placeholder:text-[#94A3B8]"
         />
       </form>
 
@@ -160,7 +160,7 @@ export default function BusinessHub({ onNavigate }) {
       {/* 3. The Business Cards */}
       <div className="flex flex-col w-full items-start gap-4">
         {filteredBusinessItems.length === 0 ? (
-          <div className="w-full py-10 text-center text-sm text-slate-400 bg-white rounded-[10px] border border-solid border-slate-300">
+          <div className="w-full py-10 text-center text-sm text-slate-400 bg-white rounded-[14px] border border-solid border-slate-300">
             Tidak ada modul bisnis yang sesuai dengan pencarian "{searchTerm}"
           </div>
         ) : (
@@ -171,7 +171,7 @@ export default function BusinessHub({ onNavigate }) {
               aria-label={`Buka ${item.title}`}
               aria-pressed={selectedBusiness === item.title}
               onClick={() => handleCardClick(item)}
-              className="flex w-full items-center gap-4 p-4 relative rounded-[10px] bg-white hub-inset-stroke hub-card active:scale-[0.99] transition-all cursor-pointer text-left"
+              className="flex w-full items-center gap-4 p-4 relative rounded-[14px] bg-white hub-inset-stroke hub-card active:scale-[0.99] transition-all cursor-pointer text-left"
             >
               <span
                 className={`relative w-[45px] h-[45px] ${item.color} rounded-[10px] aspect-[1] shrink-0`}
