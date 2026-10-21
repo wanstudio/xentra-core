@@ -745,7 +745,7 @@
       window.mountBusinessHub(modernMount, {
         onNavigate: function(targetRoute, id) {
           if (id === 'catalog') {
-            // Handled directly inside React BusinessHub
+            openBusinessSubHub('catalog');
           } else if (id === 'materials-production') {
             openBusinessSubHub('materials-production');
           } else {
@@ -1075,7 +1075,7 @@
             initialSubHub: 'catalog',
             onNavigate: function(targetRoute, id) {
               if (id === 'catalog') {
-                // Handled directly inside React BusinessHub
+                openBusinessSubHub('catalog');
               } else if (id === 'materials-production') {
                 openBusinessSubHub('materials-production');
               } else {

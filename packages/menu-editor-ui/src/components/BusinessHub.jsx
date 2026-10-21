@@ -147,13 +147,17 @@ export default function BusinessHub({ onNavigate, initialSubHub = null }) {
 
   const handleCardClick = (item) => {
     setSelectedBusiness(item.title);
-    if (item.id === 'catalog') {
-      setActiveSubHub('catalog');
-      try {
-        window.location.hash = '#business/catalog';
-      } catch (e) {}
-    } else if (typeof onNavigate === 'function') {
+    if (typeof onNavigate === 'function') {
       onNavigate(item.route, item.id);
+    } else if (item.id === 'catalog') {
+      if (typeof window.openBusinessSubHub === 'function') {
+        window.openBusinessSubHub('catalog');
+      } else if (typeof window.navigateTo === 'function') {
+        window.navigateTo('business/catalog');
+      } else {
+        setActiveSubHub('catalog');
+        window.location.hash = '#business/catalog';
+      }
     } else if (item.id === 'materials-production' && typeof window.openBusinessSubHub === 'function') {
       window.openBusinessSubHub('materials-production');
     } else {
