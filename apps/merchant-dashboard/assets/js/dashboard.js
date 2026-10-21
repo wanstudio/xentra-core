@@ -745,7 +745,7 @@
       window.mountBusinessHub(modernMount, {
         onNavigate: function(targetRoute, id) {
           if (id === 'catalog') {
-            openBusinessSubHub('catalog');
+            // Handled directly inside React BusinessHub
           } else if (id === 'materials-production') {
             openBusinessSubHub('materials-production');
           } else {
@@ -1063,24 +1063,31 @@
       var catHub = $('subpage-catalog-menu-hub');
       var matHub = $('subpage-materials-production-hub');
       if (route === 'business/catalog') {
-        if (mainView) mainView.style.display = 'none';
-        if (catHub) {
-          catHub.style.display = 'block';
-          var modernCatMount = $('modern-catalog-subhub-mount');
-          if (modernCatMount && typeof window.mountCatalogSubHub === 'function') {
-            window.mountCatalogSubHub(modernCatMount, {
-              onBack: closeBusinessSubHub,
-              onNavigate: function(targetRoute) {
+        var modernMount = $('modern-business-hub-mount');
+        if (modernMount && typeof window.mountBusinessHub === 'function') {
+          if (mainView) mainView.style.display = 'block';
+          if (catHub) catHub.style.display = 'none';
+          if (matHub) matHub.style.display = 'none';
+          var legacyContent = $('legacy-business-main-content');
+          if (legacyContent) legacyContent.style.display = 'none';
+          modernMount.style.display = 'block';
+          window.mountBusinessHub(modernMount, {
+            initialSubHub: 'catalog',
+            onNavigate: function(targetRoute, id) {
+              if (id === 'catalog') {
+                // Handled directly inside React BusinessHub
+              } else if (id === 'materials-production') {
+                openBusinessSubHub('materials-production');
+              } else {
                 navigateTo(targetRoute.replace(/^#/, ''));
               }
-            });
-            var legacyHeader = catHub.querySelector('.x-owner-child-mobile-header');
-            var legacyContainer = catHub.querySelector('.x-subhub-card-container');
-            if (legacyHeader) legacyHeader.style.display = 'none';
-            if (legacyContainer) legacyContainer.style.display = 'none';
-          }
+            }
+          });
+        } else {
+          if (mainView) mainView.style.display = 'none';
+          if (catHub) catHub.style.display = 'block';
+          if (matHub) matHub.style.display = 'none';
         }
-        if (matHub) matHub.style.display = 'none';
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } else if (route === 'business/materials-production') {
         if (mainView) mainView.style.display = 'none';

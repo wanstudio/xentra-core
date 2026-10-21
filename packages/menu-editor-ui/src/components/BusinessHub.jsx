@@ -98,10 +98,19 @@ export default function BusinessHub({ onNavigate, initialSubHub = null }) {
   const [selectedBusiness, setSelectedBusiness] = useState('');
   const [activeSubHub, setActiveSubHub] = useState(initialSubHub);
 
+  React.useEffect(() => {
+    setActiveSubHub(initialSubHub);
+  }, [initialSubHub]);
+
   if (activeSubHub === 'catalog') {
     return (
       <CatalogSubHub
-        onBack={() => setActiveSubHub(null)}
+        onBack={() => {
+          setActiveSubHub(null);
+          try {
+            window.location.hash = '#business';
+          } catch (e) {}
+        }}
         onNavigate={(route, id) => {
           if (typeof onNavigate === 'function') {
             onNavigate(route, id);
@@ -125,9 +134,9 @@ export default function BusinessHub({ onNavigate, initialSubHub = null }) {
     setSelectedBusiness(item.title);
     if (item.id === 'catalog') {
       setActiveSubHub('catalog');
-      if (typeof onNavigate === 'function') {
-        onNavigate('business/catalog', item.id);
-      }
+      try {
+        window.location.hash = '#business/catalog';
+      } catch (e) {}
     } else if (typeof onNavigate === 'function') {
       onNavigate(item.route, item.id);
     } else if (item.id === 'materials-production' && typeof window.openBusinessSubHub === 'function') {
