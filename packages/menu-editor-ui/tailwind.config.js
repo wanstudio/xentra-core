@@ -1,0 +1,27 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  important: ':is(#modern-menu-editor-root, #modern-menu-portal-root, #modern-business-hub-root)',
+  corePlugins: {
+    preflight: false,
+  },
+  theme: {
+    extend: {
+      colors: {
+        brand: {
+          50: '#F0FDF4',
+          500: '#22C55E',
+          600: '#16A34A',
+          700: '#15803D',
+        },
+      },
+      borderRadius: {
+        '2xl': '16px',
+        '3xl': '20px',
+      },
+    },
+  },
+  plugins: [],
+};
