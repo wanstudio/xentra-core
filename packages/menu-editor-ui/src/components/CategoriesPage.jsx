@@ -16,6 +16,7 @@ export default function CategoriesPage({ onBack, onNavigate }) {
   const [menus, setMenus] = useState([]);
   const [loading, setLoading] = useState(true);
   const [togglingId, setTogglingId] = useState(null);
+  const [leavingId, setLeavingId] = useState(null);
 
   const fetchCategoriesAndMenus = async () => {
     try {
@@ -29,8 +30,8 @@ export default function CategoriesPage({ onBack, onNavigate }) {
       }
 
       const [catRes, menuRes] = await Promise.all([
-        fetch('/admin/categories', { headers }),
-        fetch('/admin/menus', { headers }).catch(() => null)
+        fetch('/api/v1/admin/categories', { headers }),
+        fetch('/api/v1/admin/menus', { headers }).catch(() => null)
       ]);
 
       if (catRes.ok) {
@@ -54,7 +55,6 @@ export default function CategoriesPage({ onBack, onNavigate }) {
       }
     } catch (err) {
       console.error('[CategoriesPage] Fetch error:', err);
-      // Fallback to window.state if available
       if (window.state && Array.isArray(window.state.categories)) {
         setCategories(window.state.categories);
       }
@@ -67,7 +67,6 @@ export default function CategoriesPage({ onBack, onNavigate }) {
   };
 
   useEffect(() => {
-    // Check if window already has cached state
     if (window.state && Array.isArray(window.state.categories) && window.state.categories.length > 0) {
       setCategories(window.state.categories);
       setLoading(false);
@@ -122,18 +121,25 @@ export default function CategoriesPage({ onBack, onNavigate }) {
     const prevActive = cat.is_active !== 0 && cat.is_active !== null;
     const nextActive = !prevActive;
 
-    // Optimistic update
+    setTogglingId(cat.id);
+    setLeavingId(cat.id);
+
+    // Immediate visual update to the new toggle state
     setCategories((prev) =>
       prev.map((c) => (String(c.id) === String(cat.id) ? { ...c, is_active: nextActive ? 1 : 0 } : c))
     );
-    setTogglingId(cat.id);
+
+    // Keep item visible briefly so the user sees the toggle switch colors (green <-> red)
+    setTimeout(() => {
+      setLeavingId((current) => (current === cat.id ? null : current));
+    }, 350);
 
     try {
       const token = getAuthToken();
       const headers = { 'Accept': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const res = await fetch(`/admin/categories/${encodeURIComponent(cat.id)}/toggle`, {
+      const res = await fetch(`/api/v1/admin/categories/${encodeURIComponent(cat.id)}/toggle`, {
         method: 'PATCH',
         headers
       });
@@ -177,6 +183,7 @@ export default function CategoriesPage({ onBack, onNavigate }) {
   };
 
   const filteredCategories = categories.filter((cat) => {
+    if (leavingId === cat.id) return true;
     const isAct = cat.is_active !== 0 && cat.is_active !== null;
     return filter === 'ACTIVE' ? isAct : !isAct;
   });
@@ -184,22 +191,18 @@ export default function CategoriesPage({ onBack, onNavigate }) {
   return (
     <div id="modern-categories-page-root" className="w-full max-w-[390px] mx-auto px-4 py-2 font-sans">
       {/* 1. Header Row (Back Button + Title) */}
-      <div className="flex items-center gap-4 mb-4 pt-1">
+      <div className="flex items-center gap-[18px] mb-4 pt-1">
         <button
           type="button"
           onClick={handleBack}
           aria-label="Kembali ke Katalog & Menu"
-          className="w-9 h-9 flex items-center justify-center -ml-2 rounded-full text-[#0F172A] hover:bg-slate-100 active:scale-95 transition-all border-none bg-transparent cursor-pointer shrink-0"
+          className="w-[22px] h-[19px] flex items-center justify-center p-0 border-none bg-transparent cursor-pointer shrink-0 active:scale-95 transition-all"
         >
-          <svg width="22" height="19" viewBox="0 0 22 19" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path
-              d="M19 9.5H3M3 9.5L10.5 2M3 9.5L10.5 17"
-              stroke="#0F172A"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <img
+            src="/owner/assets/icons/ci_arrow-left-sm.svg"
+            alt="Kembali"
+            className="w-[22px] h-[19px] shrink-0"
+          />
         </button>
         <h1 className="font-bold text-[#0F172A] text-lg tracking-[0] leading-[18px] whitespace-nowrap m-0">
           Kategori
@@ -240,14 +243,13 @@ export default function CategoriesPage({ onBack, onNavigate }) {
               type="button"
               onClick={handleAddCategory}
               aria-label="Tambah Kategori"
-              className="w-[30px] h-[30px] rounded-full bg-[#0F172A] hover:bg-slate-800 active:scale-95 text-white flex items-center justify-center cursor-pointer transition-all border-none shrink-0"
+              className="w-[30px] h-[30px] rounded-full bg-[#0F172A] hover:bg-slate-800 active:scale-95 text-white flex items-center justify-center cursor-pointer transition-all border-none shrink-0 p-0"
             >
-              <svg width="14" height="13" viewBox="0 0 14 13" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path
-                  d="M7 0.8125C7.23206 0.8125 7.45462 0.898102 7.61872 1.05048C7.78281 1.20285 7.875 1.40951 7.875 1.625V5.6875H12.25C12.4821 5.6875 12.7046 5.7731 12.8687 5.92548C13.0328 6.07785 13.125 6.28451 13.125 6.5C13.125 6.71549 13.0328 6.92215 12.8687 7.07452C12.7046 7.2269 12.4821 7.3125 12.25 7.3125H7.875V11.375C7.875 11.5905 7.78281 11.7972 7.61872 11.9495C7.45462 12.1019 7.23206 12.1875 7 12.1875C6.76794 12.1875 6.54538 12.1019 6.38128 11.9495C6.21719 11.7972 6.125 11.5905 6.125 11.375V7.3125H1.75C1.51794 7.3125 1.29538 7.2269 1.13128 7.07452C0.967187 6.92215 0.875 6.71549 0.875 6.5C0.875 6.28451 0.967187 6.07785 1.13128 5.92548C1.29538 5.7731 1.51794 5.6875 1.75 5.6875H6.125V1.625C6.125 1.40951 6.21719 1.20285 6.38128 1.05048C6.54538 0.898102 6.76794 0.8125 7 0.8125Z"
-                  fill="white"
-                />
-              </svg>
+              <img
+                src="/owner/assets/icons/at-icons_plus.svg"
+                alt="Tambah"
+                className="w-[14px] h-[13px] shrink-0"
+              />
             </button>
           )}
         </div>
@@ -274,23 +276,11 @@ export default function CategoriesPage({ onBack, onNavigate }) {
                     {cat.image_url || cat.image ? (
                       <img src={cat.image_url || cat.image} alt={cat.name} className="w-full h-full object-cover" />
                     ) : (
-                      <div className="w-[25px] h-[25px] flex items-center justify-center">
-                        <svg
-                          width="20"
-                          height="20"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="white"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <rect x="3" y="3" width="7" height="7"></rect>
-                          <rect x="14" y="3" width="7" height="7"></rect>
-                          <rect x="14" y="14" width="7" height="7"></rect>
-                          <rect x="3" y="14" width="7" height="7"></rect>
-                        </svg>
-                      </div>
+                      <img
+                        src="/owner/assets/icons/bxs_category.svg"
+                        alt=""
+                        className="w-[22px] h-[22px] filter brightness-0 invert block"
+                      />
                     )}
                   </div>
 
@@ -304,7 +294,7 @@ export default function CategoriesPage({ onBack, onNavigate }) {
                     </span>
                   </div>
 
-                  {/* Toggle Switch */}
+                  {/* Toggle SVG Button (Red / Green Toggle SVG uploaded by user) */}
                   <button
                     type="button"
                     role="switch"
@@ -315,30 +305,23 @@ export default function CategoriesPage({ onBack, onNavigate }) {
                       e.stopPropagation();
                       handleToggle(cat);
                     }}
-                    className={`w-[35px] h-[21px] rounded-full p-0 relative transition-all cursor-pointer border-none shrink-0 ${
-                      isCatActive
-                        ? 'bg-[#00A637] shadow-[-1px_2px_5px_rgba(0,0,0,0.15)] outline outline-[0.5px] outline-[#009A33]'
-                        : 'bg-slate-300 outline outline-[0.5px] outline-slate-400'
-                    }`}
+                    className="p-0 border-none bg-transparent cursor-pointer shrink-0 flex items-center justify-center transition-transform active:scale-95"
                   >
-                    <span
-                      className={`w-[21px] h-[21px] rounded-full bg-white shadow-[0px_4px_15px_rgba(0,0,0,0.15)] block transition-transform ${
-                        isCatActive ? 'translate-x-[14px]' : 'translate-x-0'
-                      }`}
+                    <img
+                      src={isCatActive ? '/owner/assets/icons/green-toggle.svg' : '/owner/assets/icons/red-toggle.svg'}
+                      alt={isCatActive ? 'Status Aktif (Hijau)' : 'Status Nonaktif (Merah)'}
+                      className="w-[45px] h-[31px] object-contain select-none pointer-events-none block"
                     />
                   </button>
 
                   {/* Chevron Right */}
                   <div className="w-[13px] h-[13px] flex items-center justify-center shrink-0 -mr-1">
-                    <svg width="7" height="11" viewBox="0 0 7 11" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path
-                        d="M1.5 1.5L5.5 5.5L1.5 9.5"
-                        stroke="#303030"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
+                    <img
+                      src="/owner/assets/icons/akar-icons_chevron-right-small.svg"
+                      alt=""
+                      aria-hidden="true"
+                      className="w-[13px] h-[13px] block"
+                    />
                   </div>
                 </div>
               );
