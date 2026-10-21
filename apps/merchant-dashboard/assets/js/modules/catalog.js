@@ -114,11 +114,13 @@
   function showProductListSection() {
     var modernMount = $('modern-item-master-page-mount');
     var modernCatMount = $('modern-categories-page-mount');
+    var modernCatEditorMount = $('modern-category-editor-page-mount');
     var listView = $('product-list-view');
     var detailView = $('product-detail-view');
     var editorView = $('product-editor-view');
 
     if (modernCatMount) modernCatMount.style.display = 'none';
+    if (modernCatEditorMount) modernCatEditorMount.style.display = 'none';
 
     if (modernMount && typeof window.mountItemMasterPage === 'function') {
       modernMount.style.display = 'block';

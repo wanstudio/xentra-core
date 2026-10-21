@@ -84,19 +84,25 @@
   function showCategoryEditorSection() {
     var modernMount = $('modern-categories-page-mount');
     if (modernMount) modernMount.style.display = 'none';
+    var modernItemMount = $('modern-item-master-page-mount');
+    if (modernItemMount) modernItemMount.style.display = 'none';
     var page = $('master-categories-page');
     var catEditor = $('category-editor-view');
     var productList = $('product-list-view');
     var productDetail = $('product-detail-view');
+    var productEditor = $('product-editor-view');
     if (page) page.style.display = 'none';
     if (catEditor) catEditor.style.display = 'block';
     if (productList) productList.style.display = 'none';
     if (productDetail) productDetail.style.display = 'none';
+    if (productEditor) productEditor.style.display = 'none';
   }
 
   function showMasterCategoriesPage() {
     var modernMount = $('modern-categories-page-mount');
     var modernItemMount = $('modern-item-master-page-mount');
+    var modernCatEditorMount = $('modern-category-editor-page-mount');
+    if (modernCatEditorMount) modernCatEditorMount.style.display = 'none';
     var page = $('master-categories-page');
     var catEditor = $('category-editor-view');
     var productList = $('product-list-view');
@@ -685,6 +691,27 @@
   async function loadCategoryEditorPage(categoryId) {
     var requestSeq = ++_categoryEditorLoadSeq;
     showCategoryEditorSection();
+
+    var modernEditorMount = $('modern-category-editor-page-mount');
+    var legacyEditorContent = $('legacy-category-editor-content');
+
+    if (modernEditorMount && typeof window.mountCategoryEditorPage === 'function') {
+      modernEditorMount.style.display = 'block';
+      if (legacyEditorContent) legacyEditorContent.style.display = 'none';
+      window.mountCategoryEditorPage(modernEditorMount, {
+        categoryId: categoryId || null,
+        onBack: function() {
+          navigateTo('catalog/categories');
+        },
+        onSaved: function() {
+          navigateTo('catalog/categories');
+        }
+      });
+      return;
+    } else {
+      if (modernEditorMount) modernEditorMount.style.display = 'none';
+      if (legacyEditorContent) legacyEditorContent.style.display = 'block';
+    }
 
     if (!categoryId) {
       resetCategoryEditorForAdd();
