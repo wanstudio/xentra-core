@@ -186,7 +186,7 @@ export default function BusinessHub({ onNavigate }) {
                 <span className="relative w-fit mt-[-1.00px] font-bold text-slate-900 text-base tracking-[0] leading-[normal]">
                   {item.title}
                 </span>
-                <span className="relative self-stretch font-medium text-slate-400 text-xs tracking-[0] leading-[normal] line-clamp-2">
+                <span className="relative self-stretch font-medium text-slate-400 text-[13px] tracking-[0] leading-snug line-clamp-2">
                   {item.description}
                 </span>
               </span>
