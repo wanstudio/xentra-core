@@ -195,21 +195,21 @@ export default function CategoriesPage({ onBack, onNavigate }) {
 
   return (
     <div id="modern-categories-page-root" className="w-full max-w-[390px] mx-auto px-4 py-2 font-sans">
-      {/* 1. Header Row (Back Button + Title) */}
-      <div className="flex items-center gap-[18px] mb-4 pt-1">
+      {/* 1. Header with Back Arrow and Title (Identical spacing and sizing to CatalogSubHub) */}
+      <div className="flex items-center gap-3 mb-6 pt-1">
         <button
           type="button"
           onClick={handleBack}
           aria-label="Kembali ke Katalog & Menu"
-          className="w-[22px] h-[19px] flex items-center justify-center p-0 border-none bg-transparent cursor-pointer shrink-0 active:scale-95 transition-all"
+          className="w-9 h-9 flex items-center justify-center -ml-2 rounded-full text-slate-900 hover:bg-slate-100 active:scale-95 transition-all border-none bg-transparent cursor-pointer shrink-0"
         >
           <img
             src="/owner/assets/icons/ci_arrow-left-sm.svg"
             alt="Kembali"
-            className="w-[22px] h-[19px] shrink-0"
+            className="w-[22px] h-[19px] object-contain"
           />
         </button>
-        <h1 className="font-bold text-[#0F172A] text-lg tracking-[0] leading-[18px] whitespace-nowrap m-0">
+        <h1 className="font-bold text-slate-900 text-lg tracking-[0] leading-[18px] m-0">
           Kategori
         </h1>
       </div>
