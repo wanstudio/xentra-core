@@ -4,6 +4,7 @@ import MenuEditor from './components/MenuEditor';
 import BusinessHub from './components/BusinessHub';
 import CatalogSubHub from './components/CatalogSubHub';
 import CategoriesPage from './components/CategoriesPage';
+import ItemMasterPage from './components/ItemMasterPage';
 import './index.css';
 
 const roots = new WeakMap();
@@ -84,6 +85,25 @@ export function unmountCategoriesPage(container) {
   }
 }
 
+export function mountItemMasterPage(container, props = {}) {
+  if (!container) return;
+  let root = roots.get(container);
+  if (!root) {
+    root = createRoot(container);
+    roots.set(container, root);
+  }
+  root.render(<ItemMasterPage {...props} />);
+}
+
+export function unmountItemMasterPage(container) {
+  if (!container) return;
+  const root = roots.get(container);
+  if (root) {
+    root.unmount();
+    roots.delete(container);
+  }
+}
+
 // Attach to window for global access from host Vanilla JS app
 if (typeof window !== 'undefined') {
   window.mountMenuEditor = mountMenuEditor;
@@ -94,5 +114,7 @@ if (typeof window !== 'undefined') {
   window.unmountCatalogSubHub = unmountCatalogSubHub;
   window.mountCategoriesPage = mountCategoriesPage;
   window.unmountCategoriesPage = unmountCategoriesPage;
+  window.mountItemMasterPage = mountItemMasterPage;
+  window.unmountItemMasterPage = unmountItemMasterPage;
 }
 

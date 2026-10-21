@@ -112,27 +112,55 @@
   // ─────────────────────────────────────────────────────────────────────────
 
   function showProductListSection() {
+    var modernMount = $('modern-item-master-page-mount');
+    var modernCatMount = $('modern-categories-page-mount');
     var listView = $('product-list-view');
     var detailView = $('product-detail-view');
     var editorView = $('product-editor-view');
-    if (listView) listView.style.setProperty('display', 'block', 'important');
+
+    if (modernCatMount) modernCatMount.style.display = 'none';
+
+    if (modernMount && typeof window.mountItemMasterPage === 'function') {
+      modernMount.style.display = 'block';
+      if (listView) listView.style.setProperty('display', 'none', 'important');
+      window.mountItemMasterPage(modernMount, {
+        onBack: function() {
+          if (typeof window.goBackFromMasterProducts === 'function') {
+            window.goBackFromMasterProducts();
+          } else {
+            navigateTo('business/catalog');
+          }
+        },
+        onNavigate: function(route) {
+          navigateTo(route.replace(/^#/, ''));
+        }
+      });
+    } else {
+      if (modernMount) modernMount.style.display = 'none';
+      if (listView) listView.style.setProperty('display', 'block', 'important');
+    }
+
     if (detailView) detailView.style.setProperty('display', 'none', 'important');
     if (editorView) editorView.style.setProperty('display', 'none', 'important');
   }
 
   function showProductDetailSection() {
+    var modernMount = $('modern-item-master-page-mount');
     var listView = $('product-list-view');
     var detailView = $('product-detail-view');
     var editorView = $('product-editor-view');
+    if (modernMount) modernMount.style.display = 'none';
     if (listView) listView.style.setProperty('display', 'none', 'important');
     if (detailView) detailView.style.setProperty('display', 'block', 'important');
     if (editorView) editorView.style.setProperty('display', 'none', 'important');
   }
 
   function showProductEditorSection() {
+    var modernMount = $('modern-item-master-page-mount');
     var listView = $('product-list-view');
     var detailView = $('product-detail-view');
     var editorView = $('product-editor-view');
+    if (modernMount) modernMount.style.display = 'none';
     if (listView) listView.style.setProperty('display', 'none', 'important');
     if (detailView) detailView.style.setProperty('display', 'none', 'important');
     if (editorView) editorView.style.setProperty('display', 'block', 'important');

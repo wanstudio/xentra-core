@@ -96,6 +96,7 @@
 
   function showMasterCategoriesPage() {
     var modernMount = $('modern-categories-page-mount');
+    var modernItemMount = $('modern-item-master-page-mount');
     var page = $('master-categories-page');
     var catEditor = $('category-editor-view');
     var productList = $('product-list-view');
@@ -122,6 +123,7 @@
       if (page) page.style.display = 'block';
     }
 
+    if (modernItemMount) modernItemMount.style.display = 'none';
     if (catEditor) catEditor.style.display = 'none';
     if (productList) productList.style.display = 'none';
     if (productDetail) productDetail.style.display = 'none';
