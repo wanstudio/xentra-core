@@ -121,7 +121,7 @@ export default function BusinessHub({ onNavigate }) {
     <div id="modern-business-hub-root" className="w-full max-w-[390px] mx-auto px-4 py-2 font-sans">
       {/* 1. Search Bar */}
       <form
-        className="w-full max-w-[358px] h-11 flex items-center px-4 gap-[15px] rounded-[10px] overflow-hidden bg-white hub-inset-stroke hub-search transition-all mb-6"
+        className="w-full h-11 flex items-center px-4 gap-[15px] rounded-[10px] overflow-hidden bg-white hub-inset-stroke hub-search transition-all mb-6"
         onSubmit={(event) => event.preventDefault()}
       >
         <div className="w-[17px] h-[17px] relative flex items-center justify-center shrink-0">
