@@ -144,18 +144,10 @@ export default function BusinessHub({ onNavigate }) {
           aria-label="Cari menu atau pengaturan bisnis"
           value={searchTerm}
           onChange={(event) => setSearchTerm(event.target.value)}
+          onSearch={(event) => setSearchTerm(event.target.value)}
           placeholder="Cari menu atau pengaturan bisnis"
           className="w-full bg-transparent border-none outline-none font-medium text-slate-800 text-xs tracking-[0] leading-[normal] placeholder:text-[#94A3B8]"
         />
-        {searchTerm && (
-          <button
-            type="button"
-            onClick={() => setSearchTerm('')}
-            className="text-xs text-[#94A3B8] hover:text-slate-600 border-none bg-transparent cursor-pointer p-0 shrink-0"
-          >
-            ✕
-          </button>
-        )}
       </form>
 
       {/* 2. Heading */}
