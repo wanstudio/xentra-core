@@ -49,18 +49,11 @@ export default function CatalogSubHub({ onBack, onNavigate }) {
           aria-label="Kembali ke Kelola Bisnis"
           className="w-9 h-9 flex items-center justify-center -ml-2 rounded-full text-slate-900 hover:bg-slate-100 active:scale-95 transition-all border-none bg-transparent cursor-pointer shrink-0"
         >
-          <svg
-            className="w-5 h-5 text-slate-900"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="m15 18-6-6 6-6" />
-          </svg>
+          <img
+            src="/owner/assets/icons/ci_arrow-left-sm.svg"
+            alt="Kembali"
+            className="w-[22px] h-[19px] object-contain"
+          />
         </button>
         <h1 className="font-bold text-slate-900 text-lg tracking-[0] leading-[18px] m-0">
           Katalog &amp; Menu
