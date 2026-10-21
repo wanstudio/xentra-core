@@ -177,7 +177,12 @@ export default function CategoriesPage({ onBack, onNavigate }) {
       return String(menuCatId || '') === String(cat.id);
     });
     if (catMenus.length > 0) {
-      return catMenus.map((m) => m.title || m.name || '').filter(Boolean).join(', ');
+      const names = catMenus
+        .map((m) => m.title_name || m.package_name || m.title || m.name || '')
+        .filter(Boolean);
+      if (names.length > 0) {
+        return names.join(', ');
+      }
     }
     return cat.description || 'Belum ada menu';
   };
@@ -210,7 +215,7 @@ export default function CategoriesPage({ onBack, onNavigate }) {
       </div>
 
       {/* 2. Main Card Container (358px wide, rounded 14px, outline #CBD5E1) */}
-      <div className="w-full rounded-[14px] p-4 bg-white border border-[#CBD5E1] flex flex-col gap-4">
+      <div className="w-full rounded-[14px] p-4 bg-white hub-inset-stroke flex flex-col gap-4">
         {/* Control Row: Filter Pills (Aktif/Nonaktif) + Add Button (+) */}
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-1.5">
@@ -220,7 +225,7 @@ export default function CategoriesPage({ onBack, onNavigate }) {
               className={`w-[75px] h-[30px] rounded-[20px] text-[11px] font-bold cursor-pointer transition-all flex items-center justify-center border-none ${
                 filter === 'ACTIVE'
                   ? 'bg-[#0F172A] text-white shadow-xs'
-                  : 'bg-white text-[#94A3B8] border border-solid border-[#CBD5E1]'
+                  : 'bg-white text-[#94A3B8] hub-inset-stroke'
               }`}
             >
               Aktif
@@ -231,7 +236,7 @@ export default function CategoriesPage({ onBack, onNavigate }) {
               className={`w-[75px] h-[30px] rounded-[20px] text-[11px] font-bold cursor-pointer transition-all flex items-center justify-center border-none ${
                 filter === 'INACTIVE'
                   ? 'bg-[#0F172A] text-white shadow-xs'
-                  : 'bg-white text-[#94A3B8] border border-solid border-[#CBD5E1]'
+                  : 'bg-white text-[#94A3B8] hub-inset-stroke'
               }`}
             >
               Nonaktif
@@ -269,7 +274,7 @@ export default function CategoriesPage({ onBack, onNavigate }) {
                 <div
                   key={cat.id}
                   onClick={() => handleCardClick(cat)}
-                  className="w-full p-4 rounded-[12px] border border-[#CBD5E1] flex items-center gap-4 bg-white hover:border-slate-400 active:scale-[0.99] transition-all cursor-pointer"
+                  className="w-full p-4 rounded-[12px] bg-white hub-inset-stroke hub-card flex items-center gap-4 active:scale-[0.99] transition-all cursor-pointer"
                 >
                   {/* Icon 45x45 green */}
                   <div className="w-[45px] h-[45px] rounded-[10px] bg-[#34A853] flex items-center justify-center shrink-0 overflow-hidden relative">

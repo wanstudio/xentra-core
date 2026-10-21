@@ -25,14 +25,14 @@
 #modern-business-hub-root .hub-inset-stroke,
 #modern-catalog-subhub-root .hub-inset-stroke,
 #modern-categories-page-root .hub-inset-stroke {
-  box-shadow: inset 0 0 0 1px #CBD5E1;
+  box-shadow: inset 0 0 0 1px #CBD5E1 !important;
   border: none !important;
 }
 
 #modern-business-hub-root .hub-card:hover,
 #modern-catalog-subhub-root .hub-card:hover,
 #modern-categories-page-root .hub-card:hover {
-  box-shadow: inset 0 0 0 1px #94A3B8;
+  box-shadow: inset 0 0 0 1px #94A3B8 !important;
 }
 
 #modern-business-hub-root .hub-search:focus-within {
