@@ -232,10 +232,28 @@ export const OwnerAppShell: React.FC<OwnerAppShellProps> = ({
           />
         )}
 
-        {currentRoute === 'catalog/menus' && (
+        {(currentRoute === 'catalog/menus' ||
+          currentRoute === 'catalog/master-menus/new' ||
+          /^catalog\/master-menus\/[^/]+\/edit$/.test(currentRoute)) && (
           <MenuEditor
-            onBack={() => navigateTo('business/catalog')}
-            onNavigate={(r) => navigateTo(r)}
+            menuId={
+              /^catalog\/master-menus\/[^/]+\/edit$/.test(currentRoute)
+                ? decodeURIComponent(
+                    currentRoute.split('catalog/master-menus/')[1].split('/edit')[0]
+                  )
+                : null
+            }
+            onBack={(catId?: string) =>
+              catId
+                ? navigateTo(`catalog/categories/${encodeURIComponent(catId)}`)
+                : navigateTo('catalog/categories')
+            }
+            onSaveSuccess={(_data: any, catId?: string) =>
+              catId
+                ? navigateTo(`catalog/categories/${encodeURIComponent(catId)}`)
+                : navigateTo('catalog/categories')
+            }
+            onNavigate={(r: string) => navigateTo(r)}
           />
         )}
 

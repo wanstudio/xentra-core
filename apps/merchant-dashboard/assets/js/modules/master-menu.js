@@ -178,20 +178,36 @@
         menuId: menuId || null,
         apiBase: API_BASE || '/api/v1',
         token: localStorage.getItem('xentra_merchant_token'),
-        onSaveSuccess: function() {
+        onSaveSuccess: function(_data, targetCatId) {
           showToast('✅ Menu berhasil disimpan.');
-          if (typeof goBackFromChildPage === 'function') {
-            goBackFromChildPage();
-          } else {
-            window.location.hash = '#catalog/master-menus';
-          }
           if (typeof window.loadOwnerMasterMenusList === 'function') window.loadOwnerMasterMenusList();
-        },
-        onCancel: function() {
+          if (targetCatId) {
+            if (typeof navigateTo === 'function') {
+              navigateTo('catalog/categories/' + encodeURIComponent(targetCatId));
+            } else {
+              window.location.hash = '#catalog/categories/' + encodeURIComponent(targetCatId);
+            }
+            return;
+          }
           if (typeof goBackFromChildPage === 'function') {
             goBackFromChildPage();
           } else {
-            window.location.hash = '#catalog/master-menus';
+            window.location.hash = '#catalog/categories';
+          }
+        },
+        onCancel: function(targetCatId) {
+          if (targetCatId) {
+            if (typeof navigateTo === 'function') {
+              navigateTo('catalog/categories/' + encodeURIComponent(targetCatId));
+            } else {
+              window.location.hash = '#catalog/categories/' + encodeURIComponent(targetCatId);
+            }
+            return;
+          }
+          if (typeof goBackFromChildPage === 'function') {
+            goBackFromChildPage();
+          } else {
+            window.location.hash = '#catalog/categories';
           }
         }
       });

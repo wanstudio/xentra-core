@@ -1179,7 +1179,7 @@
       if (isCatalogChild) loadInlineBranchCatalog();
     } else {
       if (isMasterMenuEditor) {
-        showOwnerMasterMenuEditor();
+        showOwnerMasterMenuEditor(masterMenuEditorId);
         loadOwnerMasterMenuEditor(masterMenuEditorId);
       } else if (isCategoryEditor) {
         showCategoryEditorSection();
@@ -2031,12 +2031,12 @@
     }
   }
 
-  function showOwnerMasterMenuEditor() {
+  function showOwnerMasterMenuEditor(menuId) {
     if (window.XentraMasterMenuModule && typeof window.XentraMasterMenuModule.showOwnerMasterMenuEditor === 'function') {
-      return window.XentraMasterMenuModule.showOwnerMasterMenuEditor();
+      return window.XentraMasterMenuModule.showOwnerMasterMenuEditor(menuId);
     }
     if (typeof window.showOwnerMasterMenuEditor === 'function') {
-      return window.showOwnerMasterMenuEditor();
+      return window.showOwnerMasterMenuEditor(menuId);
     }
   }
 

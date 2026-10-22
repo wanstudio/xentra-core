@@ -32,6 +32,7 @@
   outline: none;
 }
 
+#modern-menu-editor-root .hub-inset-stroke,
 #modern-business-hub-root .hub-inset-stroke,
 #modern-catalog-subhub-root .hub-inset-stroke,
 #modern-categories-page-root .hub-inset-stroke,
@@ -44,6 +45,7 @@
   border: none !important;
 }
 
+#modern-menu-editor-root .hub-card:hover,
 #modern-business-hub-root .hub-card:hover,
 #modern-catalog-subhub-root .hub-card:hover,
 #modern-categories-page-root .hub-card:hover,
@@ -61,6 +63,7 @@
   border: none !important;
 }
 
+#modern-menu-editor-root .hub-search:focus-within,
 #modern-business-hub-root .hub-search:focus-within,
 #modern-item-master-page-root .hub-search:focus-within,
 #modern-category-editor-page-root .hub-search:focus-within {
@@ -107,6 +110,11 @@ body.x-owner-mobile-app #tab-catalog-categories,
 #tab-catalog-products,
 body.x-owner-mobile-app #tab-catalog-products,
 .x-tab-content#tab-catalog-products,
+#tab-catalog-master-menus,
+body.x-owner-mobile-app #tab-catalog-master-menus,
+.x-tab-content#tab-catalog-master-menus,
+#master-menu-editor-view,
+#modern-menu-editor-mount,
 #category-editor-view,
 body.x-owner-mobile-app #category-editor-view,
 #tab-business,
