@@ -3,11 +3,11 @@ import React from 'react';
 const catalogItems = [
   {
     id: 'categories',
-    title: 'Kategori',
-    description: 'Digunakan untuk mengelompokkan menu yang Anda jual',
+    title: 'Kategori & Menu',
+    description: 'Kelola etalase, pengelompokan, dan daftar menu komersial',
     color: 'bg-[#34A853]',
     icon: '/owner/assets/icons/bxs_category.svg',
-    iconAlt: 'Ikon Kategori',
+    iconAlt: 'Ikon Kategori & Menu',
     route: '#catalog/categories',
   },
   {
