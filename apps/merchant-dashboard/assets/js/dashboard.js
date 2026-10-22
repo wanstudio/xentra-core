@@ -528,6 +528,8 @@
     }
 
     if (current === 'catalog/categories/new' ||
+        current === 'catalog/categories/sort' ||
+        current === 'catalog/categories/reorder' ||
         /^catalog\/categories\/[^/]+\/edit$/.test(current)) {
       return 'catalog/categories';
     }
@@ -879,6 +881,10 @@
       route === 'catalog/categories/new' ||
       /^catalog\/categories\/[^/]+\/edit$/.test(route)
     );
+    var isCategorySort = !isPlatform && (
+      route === 'catalog/categories/sort' ||
+      route === 'catalog/categories/reorder'
+    );
     var categoryEditorId = isCategoryEditor && route !== 'catalog/categories/new'
       ? route.split('catalog/categories/')[1].split('/edit')[0]
       : null;
@@ -935,7 +941,7 @@
     var isSettingsRoute = !isPlatform && (route === 'settings' || route.indexOf('settings/') === 0);
     var settingsSubtab = isSettingsRoute ? (route.indexOf('settings/') === 0 ? route.split('settings/')[1] : 'business/profile') : 'business/profile';
 
-    var metaKey = isCategoryEditor
+    var metaKey = (isCategoryEditor || isCategorySort)
       ? 'catalog/categories'
       : ((isMasterMenuEditor || route === 'catalog/master-menus')
         ? 'catalog/master-menus'

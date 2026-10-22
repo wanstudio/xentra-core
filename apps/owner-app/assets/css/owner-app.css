@@ -739,6 +739,7 @@ body.x-owner-mobile-app #btn-save-master-menu-active,
     box-sizing: border-box !important;
   }
 
+  body.x-owner-mobile-app .x-dash-main > .x-tab-content,
   .x-owner-command-center,
   #x-owner-command-center,
   #tab-overview,
@@ -748,7 +749,10 @@ body.x-owner-mobile-app #btn-save-master-menu-active,
   #subpage-catalog-menu-hub,
   #tab-catalog-categories,
   #modern-categories-page-mount,
-  #master-categories-page {
+  #master-categories-page,
+  #tab-catalog-products,
+  #modern-item-master-page-mount,
+  #category-editor-view {
     padding-left: 0 !important;
     padding-right: 0 !important;
     margin-left: 0 !important;

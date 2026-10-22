@@ -78,8 +78,6 @@ export default function CategoriesPage({ onBack, onNavigate }) {
     }
     fetchCategoriesAndMenus();
 
-    document.body.classList.add('x-categories-active');
-
     try {
       if (window.XentraNative && typeof window.XentraNative.setNavigationBarColor === 'function') {
         window.XentraNative.setNavigationBarColor('#ffffff', true);
@@ -92,10 +90,6 @@ export default function CategoriesPage({ onBack, onNavigate }) {
         window.XentraOwnerBridge.setStatusBarColor('#ffffff', true);
       }
     } catch (e) {}
-
-    return () => {
-      document.body.classList.remove('x-categories-active');
-    };
   }, []);
 
   const handleBack = () => {

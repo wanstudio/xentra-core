@@ -84,8 +84,8 @@ test('Overview React Migration Suite', async (t) => {
 
   await t.test('5. Cache and script version bumps and business hub 16px margins', () => {
     assert.ok(swJs.includes('mybangjo-owner-v1.8.'), 'Service worker cache must be bumped to v1.8.x');
-    assert.ok(indexHtml.includes('menu-editor.js?v=1.0.35'), 'index.html must reference bundle v=1.0.35');
-    assert.ok(indexHtml.includes('menu-editor.css?v=1.0.35'), 'index.html must reference bundle css v=1.0.35');
+    assert.ok(indexHtml.includes('menu-editor.js?v=1.0.36'), 'index.html must reference bundle v=1.0.36');
+    assert.ok(indexHtml.includes('menu-editor.css?v=1.0.36'), 'index.html must reference bundle css v=1.0.36');
     assert.ok(indexHtml.includes('owner-app.js?v=1.0.'), 'index.html must reference owner-app.js v=1.0.x');
 
     const businessHubJsx = fs.readFileSync(path.join(ROOT, 'packages/menu-editor-ui/src/components/BusinessHub.jsx'), 'utf8');

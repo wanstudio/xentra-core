@@ -69,15 +69,31 @@
 
 /* Ensure modern tabs have no transform that would trap fixed positioning or squeeze mobile padding */
 #tab-catalog-categories,
+#tab-catalog-products,
+#tab-catalog-master-menus,
+#category-editor-view,
 #tab-business {
   transform: none !important;
   animation: none !important;
 }
 
-body.x-categories-active .x-dash-main,
+@media (max-width: 768px) {
+  body:not(.x-merchant-app) .x-dash-main,
+  body.x-owner-mobile-app .x-dash-main {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+    box-sizing: border-box !important;
+  }
+}
+
 #tab-catalog-categories,
 body.x-owner-mobile-app #tab-catalog-categories,
 .x-tab-content#tab-catalog-categories,
+#tab-catalog-products,
+body.x-owner-mobile-app #tab-catalog-products,
+.x-tab-content#tab-catalog-products,
+#category-editor-view,
+body.x-owner-mobile-app #category-editor-view,
 #tab-business,
 body.x-owner-mobile-app #tab-business,
 .x-tab-content#tab-business,
