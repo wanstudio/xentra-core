@@ -48,3 +48,18 @@
 #modern-category-editor-page-root .hub-search:focus-within {
   box-shadow: inset 0 0 0 1px #94A3B8;
 }
+
+@keyframes stickySwipeUp {
+  0% {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-sticky-swipe-up {
+  animation: stickySwipeUp 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}

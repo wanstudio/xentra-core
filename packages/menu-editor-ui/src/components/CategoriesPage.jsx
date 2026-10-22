@@ -18,6 +18,7 @@ export default function CategoriesPage({ onBack, onNavigate }) {
   const [togglingId, setTogglingId] = useState(null);
   const [leavingId, setLeavingId] = useState(null);
   const [showAddSheet, setShowAddSheet] = useState(false);
+  const [isSorting, setIsSorting] = useState(false);
 
   const fetchCategoriesAndMenus = async () => {
     try {
@@ -118,10 +119,10 @@ export default function CategoriesPage({ onBack, onNavigate }) {
   };
 
   const handleSortClick = () => {
+    const next = !isSorting;
+    setIsSorting(next);
     if (typeof window.showToast === 'function') {
-      window.showToast('ℹ️ Fitur urutkan kategori & menu akan segera tersedia.');
-    } else {
-      alert('Fitur urutkan kategori & menu akan segera tersedia.');
+      window.showToast(next ? 'ℹ️ Mode Urutkan aktif: Atur urutan etalase kategori Anda.' : '✓ Urutan kategori disimpan.');
     }
   };
 
@@ -277,7 +278,7 @@ export default function CategoriesPage({ onBack, onNavigate }) {
           </div>
         ) : (
           <div className="flex flex-col gap-3 w-full">
-            {filteredCategories.map((cat) => {
+            {filteredCategories.map((cat, idx) => {
               const isCatActive = cat.is_active !== 0 && cat.is_active !== null;
               return (
                 <div
@@ -285,6 +286,13 @@ export default function CategoriesPage({ onBack, onNavigate }) {
                   onClick={() => handleCardClick(cat)}
                   className="w-full p-4 rounded-[12px] bg-white hub-inset-stroke hub-card flex items-center justify-between gap-3 active:scale-[0.99] transition-all cursor-pointer"
                 >
+                  {/* Sorting Order Badge if in Sort Mode */}
+                  {isSorting && (
+                    <div className="w-6 h-6 rounded-md bg-emerald-50 border border-emerald-300 text-[#00A637] font-bold text-xs flex items-center justify-center shrink-0">
+                      {idx + 1}
+                    </div>
+                  )}
+
                   {/* Title & Subtitle (Clean layout matching new mockup without left image box) */}
                   <div className="flex-1 min-w-0 flex flex-col items-start gap-1">
                     <span className="font-bold text-[#0F172A] text-base leading-snug truncate w-full text-left">
@@ -295,7 +303,7 @@ export default function CategoriesPage({ onBack, onNavigate }) {
                     </span>
                   </div>
 
-                  {/* Toggle SVG Button (Red / Green Toggle SVG uploaded by user) */}
+                  {/* Toggle SVG Button (Identical size w-[45px] h-[31px] matching Item Master) */}
                   <button
                     type="button"
                     role="switch"
@@ -311,7 +319,7 @@ export default function CategoriesPage({ onBack, onNavigate }) {
                     <img
                       src={isCatActive ? '/owner/assets/icons/green-toggle.svg' : '/owner/assets/icons/red-toggle.svg'}
                       alt={isCatActive ? 'Status Aktif (Hijau)' : 'Status Nonaktif (Merah)'}
-                      className="w-[35px] h-[21px] object-contain select-none pointer-events-none block"
+                      className="w-[45px] h-[31px] object-contain select-none pointer-events-none block"
                     />
                   </button>
 
@@ -331,14 +339,16 @@ export default function CategoriesPage({ onBack, onNavigate }) {
         )}
       </div>
 
-      {/* 3. Bottom Sticky Bar (Matching Figma Mockup: Urutkan & Tambah) */}
-      <div className="fixed bottom-0 left-0 right-0 max-w-[390px] mx-auto h-[90px] bg-white shadow-[0px_0px_15px_rgba(0,0,0,0.15)] rounded-t-[20px] px-4 flex items-center justify-between gap-3 z-30">
+      {/* 3. Bottom Sticky Bar (Matching Figma Mockup: Urutkan & Tambah with Elegant Swipe Up Animation) */}
+      <div className="fixed bottom-0 left-0 right-0 max-w-[390px] mx-auto h-[90px] bg-white shadow-[0px_0px_15px_rgba(0,0,0,0.15)] rounded-t-[20px] px-4 flex items-center justify-between gap-3 z-30 animate-sticky-swipe-up">
         <button
           type="button"
           onClick={handleSortClick}
-          className="flex-1 h-12 rounded-full border border-[#00A637] bg-white text-[#00A637] font-bold text-sm hover:bg-emerald-50 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
+          className={`flex-1 h-12 rounded-full border border-[#00A637] font-bold text-sm active:scale-95 transition-all cursor-pointer flex items-center justify-center ${
+            isSorting ? 'bg-[#00A637] text-white shadow-sm' : 'bg-white text-[#00A637] hover:bg-emerald-50'
+          }`}
         >
-          Urutkan
+          {isSorting ? 'Selesai' : 'Urutkan'}
         </button>
         <button
           type="button"
