@@ -885,6 +885,51 @@
     });
   }
 
+  var _lastRenderedOwnerRoute = null;
+  var _lastRenderedStackDepth = 1;
+
+  function getOwnerRouteDepth(r) {
+    if (!r || isOwnerRootRoute(r)) return 1;
+    if (r === 'business/catalog' || r === 'business/materials-production') return 2;
+    if (r === 'catalog/categories' || r === 'catalog/products' || r === 'catalog/master-menus' || r === 'catalog/menus') return 3;
+    if (/^catalog\/categories\/[^/]+$/.test(r) && r !== 'catalog/categories/new' && r !== 'catalog/categories/sort' && r !== 'catalog/categories/reorder') return 4;
+    if (/^catalog\/categories\/[^/]+\/(?:edit|sort-menus|sort)$/.test(r) || r === 'catalog/categories/new' || r === 'catalog/categories/sort' || r === 'catalog/categories/reorder' || r === 'catalog/master-menus/new' || /^catalog\/master-menus\/[^/]+\/edit$/.test(r) || r === 'catalog/products/new' || /^catalog\/products\/[^/]+\/edit$/.test(r)) return 5;
+    var parent = ownerParentRoute(r);
+    return parent ? 2 + (r.split('/').length - 1) : 1;
+  }
+
+  function triggerOwnerPageSlideTransition(nextRoute) {
+    if (typeof document === 'undefined' || !document.body) return;
+    var nextDepth = getOwnerRouteDepth(nextRoute);
+    var dir = 'push';
+    if (_lastRenderedOwnerRoute === null) {
+      dir = 'tab';
+    } else if (isOwnerRootRoute(nextRoute) && isOwnerRootRoute(_lastRenderedOwnerRoute)) {
+      dir = 'tab';
+    } else if (nextDepth < _lastRenderedStackDepth) {
+      dir = 'pop';
+    } else {
+      dir = 'push';
+    }
+    _lastRenderedOwnerRoute = nextRoute;
+    _lastRenderedStackDepth = nextDepth;
+    document.body.setAttribute('data-nav-dir', dir);
+
+    if (typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(function () {
+        var targets = document.querySelectorAll(
+          '#modern-business-hub-root, #modern-catalog-subhub-root, #modern-categories-page-root, #modern-category-detail-page-root, #modern-category-editor-page-root, #modern-category-sort-page-root, #modern-category-menu-sort-page-root, #modern-item-master-page-root, #modern-menu-editor-root, .x-tab-content.active > .x-owner-child-page-shell, .x-tab-content.active > #x-owner-command-center'
+        );
+        var animClass = dir === 'pop' ? 'x-owner-page-anim-pop' : (dir === 'tab' ? 'x-owner-page-anim-tab' : 'x-owner-page-anim-push');
+        targets.forEach(function (el) {
+          el.classList.remove('x-owner-page-anim-push', 'x-owner-page-anim-pop', 'x-owner-page-anim-tab');
+          void el.offsetWidth;
+          el.classList.add(animClass);
+        });
+      });
+    }
+  }
+
   // Apply the route: update nav active state, show correct section, load data
   function applyRoute(route) {
     var isPlatform = isPlatformContext();
@@ -906,6 +951,7 @@
     }
 
     saveOwnerRoute(route);
+    triggerOwnerPageSlideTransition(route);
 
     var isCategoryEditor = !isPlatform && (
       route === 'catalog/categories/new' ||

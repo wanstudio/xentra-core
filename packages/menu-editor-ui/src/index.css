@@ -85,7 +85,41 @@
   animation: stickySwipeUp 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* Ensure modern tabs have no transform that would trap fixed positioning or squeeze mobile padding */
+/* Smooth GoBiz-style Horizontal Slide Page Transitions for Modern React Views */
+@keyframes xentraSlidePushIn {
+  0% {
+    opacity: 0;
+    transform: translate3d(28px, 0, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes xentraSlidePopIn {
+  0% {
+    opacity: 0;
+    transform: translate3d(-24px, 0, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes xentraTabFadeIn {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 4px, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Ensure modern tabs have no transform on the outer section that would trap fixed positioning */
 #tab-catalog-categories,
 #tab-catalog-products,
 #tab-catalog-master-menus,
@@ -93,6 +127,39 @@
 #tab-business {
   transform: none !important;
   animation: none !important;
+}
+
+/* Animate inner modern roots & child page shells smoothly on mount/route transition */
+#modern-business-hub-root,
+#modern-catalog-subhub-root,
+#modern-categories-page-root,
+#modern-category-detail-page-root,
+#modern-category-editor-page-root,
+#modern-category-sort-page-root,
+#modern-category-menu-sort-page-root,
+#modern-item-master-page-root,
+#modern-menu-editor-root,
+.x-owner-page-anim-push {
+  animation: xentraSlidePushIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both !important;
+}
+
+body[data-nav-dir="pop"] #modern-business-hub-root,
+body[data-nav-dir="pop"] #modern-catalog-subhub-root,
+body[data-nav-dir="pop"] #modern-categories-page-root,
+body[data-nav-dir="pop"] #modern-category-detail-page-root,
+body[data-nav-dir="pop"] #modern-category-editor-page-root,
+body[data-nav-dir="pop"] #modern-category-sort-page-root,
+body[data-nav-dir="pop"] #modern-category-menu-sort-page-root,
+body[data-nav-dir="pop"] #modern-item-master-page-root,
+body[data-nav-dir="pop"] #modern-menu-editor-root,
+.x-owner-page-anim-pop {
+  animation: xentraSlidePopIn 0.26s cubic-bezier(0.22, 1, 0.36, 1) both !important;
+}
+
+body[data-nav-dir="tab"] #modern-business-hub-root,
+body[data-nav-dir="tab"] #x-owner-command-center,
+.x-owner-page-anim-tab {
+  animation: xentraTabFadeIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both !important;
 }
 
 @media (max-width: 768px) {
