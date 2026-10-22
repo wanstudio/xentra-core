@@ -38,11 +38,13 @@ export default function CategoryDetailPage({
         if (found) setCategory(found);
       }
       if (window._ownerMasterMenuState && Array.isArray(window._ownerMasterMenuState.menus)) {
-        const related = window._ownerMasterMenuState.menus.filter((m) => {
-          if (!m) return false;
-          const mCatId = m.category_id || (m.category && m.category.id);
-          return String(mCatId || '') === String(categoryId || '');
-        });
+        const related = window._ownerMasterMenuState.menus
+          .filter((m) => {
+            if (!m) return false;
+            const mCatId = m.category_id || (m.category && m.category.id);
+            return String(mCatId || '') === String(categoryId || '');
+          })
+          .sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0));
         if (related.length > 0) {
           setMenus(related);
           setLoading(false);
@@ -71,11 +73,13 @@ export default function CategoryDetailPage({
         const menuData = await menuRes.json().catch(() => null);
         if (menuData && menuData.success && Array.isArray(menuData.menus)) {
           if (window._ownerMasterMenuState) window._ownerMasterMenuState.menus = menuData.menus;
-          const related = menuData.menus.filter((m) => {
-            if (!m) return false;
-            const mCatId = m.category_id || (m.category && m.category.id);
-            return String(mCatId || '') === String(categoryId || '');
-          });
+          const related = menuData.menus
+            .filter((m) => {
+              if (!m) return false;
+              const mCatId = m.category_id || (m.category && m.category.id);
+              return String(mCatId || '') === String(categoryId || '');
+            })
+            .sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0));
           setMenus(related);
         }
       }
@@ -148,9 +152,12 @@ export default function CategoryDetailPage({
       onSortMenus(categoryId);
       return;
     }
-    if (typeof window.showToast === 'function') {
-      window.showToast('ℹ️ Tekan dan geser atau pilih menu untuk mengatur urutan.');
+    const targetRoute = `catalog/categories/${encodeURIComponent(categoryId)}/sort-menus`;
+    if (typeof window.navigateTo === 'function') {
+      window.navigateTo(targetRoute);
+      return;
     }
+    window.location.hash = `#${targetRoute}`;
   };
 
   const isMenuActive = (m) => {

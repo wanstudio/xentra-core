@@ -136,6 +136,30 @@
       }
     }
 
+    var menuSortMatch = currentHash.match(/^catalog\/categories\/([^/]+)\/(?:sort-menus|sort)$/);
+    if (menuSortMatch && menuSortMatch[1]) {
+      var sortCatId = decodeURIComponent(menuSortMatch[1]);
+      if (modernMount && typeof window.mountCategoryMenuSortPage === 'function') {
+        modernMount.style.display = 'block';
+        if (page) page.style.display = 'none';
+        window.mountCategoryMenuSortPage(modernMount, {
+          categoryId: sortCatId,
+          onBack: function() {
+            navigateTo('catalog/categories/' + encodeURIComponent(sortCatId));
+          },
+          onSaved: function() {
+            navigateTo('catalog/categories/' + encodeURIComponent(sortCatId));
+          }
+        });
+        if (modernItemMount) modernItemMount.style.display = 'none';
+        if (catEditor) catEditor.style.display = 'none';
+        if (productList) productList.style.display = 'none';
+        if (productDetail) productDetail.style.display = 'none';
+        if (productEditor) productEditor.style.display = 'none';
+        return;
+      }
+    }
+
     var detailMatch = currentHash.match(/^catalog\/categories\/([^/]+)$/);
     if (
       detailMatch &&
@@ -161,6 +185,9 @@
           },
           onEditMenu: function(menuId) {
             navigateTo('catalog/master-menus/' + encodeURIComponent(menuId) + '/edit');
+          },
+          onSortMenus: function(id) {
+            navigateTo('catalog/categories/' + encodeURIComponent(id || detailCatId) + '/sort-menus');
           }
         });
         if (modernItemMount) modernItemMount.style.display = 'none';

@@ -4,6 +4,7 @@ import CategoriesPage from '../components/CategoriesPage';
 import CategoryEditorPage from '../components/CategoryEditorPage';
 import CategorySortPage from '../components/CategorySortPage';
 import CategoryDetailPage from '../components/CategoryDetailPage';
+import CategoryMenuSortPage from '../components/CategoryMenuSortPage';
 import ItemMasterPage from '../components/ItemMasterPage';
 import CatalogSubHub from '../components/CatalogSubHub';
 import BusinessHub from '../components/BusinessHub';
@@ -200,8 +201,29 @@ export const OwnerAppShell: React.FC<OwnerAppShellProps> = ({
               onEditCategory={(id: string) => navigateTo(`catalog/categories/${encodeURIComponent(id)}/edit`)}
               onAddMenu={() => navigateTo('catalog/master-menus/new')}
               onEditMenu={(mId: string) => navigateTo(`catalog/master-menus/${encodeURIComponent(mId)}/edit`)}
+              onSortMenus={(id: string) => navigateTo(`catalog/categories/${encodeURIComponent(id)}/sort-menus`)}
             />
           )}
+
+        {/^catalog\/categories\/[^/]+\/(?:sort-menus|sort)$/.test(currentRoute) && (
+          <CategoryMenuSortPage
+            categoryId={decodeURIComponent(
+              currentRoute.replace(/^catalog\/categories\//, '').replace(/\/(?:sort-menus|sort)$/, '')
+            )}
+            onBack={() =>
+              navigateTo(
+                'catalog/categories/' +
+                  currentRoute.replace(/^catalog\/categories\//, '').replace(/\/(?:sort-menus|sort)$/, '')
+              )
+            }
+            onSaved={() =>
+              navigateTo(
+                'catalog/categories/' +
+                  currentRoute.replace(/^catalog\/categories\//, '').replace(/\/(?:sort-menus|sort)$/, '')
+              )
+            }
+          />
+        )}
 
         {currentRoute === 'catalog/products' && (
           <ItemMasterPage

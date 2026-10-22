@@ -527,8 +527,8 @@
       return 'catalog/master-menus';
     }
 
-    if (/^catalog\/categories\/[^/]+\/edit$/.test(current)) {
-      return 'catalog/categories/' + current.split('catalog/categories/')[1].split('/edit')[0];
+    if (/^catalog\/categories\/[^/]+\/(?:edit|sort-menus|sort)$/.test(current)) {
+      return 'catalog/categories/' + current.split('catalog/categories/')[1].replace(/\/(?:edit|sort-menus|sort)$/, '');
     }
 
     if (current === 'catalog/categories/new' ||
@@ -887,7 +887,8 @@
     );
     var isCategorySort = !isPlatform && (
       route === 'catalog/categories/sort' ||
-      route === 'catalog/categories/reorder'
+      route === 'catalog/categories/reorder' ||
+      /^catalog\/categories\/[^/]+\/(?:sort-menus|sort)$/.test(route)
     );
     var isCategoryDetail = !isPlatform &&
       /^catalog\/categories\/[^/]+$/.test(route) &&

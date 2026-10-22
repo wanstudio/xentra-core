@@ -1233,6 +1233,60 @@ class ComposedMenuService {
       components: itemMap.get(String(m.id)) || []
     }));
   }
+
+  static reorderMenus({
+    brandId, categoryId = null, order
+  }) {
+    ensureSchema();
+    if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
+    if (!Array.isArray(order) || order.length === 0) {
+      throw new Error('MENU_REORDER_ARRAY_REQUIRED');
+    }
+
+    const orderedIds = order.map(id => String(id || '').trim()).filter(Boolean);
+    const uniqueIds = new Set(orderedIds);
+    if (uniqueIds.size !== orderedIds.length) {
+      throw new Error('MENU_REORDER_DUPLICATE_IDS');
+    }
+
+    const clauses = ['brand_id = ?'];
+    const params = [brandId];
+    if (categoryId) {
+      clauses.push('category_id = ?');
+      params.push(categoryId);
+    }
+
+    const owned = repository.db.queryMany(
+      'SELECT id FROM menus WHERE ' + clauses.join(' AND ') + ' ORDER BY COALESCE(sort_order, 0) ASC, id ASC',
+      params
+    );
+    const ownedIds = new Set(owned.map(r => String(r.id)));
+    const invalid = orderedIds.filter(id => !ownedIds.has(id));
+    if (invalid.length > 0) {
+      throw new Error('FORBIDDEN_SCOPE');
+    }
+
+    const untouched = owned
+      .map(r => String(r.id))
+      .filter(id => !uniqueIds.has(id));
+    const finalOrder = [...orderedIds, ...untouched];
+
+    repository.begin();
+    try {
+      finalOrder.forEach((id, idx) => {
+        repository.db.execute(
+          "UPDATE menus SET sort_order = ?, updated_at = datetime('now') WHERE id = ? AND brand_id = ?",
+          [idx + 1, id, brandId]
+        );
+      });
+      repository.commit();
+    } catch (err) {
+      try { repository.rollback(); } catch (_) {}
+      throw err;
+    }
+
+    return ComposedMenuService.listMenus({ brandId });
+  }
 }
 
 module.exports = ComposedMenuService;

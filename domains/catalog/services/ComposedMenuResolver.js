@@ -65,6 +65,7 @@ function resolveMenuBase(menu, branchState = null) {
     cost_price: Number(menu.cost_price || 0),
     spice_enabled: Number(menu.spice_enabled) === 1,
     spice_level: menu.spice_level != null ? Number(menu.spice_level) : null,
+    sort_order: Number(menu.sort_order || 0),
     category_id: menu.category_id || null,
     title_id: menu.title_id || null,
     rasa_id: menu.rasa_id || null,

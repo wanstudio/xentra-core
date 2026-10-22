@@ -211,7 +211,7 @@ class ComposedMenuRepository {
   findMenu({ brandId, menuId }) {
     return this.db.queryOne(
       "SELECT m.id, m.brand_id, m.menu_type, m.category_id, m.title_id, m.sub_category_id, m.rasa_id, " +
-      "m.package_name, m.description, m.selling_price, m.cost_price, m.spice_enabled, m.spice_level, m.status, m.created_at, m.updated_at, " +
+      "m.package_name, m.description, m.selling_price, m.cost_price, m.spice_enabled, m.spice_level, COALESCE(m.sort_order, 0) AS sort_order, m.status, m.created_at, m.updated_at, " +
       "m.media_id, m.image_url, m.image, " +
       "mt.name AS title_name, mt.slug AS title_slug, " +
       "sc.name AS sub_category_name, sc.slug AS sub_category_slug, " +
@@ -328,7 +328,7 @@ class ComposedMenuRepository {
 
     return this.db.queryMany(
       "SELECT m.id, m.brand_id, m.menu_type, m.category_id, m.title_id, m.sub_category_id, m.rasa_id, " +
-      "m.package_name, m.description, m.selling_price, m.cost_price, m.spice_enabled, m.spice_level, m.status, " +
+      "m.package_name, m.description, m.selling_price, m.cost_price, m.spice_enabled, m.spice_level, COALESCE(m.sort_order, 0) AS sort_order, m.status, " +
       "m.media_id, m.image_url, m.image, " +
       "mt.name AS title_name, mt.slug AS title_slug, " +
       "sc.name AS sub_category_name, sc.slug AS sub_category_slug, " +
@@ -341,7 +341,7 @@ class ComposedMenuRepository {
       "LEFT JOIN categories c ON c.id = m.category_id AND c.brand_id = m.brand_id " +
       "LEFT JOIN menu_flavors r ON r.id = m.rasa_id AND r.brand_id = m.brand_id " +
       "WHERE " + clauses.join(' AND ') +
-      " ORDER BY COALESCE(mt.name, m.package_name, m.id) ASC",
+      " ORDER BY COALESCE(m.sort_order, 0) ASC, COALESCE(mt.name, m.package_name, m.id) ASC",
       params
     );
   }

@@ -332,9 +332,32 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
     }
   };
 
+  const handleMenuReorder = (req, res) => {
+    try {
+      const order = req.body && req.body.order;
+      const categoryId = req.body && (req.body.category_id || req.body.categoryId) || null;
+      const menus = service.reorderMenus({
+        brandId: req.brand_id,
+        categoryId,
+        order
+      });
+      res.json({
+        success: true,
+        message: 'Urutan menu berhasil disimpan.',
+        menus
+      });
+    } catch (err) {
+      sendError(res, err, 'COMPOSED_MENU_REORDER_FAILED');
+    }
+  };
+
   ['/admin/menus', '/admin/master-menus', '/admin/composed/menus'].forEach(routePath => {
     router.get(routePath, requireAuth(ownerRoles), handleMenuList);
     router.post(routePath, requireAuth(ownerRoles), handleMenuCreate);
+  });
+
+  ['/admin/menus/reorder', '/admin/master-menus/reorder', '/admin/composed/menus/reorder'].forEach(routePath => {
+    router.put(routePath, requireAuth(ownerRoles), handleMenuReorder);
   });
 
   ['/admin/menus/:id', '/admin/master-menus/:id', '/admin/composed/menus/:id'].forEach(routePath => {

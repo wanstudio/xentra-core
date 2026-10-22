@@ -8,9 +8,11 @@ const express = require('express');
 
 const db = require('../server/database/db');
 const registerAdminCatalogRoutes = require('../server/routes/admin-catalog');
+const registerAdminComposedMenuRoutes = require('../server/routes/admin-composed-menu');
 
 const ROOT = path.resolve(__dirname, '..');
 const SORT_PAGE_PATH = path.join(ROOT, 'packages/menu-editor-ui/src/components/CategorySortPage.jsx');
+const MENU_SORT_PAGE_PATH = path.join(ROOT, 'packages/menu-editor-ui/src/components/CategoryMenuSortPage.jsx');
 const SHELL_PATH = path.join(ROOT, 'packages/menu-editor-ui/src/shell/OwnerAppShell.tsx');
 const CATEGORIES_PAGE_PATH = path.join(ROOT, 'packages/menu-editor-ui/src/components/CategoriesPage.jsx');
 const BUNDLE_JS_PATH = path.join(ROOT, 'apps/owner-app/assets/bundles/menu-editor.js');
@@ -26,6 +28,9 @@ function buildTestApp() {
   const router = express.Router();
   registerAdminCatalogRoutes(router, {
     db,
+    requireAuth: () => (req, _res, next) => next()
+  });
+  registerAdminComposedMenuRoutes(router, {
     requireAuth: () => (req, _res, next) => next()
   });
   app.use('/api/v1', router);
@@ -98,6 +103,60 @@ test('Category Reorder Suite', async (t) => {
       assert.equal(data.categories[2].id, 'cat_t2');
       assert.equal(data.categories[2].sort_order, 3);
     } finally {
+      db.prepare('DELETE FROM categories WHERE brand_id = ?').run(brandId);
+      db.prepare('DELETE FROM brands WHERE id = ?').run(brandId);
+      server.close();
+    }
+  });
+
+  await t.test('6. CategoryMenuSortPage and PUT /api/v1/admin/menus/reorder work as expected', async () => {
+    const menuSortJsx = fs.readFileSync(MENU_SORT_PAGE_PATH, 'utf8');
+    assert.ok(menuSortJsx.includes('Urutkan menu'), 'Must display "Urutkan menu" title');
+    assert.ok(menuSortJsx.includes('Kategori:'), 'Must display "Kategori:" subtitle');
+    assert.ok(menuSortJsx.includes('Tekan dan geser untuk mengatur urutan menu'), 'Must display menu sort instruction');
+    assert.ok(menuSortJsx.includes('/api/v1/admin/menus/reorder'), 'Must call /api/v1/admin/menus/reorder');
+    assert.ok(bundleJs.includes('Tekan dan geser untuk mengatur urutan menu'), 'Bundle must contain CategoryMenuSortPage');
+
+    const app = buildTestApp();
+    const server = app.listen(0);
+    const port = server.address().port;
+
+    const brandId = 'brand_menu_reorder_test';
+    try {
+      db.prepare('DELETE FROM menus WHERE brand_id = ?').run(brandId);
+      db.prepare('DELETE FROM categories WHERE brand_id = ?').run(brandId);
+      db.prepare('DELETE FROM brands WHERE id = ?').run(brandId);
+      db.prepare('INSERT INTO brands (id, organization_id, name, slug) VALUES (?, ?, ?, ?)').run(brandId, 'org_xentra_holding', 'Test Brand Menu', 'test-brand-menu');
+      db.prepare('INSERT INTO categories (id, brand_id, name, slug, sort_order) VALUES (?, ?, ?, ?, ?)').run('cat_m1', brandId, 'Contoh kategori 1', 'contoh-kategori-1', 1);
+
+      db.prepare('INSERT INTO menus (id, brand_id, category_id, package_name, selling_price, status) VALUES (?, ?, ?, ?, ?, ?)').run('m_t1', brandId, 'cat_m1', 'Menu A', 25000, 'ACTIVE');
+      db.prepare('INSERT INTO menus (id, brand_id, category_id, package_name, selling_price, status) VALUES (?, ?, ?, ?, ?, ?)').run('m_t2', brandId, 'cat_m1', 'Menu B', 30000, 'ACTIVE');
+      db.prepare('INSERT INTO menus (id, brand_id, category_id, package_name, selling_price, status) VALUES (?, ?, ?, ?, ?, ?)').run('m_t3', brandId, 'cat_m1', 'Menu C', 35000, 'ACTIVE');
+
+      const res = await fetch(`http://127.0.0.1:${port}/api/v1/admin/menus/reorder`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-test-brand': brandId
+        },
+        body: JSON.stringify({
+          category_id: 'cat_m1',
+          order: ['m_t3', 'm_t1', 'm_t2']
+        })
+      });
+
+      const data = await res.json();
+      assert.equal(res.status, 200);
+      assert.equal(data.success, true);
+      const catMenus = data.menus.filter((m) => m.category_id === 'cat_m1');
+      assert.equal(catMenus[0].id, 'm_t3');
+      assert.equal(catMenus[0].sort_order, 1);
+      assert.equal(catMenus[1].id, 'm_t1');
+      assert.equal(catMenus[1].sort_order, 2);
+      assert.equal(catMenus[2].id, 'm_t2');
+      assert.equal(catMenus[2].sort_order, 3);
+    } finally {
+      db.prepare('DELETE FROM menus WHERE brand_id = ?').run(brandId);
       db.prepare('DELETE FROM categories WHERE brand_id = ?').run(brandId);
       db.prepare('DELETE FROM brands WHERE id = ?').run(brandId);
       server.close();

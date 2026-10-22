@@ -142,7 +142,7 @@ function migrateLegacyMenuShape(db) {
 
   const copyable = [
     'id', 'brand_id', 'category_id', 'title_id', 'sub_category_id', 'rasa_id', 'menu_type', 'package_name', 'level_id',
-    'selling_price', 'cost_price', 'spice_enabled', 'spice_level', 'status', 'created_at', 'updated_at',
+    'selling_price', 'cost_price', 'spice_enabled', 'spice_level', 'sort_order', 'status', 'created_at', 'updated_at',
     'media_id', 'image_url', 'image'
   ];
   const existing = tableColumns(db, 'menus');
@@ -171,6 +171,7 @@ function migrateLegacyMenuShape(db) {
         cost_price REAL NOT NULL DEFAULT 0 CHECK (cost_price >= 0),
         spice_enabled INTEGER NOT NULL DEFAULT 0,
         spice_level INTEGER,
+        sort_order INTEGER NOT NULL DEFAULT 0,
         status TEXT NOT NULL DEFAULT 'DRAFT',
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now')),
@@ -305,6 +306,7 @@ function ensureComposedMenuSchema(db) {
       cost_price REAL NOT NULL DEFAULT 0 CHECK (cost_price >= 0),
       spice_enabled INTEGER NOT NULL DEFAULT 0,
       spice_level INTEGER,
+      sort_order INTEGER NOT NULL DEFAULT 0,
       status TEXT NOT NULL DEFAULT 'DRAFT',
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
@@ -594,6 +596,7 @@ function ensureComposedMenuSchema(db) {
   try { db.exec('ALTER TABLE menus ADD COLUMN category_id TEXT;'); } catch (_) {}
   try { db.exec('ALTER TABLE menus ADD COLUMN title_id TEXT;'); } catch (_) {}
   try { db.exec('ALTER TABLE menus ADD COLUMN description TEXT;'); } catch (_) {}
+  try { db.exec('ALTER TABLE menus ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;'); } catch (_) {}
 
   // Contract v4 (§3, §8, §21):
   // Menu adalah entitas dengan ID stabil sendiri (MENU-001). Tidak ada formula identitas

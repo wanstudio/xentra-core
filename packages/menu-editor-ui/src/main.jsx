@@ -8,6 +8,7 @@ import ItemMasterPage from './components/ItemMasterPage';
 import CategoryEditorPage from './components/CategoryEditorPage';
 import CategorySortPage from './components/CategorySortPage';
 import CategoryDetailPage from './components/CategoryDetailPage';
+import CategoryMenuSortPage from './components/CategoryMenuSortPage';
 import OwnerAppShell from './shell/OwnerAppShell';
 import './index.css';
 
@@ -165,6 +166,25 @@ export function unmountCategoryDetailPage(container) {
   }
 }
 
+export function mountCategoryMenuSortPage(container, props = {}) {
+  if (!container) return;
+  let root = roots.get(container);
+  if (!root) {
+    root = createRoot(container);
+    roots.set(container, root);
+  }
+  root.render(<CategoryMenuSortPage {...props} />);
+}
+
+export function unmountCategoryMenuSortPage(container) {
+  if (!container) return;
+  const root = roots.get(container);
+  if (root) {
+    root.unmount();
+    roots.delete(container);
+  }
+}
+
 export function mountOwnerAppShell(container, props = {}) {
   if (!container) return;
   let root = roots.get(container);
@@ -202,6 +222,8 @@ if (typeof window !== 'undefined') {
   window.unmountCategorySortPage = unmountCategorySortPage;
   window.mountCategoryDetailPage = mountCategoryDetailPage;
   window.unmountCategoryDetailPage = unmountCategoryDetailPage;
+  window.mountCategoryMenuSortPage = mountCategoryMenuSortPage;
+  window.unmountCategoryMenuSortPage = unmountCategoryMenuSortPage;
   window.mountOwnerAppShell = mountOwnerAppShell;
   window.unmountOwnerAppShell = unmountOwnerAppShell;
 }
