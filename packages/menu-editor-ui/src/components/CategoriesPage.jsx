@@ -221,7 +221,7 @@ export default function CategoriesPage({ onBack, onNavigate }) {
   });
 
   return (
-    <div id="modern-categories-page-root" className="relative w-full max-w-[390px] mx-auto px-4 py-2 font-sans pb-32">
+    <div id="modern-categories-page-root" className="relative w-full max-w-[390px] mx-auto px-4 py-2 font-sans pb-36">
       {/* 1. Header with Back Arrow and Title (Matching Figma Mockup: "Kategori & Menu") */}
       <div className="flex items-center gap-3 mb-6 pt-1">
         <button
@@ -339,36 +339,38 @@ export default function CategoriesPage({ onBack, onNavigate }) {
         )}
       </div>
 
-      {/* 3. Bottom Sticky Bar (Matching Figma Mockup: Urutkan & Tambah with Elegant Swipe Up Animation) */}
-      <div className="fixed bottom-0 left-0 right-0 max-w-[390px] mx-auto h-[90px] bg-white shadow-[0px_0px_15px_rgba(0,0,0,0.15)] rounded-t-[20px] px-4 flex items-center justify-between gap-3 z-30 animate-sticky-swipe-up">
-        <button
-          type="button"
-          onClick={handleSortClick}
-          className={`flex-1 h-12 rounded-full border border-[#00A637] font-bold text-sm active:scale-95 transition-all cursor-pointer flex items-center justify-center ${
-            isSorting ? 'bg-[#00A637] text-white shadow-sm' : 'bg-white text-[#00A637] hover:bg-emerald-50'
-          }`}
-        >
-          {isSorting ? 'Selesai' : 'Urutkan'}
-        </button>
-        <button
-          type="button"
-          onClick={() => setShowAddSheet(true)}
-          className="flex-1 h-12 rounded-full border-none bg-[#00A637] text-white font-bold text-sm hover:bg-[#009244] active:scale-95 transition-all cursor-pointer flex items-center justify-center shadow-sm"
-        >
-          Tambah
-        </button>
+      {/* 3. Dedicated Bottom Action Bar (Fixed at bottom on load, full screen width, no animation, acts like page bottom navbar) */}
+      <div className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-slate-200/90 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] z-[200]">
+        <div className="max-w-[420px] mx-auto w-full px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={handleSortClick}
+            className={`flex-1 h-12 rounded-full border border-[#00A637] font-bold text-sm active:scale-95 transition-all cursor-pointer flex items-center justify-center ${
+              isSorting ? 'bg-[#00A637] text-white shadow-sm' : 'bg-white text-[#00A637] hover:bg-emerald-50'
+            }`}
+          >
+            {isSorting ? 'Selesai' : 'Urutkan'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowAddSheet(true)}
+            className="flex-1 h-12 rounded-full border-none bg-[#00A637] text-white font-bold text-sm hover:bg-[#009244] active:scale-95 transition-all cursor-pointer flex items-center justify-center shadow-sm"
+          >
+            Tambah
+          </button>
+        </div>
       </div>
 
       {/* 4. Action Sheet Modal when "Tambah" clicked */}
       {showAddSheet && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center">
+        <div className="fixed inset-0 z-[250] flex items-end justify-center">
           {/* Backdrop */}
           <div
-            className="fixed inset-0 bg-black/40 transition-opacity"
+            className="fixed inset-0 bg-black/50 transition-opacity"
             onClick={() => setShowAddSheet(false)}
           />
           {/* Sheet */}
-          <div className="relative w-full max-w-[390px] bg-white rounded-t-[24px] p-5 flex flex-col gap-3 shadow-2xl z-10 animate-in slide-in-from-bottom duration-200">
+          <div className="relative w-full max-w-[420px] mx-auto bg-white rounded-t-[24px] p-5 pb-[max(20px,env(safe-area-inset-bottom))] flex flex-col gap-3 shadow-2xl z-10 animate-in slide-in-from-bottom duration-200">
             <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-1" />
             <div className="font-bold text-slate-900 text-base text-left mb-1">
               Pilih yang ingin ditambahkan
