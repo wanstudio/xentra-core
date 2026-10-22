@@ -18,22 +18,28 @@ router.get('/admin/categories', requireAuth(['owner', 'brand_manager']), (req, r
 
 router.post('/admin/categories', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
-    const { name, image, description } = req.body;
+    const { name, image, description, is_active } = req.body;
     const normalizedName = typeof name === 'string' ? name.trim() : '';
     if (!normalizedName) return res.status(400).json({ success: false, error: 'Nama kategori wajib diisi.' });
 
     const id = 'cat_' + Date.now();
     const slug = normalizedName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
     const cleanDesc = description !== undefined ? (typeof description === 'string' ? description.trim() : null) : null;
-    
+    let normIsActive = 1;
+    if (is_active === false || is_active === 0 || is_active === '0' || is_active === 'false') {
+      normIsActive = 0;
+    }
+
     db.prepare(`
-      INSERT INTO categories (id, brand_id, name, slug, description, sort_order)
-      VALUES (?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM categories WHERE brand_id = ?))
-    `).run(id, req.brand_id, name, slug, cleanDesc, req.brand_id);
+      INSERT INTO categories (id, brand_id, name, slug, description, is_active, sort_order)
+      VALUES (?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM categories WHERE brand_id = ?))
+    `).run(id, req.brand_id, normalizedName, slug, cleanDesc, normIsActive, req.brand_id);
+
+    const created = db.prepare('SELECT * FROM categories WHERE id = ? AND brand_id = ?').get(id, req.brand_id);
 
     res.status(201).json({
       success: true,
-      category: { id, name, slug, description: cleanDesc, image: image || '/assets/icons/delivery.png' }
+      category: created || { id, name: normalizedName, slug, description: cleanDesc, is_active: normIsActive, image: image || '/assets/icons/delivery.png' }
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

@@ -13,8 +13,10 @@ function getAuthToken() {
 export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
   const isEdit = !!categoryId;
   const [name, setName] = useState('');
+  const [initialName, setInitialName] = useState('');
   const [description, setDescription] = useState('');
-  const [categoryMenus, setCategoryMenus] = useState([]);
+  const [isActive, setIsActive] = useState(true);
+  const [initialIsActive, setInitialIsActive] = useState(true);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -27,18 +29,14 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
       if (isEdit && window.state && Array.isArray(window.state.categories)) {
         const found = window.state.categories.find((c) => c && String(c.id) === String(categoryId));
         if (found && isMounted) {
-          setName(found.name || '');
+          const foundName = found.name || '';
+          const foundActive = found.is_active !== 0 && found.is_active !== false && found.is_active !== '0';
+          setName(foundName);
+          setInitialName(foundName);
           setDescription(found.description || '');
+          setIsActive(foundActive);
+          setInitialIsActive(foundActive);
         }
-      }
-
-      if (isEdit && window._ownerMasterMenuState && Array.isArray(window._ownerMasterMenuState.menus)) {
-        const related = window._ownerMasterMenuState.menus.filter((m) => {
-          if (!m) return false;
-          const mCatId = m.category_id || (m.category && m.category.id);
-          return String(mCatId || '') === String(categoryId || '');
-        });
-        if (isMounted) setCategoryMenus(related);
       }
 
       try {
@@ -46,10 +44,7 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
         const headers = { 'Accept': 'application/json' };
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
-        const [catRes, menuRes] = await Promise.all([
-          fetch('/api/v1/admin/categories', { headers }).catch(() => null),
-          fetch('/api/v1/admin/menus', { headers }).catch(() => null),
-        ]);
+        const catRes = await fetch('/api/v1/admin/categories', { headers }).catch(() => null);
 
         if (catRes && catRes.ok) {
           const catData = await catRes.json().catch(() => null);
@@ -58,24 +53,14 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
             if (isEdit) {
               const found = catData.categories.find((c) => c && String(c.id) === String(categoryId));
               if (found && isMounted) {
-                setName(found.name || '');
+                const foundName = found.name || '';
+                const foundActive = found.is_active !== 0 && found.is_active !== false && found.is_active !== '0';
+                setName(foundName);
+                setInitialName(foundName);
                 setDescription(found.description || '');
+                setIsActive(foundActive);
+                setInitialIsActive(foundActive);
               }
-            }
-          }
-        }
-
-        if (menuRes && menuRes.ok) {
-          const menuData = await menuRes.json().catch(() => null);
-          if (menuData && menuData.success && Array.isArray(menuData.menus)) {
-            if (window._ownerMasterMenuState) window._ownerMasterMenuState.menus = menuData.menus;
-            if (isMounted) {
-              const related = isEdit ? menuData.menus.filter((m) => {
-                if (!m) return false;
-                const mCatId = m.category_id || (m.category && m.category.id);
-                return String(mCatId || '') === String(categoryId || '');
-              }) : [];
-              setCategoryMenus(related);
             }
           }
         }
@@ -108,15 +93,14 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
     window.location.hash = '#catalog/categories';
   };
 
+  const trimmedName = name.trim();
+  const canSubmit = isEdit
+    ? Boolean(trimmedName) && (trimmedName !== initialName.trim() || isActive !== initialIsActive)
+    : Boolean(trimmedName);
+
   const handleSave = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
-    const trimmedName = name.trim();
-    if (!trimmedName) {
-      if (typeof window.showToast === 'function') {
-        window.showToast('❌ Nama kategori wajib diisi.');
-      }
-      return;
-    }
+    if (!trimmedName || saving) return;
 
     setSaving(true);
     try {
@@ -138,6 +122,7 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
         body: JSON.stringify({
           name: trimmedName,
           description: description.trim(),
+          is_active: isActive ? 1 : 0,
         }),
       });
 
@@ -178,7 +163,7 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
   };
 
   const handleDelete = async () => {
-    if (!isEdit) return;
+    if (!isEdit || deleting) return;
     const confirmDelete = window.confirm(`Hapus kategori "${name}"?\nTindakan ini tidak dapat dibatalkan.`);
     if (!confirmDelete) return;
 
@@ -217,17 +202,18 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
     }
   };
 
-  const titleText = isEdit
-    ? (name ? `Kategori: ${name}` : 'Edit Kategori')
-    : 'Tambah Kategori';
+  const titleText = isEdit ? 'Edit kategori' : 'Tambah kategori';
 
   return (
     <div
       id="modern-category-editor-page-root"
-      style={{ boxSizing: 'border-box' }}
-      className="w-full flex flex-col gap-4 pb-12 max-w-lg md:mx-auto font-sans select-none"
+      style={{
+        boxSizing: 'border-box',
+        paddingBottom: '150px'
+      }}
+      className="w-full flex flex-col gap-4 max-w-lg md:mx-auto font-sans select-none"
     >
-      {/* 1. Header with Back Arrow and Title (Identical spacing and sizing to CategoriesPage & CatalogSubHub) */}
+      {/* 1. Header with Back Arrow and Title (Identical spacing and sizing to CatalogSubHub & CategoriesPage) */}
       <div className="flex items-center gap-3 mb-6 pt-1">
         <button
           type="button"
@@ -246,128 +232,132 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
         </h1>
       </div>
 
-      {/* 2. Main Card Container (358px wide, rounded 14px, outline #CBD5E1) */}
-      <div className="w-full rounded-[14px] p-4 bg-white hub-inset-stroke flex flex-col gap-5">
-        {loading ? (
-          <div className="py-10 text-center text-sm text-[#94A3B8]">Memuat data kategori...</div>
-        ) : (
-          <form onSubmit={handleSave} className="flex flex-col gap-5 w-full m-0 p-0">
-            {/* Field: Nama Kategori */}
-            <div className="flex flex-col gap-1.5 w-full text-left">
-              <label htmlFor="cat-name-input" className="font-bold text-[#0F172A] text-sm flex items-center gap-1">
-                Nama Kategori <span className="text-red-500">*</span>
+      {/* 2. Form Cards Stack (gap-4 = 16px) */}
+      {loading ? (
+        <div className="w-full rounded-[14px] p-4 bg-white hub-inset-stroke py-10 text-center text-sm text-[#94A3B8]">
+          Memuat data kategori...
+        </div>
+      ) : (
+        <form onSubmit={handleSave} className="w-full flex flex-col gap-4 m-0 p-0">
+          {/* Card 1: Nama kategori */}
+          <div className="w-full p-4 bg-white rounded-[14px] hub-inset-stroke flex flex-col items-end gap-3.5">
+            <div className="w-full flex flex-col items-start gap-1 text-left">
+              <label htmlFor="cat-name-input" className="w-full text-base font-bold text-[#0F172A] leading-snug">
+                Nama kategori <span className="text-[#FA3E3E] font-bold">*</span>
               </label>
+              <p className="w-full text-[13px] font-medium text-[#94A3B8] leading-snug m-0">
+                Berikan nama kategori yang singkat, nama kategori bisa sangat membantu dalam mencari menu sesuai kelompok atau jenisnya
+              </p>
+            </div>
+
+            <div className="w-full h-12 relative rounded-[14px] border border-[#CBD5E1] bg-white overflow-hidden flex items-center focus-within:border-[#0F172A] transition-colors">
               <input
                 id="cat-name-input"
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="contoh: Makanan Berat"
-                maxLength={120}
+                onChange={(e) => setName(e.target.value.slice(0, 150))}
+                placeholder="Cth. Makanan Berat"
+                maxLength={150}
                 required
-                className="w-full h-11 px-3.5 rounded-xl bg-white border border-[#CBD5E1] font-semibold text-slate-900 text-sm focus:outline-none focus:border-slate-800 placeholder:text-[#94A3B8] transition-colors"
+                className="w-full h-full px-4 bg-transparent border-none outline-none font-medium text-[#0F172A] text-[13px] placeholder:text-[#94A3B8]"
               />
-              <span className="text-[11px] text-[#94A3B8] mt-0.5">
-                contohnya; Makanan Berat, Minuman Segar, Camilan, dsb
+            </div>
+
+            <div className="text-[#94A3B8] text-[10px] font-normal leading-none">
+              {name.length}/150
+            </div>
+          </div>
+
+          {/* Card 2: Aktifkan kategori */}
+          <div className="w-full p-4 bg-white rounded-[14px] hub-inset-stroke flex items-center justify-between gap-4">
+            <div className="flex-1 min-w-0 flex flex-col items-start gap-1 text-left">
+              <span className="w-full text-base font-bold text-black leading-snug">
+                Aktifkan kategori
+              </span>
+              <span className="w-full text-[13px] font-medium text-[#94A3B8] leading-snug">
+                Kategori menu yang aktif akan terlihat
               </span>
             </div>
 
-            {/* Field: Menu dalam Kategori Ini */}
-            <div className="flex flex-col gap-1.5 w-full text-left">
-              <label className="font-bold text-[#0F172A] text-sm">
-                Menu dalam kategori ini
-              </label>
-              {categoryMenus && categoryMenus.length > 0 ? (
-                <div className="flex flex-col gap-2 w-full max-h-48 overflow-y-auto pr-1">
-                  {categoryMenus.map((m, idx) => {
-                    if (!m) return null;
-                    const mTitle = m.title_name || m.package_name || m.title || m.name || `Menu ${idx + 1}`;
-                    return (
-                      <div
-                        key={m.id || idx}
-                        className="flex items-center justify-between p-2.5 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] gap-3"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-8 h-8 rounded-lg bg-[#34A853] flex items-center justify-center shrink-0 overflow-hidden">
-                            {m.image_url || m.image ? (
-                              <img src={m.image_url || m.image} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              <img
-                                src="/owner/assets/icons/bxs_category.svg"
-                                alt=""
-                                className="w-4 h-4 filter brightness-0 invert block"
-                              />
-                            )}
-                          </div>
-                          <div className="flex flex-col min-w-0">
-                            <span className="font-bold text-slate-900 text-xs truncate text-left">{mTitle}</span>
-                            <span className="text-[10px] text-slate-400 font-medium text-left">Menu Komersial</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="p-3.5 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] text-xs text-[#94A3B8] leading-relaxed text-left">
-                  {isEdit
-                    ? 'Belum ada menu dalam kategori ini.'
-                    : 'Kategori baru belum memiliki menu. Menu dapat ditambahkan melalui Menu Master setelah kategori disimpan.'}
-                </div>
-              )}
-            </div>
-
-            {/* Field: Catatan */}
-            <div className="flex flex-col gap-1.5 w-full text-left">
-              <label htmlFor="cat-desc-input" className="font-bold text-[#0F172A] text-sm">
-                Catatan
-              </label>
-              <textarea
-                id="cat-desc-input"
-                rows={3}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Tambahkan catatan untuk kategori ini..."
-                className="w-full p-3 rounded-xl bg-white border border-[#CBD5E1] font-medium text-slate-800 text-sm focus:outline-none focus:border-slate-800 placeholder:text-[#94A3B8] resize-none transition-colors"
+            {/* Toggle Button */}
+            <button
+              type="button"
+              role="switch"
+              aria-checked={isActive}
+              aria-label="Aktifkan kategori"
+              onClick={() => setIsActive((prev) => !prev)}
+              className="p-0 border-none bg-transparent cursor-pointer shrink-0 flex items-center justify-center transition-transform active:scale-95"
+            >
+              <img
+                src={isActive ? '/owner/assets/icons/green-toggle.svg' : '/owner/assets/icons/red-toggle.svg'}
+                alt={isActive ? 'Aktif' : 'Nonaktif'}
+                className="w-[45px] h-[31px] object-contain select-none pointer-events-none block"
               />
-            </div>
+            </button>
+          </div>
 
-            {/* Bottom Actions (Matching Figma Editor Button Mockup) */}
-            <div className="flex flex-col gap-2.5 w-full pt-1">
-              {/* Row 1: Batal & Hapus (if edit) */}
-              <div className="flex items-center gap-3 w-full">
-                <button
-                  type="button"
-                  onClick={handleBack}
-                  className={`${
-                    isEdit ? 'flex-1' : 'w-full'
-                  } h-11 rounded-xl border border-[#CBD5E1] bg-white hover:bg-slate-50 text-slate-700 font-bold text-sm cursor-pointer transition-all active:scale-95 flex items-center justify-center`}
-                >
-                  Batal
-                </button>
-                {isEdit && (
-                  <button
-                    type="button"
-                    onClick={handleDelete}
-                    disabled={deleting}
-                    className="flex-1 h-11 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-sm cursor-pointer transition-all active:scale-95 flex items-center justify-center disabled:opacity-50"
-                  >
-                    {deleting ? 'Menghapus...' : 'Hapus'}
-                  </button>
-                )}
-              </div>
+          {/* Optional Delete Button when in Edit Mode */}
+          {isEdit && (
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="w-full h-11 rounded-[14px] border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs cursor-pointer transition-all active:scale-98 flex items-center justify-center disabled:opacity-50"
+            >
+              {deleting ? 'Menghapus kategori...' : 'Hapus kategori'}
+            </button>
+          )}
+        </form>
+      )}
 
-              {/* Row 2: Simpan Kategori (Full width green button) */}
-              <button
-                type="submit"
-                disabled={saving || !name.trim()}
-                className="w-full h-11 rounded-xl bg-[#00A84F] hover:bg-[#009244] text-white font-bold text-sm cursor-pointer transition-all active:scale-95 flex items-center justify-center border-none shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {saving ? 'Menyimpan...' : 'Simpan Kategori'}
-              </button>
-            </div>
-          </form>
-        )}
+      {/* 3. Fixed Bottom Action Bar (Matching Figma Mockup: rounded-t-[20px], top shadow, 48px pill button) */}
+      <div
+        id="modern-category-editor-bottom-bar"
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          width: '100%',
+          backgroundColor: '#ffffff',
+          borderTopLeftRadius: '20px',
+          borderTopRightRadius: '20px',
+          boxShadow: '0px 0px 15px rgba(0, 0, 0, 0.15)',
+          zIndex: 200,
+          paddingTop: '24px',
+          paddingBottom: 'max(24px, env(safe-area-inset-bottom, 24px))',
+          paddingLeft: '16px',
+          paddingRight: '16px',
+          boxSizing: 'border-box'
+        }}
+        className="w-full bg-white rounded-t-[20px] z-[200]"
+      >
+        <div className="w-full max-w-lg mx-auto">
+          <button
+            type="button"
+            disabled={saving || !canSubmit}
+            onClick={handleSave}
+            style={{
+              width: '100%',
+              height: '48px',
+              borderRadius: '9999px',
+              border: 'none',
+              outline: 'none',
+              backgroundColor: canSubmit ? '#00A637' : '#F2F2F2',
+              color: canSubmit ? '#FFFFFF' : '#979797',
+              fontWeight: 700,
+              fontSize: '14px',
+              cursor: canSubmit && !saving ? 'pointer' : 'not-allowed',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.15s ease'
+            }}
+            className={canSubmit ? 'active:scale-98 hover:bg-emerald-600' : ''}
+          >
+            {saving ? 'Menyimpan...' : (isEdit ? 'Simpan' : 'Buat kategori')}
+          </button>
+        </div>
       </div>
     </div>
   );
