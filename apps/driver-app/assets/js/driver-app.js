@@ -902,6 +902,9 @@
           '<button class="icon-btn" data-action="call" aria-label="Telepon pelanggan">☎</button>' +
         '</div>' +
         '<button class="secondary-btn" data-action="navigate" style="margin-top:13px">⌖ Buka Navigasi</button>' +
+        '<button type="button" class="secondary-btn" data-action="notify-arrived" style="margin-top:10px;border-color:' + (task.arrived_at ? '#10b981' : '#f59e0b') + ';background:' + (task.arrived_at ? '#ecfdf5' : '#fffbeb') + ';color:' + (task.arrived_at ? '#047857' : '#b45309') + ';font-weight:800;">' +
+          (task.arrived_at ? '✓ Pelanggan Sudah Dikabari (Kirim Ulang 🔔)' : '🔔 Kabari Pelanggan Sudah Sampai') +
+        '</button>' +
         '<div class="sticky-action"><button class="primary-btn green" data-action="complete-delivery">Selesaikan Pengantaran ' + icon('arrow') + '</button></div>' +
       '</div>';
 
@@ -1739,6 +1742,26 @@
     if (action === 'delivery-map') {
       state.page = 'map';
       return render();
+    }
+
+    if (action === 'notify-arrived') {
+      var arrTask = selectedTask();
+      if (!arrTask) return toast('Tugas pengantaran tidak ditemukan');
+      try {
+        var resArr = await api('/driver/tasks/' + encodeURIComponent(arrTask.order_id) + '/arrived', { method: 'POST' });
+        if (resArr && resArr.task) {
+          state.tasks = state.tasks.map(function (t) {
+            return t.order_id === arrTask.order_id ? resArr.task : t;
+          });
+        } else {
+          arrTask.arrived_at = new Date().toISOString();
+        }
+        toast('🔔 Notifikasi sampai telah dikirim ke aplikasi pelanggan!');
+        render();
+      } catch (err) {
+        toast(err.message || 'Gagal mengirim notifikasi sampai');
+      }
+      return;
     }
 
     if (action === 'complete-delivery') {

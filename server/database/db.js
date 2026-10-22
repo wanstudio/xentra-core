@@ -3033,6 +3033,7 @@ function bootstrapEssentialTenant(targetDb) {
   try { targetDb.exec("ALTER TABLE order_deliveries ADD COLUMN driver_assignment_status TEXT DEFAULT 'pending';"); } catch (_) {}
   try { targetDb.exec("ALTER TABLE order_deliveries ADD COLUMN driver_assignment_responded_at TEXT;"); } catch (_) {}
   try { targetDb.exec("ALTER TABLE order_deliveries ADD COLUMN driver_assignment_rejection_reason TEXT;"); } catch (_) {}
+  try { targetDb.exec("ALTER TABLE order_deliveries ADD COLUMN arrived_at TEXT DEFAULT NULL;"); } catch (_) {}
   try { targetDb.exec("CREATE INDEX IF NOT EXISTS idx_order_deliveries_driver_id ON order_deliveries(driver_id);"); } catch (_) {}
 
   // Driver Realtime GPS Location & Tracking tables

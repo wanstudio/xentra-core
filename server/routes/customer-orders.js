@@ -192,6 +192,7 @@ router.get('/orders/:id', (req, res) => {
     driver_name: delivery.driver_name || null,
     driver_phone: delivery.driver_phone || null,
     driver_location: liveDriverLocation || null,
+    arrived_at: delivery.arrived_at || null,
     tracking_url: delivery.tracking_url || null,
     status: delivery.status || null
   } : null;

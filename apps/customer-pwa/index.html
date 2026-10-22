@@ -11,7 +11,7 @@
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: dark)">
   <script src="/pwa-theme.js"></script>
   <script src="/assets/js/core/pwa-interaction-guards.js"></script>
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; worker-src 'self' blob:; child-src 'self' blob:; font-src 'self' data: blob: https: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://api.mapbox.com https://app.sandbox.midtrans.com https://app.midtrans.com https://xentra.cloud; style-src 'self' 'unsafe-inline' https: https://api.mapbox.com; img-src * data: blob: https: http:; connect-src 'self' https: http: ws: wss: https://api.mapbox.com https://events.mapbox.com https://xentra.cloud; frame-src 'self' https://app.sandbox.midtrans.com https://app.midtrans.com https://xentra.cloud;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; media-src 'self' data: blob:; worker-src 'self' blob:; child-src 'self' blob:; font-src 'self' data: blob: https: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://api.mapbox.com https://app.sandbox.midtrans.com https://app.midtrans.com https://xentra.cloud; style-src 'self' 'unsafe-inline' https: https://api.mapbox.com; img-src * data: blob: https: http:; connect-src 'self' https: http: ws: wss: https://api.mapbox.com https://events.mapbox.com https://xentra.cloud; frame-src 'self' https://app.sandbox.midtrans.com https://app.midtrans.com https://xentra.cloud;">
   <!-- Early theme bootstrap: apply saved brand primary color before CSS renders -->
   <script>
     (function () {
@@ -576,7 +576,7 @@
 
       var CONTROLLER_SRC = {
         checkout: '/assets/js/pages/checkout.js',
-        'order-received': '/assets/js/pages/order-received.js?v=20261022_live2',
+        'order-received': '/assets/js/pages/order-received.js?v=20261022_arrival',
         affiliate: '/assets/js/pages/aux-pages.js',
         history: '/assets/js/pages/aux-pages.js',
         profile: '/assets/js/pages/aux-pages.js',

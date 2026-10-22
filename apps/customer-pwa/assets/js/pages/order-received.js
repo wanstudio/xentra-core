@@ -25,6 +25,270 @@
   var countdownTimer = null;
   var lastDeliveryStatus = null;
   var lastDriverName = null;
+  var lastArrivedAt = null;
+  var lastOrderSnapshot = null;
+  var audioCtx = null;
+  var arrivalAudioEl = null;
+
+  function ensureAudioUnlocked() {
+    try {
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (Ctx && !audioCtx) {
+        audioCtx = new Ctx();
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(function () {});
+      }
+      if (!arrivalAudioEl) {
+        arrivalAudioEl = new Audio('/assets/audio/pesanan-sampai.mp3');
+        arrivalAudioEl.preload = 'auto';
+      }
+    } catch (_) {}
+  }
+
+  document.addEventListener('click', ensureAudioUnlocked, { passive: true, once: true });
+  document.addEventListener('touchstart', ensureAudioUnlocked, { passive: true, once: true });
+
+  function playApproachingChime() {
+    try {
+      if (navigator.vibrate) navigator.vibrate([180, 90, 220]);
+    } catch (_) {}
+    try {
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      if (!audioCtx) audioCtx = new Ctx();
+      if (audioCtx.state === 'suspended') audioCtx.resume().catch(function () {});
+      var now = audioCtx.currentTime;
+      // Two-tone warm chime (E5 -> G#5)
+      [659.25, 830.61].forEach(function (freq, idx) {
+        var osc = audioCtx.createOscillator();
+        var gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.2);
+        gain.gain.setValueAtTime(0.001, now + idx * 0.2);
+        gain.gain.exponentialRampToValueAtTime(0.28, now + idx * 0.2 + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.2 + 0.45);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now + idx * 0.2);
+        osc.stop(now + idx * 0.2 + 0.48);
+      });
+    } catch (_) {}
+  }
+
+  function playFallbackArrivalChime() {
+    try {
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      if (!audioCtx) audioCtx = new Ctx();
+      if (audioCtx.state === 'suspended') audioCtx.resume().catch(function () {});
+      var now = audioCtx.currentTime;
+      // Three-tone bright arrival chime (C5 -> E5 -> G5 -> C6)
+      [523.25, 659.25, 783.99, 1046.5].forEach(function (freq, idx) {
+        var osc = audioCtx.createOscillator();
+        var gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.16);
+        gain.gain.setValueAtTime(0.001, now + idx * 0.16);
+        gain.gain.exponentialRampToValueAtTime(0.32, now + idx * 0.16 + 0.025);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.16 + 0.42);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now + idx * 0.16);
+        osc.stop(now + idx * 0.16 + 0.45);
+      });
+    } catch (_) {}
+  }
+
+  function playArrivedMp3Alert() {
+    try {
+      if (navigator.vibrate) navigator.vibrate([300, 120, 300, 120, 450]);
+    } catch (_) {}
+    try {
+      var snd = arrivalAudioEl || new Audio('/assets/audio/pesanan-sampai.mp3');
+      snd.currentTime = 0;
+      var playPromise = snd.play();
+      if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch(function () {
+          playFallbackArrivalChime();
+        });
+      }
+    } catch (_) {
+      playFallbackArrivalChime();
+    }
+  }
+
+  function triggerSystemNotification(title, bodyText, tag) {
+    try {
+      if (!('Notification' in window)) return;
+      var show = function () {
+        if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+          navigator.serviceWorker.ready.then(function (reg) {
+            if (reg && typeof reg.showNotification === 'function') {
+              reg.showNotification(title, {
+                body: bodyText,
+                icon: '/assets/pwa/icon-192.png',
+                badge: '/assets/pwa/icon-192.png',
+                tag: tag || 'xentra-delivery-alert',
+                renotify: true,
+                vibrate: [250, 100, 250]
+              });
+            }
+          }).catch(function () {});
+        } else {
+          new Notification(title, { body: bodyText, icon: '/assets/pwa/icon-192.png', tag: tag || 'xentra-delivery-alert' });
+        }
+      };
+      if (Notification.permission === 'granted') {
+        show();
+      } else if (Notification.permission === 'default') {
+        Notification.requestPermission().then(function (perm) {
+          if (perm === 'granted') show();
+        }).catch(function () {});
+      }
+    } catch (_) {}
+  }
+
+  function calcDistanceMeters(lat1, lng1, lat2, lng2) {
+    if (!Number.isFinite(lat1) || !Number.isFinite(lng1) || !Number.isFinite(lat2) || !Number.isFinite(lng2)) return Infinity;
+    var R = 6371000;
+    var dLat = (lat2 - lat1) * Math.PI / 180;
+    var dLng = (lng2 - lng1) * Math.PI / 180;
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  function showProximityPopupModal(type, order, delivery, distMeters) {
+    var existing = document.getElementById('x-driver-proximity-modal');
+    if (existing) existing.remove();
+
+    var isArrived = type === 'arrived';
+    var driverName = (delivery && delivery.driver_name) || 'Kurir Cabang';
+    var driverPhone = (delivery && delivery.driver_phone) || '';
+    var waPhone = driverPhone ? String(driverPhone).replace(/[^0-9]/g, '').replace(/^0/, '62') : '';
+    var isCash = order && String(order.payment_method || 'cash').toLowerCase() === 'cash' && order.order_type === 'delivery';
+    var grandTotal = order ? Number(order.grand_total || 0) : 0;
+
+    var overlay = document.createElement('div');
+    overlay.id = 'x-driver-proximity-modal';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,0.58);backdrop-filter:blur(3px);display:flex;align-items:flex-end;justify-content:center;padding:16px;box-sizing:border-box;animation:fadeIn 0.22s ease;';
+
+    var badgeBg = isArrived ? '#dcfce7' : '#fef3c7';
+    var badgeColor = isArrived ? '#15803d' : '#b45309';
+    var badgeText = isArrived ? '🔔 KURIR SUDAH SAMPAI' : '🛵 KURIR HAMPIR SAMPAI';
+    var titleText = isArrived
+      ? 'Pesanan Anda Sudah Sampai!'
+      : 'Kurir Sebentar Lagi Sampai!';
+    var descText = isArrived
+      ? '<strong>' + UI.escape(driverName) + '</strong> sudah tiba di titik pengantaran. Silakan temui kurir untuk menerima pesananmu.'
+      : '<strong>' + UI.escape(driverName) + '</strong> berjarak sekitar <strong>' + Math.max(10, Math.round(distMeters || 120)) + ' meter</strong> dari lokasimu. Yuk bersiap menerima pesanan!';
+
+    var codHtml = isCash
+      ? '<div style="margin-top:12px;padding:11px 14px;background:#fffbeb;border:1px solid #fde68a;border-radius:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;">' +
+        '  <span style="font-size:12.5px;color:#92400e;font-weight:700;">💵 Siapkan Uang Tunai (COD)</span>' +
+        '  <strong style="font-size:14px;color:#78350f;font-weight:900;">' + UI.money(grandTotal) + '</strong>' +
+        '</div>'
+      : '';
+
+    overlay.innerHTML =
+      '<div style="width:100%;max-width:440px;background:#ffffff;border-radius:22px;padding:22px 20px 18px;box-shadow:0 20px 45px rgba(0,0,0,0.25);text-align:center;box-sizing:border-box;">' +
+      '  <div style="width:42px;height:4px;background:#e2e8f0;border-radius:99px;margin:0 auto 16px;"></div>' +
+      '  <div style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;background:' + badgeBg + ';color:' + badgeColor + ';font-size:11.5px;font-weight:800;margin-bottom:10px;">' + badgeText + '</div>' +
+      '  <h2 style="font-size:20px;font-weight:800;color:#0f172a;margin:0 0 8px;">' + titleText + '</h2>' +
+      '  <p style="font-size:13.5px;color:#475569;line-height:1.5;margin:0;">' + descText + '</p>' +
+      codHtml +
+      '  <div style="display:flex;gap:10px;margin-top:18px;">' +
+      (waPhone
+        ? '    <a href="https://wa.me/' + encodeURIComponent(waPhone) + '" target="_blank" rel="noopener" style="flex:1;height:46px;border-radius:23px;background:#ecfdf5;color:#047857;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;border:1.5px solid #a7f3d0;">💬 Chat Kurir</a>'
+        : '') +
+      '    <button type="button" id="x-btn-dismiss-proximity" style="flex:1.2;height:46px;border-radius:23px;border:none;background:#10b981;color:#ffffff;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 4px 12px rgba(16,185,129,0.3);">Siap, Mengerti</button>' +
+      '  </div>' +
+      '</div>';
+
+    document.body.appendChild(overlay);
+    var closeBtn = overlay.querySelector('#x-btn-dismiss-proximity');
+    if (closeBtn) closeBtn.onclick = function () { overlay.remove(); };
+    overlay.onclick = function (e) {
+      if (e.target === overlay) overlay.remove();
+    };
+  }
+
+  function evaluateDriverProximityAlerts(order, delivery) {
+    if (!order || !delivery) return;
+    if (order.status !== 'out_for_delivery' && delivery.status !== 'on_delivery') return;
+
+    var orderId = String(order.id || currentOrderId || '');
+    if (!orderId) return;
+
+    var arrivedKey = 'x_alert_arrived_' + orderId + '_' + String(delivery.arrived_at || 'gps');
+    var nearKey = 'x_alert_near_' + orderId;
+
+    var dLoc = delivery.driver_location;
+    var drvLat = dLoc && dLoc.latitude != null ? Number(dLoc.latitude) : NaN;
+    var drvLng = dLoc && dLoc.longitude != null ? Number(dLoc.longitude) : NaN;
+    var destLat = delivery.destination_latitude != null ? Number(delivery.destination_latitude) : NaN;
+    var destLng = delivery.destination_longitude != null ? Number(delivery.destination_longitude) : NaN;
+    var distMeters = calcDistanceMeters(drvLat, drvLng, destLat, destLng);
+
+    var etaEl = document.getElementById('x-live-driver-eta');
+    var badgeEl = document.getElementById('x-live-gps-badge');
+
+    // 1. Driver clicked "Sudah Sampai" OR GPS is within 35 meters of destination
+    var driverClickedArrived = Boolean(delivery.arrived_at);
+    var gpsArrived = Number.isFinite(distMeters) && distMeters <= 35;
+
+    if (driverClickedArrived || gpsArrived) {
+      if (etaEl) {
+        etaEl.textContent = '🔔 Kurir sudah sampai di titik tujuan!';
+        etaEl.style.color = '#15803d';
+      }
+      if (badgeEl) {
+        badgeEl.textContent = '🔔 Kurir Sudah Sampai';
+        badgeEl.style.background = '#dcfce7';
+        badgeEl.style.color = '#15803d';
+      }
+      try {
+        if (sessionStorage.getItem(arrivedKey) !== '1') {
+          sessionStorage.setItem(arrivedKey, '1');
+          playArrivedMp3Alert();
+          showProximityPopupModal('arrived', order, delivery, distMeters);
+          triggerSystemNotification(
+            'Pesanan Anda Sudah Sampai! 🔔',
+            (delivery.driver_name || 'Kurir') + ' sudah berada di titik pengantaran.',
+            'xentra-arrived-' + orderId
+          );
+        }
+      } catch (_) {}
+      return;
+    }
+
+    // 2. Driver is approaching on the road (<= 200 meters)
+    if (Number.isFinite(distMeters) && distMeters <= 200) {
+      if (etaEl) {
+        etaEl.textContent = '🛵 Hampir sampai (~' + Math.max(15, Math.round(distMeters)) + ' m lagi)';
+        etaEl.style.color = '#d97706';
+      }
+      if (badgeEl) {
+        badgeEl.textContent = '🛵 Hampir Sampai (' + Math.max(15, Math.round(distMeters)) + ' m)';
+        badgeEl.style.background = '#fef3c7';
+        badgeEl.style.color = '#b45309';
+      }
+      try {
+        if (sessionStorage.getItem(nearKey) !== '1') {
+          sessionStorage.setItem(nearKey, '1');
+          playApproachingChime();
+          showProximityPopupModal('approaching', order, delivery, distMeters);
+          triggerSystemNotification(
+            'Kurir Sebentar Lagi Sampai! 🛵',
+            (delivery.driver_name || 'Kurir') + ' berjarak sekitar ' + Math.round(distMeters) + 'm dari lokasimu.',
+            'xentra-near-' + orderId
+          );
+        }
+      } catch (_) {}
+    }
+  }
 
   var MAPBOX_VERSION = '3.4.0';
   var MAPBOX_TOKEN = (window.XentraConfig && window.XentraConfig.mapboxToken) ||
@@ -350,7 +614,7 @@
         if (!route || !route.geometry) return;
 
         var etaEl = document.getElementById('x-live-driver-eta');
-        if (etaEl && Number.isFinite(route.duration)) {
+        if (etaEl && Number.isFinite(route.duration) && !lastArrivedAt) {
           var mins = Math.max(1, Math.round(route.duration / 60));
           var km = (route.distance / 1000).toFixed(1);
           etaEl.textContent = 'Estimasi tiba ~' + mins + ' menit (' + km + ' km)';
@@ -1201,9 +1465,12 @@
 
     lastDeliveryStatus = delivery.status || null;
     lastDriverName = delivery.driver_name || null;
+    lastArrivedAt = delivery.arrived_at || null;
+    lastOrderSnapshot = order;
 
     if (hasLiveMap) {
       initCustomerTrackingMap(delivery);
+      evaluateDriverProximityAlerts(order, delivery);
     } else {
       cleanupTrackingMap();
     }
@@ -1703,6 +1970,7 @@
           var newPayStatus = (data.payment && data.payment.payment_status) || data.order.payment_status || 'pending';
           var newDelStatus = (data.delivery && data.delivery.status) || null;
           var newDriverName = (data.delivery && data.delivery.driver_name) || null;
+          var newArrivedAt = (data.delivery && data.delivery.arrived_at) || null;
 
           if (newStatus !== currentStatus || newPayStatus !== currentPayStatus || newDelStatus !== lastDeliveryStatus || newDriverName !== lastDriverName) {
             stopTimers();
@@ -1712,8 +1980,12 @@
             if (!TERMINAL_STATES[newStatus] && !['deny', 'cancel', 'expire'].includes(newPayStatus)) {
               schedulePolling(newStatus, newPayStatus, data.order.acceptance_deadline_at);
             }
-          } else if (data.delivery && trackingMapState.map) {
-            updateLiveDriverPosition(data.delivery);
+          } else if (data.delivery) {
+            lastArrivedAt = newArrivedAt;
+            if (trackingMapState.map || trackingMapState.fallbackMode) {
+              updateLiveDriverPosition(data.delivery);
+            }
+            evaluateDriverProximityAlerts(data.order || lastOrderSnapshot, data.delivery);
           }
         })
         .catch(function () {});

@@ -219,6 +219,62 @@ router.delete('/admin/categories/:id', requireAuth(['owner', 'brand_manager']), 
       return res.status(404).json({ success: false, error: 'Kategori tidak ditemukan.' });
     }
 
+    const cascade = req.query && (req.query.cascade === '1' || req.query.cascade === 'true');
+
+    if (cascade) {
+      db.exec('BEGIN IMMEDIATE;');
+      try {
+        const subCats = db.prepare('SELECT id FROM sub_categories WHERE category_id = ? AND brand_id = ?').all(req.params.id, req.brand_id);
+        const subCatIds = (subCats || []).map(sc => sc.id);
+
+        let menusToDelete = [];
+        try {
+          if (subCatIds.length > 0) {
+            const placeholders = subCatIds.map(() => '?').join(', ');
+            menusToDelete = db.prepare(
+              `SELECT id FROM menus WHERE brand_id = ? AND (category_id = ? OR sub_category_id IN (${placeholders}))`
+            ).all(req.brand_id, req.params.id, ...subCatIds);
+          } else {
+            menusToDelete = db.prepare(
+              'SELECT id FROM menus WHERE brand_id = ? AND category_id = ?'
+            ).all(req.brand_id, req.params.id);
+          }
+        } catch (_) {}
+
+        for (const m of (menusToDelete || [])) {
+          try { db.prepare('DELETE FROM branch_menu_categories WHERE menu_id = ?').run(m.id); } catch (_) {}
+          try { db.prepare('DELETE FROM branch_menus WHERE menu_id = ?').run(m.id); } catch (_) {}
+          try { db.prepare('DELETE FROM menu_items WHERE menu_id = ?').run(m.id); } catch (_) {}
+          try { db.prepare('DELETE FROM menus WHERE id = ? AND brand_id = ?').run(m.id, req.brand_id); } catch (_) {}
+        }
+
+        try {
+          db.prepare('UPDATE products SET category_id = NULL WHERE category_id = ? AND brand_id = ?').run(req.params.id, req.brand_id);
+        } catch (_) {}
+
+        try {
+          db.prepare('DELETE FROM sub_categories WHERE category_id = ? AND brand_id = ?').run(req.params.id, req.brand_id);
+        } catch (_) {}
+
+        const stmt = db.prepare('DELETE FROM categories WHERE id = ? AND brand_id = ?').run(req.params.id, req.brand_id);
+        db.exec('COMMIT;');
+
+        if (!stmt || stmt.changes === 0) {
+          return res.status(404).json({ success: false, error: 'Kategori tidak ditemukan atau gagal dihapus.' });
+        }
+
+        return res.json({
+          success: true,
+          deleted: true,
+          deleted_menus_count: (menusToDelete || []).length,
+          message: `Kategori "${existing.name}" beserta menunya berhasil dihapus.`
+        });
+      } catch (txErr) {
+        try { db.exec('ROLLBACK;'); } catch (_) {}
+        throw txErr;
+      }
+    }
+
     // 1. Cek apakah ada Menu Master aktif yang menggunakan kategori ini secara langsung
     try {
       const menuUsage = db.prepare(

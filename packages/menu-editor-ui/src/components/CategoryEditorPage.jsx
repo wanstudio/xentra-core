@@ -163,7 +163,9 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
 
   const handleDelete = async () => {
     if (!isEdit || deleting) return;
-    const confirmDelete = window.confirm(`Hapus kategori "${name}"?\nTindakan ini tidak dapat dibatalkan.`);
+    const confirmDelete = window.confirm(
+      `Hapus kategori "${name}"?\nJika dihapus, kategori dan seluruh isi menunya akan ikut terhapus.`
+    );
     if (!confirmDelete) return;
 
     setDeleting(true);
@@ -172,7 +174,7 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
       const headers = { 'Accept': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const res = await fetch(`/api/v1/admin/categories/${encodeURIComponent(categoryId)}`, {
+      const res = await fetch(`/api/v1/admin/categories/${encodeURIComponent(categoryId)}?cascade=1`, {
         method: 'DELETE',
         headers,
       });
@@ -188,6 +190,12 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
 
       if (window.state && Array.isArray(window.state.categories)) {
         window.state.categories = window.state.categories.filter((c) => String(c.id) !== String(categoryId));
+      }
+      if (window._ownerMasterMenuState && Array.isArray(window._ownerMasterMenuState.menus)) {
+        window._ownerMasterMenuState.menus = window._ownerMasterMenuState.menus.filter((m) => {
+          const cId = m && (m.category_id || (m.category && m.category.id));
+          return String(cId || '') !== String(categoryId);
+        });
       }
 
       if (typeof window.navigateTo === 'function') {
@@ -205,7 +213,7 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
     }
   };
 
-  const titleText = isEdit ? 'Edit kategori' : 'Tambah kategori';
+  const titleText = isEdit ? 'Ubah kategori' : 'Tambah kategori';
 
   return (
     <div
@@ -262,7 +270,9 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
                 placeholder="Cth. Makanan Berat"
                 maxLength={150}
                 required
-                className="w-full h-full px-4 bg-transparent border-none outline-none font-medium text-[#0F172A] text-[13px] placeholder:text-[#94A3B8]"
+                className={`w-full h-full px-4 bg-transparent border-none outline-none text-[#0F172A] placeholder:text-[#94A3B8] placeholder:font-medium placeholder:text-[13px] ${
+                  name.length > 0 ? 'font-bold text-base' : 'font-medium text-[13px]'
+                }`}
               />
             </div>
 
@@ -299,16 +309,43 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
             </button>
           </div>
 
-          {/* Optional Delete Button when in Edit Mode */}
+          {/* Card 3: Hapus kategori (Only shown when in Edit Mode) */}
           {isEdit && (
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={deleting}
-              className="w-full h-11 rounded-[14px] border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs cursor-pointer transition-all active:scale-98 flex items-center justify-center disabled:opacity-50"
-            >
-              {deleting ? 'Menghapus kategori...' : 'Hapus kategori'}
-            </button>
+            <div className="w-full p-4 bg-white rounded-[14px] hub-inset-stroke flex items-center justify-between gap-4">
+              <div className="flex-1 min-w-0 flex flex-col items-start gap-1 text-left">
+                <span className="w-full text-base font-bold text-black leading-snug">
+                  Hapus kategori
+                </span>
+                <span className="w-full text-[13px] font-medium text-[#94A3B8] leading-snug">
+                  Jika dihapus, kategori dan seluruh isi menunya akan ikut terhapus
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                style={{
+                  width: '70px',
+                  height: '30px',
+                  borderRadius: '20px',
+                  backgroundColor: 'transparent',
+                  boxShadow: 'inset 0 0 0 1px #FA3E3E',
+                  border: 'none',
+                  outline: 'none',
+                  color: '#FA3E3E',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  cursor: deleting ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                className="active:scale-95 transition-transform shrink-0 disabled:opacity-50"
+              >
+                {deleting ? '...' : 'Hapus'}
+              </button>
+            </div>
           )}
         </form>
       )}

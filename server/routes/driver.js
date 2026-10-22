@@ -33,7 +33,7 @@ function registerDriverRoutes(router, deps = {}) {
       'd.destination_longitude, d.actual_road_distance_meters, d.actual_duration_seconds, ' +
       'd.cod_collection_status, d.cod_cash_custody, d.cod_collected_amount, d.cod_amount_tendered, ' +
       'd.cod_change_given, d.cod_handed_over_at, d.cod_handed_over_to, ' +
-      'd.created_at AS delivery_created_at, d.updated_at AS delivery_updated_at, ' +
+      'd.arrived_at, d.created_at AS delivery_created_at, d.updated_at AS delivery_updated_at, ' +
       'o.order_number, o.status AS order_status, o.order_type, o.customer_id, o.customer_name, ' +
       'o.customer_phone, o.recipient_name, o.recipient_phone, o.grand_total, o.payment_method, ' +
       'o.branch_id, b.name AS branch_name, b.address_text AS branch_address, b.latitude AS branch_latitude, b.longitude AS branch_longitude ' +
@@ -100,6 +100,7 @@ function registerDriverRoutes(router, deps = {}) {
       item_count: task.item_count,
       distance_meters: task.actual_road_distance_meters !== null ? Number(task.actual_road_distance_meters) : null,
       duration_seconds: task.actual_duration_seconds !== null ? Number(task.actual_duration_seconds) : null,
+      arrived_at: task.arrived_at || null,
       created_at: task.delivery_created_at,
       updated_at: task.delivery_updated_at
     };
@@ -492,6 +493,31 @@ function registerDriverRoutes(router, deps = {}) {
 
   router.post('/driver/tasks/:orderId/start', driverAuth, (req, res) => {
     executeDeliveryTransition(req, res, DeliveryModel.STATUS.ON_DELIVERY);
+  });
+
+  router.post('/driver/tasks/:orderId/arrived', driverAuth, (req, res) => {
+    try {
+      const driverId = actorId(req);
+      const branchId = req.user.branchId || req.user.branch_id;
+      const task = getTask(req.params.orderId, driverId, req.brand_id, branchId);
+      if (!task) {
+        return res.status(404).json({
+          success: false,
+          code: 'DRIVER_TASK_NOT_FOUND',
+          error: 'Tugas pengantaran tidak ditemukan atau bukan milik Driver ini.'
+        });
+      }
+      const now = new Date().toISOString();
+      db.prepare('UPDATE order_deliveries SET arrived_at = ?, updated_at = ? WHERE order_id = ?').run(now, now, req.params.orderId);
+      const refreshed = getTask(req.params.orderId, driverId, req.brand_id, branchId);
+      res.json({ success: true, arrived_at: now, task: shapeTask(refreshed) });
+    } catch (err) {
+      res.status(err.status || 500).json({
+        success: false,
+        code: err.code || 'DRIVER_ARRIVED_FAILED',
+        error: err.message
+      });
+    }
   });
 
   router.post('/driver/tasks/:orderId/complete', driverAuth, (req, res) => {
