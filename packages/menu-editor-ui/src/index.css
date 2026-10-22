@@ -63,3 +63,15 @@
 .animate-sticky-swipe-up {
   animation: stickySwipeUp 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
+
+/* Ensure modern categories tab has no transform that would trap fixed positioning or squeeze mobile padding */
+#tab-catalog-categories {
+  transform: none !important;
+  animation: none !important;
+}
+
+body.x-owner-mobile-app #tab-catalog-categories,
+.x-tab-content#tab-catalog-categories {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
