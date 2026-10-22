@@ -75,7 +75,6 @@
 }
 
 body.x-categories-active .x-dash-main,
-body:has(#modern-categories-page-mount) .x-dash-main,
 #tab-catalog-categories,
 body.x-owner-mobile-app #tab-catalog-categories,
 .x-tab-content#tab-catalog-categories,

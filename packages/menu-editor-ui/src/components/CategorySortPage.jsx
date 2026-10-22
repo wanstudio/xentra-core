@@ -237,11 +237,9 @@ export default function CategorySortPage({ onBack, onSaved }) {
     <div
       id="modern-category-sort-page-root"
       style={{
-        marginLeft: '16px',
-        marginRight: '16px',
         boxSizing: 'border-box'
       }}
-      className="mx-4 flex flex-col gap-4 pb-36 max-w-lg md:mx-auto font-sans select-none"
+      className="w-full flex flex-col gap-4 pb-36 max-w-lg md:mx-auto font-sans select-none"
     >
       {/* 1. Header with Back Arrow and Title */}
       <div className="flex items-center gap-3 mb-2 pt-1">

@@ -114,6 +114,28 @@
     var productDetail = $('product-detail-view');
     var productEditor = $('product-editor-view');
 
+    var currentHash = (window.location.hash || '').replace(/^#\/?/, '');
+    if (currentHash === 'catalog/categories/sort' || currentHash === 'catalog/categories/reorder') {
+      if (modernMount && typeof window.mountCategorySortPage === 'function') {
+        modernMount.style.display = 'block';
+        if (page) page.style.display = 'none';
+        window.mountCategorySortPage(modernMount, {
+          onBack: function() {
+            navigateTo('catalog/categories');
+          },
+          onSaved: function() {
+            navigateTo('catalog/categories');
+          }
+        });
+        if (modernItemMount) modernItemMount.style.display = 'none';
+        if (catEditor) catEditor.style.display = 'none';
+        if (productList) productList.style.display = 'none';
+        if (productDetail) productDetail.style.display = 'none';
+        if (productEditor) productEditor.style.display = 'none';
+        return;
+      }
+    }
+
     if (modernMount && typeof window.mountCategoriesPage === 'function') {
       modernMount.style.display = 'block';
       if (page) page.style.display = 'none';

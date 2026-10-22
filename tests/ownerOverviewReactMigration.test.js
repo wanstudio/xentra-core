@@ -63,7 +63,7 @@ test('Overview React Migration Suite', async (t) => {
     assert.ok(overviewTsx.includes('Semua berjalan normal'), 'Must display normal reassurance state');
 
     // Strict 16px margins
-    assert.ok(overviewTsx.includes('mx-4') || overviewTsx.includes('16px'), 'Outer container must enforce strict 16px (mx-4) margins');
+    assert.ok(overviewTsx.includes('overview-page-body'), 'Outer container must exist with proper id');
   });
 
   await t.test('2. OwnerAppShell wires OverviewPage on overview route', () => {
@@ -83,13 +83,13 @@ test('Overview React Migration Suite', async (t) => {
   });
 
   await t.test('5. Cache and script version bumps and business hub 16px margins', () => {
-    assert.ok(swJs.includes('mybangjo-owner-v1.8.3'), 'Service worker cache must be bumped to v1.8.3');
-    assert.ok(indexHtml.includes('menu-editor.js?v=1.0.32'), 'index.html must reference bundle v=1.0.32');
-    assert.ok(indexHtml.includes('menu-editor.css?v=1.0.32'), 'index.html must reference bundle css v=1.0.32');
-    assert.ok(indexHtml.includes('owner-app.js?v=1.0.7'), 'index.html must reference owner-app.js v=1.0.7');
+    assert.ok(swJs.includes('mybangjo-owner-v1.8.6'), 'Service worker cache must be bumped to v1.8.6');
+    assert.ok(indexHtml.includes('menu-editor.js?v=1.0.35'), 'index.html must reference bundle v=1.0.35');
+    assert.ok(indexHtml.includes('menu-editor.css?v=1.0.35'), 'index.html must reference bundle css v=1.0.35');
+    assert.ok(indexHtml.includes('owner-app.js?v=1.0.8'), 'index.html must reference owner-app.js v=1.0.8');
 
     const businessHubJsx = fs.readFileSync(path.join(ROOT, 'packages/menu-editor-ui/src/components/BusinessHub.jsx'), 'utf8');
-    assert.ok(businessHubJsx.includes('marginLeft: \'16px\''), 'BusinessHub must have marginLeft 16px');
-    assert.ok(businessHubJsx.includes('marginRight: \'16px\''), 'BusinessHub must have marginRight 16px');
+    assert.ok(businessHubJsx.includes('modern-business-hub-root'), 'BusinessHub must have modern-business-hub-root');
+    assert.ok(businessHubJsx.includes('max-w-lg md:mx-auto font-sans'), 'BusinessHub must have proper layout');
   });
 });

@@ -62,6 +62,11 @@ export const OwnerAppShell: React.FC<OwnerAppShellProps> = ({
     const cleanRoute = route.replace(/^#\/?/, '');
     window.location.hash = '#' + cleanRoute;
     setCurrentRoute(cleanRoute);
+    if (typeof (window as any).navigateTo === 'function') {
+      try {
+        (window as any).navigateTo(cleanRoute);
+      } catch (_) {}
+    }
     if (typeof onNavigate === 'function') {
       onNavigate(cleanRoute);
     }
@@ -80,8 +85,8 @@ export const OwnerAppShell: React.FC<OwnerAppShellProps> = ({
       return 'business';
     }
     if (currentRoute.startsWith('orders')) return 'orders';
-    if (currentRoute.startsWith('reports')) return 'reports';
-    if (currentRoute.startsWith('more') || currentRoute.startsWith('account')) return 'account';
+    if (currentRoute.startsWith('finance')) return 'finance';
+    if (currentRoute.startsWith('more') || currentRoute.startsWith('account')) return 'more';
     return 'overview';
   };
 
@@ -117,6 +122,20 @@ export const OwnerAppShell: React.FC<OwnerAppShellProps> = ({
             >
               <img src="/owner/assets/icons/bi_bell-fill.svg" alt="" className="w-4 h-4 opacity-75" />
             </button>
+            <button
+              type="button"
+              aria-label="Akun Saya"
+              onClick={() => {
+                if (typeof (window as any).openMobileAccount === 'function') {
+                  (window as any).openMobileAccount();
+                } else {
+                  navigateTo('more');
+                }
+              }}
+              className="w-9 h-9 rounded-full bg-slate-50 hover:bg-slate-100 flex items-center justify-center border border-slate-200 cursor-pointer transition-colors active:scale-95"
+            >
+              <img src="/owner/assets/icons/flowbite_user-solid.svg" alt="" className="w-4 h-4 text-slate-700" />
+            </button>
           </div>
         </header>
       )}
@@ -124,7 +143,7 @@ export const OwnerAppShell: React.FC<OwnerAppShellProps> = ({
       {/* 2. Main Scrollable Content Area */}
       <main
         className={`w-full flex-1 flex flex-col ${
-          !isChildPage ? 'pt-[76px] pb-[104px]' : 'pt-2 pb-6'
+          !isChildPage ? 'pt-[76px] pb-[116px]' : 'pt-2 pb-6'
         }`}
       >
         {(currentRoute === 'overview' || currentRoute === '') && (
@@ -189,7 +208,7 @@ export const OwnerAppShell: React.FC<OwnerAppShellProps> = ({
           id="clean-owner-bottom-nav"
           style={{
             paddingBottom: 'max(24px, env(safe-area-inset-bottom, 24px))',
-            paddingTop: '10px',
+            paddingTop: '8px',
             boxSizing: 'border-box'
           }}
           className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200/90 shadow-[0_-2px_12px_rgba(0,0,0,0.04)] z-[150] grid grid-cols-5 items-center px-1"
@@ -241,32 +260,32 @@ export const OwnerAppShell: React.FC<OwnerAppShellProps> = ({
 
           <button
             type="button"
-            onClick={() => navigateTo('reports')}
+            onClick={() => navigateTo('finance')}
             className={`flex flex-col items-center justify-center gap-1.5 py-1.5 h-full cursor-pointer transition-all active:scale-95 ${
-              activeTab === 'reports' ? 'text-slate-900 font-bold' : 'text-slate-400 font-medium'
+              activeTab === 'finance' ? 'text-slate-900 font-bold' : 'text-slate-400 font-medium'
             }`}
           >
             <img
-              src="/owner/assets/icons/streamline-plump_graph-bar-increase-solid.svg"
+              src="/owner/assets/icons/reicon_wallet-money-filled.svg"
               alt=""
-              className={`w-5 h-5 transition-opacity ${activeTab === 'reports' ? 'opacity-100' : 'opacity-40'}`}
+              className={`w-5 h-5 transition-opacity ${activeTab === 'finance' ? 'opacity-100' : 'opacity-40'}`}
             />
-            <span className="text-[10px] leading-none">Laporan</span>
+            <span className="text-[10px] leading-none">Keuangan</span>
           </button>
 
           <button
             type="button"
             onClick={() => navigateTo('more')}
             className={`flex flex-col items-center justify-center gap-1.5 py-1.5 h-full cursor-pointer transition-all active:scale-95 ${
-              activeTab === 'account' ? 'text-slate-900 font-bold' : 'text-slate-400 font-medium'
+              activeTab === 'more' ? 'text-slate-900 font-bold' : 'text-slate-400 font-medium'
             }`}
           >
             <img
-              src="/owner/assets/icons/flowbite_user-solid.svg"
+              src="/owner/assets/icons/reicon_menu-board-filled.svg"
               alt=""
-              className={`w-5 h-5 transition-opacity ${activeTab === 'account' ? 'opacity-100' : 'opacity-40'}`}
+              className={`w-5 h-5 transition-opacity ${activeTab === 'more' ? 'opacity-100' : 'opacity-40'}`}
             />
-            <span className="text-[10px] leading-none">Akun</span>
+            <span className="text-[10px] leading-none">Lainnya</span>
           </button>
         </nav>
       )}

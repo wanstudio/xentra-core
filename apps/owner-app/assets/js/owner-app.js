@@ -71,6 +71,9 @@
                 initialRoute: hash || 'overview',
                 onNavigate: function (r) {
                   window.location.hash = '#' + r;
+                  if (typeof window.navigateTo === 'function') {
+                    try { window.navigateTo(r); } catch (_) {}
+                  }
                 }
               });
               return true;
@@ -89,13 +92,16 @@
             }, 50);
           }
         } else {
-          // When returning to legacy routes (orders, reports, more)
+          // When returning to legacy routes (orders, reports, more, finance, etc.)
           cleanMount.style.display = 'none';
           if (dashMain) dashMain.style.display = '';
           if (dashTopBar) dashTopBar.style.display = '';
           if (bottomNav) bottomNav.style.display = '';
           if (typeof window.unmountOwnerAppShell === 'function') {
             window.unmountOwnerAppShell(cleanMount);
+          }
+          if (typeof window.navigateTo === 'function') {
+            try { window.navigateTo(hash); } catch (_) {}
           }
         }
       }

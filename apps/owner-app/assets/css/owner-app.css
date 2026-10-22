@@ -24,7 +24,7 @@ body.x-owner-mobile-app {
   -webkit-tap-highlight-color: transparent;
   user-select: none;
   overflow-x: hidden;
-  padding-bottom: 72px; /* Space for fixed bottom nav */
+  padding-bottom: max(116px, calc(96px + env(safe-area-inset-bottom, 24px))) !important; /* Space for fixed bottom nav */
   scroll-padding-top: max(var(--topbar-height-mobile, 68px), calc(var(--topbar-height-mobile, 68px) + env(safe-area-inset-top, 0px)));
 }
 
@@ -53,14 +53,22 @@ body.x-owner-mobile-app .x-owner-bottom-nav {
   min-width: 100% !important;
   margin: 0 !important;
   z-index: 200 !important;
-  min-height: 78px !important;
-  padding-top: 10px !important;
-  padding-bottom: 24px !important;
+  min-height: 72px !important;
+  padding-top: 8px !important;
   padding-bottom: max(24px, env(safe-area-inset-bottom, 24px)) !important;
   box-sizing: border-box !important;
   background: #ffffff !important;
   border-top: 1px solid #e2e8f0 !important;
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.04) !important;
+}
+
+body.x-owner-mobile-app .x-owner-nav-item {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  padding-top: 4px !important;
+  gap: 3px !important;
 }
 
 body.x-owner-mobile-app.x-hide-bottom-nav .x-owner-bottom-nav,
@@ -106,9 +114,9 @@ body.x-owner-mobile-app .bm-orders-mobile-cards {
 body.x-owner-mobile-app .x-dash-main {
   margin: 0 !important;
   padding-top: max(var(--topbar-height-mobile, 68px), calc(var(--topbar-height-mobile, 68px) + env(safe-area-inset-top, 0px))) !important;
-  padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px)) !important;
-  padding-left: 12px !important;
-  padding-right: 12px !important;
+  padding-bottom: max(116px, calc(96px + env(safe-area-inset-bottom, 24px))) !important;
+  padding-left: 16px !important;
+  padding-right: 16px !important;
   width: 100% !important;
   max-width: 100% !important;
   box-sizing: border-box !important;
@@ -732,18 +740,21 @@ body.x-owner-mobile-app #btn-save-master-menu-active,
   }
 
   .x-owner-command-center,
-  #x-owner-command-center {
-    padding-left: 16px !important;
-    padding-right: 16px !important;
-    box-sizing: border-box !important;
-  }
-
+  #x-owner-command-center,
+  #tab-overview,
   #tab-business,
   #owner-business-main-view,
   #modern-business-hub-mount,
-  #subpage-catalog-menu-hub {
+  #subpage-catalog-menu-hub,
+  #tab-catalog-categories,
+  #modern-categories-page-mount,
+  #master-categories-page {
     padding-left: 0 !important;
     padding-right: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
     box-sizing: border-box !important;
   }
 }

@@ -255,12 +255,11 @@ export default function CategoriesPage({ onBack, onNavigate }) {
       }}
       className="relative w-full mx-auto font-sans"
     >
-      {/* BODY: Dari tombol back dan judul sampai card terluar isi yang bisa di scroll (Margin Kanan & Kiri 16px) */}
+      {/* BODY: Dari tombol back dan judul sampai card terluar isi yang bisa di scroll */}
       <div
         id="categories-page-body"
         style={{
-          marginLeft: '16px',
-          marginRight: '16px',
+          width: '100%',
           boxSizing: 'border-box'
         }}
       >

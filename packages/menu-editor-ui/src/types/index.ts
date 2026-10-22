@@ -1,15 +1,18 @@
-export type MainTab = 'overview' | 'business' | 'orders' | 'reports' | 'account';
+export type MainTab = 'overview' | 'business' | 'orders' | 'finance' | 'more' | 'reports' | 'account';
 
 export type SubRoute =
   | 'overview'
   | 'business'
   | 'business/catalog'
   | 'catalog/categories'
+  | 'catalog/categories/sort'
   | 'catalog/categories/new'
   | 'catalog/categories/edit'
   | 'catalog/products'
   | 'catalog/menus'
   | 'orders'
+  | 'finance'
+  | 'more'
   | 'reports'
   | 'account';
 

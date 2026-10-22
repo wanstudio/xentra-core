@@ -57,11 +57,9 @@ export default function CatalogSubHub({ onBack, onNavigate }) {
     <div
       id="modern-catalog-subhub-root"
       style={{
-        marginLeft: '16px',
-        marginRight: '16px',
         boxSizing: 'border-box'
       }}
-      className="mx-4 flex flex-col gap-4 pb-12 max-w-lg md:mx-auto font-sans select-none"
+      className="w-full flex flex-col gap-4 pb-12 max-w-lg md:mx-auto font-sans select-none"
     >
       {/* 1. Header with Back Arrow and Title */}
       <div className="flex items-center gap-3 mb-6 pt-1">
