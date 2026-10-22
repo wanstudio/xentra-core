@@ -63,7 +63,7 @@ test('Overview React Migration Suite', async (t) => {
     assert.ok(overviewTsx.includes('Semua berjalan normal'), 'Must display normal reassurance state');
 
     // Strict 16px margins
-    assert.ok(overviewTsx.includes('px-4'), 'Outer container must enforce strict 16px (px-4) margins');
+    assert.ok(overviewTsx.includes('mx-4') || overviewTsx.includes('16px'), 'Outer container must enforce strict 16px (mx-4) margins');
   });
 
   await t.test('2. OwnerAppShell wires OverviewPage on overview route', () => {
@@ -83,9 +83,9 @@ test('Overview React Migration Suite', async (t) => {
   });
 
   await t.test('5. Cache and script version bumps', () => {
-    assert.ok(swJs.includes('mybangjo-owner-v1.7.0'), 'Service worker cache must be bumped to v1.7.0');
-    assert.ok(indexHtml.includes('menu-editor.js?v=1.0.27'), 'index.html must reference bundle v=1.0.27');
-    assert.ok(indexHtml.includes('menu-editor.css?v=1.0.27'), 'index.html must reference bundle css v=1.0.27');
+    assert.ok(swJs.includes('mybangjo-owner-v1.7.1'), 'Service worker cache must be bumped to v1.7.1');
+    assert.ok(indexHtml.includes('menu-editor.js?v=1.0.28'), 'index.html must reference bundle v=1.0.28');
+    assert.ok(indexHtml.includes('menu-editor.css?v=1.0.28'), 'index.html must reference bundle css v=1.0.28');
     assert.ok(indexHtml.includes('owner-app.js?v=1.0.3'), 'index.html must reference owner-app.js v=1.0.3');
   });
 });

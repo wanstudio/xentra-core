@@ -171,7 +171,15 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
   };
 
   return (
-    <div className="w-full px-4 flex flex-col gap-4 pb-12 max-w-lg mx-auto select-none">
+    <div
+      id="overview-page-body"
+      style={{
+        marginLeft: '16px',
+        marginRight: '16px',
+        boxSizing: 'border-box'
+      }}
+      className="mx-4 flex flex-col gap-4 pb-12 max-w-lg md:mx-auto select-none"
+    >
       {/* 1. Period Selector & Filter Header */}
       <div className="flex items-center justify-between gap-2 pt-1 relative">
         <div className="relative">
