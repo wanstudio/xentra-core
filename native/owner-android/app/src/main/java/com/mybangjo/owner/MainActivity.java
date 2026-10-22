@@ -108,6 +108,8 @@ public class MainActivity extends AppCompatActivity {
 
         setupSwipeRefresh();
         setupWebView();
+        updateStatusBar("#ffffff", true);
+        updateNavigationBar("#ffffff", true);
         requestNecessaryPermissions();
         checkOverlayPermission();
         checkBatteryOptimization();
@@ -186,6 +188,10 @@ public class MainActivity extends AppCompatActivity {
                 try {
                     int color = Color.parseColor(hexColor);
                     getWindow().setNavigationBarColor(color);
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        getWindow().setNavigationBarContrastEnforced(false);
+                    }
 
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                         WindowInsetsController controller = getWindow().getInsetsController();
