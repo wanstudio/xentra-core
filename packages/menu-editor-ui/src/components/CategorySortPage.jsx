@@ -263,44 +263,53 @@ export default function CategorySortPage({ onBack, onSaved }) {
       {/* 2. Main Card Panel with Outline / Inset Stroke */}
       <div
         ref={listContainerRef}
-        className="w-full rounded-2xl p-4 bg-white hub-inset-stroke flex flex-col gap-3.5 border border-zinc-300 shadow-xs"
+        className="w-full rounded-[14px] p-4 bg-white hub-inset-stroke flex flex-col gap-4"
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
         {/* Instruction Header Row */}
-        <div className="flex items-center gap-2 pb-1">
-          <div className="w-5 h-5 flex items-center justify-center shrink-0">
-            {/* Gesture / Drag Hand Icon matching Figma */}
+        <div className="w-full flex items-center justify-start gap-2">
+          <div className="w-[25px] h-[25px] relative flex items-center justify-center shrink-0 overflow-hidden">
+            {/* Gesture / Drag Hand Icon matching Figma (25x25 frame, #0F172A) */}
             <svg
-              width="18"
-              height="18"
+              width="22"
+              height="22"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="#0F172A"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+              xmlns="http://www.w3.org/2000/svg"
             >
-              <polyline points="7 10 12 15 17 10" />
-              <polyline points="7 14 12 9 17 14" />
+              <path
+                d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v6M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"
+                stroke="#0F172A"
+                strokeWidth="1.9"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"
+                stroke="#0F172A"
+                strokeWidth="1.9"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
           </div>
-          <span className="text-slate-400 text-xs font-bold leading-none">
+          <span className="text-[#94A3B8] text-[11px] font-bold leading-snug text-left">
             Tekan dan geser untuk mengatur urutan kategori
           </span>
         </div>
 
         {/* Categories List */}
         {loading ? (
-          <div className="py-12 text-center text-sm text-slate-400 font-medium">
+          <div className="py-12 text-center text-sm text-[#94A3B8] font-medium">
             Memuat kategori...
           </div>
         ) : categories.length === 0 ? (
-          <div className="py-12 text-center text-sm text-slate-400 font-medium">
+          <div className="py-12 text-center text-sm text-[#94A3B8] font-medium">
             Belum ada kategori untuk diurutkan.
           </div>
         ) : (
-          <div className="flex flex-col gap-3 w-full">
+          <div className="flex flex-col gap-4 w-full">
             {categories.map((cat, index) => {
               const isDragging = draggedIndex === index;
               const isOver = dragOverIndex === index && !isDragging;
@@ -315,7 +324,7 @@ export default function CategorySortPage({ onBack, onSaved }) {
                   onDragOver={(e) => handleDragOver(e, index)}
                   onDrop={(e) => handleDrop(e, index)}
                   onDragEnd={handleDragEnd}
-                  className={`w-full p-4 rounded-xl border border-slate-300 bg-white flex items-center justify-between gap-4 select-none transition-all ${
+                  className={`w-full p-4 rounded-[12px] border border-[#CBD5E1] bg-white flex items-center justify-between gap-4 select-none transition-all ${
                     isDragging
                       ? 'opacity-60 shadow-md border-emerald-500 scale-[0.99] bg-slate-50'
                       : isOver
@@ -325,35 +334,36 @@ export default function CategorySortPage({ onBack, onSaved }) {
                 >
                   {/* Category Info */}
                   <div className="flex-1 min-w-0 flex flex-col justify-start items-start gap-1">
-                    <div className="text-slate-900 text-base font-bold leading-snug truncate w-full text-left">
+                    <div className="text-[#0F172A] text-base font-bold leading-snug truncate w-full text-left">
                       {cat.name}
                     </div>
-                    <div className="text-slate-400 text-xs font-medium truncate w-full max-w-[260px] text-left">
+                    <div className="text-[#94A3B8] text-[13px] font-medium leading-snug truncate w-full max-w-[160px] text-left">
                       {snippet}
                     </div>
                   </div>
 
-                  {/* Drag Handle Grip Icon */}
+                  {/* Drag Handle Grip Icon (13x13 box, 10.16x4.88 inner bars #303030) */}
                   <div
                     onTouchStart={(e) => handleTouchStart(e, index)}
-                    className="w-7 h-7 flex items-center justify-center shrink-0 text-zinc-800 cursor-grab active:cursor-grabbing hover:bg-slate-100 rounded-lg transition-colors p-1"
+                    className="w-7 h-7 -mr-1.5 flex items-center justify-center shrink-0 text-[#303030] cursor-grab active:cursor-grabbing rounded-lg transition-colors"
                     title="Geser untuk mengatur urutan"
                   >
-                    <svg
-                      width="18"
-                      height="12"
-                      viewBox="0 0 18 12"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="pointer-events-none select-none"
-                    >
-                      <path
-                        d="M1 2.5H17M1 9.5H17"
-                        stroke="#27272A"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                      />
-                    </svg>
+                    <div className="w-[13px] h-[13px] relative flex items-center justify-center pointer-events-none select-none">
+                      <svg
+                        width="13"
+                        height="13"
+                        viewBox="0 0 13 13"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M1.42 4.5H11.58M1.42 8.5H11.58"
+                          stroke="#303030"
+                          strokeWidth="1.6"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    </div>
                   </div>
                 </div>
               );
@@ -374,16 +384,15 @@ export default function CategorySortPage({ onBack, onSaved }) {
           backgroundColor: '#ffffff',
           borderTopLeftRadius: '20px',
           borderTopRightRadius: '20px',
-          borderTop: '1px solid rgba(203, 213, 225, 0.9)',
-          boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.08)',
+          boxShadow: '0px 0px 15px rgba(0, 0, 0, 0.15)',
           zIndex: 200,
           paddingTop: '24px',
-          paddingBottom: 'max(20px, env(safe-area-inset-bottom, 20px))',
+          paddingBottom: 'max(24px, env(safe-area-inset-bottom, 24px))',
           paddingLeft: '16px',
           paddingRight: '16px',
           boxSizing: 'border-box'
         }}
-        className="w-full bg-white rounded-t-[20px] border-t border-slate-200/90 z-[200]"
+        className="w-full bg-white rounded-t-[20px] z-[200]"
       >
         <div className="w-full max-w-lg mx-auto">
           <button
@@ -394,10 +403,10 @@ export default function CategorySortPage({ onBack, onSaved }) {
               width: '100%',
               height: '48px',
               borderRadius: '9999px',
-              border: hasChanged ? 'none' : '1px solid #E4E4E7',
+              border: 'none',
               outline: 'none',
-              backgroundColor: hasChanged ? '#00A637' : '#F4F4F5',
-              color: hasChanged ? '#FFFFFF' : '#A1A1AA',
+              backgroundColor: hasChanged ? '#00A637' : '#F2F2F2',
+              color: hasChanged ? '#FFFFFF' : '#979797',
               fontWeight: 700,
               fontSize: '14px',
               cursor: hasChanged && !isSaving ? 'pointer' : 'not-allowed',
