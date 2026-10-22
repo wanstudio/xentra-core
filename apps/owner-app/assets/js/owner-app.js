@@ -42,7 +42,11 @@
 
       function handleRouting() {
         var hash = (window.location.hash || '').replace(/^#\/?/, '');
-        var isModernRoute = hash.startsWith('catalog') || hash.startsWith('business');
+        var isModernRoute =
+          hash.startsWith('catalog') ||
+          hash.startsWith('business') ||
+          hash === 'overview' ||
+          hash === '';
 
         var dashMain = document.querySelector('.x-dash-main');
         var dashTopBar = document.querySelector('.x-dash-topbar, .x-owner-mobile-topbar');

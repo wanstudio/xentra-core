@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import OverviewPage from '../components/OverviewPage';
 import CategoriesPage from '../components/CategoriesPage';
 import CategoryEditorPage from '../components/CategoryEditorPage';
 import ItemMasterPage from '../components/ItemMasterPage';
@@ -118,6 +119,12 @@ export const OwnerAppShell: React.FC<OwnerAppShellProps> = ({
           !isChildPage ? 'pt-[76px] pb-[88px]' : 'pt-2 pb-6'
         }`}
       >
+        {(currentRoute === 'overview' || currentRoute === '') && (
+          <OverviewPage
+            onNavigate={(r) => navigateTo(r)}
+          />
+        )}
+
         {currentRoute === 'catalog/categories' && (
           <CategoriesPage
             onBack={() => navigateTo('business/catalog')}
