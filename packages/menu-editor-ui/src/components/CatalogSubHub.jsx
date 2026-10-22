@@ -4,29 +4,22 @@ const catalogItems = [
   {
     id: 'categories',
     title: 'Kategori & Menu',
-    description: 'Kelola etalase, pengelompokan, dan daftar menu komersial',
+    description: 'Kelola kategori dan daftar menu untuk seluruh cabang restoran Anda',
     color: 'bg-[#34A853]',
     icon: '/owner/assets/icons/bxs_category.svg',
     iconAlt: 'Ikon Kategori & Menu',
+    iconClassName: 'w-[25px] h-[25px] object-contain filter brightness-0 invert',
     route: '#catalog/categories',
   },
   {
     id: 'products',
     title: 'Item Master',
     description: 'Product yang sama dapat digunakan berulang untuk menyusun menu',
-    color: 'bg-[#4285F4]',
+    color: 'bg-[#EA4335]',
     icon: '/owner/assets/icons/mdi_food-drumstick.svg',
     iconAlt: 'Ikon Item Master',
+    iconClassName: 'w-[24px] h-[24px] object-contain filter brightness-0 invert',
     route: '#catalog/products',
-  },
-  {
-    id: 'master-menus',
-    title: 'Menu Master',
-    description: 'Kelola menu yang akan dijual kepada pelanggan',
-    color: 'bg-[#EA4335]',
-    icon: '/owner/assets/icons/reicon_food-tray-filled.svg',
-    iconAlt: 'Ikon Menu Master',
-    route: '#catalog/master-menus',
   },
 ];
 
@@ -80,7 +73,7 @@ export default function CatalogSubHub({ onBack, onNavigate }) {
         </h1>
       </div>
 
-      {/* 2. The 3 Sub-Hub Cards */}
+      {/* 2. The 2 Sub-Hub Cards */}
       <div className="flex flex-col w-full items-start gap-4">
         {catalogItems.map((item) => (
           <button
@@ -97,16 +90,16 @@ export default function CatalogSubHub({ onBack, onNavigate }) {
               <img
                 src={item.icon}
                 alt={item.iconAlt}
-                className="w-6 h-6 object-contain filter brightness-0 invert"
+                className={item.iconClassName || 'w-6 h-6 object-contain filter brightness-0 invert'}
               />
             </span>
 
             {/* Title & Description */}
             <span className="flex flex-col flex-1 min-w-0 items-start gap-1 relative">
-              <span className="relative w-fit mt-[-1.00px] font-bold text-slate-900 text-base tracking-[0] leading-[normal]">
+              <span className="relative w-fit mt-[-1.00px] font-bold text-[#0F172A] text-base tracking-[0] leading-[normal]">
                 {item.title}
               </span>
-              <span className="relative self-stretch font-medium text-slate-400 text-[13px] tracking-[0] leading-snug line-clamp-2">
+              <span className="relative self-stretch font-medium text-[#94A3B8] text-[13px] tracking-[0] leading-snug">
                 {item.description}
               </span>
             </span>

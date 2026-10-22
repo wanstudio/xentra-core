@@ -718,16 +718,42 @@
     var destination = task.destination || {};
     var payment = task.payment || {};
     var newTask = isNewTask(task);
+    var onDelivery = task.delivery_status === 'on_delivery';
+    var btnColor = newTask ? 'blue' : (onDelivery ? 'green' : 'orange');
+    var targetPage = newTask ? 'new-task' : (onDelivery ? 'map' : 'delivery-detail');
+    var btnLabel = newTask ? '✓ Lihat & Terima Tugas' : (onDelivery ? '🗺️ Lanjut Pengantaran' : '📦 Ambil & Mulai Antar');
 
     return '<article class="card task-card">' +
-      '<div class="task-top"><span class="task-id">' + escapeHTML(task.order_number || task.order_id) + '</span><span class="pill ' + (newTask ? 'orange' : 'blue') + '">' + escapeHTML(formatDeliveryStatus(task)) + '</span></div>' +
+      '<div class="task-top"><span class="task-id">' + escapeHTML(task.order_number || task.order_id) + '</span><span class="pill ' + (newTask ? 'blue' : (onDelivery ? 'green' : 'orange')) + '">' + escapeHTML(formatDeliveryStatus(task)) + '</span></div>' +
       '<div class="customer-row"><span class="pin">' + icon('pin') + '</span><div style="min-width:0"><div class="customer-name">' + escapeHTML(customer.name || 'Pelanggan') + '</div><div class="address">' + escapeHTML(destination.address || 'Alamat tujuan belum tersedia') + '</div></div></div>' +
       '<div class="meta-row"><span class="meta-item">' + icon('bag') + ' ' + Number(task.item_count || 0) + ' item</span>' +
       (payment.is_cod ? '<span class="meta-item">🟧 COD ' + rupiah(payment.amount) + '</span>' : '<span class="meta-item">✓ Online</span>') +
       '</div>' +
-      '<button class="primary-btn" data-order="' + escapeHTML(task.order_id) + '" data-page="' + (newTask ? 'new-task' : 'delivery-detail') + '" style="margin-top:14px">' +
-      (newTask ? 'Lihat Tugas' : 'Lihat Pengantaran') + ' ' + icon('arrow') + '</button>' +
+      '<button class="primary-btn ' + btnColor + '" data-order="' + escapeHTML(task.order_id) + '" data-page="' + targetPage + '" style="margin-top:14px">' +
+      btnLabel + ' ' + icon('arrow') + '</button>' +
     '</article>';
+  }
+
+  function renderDriverStepper(currentStep, activeColorClass) {
+    var steps = [
+      { num: 1, label: 'Terima' },
+      { num: 2, label: 'Ambil & Jalan' },
+      { num: 3, label: 'Sampai & Selesai' }
+    ];
+    var html = '<div class="driver-stepper">';
+    for (var i = 0; i < steps.length; i++) {
+      var s = steps[i];
+      var isDone = s.num < currentStep;
+      var isActive = s.num === currentStep;
+      var cls = 'driver-step' + (isDone ? ' done' : '') + (isActive ? (' active ' + (activeColorClass || 'step-blue')) : '');
+      var dotText = isDone ? '✓' : s.num;
+      html += '<div class="' + cls + '"><span class="driver-step-dot">' + dotText + '</span><span>' + s.label + '</span></div>';
+      if (i < steps.length - 1) {
+        html += '<div class="driver-step-line' + (isDone ? ' done' : '') + '"></div>';
+      }
+    }
+    html += '</div>';
+    return html;
   }
 
   function renderTasks() {
@@ -794,15 +820,15 @@
     var hasCoords = d.latitude != null && d.longitude != null;
 
     var body = '<div class="back-row"><button class="back-btn" data-action="back">‹</button><div class="back-title">Tugas Baru</div></div>' +
+      renderDriverStepper(1, 'step-blue') +
       '<div class="card">' +
-        '<div class="task-top"><span class="task-id">Pengantaran ' + escapeHTML(task.order_number || task.order_id) + '</span><span class="pill orange">Menunggu Anda</span></div>' +
+        '<div class="task-top"><span class="task-id">Pengantaran ' + escapeHTML(task.order_number || task.order_id) + '</span><span class="pill blue">Tahap 1 • Tugas Baru</span></div>' +
         '<div class="customer-row"><span class="pin">' + icon('pin') + '</span><div><div class="customer-name">' + escapeHTML(c.name || 'Pelanggan') + '</div><div class="address">' + escapeHTML(d.address || 'Alamat tujuan belum tersedia') + '</div></div></div>' +
         (hasCoords ? '<div id="driver-detail-map" style="height:165px;border-radius:12px;margin-top:12px;background:#e8ece8;border:1px solid #e2e8f0;"></div>' : '') +
-        '<div class="meta-row"><span class="meta-item">⌖ ' + escapeHTML(task.distance_meters ? (Number(task.distance_meters) / 1000).toFixed(1) + ' km' : 'Jarak akan dihitung') + '</span><span class="meta-item">◷ ' + escapeHTML(task.duration_seconds ? Math.round(Number(task.duration_seconds) / 60) + ' menit' : 'ETA akan dihitung') + '</span></div>' +
+        '<div class="meta-row"><span class="meta-item">⌖ ' + escapeHTML(task.distance_meters ? (Number(task.distance_meters) / 1000).toFixed(1) + ' km' : 'Jarak akan dihitung') + '</span><span class="meta-item">◷ ' + escapeHTML(task.duration_seconds ? Math.round(Number(task.duration_seconds) / 60) + ' menit' : 'ETA akan dihitung') + '</span><span class="meta-item">▣ ' + Number(task.item_count || 0) + ' item</span></div>' +
         (p.is_cod ? '<div class="money-card"><div class="money-label">COD / Bayar di Tempat</div><div class="money">' + rupiah(p.amount) + '</div></div>' : '<div class="money-card"><div class="money-label">Pembayaran</div><div class="money">Sudah dibayar</div></div>') +
-        '<div class="info-box"><span>i</span><div>Terima tugas jika Anda siap mengambil pesanan dari cabang dan mengantarkannya ke pelanggan.</div></div>' +
       '</div>' +
-      '<div class="sticky-action"><div class="btn-row"><button class="danger-btn" data-action="reject">× Tolak</button><button class="primary-btn" data-action="accept">✓ Terima Tugas</button></div></div>';
+      '<div class="sticky-action"><div class="btn-row"><button class="danger-btn" data-action="reject">× Tolak</button><button class="primary-btn blue" data-action="accept">✓ Terima Tugas</button></div></div>';
 
     shell('Tugas Baru', body, 'tasks', {hideNav:true});
     if (hasCoords) initializeDetailMap(task);
@@ -818,34 +844,33 @@
     var hasCoords = d.latitude != null && d.longitude != null;
     var action = '';
     var actionLabel = '';
+    var btnColor = 'orange';
 
-    if (isAcceptedAssigned(task)) {
-      action = 'pickup';
-      actionLabel = 'Ambil Pesanan';
-    } else if (task.delivery_status === 'picked_up') {
-      action = 'start-delivery';
-      actionLabel = 'Mulai Antar';
+    if (isAcceptedAssigned(task) || task.delivery_status === 'picked_up') {
+      action = 'pickup-and-start';
+      actionLabel = '📦 Ambil & Mulai Pengantaran';
+      btnColor = 'orange';
     } else if (task.delivery_status === 'on_delivery') {
       action = 'delivery-map';
-      actionLabel = 'Lihat Pengantaran';
+      actionLabel = '🗺️ Buka Layar Pengantaran';
+      btnColor = 'green';
     }
 
-    var statusBox = isAcceptedAssigned(task)
-      ? '<div class="info-box"><span>→</span><div><strong>Tugas Diterima</strong><br>Pesanan siap untuk diambil dari cabang.</div></div>'
-      : task.delivery_status === 'picked_up'
-        ? '<div class="info-box success"><span>✓</span><div><strong>Pesanan Diambil</strong><br>Siap dimulai untuk pengantaran.</div></div>'
-        : '<div class="info-box success"><span>✓</span><div><strong>Sedang Diantar</strong><br>Pengantaran sedang berjalan.</div></div>';
+    var pickupBranch = (task.pickup && task.pickup.branch_name) || 'Cabang';
+    var statusBox = (isAcceptedAssigned(task) || task.delivery_status === 'picked_up')
+      ? '<div class="info-box warning"><span>📦</span><div><strong>Siap Diambil di ' + escapeHTML(pickupBranch) + '</strong><br>Pastikan ' + Number(task.item_count || 0) + ' item sesuai & kemasan baik, lalu ketuk tombol oranye di bawah untuk langsung berangkat.</div></div>'
+      : '<div class="info-box success"><span>🛵</span><div><strong>Sedang Diantar</strong><br>Pengantaran sedang berjalan menuju pelanggan.</div></div>';
 
     var body = '<div class="back-row"><button class="back-btn" data-action="back">‹</button><div class="back-title">Pengantaran ' + escapeHTML(task.order_number || task.order_id) + '</div></div>' +
+      renderDriverStepper(task.delivery_status === 'on_delivery' ? 3 : 2, task.delivery_status === 'on_delivery' ? 'step-green' : 'step-orange') +
       '<div class="card">' + statusBox + '</div>' +
       '<div class="card"><div class="section-title">Tujuan</div><div class="customer-row"><span class="pin">' + icon('pin') + '</span><div style="flex:1"><div class="customer-name">' + escapeHTML(c.name || 'Pelanggan') + '</div><div class="address">' + escapeHTML(d.address || 'Alamat tujuan belum tersedia') + '</div></div><button class="icon-btn" data-action="call" aria-label="Telepon pelanggan">☎</button></div>' +
       (hasCoords ? '<div id="driver-detail-map" style="height:175px;border-radius:12px;margin-top:12px;background:#e8ece8;border:1px solid #e2e8f0;position:relative;overflow:hidden;"></div>' : '') +
       '<button class="secondary-btn" data-action="navigate" style="margin-top:13px">⌖ Buka Navigasi</button></div>' +
-      '<div class="card"><div class="section-title">Pesanan</div><div class="meta-row"><span class="meta-item">▣ ' + Number(task.item_count || 0) + ' item</span></div></div>' +
-      '<div class="card"><div class="section-title">Pembayaran</div><div class="money">' + (p.is_cod ? rupiah(p.amount) : 'Sudah dibayar') + '</div><div class="pill ' + (p.is_cod ? 'orange' : 'green') + '" style="margin-top:8px">' + (p.is_cod ? 'Bayar di Tempat (COD)' : 'Online') + '</div></div>';
+      '<div class="card"><div class="section-title">Ringkasan & Pembayaran</div><div class="meta-row" style="margin-top:6px;margin-bottom:8px;"><span class="meta-item">▣ ' + Number(task.item_count || 0) + ' item pesanan</span></div><div class="money">' + (p.is_cod ? rupiah(p.amount) : 'Sudah dibayar') + '</div><div class="pill ' + (p.is_cod ? 'orange' : 'green') + '" style="margin-top:8px">' + (p.is_cod ? 'Bayar di Tempat (COD)' : 'Online') + '</div></div>';
 
     if (action) {
-      body += '<div class="sticky-action"><button class="primary-btn" data-action="' + action + '">' + actionLabel + ' ' + icon('arrow') + '</button></div>';
+      body += '<div class="sticky-action"><button class="primary-btn ' + btnColor + '" data-action="' + action + '">' + actionLabel + ' ' + icon('arrow') + '</button></div>';
     }
 
     shell('Detail Pengantaran', body, 'tasks', {hideNav:true});
@@ -853,20 +878,7 @@
   }
 
   function renderPickup() {
-    var task = selectedTask();
-    if (!task) return shell('Ambil Pesanan', errorBody('Tugas tidak ditemukan.'), 'tasks', {hideNav:true});
-
-    var p = task.payment || {};
-    var pickupName = task.pickup && task.pickup.branch_name || 'Cabang';
-    var body = '<div class="back-row"><button class="back-btn" data-action="back">‹</button><div class="back-title">Ambil Pesanan</div></div>' +
-      '<div class="card"><div class="customer-row" style="margin-top:0"><span class="pin" style="background:#fff0f4;color:#d64572">▣</span><div><div class="customer-name">' + escapeHTML(pickupName) + '</div><div class="address">Tunjukkan nomor pesanan kepada staf.</div></div></div></div>' +
-      '<div class="card"><div class="task-top"><span class="task-id">Pesanan ' + escapeHTML(task.order_number || task.order_id) + '</span><span class="pill blue">' + Number(task.item_count || 0) + ' item</span></div>' +
-      (p.is_cod ? '<div class="money-card"><div class="money-label">COD</div><div class="money">' + rupiah(p.amount) + '</div></div>' : '') +
-      '<div class="info-box"><span>i</span><div>Pastikan jumlah dan kondisi pesanan sesuai sebelum Anda mengonfirmasi pengambilan.</div></div>' +
-      '<div class="check-list"><div class="check"><span class="check-icon">✓</span>Jumlah item sesuai</div><div class="check"><span class="check-icon">✓</span>Kemasan dalam kondisi baik</div></div></div>' +
-      '<div class="sticky-action"><button class="primary-btn" data-action="confirm-pickup">Konfirmasi Pesanan Diambil ' + icon('arrow') + '</button></div>';
-
-    shell('Ambil Pesanan', body, 'tasks', {hideNav:true});
+    return renderDetail();
   }
 
   function renderMap() {
@@ -875,11 +887,21 @@
 
     var c = task.customer || {};
     var d = task.destination || {};
+    var p = task.payment || {};
+    var hasArrived = Boolean(task.arrived_at);
+
+    var primaryCtaHtml = !hasArrived
+      ? '<button type="button" class="primary-btn amber" data-action="notify-arrived">🔔 Saya Sudah Sampai di Lokasi</button>' +
+        '<button type="button" class="secondary-btn" data-action="complete-delivery" style="margin-top:8px;min-height:42px;font-size:13px;">Langsung Selesaikan Pengantaran →</button>'
+      : '<button type="button" class="primary-btn green" data-action="complete-delivery">✅ Selesaikan Pengantaran ' + icon('arrow') + '</button>' +
+        '<button type="button" class="secondary-btn" data-action="notify-arrived" style="margin-top:8px;min-height:40px;font-size:12.5px;border-color:#10b981;background:#ecfdf5;color:#047857;">🔔 Bunyikan Ulang Peringatan Sampai</button>';
+
     var body =
+      renderDriverStepper(3, hasArrived ? 'step-green' : 'step-amber') +
       '<div class="hero-map">' +
         '<div id="driver-map" class="driver-map" aria-label="Peta pengantaran"></div>' +
         '<div class="nav-banner">' +
-          '<div class="nav-turn">Tujuan Pengantaran</div>' +
+          '<div class="nav-turn">' + (hasArrived ? '🔔 Sudah Tiba di Titik Tujuan' : '🛵 Sedang Menuju Lokasi') + '</div>' +
           '<div class="nav-road">' + escapeHTML(d.address || 'Alamat tujuan') + '</div>' +
           '<div id="driver-gps-status" class="map-status">Mencari lokasi GPS…</div>' +
         '</div>' +
@@ -901,11 +923,11 @@
           '<div class="address">' + escapeHTML(d.address || 'Alamat tujuan belum tersedia') + '</div></div>' +
           '<button class="icon-btn" data-action="call" aria-label="Telepon pelanggan">☎</button>' +
         '</div>' +
-        '<button class="secondary-btn" data-action="navigate" style="margin-top:13px">⌖ Buka Navigasi</button>' +
-        '<button type="button" class="secondary-btn" data-action="notify-arrived" style="margin-top:10px;border-color:' + (task.arrived_at ? '#10b981' : '#f59e0b') + ';background:' + (task.arrived_at ? '#ecfdf5' : '#fffbeb') + ';color:' + (task.arrived_at ? '#047857' : '#b45309') + ';font-weight:800;">' +
-          (task.arrived_at ? '✓ Pelanggan Sudah Dikabari (Kirim Ulang 🔔)' : '🔔 Kabari Pelanggan Sudah Sampai') +
-        '</button>' +
-        '<div class="sticky-action"><button class="primary-btn green" data-action="complete-delivery">Selesaikan Pengantaran ' + icon('arrow') + '</button></div>' +
+        (p.is_cod
+          ? '<div style="margin-top:10px;padding:9px 12px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:#92400e;"><span>💵 Tagih Tunai (COD)</span><strong>' + rupiah(p.amount) + '</strong></div>'
+          : '') +
+        '<button class="secondary-btn" data-action="navigate" style="margin-top:12px">⌖ Buka Navigasi</button>' +
+        '<div class="sticky-action">' + primaryCtaHtml + '</div>' +
       '</div>';
 
     shell('Sedang Mengantar', body, 'tasks', {hideNav:true});
@@ -917,12 +939,31 @@
     if (!task) return shell('Konfirmasi COD', errorBody('Tugas pengantaran tidak ditemukan.'), 'tasks', {hideNav:true});
 
     var p = task.payment || {};
+    var expected = Number(p.amount || 0);
+    var round50k = Math.ceil(expected / 50000) * 50000;
+    var round100k = Math.ceil(expected / 100000) * 100000;
+    var chipAmounts = [];
+    if (round50k > expected) chipAmounts.push(round50k);
+    if (round100k > expected && round100k !== round50k) chipAmounts.push(round100k);
+    if (expected < 50000 && chipAmounts.indexOf(50000) === -1) chipAmounts.push(50000);
+    if (expected < 100000 && chipAmounts.indexOf(100000) === -1) chipAmounts.push(100000);
+
+    var chipsHtml =
+      '<div class="cod-quick-chips">' +
+        '<button type="button" class="cod-chip exact" data-action="cod-exact" data-amount="' + expected + '">⚡ Uang Pas (' + rupiah(expected) + ') — Langsung Selesai</button>' +
+        chipAmounts.map(function (amt) {
+          return '<button type="button" class="cod-chip" data-action="cod-fill" data-amount="' + amt + '">' + rupiah(amt) + '</button>';
+        }).join('') +
+      '</div>';
+
     var body = '<div class="back-row"><button class="back-btn" data-action="back">‹</button><div class="back-title">Konfirmasi COD</div></div>' +
-      '<div class="card"><div class="money-card"><div class="money-label">Yang harus dibayar (COD)</div><div class="money">' + rupiah(p.amount) + '</div></div>' +
-      '<label class="input-label" for="tendered">Uang diterima dari pelanggan</label><input id="tendered" class="money-input" inputmode="numeric" autocomplete="off" placeholder="Masukkan nominal">' +
+      '<div class="card"><div class="money-card"><div class="money-label">Yang harus dibayar (COD)</div><div class="money">' + rupiah(expected) + '</div></div>' +
+      '<label class="input-label">Pilih cepat nominal uang diterima:</label>' +
+      chipsHtml +
+      '<label class="input-label" for="tendered" style="margin-top:8px;">Atau ketik nominal lain:</label><input id="tendered" class="money-input" inputmode="numeric" autocomplete="off" value="' + expected + '" placeholder="Masukkan nominal">' +
       '<div class="change-box"><div class="change-label">Kembalian untuk pelanggan</div><div id="change" class="change-value">Rp0</div></div>' +
       '<div class="info-box warning" style="margin-top:12px"><span>!</span><div>Uang tunai ini akan tetap berada pada Anda sampai diserahkan kepada Kasir.</div></div></div>' +
-      '<div class="sticky-action"><button class="primary-btn" data-action="complete-cod">Konfirmasi Uang Diterima</button></div>';
+      '<div class="sticky-action"><button class="primary-btn green" data-action="complete-cod">✅ Konfirmasi Uang Diterima</button></div>';
 
     shell('Konfirmasi COD', body, 'tasks', {hideNav:true});
   }
@@ -1596,7 +1637,7 @@
 
     app.querySelectorAll('[data-action]').forEach(function (el) {
       el.addEventListener('click', function () {
-        handleAction(el.getAttribute('data-action'));
+        handleAction(el.getAttribute('data-action'), el);
       });
     });
 
@@ -1695,7 +1736,7 @@
     }
   }
 
-  async function handleAction(action) {
+  async function handleAction(action, triggerEl) {
     if (action === 'edit-profile' || action === 'edit-vehicle') {
       return showEditProfileSheet();
     }
@@ -1726,17 +1767,28 @@
     if (action === 'accept') return acceptTask();
     if (action === 'reject') return showRejectSheet();
 
-    if (action === 'pickup') {
-      state.page = 'pickup';
-      return render();
-    }
-
-    if (action === 'confirm-pickup') {
-      return transitionTask('pickup', null, 'delivery-detail');
-    }
-
-    if (action === 'start-delivery') {
-      return transitionTask('start', null, 'map');
+    if (action === 'pickup-and-start' || action === 'pickup' || action === 'confirm-pickup' || action === 'start-delivery') {
+      var pTask = selectedTask();
+      if (!pTask || state.busy) return;
+      state.busy = true;
+      render();
+      try {
+        if (pTask.delivery_status === 'assigned') {
+          await api('/driver/tasks/' + encodeURIComponent(pTask.order_id) + '/pickup', { method: 'POST' });
+        }
+        await api('/driver/tasks/' + encodeURIComponent(pTask.order_id) + '/start', { method: 'POST' });
+        state.busy = false;
+        await refreshTasks(false);
+        state.selectedOrderId = pTask.order_id;
+        state.page = 'map';
+        toast('🛵 Pesanan diambil & pengantaran dimulai!');
+        render();
+      } catch (err) {
+        state.busy = false;
+        render();
+        toast(err.message || 'Gagal memulai pengantaran');
+      }
+      return;
     }
 
     if (action === 'delivery-map') {
@@ -1772,6 +1824,26 @@
         return render();
       }
       return transitionTask('complete', null, 'complete');
+    }
+
+    if (action === 'cod-exact') {
+      var exactTask = selectedTask();
+      var exactAmt = exactTask && exactTask.payment ? Number(exactTask.payment.amount || 0) : 0;
+      if (exactAmt <= 0) return toast('Nominal COD tidak valid');
+      return transitionTask('complete', { cod_amount_tendered: exactAmt }, 'complete');
+    }
+
+    if (action === 'cod-fill') {
+      var fillAmt = triggerEl ? Number(triggerEl.getAttribute('data-amount') || 0) : 0;
+      var inputEl = document.getElementById('tendered');
+      if (inputEl && fillAmt > 0) {
+        inputEl.value = String(fillAmt);
+        var cTask = selectedTask();
+        var exp = cTask && cTask.payment ? Number(cTask.payment.amount || 0) : 0;
+        var outEl = document.getElementById('change');
+        if (outEl) outEl.textContent = rupiah(Math.max(0, fillAmt - exp));
+      }
+      return;
     }
 
     if (action === 'complete-cod') {

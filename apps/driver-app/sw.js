@@ -1,4 +1,4 @@
-const CACHE_NAME = 'xentra-driver-shell-v9';
+const CACHE_NAME = 'xentra-driver-shell-v10';
 const APP_SHELL = [
   '/driver/',
   '/driver/manifest.json',
