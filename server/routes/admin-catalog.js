@@ -40,6 +40,60 @@ router.post('/admin/categories', requireAuth(['owner', 'brand_manager']), (req, 
   }
 });
 
+// Reorder categories — accepts ordered array of category IDs, updates sort_order atomically
+router.put('/admin/categories/reorder', requireAuth(['owner', 'brand_manager']), (req, res) => {
+  try {
+    const { order } = req.body;
+    if (!Array.isArray(order) || order.length === 0) {
+      return res.status(400).json({ success: false, error: 'Payload "order" harus berupa array ID kategori.' });
+    }
+
+    const uniqueIds = new Set(order.map(String));
+    if (uniqueIds.size !== order.length) {
+      return res.status(400).json({ success: false, error: 'Payload "order" mengandung ID kategori duplikat.' });
+    }
+
+    const owned = db.prepare('SELECT id FROM categories WHERE brand_id = ?').all(req.brand_id);
+    const ownedIds = new Set(owned.map((c) => String(c.id)));
+    const invalidIds = order.filter((catId) => !ownedIds.has(String(catId)));
+    if (invalidIds.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'FORBIDDEN_SCOPE',
+        message: 'Sebagian ID kategori tidak valid atau bukan milik brand ini.'
+      });
+    }
+
+    const orderedIdStrings = order.map(String);
+    const untouched = owned
+      .map((c) => String(c.id))
+      .filter((id) => !uniqueIds.has(id));
+    const finalOrder = [...orderedIdStrings, ...untouched];
+
+    const updateSort = db.prepare('UPDATE categories SET sort_order = ? WHERE id = ? AND brand_id = ?');
+    db.exec('BEGIN IMMEDIATE;');
+    try {
+      finalOrder.forEach((id, idx) => {
+        updateSort.run(idx + 1, id, req.brand_id);
+      });
+      db.exec('COMMIT;');
+    } catch (txErr) {
+      try { db.exec('ROLLBACK;'); } catch (_) {}
+      throw txErr;
+    }
+
+    const updatedCategories = db.prepare('SELECT * FROM categories WHERE brand_id = ? ORDER BY sort_order ASC').all(req.brand_id);
+
+    res.json({
+      success: true,
+      message: 'Urutan kategori berhasil disimpan.',
+      categories: updatedCategories || []
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.put('/admin/categories/:id', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const { name, image, description, sort_order, is_active } = req.body;

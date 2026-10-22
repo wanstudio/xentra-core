@@ -138,10 +138,12 @@ export default function CategoriesPage({ onBack, onNavigate }) {
   };
 
   const handleSortClick = () => {
-    const next = !isSorting;
-    setIsSorting(next);
-    if (typeof window.showToast === 'function') {
-      window.showToast(next ? 'ℹ️ Mode Urutkan aktif: Atur urutan etalase kategori Anda.' : '✓ Urutan kategori disimpan.');
+    if (typeof onNavigate === 'function') {
+      onNavigate('catalog/categories/sort');
+    } else if (typeof window.navigateTo === 'function') {
+      window.navigateTo('catalog/categories/sort');
+    } else {
+      window.location.hash = '#catalog/categories/sort';
     }
   };
 
@@ -452,8 +454,8 @@ export default function CategoriesPage({ onBack, onNavigate }) {
               border: '1.5px solid #00A637',
               outline: 'none',
               boxShadow: 'none',
-              backgroundColor: isSorting ? '#00A637' : '#ffffff',
-              color: isSorting ? '#ffffff' : '#00A637',
+              backgroundColor: '#ffffff',
+              color: '#00A637',
               fontWeight: 700,
               fontSize: '14px',
               cursor: 'pointer',
@@ -463,7 +465,7 @@ export default function CategoriesPage({ onBack, onNavigate }) {
               transition: 'all 0.15s ease'
             }}
           >
-            {isSorting ? 'Selesai' : 'Urutkan'}
+            Urutkan
           </button>
           <button
             type="button"

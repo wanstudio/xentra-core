@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import OverviewPage from '../components/OverviewPage';
 import CategoriesPage from '../components/CategoriesPage';
 import CategoryEditorPage from '../components/CategoryEditorPage';
+import CategorySortPage from '../components/CategorySortPage';
 import ItemMasterPage from '../components/ItemMasterPage';
 import CatalogSubHub from '../components/CatalogSubHub';
 import BusinessHub from '../components/BusinessHub';
@@ -25,6 +26,13 @@ export const OwnerAppShell: React.FC<OwnerAppShellProps> = ({
 
   const [currentRoute, setCurrentRoute] = useState<string>(initialRoute || getHashRoute());
   const [activeBranchName, setActiveBranchName] = useState<string>('Semua Cabang');
+
+  // Sync initialRoute prop if updated from host
+  useEffect(() => {
+    if (initialRoute) {
+      setCurrentRoute(initialRoute.replace(/^#\/?/, ''));
+    }
+  }, [initialRoute]);
 
   // Sync hash changes
   useEffect(() => {
@@ -134,6 +142,13 @@ export const OwnerAppShell: React.FC<OwnerAppShellProps> = ({
 
         {(currentRoute === 'catalog/categories/new' || currentRoute === 'catalog/categories/edit') && (
           <CategoryEditorPage
+            onBack={() => navigateTo('catalog/categories')}
+            onSaved={() => navigateTo('catalog/categories')}
+          />
+        )}
+
+        {(currentRoute === 'catalog/categories/sort' || currentRoute === 'catalog/categories/reorder') && (
+          <CategorySortPage
             onBack={() => navigateTo('catalog/categories')}
             onSaved={() => navigateTo('catalog/categories')}
           />
