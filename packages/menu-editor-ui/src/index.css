@@ -47,6 +47,11 @@
   box-shadow: inset 0 0 0 1px #94A3B8 !important;
 }
 
+#modern-category-sort-page-root .hub-card-dragging {
+  box-shadow: 0 14px 28px -6px rgba(15, 23, 42, 0.16), 0 4px 10px -2px rgba(15, 23, 42, 0.08), inset 0 0 0 1.5px #00A637 !important;
+  border: none !important;
+}
+
 #modern-business-hub-root .hub-search:focus-within,
 #modern-item-master-page-root .hub-search:focus-within,
 #modern-category-editor-page-root .hub-search:focus-within {

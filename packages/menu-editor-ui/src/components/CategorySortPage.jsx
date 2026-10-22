@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 
 function getAuthToken() {
   try {
@@ -9,19 +9,30 @@ function getAuthToken() {
   return match ? decodeURIComponent(match[1]) : '';
 }
 
+function triggerHaptic(ms = 8) {
+  try {
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      navigator.vibrate(ms);
+    }
+  } catch (_) {}
+}
+
 export default function CategorySortPage({ onBack, onSaved }) {
   const [categories, setCategories] = useState([]);
   const [initialOrder, setInitialOrder] = useState([]);
   const [menus, setMenus] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  
-  // Drag and Drop State
-  const [draggedIndex, setDraggedIndex] = useState(null);
-  const [dragOverIndex, setDragOverIndex] = useState(null);
-  const touchStartY = useRef(0);
-  const touchCurrentIndex = useRef(null);
+
+  // Interactive Pointer / Touch Drag & FLIP State
+  const [activeId, setActiveId] = useState(null);
+  const [dragOffsetY, setDragOffsetY] = useState(0);
+  const [isSettling, setIsSettling] = useState(false);
+
   const listContainerRef = useRef(null);
+  const cardRefs = useRef(new Map());
+  const prevTopsRef = useRef(new Map());
+  const dragSessionRef = useRef(null);
 
   const handleBack = () => {
     if (typeof onBack === 'function') {
@@ -113,76 +124,145 @@ export default function CategorySortPage({ onBack, onSaved }) {
   const currentOrderIds = categories.map(c => String(c.id));
   const hasChanged = currentOrderIds.length > 0 && currentOrderIds.some((id, idx) => id !== initialOrder[idx]);
 
-  // Reorder Helper
-  const moveCategory = (fromIdx, toIdx) => {
-    if (fromIdx === toIdx || fromIdx < 0 || toIdx < 0 || fromIdx >= categories.length || toIdx >= categories.length) return;
-    setCategories(prev => {
-      const next = [...prev];
-      const [moved] = next.splice(fromIdx, 1);
-      next.splice(toIdx, 0, moved);
-      return next;
-    });
-  };
-
-  // HTML5 Drag and Drop handlers (Mouse / Desktop)
-  const handleDragStart = (e, index) => {
-    setDraggedIndex(index);
-    e.dataTransfer.effectAllowed = 'move';
-    try {
-      e.dataTransfer.setData('text/plain', String(index));
-    } catch (_) {}
-  };
-
-  const handleDragOver = (e, index) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (dragOverIndex !== index) {
-      setDragOverIndex(index);
-    }
-  };
-
-  const handleDrop = (e, dropIndex) => {
-    e.preventDefault();
-    if (draggedIndex !== null && draggedIndex !== dropIndex) {
-      moveCategory(draggedIndex, dropIndex);
-    }
-    setDraggedIndex(null);
-    setDragOverIndex(null);
-  };
-
-  const handleDragEnd = () => {
-    setDraggedIndex(null);
-    setDragOverIndex(null);
-  };
-
-  // Touch Drag and Drop handlers (Mobile touch gesture)
-  const handleTouchStart = (e, index) => {
-    touchStartY.current = e.touches[0].clientY;
-    touchCurrentIndex.current = index;
-    setDraggedIndex(index);
-  };
-
-  const handleTouchMove = (e) => {
-    if (touchCurrentIndex.current === null) return;
-    const touch = e.touches[0];
-    const elemBelow = document.elementFromPoint(touch.clientX, touch.clientY);
-    if (!elemBelow) return;
-    const cardElem = elemBelow.closest('[data-sort-index]');
-    if (cardElem) {
-      const targetIndex = Number(cardElem.getAttribute('data-sort-index'));
-      if (!isNaN(targetIndex) && targetIndex !== touchCurrentIndex.current) {
-        moveCategory(touchCurrentIndex.current, targetIndex);
-        touchCurrentIndex.current = targetIndex;
-        setDraggedIndex(targetIndex);
+  // Capture current card positions before reorder for FLIP animation
+  const capturePositions = useCallback(() => {
+    const map = new Map();
+    cardRefs.current.forEach((node, id) => {
+      if (node) {
+        map.set(String(id), node.getBoundingClientRect().top);
       }
-    }
+    });
+    prevTopsRef.current = map;
+  }, []);
+
+  // FLIP animation: smoothly animate non-dragged sibling cards when they swap slots
+  useLayoutEffect(() => {
+    const prevTops = prevTopsRef.current;
+    if (!prevTops || prevTops.size === 0) return;
+
+    cardRefs.current.forEach((node, id) => {
+      const key = String(id);
+      if (!node || key === String(activeId)) return;
+      const prevTop = prevTops.get(key);
+      if (typeof prevTop !== 'number') return;
+      const newTop = node.getBoundingClientRect().top;
+      const deltaY = prevTop - newTop;
+      if (Math.abs(deltaY) > 1) {
+        node.style.transition = 'none';
+        node.style.transform = `translate3d(0, ${deltaY}px, 0)`;
+        // Force reflow
+        void node.offsetHeight;
+        node.style.transition = 'transform 260ms cubic-bezier(0.22, 1, 0.36, 1)';
+        node.style.transform = 'translate3d(0, 0, 0)';
+      }
+    });
+
+    prevTopsRef.current = new Map();
+  }, [categories, activeId]);
+
+  // Pointer-based smooth drag & drop
+  const startPointerDrag = (clientY, catId, index) => {
+    const node = cardRefs.current.get(String(catId));
+    const rect = node ? node.getBoundingClientRect() : { height: 74 };
+    // Step pitch = card height + 16px gap
+    const pitch = (rect.height || 74) + 16;
+
+    dragSessionRef.current = {
+      id: String(catId),
+      currentIndex: index,
+      anchorY: clientY,
+      pitch,
+    };
+
+    setIsSettling(false);
+    setActiveId(String(catId));
+    setDragOffsetY(0);
+    triggerHaptic(10);
   };
 
-  const handleTouchEnd = () => {
-    touchCurrentIndex.current = null;
-    setDraggedIndex(null);
-    setDragOverIndex(null);
-  };
+  const updatePointerDrag = useCallback((clientY) => {
+    const session = dragSessionRef.current;
+    if (!session) return;
+
+    let dy = clientY - session.anchorY;
+    const threshold = session.pitch * 0.52;
+
+    if (dy > threshold && session.currentIndex < categories.length - 1) {
+      const fromIdx = session.currentIndex;
+      const toIdx = fromIdx + 1;
+      capturePositions();
+      session.currentIndex = toIdx;
+      session.anchorY += session.pitch;
+      dy = clientY - session.anchorY;
+      setCategories((prev) => {
+        const next = [...prev];
+        const [moved] = next.splice(fromIdx, 1);
+        next.splice(toIdx, 0, moved);
+        return next;
+      });
+      triggerHaptic(6);
+    } else if (dy < -threshold && session.currentIndex > 0) {
+      const fromIdx = session.currentIndex;
+      const toIdx = fromIdx - 1;
+      capturePositions();
+      session.currentIndex = toIdx;
+      session.anchorY -= session.pitch;
+      dy = clientY - session.anchorY;
+      setCategories((prev) => {
+        const next = [...prev];
+        const [moved] = next.splice(fromIdx, 1);
+        next.splice(toIdx, 0, moved);
+        return next;
+      });
+      triggerHaptic(6);
+    }
+
+    setDragOffsetY(dy);
+  }, [categories.length, capturePositions]);
+
+  const finishPointerDrag = useCallback(() => {
+    if (!dragSessionRef.current) return;
+    dragSessionRef.current = null;
+    setIsSettling(true);
+    setDragOffsetY(0);
+    setTimeout(() => {
+      setActiveId(null);
+      setIsSettling(false);
+    }, 220);
+  }, []);
+
+  useEffect(() => {
+    if (!activeId) return;
+
+    const onPointerMove = (e) => {
+      if (!dragSessionRef.current) return;
+      if (e.cancelable) e.preventDefault();
+      const clientY = e.touches && e.touches[0] ? e.touches[0].clientY : e.clientY;
+      if (typeof clientY === 'number') {
+        updatePointerDrag(clientY);
+      }
+    };
+
+    const onPointerUp = () => {
+      finishPointerDrag();
+    };
+
+    window.addEventListener('pointermove', onPointerMove, { passive: false });
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+    window.addEventListener('touchmove', onPointerMove, { passive: false });
+    window.addEventListener('touchend', onPointerUp);
+    window.addEventListener('touchcancel', onPointerUp);
+
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+      window.removeEventListener('touchmove', onPointerMove);
+      window.removeEventListener('touchend', onPointerUp);
+      window.removeEventListener('touchcancel', onPointerUp);
+    };
+  }, [activeId, updatePointerDrag, finishPointerDrag]);
 
   // Save reordered categories
   const handleSaveOrder = async () => {
@@ -264,8 +344,6 @@ export default function CategorySortPage({ onBack, onSaved }) {
       <div
         ref={listContainerRef}
         className="w-full rounded-[14px] p-4 bg-white hub-inset-stroke flex flex-col gap-4"
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
       >
         {/* Instruction Header Row */}
         <div className="w-full flex items-center justify-start gap-2">
@@ -289,31 +367,45 @@ export default function CategorySortPage({ onBack, onSaved }) {
             Belum ada kategori untuk diurutkan.
           </div>
         ) : (
-          <div className="flex flex-col gap-4 w-full">
+          <div className="flex flex-col gap-4 w-full relative">
             {categories.map((cat, index) => {
-              const isDragging = draggedIndex === index;
-              const isOver = dragOverIndex === index && !isDragging;
+              const isDragging = String(activeId) === String(cat.id);
               const snippet = getCategorySnippet(cat);
 
               return (
                 <div
                   key={cat.id}
+                  ref={(el) => {
+                    if (el) cardRefs.current.set(String(cat.id), el);
+                    else cardRefs.current.delete(String(cat.id));
+                  }}
                   data-sort-index={index}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, index)}
-                  onDragOver={(e) => handleDragOver(e, index)}
-                  onDrop={(e) => handleDrop(e, index)}
-                  onDragEnd={handleDragEnd}
-                  className={`w-full p-4 rounded-[12px] bg-white hub-inset-stroke hub-card flex items-center justify-between gap-4 select-none transition-all ${
+                  onPointerDown={(e) => {
+                    if (e.button !== undefined && e.button !== 0) return;
+                    e.preventDefault();
+                    startPointerDrag(e.clientY, cat.id, index);
+                  }}
+                  style={{
+                    touchAction: 'none',
+                    zIndex: isDragging ? 30 : 1,
+                    transform: isDragging
+                      ? `translate3d(0, ${dragOffsetY}px, 0) scale(${isSettling ? 1 : 1.025})`
+                      : undefined,
+                    transition: isDragging
+                      ? (isSettling
+                        ? 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 220ms ease'
+                        : 'box-shadow 150ms ease')
+                      : undefined,
+                    willChange: 'transform',
+                  }}
+                  className={`w-full p-4 rounded-[12px] bg-white flex items-center justify-between gap-4 select-none cursor-grab active:cursor-grabbing ${
                     isDragging
-                      ? 'opacity-60 shadow-md scale-[0.99] bg-slate-50'
-                      : isOver
-                      ? 'bg-emerald-50/40'
-                      : ''
+                      ? 'hub-card-dragging'
+                      : 'hub-inset-stroke hub-card'
                   }`}
                 >
                   {/* Category Info */}
-                  <div className="flex-1 min-w-0 flex flex-col justify-start items-start gap-1">
+                  <div className="flex-1 min-w-0 flex flex-col justify-start items-start gap-1 pointer-events-none">
                     <div className="text-[#0F172A] text-base font-bold leading-snug truncate w-full text-left">
                       {cat.name}
                     </div>
@@ -324,8 +416,7 @@ export default function CategorySortPage({ onBack, onSaved }) {
 
                   {/* Drag Handle Grip Icon (13x13 gravity-ui_equal.svg) */}
                   <div
-                    onTouchStart={(e) => handleTouchStart(e, index)}
-                    className="w-7 h-7 -mr-1.5 flex items-center justify-center shrink-0 cursor-grab active:cursor-grabbing rounded-lg transition-colors"
+                    className="w-7 h-7 -mr-1.5 flex items-center justify-center shrink-0 rounded-lg pointer-events-none"
                     title="Geser untuk mengatur urutan"
                   >
                     <img
