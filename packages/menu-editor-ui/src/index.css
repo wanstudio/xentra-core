@@ -32,6 +32,16 @@
   outline: none;
 }
 
+/* Hide browser native search cancel button so our persistent custom X button is the single source of truth */
+#modern-business-hub-root input[type="search"]::-webkit-search-cancel-button,
+#modern-business-hub-root input[type="search"]::-webkit-search-decoration,
+#modern-item-master-page-root input[type="search"]::-webkit-search-cancel-button,
+#modern-item-master-page-root input[type="search"]::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+
 #modern-menu-editor-root .hub-inset-stroke,
 #modern-business-hub-root .hub-inset-stroke,
 #modern-catalog-subhub-root .hub-inset-stroke,
@@ -117,6 +127,28 @@
     opacity: 1;
     transform: none;
   }
+}
+
+/* Fast ease-up animation for fixed bottom action bars and sheets (< 1s, specifically ~220ms with 60ms delay) */
+@keyframes xentraBottomBarEaseUp {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 100%, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+#modern-categories-bottom-bar,
+#modern-category-detail-bottom-bar,
+#modern-category-editor-bottom-bar,
+#modern-category-menu-sort-bottom-bar,
+#modern-categories-sort-bottom-bar,
+#modern-menu-editor-bottom-bar,
+.x-owner-bottom-bar-ease-up {
+  animation: xentraBottomBarEaseUp 0.22s cubic-bezier(0.16, 1, 0.3, 1) 0.06s both !important;
 }
 
 /* Ensure modern tabs have no transform on the outer section that would trap fixed positioning */

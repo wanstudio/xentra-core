@@ -22,6 +22,43 @@ export default function ItemMasterPage({ onBack, onNavigate }) {
   const [loading, setLoading] = useState(true);
   const [togglingId, setTogglingId] = useState(null);
   const [leavingId, setLeavingId] = useState(null);
+  const searchHistoryPushedRef = React.useRef(false);
+
+  // Guard mobile back gesture when searchQuery is non-empty so back swipe clears search instead of leaving page
+  useEffect(() => {
+    const hasSearch = searchQuery.trim().length > 0;
+    if (hasSearch && !searchHistoryPushedRef.current) {
+      try {
+        const currentState = window.history.state || {};
+        window.history.pushState(
+          { ...currentState, __xentraSearchActive: 'item-master' },
+          '',
+          window.location.hash || '#catalog/products'
+        );
+        searchHistoryPushedRef.current = true;
+      } catch (_) {}
+    } else if (!hasSearch && searchHistoryPushedRef.current) {
+      searchHistoryPushedRef.current = false;
+      try {
+        if (window.history.state && window.history.state.__xentraSearchActive === 'item-master') {
+          const cleanState = { ...window.history.state };
+          delete cleanState.__xentraSearchActive;
+          window.history.replaceState(cleanState, '', window.location.hash || '#catalog/products');
+        }
+      } catch (_) {}
+    }
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (searchHistoryPushedRef.current) {
+        searchHistoryPushedRef.current = false;
+        setSearchQuery('');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   const fetchProducts = async () => {
     try {
@@ -234,6 +271,19 @@ export default function ItemMasterPage({ onBack, onNavigate }) {
             placeholder="Cari nama atau kode bahan"
             className="w-full bg-transparent border-none outline-none font-medium text-slate-800 text-[13px] tracking-[0] leading-[normal] placeholder:text-[#94A3B8]"
           />
+          {searchQuery.length > 0 && (
+            <button
+              type="button"
+              aria-label="Bersihkan pencarian"
+              onClick={() => setSearchQuery('')}
+              className="w-6 h-6 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 flex items-center justify-center text-slate-500 border-none cursor-pointer shrink-0 p-0 transition-all"
+            >
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="10.5" y1="3.5" x2="3.5" y2="10.5" />
+                <line x1="3.5" y1="3.5" x2="10.5" y2="10.5" />
+              </svg>
+            </button>
+          )}
         </div>
 
         {/* Control Row: Filter Pills (Aktif/Nonaktif) + Add Button (+) */}
