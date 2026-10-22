@@ -482,6 +482,15 @@ class OrderPlacementService {
         updatedAt: now
       });
 
+      if (effectiveDiningSessionId && customer?.phone) {
+        DiningTableService.bindCustomerToSessionIfEmpty({
+          sessionId: effectiveDiningSessionId,
+          customerName: customer?.name || '',
+          customerPhone: customer.phone,
+          updatedAt: now
+        });
+      }
+
       for (const item of verifiedItems) {
         const itemId = `item_${crypto.randomBytes(6).toString('hex')}`;
         const persistedProductId = resolveOrderItemProductId(item);

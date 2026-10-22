@@ -18,6 +18,7 @@
   var ORDER_CTX_KEY = PREFIX + 'order_context';
   var BRANCH_CTX_KEY = PREFIX + 'branch_context';
   var RECIPIENT_KEY = PREFIX + 'delivery_recipient';
+  var COLLECTIONS_KEY = PREFIX + 'collections';
 
   var listeners = [];
 
@@ -42,9 +43,23 @@
     window.Xentra.UI.applyTheme(initialBrand.primary_color);
   }
 
+  function sanitizeCustomerSession(sess) {
+    if (!sess || typeof sess !== 'object') return sess;
+    if (sess.phone && typeof sess.phone === 'string' && sess.phone.indexOf('@') !== -1) {
+      sess.phone = '';
+    }
+    return sess;
+  }
+
+  var rawInitialSession = load(SESSION_KEY, null);
+  var initialSession = sanitizeCustomerSession(rawInitialSession);
+  if (rawInitialSession && rawInitialSession.phone && typeof rawInitialSession.phone === 'string' && rawInitialSession.phone.indexOf('@') !== -1) {
+    save(SESSION_KEY, initialSession);
+  }
+
   var state = {
     brand: initialBrand,
-    customerSession: load(SESSION_KEY, null),
+    customerSession: initialSession,
     orderType: load(ORDER_TYPE_KEY, 'delivery'),
     orderContext: load(ORDER_CTX_KEY, {
       delivery: { scheduled: false, date: 'Hari Ini', timeSlot: '12.00 - 12.30', note: '' },
@@ -76,7 +91,8 @@
     notes: load(NOTES_KEY, {}),
     promo: { enabled: false, target: 0, discount: 0 },
     recipient: load(RECIPIENT_KEY, null),
-    myTable: load(MY_TABLE_KEY, null)
+    myTable: load(MY_TABLE_KEY, null),
+    collections: load(COLLECTIONS_KEY, [])
   };
 
   // ── Persistence helpers ──
@@ -157,6 +173,7 @@
   }
 
   function setCustomerSession(session) {
+    session = sanitizeCustomerSession(session);
     state.customerSession = session;
     save(SESSION_KEY, session);
     notify({ type: 'customerSession' });
@@ -165,7 +182,10 @@
   function clearCustomerSession() {
     state.customerSession = null;
     try { localStorage.removeItem(SESSION_KEY); } catch (_) {}
+    clearMyTable();
+    try { localStorage.removeItem('xentra_v2_pending_table_token'); } catch (_) {}
     notify({ type: 'customerSession' });
+    notify({ type: 'customer_session' });
   }
 
   function setRecipient(recipient) {
@@ -183,18 +203,29 @@
   // Meja yang di-scan/dipilih tamu. Disimpan supaya ikon di home tahu "saya di
   // meja berapa" dan tidak hilang saat pindah halaman atau refresh.
   function setMyTable(table) {
+    if (table && !table.claimed_at) {
+      table.claimed_at = Date.now();
+    }
     state.myTable = table || null;
     save(MY_TABLE_KEY, state.myTable);
     notify({ type: 'my_table' });
   }
 
   function getMyTable() {
+    if (state.myTable && state.myTable.claimed_at) {
+      // Auto-expire table cache older than 4 hours if no active bill
+      if (!state.myTable.hadOpenBill && (Date.now() - Number(state.myTable.claimed_at) > 4 * 60 * 60 * 1000)) {
+        clearMyTable();
+        return null;
+      }
+    }
     return state.myTable;
   }
 
   function clearMyTable() {
     state.myTable = null;
     try { localStorage.removeItem(MY_TABLE_KEY); } catch (_) {}
+    try { localStorage.removeItem('xentra_v2_pending_table_token'); } catch (_) {}
     notify({ type: 'my_table' });
   }
 
@@ -657,6 +688,65 @@
     save(NOTES_KEY, state.notes);
   }
 
+  // ── Wishlist / My Collections state ──
+  function getCollections() {
+    return Array.isArray(state.collections) ? state.collections : [];
+  }
+
+  function isSavedInCollections(productId) {
+    if (!productId) return false;
+    var list = getCollections();
+    return list.some(function (item) {
+      return String(item.id) === String(productId);
+    });
+  }
+
+  function toggleCollection(product) {
+    if (!product || !product.id) return false;
+    var list = getCollections().slice();
+    var idx = -1;
+    for (var i = 0; i < list.length; i++) {
+      if (String(list[i].id) === String(product.id)) {
+        idx = i;
+        break;
+      }
+    }
+    var saved = false;
+    if (idx !== -1) {
+      list.splice(idx, 1);
+      saved = false;
+    } else {
+      list.unshift({
+        id: product.id,
+        name: product.name || product.menu_title || product.title || '',
+        price: Number(product.price || 0),
+        regular_price: Number(product.regular_price || product.price || 0),
+        image_url: product.image_url || product.image || '',
+        description: product.description || '',
+        menu_subtitle: product.menu_subtitle || product.subtitle || '',
+        menu_detail: Array.isArray(product.menu_detail) ? product.menu_detail : [],
+        menu_indicator_level: product.menu_indicator_level || 0,
+        branch_id: product.branch_id || null,
+        saved_at: new Date().toISOString()
+      });
+      saved = true;
+    }
+    state.collections = list;
+    save(COLLECTIONS_KEY, state.collections);
+    notify({ type: 'collections', saved: saved, productId: product.id });
+    return saved;
+  }
+
+  function removeFromCollections(productId) {
+    if (!productId) return;
+    var list = getCollections();
+    state.collections = list.filter(function (item) {
+      return String(item.id) !== String(productId);
+    });
+    save(COLLECTIONS_KEY, state.collections);
+    notify({ type: 'collections', saved: false, productId: productId });
+  }
+
   // ── Export ──
   window.Xentra = window.Xentra || {};
   window.Xentra.Store = {
@@ -694,6 +784,10 @@
     clearRecipient: clearRecipient,
     setMyTable: setMyTable,
     getMyTable: getMyTable,
-    clearMyTable: clearMyTable
+    clearMyTable: clearMyTable,
+    getCollections: getCollections,
+    isSavedInCollections: isSavedInCollections,
+    toggleCollection: toggleCollection,
+    removeFromCollections: removeFromCollections
   };
 })();

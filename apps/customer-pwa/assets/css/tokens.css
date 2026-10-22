@@ -47,8 +47,10 @@
   --x-text-muted:      var(--x-gray-400);
   --x-border:          var(--x-gray-150);
 
-  /* ── Typography ── */
+  /* ── Typography (Authoritative: Plus Jakarta Sans only) ── */
   --x-font:            'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-family:       var(--x-font);
+  --font:              var(--x-font);
 
   /* ── Radius ── */
   --x-radius-xs:       10px;

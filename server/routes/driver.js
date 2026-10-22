@@ -36,7 +36,7 @@ function registerDriverRoutes(router, deps = {}) {
       'd.created_at AS delivery_created_at, d.updated_at AS delivery_updated_at, ' +
       'o.order_number, o.status AS order_status, o.order_type, o.customer_id, o.customer_name, ' +
       'o.customer_phone, o.recipient_name, o.recipient_phone, o.grand_total, o.payment_method, ' +
-      'o.branch_id, b.name AS branch_name ' +
+      'o.branch_id, b.name AS branch_name, b.address_text AS branch_address, b.latitude AS branch_latitude, b.longitude AS branch_longitude ' +
       'FROM order_deliveries d ' +
       'JOIN orders o ON o.id = d.order_id ' +
       'LEFT JOIN branches b ON b.id = o.branch_id ' +
@@ -79,7 +79,10 @@ function registerDriverRoutes(router, deps = {}) {
       },
       pickup: {
         branch_id: task.branch_id,
-        branch_name: task.branch_name || null
+        branch_name: task.branch_name || null,
+        address: task.branch_address || '',
+        latitude: task.branch_latitude !== null && task.branch_latitude !== undefined ? Number(task.branch_latitude) : null,
+        longitude: task.branch_longitude !== null && task.branch_longitude !== undefined ? Number(task.branch_longitude) : null
       },
       payment: {
         method: task.payment_method,
@@ -104,10 +107,11 @@ function registerDriverRoutes(router, deps = {}) {
 
   router.get('/driver/me', driverAuth, (req, res) => {
     try {
+      res.set('Cache-Control', 'no-store');
       const userId = actorId(req);
       const user = db.prepare(
         'SELECT id, username, email, full_name, phone, nik, ktp_url, ktp_media_id, role, status, brand_id, organization_id, branch_id, ' +
-        'avatar_url, avatar_media_id, created_at, updated_at, last_login_at ' +
+        'avatar_url, avatar_media_id, vehicle_type, created_at, updated_at, last_login_at ' +
         'FROM users WHERE id = ? AND brand_id = ? AND role = ? LIMIT 1'
       ).get(userId, req.brand_id, 'driver');
 
@@ -143,6 +147,7 @@ function registerDriverRoutes(router, deps = {}) {
           status: user.status,
           avatar_url: user.avatar_url || null,
           avatar_media_id: user.avatar_media_id || null,
+          vehicle_type: user.vehicle_type || 'motorcycle',
           brand_id: user.brand_id,
           organization_id: user.organization_id,
           branch_id: user.branch_id,
@@ -158,10 +163,15 @@ function registerDriverRoutes(router, deps = {}) {
 
   router.put('/driver/profile', driverAuth, (req, res) => {
     try {
+      res.set('Cache-Control', 'no-store');
       const userId = actorId(req);
-      const { full_name, phone, nik } = req.body || {};
+      const body = req.body || {};
+      const full_name = body.full_name;
+      const phone = body.phone !== undefined ? body.phone : (body.phone_number !== undefined ? body.phone_number : body.whatsapp);
+      const nik = body.nik;
+      const vehicle_type = body.vehicle_type;
 
-      const current = db.prepare('SELECT id FROM users WHERE id = ? AND brand_id = ? AND role = ? LIMIT 1')
+      const current = db.prepare('SELECT id, phone FROM users WHERE id = ? AND brand_id = ? AND role = ? LIMIT 1')
         .get(userId, req.brand_id, 'driver');
       if (!current) {
         return res.status(404).json({ success: false, code: 'DRIVER_NOT_FOUND', error: 'Driver tidak ditemukan.' });
@@ -181,14 +191,24 @@ function registerDriverRoutes(router, deps = {}) {
 
       if (typeof phone === 'string') {
         const cleanPhone = phone.trim();
-        updates.push('phone = ?');
-        params.push(cleanPhone || null);
+        if (cleanPhone || !current.phone) {
+          updates.push('phone = ?');
+          params.push(cleanPhone || null);
+        }
       }
 
       if (typeof nik === 'string') {
         const cleanNik = nik.trim();
         updates.push('nik = ?');
         params.push(cleanNik || null);
+      }
+
+      if (typeof vehicle_type === 'string') {
+        const cleanVehicle = vehicle_type.trim().toLowerCase();
+        if (['motorcycle', 'car', 'bicycle'].includes(cleanVehicle)) {
+          updates.push('vehicle_type = ?');
+          params.push(cleanVehicle);
+        }
       }
 
       if (!updates.length) {
@@ -201,7 +221,7 @@ function registerDriverRoutes(router, deps = {}) {
       db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ? AND brand_id = ?`).run(...params);
 
       const updated = db.prepare(
-        'SELECT id, username, email, full_name, phone, nik, ktp_url, ktp_media_id, role, status, brand_id, organization_id, branch_id, avatar_url ' +
+        'SELECT id, username, email, full_name, phone, nik, ktp_url, ktp_media_id, role, status, brand_id, organization_id, branch_id, avatar_url, vehicle_type ' +
         'FROM users WHERE id = ? AND brand_id = ? LIMIT 1'
       ).get(userId, req.brand_id);
 
@@ -406,7 +426,7 @@ function registerDriverRoutes(router, deps = {}) {
         order_id: req.params.orderId,
         actor_id: actorId(req)
       });
-      const task = getTask(req.params.orderId, actorId(req), req.brand_id);
+      const task = getTask(req.params.orderId, actorId(req), req.brand_id, req.user.branchId || req.user.branch_id);
       res.json({ success: true, ...result, task: shapeTask(task) });
     } catch (err) {
       const status = err.status || 409;

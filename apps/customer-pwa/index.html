@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
   <title>Bangjo — Spesial Ayam Tulang Lunak</title>
   <meta name="description" content="Pesan ayam tulang lunak spesial Bangjo langsung dari HP. Delivery & Pick-up tersedia!">
   <meta name="color-scheme" content="light">
@@ -11,10 +11,24 @@
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: dark)">
   <script src="/pwa-theme.js"></script>
   <script src="/assets/js/core/pwa-interaction-guards.js"></script>
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://api.mapbox.com https://app.sandbox.midtrans.com https://app.midtrans.com https://xentra.cloud; style-src 'self' 'unsafe-inline' https: https://api.mapbox.com; img-src * data: blob: https: http:; connect-src 'self' https: http: ws: wss: https://api.mapbox.com https://events.mapbox.com https://xentra.cloud; frame-src 'self' https://app.sandbox.midtrans.com https://app.midtrans.com https://xentra.cloud;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; worker-src 'self' blob:; child-src 'self' blob:; font-src 'self' data: blob: https: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://api.mapbox.com https://app.sandbox.midtrans.com https://app.midtrans.com https://xentra.cloud; style-src 'self' 'unsafe-inline' https: https://api.mapbox.com; img-src * data: blob: https: http:; connect-src 'self' https: http: ws: wss: https://api.mapbox.com https://events.mapbox.com https://xentra.cloud; frame-src 'self' https://app.sandbox.midtrans.com https://app.midtrans.com https://xentra.cloud;">
   <!-- Early theme bootstrap: apply saved brand primary color before CSS renders -->
   <script>
     (function () {
+      // Early customer session sanitizer: ensure no email address is ever retained as a phone number
+      try {
+        ['xentra_v2_customer_session', 'xentra_customer_session'].forEach(function (k) {
+          var raw = localStorage.getItem(k);
+          if (raw) {
+            var parsed = JSON.parse(raw);
+            if (parsed && typeof parsed.phone === 'string' && parsed.phone.indexOf('@') !== -1) {
+              parsed.phone = '';
+              localStorage.setItem(k, JSON.stringify(parsed));
+            }
+          }
+        });
+      } catch (_) {}
+
       // Early theme bootstrap: apply saved brand primary color before CSS renders to prevent theme flash
       try {
         var rawBrand = localStorage.getItem('xentra_v2_brand');
@@ -63,6 +77,9 @@
   <link rel="apple-touch-icon" href="/assets/pwa/icon-192.png">
   <link rel="manifest" href="/manifest.json">
 
+  <!-- Font: Plus Jakarta Sans (Self-hosted authoritative brand typography) -->
+  <link rel="stylesheet" href="/assets/fonts/plus-jakarta-sans.css">
+
   <!-- CSS kritis di-preload agar splash lebih cepat hilang -->
   <link rel="preload" href="/assets/css/tokens.css" as="style">
   <link rel="preload" href="/assets/css/layout.css" as="style">
@@ -70,7 +87,7 @@
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/layout.css">
   <link rel="stylesheet" href="/assets/css/components.css">
-  <link rel="stylesheet" href="/assets/css/home.css">
+  <link rel="stylesheet" href="/assets/css/home.css?v=20261021_rev7">
   <!-- checkout.css, order-received.css & location-picker.css are NOT render-blocking:
        they are lazy-loaded via loadStylesheetOnce() when their view/feature is used.
        Checkout's CSS is additionally gated in updateViews() so it is ready BEFORE
@@ -82,14 +99,15 @@
        1. HOME VIEW (MENU KATALOG)
        ═══════════════════════════════════════════════════ -->
   <script>
-    // Splash tertutup lebih cepat — robot terlihat 1 detik, lalu skeleton
-    // menggantikan. Boot yang gagal tetap punya jalan keluar.
     (function () {
       window.Xentra = window.Xentra || {};
       window.Xentra.showSplash = function (message) {
         var el = document.getElementById('x-splash');
         if (el) {
+          el.classList.remove('x-splash-fade');
           el.style.display = 'flex';
+          el.style.opacity = '1';
+          el.style.pointerEvents = 'auto';
           var txt = document.getElementById('x-splash-text');
           if (txt && typeof message === 'string') {
             txt.textContent = message;
@@ -98,23 +116,34 @@
       };
       window.Xentra.hideSplash = function () {
         var el = document.getElementById('x-splash');
-        if (el) el.style.display = 'none';
+        if (el && el.style.display !== 'none' && !el.classList.contains('x-splash-fade')) {
+          el.classList.add('x-splash-fade');
+          setTimeout(function () {
+            el.style.display = 'none';
+          }, 280);
+        }
       };
       window.__xentraHideSplash = window.Xentra.hideSplash;
 
       // Auto-hide splash when user navigates back (via browser back button or bfcache)
-      window.addEventListener('pageshow', function () {
-        if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
+      window.addEventListener('pageshow', function (event) {
+        if (event && event.persisted && window.Xentra && typeof window.Xentra.hideSplash === 'function') {
           window.Xentra.hideSplash();
         }
       });
 
+      // Ceiling timeout: if API stalls or network fails, gracefully dismiss after 3s
       setTimeout(window.__xentraHideSplash, 3000);
     })();
   </script>
 
-  <div id="x-splash" style="position:fixed;inset:0;z-index:99999;background:#ffffff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;font-family:'Plus Jakarta Sans',system-ui,sans-serif;">
+  <div id="x-splash" style="position:fixed;inset:0;z-index:99999;background:#ffffff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;font-family:'Plus Jakarta Sans',system-ui,sans-serif;transition:opacity 0.28s ease, visibility 0.28s ease;">
     <style>
+      #x-splash.x-splash-fade {
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+      }
       #x-splash .bot-arm-l, #x-splash .bot-arm-r { transform-box: fill-box; transform-origin: 50% 0%; }
       #x-splash .bot-float { animation: bot-float 2.6s ease-in-out infinite alternate; }
       #x-splash .bot-shadow { animation: bot-shadow 2.6s ease-in-out infinite alternate; }
@@ -183,7 +212,7 @@
 
         <!-- RIGHT: Share (Affiliate) + Scan Table + Library (Orders) + Profile -->
         <div class="x-hero-action-icons">
-          <button type="button" class="x-hero-icon-btn x-hero-icon-btn-join" id="x-btn-join" aria-label="Bagikan / Program Kemitraan">
+          <button type="button" class="x-hero-icon-btn x-hero-icon-btn-join" id="x-btn-join" aria-label="Bagikan / Daftar Affiliate">
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#303030" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <circle cx="18" cy="5" r="3"></circle>
               <circle cx="6" cy="12" r="3"></circle>
@@ -326,6 +355,7 @@
        ═══════════════════════════════════════════════════ -->
   <div id="xentra-profile-view" class="x-page" style="display:none;"></div>
   <div id="xentra-account-settings-view" class="x-page" style="display:none;"></div>
+  <div id="xentra-collections-view" class="x-page" style="display:none;"></div>
 
   <!-- NOTE SHEET (EXACT XENTRA-MVP PORTAL) -->
   <div id="x-note-overlay" class="x-note-overlay" style="display:none;">
@@ -400,7 +430,8 @@
         if (_scriptPromises[src]) return _scriptPromises[src];
         _scriptPromises[src] = new Promise(function (resolve, reject) {
           var s = document.createElement('script');
-          s.src = src;
+          var bust = src.indexOf('?') === -1 ? (src + '?v=20261021_rev5') : src;
+          s.src = bust;
           s.async = false;
           s.onload = function () { resolve(); };
           s.onerror = function () { reject(new Error('Failed to load ' + src)); };
@@ -545,11 +576,12 @@
 
       var CONTROLLER_SRC = {
         checkout: '/assets/js/pages/checkout.js',
-        'order-received': '/assets/js/pages/order-received.js',
+        'order-received': '/assets/js/pages/order-received.js?v=20261022_live2',
         affiliate: '/assets/js/pages/aux-pages.js',
         history: '/assets/js/pages/aux-pages.js',
         profile: '/assets/js/pages/aux-pages.js',
-        'account-settings': '/assets/js/pages/aux-pages.js'
+        'account-settings': '/assets/js/pages/aux-pages.js',
+        collections: '/assets/js/pages/aux-pages.js'
       };
 
       function ensureController(view) {
@@ -571,7 +603,7 @@
             (window.Xentra && window.Xentra.OrderReceived) ? Promise.resolve() : loadScriptOnce(src)
           ]);
         }
-        if ((view === 'affiliate' || view === 'history' || view === 'profile') && window.XentraAuxPages) return Promise.resolve();
+        if ((view === 'affiliate' || view === 'history' || view === 'profile' || view === 'account-settings' || view === 'collections') && window.XentraAuxPages) return Promise.resolve();
         return loadScriptOnce(src);
       }
 
@@ -583,14 +615,17 @@
         var historyEl = document.getElementById('xentra-history-view');
         var profileEl = document.getElementById('xentra-profile-view');
         var accountSettingsEl = document.getElementById('xentra-account-settings-view');
+        var collectionsEl = document.getElementById('xentra-collections-view');
 
-        // Hide all views first
-        if (homeEl) homeEl.style.display = 'none';
-        if (checkoutEl) checkoutEl.style.display = 'none';
-        if (orderEl) orderEl.style.display = 'none';
-        if (affiliateEl) affiliateEl.style.display = 'none';
-        if (historyEl) historyEl.style.display = 'none';
-        if (profileEl) profileEl.style.display = 'none';
+        // Hide only views that are not the target view to avoid flicker
+        if (view !== 'home' && homeEl) homeEl.style.display = 'none';
+        if (view !== 'checkout' && checkoutEl) checkoutEl.style.display = 'none';
+        if (view !== 'order-received' && orderEl) orderEl.style.display = 'none';
+        if (view !== 'affiliate' && affiliateEl) affiliateEl.style.display = 'none';
+        if (view !== 'history' && historyEl) historyEl.style.display = 'none';
+        if (view !== 'profile' && profileEl) profileEl.style.display = 'none';
+        if (view !== 'account-settings' && accountSettingsEl) accountSettingsEl.style.display = 'none';
+        if (view !== 'collections' && collectionsEl) collectionsEl.style.display = 'none';
 
         if (view === 'checkout') {
           if (checkoutEl) {
@@ -605,8 +640,12 @@
               .then(function () {
                 var C = window.Xentra && window.Xentra.Checkout;
                 if (C) C.mount(checkoutEl, params);
+                if (typeof window.__xentraHideSplash === 'function') window.__xentraHideSplash();
               })
-              .catch(function () { checkoutEl.style.display = 'block'; });
+              .catch(function () {
+                checkoutEl.style.display = 'block';
+                if (typeof window.__xentraHideSplash === 'function') window.__xentraHideSplash();
+              });
             window.scrollTo(0, 0);
           }
         } else if (view === 'order-received') {
@@ -620,8 +659,11 @@
               .then(function () {
                 var O = window.Xentra && window.Xentra.OrderReceived;
                 if (O) O.mount(orderEl, params && params.orderId);
+                if (typeof window.__xentraHideSplash === 'function') window.__xentraHideSplash();
               })
-              .catch(function () {});
+              .catch(function () {
+                if (typeof window.__xentraHideSplash === 'function') window.__xentraHideSplash();
+              });
             window.scrollTo(0, 0);
           }
         } else if (view === 'affiliate') {
@@ -629,7 +671,9 @@
             affiliateEl.style.display = 'block';
             ensureController('affiliate').then(function () {
               if (window.XentraAuxPages) window.XentraAuxPages.mountAffiliate(affiliateEl);
-            }).catch(function () {});
+            }).catch(function () {
+              if (typeof window.__xentraHideSplash === 'function') window.__xentraHideSplash();
+            });
             window.scrollTo(0, 0);
           }
         } else if (view === 'history') {
@@ -637,7 +681,9 @@
             historyEl.style.display = 'block';
             ensureController('history').then(function () {
               if (window.XentraAuxPages) window.XentraAuxPages.mountHistory(historyEl);
-            }).catch(function () {});
+            }).catch(function () {
+              if (typeof window.__xentraHideSplash === 'function') window.__xentraHideSplash();
+            });
             window.scrollTo(0, 0);
           }
         } else if (view === 'profile') {
@@ -645,7 +691,9 @@
             profileEl.style.display = 'block';
             ensureController('profile').then(function () {
               if (window.XentraAuxPages) window.XentraAuxPages.mountProfile(profileEl);
-            }).catch(function () {});
+            }).catch(function () {
+              if (typeof window.__xentraHideSplash === 'function') window.__xentraHideSplash();
+            });
             window.scrollTo(0, 0);
           }
         } else if (view === 'account-settings') {
@@ -653,19 +701,30 @@
             accountSettingsEl.style.display = 'block';
             ensureController('account-settings').then(function () {
               if (window.XentraAuxPages) window.XentraAuxPages.mountAccountSettings(accountSettingsEl);
-            }).catch(function () {});
+            }).catch(function () {
+              if (typeof window.__xentraHideSplash === 'function') window.__xentraHideSplash();
+            });
+            window.scrollTo(0, 0);
+          }
+        } else if (view === 'collections') {
+          if (collectionsEl) {
+            collectionsEl.style.display = 'block';
+            ensureController('collections').then(function () {
+              if (window.XentraAuxPages && typeof window.XentraAuxPages.mountCollections === 'function') {
+                window.XentraAuxPages.mountCollections(collectionsEl);
+              }
+            }).catch(function () {
+              if (typeof window.__xentraHideSplash === 'function') window.__xentraHideSplash();
+            });
             window.scrollTo(0, 0);
           }
         } else {
-          // Home
+          // Home: splash is hidden by home.js checkHomeReady() once banners & catalog are both painted
           if (homeEl) {
             homeEl.style.display = 'block';
             if (window.XentraHome && typeof window.XentraHome.refresh === 'function') {
               window.XentraHome.refresh();
             }
-              if (typeof window.__xentraHideSplash === 'function') {
-                window.__xentraHideSplash();
-              }
             window.scrollTo(0, 0);
           }
         }
@@ -739,10 +798,12 @@
             if (res && res.success && res.token) {
               var customerName = (res.customer && res.customer.name) || 'Pelanggan';
               var customerEmail = (res.customer && res.customer.email) || '';
+              var rawPhone = (res.customer && res.customer.phone) || '';
+              var customerPhone = (rawPhone && typeof rawPhone === 'string' && !rawPhone.includes('@')) ? rawPhone : '';
               var customerId = (res.customer && res.customer.id) || '';
               Store.setCustomerSession({
                 name: customerName,
-                phone: customerEmail,
+                phone: customerPhone,
                 email: customerEmail,
                 customerId: customerId,
                 customer_id: customerId,
@@ -764,6 +825,30 @@
             if (UI && UI.toast) UI.toast('Gagal menghubungi server saat menyelesaikan login Google.');
           });
       })();
+
+      // Global fallback for customer authentication trigger across all views
+      if (typeof window.openCustomerAuthSheet !== 'function') {
+        window.openCustomerAuthSheet = function (onSuccess) {
+          var returnHash = window.location.hash || '#home';
+          try { sessionStorage.setItem('xnt_auth_return_hash', returnHash); } catch (_) {}
+          var API = window.Xentra && window.Xentra.API;
+          var UI = window.Xentra && window.Xentra.UI;
+          if (UI && UI.toast) UI.toast('Membuka Google Sign-In…');
+          if (API) {
+            API.post('/customer/auth/broker/init', {})
+              .then(function (res) {
+                if (res && res.success && res.broker_url) {
+                  window.location.href = res.broker_url;
+                } else if (UI && UI.toast) {
+                  UI.toast((res && (res.error || res.message)) || 'Gagal membuka Google Sign-In.');
+                }
+              })
+              .catch(function () {
+                if (UI && UI.toast) UI.toast('Gagal menghubungi server Google Sign-In.');
+              });
+          }
+        };
+      }
     })();
   </script>
 
@@ -773,6 +858,7 @@
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').then(function (reg) {
+        try { reg.update(); } catch (_) {}
         reg.addEventListener('updatefound', function () {
           var newWorker = reg.installing;
           if (newWorker) {

@@ -225,10 +225,13 @@ test('CPR-07: Product brand lain tidak bisa diubah lewat brand ini', async () =>
 // ── CPR-08: sisi klien (guard terhadap regresi) ──
 
 test('CPR-08: Editor Product memakai LIST canonical, bukan by-id atau legacy', () => {
-  const start = DASHBOARD_JS.indexOf('async function loadProductEditorPage(productId)');
-  const end = DASHBOARD_JS.indexOf('window.openAddProduct = function ()', start);
+  const catalogJs = fs.readFileSync(
+    path.join(__dirname, '../apps/merchant-dashboard/assets/js/modules/catalog.js'), 'utf8'
+  );
+  const start = catalogJs.indexOf('async function loadProductEditorPage(productId)');
+  const end = catalogJs.indexOf('window.openAddProduct = function ()', start);
   assert.ok(start >= 0 && end > start, 'loader Product Editor harus ada');
-  const loader = DASHBOARD_JS.slice(start, end);
+  const loader = catalogJs.slice(start, end);
 
   assert.ok(loader.includes("API_BASE + '/admin/composed/products?active_only=0'"),
     'loader harus memakai list canonical');
@@ -237,8 +240,8 @@ test('CPR-08: Editor Product memakai LIST canonical, bukan by-id atau legacy', (
   assert.ok(!loader.includes("'/admin/products/'"), 'loader tidak boleh memakai endpoint legacy');
 
   // Save tetap canonical: PUT by-id + payload atomic saja.
-  const saveStart = DASHBOARD_JS.indexOf("var formProduct = $('form-product');");
-  const save = DASHBOARD_JS.slice(saveStart, saveStart + 3000);
+  const saveStart = catalogJs.indexOf("var formProduct = $('form-product');");
+  const save = catalogJs.slice(saveStart, saveStart + 5000);
   assert.ok(save.includes("API_BASE + '/admin/composed/products/' + encodeURIComponent(id)"));
   assert.ok(save.includes("var method = id ? 'PUT' : 'POST';"));
   ['price:', 'category_id:', 'sub_category_id:', 'rasa_id:', 'options:', 'composition:'].forEach((field) => {

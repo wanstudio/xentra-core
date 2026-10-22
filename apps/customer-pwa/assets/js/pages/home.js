@@ -286,6 +286,15 @@
    * Render an array of banners into the carousel track.
    * Cleans up existing slides, renders new ones, and re-initializes carousel.
    */
+  var _homeReady = { catalog: false, banners: false };
+  function checkHomeReady() {
+    if (_homeReady.catalog && _homeReady.banners) {
+      if (typeof window.__xentraHideSplash === 'function') {
+        window.__xentraHideSplash();
+      }
+    }
+  }
+
   function renderBanners(banners) {
     var track = $('x-carousel-track');
     if (!track) return;
@@ -297,6 +306,8 @@
 
     if (!banners || !banners.length) {
       initCarousel();
+      _homeReady.banners = true;
+      checkHomeReady();
       return;
     }
 
@@ -324,6 +335,8 @@
     });
 
     initCarousel();
+    _homeReady.banners = true;
+    checkHomeReady();
     perfLog('banner_paint', 'rendered ' + banners.length + ' banners');
   }
 
@@ -358,6 +371,8 @@
         perfLog('home_api_brand_end', 'error');
         console.warn('[Home] Banner load warn:', err);
         initCarousel();
+        _homeReady.banners = true;
+        checkHomeReady();
       });
   }
 
@@ -1124,6 +1139,8 @@
     renderCategories();
     renderProducts();
     if (branches.length > 1) renderBranchDiscovery();
+    _homeReady.catalog = true;
+    checkHomeReady();
   }
 
   function applyCatalog(data) {
@@ -1303,6 +1320,9 @@
         // legacy products into a genuinely empty canonical branch catalog.
         if (catalogBranchId || !categories.length) {
           renderEmptyBranchCatalog();
+        } else {
+          _homeReady.catalog = true;
+          checkHomeReady();
         }
       })
       .catch(function (err) {
@@ -1313,7 +1333,12 @@
         // Canonical Menu resolution is the only forward Customer PWA catalog source.
         // A canonical failure must remain visible instead of silently reviving the
         // legacy Product-centric catalog, which could produce a mixed/incorrect cart.
-        if (catalogBranchId || !categories.length) renderEmptyBranchCatalog();
+        if (catalogBranchId || !categories.length) {
+          renderEmptyBranchCatalog();
+        } else {
+          _homeReady.catalog = true;
+          checkHomeReady();
+        }
       });
   }
 
@@ -1453,6 +1478,10 @@
     if (closedBanner) {
       closedBanner.hidden = !branchClosed;
     }
+    if (branchClosed && Store.getMyTable && Store.getMyTable()) {
+      Store.clearMyTable();
+      renderMyTableState();
+    }
 
     if (!products.length) {
       // Skip the write when the empty state is already on screen.
@@ -1569,6 +1598,8 @@
     lastProductsHtml = html;
     bindProductEvents();
     perfLog('home_render_end');
+    _homeReady.catalog = true;
+    checkHomeReady();
   }
 
 
@@ -1823,6 +1854,11 @@
     var oldPriceHtml = regPrice > price
       ? '<span class="x-detail-old-price">' + UI.money(regPrice) + '</span>'
       : '';
+    var isPromo = (regPrice > price) || Boolean(product.is_promo);
+    var promoBadgeHtml = isPromo ? '<span class="x-detail-promo-badge">Promo</span>' : '';
+    var isSaved = Boolean(Store && Store.isSavedInCollections && Store.isSavedInCollections(product.id));
+    var compText = menuSubtitle || (menuDetail.length ? menuDetail.join(' + ') : (product.description || ''));
+
     var availabilityHtml = '';
     if (branchClosed) {
       availabilityHtml = '<div style="background:#ffe4e6;color:#e11d48;padding:8px 12px;border-radius:10px;font-size:12px;font-weight:700;margin:8px 0;display:inline-flex;align-items:center;gap:6px;">⚠️ Resto Sedang Tutup Sementara</div>';
@@ -1836,27 +1872,42 @@
       ? '<div class="x-detail-cart-hint">Sudah ada <strong>' + scopedQty + '</strong> di keranjang untuk cabang ini.</div>'
       : '';
 
-
     var overlay = document.createElement('div');
     overlay.className = 'x-overlay x-note-overlay x-detail-overlay';
     overlay.innerHTML =
       '<div class="x-sheet x-note-sheet x-detail-sheet">' +
       '  <div class="x-detail-topbar">' +
-      '    <div class="x-note-handle"></div>' +
-      '    <button type="button" class="x-detail-close" aria-label="Tutup">' +
-      '      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
-      '    </button>' +
+      '    <div class="x-note-handle">' +
+      '      <svg width="30" height="4" viewBox="0 0 30 4" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 2H28" stroke-width="4" stroke-linecap="round" stroke="#979797"/></svg>' +
+      '    </div>' +
       '  </div>' +
       '  <div class="x-detail-scroll-area">' +
       imgHtml +
       '    <div class="x-detail-body">' +
       '      <h3 class="x-detail-name">' + UI.escape(menuTitle) + '</h3>' +
-      (menuSubtitle ? '      <div class="x-detail-subtitle">' + UI.escape(menuSubtitle) + '</div>' : '') +
-      (menuDetail.length ? '      <div class="x-detail-desc">' + UI.escape(menuDetail.join(' · ')) + '</div>' : '') +
+      (compText ? '      <div class="x-detail-subtitle">' + UI.escape(compText) + '</div>' : '') +
       renderCustomerSpiceIndicator(product.menu_indicator_level) +
       branchLabelHtml +
       availabilityHtml +
-      '      <div class="x-detail-price">' + oldPriceHtml + '<span class="x-detail-current">' + UI.money(price) + '</span></div>' +
+      '      <div class="x-detail-price-row">' +
+      '        <span class="x-detail-current">' + UI.money(price) + '</span>' +
+      oldPriceHtml +
+      promoBadgeHtml +
+      '      </div>' +
+      '      <div class="x-detail-actions-row">' +
+      '        <button type="button" class="x-detail-pill-btn x-detail-btn-save' + (isSaved ? ' is-saved' : '') + '" id="x-detail-btn-save" aria-label="Simpan">' +
+      '          <span class="x-detail-pill-icon">' +
+      '            <svg width="16" height="16" viewBox="0 0 15 15" fill="' + (isSaved ? '#e11d48' : 'none') + '" xmlns="http://www.w3.org/2000/svg"><path d="M4.6875 2.5C2.78906 2.5 1.25 4.03906 1.25 5.9375C1.25 9.375 5.3125 12.5 7.5 13.2269C9.6875 12.5 13.75 9.375 13.75 5.9375C13.75 4.03906 12.2109 2.5 10.3125 2.5C9.15 2.5 8.12188 3.07719 7.5 3.96063C7.18297 3.50918 6.76186 3.14075 6.2723 2.88651C5.78274 2.63226 5.23914 2.49969 4.6875 2.5Z" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" stroke="' + (isSaved ? '#e11d48' : 'currentColor') + '"/></svg>' +
+      '          </span>' +
+      '          <span class="x-detail-pill-text">' + (isSaved ? 'Tersimpan' : 'Simpan') + '</span>' +
+      '        </button>' +
+      '        <button type="button" class="x-detail-pill-btn x-detail-btn-share" id="x-detail-btn-share" aria-label="Share">' +
+      '          <span class="x-detail-pill-icon">' +
+      '            <svg width="16" height="16" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10.875 9C12.12 9 13.125 10.005 13.125 11.25C13.125 12.495 12.12 13.5 10.875 13.5C9.63 13.5 8.625 12.495 8.625 11.25C8.625 11.07 8.6475 10.905 8.6925 10.7325L5.4075 9.0075C4.995 9.465 4.41 9.75 3.75 9.75C2.505 9.75 1.5 8.745 1.5 7.5C1.5 6.255 2.505 5.25 3.75 5.25C4.41 5.25 4.995 5.5425 5.4075 5.9925L8.6925 4.2675C8.6475 4.095 8.625 3.93 8.625 3.75C8.625 2.505 9.63 1.5 10.875 1.5C12.12 1.5 13.125 2.505 13.125 3.75C13.125 4.995 12.12 6 10.875 6C10.215 6 9.63 5.7075 9.2175 5.2575L5.9325 6.9825C6.0232 7.32154 6.0232 7.67846 5.9325 8.0175L9.2175 9.7425C9.63 9.285 10.215 9 10.875 9Z" fill="currentColor"/></svg>' +
+      '          </span>' +
+      '          <span class="x-detail-pill-text">Share</span>' +
+      '        </button>' +
+      '      </div>' +
       '    </div>' +
       '  </div>' +
       '  <div class="x-detail-footer">' +
@@ -1864,7 +1915,7 @@
         ? '<button type="button" class="x-detail-add" disabled style="opacity:0.6;background:#ffe4e6;color:#e11d48;cursor:not-allowed;">Resto Tutup</button>'
         : (unavailable
           ? '<button type="button" class="x-detail-add" disabled style="opacity:0.6;background:#e5e7eb;color:#9ca3af;cursor:not-allowed;">Habis</button>'
-          : '<button type="button" class="x-detail-add">' + (scopedQty > 0 ? 'Tambah lagi' : 'Masukkan ke keranjang') + '</button>')) +
+          : '<button type="button" class="x-detail-add">Add to cart' + (scopedQty > 0 ? ' (' + scopedQty + ')' : '') + '</button>')) +
       cartHint +
       '  </div>' +
       '</div>';
@@ -1907,6 +1958,95 @@
         close();
       }
     };
+
+    var saveBtn = overlay.querySelector('#x-detail-btn-save');
+    if (saveBtn) {
+      saveBtn.onclick = function (e) {
+        e.stopPropagation();
+        var newSaved = Store.toggleCollection({
+          id: product.id,
+          name: menuTitle,
+          price: price,
+          regular_price: regPrice,
+          image_url: detailImgSrc,
+          description: product.description || '',
+          menu_subtitle: compText,
+          menu_detail: menuDetail,
+          menu_indicator_level: product.menu_indicator_level || 0,
+          branch_id: branchCtx ? branchCtx.branch_id : (product.branch_id || null)
+        });
+        var iconEl = saveBtn.querySelector('.x-detail-pill-icon');
+        var textEl = saveBtn.querySelector('.x-detail-pill-text');
+        var heartSvg = '<svg width="16" height="16" viewBox="0 0 15 15" fill="' + (newSaved ? '#e11d48' : 'none') + '" xmlns="http://www.w3.org/2000/svg"><path d="M4.6875 2.5C2.78906 2.5 1.25 4.03906 1.25 5.9375C1.25 9.375 5.3125 12.5 7.5 13.2269C9.6875 12.5 13.75 9.375 13.75 5.9375C13.75 4.03906 12.2109 2.5 10.3125 2.5C9.15 2.5 8.12188 3.07719 7.5 3.96063C7.18297 3.50918 6.76186 3.14075 6.2723 2.88651C5.78274 2.63226 5.23914 2.49969 4.6875 2.5Z" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" stroke="' + (newSaved ? '#e11d48' : 'currentColor') + '"/></svg>';
+        if (newSaved) {
+          saveBtn.classList.add('is-saved');
+          if (iconEl) iconEl.innerHTML = heartSvg;
+          if (textEl) textEl.textContent = 'Tersimpan';
+          if (UI && UI.toast) UI.toast('Menu disimpan ke My Collections');
+        } else {
+          saveBtn.classList.remove('is-saved');
+          if (iconEl) iconEl.innerHTML = heartSvg;
+          if (textEl) textEl.textContent = 'Simpan';
+          if (UI && UI.toast) UI.toast('Menu dihapus dari My Collections');
+        }
+      };
+    }
+
+    var shareBtn = overlay.querySelector('#x-detail-btn-share') || overlay.querySelector('#x-share-menu-affiliate');
+    if (shareBtn) {
+      shareBtn.onclick = function (e) {
+        e.stopPropagation();
+        var session = Store ? Store.getState().customerSession : null;
+        if (!session || !session.token) {
+          if (typeof window.startCustomerAuth === 'function') {
+            window.startCustomerAuth(window.location.hash || '#home', function () {
+              triggerShare();
+            });
+          } else if (typeof window.openCustomerAuthSheet === 'function') {
+            window.openCustomerAuthSheet(function () {
+              triggerShare();
+            });
+          } else if (UI && UI.toast) {
+            UI.toast('Silakan masuk terlebih dahulu untuk mendapatkan link affiliate Anda.');
+          }
+          return;
+        }
+        triggerShare();
+
+        function triggerShare() {
+          if (UI && UI.toast) UI.toast('Menyiapkan link rekomendasi…');
+          API.get('/customer/affiliate/share-text?menu_id=' + encodeURIComponent(product.id) + '&menu_title=' + encodeURIComponent(menuTitle))
+            .then(function (res) {
+              if (!res || !res.share_url) {
+                if (UI && UI.toast) UI.toast('Gagal membuat link rekomendasi.');
+                return;
+              }
+              var shareData = {
+                title: menuTitle + ' - Rekomendasi Bangjo',
+                text: res.whatsapp_text || ('Cobain ' + menuTitle + ' di Bangjo: ' + res.share_url),
+                url: res.share_url
+              };
+              if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+                navigator.share(shareData).catch(function () {});
+              } else {
+                var waUrl = 'https://api.whatsapp.com/send?text=' + encodeURIComponent(res.whatsapp_text || (menuTitle + ' ' + res.share_url));
+                window.open(waUrl, '_blank');
+              }
+            })
+            .catch(function (err) {
+              var errMsg = (err && (err.message || err.error)) || '';
+              if (err && (err.error === 'AFFILIATE_NOT_ACTIVE' || /belum terdaftar|belum aktif/i.test(errMsg))) {
+                if (UI && UI.toast) UI.toast('Silakan daftar kemitraan affiliate terlebih dahulu untuk mulai membagikan menu.');
+                if (window.Xentra && window.Xentra.Router) {
+                  window.Xentra.Router.navigate('affiliate');
+                }
+                return;
+              }
+              if (UI && UI.toast) UI.toast('Gagal membagikan menu: ' + errMsg);
+            });
+        }
+      };
+    }
 
     var addBtn = overlay.querySelector('.x-detail-add');
     if (addBtn && !addBtn.disabled) {
@@ -2530,6 +2670,24 @@
 
     function renderMyTableState() {
       var table = (Store.getMyTable && Store.getMyTable()) || null;
+      var sess = (Store.getState && Store.getState().customerSession) || null;
+
+      // Mekanisme Destroy / Bersih Cache:
+      // 1. Jika restoran / cabang sedang tutup, meja tidak boleh aktif / terlock
+      if (activeBranch && isBranchClosed(activeBranch) && table) {
+        Store.clearMyTable();
+        table = null;
+      }
+
+      // 2. Jika dalam posisi logout (tidak ada customerSession) dan tidak ada ?meja= baru di URL,
+      // meja dari sesi masa lalu tidak boleh terlock di layar!
+      var urlHasMeja = false;
+      try { urlHasMeja = Boolean(new URLSearchParams(window.location.search).get('meja')); } catch (_) {}
+      if ((!sess || !sess.token) && table && !urlHasMeja) {
+        Store.clearMyTable();
+        table = null;
+      }
+
       var showTable = !!table && isDineInOrderType();
       // SATU mekanisme saja: atribut `hidden`. home.css menegakkannya dengan
       // [hidden] { display: none !important }, karena display:flex milik kelas
@@ -2578,8 +2736,15 @@
       });
     }
 
-    function claimTableFromHome(token) {
-      if (!token || !API || !API.post) return;
+    function claimTableFromHome(token, onDone) {
+      if (!token || !API || !API.post) {
+        if (typeof onDone === 'function') onDone(false);
+        return;
+      }
+
+      try {
+        localStorage.setItem('xentra_v2_pending_table_token', token);
+      } catch (_) {}
 
       // Sudah punya meja: memindahkan meja bukan hak tamu. Sistem mengunci, dan
       // kasir yang bisa memindahkan (reassign) atau menutup & membuka sesi baru.
@@ -2593,12 +2758,14 @@
           body: 'Pesananmu sudah terikat ke meja ' + (current.number || '-') + '.',
           actions: [{ label: 'Mengerti', onClick: closeTableNotice }]
         });
+        if (typeof onDone === 'function') onDone(false);
         return;
       }
 
       API.post('/customer/dining-session/claim', { qr_token: token, branch_id: myTableBranchId() }).then(function (res) {
         if (!res || res.success !== true || !res.table) {
           showTableNotice({ tone: 'warn', title: 'QR meja tidak dikenali.', body: 'Coba lagi, atau minta bantuan petugas.', actions: [{ label: 'Mengerti', onClick: closeTableNotice }] });
+          if (typeof onDone === 'function') onDone(false);
           return;
         }
         var table = { id: res.table.id, number: res.table.table_number || res.table.label || '' };
@@ -2614,8 +2781,11 @@
           body: 'Pesan makananmu, kami akan antarkan langsung ke mejamu.',
           actions: [{ label: 'Pesan menu', primary: true, onClick: closeTableNotice }]
         });
+        reconcileMyTable();
+        if (typeof onDone === 'function') onDone(true);
       }).catch(function () {
         showTableNotice({ tone: 'warn', title: 'Koneksi bermasalah.', body: 'Meja belum bisa dipasang. Coba lagi.', actions: [{ label: 'Mengerti', onClick: closeTableNotice }] });
+        if (typeof onDone === 'function') onDone(false);
       });
     }
 
@@ -2624,6 +2794,28 @@
     // (baru scan, belum pesan) bukan alasan menghapus meja.
     function reconcileMyTable() {
       var table = (Store.getMyTable && Store.getMyTable()) || null;
+      if (!table) return;
+
+      // 1. Cabang tutup: otomatis destroy meja
+      if (activeBranch && isBranchClosed(activeBranch)) {
+        Store.clearMyTable();
+        renderMyTableState();
+        return;
+      }
+
+      var sess = (Store.getState && Store.getState().customerSession) || null;
+      var urlHasMeja = false;
+      try { urlHasMeja = Boolean(new URLSearchParams(window.location.search).get('meja')); } catch (_) {}
+
+      // 2. Posisi logout: meja dari sesi masa lalu dihancurkan
+      if (!sess || !sess.token) {
+        if (!urlHasMeja || table.hadOpenBill) {
+          Store.clearMyTable();
+          renderMyTableState();
+        }
+        return;
+      }
+
       if (!API || !API.get) return;
       API.get('/customer/dining-session').then(function (res) {
         var current = (Store.getMyTable && Store.getMyTable()) || {};
@@ -2636,9 +2828,18 @@
           }
         } else if (current.hadOpenBill) {
           Store.clearMyTable();
+        } else if (!urlHasMeja) {
+          // Kasir sudah release meja / sesi ditutup / tidak ada tagihan
+          Store.clearMyTable();
         }
         renderMyTableState();
-      }).catch(function () {});
+      }).catch(function (err) {
+        // Jika sesi tidak valid / 401: hancurkan cache meja
+        if (err && (err.status === 401 || (err.error && String(err.error).indexOf('AUTH') !== -1))) {
+          Store.clearMyTable();
+          renderMyTableState();
+        }
+      });
     }
 
     if (btnScanTable) {
@@ -2653,14 +2854,44 @@
     renderMyTableState();
     reconcileMyTable();
 
+    // Auto-claim table when visiting with ?meja= in URL (e.g. native phone camera QR scan)
+    try {
+      var urlParams = new URLSearchParams(window.location.search);
+      var mejaParam = urlParams.get('meja');
+      if (mejaParam) {
+        claimTableFromHome(mejaParam);
+      }
+    } catch (_) {}
+
     // Ikon topbar juga harus ikut berubah TANPA reload: meja bisa dipasang dari
     // halaman lain (dipilih di checkout), dan home tidak di-render ulang saat
     // kembali. Sekali langganan saja, jangan menumpuk tiap init.
     if (!window.__xentraMyTableBound && Store.subscribe) {
       window.__xentraMyTableBound = true;
       Store.subscribe(function (evt) {
-        // Ikut perubahan meja DAN perubahan tipe pembelian (tampil/sembunyi).
+        // Ikut perubahan meja DAN perubahan tipe pembelian (tampil/sembunyi) DAN login akun.
         if (!evt || evt.type === 'my_table' || evt.type === 'orderType') renderMyTableState();
+        if (evt && (evt.type === 'customer_session' || evt.type === 'customerSession')) {
+          var curSess = (Store.getState && Store.getState().customerSession) || null;
+          if (!curSess || !curSess.token) {
+            // Tamu logout: langsung destroy meja dan refresh tampilan!
+            Store.clearMyTable();
+            renderMyTableState();
+          } else {
+            try {
+              var pendingToken = localStorage.getItem('xentra_v2_pending_table_token');
+              if (pendingToken) {
+                API.post('/customer/dining-session/claim', { qr_token: pendingToken, branch_id: myTableBranchId() }).then(function () {
+                  reconcileMyTable();
+                }).catch(function () {});
+              } else {
+                reconcileMyTable();
+              }
+            } catch (_) {
+              reconcileMyTable();
+            }
+          }
+        }
       });
     }
 
@@ -2780,6 +3011,8 @@
     },
     getBranches: function () {
       return branches;
-    }
+    },
+    openProductDetail: openProductDetail
   };
+  window.openProductDetail = openProductDetail;
 })();

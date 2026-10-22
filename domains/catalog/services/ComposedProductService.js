@@ -55,6 +55,8 @@ class ComposedProductService {
     imageUrl = null,
     image = null,
     isActive = true,
+    optionsConfig = null,
+    options_config = null,
     actorId = null,
     actorRole = null
   }) {
@@ -67,6 +69,10 @@ class ComposedProductService {
       ? Number(costPrice) || 0
       : (cost_price !== null && cost_price !== undefined ? Number(cost_price) || 0 : 0);
     const resolvedInventoryType = String(inventory_type || inventoryType || 'COOKED').toUpperCase() === 'DIRECT' ? 'DIRECT' : 'COOKED';
+    const rawOptionsConfig = options_config !== null && options_config !== undefined ? options_config : optionsConfig;
+    const resolvedOptionsConfig = rawOptionsConfig !== null && rawOptionsConfig !== undefined
+      ? (typeof rawOptionsConfig === 'object' ? JSON.stringify(rawOptionsConfig) : String(rawOptionsConfig))
+      : null;
     const id = makeId('prd');
     const baseSlug = slugify(normalizedName) || id;
     const slug = baseSlug + '-' + id.slice(-8);
@@ -75,9 +81,9 @@ class ComposedProductService {
     try {
       repository.db.execute(
         "INSERT INTO products " +
-        "(id, brand_id, category_id, name, slug, description, price, regular_price, image_url, image, is_active, sku, cost_price, inventory_type) " +
-        "VALUES (?, ?, NULL, ?, ?, ?, 0, NULL, ?, ?, ?, ?, ?, ?)",
-        [id, brandId, normalizedName, slug, description == null ? '' : String(description), imageUrl, image, normalizeBoolean(isActive) ? 1 : 0, normalizedSku, normalizedCostPrice, resolvedInventoryType]
+        "(id, brand_id, category_id, name, slug, description, price, regular_price, image_url, image, is_active, sku, cost_price, inventory_type, options_config) " +
+        "VALUES (?, ?, NULL, ?, ?, ?, 0, NULL, ?, ?, ?, ?, ?, ?, ?)",
+        [id, brandId, normalizedName, slug, description == null ? '' : String(description), imageUrl, image, normalizeBoolean(isActive) ? 1 : 0, normalizedSku, normalizedCostPrice, resolvedInventoryType, resolvedOptionsConfig]
       );
 
       if (normalizedSku) {
@@ -121,6 +127,8 @@ class ComposedProductService {
     image,
     isActive,
     sku,
+    optionsConfig,
+    options_config,
     actorId = null,
     actorRole = null
   }) {
@@ -192,6 +200,15 @@ class ComposedProductService {
         repository.db.execute(
           "UPDATE products SET is_active = ?, updated_at = datetime('now') WHERE id = ? AND brand_id = ?",
           [nextActive, productId, brandId]
+        );
+      }
+
+      const rawOptionsConfig = options_config !== undefined ? options_config : optionsConfig;
+      if (rawOptionsConfig !== undefined) {
+        const serialized = rawOptionsConfig === null ? null : (typeof rawOptionsConfig === 'object' ? JSON.stringify(rawOptionsConfig) : String(rawOptionsConfig));
+        repository.db.execute(
+          "UPDATE products SET options_config = ?, updated_at = datetime('now') WHERE id = ? AND brand_id = ?",
+          [serialized, productId, brandId]
         );
       }
 

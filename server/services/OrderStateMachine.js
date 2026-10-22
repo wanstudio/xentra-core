@@ -119,6 +119,27 @@ class OrderStateMachine {
         PromotionEngineService.voidRedemptions({ order_id, reason: note || `Order ${target_status} by ${actor_type} (never accepted)` });
       }
 
+      // Affiliate commission settlement hooks:
+      // When an order is completed, release pending commission to payable balance.
+      // When cancelled, rejected, timed out, or refunded, void the commission.
+      if (target_status === 'completed') {
+        try {
+          const { createAffiliateService } = require('../../domains/affiliate');
+          const affiliateService = createAffiliateService();
+          affiliateService.approveOrderCommission({ orderId: order_id });
+        } catch (affErr) {
+          console.warn('[Affiliate Order Completed Warning]:', affErr.message);
+        }
+      } else if (['cancelled', 'rejected', 'timeout', 'refunded'].includes(target_status)) {
+        try {
+          const { createAffiliateService } = require('../../domains/affiliate');
+          const affiliateService = createAffiliateService();
+          affiliateService.voidOrderCommission({ orderId: order_id });
+        } catch (affErr) {
+          console.warn('[Affiliate Order Void Warning]:', affErr.message);
+        }
+      }
+
       if (ownsTransaction) orderRepository.commitTransaction();
     } catch (txErr) {
       if (ownsTransaction) {

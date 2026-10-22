@@ -142,12 +142,13 @@ export default function CategoriesPage({ onBack, onNavigate }) {
   };
 
   const handleCardClick = (cat) => {
-    if (typeof window.openEditCategory === 'function') {
-      window.openEditCategory(cat.id);
+    const targetRoute = `catalog/categories/${encodeURIComponent(cat.id)}`;
+    if (typeof onNavigate === 'function') {
+      onNavigate(targetRoute);
     } else if (typeof window.navigateTo === 'function') {
-      window.navigateTo(`catalog/categories/${encodeURIComponent(cat.id)}/edit`);
+      window.navigateTo(targetRoute);
     } else {
-      window.location.hash = `#catalog/categories/${encodeURIComponent(cat.id)}/edit`;
+      window.location.hash = `#${targetRoute}`;
     }
   };
 

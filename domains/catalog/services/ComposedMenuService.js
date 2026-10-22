@@ -207,7 +207,7 @@ class ComposedMenuService {
       if (!item || typeof item !== 'object') {
         throw new Error('MENU_ITEM_INVALID');
       }
-      const productId = String(item.product_id ?? item.productId ?? '').trim();
+      const productId = String(item.product_id ?? item.productId ?? item.item_id ?? item.itemId ?? item.id ?? '').trim();
       if (!productId) throw new Error('MENU_ITEM_PRODUCT_REQUIRED');
       if (seen.has(productId)) throw new Error('MENU_ITEM_DUPLICATE_PRODUCT');
       seen.add(productId);

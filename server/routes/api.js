@@ -35,9 +35,11 @@ const { NotificationService } = require('../../core');
 const notificationService = new NotificationService(db);
 const registerDineInRoutes = require('./dine-in');
 const registerPaymentWebhooks = require('./webhooks');
+const registerChannelIntegrationRoutes = require('./channel-integrations');
 const registerSettingsRoutes = require('./settings');
 const registerAdminMarketingPromotionRoutes = require('./admin-marketing-promotions');
 const registerAdminMarketingOverviewRoutes = require('./admin-marketing-overview');
+const registerAffiliateRoutes = require('./affiliate');
 const registerAdminMarketingBannerRoutes = require('./admin-marketing-banners');
 const { createBannerHelpers } = require('./banner-helpers');
 const registerAdminReportingRoutes = require('./admin-reporting');
@@ -914,6 +916,12 @@ registerOperationalOrderRoutes(router, {
   AcceptanceTimeoutService
 });
 
+// External Marketplace Orders (GoFood / GrabFood / ShopeeFood) Ingestion & Settlement
+registerChannelIntegrationRoutes(router, {
+  db,
+  requireAuth
+});
+
 // 9.0.1 R7 CUSTOMER CANCELLATION — a customer may cancel ONLY an order still
 // awaiting branch acceptance (orders.status = 'pending'). ACCEPTED
 // ('confirmed') and later orders may NOT be customer-cancelled here (branch
@@ -947,6 +955,9 @@ registerMerchantAuthRoutes(router, {
 
 // Workforce routes are isolated in server/routes/workforce.js.
 registerWorkforceRoutes(router, { db, requireAuth, TokenSessionStore });
+
+// Affiliate domain routes (Customer referral & Owner payout management)
+registerAffiliateRoutes(router, { requireCustomerAuth, requireAuth });
 
 // P1 DATA SANITIZATION HELPER (SEC-02 & FINDING 10)
 function serializePublicBrand(brand) {

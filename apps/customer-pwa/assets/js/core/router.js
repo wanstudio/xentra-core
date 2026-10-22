@@ -33,6 +33,9 @@
   if (hash.startsWith('#account-settings') || window.location.pathname.startsWith('/pengaturan-akun')) {
     return 'account-settings';
   }
+  if (hash.startsWith('#collections') || window.location.pathname.startsWith('/collections')) {
+    return 'collections';
+  }
     return 'home';
   }
 
@@ -70,34 +73,47 @@
     return params.get('branch_id') || params.get('branch') || null;
   }
 
+  var _lastNavigatedHash = null;
+
   function navigate(view, params) {
     if (view === 'checkout') {
       var branchId = (params && params.branchId) || '';
       var itemId = (params && params.itemId) || '';
-      window.location.hash = branchId
+      _lastNavigatedHash = branchId
         ? '#checkout/branch/' + branchId
         : (itemId ? '#checkout/item/' + itemId : '#checkout');
+      window.location.hash = _lastNavigatedHash;
     } else if (view === 'order-received') {
       var orderId = (params && params.orderId) || '';
-      window.location.hash = '#order-received/' + orderId;
+      _lastNavigatedHash = '#order-received/' + orderId;
+      window.location.hash = _lastNavigatedHash;
     } else if (view === 'affiliate') {
+      _lastNavigatedHash = '#affiliate';
       window.location.hash = '#affiliate';
     } else if (view === 'history') {
+      _lastNavigatedHash = '#history';
       window.location.hash = '#history';
     } else if (view === 'profile') {
+      _lastNavigatedHash = '#profile';
       window.location.hash = '#profile';
     } else if (view === 'account-settings') {
+      _lastNavigatedHash = '#account-settings';
       window.location.hash = '#account-settings';
+    } else if (view === 'collections') {
+      _lastNavigatedHash = '#collections';
+      window.location.hash = '#collections';
     } else {
       // Navigating to Home
       if (window.location.pathname.startsWith('/checkout') ||
           window.location.pathname.startsWith('/order-received') ||
           window.location.pathname.startsWith('/affiliate') ||
           window.location.pathname.startsWith('/history') ||
-          window.location.pathname.startsWith('/profile')) {
+          window.location.pathname.startsWith('/profile') ||
+          window.location.pathname.startsWith('/collections')) {
         window.location.href = '/';
         return;
       }
+      _lastNavigatedHash = '';
       if (window.location.hash) {
         window.location.hash = '';
       }
@@ -112,7 +128,8 @@
         window.location.pathname.startsWith('/order-received') ||
         window.location.pathname.startsWith('/affiliate') ||
         window.location.pathname.startsWith('/history') ||
-        window.location.pathname.startsWith('/profile')) {
+        window.location.pathname.startsWith('/profile') ||
+        window.location.pathname.startsWith('/collections')) {
       window.location.href = '/';
       return;
     }
@@ -138,6 +155,12 @@
 
   // Handle URL hash changes & browser back button
   window.addEventListener('hashchange', function () {
+    var currentHash = window.location.hash || '';
+    if (_lastNavigatedHash !== null && currentHash === _lastNavigatedHash) {
+      _lastNavigatedHash = null;
+      return;
+    }
+    _lastNavigatedHash = null;
     var v = getViewFromUrl();
     var orderId = getOrderIdFromUrl();
     var itemId = getItemIdFromUrl();
@@ -158,6 +181,38 @@
     currentView = v;
     emit(v, { orderId: orderId, itemId: itemId, branchId: branchId });
   });
+
+  // Capture affiliate referral code on page load / entry
+  try {
+    var urlParams = new URLSearchParams(window.location.search);
+    var affRef = urlParams.get('ref') || urlParams.get('aff');
+    var affMenu = urlParams.get('menu') || urlParams.get('menu_id');
+    if (affRef) {
+      affRef = affRef.trim();
+      localStorage.setItem('xentra_affiliate_ref', affRef);
+      if (affMenu) {
+        sessionStorage.setItem('xentra_affiliate_menu', affMenu.trim());
+      }
+      var visitorSessionId = localStorage.getItem('xentra_visitor_session_id');
+      if (!visitorSessionId) {
+        visitorSessionId = 'vis_' + Math.random().toString(36).substring(2, 12) + '_' + Date.now();
+        localStorage.setItem('xentra_visitor_session_id', visitorSessionId);
+      }
+      fetch('/api/v1/customer/affiliate/attribute', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Session-ID': visitorSessionId
+        },
+        body: JSON.stringify({
+          referral_code: affRef,
+          session_id: visitorSessionId,
+          menu_id: affMenu || null,
+          source: 'link'
+        })
+      }).catch(function () {});
+    }
+  } catch (_) {}
 
   // Export
   window.Xentra = window.Xentra || {};

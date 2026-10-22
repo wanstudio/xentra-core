@@ -112,7 +112,7 @@ class ComposedMenuRepository {
 
   findProduct({ brandId, productId }) {
     return this.db.queryOne(
-      "SELECT id, brand_id, name, sku, cost_price, description, image_url, image, is_active, COALESCE(inventory_type, 'COOKED') AS inventory_type FROM products " +
+      "SELECT id, brand_id, name, sku, cost_price, description, image_url, image, is_active, COALESCE(inventory_type, 'COOKED') AS inventory_type, options_config FROM products " +
       "WHERE id = ? AND brand_id = ?",
       [productId, brandId]
     );
@@ -135,7 +135,7 @@ class ComposedMenuRepository {
       params.push(needle, needle);
     }
     const products = this.db.queryMany(
-      "SELECT p.id, p.brand_id, p.name, p.sku, p.cost_price, p.description, p.image_url, p.image, p.is_active, COALESCE(p.inventory_type, 'COOKED') AS inventory_type " +
+      "SELECT p.id, p.brand_id, p.name, p.sku, p.cost_price, p.description, p.image_url, p.image, p.is_active, COALESCE(p.inventory_type, 'COOKED') AS inventory_type, p.options_config " +
       "FROM products p WHERE " + clauses.join(' AND ') +
       " ORDER BY p.name ASC, p.id ASC",
       params
@@ -303,7 +303,7 @@ class ComposedMenuRepository {
       "SELECT mi.menu_id, mi.product_id, mi.quantity, mi.sort_order, " +
       "p.name AS product_name, p.slug AS product_slug, p.sku, p.description AS product_description, " +
       "p.image_url AS product_image_url, p.image AS product_image, p.media_id AS product_media_id, " +
-      "p.is_active AS product_is_active, " +
+      "p.is_active AS product_is_active, p.options_config, " +
       "COALESCE(p.fulfillment_type, 'BY_STOCK') AS fulfillment_type " +
       "FROM menu_items mi " +
       "JOIN menus m ON m.id = mi.menu_id AND m.brand_id = ? " +

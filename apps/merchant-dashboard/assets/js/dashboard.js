@@ -527,10 +527,14 @@
       return 'catalog/master-menus';
     }
 
+    if (/^catalog\/categories\/[^/]+\/edit$/.test(current)) {
+      return 'catalog/categories/' + current.split('catalog/categories/')[1].split('/edit')[0];
+    }
+
     if (current === 'catalog/categories/new' ||
         current === 'catalog/categories/sort' ||
         current === 'catalog/categories/reorder' ||
-        /^catalog\/categories\/[^/]+\/edit$/.test(current)) {
+        /^catalog\/categories\/[^/]+$/.test(current)) {
       return 'catalog/categories';
     }
 
@@ -885,6 +889,10 @@
       route === 'catalog/categories/sort' ||
       route === 'catalog/categories/reorder'
     );
+    var isCategoryDetail = !isPlatform &&
+      /^catalog\/categories\/[^/]+$/.test(route) &&
+      !isCategoryEditor &&
+      !isCategorySort;
     var categoryEditorId = isCategoryEditor && route !== 'catalog/categories/new'
       ? route.split('catalog/categories/')[1].split('/edit')[0]
       : null;
@@ -941,7 +949,7 @@
     var isSettingsRoute = !isPlatform && (route === 'settings' || route.indexOf('settings/') === 0);
     var settingsSubtab = isSettingsRoute ? (route.indexOf('settings/') === 0 ? route.split('settings/')[1] : 'business/profile') : 'business/profile';
 
-    var metaKey = (isCategoryEditor || isCategorySort)
+    var metaKey = (isCategoryEditor || isCategorySort || isCategoryDetail)
       ? 'catalog/categories'
       : ((isMasterMenuEditor || route === 'catalog/master-menus')
         ? 'catalog/master-menus'
@@ -984,7 +992,7 @@
     if (!isPlatform) {
       document.querySelectorAll('.x-nav-sub-item[data-route]').forEach(function (btn) {
         var targetRoute = btn.dataset.route;
-        var isActiveSub = targetRoute === route || (isProductDetail && targetRoute === 'catalog/products') || (isMasterMenuEditor && targetRoute === 'catalog/master-menus') || (isCategoryEditor && targetRoute === 'catalog/categories');
+        var isActiveSub = targetRoute === route || (isProductDetail && targetRoute === 'catalog/products') || (isMasterMenuEditor && targetRoute === 'catalog/master-menus') || ((isCategoryEditor || isCategoryDetail || isCategorySort) && targetRoute === 'catalog/categories');
         btn.classList.toggle('active', isActiveSub);
       });
 

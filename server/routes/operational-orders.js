@@ -437,4 +437,136 @@ router.post('/orders/:id/branch-acceptance', requireAuth(['owner', 'brand_manage
   }
 });
 
+// ==============================================================================
+// BRANCH MANAGER DELIVERY DISPATCH APIS
+// ==============================================================================
+
+// GET /api/v1/admin/branches/:branchId/drivers
+// List active branch drivers for operational dispatch assignment
+router.get('/admin/branches/:branchId/drivers', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    res.set('Cache-Control', 'no-store');
+    const { branchId } = req.params;
+    if (!branchId) {
+      return res.status(400).json({ success: false, error: 'branchId wajib diisi.' });
+    }
+
+    // Branch scoping guard for branch_manager
+    if (req.user.role === 'branch_manager' && req.user.branchId && String(req.user.branchId) !== String(branchId)) {
+      return res.status(403).json({ success: false, error: 'Akses ditolak: di luar cabang wewenang Anda.' });
+    }
+
+    const drivers = db.prepare(
+      `SELECT id, username, full_name, phone, status, branch_id, avatar_url, updated_at
+       FROM users
+       WHERE brand_id = ? AND branch_id = ? AND role = 'driver' AND status = 'active'
+       ORDER BY full_name ASC, username ASC`
+    ).all(req.brand_id, branchId);
+
+    // Enrich with active delivery task count
+    const enriched = drivers.map(d => {
+      const activeTaskCount = db.prepare(
+        `SELECT COUNT(*) as count
+         FROM order_deliveries dlv
+         JOIN orders o ON o.id = dlv.order_id
+         WHERE dlv.driver_id = ? AND o.branch_id = ? AND dlv.status IN ('assigned', 'picked_up', 'on_delivery')`
+      ).get(d.id, branchId);
+      return {
+        id: d.id,
+        name: d.full_name || d.username,
+        phone: d.phone || '',
+        status: d.status,
+        active_tasks: activeTaskCount ? Number(activeTaskCount.count || 0) : 0,
+        avatar_url: d.avatar_url || null
+      };
+    });
+
+    return res.json({ success: true, drivers: enriched });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/v1/admin/orders/:id/assign-driver
+// Assign driver to a ready delivery order
+router.post('/admin/orders/:id/assign-driver', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const { driver_id, driver_name, driver_phone } = req.body || {};
+
+    const order = db.prepare('SELECT * FROM orders WHERE id = ? AND brand_id = ?').get(orderId, req.brand_id);
+    if (!order) {
+      return res.status(404).json({ success: false, error: 'Pesanan tidak ditemukan.' });
+    }
+
+    if (req.user.role === 'branch_manager' && req.user.branchId && String(req.user.branchId) !== String(order.branch_id)) {
+      return res.status(403).json({ success: false, error: 'Akses ditolak: Pesanan berada di luar cabang wewenang Anda.' });
+    }
+
+    if (order.order_type !== 'delivery') {
+      return res.status(400).json({ success: false, error: 'Penugasan driver hanya berlaku untuk pesanan delivery.' });
+    }
+
+    if (order.status !== 'ready') {
+      return res.status(400).json({ success: false, error: 'Driver hanya dapat ditugaskan saat pesanan sudah berstatus ready.' });
+    }
+
+    let resolvedDriverName = driver_name ? String(driver_name).trim() : '';
+    let resolvedDriverPhone = driver_phone ? String(driver_phone).trim() : '';
+    let resolvedDriverId = driver_id ? String(driver_id).trim() : null;
+
+    if (resolvedDriverId) {
+      const driver = db.prepare(
+        `SELECT id, full_name, username, phone, role, status, branch_id, brand_id
+         FROM users WHERE id = ? AND brand_id = ? LIMIT 1`
+      ).get(resolvedDriverId, req.brand_id);
+
+      if (!driver || driver.role !== 'driver' || driver.status !== 'active') {
+        return res.status(400).json({ success: false, error: 'Driver tidak valid atau tidak aktif.' });
+      }
+
+      if (String(driver.branch_id) !== String(order.branch_id)) {
+        return res.status(400).json({ success: false, error: 'Driver harus berasal dari cabang yang sama dengan pesanan.' });
+      }
+
+      resolvedDriverName = driver.full_name || driver.username;
+      if (resolvedDriverPhone && resolvedDriverPhone !== (driver.phone || '')) {
+        db.prepare(`UPDATE users SET phone = ?, updated_at = datetime('now') WHERE id = ? AND brand_id = ?`)
+          .run(resolvedDriverPhone, resolvedDriverId, req.brand_id);
+      } else {
+        resolvedDriverPhone = driver.phone || resolvedDriverPhone || '';
+      }
+    }
+
+    if (!resolvedDriverName) {
+      return res.status(400).json({ success: false, error: 'Nama driver wajib diisi.' });
+    }
+
+    if (!resolvedDriverId && !resolvedDriverPhone) {
+      return res.status(400).json({ success: false, error: 'Nomor telepon driver wajib diisi.' });
+    }
+
+    const { DeliveryDispatchService } = require('../../domains/delivery');
+    const result = DeliveryDispatchService.assign({
+      order_id: order.id,
+      driver_id: resolvedDriverId,
+      driver_name: resolvedDriverName,
+      driver_phone: resolvedDriverPhone,
+      assigned_by: req.user.id || req.user.userId
+    });
+
+    const deliveryRecord = db.prepare('SELECT * FROM order_deliveries WHERE order_id = ?').get(order.id);
+
+    return res.json({
+      success: true,
+      order_id: order.id,
+      order_number: order.order_number,
+      delivery: deliveryRecord,
+      ...result
+    });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 };

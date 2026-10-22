@@ -473,7 +473,7 @@ router.post('/admin/brand/customer-icon', requireAuth(['owner', 'brand_manager']
   try {
     const { image_base64, mime_type, original_filename, crop_spec } = req.body || {};
     if (!image_base64) {
-      return res.status(400).json({ success: false, error: 'Data icon Belanja PWA wajib diunggah.', code: 'MISSING_IMAGE_DATA' });
+      return res.status(400).json({ success: false, error: 'Data icon Pelanggan PWA wajib diunggah.', code: 'MISSING_IMAGE_DATA' });
     }
 
     const oldMediaId = latestAttachedMediaId(req.brand_id, 'brand_customer_pwa_icon', req.brand_id);
@@ -500,14 +500,14 @@ router.post('/admin/brand/customer-icon', requireAuth(['owner', 'brand_manager']
     if (req.brand) req.brand.customer_pwa_icon_url = iconUrl;
     res.status(201).json({
       success: true,
-      message: 'Icon Belanja PWA berhasil diproses dan diperbarui.',
+      message: 'Icon Pelanggan PWA berhasil diproses dan diperbarui.',
       media_id: asset.media_id,
       preview_url: iconUrl,
       customer_pwa_icon_url: iconUrl
     });
   } catch (err) {
     const statusCode = err.code === 'UNAUTHORIZED_TENANT' ? 403 : 400;
-    res.status(statusCode).json({ success: false, error: err.message || 'Gagal menyimpan icon Belanja PWA.', code: err.code || 'CUSTOMER_PWA_ICON_UPLOAD_ERROR' });
+    res.status(statusCode).json({ success: false, error: err.message || 'Gagal menyimpan icon Pelanggan PWA.', code: err.code || 'CUSTOMER_PWA_ICON_UPLOAD_ERROR' });
   }
 });
 
@@ -524,7 +524,7 @@ router.delete('/admin/brand/customer-icon', requireAuth(['owner', 'brand_manager
       coreBrandRepo.removeCustomerPwaIcon(req.brand_id);
     }
     if (req.brand) req.brand.customer_pwa_icon_url = null;
-    res.json({ success: true, message: 'Icon Belanja PWA berhasil dihapus.', customer_pwa_icon_url: null });
+    res.json({ success: true, message: 'Icon Pelanggan PWA berhasil dihapus.', customer_pwa_icon_url: null });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message || 'Server error', code: 'CUSTOMER_PWA_ICON_DELETE_ERROR' });
   }

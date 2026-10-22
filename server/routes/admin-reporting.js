@@ -174,7 +174,8 @@ router.get('/reports/:report_type', requireAuth(['owner', 'brand_manager', 'bran
       pos_shifts: ['owner', 'brand_manager', 'branch_manager'],
       products: ['owner', 'brand_manager', 'branch_manager'],
       branches: ['owner', 'brand_manager'],
-      branch_comparison: ['owner', 'brand_manager']
+      branch_comparison: ['owner', 'brand_manager'],
+      affiliate: ['owner', 'brand_manager']
     };
 
     const allowedRoles = REPORT_ALLOWED_ROLES[report_type];

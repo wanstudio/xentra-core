@@ -3,6 +3,7 @@ import OverviewPage from '../components/OverviewPage';
 import CategoriesPage from '../components/CategoriesPage';
 import CategoryEditorPage from '../components/CategoryEditorPage';
 import CategorySortPage from '../components/CategorySortPage';
+import CategoryDetailPage from '../components/CategoryDetailPage';
 import ItemMasterPage from '../components/ItemMasterPage';
 import CatalogSubHub from '../components/CatalogSubHub';
 import BusinessHub from '../components/BusinessHub';
@@ -159,10 +160,25 @@ export const OwnerAppShell: React.FC<OwnerAppShellProps> = ({
           />
         )}
 
-        {(currentRoute === 'catalog/categories/new' || currentRoute === 'catalog/categories/edit') && (
+        {(currentRoute === 'catalog/categories/new' ||
+          currentRoute === 'catalog/categories/edit' ||
+          /^catalog\/categories\/[^/]+\/edit$/.test(currentRoute)) && (
           <CategoryEditorPage
-            onBack={() => navigateTo('catalog/categories')}
-            onSaved={() => navigateTo('catalog/categories')}
+            categoryId={
+              /^catalog\/categories\/[^/]+\/edit$/.test(currentRoute)
+                ? decodeURIComponent(currentRoute.split('catalog/categories/')[1].split('/edit')[0])
+                : null
+            }
+            onBack={() =>
+              /^catalog\/categories\/[^/]+\/edit$/.test(currentRoute)
+                ? navigateTo('catalog/categories/' + currentRoute.split('catalog/categories/')[1].split('/edit')[0])
+                : navigateTo('catalog/categories')
+            }
+            onSaved={() =>
+              /^catalog\/categories\/[^/]+\/edit$/.test(currentRoute)
+                ? navigateTo('catalog/categories/' + currentRoute.split('catalog/categories/')[1].split('/edit')[0])
+                : navigateTo('catalog/categories')
+            }
           />
         )}
 
@@ -172,6 +188,20 @@ export const OwnerAppShell: React.FC<OwnerAppShellProps> = ({
             onSaved={() => navigateTo('catalog/categories')}
           />
         )}
+
+        {/^catalog\/categories\/[^/]+$/.test(currentRoute) &&
+          currentRoute !== 'catalog/categories/new' &&
+          currentRoute !== 'catalog/categories/edit' &&
+          currentRoute !== 'catalog/categories/sort' &&
+          currentRoute !== 'catalog/categories/reorder' && (
+            <CategoryDetailPage
+              categoryId={decodeURIComponent(currentRoute.split('catalog/categories/')[1])}
+              onBack={() => navigateTo('catalog/categories')}
+              onEditCategory={(id: string) => navigateTo(`catalog/categories/${encodeURIComponent(id)}/edit`)}
+              onAddMenu={() => navigateTo('catalog/master-menus/new')}
+              onEditMenu={(mId: string) => navigateTo(`catalog/master-menus/${encodeURIComponent(mId)}/edit`)}
+            />
+          )}
 
         {currentRoute === 'catalog/products' && (
           <ItemMasterPage

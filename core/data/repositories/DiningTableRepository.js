@@ -320,6 +320,16 @@ class DiningTableRepository {
     `, [closedAt, updatedAt, sessionId]);
   }
 
+  updateDiningSessionCustomer({ sessionId, customerName, customerPhone, updatedAt }) {
+    return this.db.execute(`
+      UPDATE dining_sessions
+      SET customer_name = COALESCE(NULLIF(?, ''), customer_name),
+          customer_phone = ?,
+          updated_at = ?
+      WHERE id = ?
+    `, [customerName || '', customerPhone || '', updatedAt, sessionId]);
+  }
+
   attachDiningSessionTable({ mappingId, sessionId, tableId, attachedAt }) {
     return this.db.execute(`
       INSERT INTO dining_session_tables (id, session_id, table_id, attached_at)

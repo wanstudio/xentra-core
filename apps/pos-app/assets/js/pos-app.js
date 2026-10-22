@@ -3778,11 +3778,12 @@
     var box=$('pos-sales-list');if(!box)return;
     if(!state.sales.length){box.innerHTML='<div class="pos-empty">Belum ada transaksi POS.</div>';return;}
     box.innerHTML=state.sales.map(function(s){
-      var isCodPending = s.order_type === 'delivery' && s.payment_method === 'cash' && s.payment_status !== 'settlement' && s.payment_status !== 'paid';
-      var badgeCls = isCodPending ? 'caution' : (s.payment_status === 'settlement' || s.payment_status === 'paid' ? 'ok' : 'pending');
-      var badgeLabel = isCodPending ? (s.cod_cash_custody === 'driver' ? 'COD (Di Driver)' : 'COD Pending') : (s.payment_status === 'settlement' ? 'LUNAS' : (s.payment_status || 'paid').toUpperCase());
+      var isOjol = s.order_channel === 'gofood' || s.order_channel === 'grabfood' || s.order_channel === 'shopeefood';
+      var isCodPending = !isOjol && s.order_type === 'delivery' && s.payment_method === 'cash' && s.payment_status !== 'settlement' && s.payment_status !== 'paid';
+      var badgeCls = isOjol ? 'ok' : (isCodPending ? 'caution' : (s.payment_status === 'settlement' || s.payment_status === 'paid' ? 'ok' : 'pending'));
+      var badgeLabel = isOjol ? (s.order_channel === 'gofood' ? 'GOFOOD' : (s.order_channel === 'grabfood' ? 'GRABFOOD' : 'SHOPEE')) : (isCodPending ? (s.cod_cash_custody === 'driver' ? 'COD (Di Driver)' : 'COD Pending') : (s.payment_status === 'settlement' ? 'LUNAS' : (s.payment_status || 'paid').toUpperCase()));
       var codActionBtn = isCodPending ? '<button type="button" class="pos-btn small" data-cod-settle="'+esc(s.id)+'" style="margin-left:6px;">Setor COD</button>' : '';
-      var oTypeDisplay = s.order_type === 'pickup' ? 'TAKEAWAY' : (s.order_type === 'dine_in' ? 'DINE-IN' : (s.order_type || '').toUpperCase());
+      var oTypeDisplay = isOjol ? 'OJOL' : (s.order_type === 'pickup' ? 'TAKEAWAY' : (s.order_type === 'dine_in' ? 'DINE-IN' : (s.order_type || '').toUpperCase()));
       return '<div class="pos-sale-row" data-sale-id="'+esc(s.id)+'">' +
         '<div class="pos-sale-main"><strong>#'+esc(s.order_number||s.id)+'</strong><small>'+esc(s.created_at||'')+'</small></div>' +
         '<div>'+esc(oTypeDisplay)+'</div>' +
@@ -4079,6 +4080,7 @@
         (!isAvailable ? '<button type="button" class="pos-action-sheet-btn" id="btn-table-transfer"><span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 14 20 9 15 4"></polyline><path d="M4 20v-7a4 4 0 0 1 4-4h12"></path></svg> Pindah Meja (Transfer Tamu)</span><small>Pindahkan pesanan tamu ke meja kosong lainnya</small></button>' : '') +
         '<button type="button" class="pos-action-sheet-btn" id="btn-table-toggle-block"><span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg> ' + (st === 'blocked' ? 'Buka Blokir Meja' : 'Blokir Meja') + '</span><small>' + (st === 'blocked' ? 'Meja kembali dapat dipakai untuk pesanan' : 'Tandai meja sedang rusak atau tidak dipakai') + '</small></button>' +
         (isAvailable ? '<button type="button" class="pos-action-sheet-btn" id="btn-table-use-sale"><span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Pilih untuk Transaksi Kasir</span><small>Gunakan meja ini sebagai konteks dine-in</small></button>' : '') +
+        '<button type="button" class="pos-action-sheet-btn" id="btn-table-qr"><span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg> Cetak / Lihat QR Meja</span><small>Cetak plakat nomor meja atau tampilkan QR Code</small></button>' +
       '</div>' +
       '<div class="pos-modal-actions"><button type="button" class="pos-btn ghost" id="btn-table-action-close">Tutup</button></div>' +
     '</div>';
@@ -4129,6 +4131,30 @@
         applySelectedTable(t);
         hideModal();
         setView('kasir');
+      };
+    }
+
+    if($('btn-table-qr')) {
+      $('btn-table-qr').onclick = async function(){
+        try {
+          var res = await request('/dine-in/tables/' + encodeURIComponent(t.id) + '/qr', { headers: headers() });
+          if (!res || !res.success || !res.svg) throw new Error((res && res.error) || 'Gagal memuat QR meja.');
+          var title = (res.table && (res.table.label || res.table.table_number)) || tableName;
+          var kode = (res.table && res.table.table_number) ? ('meja' + res.table.table_number) : '';
+          var w = window.open('', '_blank');
+          if (!w) {
+            toast('Pop-up terblokir. Izinkan pop-up browser untuk mencetak QR.');
+            return;
+          }
+          w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>QR ' + esc(title) + '</title>' +
+            '<style>body{font-family:\'Plus Jakarta Sans\', sans-serif;text-align:center;padding:32px;}h1{font-size:22px;margin:0 0 6px;font-weight:800;}p{font-size:13px;color:#555;margin:0 0 20px;}svg{width:280px;height:280px;margin:0 auto;display:block;}.kode-box{display:inline-block;margin-top:20px;padding:8px 16px;background:#f1f5f9;border-radius:8px;font-size:13px;font-weight:700;color:#334155;}</style>' +
+            '</head><body><h1>' + esc(title) + '</h1><p>Scan untuk melihat pesanan meja ini</p>' + (res.svg || '') + (kode ? '<div class="kode-box">Kode alternatif: ' + esc(kode) + '</div>' : '') + '</body></html>');
+          w.document.close();
+          w.focus();
+          w.print();
+        } catch(e) {
+          toast(e.message || 'Gagal mencetak QR meja.');
+        }
       };
     }
   }

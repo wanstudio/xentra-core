@@ -18,7 +18,9 @@
     lastRouteAt: 0,
     lastRoutedPosition: null,
     routeRequestId: 0,
-    initId: 0
+    initId: 0,
+    detailInitId: 0,
+    detailMap: null
   };
 
 
@@ -162,6 +164,7 @@
     var res;
     try {
       res = await fetch('/api/v1' + path, Object.assign({}, options, {
+        cache: 'no-store',
         headers: headers,
         credentials: 'same-origin'
       }));
@@ -458,12 +461,110 @@
     if (mapState.map) {
       try { mapState.map.remove(); } catch (_) {}
     }
+    if (mapState.detailMap) {
+      try { mapState.detailMap.remove(); } catch (_) {}
+    }
     mapState.map = null;
+    mapState.detailMap = null;
     mapState.driverMarker = null;
     mapState.destinationMarker = null;
     mapState.currentPosition = null;
     mapState.lastRouteAt = 0;
     mapState.lastRoutedPosition = null;
+  }
+
+  function renderOsmTilePreview(container, dest, zoom) {
+    if (!container || !dest) return;
+    zoom = zoom || 16;
+    var n = Math.pow(2, zoom);
+    var rad = dest.latitude * Math.PI / 180;
+    var cx = ((dest.longitude + 180) / 360) * n * 256;
+    var cy = (1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2 * n * 256;
+    var rect = container.getBoundingClientRect();
+    var w = rect.width || 360;
+    var h = rect.height || 180;
+    var halfW = w / 2;
+    var halfH = h / 2;
+    var minTx = Math.floor((cx - halfW) / 256);
+    var maxTx = Math.floor((cx + halfW) / 256);
+    var minTy = Math.floor((cy - halfH) / 256);
+    var maxTy = Math.floor((cy + halfH) / 256);
+
+    container.style.position = 'relative';
+    container.style.overflow = 'hidden';
+    container.innerHTML = '';
+
+    for (var tx = minTx; tx <= maxTx; tx++) {
+      for (var ty = minTy; ty <= maxTy; ty++) {
+        var img = document.createElement('img');
+        img.src = 'https://tile.openstreetmap.org/' + zoom + '/' + tx + '/' + ty + '.png';
+        img.alt = '';
+        img.style.position = 'absolute';
+        img.style.width = '256px';
+        img.style.height = '256px';
+        img.style.left = Math.round(tx * 256 - cx + halfW) + 'px';
+        img.style.top = Math.round(ty * 256 - cy + halfH) + 'px';
+        img.style.pointerEvents = 'none';
+        img.style.userSelect = 'none';
+        container.appendChild(img);
+      }
+    }
+
+    var pinEl = document.createElement('div');
+    pinEl.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-100%);z-index:2;pointer-events:none;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.35));';
+    pinEl.innerHTML = '<svg width="32" height="38" viewBox="0 0 24 28" fill="none"><path d="M12 0C5.925 0 1 4.925 1 11c0 7.75 11 17 11 17s11-9.25 11-17c0-6.075-4.925-11-11-11z" fill="#e5484d"/><circle cx="12" cy="11" r="4.5" fill="#fff"/></svg>';
+    container.appendChild(pinEl);
+  }
+
+  async function initializeDetailMap(task) {
+    var initId = ++mapState.detailInitId;
+    var container = document.getElementById('driver-detail-map');
+    var dest = destinationCoordinates(task);
+    if (!container || !dest) return;
+
+    var pickup = task && task.pickup || {};
+    var pickupLat = Number(pickup.latitude);
+    var pickupLng = Number(pickup.longitude);
+    var hasPickup = Number.isFinite(pickupLat) && Number.isFinite(pickupLng);
+
+    try {
+      await loadMapboxGL();
+      if (initId !== mapState.detailInitId || (state.page !== 'delivery-detail' && state.page !== 'new-task')) return;
+      if (window.mapboxgl && typeof window.mapboxgl.supported === 'function' && !window.mapboxgl.supported()) {
+        throw new Error('WebGL tidak didukung');
+      }
+
+      container.innerHTML = '';
+      window.mapboxgl.accessToken = MAPBOX_TOKEN;
+
+      mapState.detailMap = new window.mapboxgl.Map({
+        container: container,
+        style: 'mapbox://styles/mapbox/streets-v12',
+        center: [dest.longitude, dest.latitude],
+        zoom: 15,
+        attributionControl: false,
+        interactive: true
+      });
+
+      if (hasPickup) {
+        new window.mapboxgl.Marker({ color: '#1463ff' })
+          .setLngLat([pickupLng, pickupLat])
+          .addTo(mapState.detailMap);
+      }
+
+      new window.mapboxgl.Marker({ color: '#e5484d' })
+        .setLngLat([dest.longitude, dest.latitude])
+        .addTo(mapState.detailMap);
+
+      if (hasPickup) {
+        var bounds = new window.mapboxgl.LngLatBounds();
+        bounds.extend([pickupLng, pickupLat]);
+        bounds.extend([dest.longitude, dest.latitude]);
+        mapState.detailMap.fitBounds(bounds, { padding: 38, maxZoom: 15.5, duration: 0 });
+      }
+    } catch (_) {
+      renderOsmTilePreview(container, dest, 16);
+    }
   }
 
   async function initializeDriverMap(task) {
@@ -484,7 +585,11 @@
     try {
       await loadMapboxGL();
       if (initId !== mapState.initId || state.page !== 'map') return;
+      if (window.mapboxgl && typeof window.mapboxgl.supported === 'function' && !window.mapboxgl.supported()) {
+        throw new Error('WebGL tidak didukung');
+      }
 
+      container.innerHTML = '';
       window.mapboxgl.accessToken = MAPBOX_TOKEN;
       mapState.map = new window.mapboxgl.Map({
         container: container,
@@ -509,11 +614,12 @@
       });
 
       mapState.map.on('error', function () {
-        updateMapError('Peta gagal dimuat. Gunakan navigasi eksternal.');
+        startDriverGeolocation(task);
       });
     } catch (err) {
-      setMapStatus('Peta tidak dapat dimuat', 'error');
-      updateMapError('Peta Xentra gagal dimuat. Anda masih dapat membuka navigasi eksternal.');
+      renderOsmTilePreview(container, dest, 15);
+      setMapStatus('Peta ringan aktif (Mencari GPS…)', 'success');
+      startDriverGeolocation(task);
     }
   }
 
@@ -685,11 +791,13 @@
     var c = task.customer || {};
     var d = task.destination || {};
     var p = task.payment || {};
+    var hasCoords = d.latitude != null && d.longitude != null;
 
     var body = '<div class="back-row"><button class="back-btn" data-action="back">‹</button><div class="back-title">Tugas Baru</div></div>' +
       '<div class="card">' +
         '<div class="task-top"><span class="task-id">Pengantaran ' + escapeHTML(task.order_number || task.order_id) + '</span><span class="pill orange">Menunggu Anda</span></div>' +
         '<div class="customer-row"><span class="pin">' + icon('pin') + '</span><div><div class="customer-name">' + escapeHTML(c.name || 'Pelanggan') + '</div><div class="address">' + escapeHTML(d.address || 'Alamat tujuan belum tersedia') + '</div></div></div>' +
+        (hasCoords ? '<div id="driver-detail-map" style="height:165px;border-radius:12px;margin-top:12px;background:#e8ece8;border:1px solid #e2e8f0;"></div>' : '') +
         '<div class="meta-row"><span class="meta-item">⌖ ' + escapeHTML(task.distance_meters ? (Number(task.distance_meters) / 1000).toFixed(1) + ' km' : 'Jarak akan dihitung') + '</span><span class="meta-item">◷ ' + escapeHTML(task.duration_seconds ? Math.round(Number(task.duration_seconds) / 60) + ' menit' : 'ETA akan dihitung') + '</span></div>' +
         (p.is_cod ? '<div class="money-card"><div class="money-label">COD / Bayar di Tempat</div><div class="money">' + rupiah(p.amount) + '</div></div>' : '<div class="money-card"><div class="money-label">Pembayaran</div><div class="money">Sudah dibayar</div></div>') +
         '<div class="info-box"><span>i</span><div>Terima tugas jika Anda siap mengambil pesanan dari cabang dan mengantarkannya ke pelanggan.</div></div>' +
@@ -697,6 +805,7 @@
       '<div class="sticky-action"><div class="btn-row"><button class="danger-btn" data-action="reject">× Tolak</button><button class="primary-btn" data-action="accept">✓ Terima Tugas</button></div></div>';
 
     shell('Tugas Baru', body, 'tasks', {hideNav:true});
+    if (hasCoords) initializeDetailMap(task);
   }
 
   function renderDetail() {
@@ -706,6 +815,7 @@
     var c = task.customer || {};
     var d = task.destination || {};
     var p = task.payment || {};
+    var hasCoords = d.latitude != null && d.longitude != null;
     var action = '';
     var actionLabel = '';
 
@@ -728,7 +838,9 @@
 
     var body = '<div class="back-row"><button class="back-btn" data-action="back">‹</button><div class="back-title">Pengantaran ' + escapeHTML(task.order_number || task.order_id) + '</div></div>' +
       '<div class="card">' + statusBox + '</div>' +
-      '<div class="card"><div class="section-title">Tujuan</div><div class="customer-row"><span class="pin">' + icon('pin') + '</span><div style="flex:1"><div class="customer-name">' + escapeHTML(c.name || 'Pelanggan') + '</div><div class="address">' + escapeHTML(d.address || 'Alamat tujuan belum tersedia') + '</div></div><button class="icon-btn" data-action="call" aria-label="Telepon pelanggan">☎</button></div><button class="secondary-btn" data-action="navigate" style="margin-top:13px">⌖ Buka Navigasi</button></div>' +
+      '<div class="card"><div class="section-title">Tujuan</div><div class="customer-row"><span class="pin">' + icon('pin') + '</span><div style="flex:1"><div class="customer-name">' + escapeHTML(c.name || 'Pelanggan') + '</div><div class="address">' + escapeHTML(d.address || 'Alamat tujuan belum tersedia') + '</div></div><button class="icon-btn" data-action="call" aria-label="Telepon pelanggan">☎</button></div>' +
+      (hasCoords ? '<div id="driver-detail-map" style="height:175px;border-radius:12px;margin-top:12px;background:#e8ece8;border:1px solid #e2e8f0;position:relative;overflow:hidden;"></div>' : '') +
+      '<button class="secondary-btn" data-action="navigate" style="margin-top:13px">⌖ Buka Navigasi</button></div>' +
       '<div class="card"><div class="section-title">Pesanan</div><div class="meta-row"><span class="meta-item">▣ ' + Number(task.item_count || 0) + ' item</span></div></div>' +
       '<div class="card"><div class="section-title">Pembayaran</div><div class="money">' + (p.is_cod ? rupiah(p.amount) : 'Sudah dibayar') + '</div><div class="pill ' + (p.is_cod ? 'orange' : 'green') + '" style="margin-top:8px">' + (p.is_cod ? 'Bayar di Tempat (COD)' : 'Online') + '</div></div>';
 
@@ -737,6 +849,7 @@
     }
 
     shell('Detail Pengantaran', body, 'tasks', {hideNav:true});
+    if (hasCoords) initializeDetailMap(task);
   }
 
   function renderPickup() {
@@ -856,12 +969,20 @@
     return '<div class="history-row"><span class="history-pin">●</span><div class="history-main"><div class="history-id">' + escapeHTML(id) + '</div><div class="history-name">' + escapeHTML(name) + '</div><div class="history-time">Terkirim</div></div><div class="history-right"><span class="pill green">Terkirim</span><div class="amount">' + escapeHTML(payment) + '</div></div></div>';
   }
 
+  function getVehicleLabel(vehicleType) {
+    var vt = String(vehicleType || 'motorcycle').toLowerCase();
+    if (vt === 'car') return 'Mobil';
+    if (vt === 'bicycle') return 'Sepeda';
+    return 'Sepeda Motor';
+  }
+
   function renderProfile() {
     if (!state.driver) return shell('Profil', loadingBody('Memuat profil…'), 'profile');
 
     var driverName = state.driver.full_name || state.driver.username || 'Driver';
     var branchName = state.driver.branch_name || 'Cabang Xentra';
     var phone = state.driver.phone || 'Nomor telepon belum diatur';
+    var vehicleLabel = getVehicleLabel(state.driver.vehicle_type);
     var totalDelivered = state.history ? state.history.length : 0;
 
     var avatarContent = state.driver.avatar_url
@@ -902,16 +1023,19 @@
       '</div>' +
 
       '<div class="profile-group-title">Data Diri & Identitas Mitra</div>' +
+      (phone === 'Nomor telepon belum diatur'
+        ? '<div class="info-box warning" data-action="edit-profile" style="margin-bottom:10px;cursor:pointer;"><span>!</span><div><strong>Nomor HP/WhatsApp belum diisi.</strong> Ketuk di sini untuk mengisi nomor HP aktif Anda.</div></div>'
+        : '') +
       '<div class="profile-list-card">' +
-        profileItem(icon('user'), 'Edit Data Profil', escapeHTML(driverName) + ' • ' + (phone !== 'Nomor telepon belum diatur' ? escapeHTML(phone) : 'Belum diisi'), 'edit-profile') +
+        profileItem(icon('user'), 'Edit Data Profil', escapeHTML(driverName) + ' • ' + (phone !== 'Nomor telepon belum diatur' ? escapeHTML(phone) : 'Nomor HP belum diisi'), 'edit-profile') +
         profileItem(icon('idcard'), 'Verifikasi KTP / NIK', state.driver.nik ? ('NIK: ' + escapeHTML(state.driver.nik)) : 'Belum diverifikasi', 'verify-ktp') +
       '</div>' +
 
       '<div class="profile-group-title">Operasional & Pengiriman</div>' +
       '<div class="profile-list-card">' +
         profileItem(icon('check'), 'Status Kerja', 'Siap Menerima Pesanan', 'availability') +
-        profileItem(icon('motor'), 'Kendaraan', 'Sepeda Motor (Reguler)') +
-        profileItem(icon('map'), 'Navigasi Pilihan', 'Google Maps / Waze', 'navigate') +
+        profileItem(icon('motor'), 'Kendaraan', vehicleLabel + ' (Klik untuk ubah)', 'edit-vehicle') +
+        profileItem(icon('map'), 'Navigasi Pilihan', 'Google Maps (' + vehicleLabel + ')', 'navigate') +
       '</div>' +
 
       '<div class="profile-group-title">Akun & Bantuan</div>' +
@@ -968,6 +1092,14 @@
           '<input type="tel" id="edit-driver-phone" class="sheet-input" value="' + escapeHTML(driver.phone || '') + '" placeholder="Contoh: 08123456789">' +
         '</div>' +
         '<div class="form-group" style="margin-top:12px">' +
+          '<label class="input-label" for="edit-driver-vehicle">Jenis Kendaraan Operasional</label>' +
+          '<select id="edit-driver-vehicle" class="sheet-input" style="background:#fff">' +
+            '<option value="motorcycle"' + ((driver.vehicle_type || 'motorcycle') === 'motorcycle' ? ' selected' : '') + '>🏍️ Sepeda Motor (Rute Roda Dua)</option>' +
+            '<option value="car"' + (driver.vehicle_type === 'car' ? ' selected' : '') + '>🚗 Mobil (Rute Roda Empat)</option>' +
+            '<option value="bicycle"' + (driver.vehicle_type === 'bicycle' ? ' selected' : '') + '>🚲 Sepeda</option>' +
+          '</select>' +
+        '</div>' +
+        '<div class="form-group" style="margin-top:12px">' +
           '<label class="input-label" for="edit-driver-email">Email Terdaftar</label>' +
           '<input type="email" id="edit-driver-email" class="sheet-input" value="' + escapeHTML(driver.email || '') + '" disabled style="opacity:0.6;background:#f1f5f9">' +
         '</div>' +
@@ -992,12 +1124,20 @@
       if (act === 'save') {
         var nameInput = document.getElementById('edit-driver-name');
         var phoneInput = document.getElementById('edit-driver-phone');
+        var vehicleInput = document.getElementById('edit-driver-vehicle');
         var nameVal = nameInput ? nameInput.value.trim() : '';
         var phoneVal = phoneInput ? phoneInput.value.trim() : '';
+        var vehicleVal = vehicleInput ? vehicleInput.value : 'motorcycle';
 
         if (!nameVal) {
           toast('Nama lengkap wajib diisi');
           if (nameInput) nameInput.focus();
+          return;
+        }
+
+        if (!phoneVal) {
+          toast('Nomor HP / WhatsApp wajib diisi');
+          if (phoneInput) phoneInput.focus();
           return;
         }
 
@@ -1009,7 +1149,8 @@
             method: 'PUT',
             body: JSON.stringify({
               full_name: nameVal,
-              phone: phoneVal
+              phone: phoneVal,
+              vehicle_type: vehicleVal
             })
           });
 
@@ -1552,7 +1693,7 @@
   }
 
   async function handleAction(action) {
-    if (action === 'edit-profile') {
+    if (action === 'edit-profile' || action === 'edit-vehicle') {
       return showEditProfileSheet();
     }
 
@@ -1656,15 +1797,19 @@
         return toast('Koordinat tujuan belum tersedia');
       }
       var destCoords = destination.latitude + ',' + destination.longitude;
+      var vehicleType = (state.driver && state.driver.vehicle_type) || 'motorcycle';
+      var androidMode = vehicleType === 'car' ? 'd' : (vehicleType === 'bicycle' ? 'b' : 'l');
+      var webTravelMode = vehicleType === 'car' ? 'driving' : (vehicleType === 'bicycle' ? 'bicycling' : 'two-wheeler');
+
       // Android Native Turn-by-Turn intent with fallback to web Google Maps
       var isAndroid = /Android/i.test(navigator.userAgent);
       if (isAndroid) {
-        window.location.href = 'google.navigation:q=' + encodeURIComponent(destCoords) + '&mode=d';
+        window.location.href = 'google.navigation:q=' + encodeURIComponent(destCoords) + '&mode=' + androidMode;
         setTimeout(function () {
-          window.location.href = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(destCoords);
+          window.location.href = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(destCoords) + '&travelmode=' + webTravelMode;
         }, 1200);
       } else {
-        window.location.href = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(destCoords);
+        window.location.href = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(destCoords) + '&travelmode=' + webTravelMode;
       }
       return;
     }
@@ -1705,11 +1850,41 @@
     refreshTasks(false).then(render);
   });
 
+  var _lastNewTaskCount = 0;
+  function playNewTaskChime() {
+    try {
+      if (typeof window.AudioContext !== 'undefined' || typeof window.webkitAudioContext !== 'undefined') {
+        var AudioCtx = window.AudioContext || window.webkitAudioContext;
+        var ctx = new AudioCtx();
+        var osc = ctx.createOscillator();
+        var gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+        osc.frequency.setValueAtTime(880.00, ctx.currentTime + 0.12); // A5
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.42);
+      }
+      if (navigator.vibrate) {
+        navigator.vibrate([200, 100, 200]);
+      }
+    } catch (_) {}
+  }
+
   loadDriver().then(function () {
-    // Start periodic polling for new tasks every 12 seconds
+    // Start periodic polling for new tasks every 12 seconds with alert chime
     setInterval(function () {
       if (document.visibilityState === 'hidden' || !token()) return;
       refreshTasks(false).then(function () {
+        var newCount = (state.counts && state.counts.new) || 0;
+        if (newCount > _lastNewTaskCount) {
+          playNewTaskChime();
+          toast('🔔 Ada ' + newCount + ' tugas antar baru masuk!');
+        }
+        _lastNewTaskCount = newCount;
         if (state.page === 'tasks') render();
       });
     }, 12000);

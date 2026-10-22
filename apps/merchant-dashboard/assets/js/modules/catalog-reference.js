@@ -136,6 +136,42 @@
       }
     }
 
+    var detailMatch = currentHash.match(/^catalog\/categories\/([^/]+)$/);
+    if (
+      detailMatch &&
+      detailMatch[1] !== 'new' &&
+      detailMatch[1] !== 'sort' &&
+      detailMatch[1] !== 'reorder' &&
+      detailMatch[1] !== 'edit'
+    ) {
+      var detailCatId = decodeURIComponent(detailMatch[1]);
+      if (modernMount && typeof window.mountCategoryDetailPage === 'function') {
+        modernMount.style.display = 'block';
+        if (page) page.style.display = 'none';
+        window.mountCategoryDetailPage(modernMount, {
+          categoryId: detailCatId,
+          onBack: function() {
+            navigateTo('catalog/categories');
+          },
+          onEditCategory: function(id) {
+            navigateTo('catalog/categories/' + encodeURIComponent(id || detailCatId) + '/edit');
+          },
+          onAddMenu: function() {
+            navigateTo('catalog/master-menus/new');
+          },
+          onEditMenu: function(menuId) {
+            navigateTo('catalog/master-menus/' + encodeURIComponent(menuId) + '/edit');
+          }
+        });
+        if (modernItemMount) modernItemMount.style.display = 'none';
+        if (catEditor) catEditor.style.display = 'none';
+        if (productList) productList.style.display = 'none';
+        if (productDetail) productDetail.style.display = 'none';
+        if (productEditor) productEditor.style.display = 'none';
+        return;
+      }
+    }
+
     if (modernMount && typeof window.mountCategoriesPage === 'function') {
       modernMount.style.display = 'block';
       if (page) page.style.display = 'none';
@@ -729,10 +765,18 @@
         window.mountCategoryEditorPage(modernEditorMount, {
           categoryId: categoryId || null,
           onBack: function() {
-            navigateTo('catalog/categories');
+            if (categoryId) {
+              navigateTo('catalog/categories/' + encodeURIComponent(categoryId));
+            } else {
+              navigateTo('catalog/categories');
+            }
           },
           onSaved: function() {
-            navigateTo('catalog/categories');
+            if (categoryId) {
+              navigateTo('catalog/categories/' + encodeURIComponent(categoryId));
+            } else {
+              navigateTo('catalog/categories');
+            }
           }
         });
         return;

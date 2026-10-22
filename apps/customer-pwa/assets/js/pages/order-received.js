@@ -23,6 +23,508 @@
   var targetContainer = null;
   var pollingTimer = null;
   var countdownTimer = null;
+  var lastDeliveryStatus = null;
+  var lastDriverName = null;
+
+  var MAPBOX_VERSION = '3.4.0';
+  var MAPBOX_TOKEN = (window.XentraConfig && window.XentraConfig.mapboxToken) ||
+    'pk.eyJ1IjoiaWtod2FucyIsImEiOiJjbXQ5c2cwMzYwOW15MnpxdXdpeWU3am45In0.YcX49DH0uXP70aBxVDC-TA';
+
+  var trackingMapState = {
+    map: null,
+    driverMarker: null,
+    destMarker: null,
+    branchMarker: null,
+    lastRouteKey: '',
+    lastDriverCoords: null,
+    lastDriverHeading: 0,
+    fallbackMode: false,
+    fallbackDelivery: null,
+    initSeq: 0
+  };
+
+  function calculateBearing(lat1, lng1, lat2, lng2) {
+    if (!Number.isFinite(lat1) || !Number.isFinite(lng1) || !Number.isFinite(lat2) || !Number.isFinite(lng2)) return null;
+    var dLat = Math.abs(lat2 - lat1);
+    var dLng = Math.abs(lng2 - lng1);
+    if (dLat < 0.00002 && dLng < 0.00002) return null;
+    var phi1 = lat1 * Math.PI / 180;
+    var phi2 = lat2 * Math.PI / 180;
+    var deltaLambda = (lng2 - lng1) * Math.PI / 180;
+    var y = Math.sin(deltaLambda) * Math.cos(phi2);
+    var x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(deltaLambda);
+    var theta = Math.atan2(y, x);
+    return (theta * 180 / Math.PI + 360) % 360;
+  }
+
+  function resolveDriverHeading(delivery, drvLat, drvLng) {
+    var dLoc = delivery && delivery.driver_location;
+    var rawHeading = dLoc && dLoc.heading != null ? Number(dLoc.heading) : NaN;
+    if (Number.isFinite(rawHeading) && rawHeading >= 0 && rawHeading <= 360) {
+      trackingMapState.lastDriverHeading = rawHeading;
+      return rawHeading;
+    }
+    if (trackingMapState.lastDriverCoords) {
+      var movedBearing = calculateBearing(
+        trackingMapState.lastDriverCoords.lat,
+        trackingMapState.lastDriverCoords.lng,
+        drvLat,
+        drvLng
+      );
+      if (movedBearing !== null) {
+        trackingMapState.lastDriverHeading = movedBearing;
+        return movedBearing;
+      }
+    }
+    var destLat = delivery && delivery.destination_latitude != null ? Number(delivery.destination_latitude) : NaN;
+    var destLng = delivery && delivery.destination_longitude != null ? Number(delivery.destination_longitude) : NaN;
+    var toDest = calculateBearing(drvLat, drvLng, destLat, destLng);
+    if (toDest !== null) {
+      trackingMapState.lastDriverHeading = toDest;
+      return toDest;
+    }
+    return trackingMapState.lastDriverHeading || 0;
+  }
+
+  // Multi-angle 2.5D isometric scooter + green-jacket rider SVG (back, right, left, front)
+  // Automatically switches perspective based on road bearing / heading like Gojek/Grab
+  function getDirectionalScooterSvg(headingDeg) {
+    var h = ((Number(headingDeg) || 0) % 360 + 360) % 360;
+    // Normalize into 4 isometric camera views relative to screen-up (North = 0°):
+    // 1. GOING UP / STRAIGHT AWAY (315°..360° or 0°..45°): Seen from behind (back of rider & rear wheel)
+    // 2. TURNING RIGHT / HEADING EAST (45°..135°): Seen from right side profile (facing right)
+    // 3. GOING DOWN / TOWARD CAMERA (135°..225°): Seen from front-angle (headlight & front shield)
+    // 4. TURNING LEFT / HEADING WEST (225°..315°): Seen from left side profile (facing left, mirrored right)
+    if (h >= 45 && h < 135) {
+      var tiltRight = Math.max(-18, Math.min(18, h - 90));
+      return (
+        '<svg width="44" height="44" viewBox="0 0 48 48" style="transform:rotate(' + tiltRight.toFixed(1) + 'deg);transition:transform 0.35s ease;filter:drop-shadow(0 4px 6px rgba(0,0,0,0.28));">' +
+        '  <ellipse cx="24" cy="40" rx="16" ry="4" fill="rgba(0,0,0,0.22)"/>' +
+        '  <!-- Rear & Front Wheels (Right Side Profile) -->' +
+        '  <circle cx="13" cy="34" r="6" fill="#1e293b" stroke="#ffffff" stroke-width="1.5"/>' +
+        '  <circle cx="13" cy="34" r="2.5" fill="#94a3b8"/>' +
+        '  <circle cx="35" cy="34" r="6" fill="#1e293b" stroke="#ffffff" stroke-width="1.5"/>' +
+        '  <circle cx="35" cy="34" r="2.5" fill="#94a3b8"/>' +
+        '  <!-- Delivery Box at Rear -->' +
+        '  <rect x="6" y="18" width="9" height="9" rx="2" fill="#059669" stroke="#ffffff" stroke-width="1.5"/>' +
+        '  <!-- Scooter Body (White/Emerald) -->' +
+        '  <path d="M10 28 L23 28 L28 33 L35 31 L31 20 L27 20 L25 26 L12 25 Z" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" stroke-linejoin="round"/>' +
+        '  <!-- Headlight & Handlebar -->' +
+        '  <circle cx="33" cy="20" r="2.2" fill="#fde047" stroke="#0f172a" stroke-width="1.2"/>' +
+        '  <!-- Rider Legs & Green Jacket (Right Profile) -->' +
+        '  <path d="M18 25 L24 26 L25 32 L21 32 Z" fill="#1e293b"/>' +
+        '  <path d="M16 15 C16 13 22 13 23 16 L26 22 L21 25 L16 24 Z" fill="#10b981" stroke="#ffffff" stroke-width="1.3" stroke-linejoin="round"/>' +
+        '  <!-- Green Helmet facing Right -->' +
+        '  <circle cx="21" cy="10" r="5.2" fill="#10b981" stroke="#ffffff" stroke-width="1.5"/>' +
+        '  <path d="M23 8.5 L26.5 10.5 L23 12.5 Z" fill="#1e293b"/>' +
+        '</svg>'
+      );
+    }
+    if (h >= 225 && h < 315) {
+      var tiltLeft = Math.max(-18, Math.min(18, h - 270));
+      return (
+        '<svg width="44" height="44" viewBox="0 0 48 48" style="transform:rotate(' + tiltLeft.toFixed(1) + 'deg) scaleX(-1);transition:transform 0.35s ease;filter:drop-shadow(0 4px 6px rgba(0,0,0,0.28));">' +
+        '  <ellipse cx="24" cy="40" rx="16" ry="4" fill="rgba(0,0,0,0.22)"/>' +
+        '  <circle cx="13" cy="34" r="6" fill="#1e293b" stroke="#ffffff" stroke-width="1.5"/>' +
+        '  <circle cx="13" cy="34" r="2.5" fill="#94a3b8"/>' +
+        '  <circle cx="35" cy="34" r="6" fill="#1e293b" stroke="#ffffff" stroke-width="1.5"/>' +
+        '  <circle cx="35" cy="34" r="2.5" fill="#94a3b8"/>' +
+        '  <rect x="6" y="18" width="9" height="9" rx="2" fill="#059669" stroke="#ffffff" stroke-width="1.5"/>' +
+        '  <path d="M10 28 L23 28 L28 33 L35 31 L31 20 L27 20 L25 26 L12 25 Z" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" stroke-linejoin="round"/>' +
+        '  <circle cx="33" cy="20" r="2.2" fill="#fde047" stroke="#0f172a" stroke-width="1.2"/>' +
+        '  <path d="M18 25 L24 26 L25 32 L21 32 Z" fill="#1e293b"/>' +
+        '  <path d="M16 15 C16 13 22 13 23 16 L26 22 L21 25 L16 24 Z" fill="#10b981" stroke="#ffffff" stroke-width="1.3" stroke-linejoin="round"/>' +
+        '  <circle cx="21" cy="10" r="5.2" fill="#10b981" stroke="#ffffff" stroke-width="1.5"/>' +
+        '  <path d="M23 8.5 L26.5 10.5 L23 12.5 Z" fill="#1e293b"/>' +
+        '</svg>'
+      );
+    }
+    if (h >= 135 && h < 225) {
+      var tiltDown = Math.max(-20, Math.min(20, 180 - h));
+      // Front-facing isometric view (heading South/down)
+      return (
+        '<svg width="44" height="44" viewBox="0 0 48 48" style="transform:rotate(' + tiltDown.toFixed(1) + 'deg);transition:transform 0.35s ease;filter:drop-shadow(0 4px 6px rgba(0,0,0,0.28));">' +
+        '  <ellipse cx="24" cy="41" rx="11" ry="3.5" fill="rgba(0,0,0,0.22)"/>' +
+        '  <!-- Handlebar Mirrors -->' +
+        '  <line x1="13" y1="18" x2="35" y2="18" stroke="#1e293b" stroke-width="2.5" stroke-linecap="round"/>' +
+        '  <!-- Rider Shoulders (Green Jacket) -->' +
+        '  <path d="M15 16 C15 11 33 11 33 16 L31 24 L17 24 Z" fill="#10b981" stroke="#ffffff" stroke-width="1.5"/>' +
+        '  <!-- Rider Helmet (Front Visor) -->' +
+        '  <circle cx="24" cy="10" r="5.8" fill="#10b981" stroke="#ffffff" stroke-width="1.5"/>' +
+        '  <rect x="19.5" y="8" width="9" height="4" rx="2" fill="#1e293b"/>' +
+        '  <!-- Front Scooter Shield & Headlight -->' +
+        '  <path d="M17 19 L31 19 L29 34 L19 34 Z" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" stroke-linejoin="round"/>' +
+        '  <circle cx="24" cy="22" r="3" fill="#fde047" stroke="#0f172a" stroke-width="1.2"/>' +
+        '  <!-- Front Tire -->' +
+        '  <rect x="21" y="31" width="6" height="10" rx="3" fill="#1e293b" stroke="#ffffff" stroke-width="1.2"/>' +
+        '</svg>'
+      );
+    }
+    // Default: Straight / Going Up (seen from behind: back of green jacket, helmet, taillight & rear tire)
+    var signedUp = h > 180 ? h - 360 : h;
+    var tiltUp = Math.max(-22, Math.min(22, signedUp));
+    return (
+      '<svg width="44" height="44" viewBox="0 0 48 48" style="transform:rotate(' + tiltUp.toFixed(1) + 'deg);transition:transform 0.35s ease;filter:drop-shadow(0 4px 6px rgba(0,0,0,0.28));">' +
+      '  <ellipse cx="24" cy="41" rx="11" ry="3.5" fill="rgba(0,0,0,0.22)"/>' +
+      '  <!-- Handlebar ends -->' +
+      '  <line x1="13" y1="17" x2="35" y2="17" stroke="#1e293b" stroke-width="2.5" stroke-linecap="round"/>' +
+      '  <!-- Rider Back (Gojek-style Green Jacket with White Stripe) -->' +
+      '  <path d="M15 16 C15 11 33 11 33 16 L32 27 L16 27 Z" fill="#10b981" stroke="#ffffff" stroke-width="1.5" stroke-linejoin="round"/>' +
+      '  <rect x="19" y="19" width="10" height="2.2" rx="1" fill="#ffffff"/>' +
+      '  <!-- Helmet from behind -->' +
+      '  <circle cx="24" cy="10" r="5.8" fill="#10b981" stroke="#ffffff" stroke-width="1.5"/>' +
+      '  <!-- Scooter Rear Body & Red Taillight -->' +
+      '  <path d="M17 26 L31 26 L29 34 L19 34 Z" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" stroke-linejoin="round"/>' +
+      '  <rect x="20.5" y="28" width="7" height="3" rx="1.5" fill="#ef4444"/>' +
+      '  <!-- Rear Tire -->' +
+      '  <rect x="21" y="32" width="6" height="9" rx="3" fill="#1e293b" stroke="#ffffff" stroke-width="1.2"/>' +
+      '</svg>'
+    );
+  }
+
+  function loadMapboxGL() {
+    return new Promise(function (resolve, reject) {
+      if (window.mapboxgl && typeof window.mapboxgl.Map === 'function') {
+        resolve();
+        return;
+      }
+      var css = document.getElementById('xentra-mapbox-css');
+      if (!css) {
+        css = document.createElement('link');
+        css.id = 'xentra-mapbox-css';
+        css.rel = 'stylesheet';
+        css.href = 'https://api.mapbox.com/mapbox-gl-js/v' + MAPBOX_VERSION + '/mapbox-gl.css';
+        document.head.appendChild(css);
+      }
+      var script = document.getElementById('xentra-mapbox-js');
+      if (script) {
+        if (script.dataset.loaded === '1' || (window.mapboxgl && typeof window.mapboxgl.Map === 'function')) {
+          resolve();
+          return;
+        }
+        script.addEventListener('load', function () { resolve(); }, { once: true });
+        script.addEventListener('error', function () { reject(new Error('Mapbox GL gagal dimuat')); }, { once: true });
+        return;
+      }
+      script = document.createElement('script');
+      script.id = 'xentra-mapbox-js';
+      script.src = 'https://api.mapbox.com/mapbox-gl-js/v' + MAPBOX_VERSION + '/mapbox-gl.js';
+      script.onload = function () {
+        script.dataset.loaded = '1';
+        resolve();
+      };
+      script.onerror = function () { reject(new Error('Mapbox GL gagal dimuat')); };
+      document.head.appendChild(script);
+    });
+  }
+
+  function cleanupTrackingMap() {
+    trackingMapState.initSeq++;
+    if (trackingMapState.map) {
+      try { trackingMapState.map.remove(); } catch (_) {}
+    }
+    trackingMapState.map = null;
+    trackingMapState.driverMarker = null;
+    trackingMapState.destMarker = null;
+    trackingMapState.branchMarker = null;
+    trackingMapState.lastRouteKey = '';
+    trackingMapState.fallbackMode = false;
+    trackingMapState.fallbackDelivery = null;
+  }
+
+  function createDriverMarkerElement(headingDeg) {
+    var el = document.createElement('div');
+    el.className = 'x-driver-scooter-marker';
+    el.style.cssText = 'width:48px;height:48px;display:flex;align-items:center;justify-content:center;z-index:6;pointer-events:none;';
+    el.innerHTML = getDirectionalScooterSvg(headingDeg);
+    return el;
+  }
+
+  function renderFallbackTrackingTileMap(container, delivery) {
+    if (!container || !delivery) return;
+    trackingMapState.fallbackMode = true;
+    trackingMapState.fallbackDelivery = delivery;
+
+    var destLat = Number(delivery.destination_latitude);
+    var destLng = Number(delivery.destination_longitude);
+    if (!Number.isFinite(destLat) || !Number.isFinite(destLng)) return;
+
+    var branchLat = delivery.branch_latitude != null ? Number(delivery.branch_latitude) : NaN;
+    var branchLng = delivery.branch_longitude != null ? Number(delivery.branch_longitude) : NaN;
+    var dLoc = delivery.driver_location;
+    var drvLat = dLoc && dLoc.latitude != null ? Number(dLoc.latitude) : branchLat;
+    var drvLng = dLoc && dLoc.longitude != null ? Number(dLoc.longitude) : branchLng;
+
+    var centerLat = Number.isFinite(drvLat) ? (destLat + drvLat) / 2 : destLat;
+    var centerLng = Number.isFinite(drvLng) ? (destLng + drvLng) / 2 : destLng;
+    var zoom = 15;
+    if (Number.isFinite(drvLat) && Number.isFinite(drvLng)) {
+      var span = Math.max(Math.abs(destLat - drvLat), Math.abs(destLng - drvLng));
+      if (span > 0.04) zoom = 12;
+      else if (span > 0.02) zoom = 13;
+      else if (span > 0.008) zoom = 14;
+      else if (span < 0.003) zoom = 16;
+    }
+
+    function latLngToWorld(lat, lng, z) {
+      var n = Math.pow(2, z);
+      var rad = lat * Math.PI / 180;
+      var x = ((lng + 180) / 360) * n * 256;
+      var y = (1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2 * n * 256;
+      return { x: x, y: y };
+    }
+
+    var rect = container.getBoundingClientRect();
+    var w = rect.width || 360;
+    var h = rect.height || 220;
+    var halfW = w / 2;
+    var halfH = h / 2;
+    var centerPt = latLngToWorld(centerLat, centerLng, zoom);
+
+    var minTileX = Math.floor((centerPt.x - halfW) / 256);
+    var maxTileX = Math.floor((centerPt.x + halfW) / 256);
+    var minTileY = Math.floor((centerPt.y - halfH) / 256);
+    var maxTileY = Math.floor((centerPt.y + halfH) / 256);
+
+    container.style.position = 'relative';
+    container.style.overflow = 'hidden';
+    container.innerHTML = '';
+
+    for (var tx = minTileX; tx <= maxTileX; tx++) {
+      for (var ty = minTileY; ty <= maxTileY; ty++) {
+        var img = document.createElement('img');
+        img.src = 'https://tile.openstreetmap.org/' + zoom + '/' + tx + '/' + ty + '.png';
+        img.alt = '';
+        img.style.cssText = 'position:absolute;width:256px;height:256px;left:' + (tx * 256 - centerPt.x + halfW) + 'px;top:' + (ty * 256 - centerPt.y + halfH) + 'px;pointer-events:none;user-select:none;';
+        container.appendChild(img);
+      }
+    }
+
+    var destPt = latLngToWorld(destLat, destLng, zoom);
+    var destX = destPt.x - centerPt.x + halfW;
+    var destY = destPt.y - centerPt.y + halfH;
+
+    if (Number.isFinite(drvLat) && Number.isFinite(drvLng)) {
+      var drvPt = latLngToWorld(drvLat, drvLng, zoom);
+      var drvX = drvPt.x - centerPt.x + halfW;
+      var drvY = drvPt.y - centerPt.y + halfH;
+
+      var svgLine = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svgLine.setAttribute('width', String(w));
+      svgLine.setAttribute('height', String(h));
+      svgLine.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:2;';
+      svgLine.innerHTML = '<line x1="' + drvX.toFixed(1) + '" y1="' + drvY.toFixed(1) + '" x2="' + destX.toFixed(1) + '" y2="' + destY.toFixed(1) + '" stroke="#10b981" stroke-width="4" stroke-dasharray="6,5" stroke-linecap="round"/>';
+      container.appendChild(svgLine);
+
+      var heading = resolveDriverHeading(delivery, drvLat, drvLng);
+      trackingMapState.lastDriverCoords = { lat: drvLat, lng: drvLng };
+
+      var drvEl = createDriverMarkerElement(heading);
+      drvEl.style.position = 'absolute';
+      drvEl.style.left = (drvX - 24) + 'px';
+      drvEl.style.top = (drvY - 24) + 'px';
+      container.appendChild(drvEl);
+    }
+
+    var pinEl = document.createElement('div');
+    pinEl.style.cssText = 'position:absolute;left:' + (destX - 14) + 'px;top:' + (destY - 28) + 'px;width:28px;height:28px;z-index:4;pointer-events:none;display:flex;align-items:center;justify-content:center;font-size:22px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3));';
+    pinEl.innerHTML = '📍';
+    container.appendChild(pinEl);
+  }
+
+  function updateTrackingRouteLine(map, fromLng, fromLat, toLng, toLat) {
+    if (!map || !Number.isFinite(fromLng) || !Number.isFinite(fromLat) || !Number.isFinite(toLng) || !Number.isFinite(toLat)) return;
+    var routeKey = fromLng.toFixed(4) + ',' + fromLat.toFixed(4) + ';' + toLng.toFixed(4) + ',' + toLat.toFixed(4);
+    if (trackingMapState.lastRouteKey === routeKey) return;
+    trackingMapState.lastRouteKey = routeKey;
+
+    var url = 'https://router.project-osrm.org/route/v1/driving/' +
+      encodeURIComponent(fromLng) + ',' + encodeURIComponent(fromLat) + ';' +
+      encodeURIComponent(toLng) + ',' + encodeURIComponent(toLat) +
+      '?overview=full&geometries=geojson';
+
+    fetch(url, { method: 'GET', headers: { Accept: 'application/json' } })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var route = data && data.code === 'Ok' && data.routes && data.routes[0];
+        if (!route || !route.geometry) return;
+
+        var etaEl = document.getElementById('x-live-driver-eta');
+        if (etaEl && Number.isFinite(route.duration)) {
+          var mins = Math.max(1, Math.round(route.duration / 60));
+          var km = (route.distance / 1000).toFixed(1);
+          etaEl.textContent = 'Estimasi tiba ~' + mins + ' menit (' + km + ' km)';
+        }
+
+        // Also refine scooter direction using the first road segment ahead of the driver
+        var coords = route.geometry.coordinates;
+        if (Array.isArray(coords) && coords.length >= 2 && trackingMapState.driverMarker) {
+          var segBearing = calculateBearing(coords[0][1], coords[0][0], coords[1][1], coords[1][0]);
+          if (segBearing !== null) {
+            trackingMapState.lastDriverHeading = segBearing;
+            var markerEl = trackingMapState.driverMarker.getElement && trackingMapState.driverMarker.getElement();
+            if (markerEl) markerEl.innerHTML = getDirectionalScooterSvg(segBearing);
+          }
+        }
+
+        if (!trackingMapState.map || trackingMapState.map !== map) return;
+        var feature = { type: 'Feature', properties: {}, geometry: route.geometry };
+        var source = map.getSource('x-customer-live-route');
+        if (source) {
+          source.setData({ type: 'FeatureCollection', features: [feature] });
+        } else {
+          map.addSource('x-customer-live-route', {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features: [feature] }
+          });
+          map.addLayer({
+            id: 'x-customer-live-route-line',
+            type: 'line',
+            source: 'x-customer-live-route',
+            layout: { 'line-join': 'round', 'line-cap': 'round' },
+            paint: { 'line-color': '#10b981', 'line-width': 5, 'line-opacity': 0.85 }
+          });
+        }
+      })
+      .catch(function () {});
+  }
+
+  function updateLiveDriverPosition(delivery) {
+    if (!delivery) return;
+    if (trackingMapState.fallbackMode) {
+      var fallbackContainer = document.getElementById('x-customer-live-map');
+      if (fallbackContainer) renderFallbackTrackingTileMap(fallbackContainer, delivery);
+      return;
+    }
+
+    var map = trackingMapState.map;
+    if (!map || !window.mapboxgl) return;
+
+    var dLoc = delivery.driver_location;
+    var hasLiveGps = Boolean(dLoc && dLoc.latitude != null && dLoc.longitude != null);
+    var drvLat = hasLiveGps ? Number(dLoc.latitude) : (delivery.branch_latitude != null ? Number(delivery.branch_latitude) : NaN);
+    var drvLng = hasLiveGps ? Number(dLoc.longitude) : (delivery.branch_longitude != null ? Number(delivery.branch_longitude) : NaN);
+    var destLat = delivery.destination_latitude != null ? Number(delivery.destination_latitude) : NaN;
+    var destLng = delivery.destination_longitude != null ? Number(delivery.destination_longitude) : NaN;
+
+    if (Number.isFinite(drvLat) && Number.isFinite(drvLng)) {
+      var heading = resolveDriverHeading(delivery, drvLat, drvLng);
+      trackingMapState.lastDriverCoords = { lat: drvLat, lng: drvLng };
+
+      if (!trackingMapState.driverMarker) {
+        var el = createDriverMarkerElement(heading);
+        trackingMapState.driverMarker = new window.mapboxgl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([drvLng, drvLat])
+          .addTo(map);
+      } else {
+        trackingMapState.driverMarker.setLngLat([drvLng, drvLat]);
+        var markerEl = trackingMapState.driverMarker.getElement && trackingMapState.driverMarker.getElement();
+        if (markerEl) markerEl.innerHTML = getDirectionalScooterSvg(heading);
+      }
+
+      var statusBadge = document.getElementById('x-live-gps-badge');
+      if (statusBadge && hasLiveGps) {
+        statusBadge.textContent = '● Live GPS Aktif';
+        statusBadge.style.background = '#dcfce7';
+        statusBadge.style.color = '#15803d';
+      }
+
+      if (Number.isFinite(destLat) && Number.isFinite(destLng)) {
+        updateTrackingRouteLine(map, drvLng, drvLat, destLng, destLat);
+      }
+    }
+  }
+
+  function initCustomerTrackingMap(delivery) {
+    cleanupTrackingMap();
+    var container = document.getElementById('x-customer-live-map');
+    if (!container || !delivery) return;
+
+    var destLat = delivery.destination_latitude != null ? Number(delivery.destination_latitude) : NaN;
+    var destLng = delivery.destination_longitude != null ? Number(delivery.destination_longitude) : NaN;
+    if (!Number.isFinite(destLat) || !Number.isFinite(destLng)) return;
+
+    var branchLat = delivery.branch_latitude != null ? Number(delivery.branch_latitude) : NaN;
+    var branchLng = delivery.branch_longitude != null ? Number(delivery.branch_longitude) : NaN;
+    var dLoc = delivery.driver_location;
+    var drvLat = dLoc && dLoc.latitude != null ? Number(dLoc.latitude) : branchLat;
+    var drvLng = dLoc && dLoc.longitude != null ? Number(dLoc.longitude) : branchLng;
+
+    var seq = trackingMapState.initSeq;
+    loadMapboxGL()
+      .then(function () {
+        if (seq !== trackingMapState.initSeq) return;
+        var el = document.getElementById('x-customer-live-map');
+        if (!el) return;
+
+        window.mapboxgl.accessToken = MAPBOX_TOKEN;
+        var map = new window.mapboxgl.Map({
+          container: el,
+          style: 'mapbox://styles/mapbox/streets-v12',
+          center: [destLng, destLat],
+          zoom: 14.5,
+          attributionControl: false
+        });
+        trackingMapState.map = map;
+
+        map.on('error', function (ev) {
+          if (ev && ev.error && /webgl|style|worker/i.test(String(ev.error.message || ''))) {
+            try { map.remove(); } catch (_) {}
+            trackingMapState.map = null;
+            renderFallbackTrackingTileMap(el, delivery);
+          }
+        });
+
+        if (Number.isFinite(branchLat) && Number.isFinite(branchLng)) {
+          trackingMapState.branchMarker = new window.mapboxgl.Marker({ color: '#1463ff' })
+            .setLngLat([branchLng, branchLat])
+            .addTo(map);
+        }
+
+        trackingMapState.destMarker = new window.mapboxgl.Marker({ color: '#e5484d' })
+          .setLngLat([destLng, destLat])
+          .addTo(map);
+
+        // Place scooter marker immediately even before style 'load' finishes
+        if (Number.isFinite(drvLat) && Number.isFinite(drvLng)) {
+          var initHeading = resolveDriverHeading(delivery, drvLat, drvLng);
+          trackingMapState.lastDriverCoords = { lat: drvLat, lng: drvLng };
+          var scooterEl = createDriverMarkerElement(initHeading);
+          trackingMapState.driverMarker = new window.mapboxgl.Marker({ element: scooterEl, anchor: 'center' })
+            .setLngLat([drvLng, drvLat])
+            .addTo(map);
+        }
+
+        setTimeout(function () {
+          if (trackingMapState.map === map) {
+            try { map.resize(); } catch (_) {}
+          }
+        }, 120);
+
+        map.on('load', function () {
+          if (seq !== trackingMapState.initSeq) return;
+          try { map.resize(); } catch (_) {}
+          var bounds = new window.mapboxgl.LngLatBounds();
+          bounds.extend([destLng, destLat]);
+
+          if (Number.isFinite(drvLat) && Number.isFinite(drvLng)) {
+            bounds.extend([drvLng, drvLat]);
+            updateLiveDriverPosition(delivery);
+          } else if (Number.isFinite(branchLat) && Number.isFinite(branchLng)) {
+            bounds.extend([branchLng, branchLat]);
+            updateTrackingRouteLine(map, branchLng, branchLat, destLng, destLat);
+          }
+
+          if (!bounds.isEmpty()) {
+            map.fitBounds(bounds, { padding: 44, maxZoom: 15.8, duration: 500 });
+          }
+        });
+      })
+      .catch(function () {
+        var el = document.getElementById('x-customer-live-map');
+        if (el) renderFallbackTrackingTileMap(el, delivery);
+      });
+  }
 
   // P7.13 Stale-response guard: increment on each fetch; discard responses
   // whose sequence number is older than the current one.
@@ -548,6 +1050,43 @@
         '</div>';
     });
 
+    var hasLiveMap = !isPickup && delivery.destination_latitude != null && delivery.destination_longitude != null &&
+      (status === 'out_for_delivery' || status === 'ready' || delivery.status === 'on_delivery' || delivery.status === 'picked_up' || delivery.status === 'assigned');
+
+    var liveMapHtml = '';
+    if (hasLiveMap) {
+      var hasGps = delivery.driver_location && delivery.driver_location.latitude != null;
+      var waPhone = delivery.driver_phone ? String(delivery.driver_phone).replace(/[^0-9]/g, '').replace(/^0/, '62') : '';
+      liveMapHtml =
+        '<div style="margin-bottom:14px;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;background:#f8fafc;">' +
+        '  <div style="position:relative;">' +
+        '    <div id="x-customer-live-map" style="width:100%;height:220px;background:#e8ece8;"></div>' +
+        '    <div style="position:absolute;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;align-items:center;pointer-events:none;z-index:2;">' +
+        '      <span id="x-live-gps-badge" style="padding:4px 10px;border-radius:999px;font-size:11px;font-weight:800;box-shadow:0 2px 6px rgba(0,0,0,0.12);' + (hasGps ? 'background:#dcfce7;color:#15803d;' : 'background:#ffffff;color:#374151;') + '">' +
+                 (hasGps ? '● Live GPS Aktif' : (status === 'out_for_delivery' ? '🛵 Kurir Menuju Lokasi' : '📍 Peta Pengantaran')) +
+        '      </span>' +
+        '    </div>' +
+        '  </div>' +
+        (delivery.driver_name
+          ? '  <div style="padding:12px 14px;background:#ffffff;border-top:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;gap:10px;">' +
+            '    <div style="display:flex;align-items:center;gap:10px;min-width:0;">' +
+            '      <div style="width:38px;height:38px;border-radius:50%;background:#ecfdf5;color:#059669;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">🛵</div>' +
+            '      <div style="min-width:0;">' +
+            '        <div style="font-size:14px;font-weight:800;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + UI.escape(delivery.driver_name) + '</div>' +
+            '        <div id="x-live-driver-eta" style="font-size:11.5px;color:#059669;font-weight:700;margin-top:1px;">' + (status === 'out_for_delivery' ? 'Sedang menuju alamatmu' : 'Kurir Cabang') + '</div>' +
+            '      </div>' +
+            '    </div>' +
+            (delivery.driver_phone
+              ? '    <div style="display:flex;gap:6px;flex-shrink:0;">' +
+                (waPhone ? '<a href="https://wa.me/' + encodeURIComponent(waPhone) + '" target="_blank" rel="noopener" style="width:36px;height:36px;border-radius:50%;background:#dcfce7;color:#15803d;display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:15px;" title="Chat WhatsApp">💬</a>' : '') +
+                '      <a href="tel:' + UI.escape(delivery.driver_phone) + '" style="width:36px;height:36px;border-radius:50%;background:#f1f5f9;color:#0f172a;display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:15px;" title="Telepon Kurir">📞</a>' +
+                '    </div>'
+              : '') +
+            '  </div>'
+          : '') +
+        '</div>';
+    }
+
     var routeHtml;
     if (isPickup) {
       routeHtml =
@@ -561,6 +1100,7 @@
         '</div>';
     } else {
       routeHtml =
+        liveMapHtml +
         '<div style="display:flex;gap:10px;align-items:flex-start;">' +
         '  <div style="font-size:20px;line-height:1.3;">🍴</div>' +
         '  <div style="min-width:0;">' +
@@ -574,7 +1114,7 @@
         '  <div style="min-width:0;">' +
         '    <div style="font-size:12px;color:#6b7280;">Alamat pengiriman' + (dist ? ' · ' + dist : '') + '</div>' +
         '    <div style="font-size:13.5px;color:#111;line-height:1.45;">' + UI.escape(destAddr || 'Alamat tujuan') + '</div>' +
-        (delivery.driver_name
+        (!hasLiveMap && delivery.driver_name
           ? '<div style="margin-top:8px;padding:9px 12px;background:#f0fdf4;border-radius:10px;font-size:13px;color:#166534;">🛵 Kurir: <strong>' + UI.escape(delivery.driver_name) + '</strong>' +
             (delivery.driver_phone ? ' (' + UI.escape(delivery.driver_phone) + ')' : '') +
             (delivery.tracking_url ? '<div style="margin-top:6px;"><a href="' + UI.escape(delivery.tracking_url) + '" target="_blank" rel="noopener noreferrer" style="color:#16a34a;font-weight:700;text-decoration:underline;">Lacak Pengiriman Langsung →</a></div>' : '') +
@@ -658,6 +1198,15 @@
 
     var backBtn = document.getElementById('x-btn-order-back');
     if (backBtn && Router) backBtn.onclick = function () { Router.navigate('history'); };
+
+    lastDeliveryStatus = delivery.status || null;
+    lastDriverName = delivery.driver_name || null;
+
+    if (hasLiveMap) {
+      initCustomerTrackingMap(delivery);
+    } else {
+      cleanupTrackingMap();
+    }
   }
 
   // ─── P7.1 AWAITING BRANCH ACCEPTANCE SURFACE ─────────────────────────────
@@ -1152,7 +1701,10 @@
           if (!data.success || !data.order) return;
           var newStatus = data.order.status;
           var newPayStatus = (data.payment && data.payment.payment_status) || data.order.payment_status || 'pending';
-          if (newStatus !== currentStatus || newPayStatus !== currentPayStatus) {
+          var newDelStatus = (data.delivery && data.delivery.status) || null;
+          var newDriverName = (data.delivery && data.delivery.driver_name) || null;
+
+          if (newStatus !== currentStatus || newPayStatus !== currentPayStatus || newDelStatus !== lastDeliveryStatus || newDriverName !== lastDriverName) {
             stopTimers();
             renderOrder(data);
             currentStatus = newStatus;
@@ -1160,6 +1712,8 @@
             if (!TERMINAL_STATES[newStatus] && !['deny', 'cancel', 'expire'].includes(newPayStatus)) {
               schedulePolling(newStatus, newPayStatus, data.order.acceptance_deadline_at);
             }
+          } else if (data.delivery && trackingMapState.map) {
+            updateLiveDriverPosition(data.delivery);
           }
         })
         .catch(function () {});
@@ -1168,6 +1722,7 @@
 
   function unmount() {
     stopTimers();
+    cleanupTrackingMap();
     targetContainer = null;
     currentOrderId = null;
     fetchSeq = 0;

@@ -76,7 +76,7 @@ router.post('/admin/users', requireAuth(['owner', 'brand_manager', 'branch_manag
   try {
     const workforce = new WorkforceService();
     const actor = getWorkforceActor(req);
-    const { username, email, password, full_name, role, branch_id } = req.body;
+    const { username, email, phone, password, full_name, role, branch_id } = req.body;
 
     // Authorization: determine what role/scope the actor can assign
     let allowedRoles = [];
@@ -135,6 +135,7 @@ router.post('/admin/users', requireAuth(['owner', 'brand_manager', 'branch_manag
       branch_id: targetBranchId,
       username,
       email,
+      phone,
       password,
       full_name,
       role,

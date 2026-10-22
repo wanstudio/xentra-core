@@ -68,6 +68,11 @@ export default function MenuEditor({
           setAvailableProducts(prodData.products);
         }
 
+        if (!menuId && typeof window !== 'undefined' && window._ownerMasterMenuState && window._ownerMasterMenuState.preselectedCategoryId) {
+          setCategoryId(String(window._ownerMasterMenuState.preselectedCategoryId));
+          delete window._ownerMasterMenuState.preselectedCategoryId;
+        }
+
         // If editing existing menu
         if (menuId) {
           const menuRes = await authFetch(`${apiBase}/admin/menus/${encodeURIComponent(menuId)}`);

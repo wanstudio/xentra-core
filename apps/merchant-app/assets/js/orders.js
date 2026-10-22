@@ -896,15 +896,32 @@
 
     // Status: Ready
     // Sesuai panduan warna2 tombol.png:
-    // - Delivery: Serahkan ke Driver (Merah #fa3e3e)
-    // - Dine-in / Takeaway: Pesanan Selesai (Charcoal #303030)
+    // - Delivery: Tugaskan Driver (Merah #fa3e3e, aksi: 'assign_driver')
+    // - Dine-in / Takeaway: Pesanan Selesai (Charcoal #303030, aksi: 'advance')
     if (status === 'ready') {
       if (type === 'delivery') {
+        var dlv = ord && ord.delivery;
+        var hasDriver = dlv && (dlv.driver_id || dlv.driver_name);
+        if (hasDriver && dlv.driver_assignment_status === 'pending') {
+          return {
+            label: 'Driver Ditugaskan (Menunggu)',
+            bg: '#f59e0b',
+            cls: 'btn-amber',
+            action: 'assign_driver'
+          };
+        } else if (hasDriver && dlv.driver_assignment_status === 'accepted') {
+          return {
+            label: 'Driver Siap Mengantar',
+            bg: '#10b981',
+            cls: 'btn-emerald',
+            action: 'advance'
+          };
+        }
         return {
-          label: 'Serahkan ke Driver',
+          label: 'Tugaskan Driver',
           bg: '#fa3e3e',
           cls: 'btn-coral',
-          action: 'advance'
+          action: 'assign_driver'
         };
       } else {
         return {
@@ -1323,6 +1340,8 @@
           btnHtml = '<button type="button" class="bm-pesanan-action-btn ' + btnCls + '" onclick="event.stopPropagation(); viewBMOrderDetail(\'' + esc(ord.id) + '\')">' + esc(action.label) + '</button>';
         } else if (action.action === 'accept') {
           btnHtml = '<button type="button" class="bm-pesanan-action-btn ' + btnCls + '" onclick="event.stopPropagation(); advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'pending\', \'' + esc(type) + '\', this)">' + esc(action.label) + '</button>';
+        } else if (action.action === 'assign_driver') {
+          btnHtml = '<button type="button" class="bm-pesanan-action-btn ' + btnCls + '" onclick="event.stopPropagation(); openBMAssignDriverModal(\'' + esc(ord.id) + '\')">' + esc(action.label) + '</button>';
         } else if (action.action === 'advance') {
           btnHtml = '<button type="button" class="bm-pesanan-action-btn ' + btnCls + '" onclick="event.stopPropagation(); advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'' + esc(String(ord.status)) + '\', \'' + esc(type) + '\', this)">' + esc(action.label) + '</button>';
         } else if (action.action === 'checkin') {
@@ -1732,6 +1751,198 @@
   }
   window.rejectBMOrder = rejectBMOrder;
 
+  /* =========================================================================
+     BRANCH MANAGER: ASSIGN DRIVER MODAL & SUBMIT
+     ========================================================================= */
+  var _bmActiveBranchDrivers = [];
+
+  async function openBMAssignDriverModal(orderId) {
+    var modal = $('modal-bm-assign-driver');
+    var idInput = $('bm-assign-order-id');
+    var subtitle = $('bm-assign-driver-subtitle');
+    var listContainer = $('bm-driver-list-container');
+    var errorEl = $('bm-assign-error');
+    var manualFields = $('bm-assign-manual-fields');
+    var manualName = $('bm-assign-manual-name');
+    var manualPhone = $('bm-assign-manual-phone');
+    var btnText = $('bm-assign-btn-text');
+    var confirmBtn = $('btn-bm-confirm-assign-driver');
+
+    var ord = findBMOrderById(orderId);
+    if (idInput) idInput.value = orderId;
+    if (errorEl) {
+      errorEl.textContent = '';
+      errorEl.style.display = 'none';
+    }
+    if (subtitle) {
+      var subText = formatBMOrderCode(ord);
+      if (ord && ord.customer_name) subText += ' • ' + ord.customer_name;
+      subtitle.textContent = subText;
+    }
+    if (manualFields) manualFields.style.display = 'none';
+    if (manualName) manualName.value = '';
+    if (manualPhone) manualPhone.value = '';
+    if (btnText) btnText.textContent = 'Tugaskan Driver';
+    if (confirmBtn) confirmBtn.disabled = false;
+
+    if (modal) modal.style.display = 'flex';
+    if (window.XentraNav && typeof window.XentraNav.push === 'function') {
+      window.XentraNav.push(function () { closeBMAssignDriverModal({ fromNav: true }); }, 'modal-bm-assign-driver');
+    }
+
+    // Load branch drivers
+    if (listContainer) {
+      listContainer.innerHTML = '<p style="font-size:12px; color:#64748b; margin:0;">Memuat daftar driver...</p>';
+    }
+
+    try {
+      var branchId = (ord && ord.branch_id) || (typeof currentBranchId === 'function' ? currentBranchId() : null);
+      if (!branchId && window.__xentraCurrentBranchId) branchId = window.__xentraCurrentBranchId;
+      var url = API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/drivers';
+      var res = await adminFetch(url, { cache: 'no-store', headers: getAuthHeaders() });
+      var data = await res.json();
+
+      if (res.ok && data && data.success) {
+        _bmActiveBranchDrivers = data.drivers || [];
+        renderBMDriverList(_bmActiveBranchDrivers, ord && ord.delivery && ord.delivery.driver_id);
+      } else {
+        if (listContainer) {
+          listContainer.innerHTML = '<p style="font-size:12px; color:#e11d48; margin:0;">Gagal memuat driver cabang.</p>';
+        }
+      }
+    } catch (err) {
+      if (listContainer) {
+        listContainer.innerHTML = '<p style="font-size:12px; color:#e11d48; margin:0;">Kesalahan koneksi memuat driver.</p>';
+      }
+    }
+  }
+  window.openBMAssignDriverModal = openBMAssignDriverModal;
+
+  function renderBMDriverList(drivers, selectedDriverId) {
+    var container = $('bm-driver-list-container');
+    if (!container) return;
+
+    if (!drivers || !drivers.length) {
+      container.innerHTML =
+        '<div style="background:#f8fafc; border:1px dashed #cbd5e1; border-radius:8px; padding:12px; text-align:center;">' +
+          '<p style="font-size:12px; color:#64748b; margin:0 0 6px;">Belum ada driver aktif di cabang ini.</p>' +
+          '<button type="button" onclick="toggleBMManualDriverInput(true)" style="background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe; font-size:11.5px; font-weight:700; padding:4px 8px; border-radius:6px; cursor:pointer;">+ Input Driver Manual</button>' +
+        '</div>';
+      return;
+    }
+
+    container.innerHTML = drivers.map(function (d, idx) {
+      var isChecked = selectedDriverId ? (String(d.id) === String(selectedDriverId)) : (idx === 0);
+      var taskBadge = d.active_tasks > 0
+        ? '<span style="font-size:10.5px; background:#fef3c7; color:#b45309; padding:2px 6px; border-radius:4px; font-weight:600;">' + d.active_tasks + ' antar</span>'
+        : '<span style="font-size:10.5px; background:#dcfce7; color:#15803d; padding:2px 6px; border-radius:4px; font-weight:600;">Siap antar</span>';
+
+      return '<label style="display:flex; align-items:center; gap:10px; padding:8px 10px; background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; cursor:pointer;">' +
+        '<input type="radio" name="bm_selected_driver" value="' + esc(d.id) + '" ' + (isChecked ? 'checked' : '') + ' style="accent-color:#fa3e3e; width:16px; height:16px;">' +
+        '<div style="flex:1; min-width:0;">' +
+          '<div style="display:flex; justify-content:space-between; align-items:center;">' +
+            '<strong style="font-size:13px; color:#0f172a;">' + esc(d.name) + '</strong>' +
+            taskBadge +
+          '</div>' +
+          '<div style="font-size:11.5px; color:#64748b; margin-top:2px;">' + esc(d.phone || 'Tanpa no. HP') + '</div>' +
+        '</div>' +
+      '</label>';
+    }).join('');
+  }
+
+  function toggleBMManualDriverInput(forceShow) {
+    var manualFields = $('bm-assign-manual-fields');
+    if (!manualFields) return;
+    var isHidden = manualFields.style.display === 'none';
+    var shouldShow = (typeof forceShow === 'boolean') ? forceShow : isHidden;
+    manualFields.style.display = shouldShow ? 'block' : 'none';
+
+    // Deselect radio if showing manual
+    if (shouldShow) {
+      var radios = document.querySelectorAll('input[name="bm_selected_driver"]');
+      radios.forEach(function (r) { r.checked = false; });
+    }
+  }
+  window.toggleBMManualDriverInput = toggleBMManualDriverInput;
+
+  function closeBMAssignDriverModal(options) {
+    options = options || {};
+    var modal = $('modal-bm-assign-driver');
+    if (modal) modal.style.display = 'none';
+    if (!options.fromNav && window.XentraNav && window.XentraNav.hasOpen('modal-bm-assign-driver')) {
+      window.XentraNav.pop('modal-bm-assign-driver');
+    }
+  }
+  window.closeBMAssignDriverModal = closeBMAssignDriverModal;
+
+  async function submitBMAssignDriver(event) {
+    if (event) event.preventDefault();
+    var orderId = $('bm-assign-order-id') ? $('bm-assign-order-id').value : null;
+    var errorEl = $('bm-assign-error');
+    var btnText = $('bm-assign-btn-text');
+    var confirmBtn = $('btn-bm-confirm-assign-driver');
+
+    if (!orderId) return;
+
+    var selectedRadio = document.querySelector('input[name="bm_selected_driver"]:checked');
+    var driverId = selectedRadio ? selectedRadio.value : null;
+    var manualName = $('bm-assign-manual-name') ? $('bm-assign-manual-name').value.trim() : '';
+    var manualPhone = $('bm-assign-manual-phone') ? $('bm-assign-manual-phone').value.trim() : '';
+
+    var payload = {};
+    if (driverId) {
+      payload.driver_id = driverId;
+      if (manualPhone) payload.driver_phone = manualPhone;
+    } else if (manualName && manualPhone) {
+      payload.driver_name = manualName;
+      payload.driver_phone = manualPhone;
+    } else {
+      if (errorEl) {
+        errorEl.textContent = 'Pilih salah satu driver cabang atau isi nama & telepon driver manual.';
+        errorEl.style.display = 'block';
+      }
+      return;
+    }
+
+    if (errorEl) errorEl.style.display = 'none';
+    if (confirmBtn) confirmBtn.disabled = true;
+    if (btnText) btnText.textContent = 'Menugaskan...';
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/orders/' + encodeURIComponent(orderId) + '/assign-driver', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload)
+      });
+      var data = await res.json();
+
+      if (res.ok && data.success) {
+        showToast('Driver berhasil ditugaskan.');
+        closeBMAssignDriverModal();
+        loadBMOrders();
+        if (typeof loadHariIni === 'function') loadHariIni();
+        var detailView = $('bm-orders-detail-view');
+        if (detailView && detailView.style.display !== 'none' && _bmOrdersState.currentDetailOrderId === orderId) {
+          viewBMOrderDetail(orderId);
+        }
+      } else {
+        if (errorEl) {
+          errorEl.textContent = data.error || 'Gagal menugaskan driver.';
+          errorEl.style.display = 'block';
+        }
+      }
+    } catch (err) {
+      if (errorEl) {
+        errorEl.textContent = 'Kesalahan jaringan saat menugaskan driver.';
+        errorEl.style.display = 'block';
+      }
+    } finally {
+      if (confirmBtn) confirmBtn.disabled = false;
+      if (btnText) btnText.textContent = 'Tugaskan Driver';
+    }
+  }
+  window.submitBMAssignDriver = submitBMAssignDriver;
+
   function getBMReservationGuestCount(ord) {
     if (!ord) return 0;
     var explicit = Number(ord.guest_count);
@@ -2072,9 +2283,15 @@
           if (act) {
             var actCls = 'bm-pesanan-action-btn ' + (act.cls || 'btn-green');
             topActions.style.display = 'flex';
-            topActions.innerHTML =
-              '<button type="button" class="' + actCls + '" style="width:100%; height:44px; font-size:14.5px; font-weight:700; border-radius:9999px; justify-content:center;" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'' + esc(ord.status) + '\', \'' + esc(ordType) + '\', this);">' +
-              esc(act.label) + '</button>';
+            if (act.action === 'assign_driver') {
+              topActions.innerHTML =
+                '<button type="button" class="' + actCls + '" style="width:100%; height:44px; font-size:14.5px; font-weight:700; border-radius:9999px; justify-content:center;" onclick="openBMAssignDriverModal(\'' + esc(ord.id) + '\');">' +
+                esc(act.label) + '</button>';
+            } else {
+              topActions.innerHTML =
+                '<button type="button" class="' + actCls + '" style="width:100%; height:44px; font-size:14.5px; font-weight:700; border-radius:9999px; justify-content:center;" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'' + esc(ord.status) + '\', \'' + esc(ordType) + '\', this);">' +
+                esc(act.label) + '</button>';
+            }
           } else {
             topActions.style.display = 'none';
           }

@@ -560,6 +560,34 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
     const orderNumber = order.order_number;
     const subtotal = order.subtotal;
 
+    // Record affiliate conversion if applicable (excluding reservations)
+    if (order_type !== 'reservation') {
+      try {
+        const { createAffiliateService } = require('../../domains/affiliate');
+        const affiliateService = createAffiliateService();
+        const refCode = (req.body.referral_code || req.body.ref || '').toString().trim() || null;
+        const custId = customerSession.customerId || customerSession.customer_id || null;
+        const sessId = req.headers['x-session-id'] || req.body.session_id || req.body.sessionId || null;
+
+        const orderedItems = Array.isArray(items) ? items : ((placementResult.order && placementResult.order.items) || []);
+        const totalItems = orderedItems.reduce((sum, it) => sum + (Number(it.quantity || it.qty || 1)), 0);
+
+        await affiliateService.evaluateOrderConversion({
+          brandId: req.brand_id || (branch && branch.brand_id),
+          orderId,
+          referralCode: refCode,
+          customerId: custId,
+          sessionId: sessId,
+          subtotal,
+          discountAmount,
+          items: orderedItems,
+          totalItems: totalItems > 0 ? totalItems : 1
+        });
+      } catch (affErr) {
+        console.warn('[Affiliate Conversion Trigger Warning]:', affErr.message);
+      }
+    }
+
     // Reservation is a booking, not a purchase. It must never enter table-hold
     // or online-payment gateway resolution, even if a malicious/stale client
     // sends payment_method=doku/midtrans.

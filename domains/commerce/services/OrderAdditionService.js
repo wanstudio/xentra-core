@@ -10,7 +10,7 @@ const orderRepository = new OrderRepository();
 const additionRepository = new OrderAdditionRepository();
 const posBillRepository = new PosBillRepository();
 
-const ALLOWED_PARENT_STATUSES = ['confirmed', 'preparing', 'ready'];
+const ALLOWED_PARENT_STATUSES = ['pending', 'confirmed', 'preparing', 'ready'];
 
 class OrderAdditionService {
   static _loadParent({ order_id, brand_id, branch_id, allowInactiveRead = false }) {

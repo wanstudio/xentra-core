@@ -132,7 +132,7 @@ module.exports = function registerCustomerAuthRoutes(router, deps) {
     }, 5 * 60 * 1000).unref();
 
     return {
-      create({ customerId, brandId, organizationId, customerEmail, customerName, ttlSeconds = 120 }) {
+      create({ customerId, brandId, organizationId, customerEmail, customerName, customerPhone, ttlSeconds = 120 }) {
         const ticket = 'xnt_chdf_' + crypto.randomBytes(24).toString('hex');
         store.set(ticket, {
           customerId,
@@ -140,6 +140,7 @@ module.exports = function registerCustomerAuthRoutes(router, deps) {
           organizationId,
           customerEmail,
           customerName,
+          customerPhone: customerPhone || null,
           expiresAt: Date.now() + ttlSeconds * 1000,
           used: false
         });
@@ -160,6 +161,31 @@ module.exports = function registerCustomerAuthRoutes(router, deps) {
     };
   })();
 
+  router.get('/customer/auth/brand-info', (req, res) => {
+    try {
+      const brandId = req.query.brand_id || req.brand_id;
+      if (!brandId) {
+        return res.status(400).json({ success: false, error: 'brand_id required' });
+      }
+      const brand = db.prepare('SELECT id, name, customer_pwa_name, logo_url, customer_pwa_icon_url, primary_color, custom_domain FROM brands WHERE id = ?').get(brandId);
+      if (!brand) {
+        return res.status(404).json({ success: false, error: 'Brand not found' });
+      }
+      return res.json({
+        success: true,
+        brand: {
+          id: brand.id,
+          name: brand.customer_pwa_name || brand.name || 'MyBangjo',
+          logo_url: brand.customer_pwa_icon_url || brand.logo_url || '',
+          primary_color: brand.primary_color || '#B6FF00',
+          custom_domain: brand.custom_domain
+        }
+      });
+    } catch (err) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   router.post('/customer/auth/broker/init', (req, res) => {
     try {
       const brandId = req.brand_id;
@@ -170,7 +196,10 @@ module.exports = function registerCustomerAuthRoutes(router, deps) {
           error: 'Tenant brand context diperlukan.'
         });
       }
-      const brand = req.brand || db.prepare('SELECT id, custom_domain FROM brands WHERE id = ?').get(brandId);
+      let brand = req.brand;
+      if (!brand || !brand.custom_domain || !brand.name) {
+        brand = db.prepare('SELECT id, custom_domain, name, customer_pwa_name, logo_url, customer_pwa_icon_url, primary_color FROM brands WHERE id = ?').get(brandId) || brand;
+      }
       if (!brand || !brand.custom_domain) {
         return res.status(400).json({
           success: false,
@@ -179,8 +208,14 @@ module.exports = function registerCustomerAuthRoutes(router, deps) {
         });
       }
       const returnTo = `https://${brand.custom_domain}/`;
-      const brokerBase = process.env.XENTRA_CONTROL_PLANE_URL || 'https://xentra.cloud';
-      const brokerUrl = `${brokerBase}/auth/broker?mode=customer&return_to=${encodeURIComponent(returnTo)}&brand_id=${encodeURIComponent(brandId)}`;
+      const isTest = process.env.NODE_ENV === 'test';
+      const brokerBase = (isTest && process.env.XENTRA_CONTROL_PLANE_URL)
+        ? process.env.XENTRA_CONTROL_PLANE_URL
+        : `https://${brand.custom_domain}`;
+      const brandName = brand.customer_pwa_name || brand.name || 'MyBangjo';
+      const brandLogo = brand.customer_pwa_icon_url || brand.logo_url || '';
+      const brandColor = brand.primary_color || '#B6FF00';
+      const brokerUrl = `${brokerBase}/auth/broker?mode=customer&return_to=${encodeURIComponent(returnTo)}&brand_id=${encodeURIComponent(brandId)}&brand_name=${encodeURIComponent(brandName)}&brand_logo=${encodeURIComponent(brandLogo)}&brand_color=${encodeURIComponent(brandColor)}`;
       return res.json({ success: true, broker_url: brokerUrl, return_to: returnTo });
     } catch (err) {
       console.error('[CUSTOMER_BROKER_INIT]', err);
@@ -249,7 +284,8 @@ module.exports = function registerCustomerAuthRoutes(router, deps) {
         customer: {
           id: entry.customerId,
           name: entry.customerName,
-          email: entry.customerEmail
+          email: entry.customerEmail,
+          phone: entry.customerPhone || null
         }
       });
     } catch (err) {
@@ -267,11 +303,20 @@ module.exports = function registerCustomerAuthRoutes(router, deps) {
       const origin = (req.headers.origin || '').toLowerCase();
       const host = (req.headers.host || '').split(':')[0].trim().toLowerCase();
       const isProduction = process.env.NODE_ENV === 'production';
-      const allowedOrigins = ['https://xentra.cloud'];
-      const isFromBroker = allowedOrigins.some(o => origin.startsWith(o)) ||
-        (!isProduction && (host === 'localhost' || host === '127.0.0.1'));
+      const { credential, brand_id: brokerBrandId, return_to } = req.body || {};
 
-      if (isProduction && !isFromBroker) {
+      let isAllowedOrigin = origin.startsWith('https://xentra.cloud') ||
+        (!isProduction && (host === 'localhost' || host === '127.0.0.1'));
+      if (!isAllowedOrigin && brokerBrandId) {
+        try {
+          const tenantBrand = db.prepare('SELECT custom_domain FROM brands WHERE id = ?').get(brokerBrandId);
+          if (tenantBrand && tenantBrand.custom_domain && origin.startsWith(`https://${tenantBrand.custom_domain.toLowerCase()}`)) {
+            isAllowedOrigin = true;
+          }
+        } catch (_) {}
+      }
+
+      if (isProduction && !isAllowedOrigin) {
         return res.status(403).json({
           success: false,
           code: 'BROKER_ONLY',
@@ -279,7 +324,6 @@ module.exports = function registerCustomerAuthRoutes(router, deps) {
         });
       }
 
-      const { credential, brand_id: brokerBrandId, return_to } = req.body || {};
       if (!credential) {
         return res.status(400).json({
           success: false,
@@ -346,6 +390,7 @@ module.exports = function registerCustomerAuthRoutes(router, deps) {
         organizationId: brand.organization_id,
         customerEmail: customerRecord.email || verifiedClaims.email,
         customerName: displayName,
+        customerPhone: customerRecord.phone || null,
         ttlSeconds: 120
       });
 

@@ -136,7 +136,10 @@ class GoogleAuthService {
     // 1. Audience Check
     // aud can be string or in azp
     const tokenAudience = tokenData.aud;
-    if (tokenAudience !== expectedAudience) {
+    const validAudiences = Array.isArray(expectedAudience)
+      ? expectedAudience
+      : String(expectedAudience).split(',').map(s => s.trim()).filter(Boolean);
+    if (!validAudiences.includes(tokenAudience)) {
       throw {
         status: 401,
         code: 'INVALID_TOKEN_AUDIENCE',

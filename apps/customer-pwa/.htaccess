@@ -24,7 +24,7 @@
     # Never cache HTML — ensures version-busted JS/CSS queries are always evaluated
     <FilesMatch "\.(html|htm)$">
         Header set Cache-Control "no-cache, no-store, must-revalidate"
-        Header set Content-Security-Policy "default-src 'self' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://api.mapbox.com https://app.sandbox.midtrans.com https://app.midtrans.com https://xentra.cloud; style-src 'self' 'unsafe-inline' https: https://api.mapbox.com; img-src * data: blob: https: http:; connect-src 'self' https: http: ws: wss: https://api.mapbox.com https://events.mapbox.com https://xentra.cloud; frame-src 'self' https://app.sandbox.midtrans.com https://app.midtrans.com https://xentra.cloud;"
+        Header set Content-Security-Policy "default-src 'self' data: blob:; font-src 'self' data: blob: https: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://api.mapbox.com https://app.sandbox.midtrans.com https://app.midtrans.com https://xentra.cloud; style-src 'self' 'unsafe-inline' https: https://api.mapbox.com; img-src * data: blob: https: http:; connect-src 'self' https: http: ws: wss: https://api.mapbox.com https://events.mapbox.com https://xentra.cloud; frame-src 'self' https://app.sandbox.midtrans.com https://app.midtrans.com https://xentra.cloud;"
     </FilesMatch>
     # JS/CSS: revalidate on every load so version query strings bust the cache
     <FilesMatch "\.(js|css)$">

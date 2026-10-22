@@ -218,7 +218,21 @@ router.post('/customer/dining-session/additions', requireCustomerAuth(), async (
   }
 });
 
-router.post('/customer/dining-session/claim', requireCustomerAuth(), (req, res) => {
+  function optionalCustomerAuth() {
+    return (req, res, next) => {
+      const authHeader = req.headers['authorization'] || '';
+      const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : (req.headers['x-auth-token'] || req.headers['x-customer-token'] || '').trim();
+      if (token && TokenSessionStore) {
+        const session = TokenSessionStore.getSession(token);
+        if (session && (session.type === 'customer' || session.role === 'customer')) {
+          req.customer = session;
+        }
+      }
+      next();
+    };
+  }
+
+router.post('/customer/dining-session/claim', optionalCustomerAuth(), (req, res) => {
   try {
     const { qr_token, branch_id } = req.body || {};
     if (!qr_token) {
@@ -268,6 +282,87 @@ router.post('/customer/dining-session/claim', requireCustomerAuth(), (req, res) 
     }
 
     const tableId = tableRow.id;
+
+    // If the table currently has an active occupied session that has no customer phone
+    // (e.g. opened anonymously at the POS cashier without asking the customer for their phone),
+    // and the customer claiming the physical QR is authenticated with a phone number,
+    // bind the customer's phone to the active session so they can view and manage their open bill!
+    const custPhone = req.customer && req.customer.phone ? String(req.customer.phone).trim() : '';
+
+    // If table currently has an active hold from a POS cashier dine-in order,
+    // activate the cashier's held order into an operational dining session immediately.
+    try {
+      const activeHold = db.prepare(`
+        SELECT h.hold_reference_id, h.id as hold_id
+        FROM branch_table_holds h
+        WHERE h.table_id = ? AND h.status = 'active'
+      `).get(tableId);
+
+      if (activeHold) {
+        let heldOrder = db.prepare(`
+          SELECT id, branch_id, customer_name, customer_phone, order_channel, order_type
+          FROM orders
+          WHERE id = ? AND order_type = 'dine_in'
+        `).get(activeHold.hold_reference_id);
+
+        if (!heldOrder) {
+          const held = db.prepare('SELECT order_id FROM pos_held_orders WHERE id = ?').get(activeHold.hold_reference_id);
+          if (held && held.order_id) {
+            heldOrder = db.prepare(`
+              SELECT id, branch_id, customer_name, customer_phone, order_channel, order_type
+              FROM orders
+              WHERE id = ? AND order_type = 'dine_in'
+            `).get(held.order_id);
+          }
+        }
+
+        if (heldOrder && heldOrder.order_channel === 'pos_cashier') {
+          const { DiningTableService } = require('../../domains/dining');
+          DiningTableService.createOrAttachDiningSession({
+            branch_id: heldOrder.branch_id,
+            table_ids: [tableId],
+            order_id: heldOrder.id,
+            customer_name: (req.customer && req.customer.name) || heldOrder.customer_name || 'Tamu Dine-In',
+            customer_phone: custPhone || heldOrder.customer_phone || '',
+            guest_count: heldOrder.guest_count || 1,
+            hold_reference_id: heldOrder.id,
+            channel: 'pos_cashier'
+          });
+        }
+      }
+    } catch (activateErr) {
+      console.warn('[customer/claim] Error activating held cashier order into session:', activateErr.message);
+    }
+
+    if (custPhone) {
+      const activeSessionRow = db.prepare(`
+        SELECT s.current_session_id, ds.customer_phone
+        FROM branch_table_states s
+        JOIN dining_sessions ds ON ds.id = s.current_session_id
+        WHERE s.table_id = ? AND s.operational_state = 'occupied' AND ds.status = 'active'
+      `).get(tableId);
+
+      if (activeSessionRow && (!activeSessionRow.customer_phone || activeSessionRow.customer_phone === '')) {
+        const now = new Date().toISOString();
+        db.prepare(`
+          UPDATE dining_sessions
+          SET customer_phone = ?,
+              customer_name = CASE WHEN customer_name IS NULL OR customer_name = '' OR customer_name = 'Tamu Dine-In' THEN ? ELSE customer_name END,
+              updated_at = ?
+          WHERE id = ?
+        `).run(custPhone, req.customer.name || 'Tamu Dine-In', now, activeSessionRow.current_session_id);
+
+        try {
+          db.prepare(`
+            UPDATE orders
+            SET customer_phone = ?,
+                customer_name = CASE WHEN customer_name IS NULL OR customer_name = '' OR customer_name = 'Tamu' OR customer_name = 'Tamu Meja' THEN ? ELSE customer_name END,
+                updated_at = ?
+            WHERE dining_session_id = ? AND (customer_phone IS NULL OR customer_phone = '')
+          `).run(custPhone, req.customer.name || 'Tamu Dine-In', now, activeSessionRow.current_session_id);
+        } catch (_) {}
+      }
+    }
 
     // Mejanya selalu dikembalikan, walau belum ada billnya: konsumen yang scan QR
     // tidak boleh diminta memilih meja lagi — mejanya sudah ada di QR itu.

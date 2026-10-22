@@ -873,6 +873,7 @@ function initSchema(targetDb) {
       ktp_media_id TEXT,
       avatar_url TEXT,
       avatar_media_id TEXT,
+      vehicle_type TEXT DEFAULT 'motorcycle',
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
@@ -2484,6 +2485,7 @@ function initSchema(targetDb) {
   try { targetDb.exec('ALTER TABLE users ADD COLUMN ktp_media_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE users ADD COLUMN avatar_url TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE users ADD COLUMN avatar_media_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL;'); } catch (e) {}
+  try { targetDb.exec("ALTER TABLE users ADD COLUMN vehicle_type TEXT DEFAULT 'motorcycle';"); } catch (e) {}
 
   // M5 DASHBOARD MEDIA INTEGRATION: canonical media_id reference columns.
   // Each entity gets a nullable media_id FK referencing media_assets.id.
@@ -3065,9 +3067,56 @@ function bootstrapEssentialTenant(targetDb) {
         created_at TEXT DEFAULT (datetime('now'))
       );
       CREATE INDEX IF NOT EXISTS idx_driver_locations_brand ON driver_locations (brand_id, is_online);
-      CREATE INDEX IF NOT EXISTS idx_driver_locations_branch ON driver_locations (branch_id, is_online);
       CREATE INDEX IF NOT EXISTS idx_driver_location_logs_order ON driver_location_logs (order_id, created_at);
       CREATE INDEX IF NOT EXISTS idx_driver_location_logs_driver ON driver_location_logs (driver_id, created_at);
+    `);
+  } catch (_) {}
+
+  // External Channel (GoFood / GrabFood / ShopeeFood) Ingestion & Commission Settlement
+  try { targetDb.exec("ALTER TABLE orders ADD COLUMN channel_fee REAL DEFAULT 0.0;"); } catch (_) {}
+  try { targetDb.exec("ALTER TABLE orders ADD COLUMN net_revenue REAL;"); } catch (_) {}
+  try { targetDb.exec("ALTER TABLE orders ADD COLUMN external_order_id TEXT;"); } catch (_) {}
+  try { targetDb.exec("CREATE INDEX IF NOT EXISTS idx_orders_external_order_id ON orders(external_order_id);"); } catch (_) {}
+
+  try {
+    targetDb.exec(`
+      CREATE TABLE IF NOT EXISTS external_channel_orders (
+        id TEXT PRIMARY KEY,
+        order_id TEXT UNIQUE REFERENCES orders(id) ON DELETE CASCADE,
+        channel TEXT NOT NULL,
+        external_order_id TEXT NOT NULL,
+        brand_id TEXT NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+        branch_id TEXT NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+        driver_name TEXT,
+        driver_phone TEXT,
+        gross_amount REAL NOT NULL,
+        commission_rate REAL NOT NULL DEFAULT 0.20,
+        commission_amount REAL NOT NULL DEFAULT 0.0,
+        platform_fee REAL NOT NULL DEFAULT 0.0,
+        net_amount REAL NOT NULL,
+        raw_payload TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (brand_id) REFERENCES brands(id),
+        FOREIGN KEY (branch_id) REFERENCES branches(id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_eco_channel ON external_channel_orders(channel);
+      CREATE INDEX IF NOT EXISTS idx_eco_branch ON external_channel_orders(branch_id);
+      CREATE INDEX IF NOT EXISTS idx_eco_brand ON external_channel_orders(brand_id);
+
+      CREATE TABLE IF NOT EXISTS branch_channel_settings (
+        id TEXT PRIMARY KEY,
+        branch_id TEXT NOT NULL,
+        channel TEXT NOT NULL,
+        is_active INTEGER DEFAULT 1,
+        commission_rate REAL DEFAULT 0.20,
+        platform_fee REAL DEFAULT 1000.0,
+        auto_accept INTEGER DEFAULT 1,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now')),
+        UNIQUE(branch_id, channel),
+        FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_bcs_branch ON branch_channel_settings(branch_id);
     `);
   } catch (_) {}
 }

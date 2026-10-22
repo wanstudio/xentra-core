@@ -203,7 +203,8 @@ class ComposedMenuResolver {
         description: item.product_description || '',
         image_url: item.product_image_url || item.product_image || '',
         media_id: item.product_media_id || null,
-        product_is_active: item.product_is_active !== 0
+        product_is_active: item.product_is_active !== 0,
+        options_config: item.options_config || null
       }))
     };
   }

@@ -82,15 +82,14 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
       onBack();
       return;
     }
-    if (typeof window.goBackFromCategoryEditor === 'function') {
-      window.goBackFromCategoryEditor();
-      return;
-    }
+    const fallbackRoute = isEdit
+      ? `catalog/categories/${encodeURIComponent(categoryId)}`
+      : 'catalog/categories';
     if (typeof window.navigateTo === 'function') {
-      window.navigateTo('catalog/categories');
+      window.navigateTo(fallbackRoute);
       return;
     }
-    window.location.hash = '#catalog/categories';
+    window.location.hash = `#${fallbackRoute}`;
   };
 
   const trimmedName = name.trim();
@@ -191,7 +190,11 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
         window.state.categories = window.state.categories.filter((c) => String(c.id) !== String(categoryId));
       }
 
-      handleBack();
+      if (typeof window.navigateTo === 'function') {
+        window.navigateTo('catalog/categories');
+      } else {
+        window.location.hash = '#catalog/categories';
+      }
     } catch (err) {
       console.error('[CategoryEditorPage] Delete error:', err);
       if (typeof window.showToast === 'function') {

@@ -361,6 +361,7 @@ router.get('/pos/sales', requireAuth(['cashier']), (req, res) => {
       WHERE o.brand_id = ? AND o.branch_id = ? AND (
         o.order_channel = 'pos_cashier'
         OR (o.order_type = 'delivery' AND o.payment_method = 'cash')
+        OR o.order_channel IN ('gofood', 'grabfood', 'shopeefood')
       )
       ORDER BY o.created_at DESC
       LIMIT 100

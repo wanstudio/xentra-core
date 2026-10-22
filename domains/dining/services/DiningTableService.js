@@ -254,12 +254,15 @@ class DiningTableService {
           const currentTable = repository.findCurrentSessionForTable(tid);
           if (currentTable && currentTable.operational_state === 'occupied' && currentTable.current_session_id) {
             const activeSession = repository.findDiningSessionById(currentTable.current_session_id);
-            if (activeSession && activeSession.status === 'active' && activeSession.customer_phone !== authenticatedCustomerPhone) {
-              return {
-                valid: false,
-                status: 'TABLE_ALREADY_OCCUPIED',
-                errors: ['Meja sedang digunakan oleh pelanggan lain.']
-              };
+            if (activeSession && activeSession.status === 'active') {
+              if (activeSession.customer_phone && activeSession.customer_phone !== authenticatedCustomerPhone) {
+                return {
+                  valid: false,
+                  status: 'TABLE_ALREADY_OCCUPIED',
+                  errors: ['Meja sedang digunakan oleh pelanggan lain.']
+                };
+              }
+              effectiveDiningSessionId = activeSession.id;
             }
           }
         }
@@ -482,12 +485,14 @@ class DiningTableService {
       if (!row || !row.is_active) return { valid: false, error: `Meja "${tid}" tidak ditemukan atau tidak aktif di cabang ini.` };
       if (row.operational_state !== 'available') {
         let isOwnActiveSession = false;
-        if (row.operational_state === 'occupied' && customerPhone) {
+        if (row.operational_state === 'occupied') {
           const sessRow = repository.findCurrentSessionForTable(tid);
           if (sessRow && sessRow.current_session_id) {
             const session = repository.findDiningSessionById(sessRow.current_session_id);
-            if (session && session.status === 'active' && session.customer_phone === customerPhone) {
-              isOwnActiveSession = true;
+            if (session && session.status === 'active') {
+              if (!session.customer_phone || (customerPhone && session.customer_phone === customerPhone)) {
+                isOwnActiveSession = true;
+              }
             }
           }
         }
@@ -551,12 +556,14 @@ class DiningTableService {
         if (!row || !row.is_active) throw new Error(`[TABLE_UNAVAILABLE] Meja "${tid}" tidak aktif atau tidak ditemukan.`);
         if (row.operational_state !== 'available') {
           let isOwnActiveSession = false;
-          if (row.operational_state === 'occupied' && cleanCustomerPhone) {
+          if (row.operational_state === 'occupied') {
             const sessRow = repository.findCurrentSessionForTable(tid);
             if (sessRow && sessRow.current_session_id) {
               const session = repository.findDiningSessionById(sessRow.current_session_id);
-              if (session && session.status === 'active' && session.customer_phone === cleanCustomerPhone) {
-                isOwnActiveSession = true;
+              if (session && session.status === 'active') {
+                if (!session.customer_phone || (cleanCustomerPhone && session.customer_phone === cleanCustomerPhone)) {
+                  isOwnActiveSession = true;
+                }
               }
             }
           }
@@ -695,6 +702,14 @@ class DiningTableService {
             throw new Error(`[DiningTableService] TABLE_SESSION_MISMATCH: Meja yang diminta tidak sesuai dengan meja pada sesi aktif "${session_id}".`);
           }
         }
+        if (!session.customer_phone && cleanCustomerPhone) {
+          repository.updateDiningSessionCustomer({
+            sessionId: session.id,
+            customerName: customer_name,
+            customerPhone: cleanCustomerPhone,
+            updatedAt: now
+          });
+        }
         sessionId = session.id;
       }
 
@@ -722,9 +737,19 @@ class DiningTableService {
             if (stateRow.operational_state === 'occupied' && stateRow.current_session_id) {
               const occSession = repository.findDiningSessionById(stateRow.current_session_id);
               if (occSession && occSession.status === 'active') {
-                if (!cleanCustomerPhone || occSession.customer_phone !== cleanCustomerPhone) {
+                if (channel === 'customer_app' && occSession.customer_phone && cleanCustomerPhone && occSession.customer_phone !== cleanCustomerPhone) {
                   throw new Error(`[DiningTableService] TABLE_ALREADY_OCCUPIED: Meja "${tid}" sedang digunakan oleh pelanggan lain.`);
                 }
+                sessionId = occSession.id;
+                if (!occSession.customer_phone && cleanCustomerPhone) {
+                  repository.updateDiningSessionCustomer({
+                    sessionId: occSession.id,
+                    customerName: customer_name,
+                    customerPhone: cleanCustomerPhone,
+                    updatedAt: now
+                  });
+                }
+                break;
               }
             } else if (stateRow.operational_state === 'held') {
               if (hold_reference_id) {
@@ -742,17 +767,19 @@ class DiningTableService {
           }
         }
 
-        sessionId = `sess_${crypto.randomBytes(6).toString('hex')}`;
-        repository.createDiningSession({
-          sessionId,
-          branchId: branch_id,
-          customerName: customer_name,
-          customerPhone: cleanCustomerPhone,
-          guestCount: guest_count,
-          channel: channel || 'customer_app',
-          openedAt: now,
-          updatedAt: now
-        });
+        if (!sessionId) {
+          sessionId = `sess_${crypto.randomBytes(6).toString('hex')}`;
+          repository.createDiningSession({
+            sessionId,
+            branchId: branch_id,
+            customerName: customer_name,
+            customerPhone: cleanCustomerPhone,
+            guestCount: guest_count,
+            channel: channel || 'customer_app',
+            openedAt: now,
+            updatedAt: now
+          });
+        }
       }
 
       // 5. Attach tables & set state to occupied
@@ -954,6 +981,32 @@ class DiningTableService {
     const result = repository.regenerateQrToken({ tableId, qrToken: newQrToken, updatedAt: now });
     if (!result || result.changes === 0) throw new Error(`[DiningTableService] Meja "${tableId}" tidak ditemukan.`);
     return { table_id: tableId, qr_token: newQrToken };
+  }
+
+  static bindCustomerToSessionIfEmpty({ sessionId, customerName, customerPhone, updatedAt = new Date().toISOString() }) {
+    if (!sessionId || !customerPhone) return;
+    const session = repository.findDiningSession(sessionId);
+    if (session && session.status === 'active' && (!session.customer_phone || session.customer_phone === '')) {
+      repository.updateDiningSessionCustomer({
+        sessionId,
+        customerName: customerName || session.customer_name,
+        customerPhone: String(customerPhone).trim(),
+        updatedAt
+      });
+    }
+  }
+
+  static bindCustomerToTableSessionIfEmpty({ tableId, customerName, customerPhone, updatedAt = new Date().toISOString() }) {
+    if (!tableId || !customerPhone) return;
+    const stateRow = repository.findCurrentSessionForTable(tableId);
+    if (stateRow && stateRow.operational_state === 'occupied' && stateRow.current_session_id) {
+      this.bindCustomerToSessionIfEmpty({
+        sessionId: stateRow.current_session_id,
+        customerName,
+        customerPhone,
+        updatedAt
+      });
+    }
   }
 }
 

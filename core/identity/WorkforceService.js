@@ -37,7 +37,7 @@ class WorkforceService {
 
   // ==================== USER LIFECYCLE ====================
 
-  createUser({ brand_id, organization_id, branch_id, username, email, password, full_name, role, created_by }) {
+  createUser({ brand_id, organization_id, branch_id, username, email, phone, password, full_name, role, created_by }) {
     // Validate required fields
     if (!brand_id || !organization_id || !username || !password || !role) {
       throw { status: 400, code: 'VALIDATION_ERROR', message: 'brand_id, organization_id, username, password, and role are required.' };
@@ -81,16 +81,16 @@ class WorkforceService {
     const now = new Date().toISOString();
 
     this.repository.prepare(`
-      INSERT INTO users (id, brand_id, organization_id, branch_id, username, email, password_hash, full_name, role, status, password_changed_at, email_verified_at, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
-    `).run(id, brand_id, organization_id, branch_id || null, username, email || null, password_hash, full_name || null, role, now, now, now, now);
+      INSERT INTO users (id, brand_id, organization_id, branch_id, username, email, phone, password_hash, full_name, role, status, password_changed_at, email_verified_at, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
+    `).run(id, brand_id, organization_id, branch_id || null, username, email || null, phone ? String(phone).trim() : null, password_hash, full_name || null, role, now, now, now, now);
 
-    return { id, username, email, full_name, role, branch_id: branch_id || null, status: 'active', email_verified: true };
+    return { id, username, email, phone: phone ? String(phone).trim() : null, full_name, role, branch_id: branch_id || null, status: 'active', email_verified: true };
   }
 
   getUser(userId, brandId) {
     const user = this.repository.prepare(`
-      SELECT id, brand_id, organization_id, branch_id, username, email, full_name, role, status, 
+      SELECT id, brand_id, organization_id, branch_id, username, email, phone, full_name, role, status, 
              created_at, updated_at, last_login_at, password_changed_at
       FROM users WHERE id = ? AND brand_id = ?
     `).get(userId, brandId);
@@ -100,7 +100,7 @@ class WorkforceService {
 
   listUsers(brandId, { role, branch_id, status, limit = 50, offset = 0 } = {}) {
     let query = `
-      SELECT id, brand_id, organization_id, branch_id, username, email, full_name, role, status,
+      SELECT id, brand_id, organization_id, branch_id, username, email, phone, full_name, role, status,
              created_at, updated_at, last_login_at
       FROM users WHERE brand_id = ?
     `;
@@ -136,14 +136,14 @@ class WorkforceService {
       }
     }
 
-    const allowedFields = ['full_name', 'email'];
+    const allowedFields = ['full_name', 'email', 'phone'];
     const setClauses = [];
     const params = [];
 
     for (const [key, value] of Object.entries(updates)) {
       if (allowedFields.includes(key)) {
         setClauses.push(`${key} = ?`);
-        params.push(value);
+        params.push(typeof value === 'string' ? (value.trim() || null) : value);
       }
     }
 

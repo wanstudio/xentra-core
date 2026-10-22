@@ -9,6 +9,7 @@ const PosShiftReportService = require('./services/PosShiftReportService');
 const ProductReportService = require('./services/ProductReportService');
 const BranchCompareService = require('./services/BranchCompareService');
 const CustomerReportService = require('./services/CustomerReportService');
+const AffiliateReportService = require('./services/AffiliateReportService');
 
 const REPORTING_IDENTITY = {
   name: 'reporting',
@@ -82,6 +83,8 @@ class ReportingEngine {
         return BranchCompareService.getBranchComparisonReport(filterParams);
       case 'customers':
         return CustomerReportService.getCustomerReport(filterParams);
+      case 'affiliate':
+        return AffiliateReportService.getAffiliateReport(filterParams);
       default:
         throw new Error(`[ReportingEngine] Report type "${reportType}" tidak dikenali.`);
     }
@@ -100,6 +103,7 @@ module.exports = {
   PosShiftReportService,
   ProductReportService,
   BranchCompareService,
-  CustomerReportService
+  CustomerReportService,
+  AffiliateReportService
 };
 

@@ -20,7 +20,7 @@ router.get('/orders/:id', (req, res) => {
   // P1 TENANT ISOLATION: Join branches to strictly verify brand ownership.
   // branch_name is included for P7.1 Branch Acceptance Waiting surface.
   const order = db.prepare(`
-    SELECT o.*, b.brand_id, b.name AS branch_name
+    SELECT o.*, b.brand_id, b.name AS branch_name, b.latitude AS branch_latitude, b.longitude AS branch_longitude
     FROM orders o
     JOIN branches b ON b.id = o.branch_id
     WHERE o.id = ? AND b.brand_id = ?
@@ -171,7 +171,7 @@ router.get('/orders/:id', (req, res) => {
   }));
 
   let liveDriverLocation = null;
-  if (delivery && delivery.driver_id && ['picked_up', 'on_delivery'].includes(delivery.status)) {
+  if (delivery && delivery.driver_id && ['assigned', 'picked_up', 'on_delivery'].includes(delivery.status)) {
     try {
       liveDriverLocation = db.prepare(`
         SELECT latitude, longitude, heading, speed, accuracy, updated_at
@@ -185,6 +185,8 @@ router.get('/orders/:id', (req, res) => {
     destination_address: delivery.destination_address,
     destination_latitude: delivery.destination_latitude ? Number(delivery.destination_latitude) : null,
     destination_longitude: delivery.destination_longitude ? Number(delivery.destination_longitude) : null,
+    branch_latitude: order.branch_latitude !== null && order.branch_latitude !== undefined ? Number(order.branch_latitude) : null,
+    branch_longitude: order.branch_longitude !== null && order.branch_longitude !== undefined ? Number(order.branch_longitude) : null,
     actual_road_distance_meters: delivery.actual_road_distance_meters,
     delivery_fee_calculated: delivery.delivery_fee_calculated,
     driver_name: delivery.driver_name || null,
@@ -228,7 +230,7 @@ router.get('/customer/orders/:orderNumber/live-tracking', (req, res) => {
     const delivery = db.prepare(`
       SELECT d.driver_id, d.driver_name, d.driver_phone, d.status as delivery_status,
              d.destination_address, d.destination_latitude, d.destination_longitude,
-             b.name as branch_name, b.lat as branch_latitude, b.lng as branch_longitude
+             b.name as branch_name, b.latitude as branch_latitude, b.longitude as branch_longitude
       FROM order_deliveries d
       JOIN orders o ON o.id = d.order_id
       LEFT JOIN branches b ON b.id = o.branch_id

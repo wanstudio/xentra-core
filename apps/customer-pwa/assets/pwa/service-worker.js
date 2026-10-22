@@ -10,6 +10,22 @@
  * Release 2026-10-13a: Fix syntax error in pages/home.js (missing closing brace on
  *   renderCustomerSpiceIndicator) to resolve stuck loading in customer PWA.
  * Release 2026-10-14a: Operational open/close branch guard in Customer PWA and POS.
+ * Release 2026-10-21a: PWA isolation fix - exclude belanja/purchasing routes from customer SW.
+ * Release 2026-10-21d: Dribbble-grade multi-step human onboarding wizard for Affiliate.
+ * Release 2026-10-21e: Plus Jakarta Sans self-hosted authoritative brand typography & font-src CSP fix.
+ * Release 2026-10-21f: Human copywriting overhaul for referral/affiliate program (anti-robotic).
+ * Release 2026-10-21g: Fix syntax parser in aux-pages.js (resolve loop loading in customer PWA).
+ * Release 2026-10-21h: Performance audit: instant zero-delay boot, smart asset caching, eliminate blocking splash.
+ * Release 2026-10-21i: Coordinated splash lifecycle (smooth fade-out on data ready, no naked skeleton flash).
+ * Release 2026-10-21j: Strict data-readiness curtain lifecycle (bfcache event guard, full aux page splash synchronization).
+ * Release 2026-10-21k: Fix affiliate form title, remove double-router flicker, sanitize WhatsApp phone prefill.
+ * Release 2026-10-21L: Network-First JS/CSS delivery, zero-flicker instant affiliate form, strict phone sanitization.
+ * Release 2026-10-21M: Hard cache-busting, zero-flicker affiliate persistence, strict phone sanitization.
+ * Release 2026-10-21N: Instant Share & Earn architecture (zero-formulir, instant referral link, delayed payout KYC).
+ * Release 2026-10-21O: Menu Detail Modal Redesign (Frame 241) & My Collections wishlist page.
+ * Release 2026-10-21Q: Flat Rp1.000 per menu affiliate commission model and copy.
+ * Release 2026-10-21P: Remove viewport-fit=cover and enforce canonical white navigation bar (#ffffff) without stroke or scrim.
+ * Release 2026-10-22A: Live driver map tracking in order-received (CSP worker-src blob fix, OSM tile fallback, and multi-angle Gojek-style scooter SVG).
  * When this file changes (new commit), the hash changes → new cache → old purged.
  * No hardcoded version strings. No external endpoints. No manual edits.
  *
@@ -41,6 +57,11 @@ var STATIC_ASSETS = [
   "/manifest.json",
   "/assets/pwa/icon-192.png",
   "/assets/pwa/icon-512.png",
+  "/assets/fonts/plus-jakarta-sans.css",
+  "/assets/fonts/plus-jakarta-sans-400-latin.woff2",
+  "/assets/fonts/plus-jakarta-sans-600-latin.woff2",
+  "/assets/fonts/plus-jakarta-sans-700-latin.woff2",
+  "/assets/fonts/plus-jakarta-sans-800-latin.woff2",
   "/assets/css/tokens.css",
   "/assets/css/layout.css",
   "/assets/css/components.css",
@@ -165,7 +186,11 @@ function staleWhileRevalidate(event) {
 
 // Network-First: fresh when online, cached when the network is unavailable.
 function networkFirst(event) {
-  return fetch(event.request)
+  var req = event.request;
+  try {
+    req = new Request(event.request, { cache: "reload" });
+  } catch (_) {}
+  return fetch(req)
     .then(function (response) {
       if (response && response.status === 200) {
         var copy = response.clone();
@@ -185,6 +210,12 @@ function networkFirst(event) {
       });
     });
 }
+
+self.addEventListener("message", function (event) {
+  if (event.data && (event.data.action === "skipWaiting" || event.data === "skipWaiting")) {
+    self.skipWaiting();
+  }
+});
 
 // 3. Fetch strategy — per asset category.
 self.addEventListener("fetch", function (event) {
@@ -206,7 +237,9 @@ self.addEventListener("fetch", function (event) {
     url.pathname.startsWith("/merchant-app") ||
     url.pathname.startsWith("/merchant") ||
     url.pathname.startsWith("/merchant-shared/") ||
-    url.pathname.startsWith("/pos")
+    url.pathname.startsWith("/pos") ||
+    url.pathname.startsWith("/belanja") ||
+    url.pathname.startsWith("/purchasing")
   ) {
     return;
   }
@@ -224,6 +257,14 @@ self.addEventListener("fetch", function (event) {
     return;
   }
 
+  // Static font assets (Plus Jakarta Sans woff2/css): Cache-First for instant paint.
+  if (url.pathname.startsWith("/assets/fonts/")) {
+    event.respondWith(
+      computeCacheName().then(function (cn) { return cacheFirst(event, cn); })
+    );
+    return;
+  }
+
   // Static UI images (app icons): Cache-First.
   if (url.pathname.startsWith("/assets/icons/") || url.pathname.startsWith("/assets/pwa/")) {
     event.respondWith(
@@ -232,10 +273,10 @@ self.addEventListener("fetch", function (event) {
     return;
   }
 
-  // Static app shell styles and scripts: Stale-While-Revalidate for instant render,
-  // refreshed in background without stale mismatch (bound to active release cache).
+  // Static app shell styles and scripts: Network-First for immediate code freshness,
+  // falling back to cache when offline.
   if (url.pathname.startsWith("/assets/css/") || url.pathname.startsWith("/assets/js/")) {
-    event.respondWith(staleWhileRevalidate(event));
+    event.respondWith(networkFirst(event));
     return;
   }
 

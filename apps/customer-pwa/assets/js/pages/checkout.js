@@ -726,7 +726,9 @@
         state.fulfillment.tableNumber = storedTable.number || '';
       }
 
-      var joinToken = getJoinTokenFromUrl();
+      var joinToken = getJoinTokenFromUrl() || (function () {
+        try { return localStorage.getItem('xentra_v2_pending_table_token'); } catch (_) { return null; }
+      })();
       if (joinToken) claimTableFromQr(joinToken);
       var hasValidToken = storeState.customerSession.token &&
         storeState.customerSession.token.indexOf('xnt_cust_') === 0;
@@ -4819,7 +4821,9 @@
       payment_method: state.paymentMethod || 'cash',
       cash_tendered: needsCashTendered() ? state.cashTendered : null,
       order_note: state.fulfillment.note || '',
-      note: state.fulfillment.note || ''
+      note: state.fulfillment.note || '',
+      referral_code: (typeof localStorage !== 'undefined' && localStorage.getItem('xentra_affiliate_ref')) || undefined,
+      session_id: (typeof localStorage !== 'undefined' && localStorage.getItem('xentra_visitor_session_id')) || undefined
     };
 
     function onSuccess(orderId, snapToken, redirectUrl) {
