@@ -64,8 +64,9 @@
   animation: stickySwipeUp 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* Ensure modern categories tab has no transform that would trap fixed positioning or squeeze mobile padding */
-#tab-catalog-categories {
+/* Ensure modern tabs have no transform that would trap fixed positioning or squeeze mobile padding */
+#tab-catalog-categories,
+#tab-business {
   transform: none !important;
   animation: none !important;
 }
@@ -74,7 +75,13 @@ body.x-categories-active .x-dash-main,
 body:has(#modern-categories-page-mount) .x-dash-main,
 #tab-catalog-categories,
 body.x-owner-mobile-app #tab-catalog-categories,
-.x-tab-content#tab-catalog-categories {
+.x-tab-content#tab-catalog-categories,
+#tab-business,
+body.x-owner-mobile-app #tab-business,
+.x-tab-content#tab-business,
+#owner-business-main-view,
+#modern-business-hub-mount,
+#subpage-catalog-menu-hub {
   padding-left: 0 !important;
   padding-right: 0 !important;
   margin-left: 0 !important;

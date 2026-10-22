@@ -103,11 +103,14 @@
       window.addEventListener('hashchange', handleRouting);
       handleRouting();
     }
-    }
   };
 
   window.OwnerApp = OwnerApp;
-  document.addEventListener('DOMContentLoaded', function () {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () {
+      OwnerApp.init();
+    });
+  } else {
     OwnerApp.init();
-  });
+  }
 })(window);
