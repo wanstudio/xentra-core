@@ -116,7 +116,7 @@ export const OwnerAppShell: React.FC<OwnerAppShellProps> = ({
       {/* 2. Main Scrollable Content Area */}
       <main
         className={`w-full flex-1 flex flex-col ${
-          !isChildPage ? 'pt-[76px] pb-[88px]' : 'pt-2 pb-6'
+          !isChildPage ? 'pt-[76px] pb-[104px]' : 'pt-2 pb-6'
         }`}
       >
         {(currentRoute === 'overview' || currentRoute === '') && (
@@ -172,12 +172,17 @@ export const OwnerAppShell: React.FC<OwnerAppShellProps> = ({
       {!isChildPage && (
         <nav
           id="clean-owner-bottom-nav"
-          className="fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-slate-200/90 shadow-[0_-2px_10px_rgba(0,0,0,0.03)] z-[150] grid grid-cols-5 items-center px-1"
+          style={{
+            paddingBottom: 'max(24px, env(safe-area-inset-bottom, 24px))',
+            paddingTop: '10px',
+            boxSizing: 'border-box'
+          }}
+          className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200/90 shadow-[0_-2px_12px_rgba(0,0,0,0.04)] z-[150] grid grid-cols-5 items-center px-1"
         >
           <button
             type="button"
             onClick={() => navigateTo('overview')}
-            className={`flex flex-col items-center justify-center gap-1 h-full cursor-pointer transition-all ${
+            className={`flex flex-col items-center justify-center gap-1.5 py-1.5 h-full cursor-pointer transition-all active:scale-95 ${
               activeTab === 'overview' ? 'text-slate-900 font-bold' : 'text-slate-400 font-medium'
             }`}
           >
@@ -192,7 +197,7 @@ export const OwnerAppShell: React.FC<OwnerAppShellProps> = ({
           <button
             type="button"
             onClick={() => navigateTo('business')}
-            className={`flex flex-col items-center justify-center gap-1 h-full cursor-pointer transition-all ${
+            className={`flex flex-col items-center justify-center gap-1.5 py-1.5 h-full cursor-pointer transition-all active:scale-95 ${
               activeTab === 'business' ? 'text-slate-900 font-bold' : 'text-slate-400 font-medium'
             }`}
           >
@@ -207,7 +212,7 @@ export const OwnerAppShell: React.FC<OwnerAppShellProps> = ({
           <button
             type="button"
             onClick={() => navigateTo('orders')}
-            className={`flex flex-col items-center justify-center gap-1 h-full cursor-pointer transition-all ${
+            className={`flex flex-col items-center justify-center gap-1.5 py-1.5 h-full cursor-pointer transition-all active:scale-95 ${
               activeTab === 'orders' ? 'text-slate-900 font-bold' : 'text-slate-400 font-medium'
             }`}
           >
@@ -222,7 +227,7 @@ export const OwnerAppShell: React.FC<OwnerAppShellProps> = ({
           <button
             type="button"
             onClick={() => navigateTo('reports')}
-            className={`flex flex-col items-center justify-center gap-1 h-full cursor-pointer transition-all ${
+            className={`flex flex-col items-center justify-center gap-1.5 py-1.5 h-full cursor-pointer transition-all active:scale-95 ${
               activeTab === 'reports' ? 'text-slate-900 font-bold' : 'text-slate-400 font-medium'
             }`}
           >
@@ -237,7 +242,7 @@ export const OwnerAppShell: React.FC<OwnerAppShellProps> = ({
           <button
             type="button"
             onClick={() => navigateTo('more')}
-            className={`flex flex-col items-center justify-center gap-1 h-full cursor-pointer transition-all ${
+            className={`flex flex-col items-center justify-center gap-1.5 py-1.5 h-full cursor-pointer transition-all active:scale-95 ${
               activeTab === 'account' ? 'text-slate-900 font-bold' : 'text-slate-400 font-medium'
             }`}
           >
