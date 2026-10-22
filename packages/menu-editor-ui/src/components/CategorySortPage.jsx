@@ -269,31 +269,11 @@ export default function CategorySortPage({ onBack, onSaved }) {
       >
         {/* Instruction Header Row */}
         <div className="w-full flex items-center justify-start gap-2">
-          <div className="w-[25px] h-[25px] relative flex items-center justify-center shrink-0 overflow-hidden">
-            {/* Gesture / Drag Hand Icon matching Figma (25x25 frame, #0F172A) */}
-            <svg
-              width="22"
-              height="22"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v6M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"
-                stroke="#0F172A"
-                strokeWidth="1.9"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"
-                stroke="#0F172A"
-                strokeWidth="1.9"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </div>
+          <img
+            src="/owner/assets/icons/mage_information-circle-fill.svg"
+            alt="Info"
+            className="w-[25px] h-[25px] object-contain shrink-0 block"
+          />
           <span className="text-[#94A3B8] text-[11px] font-bold leading-snug text-left">
             Tekan dan geser untuk mengatur urutan kategori
           </span>
@@ -342,28 +322,17 @@ export default function CategorySortPage({ onBack, onSaved }) {
                     </div>
                   </div>
 
-                  {/* Drag Handle Grip Icon (13x13 box, 10.16x4.88 inner bars #303030) */}
+                  {/* Drag Handle Grip Icon (13x13 gravity-ui_equal.svg) */}
                   <div
                     onTouchStart={(e) => handleTouchStart(e, index)}
-                    className="w-7 h-7 -mr-1.5 flex items-center justify-center shrink-0 text-[#303030] cursor-grab active:cursor-grabbing rounded-lg transition-colors"
+                    className="w-7 h-7 -mr-1.5 flex items-center justify-center shrink-0 cursor-grab active:cursor-grabbing rounded-lg transition-colors"
                     title="Geser untuk mengatur urutan"
                   >
-                    <div className="w-[13px] h-[13px] relative flex items-center justify-center pointer-events-none select-none">
-                      <svg
-                        width="13"
-                        height="13"
-                        viewBox="0 0 13 13"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          d="M1.42 4.5H11.58M1.42 8.5H11.58"
-                          stroke="#303030"
-                          strokeWidth="1.6"
-                          strokeLinecap="round"
-                        />
-                      </svg>
-                    </div>
+                    <img
+                      src="/owner/assets/icons/gravity-ui_equal.svg"
+                      alt="Geser"
+                      className="w-[13px] h-[13px] object-contain pointer-events-none select-none block"
+                    />
                   </div>
                 </div>
               );
