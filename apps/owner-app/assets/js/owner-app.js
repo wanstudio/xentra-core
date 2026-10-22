@@ -28,86 +28,16 @@
         window.XentraOwnerBridge.onAppReady();
       }
 
-      this.setupCleanShell();
+      this.setupRoutingBridge();
     },
 
-    setupCleanShell: function () {
-      var cleanMount = document.getElementById('xentra-owner-app-clean-mount');
-      if (!cleanMount) {
-        cleanMount = document.createElement('div');
-        cleanMount.id = 'xentra-owner-app-clean-mount';
-        cleanMount.style.display = 'none';
-        document.body.appendChild(cleanMount);
+    setupRoutingBridge: function () {
+      function checkRoute(hash) {
+        var h = (hash || window.location.hash || '').replace(/^#\/?/, '');
+        var isModernRoute = (h === 'overview' || h === '' || h.startsWith('business') || h.startsWith('catalog'));
+        return isModernRoute;
       }
-
-      var mountTimer = null;
-      function handleRouting() {
-        if (mountTimer) {
-          clearInterval(mountTimer);
-          mountTimer = null;
-        }
-
-        var hash = (window.location.hash || '').replace(/^#\/?/, '');
-        var isModernRoute =
-          hash.startsWith('catalog') ||
-          hash.startsWith('business') ||
-          hash === 'overview' ||
-          hash === '';
-
-        var dashMain = document.querySelector('.x-dash-main');
-        var dashTopBar = document.querySelector('.x-dash-topbar, .x-owner-mobile-topbar');
-        var bottomNav = document.getElementById('x-owner-bottom-nav');
-
-        if (isModernRoute) {
-          // Immediately hide legacy UI shell so old layout never shows
-          if (dashMain) dashMain.style.display = 'none';
-          if (dashTopBar) dashTopBar.style.display = 'none';
-          if (bottomNav) bottomNav.style.display = 'none';
-
-          var tryMount = function () {
-            if (typeof window.mountOwnerAppShell === 'function') {
-              cleanMount.style.display = 'block';
-              window.mountOwnerAppShell(cleanMount, {
-                initialRoute: hash || 'overview',
-                onNavigate: function (r) {
-                  window.location.hash = '#' + r;
-                  if (typeof window.navigateTo === 'function') {
-                    try { window.navigateTo(r); } catch (_) {}
-                  }
-                }
-              });
-              return true;
-            }
-            return false;
-          };
-
-          if (!tryMount()) {
-            var attempts = 0;
-            mountTimer = setInterval(function () {
-              attempts++;
-              if (tryMount() || attempts > 100) {
-                clearInterval(mountTimer);
-                mountTimer = null;
-              }
-            }, 50);
-          }
-        } else {
-          // When returning to legacy routes (orders, reports, more, finance, etc.)
-          cleanMount.style.display = 'none';
-          if (dashMain) dashMain.style.display = '';
-          if (dashTopBar) dashTopBar.style.display = '';
-          if (bottomNav) bottomNav.style.display = '';
-          if (typeof window.unmountOwnerAppShell === 'function') {
-            window.unmountOwnerAppShell(cleanMount);
-          }
-          if (typeof window.navigateTo === 'function') {
-            try { window.navigateTo(hash); } catch (_) {}
-          }
-        }
-      }
-
-      window.addEventListener('hashchange', handleRouting);
-      handleRouting();
+      window.isOwnerModernRoute = checkRoute;
     }
   };
 

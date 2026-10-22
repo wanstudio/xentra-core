@@ -1599,7 +1599,8 @@ module.exports = function registerMerchantAuthRoutes(router, deps) {
   
   
   router.get('/auth/config', (req, res) => {
-    const googleClientId = process.env.GOOGLE_CLIENT_ID || '';
+    const rawGoogleClientId = process.env.GOOGLE_CLIENT_ID || '';
+    const googleClientId = rawGoogleClientId.split(',')[0].trim();
     res.json({
       success: true,
       google_enabled: Boolean(googleClientId),
