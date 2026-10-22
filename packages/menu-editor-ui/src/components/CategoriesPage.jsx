@@ -112,7 +112,9 @@ export default function CategoriesPage({ onBack, onNavigate }) {
   };
 
   const handleAddCategory = () => {
-    if (typeof window.openNewCategory === 'function') {
+    if (typeof onNavigate === 'function') {
+      onNavigate('catalog/categories/new');
+    } else if (typeof window.openNewCategory === 'function') {
       window.openNewCategory();
     } else if (typeof window.navigateTo === 'function') {
       window.navigateTo('catalog/categories/new');
@@ -428,7 +430,7 @@ export default function CategoriesPage({ onBack, onNavigate }) {
           </button>
           <button
             type="button"
-            onClick={() => setShowAddSheet(true)}
+            onClick={handleAddCategory}
             style={{
               flex: 1,
               height: '48px',
@@ -452,8 +454,8 @@ export default function CategoriesPage({ onBack, onNavigate }) {
         </div>
       </div>
 
-      {/* 4. Action Sheet Modal when "Tambah" clicked (Figma 1:1 spec) */}
-      {showAddSheet && (
+      {/* 4. Action Sheet Modal when "Tambah" clicked (Figma 1:1 spec - currently hidden/inactive, Tambah navigates directly to Tambah Kategori) */}
+      {false && showAddSheet && (
         <div className="fixed inset-0 z-[250] flex items-end justify-center font-sans">
           {/* Backdrop */}
           <div
