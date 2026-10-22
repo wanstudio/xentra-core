@@ -728,7 +728,9 @@ body.x-owner-mobile-app #btn-save-master-menu-active,
   }
 
   .x-owner-command-center,
-  #x-owner-command-center {
+  #x-owner-command-center,
+  #tab-business,
+  #owner-business-main-view {
     padding-left: 16px !important;
     padding-right: 16px !important;
     box-sizing: border-box !important;

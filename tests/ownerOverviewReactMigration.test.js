@@ -82,10 +82,14 @@ test('Overview React Migration Suite', async (t) => {
     assert.ok(bundleJs.includes('Semua berjalan normal'), 'Compiled bundle must contain reassurance text');
   });
 
-  await t.test('5. Cache and script version bumps', () => {
-    assert.ok(swJs.includes('mybangjo-owner-v1.8.0'), 'Service worker cache must be bumped to v1.8.0');
-    assert.ok(indexHtml.includes('menu-editor.js?v=1.0.29'), 'index.html must reference bundle v=1.0.29');
-    assert.ok(indexHtml.includes('menu-editor.css?v=1.0.29'), 'index.html must reference bundle css v=1.0.29');
-    assert.ok(indexHtml.includes('owner-app.js?v=1.0.4'), 'index.html must reference owner-app.js v=1.0.4');
+  await t.test('5. Cache and script version bumps and business hub 16px margins', () => {
+    assert.ok(swJs.includes('mybangjo-owner-v1.8.1'), 'Service worker cache must be bumped to v1.8.1');
+    assert.ok(indexHtml.includes('menu-editor.js?v=1.0.30'), 'index.html must reference bundle v=1.0.30');
+    assert.ok(indexHtml.includes('menu-editor.css?v=1.0.30'), 'index.html must reference bundle css v=1.0.30');
+    assert.ok(indexHtml.includes('owner-app.js?v=1.0.5'), 'index.html must reference owner-app.js v=1.0.5');
+
+    const businessHubJsx = fs.readFileSync(path.join(ROOT, 'packages/menu-editor-ui/src/components/BusinessHub.jsx'), 'utf8');
+    assert.ok(businessHubJsx.includes('marginLeft: \'16px\''), 'BusinessHub must have marginLeft 16px');
+    assert.ok(businessHubJsx.includes('marginRight: \'16px\''), 'BusinessHub must have marginRight 16px');
   });
 });

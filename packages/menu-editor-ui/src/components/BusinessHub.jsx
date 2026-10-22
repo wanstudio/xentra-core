@@ -166,7 +166,15 @@ export default function BusinessHub({ onNavigate, initialSubHub = null }) {
   };
 
   return (
-    <div id="modern-business-hub-root" className="w-full max-w-[390px] mx-auto px-4 py-2 font-sans">
+    <div
+      id="modern-business-hub-root"
+      style={{
+        marginLeft: '16px',
+        marginRight: '16px',
+        boxSizing: 'border-box'
+      }}
+      className="mx-4 flex flex-col gap-4 pb-12 max-w-lg md:mx-auto font-sans select-none"
+    >
       {/* 1. Search Bar */}
       <form
         className="w-full h-12 flex items-center px-4 gap-[15px] rounded-[14px] overflow-hidden bg-white hub-inset-stroke hub-search transition-all mb-6"
