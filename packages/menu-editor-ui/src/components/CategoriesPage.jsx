@@ -452,56 +452,254 @@ export default function CategoriesPage({ onBack, onNavigate }) {
         </div>
       </div>
 
-      {/* 4. Action Sheet Modal when "Tambah" clicked */}
+      {/* 4. Action Sheet Modal when "Tambah" clicked (Figma 1:1 spec) */}
       {showAddSheet && (
-        <div className="fixed inset-0 z-[250] flex items-end justify-center">
+        <div className="fixed inset-0 z-[250] flex items-end justify-center font-sans">
           {/* Backdrop */}
           <div
             className="fixed inset-0 bg-black/50 transition-opacity"
             onClick={() => setShowAddSheet(false)}
           />
-          {/* Sheet */}
-          <div className="relative w-full max-w-[420px] mx-auto bg-white rounded-t-[24px] p-5 pb-[max(20px,env(safe-area-inset-bottom))] flex flex-col gap-3 shadow-2xl z-10 animate-in slide-in-from-bottom duration-200">
-            <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-1" />
-            <div className="font-bold text-slate-900 text-base text-left mb-1">
-              Pilih yang ingin ditambahkan
+          {/* Bottom Sheet Container */}
+          <div
+            style={{
+              borderTopLeftRadius: '20px',
+              borderTopRightRadius: '20px',
+              paddingLeft: '27px',
+              paddingRight: '27px',
+              paddingTop: '24px',
+              paddingBottom: 'max(40px, env(safe-area-inset-bottom, 40px))',
+              boxSizing: 'border-box',
+            }}
+            className="relative w-full max-w-[447px] mx-auto bg-white overflow-hidden flex flex-col items-start z-10 animate-sticky-swipe-up"
+          >
+            {/* Drag Handle Pill (40px wide, 5px thick, #D9D9D9, centered) */}
+            <div
+              style={{
+                width: '40px',
+                height: '5px',
+                backgroundColor: '#D9D9D9',
+                borderRadius: '9999px',
+                marginBottom: '18px',
+              }}
+              className="mx-auto shrink-0"
+            />
+
+            {/* Header Title */}
+            <div
+              style={{
+                color: '#0F172A',
+                fontSize: '18px',
+                fontWeight: 700,
+                lineHeight: '18px',
+                marginBottom: '25px',
+              }}
+              className="w-full text-left"
+            >
+              Pilih yang ingin di tambahkan
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setShowAddSheet(false);
-                handleAddCategory();
+
+            {/* Cards Stack (gap: 20px) */}
+            <div
+              style={{
+                gap: '20px',
+                marginBottom: '42px',
               }}
-              className="w-full p-3.5 rounded-xl border border-slate-200 hover:border-slate-400 bg-white flex items-center gap-3 cursor-pointer text-left transition-colors"
+              className="w-full flex flex-col items-stretch"
             >
-              <div className="w-10 h-10 rounded-lg bg-[#34A853] flex items-center justify-center shrink-0">
-                <img src="/owner/assets/icons/bxs_category.svg" alt="" className="w-5 h-5 filter brightness-0 invert" />
-              </div>
-              <div className="flex flex-col min-w-0">
-                <span className="font-bold text-slate-900 text-sm">Tambah Kategori Baru</span>
-                <span className="text-xs text-slate-400 font-medium">Buat pengelompokan menu di storefront</span>
-              </div>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setShowAddSheet(false);
-                handleAddMenu();
-              }}
-              className="w-full p-3.5 rounded-xl border border-slate-200 hover:border-slate-400 bg-white flex items-center gap-3 cursor-pointer text-left transition-colors"
-            >
-              <div className="w-10 h-10 rounded-lg bg-[#EA4335] flex items-center justify-center shrink-0">
-                <img src="/owner/assets/icons/reicon_food-tray-filled.svg" alt="" className="w-5 h-5 filter brightness-0 invert" />
-              </div>
-              <div className="flex flex-col min-w-0">
-                <span className="font-bold text-slate-900 text-sm">Tambah Menu Baru</span>
-                <span className="text-xs text-slate-400 font-medium">Buat produk komersial yang dijual</span>
-              </div>
-            </button>
+              {/* Card 1: Tambah kategori baru */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddSheet(false);
+                  handleAddCategory();
+                }}
+                style={{
+                  minHeight: '102px',
+                  borderRadius: '20px',
+                  backgroundColor: '#FFFFFF',
+                  boxShadow: '0px 3px 10px rgba(0, 0, 0, 0.20)',
+                  paddingLeft: '17px',
+                  paddingRight: '14px',
+                  paddingTop: '24px',
+                  paddingBottom: '24px',
+                  border: 'none',
+                }}
+                className="w-full flex items-center justify-between gap-[23px] cursor-pointer text-left active:scale-[0.99] transition-transform"
+              >
+                <div className="flex items-center gap-[23px] min-w-0 flex-1">
+                  {/* Green Icon Box (45x45, #34A853, radius 10) */}
+                  <div
+                    style={{
+                      width: '45px',
+                      height: '45px',
+                      borderRadius: '10px',
+                      backgroundColor: '#34A853',
+                    }}
+                    className="flex items-center justify-center shrink-0"
+                  >
+                    <img
+                      src="/owner/assets/icons/bxs_category.svg"
+                      alt=""
+                      style={{ width: '25px', height: '25px' }}
+                      className="object-contain block"
+                    />
+                  </div>
+
+                  {/* Text Column */}
+                  <div className="flex flex-col items-start justify-center gap-[10px] min-w-0 flex-1">
+                    <span
+                      style={{
+                        color: '#0F172A',
+                        fontSize: '16px',
+                        fontWeight: 700,
+                        lineHeight: '1.2',
+                      }}
+                      className="truncate w-full text-left"
+                    >
+                      Tambah kategori baru
+                    </span>
+                    <span
+                      style={{
+                        color: '#94A3B8',
+                        fontSize: '13px',
+                        fontWeight: 500,
+                        lineHeight: '1.3',
+                      }}
+                      className="w-full text-left"
+                    >
+                      Buat kategori untuk menu Anda
+                    </span>
+                  </div>
+                </div>
+
+                {/* Right Chevron (20x20 container, 5x10 stroke #979797) */}
+                <div
+                  style={{ width: '20px', height: '20px' }}
+                  className="flex items-center justify-center shrink-0"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M7.5 5L12.5 10L7.5 15"
+                      stroke="#979797"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </div>
+              </button>
+
+              {/* Card 2: Tambah menu baru */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddSheet(false);
+                  handleAddMenu();
+                }}
+                style={{
+                  minHeight: '102px',
+                  borderRadius: '20px',
+                  backgroundColor: '#FFFFFF',
+                  boxShadow: '0px 3px 10px rgba(0, 0, 0, 0.20)',
+                  paddingLeft: '17px',
+                  paddingRight: '14px',
+                  paddingTop: '24px',
+                  paddingBottom: '24px',
+                  border: 'none',
+                }}
+                className="w-full flex items-center justify-between gap-[23px] cursor-pointer text-left active:scale-[0.99] transition-transform"
+              >
+                <div className="flex items-center gap-[23px] min-w-0 flex-1">
+                  {/* Red Icon Box (45x45, #EA4335, radius 10) */}
+                  <div
+                    style={{
+                      width: '45px',
+                      height: '45px',
+                      borderRadius: '10px',
+                      backgroundColor: '#EA4335',
+                    }}
+                    className="flex items-center justify-center shrink-0"
+                  >
+                    <img
+                      src="/owner/assets/icons/reicon_food-tray-filled.svg"
+                      alt=""
+                      style={{ width: '23px', height: '23px' }}
+                      className="object-contain block"
+                    />
+                  </div>
+
+                  {/* Text Column */}
+                  <div className="flex flex-col items-start justify-center gap-[10px] min-w-0 flex-1">
+                    <span
+                      style={{
+                        color: '#0F172A',
+                        fontSize: '16px',
+                        fontWeight: 700,
+                        lineHeight: '1.2',
+                      }}
+                      className="truncate w-full text-left"
+                    >
+                      Tambah menu baru
+                    </span>
+                    <span
+                      style={{
+                        color: '#94A3B8',
+                        fontSize: '13px',
+                        fontWeight: 500,
+                        lineHeight: '1.3',
+                      }}
+                      className="w-full text-left"
+                    >
+                      Buat menu baru yang siap dijual
+                    </span>
+                  </div>
+                </div>
+
+                {/* Right Chevron (20x20 container, 5x10 stroke #979797) */}
+                <div
+                  style={{ width: '20px', height: '20px' }}
+                  className="flex items-center justify-center shrink-0"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M7.5 5L12.5 10L7.5 15"
+                      stroke="#979797"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </div>
+              </button>
+            </div>
+
+            {/* Batal Button (height: 48px, #F2F2F2, rounded-full, #979797 14px bold) */}
             <button
               type="button"
               onClick={() => setShowAddSheet(false)}
-              className="w-full h-11 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 font-bold text-sm cursor-pointer mt-1 hover:bg-slate-100 transition-colors"
+              style={{
+                height: '48px',
+                borderRadius: '9999px',
+                backgroundColor: '#F2F2F2',
+                color: '#979797',
+                fontSize: '14px',
+                fontWeight: 700,
+                border: 'none',
+              }}
+              className="w-full flex items-center justify-center cursor-pointer active:scale-[0.99] transition-all"
             >
               Batal
             </button>
