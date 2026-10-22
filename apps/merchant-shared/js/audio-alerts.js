@@ -289,14 +289,22 @@
       }
     },
 
-    // 4. Tugas Delivery Baru (Driver App) — Chime ritmik motor/bel sepeda + Voice
+    // 4. Tugas Delivery Baru (Driver App) — Sirine ritmik + MP3 / Voice Looping hingga diterima
     deliveryAssigned: function (options) {
       options = options || {};
-      playChime([440, 554.37, 659.25, 880], 0.13, 'sine'); // A4, C#5, E5, A5
+      playChime([523.25, 659.25, 783.99, 1046.50, 783.99, 1046.50], 0.12, 'triangle'); // C5, E5, G5, C6, G5, C6 (nyaring di jalanan)
+      if (navigator.vibrate) {
+        try { navigator.vibrate([400, 150, 400, 150, 600]); } catch (_) {}
+      }
+      playOrderAlertAudio({
+        maxRepeats: options.maxRepeats !== undefined ? options.maxRepeats : 6,
+        pauseMs: options.pauseMs !== undefined ? options.pauseMs : 1200,
+        force: true
+      });
       if (options.voice !== false) {
         setTimeout(function () {
-          speakIndonesian(options.text || 'Tugas pengantaran baru!');
-        }, 550);
+          speakIndonesian(options.text || 'Ada tugas pengantaran baru! Silakan terima tugas.');
+        }, 700);
       }
     },
 

@@ -679,10 +679,13 @@
 
   function shell(title, body, active, options) {
     options = options || {};
+    var newPendingCount = state.tasks ? state.tasks.filter(isNewTask).length : 0;
+    var bellBadgeHtml = newPendingCount > 0 ? '<span class="bell-badge">' + newPendingCount + '</span>' : '';
+    var bellCls = 'icon-btn bell-btn' + (newPendingCount > 0 ? ' ringing' : '');
 
     var header = options.back
       ? '<header class="driver-header"><div class="back-row" style="margin:0"><button class="back-btn" data-action="back">' + icon('back') + '</button><div class="back-title">' + escapeHTML(title) + '</div></div></header>'
-      : '<header class="driver-header"><div class="brand"><span class="brand-mark">X</span><span>Xentra Driver</span></div><div class="header-meta"><span class="header-branch">' + escapeHTML(state.driver && state.driver.branch_name || '') + '</span><button class="icon-btn" aria-label="Notifikasi">' + icon('bell') + '</button></div></header>';
+      : '<header class="driver-header"><div class="brand"><span class="brand-mark">X</span><span>Xentra Driver</span></div><div class="header-meta"><span class="header-branch">' + escapeHTML(state.driver && state.driver.branch_name || '') + '</span><button type="button" class="' + bellCls + '" data-action="open-notifications" aria-label="Notifikasi">' + icon('bell') + bellBadgeHtml + '</button></div></header>';
 
     var nav = options.hideNav ? '' :
       '<nav class="bottom-nav">' +
@@ -1423,7 +1426,346 @@
     if (input) setTimeout(function () { input.focus(); }, 50);
   }
 
+  var _wakeLockSentinel = null;
+  async function syncWakeLock() {
+    if (!('wakeLock' in navigator)) return;
+    try {
+      if (state.isOnline && document.visibilityState === 'visible') {
+        if (!_wakeLockSentinel) {
+          _wakeLockSentinel = await navigator.wakeLock.request('screen');
+          _wakeLockSentinel.addEventListener('release', function () {
+            _wakeLockSentinel = null;
+          });
+        }
+      } else if (_wakeLockSentinel) {
+        await _wakeLockSentinel.release();
+        _wakeLockSentinel = null;
+      }
+    } catch (_) {}
+  }
+
+  document.addEventListener('visibilitychange', function () {
+    syncWakeLock();
+    if (document.visibilityState === 'visible' && token()) {
+      refreshTasks(false).then(function () {
+        if (state.page === 'tasks') render();
+      });
+    }
+  });
+
+  var _customTaskAudio = null;
+  var _sirenInterval = null;
+  var _sirenLoopCount = 0;
+  var _alertedOrderIds = {};
+
+  function stopDriverTaskAlarm() {
+    if (window.XentraAudio && typeof window.XentraAudio.stopOrderAlert === 'function') {
+      try { window.XentraAudio.stopOrderAlert(); } catch (_) {}
+    }
+    if (_sirenInterval) {
+      clearInterval(_sirenInterval);
+      _sirenInterval = null;
+    }
+    if (_customTaskAudio) {
+      try {
+        _customTaskAudio.pause();
+        _customTaskAudio.currentTime = 0;
+      } catch (_) {}
+    }
+  }
+
+  function playSynthesizedDriverSirenBurst() {
+    try {
+      var AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      var ctx = new AudioCtx();
+      if (ctx.state === 'suspended') ctx.resume().catch(function () {});
+      var now = ctx.currentTime;
+      // High-visibility GoPartner-style double-trill bell: E5 -> A5 -> C#6 -> E6
+      var notes = [659.25, 880.0, 1108.73, 1318.51, 880.0, 1318.51];
+      notes.forEach(function (freq, i) {
+        var osc = ctx.createOscillator();
+        var gain = ctx.createGain();
+        osc.type = 'triangle';
+        var start = now + i * 0.11;
+        osc.frequency.setValueAtTime(freq, start);
+        gain.gain.setValueAtTime(0.01, start);
+        gain.gain.exponentialRampToValueAtTime(0.45, start + 0.025);
+        gain.gain.exponentialRampToValueAtTime(0.008, start + 0.105);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(start);
+        osc.stop(start + 0.11);
+      });
+      if (navigator.vibrate) {
+        navigator.vibrate([350, 120, 350, 120, 500]);
+      }
+    } catch (_) {}
+  }
+
+  function triggerIncomingTaskAlert(task, isManualTest) {
+    stopDriverTaskAlarm();
+    playSynthesizedDriverSirenBurst();
+
+    // Try custom driver MP3 first (/driver/assets/audio/tugas-baru.mp3), fallback to XentraAudio.deliveryAssigned
+    try {
+      if (!_customTaskAudio && typeof Audio !== 'undefined') {
+        _customTaskAudio = new Audio('/driver/assets/audio/tugas-baru.mp3');
+      }
+      if (_customTaskAudio) {
+        _customTaskAudio.currentTime = 0;
+        var p = _customTaskAudio.play();
+        if (p && typeof p.catch === 'function') {
+          p.catch(function () {
+            if (window.XentraAudio && typeof window.XentraAudio.deliveryAssigned === 'function') {
+              window.XentraAudio.deliveryAssigned({
+                text: 'Ada tugas pengantaran baru! Silakan terima tugas.',
+                maxRepeats: isManualTest ? 1 : 6
+              });
+            }
+          });
+        }
+      }
+    } catch (_) {
+      if (window.XentraAudio && typeof window.XentraAudio.deliveryAssigned === 'function') {
+        window.XentraAudio.deliveryAssigned({
+          text: 'Ada tugas pengantaran baru! Silakan terima tugas.',
+          maxRepeats: isManualTest ? 1 : 6
+        });
+      }
+    }
+
+    if (!isManualTest) {
+      _sirenLoopCount = 0;
+      _sirenInterval = setInterval(function () {
+        _sirenLoopCount++;
+        var stillHasPending = state.tasks && state.tasks.some(isNewTask);
+        if (_sirenLoopCount >= 8 || !stillHasPending) {
+          stopDriverTaskAlarm();
+          return;
+        }
+        playSynthesizedDriverSirenBurst();
+      }, 3200);
+    }
+
+    // Trigger System / OS Notification for background visibility
+    if (task && 'Notification' in window && Notification.permission === 'granted') {
+      try {
+        var cName = (task.customer && task.customer.name) || 'Pelanggan';
+        var addr = (task.destination && task.destination.address) || 'Alamat tujuan';
+        var n = new Notification('🛵 Tugas Antar Baru: ' + (task.order_number || task.order_id), {
+          body: cName + ' • ' + addr,
+          icon: '/driver/assets/icons/icon-192.png',
+          tag: 'driver-task-' + task.order_id,
+          renotify: true
+        });
+        n.onclick = function () {
+          window.focus();
+          state.selectedOrderId = task.order_id;
+          showIncomingTaskModal(task);
+        };
+      } catch (_) {}
+    }
+
+    if (task) {
+      showIncomingTaskModal(task);
+    }
+  }
+
+  function closeIncomingTaskModal() {
+    var existing = document.getElementById('driver-incoming-task-modal');
+    if (existing) existing.remove();
+  }
+
+  function showIncomingTaskModal(task) {
+    if (!task) return;
+    closeIncomingTaskModal();
+
+    var c = task.customer || {};
+    var d = task.destination || {};
+    var p = task.payment || {};
+    var distText = task.distance_meters ? (Number(task.distance_meters) / 1000).toFixed(1) + ' km' : 'Siap Antar';
+    var etaText = task.duration_seconds ? '~' + Math.max(1, Math.round(Number(task.duration_seconds) / 60)) + ' mnt' : 'Langsung';
+
+    var overlay = document.createElement('div');
+    overlay.id = 'driver-incoming-task-modal';
+    overlay.className = 'incoming-task-backdrop';
+    overlay.innerHTML =
+      '<div class="incoming-task-modal" role="dialog" aria-modal="true">' +
+        '<div class="incoming-pulse-ring">🛵</div>' +
+        '<div style="text-align:center;margin-bottom:14px;">' +
+          '<span class="pill blue" style="margin-bottom:6px;">🔔 TUGAS PENGANTARAN BARU</span>' +
+          '<h3 style="margin:4px 0 2px;font-size:20px;font-weight:900;color:#0f172a;">Order ' + escapeHTML(task.order_number || task.order_id) + '</h3>' +
+          '<div style="font-size:12.5px;color:#64748b;font-weight:600;">Segera konfirmasi penerimaan tugas ini</div>' +
+        '</div>' +
+        '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:14px;margin-bottom:14px;">' +
+          '<div style="display:flex;align-items:flex-start;gap:10px;">' +
+            '<span class="pin" style="background:#dbeafe;color:#1d4ed8;flex-shrink:0;">' + icon('pin') + '</span>' +
+            '<div style="min-width:0;flex:1;">' +
+              '<div style="font-weight:800;font-size:15px;color:#0f172a;">' + escapeHTML(c.name || 'Pelanggan') + '</div>' +
+              '<div style="font-size:12.5px;color:#475569;margin-top:3px;line-height:1.4;">' + escapeHTML(d.address || 'Alamat tujuan belum tersedia') + '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;padding-top:10px;border-top:1px dashed #cbd5e1;font-size:12px;font-weight:800;color:#334155;">' +
+            '<span style="background:#fff;padding:4px 8px;border-radius:8px;border:1px solid #e2e8f0;">📍 ' + escapeHTML(distText) + ' (' + escapeHTML(etaText) + ')</span>' +
+            '<span style="background:#fff;padding:4px 8px;border-radius:8px;border:1px solid #e2e8f0;">📦 ' + Number(task.item_count || 0) + ' Item</span>' +
+            (p.is_cod
+              ? '<span style="background:#fff7ed;color:#c2410c;padding:4px 9px;border-radius:8px;border:1px solid #fed7aa;">💵 COD ' + rupiah(p.amount) + '</span>'
+              : '<span style="background:#ecfdf5;color:#047857;padding:4px 9px;border-radius:8px;border:1px solid #a7f3d0;">✓ Non-Tunai (Lunas)</span>') +
+          '</div>' +
+        '</div>' +
+        '<button type="button" class="primary-btn blue" id="btn-modal-accept-task" style="min-height:52px;font-size:15.5px;">✓ TERIMA TUGAS SEKARANG</button>' +
+        '<div style="display:flex;gap:8px;margin-top:8px;">' +
+          '<button type="button" class="secondary-btn" id="btn-modal-view-task" style="min-height:42px;font-size:13px;flex:1;">Lihat Detail</button>' +
+          '<button type="button" class="danger-btn" id="btn-modal-reject-task" style="min-height:42px;font-size:13px;flex:1;">× Tolak</button>' +
+        '</div>' +
+      '</div>';
+
+    document.body.appendChild(overlay);
+
+    var acceptBtn = document.getElementById('btn-modal-accept-task');
+    var viewBtn = document.getElementById('btn-modal-view-task');
+    var rejectBtn = document.getElementById('btn-modal-reject-task');
+
+    if (acceptBtn) {
+      acceptBtn.onclick = function () {
+        stopDriverTaskAlarm();
+        closeIncomingTaskModal();
+        state.selectedOrderId = task.order_id;
+        acceptTask();
+      };
+    }
+    if (viewBtn) {
+      viewBtn.onclick = function () {
+        stopDriverTaskAlarm();
+        closeIncomingTaskModal();
+        state.selectedOrderId = task.order_id;
+        state.page = 'new-task';
+        render();
+      };
+    }
+    if (rejectBtn) {
+      rejectBtn.onclick = function () {
+        stopDriverTaskAlarm();
+        closeIncomingTaskModal();
+        state.selectedOrderId = task.order_id;
+        showRejectSheet();
+      };
+    }
+  }
+
+  function showDriverNotificationCenter() {
+    var existing = document.getElementById('driver-notif-sheet');
+    if (existing) existing.remove();
+
+    var pendingTasks = state.tasks ? state.tasks.filter(isNewTask) : [];
+    var activeTasks = state.tasks ? state.tasks.filter(function (t) { return !isNewTask(t); }) : [];
+    var permState = ('Notification' in window) ? Notification.permission : 'unsupported';
+
+    var listHtml = '';
+    if (pendingTasks.length) {
+      pendingTasks.forEach(function (t) {
+        var c = t.customer || {};
+        var p = t.payment || {};
+        listHtml +=
+          '<div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:14px;padding:12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;">' +
+            '<div style="min-width:0;">' +
+              '<div style="font-weight:800;font-size:13.5px;color:#1e3a8a;">🔔 Tugas Baru ' + escapeHTML(t.order_number || t.order_id) + '</div>' +
+              '<div style="font-size:12px;color:#1e40af;margin-top:2px;">' + escapeHTML(c.name || 'Pelanggan') + ' • ' + (p.is_cod ? 'COD ' + rupiah(p.amount) : 'Non-Tunai') + '</div>' +
+            '</div>' +
+            '<button type="button" class="primary-btn blue" data-notif-order="' + escapeHTML(t.order_id) + '" style="width:auto;min-height:36px;padding:0 12px;font-size:12px;flex-shrink:0;">Lihat</button>' +
+          '</div>';
+      });
+    } else if (activeTasks.length) {
+      activeTasks.forEach(function (t) {
+        var c = t.customer || {};
+        listHtml +=
+          '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;">' +
+            '<div style="min-width:0;">' +
+              '<div style="font-weight:800;font-size:13.5px;color:#0f172a;">🛵 ' + escapeHTML(formatDeliveryStatus(t)) + ' (' + escapeHTML(t.order_number || t.order_id) + ')</div>' +
+              '<div style="font-size:12px;color:#64748b;margin-top:2px;">' + escapeHTML(c.name || 'Pelanggan') + '</div>' +
+            '</div>' +
+            '<button type="button" class="secondary-btn" data-notif-active="' + escapeHTML(t.order_id) + '" style="width:auto;min-height:36px;padding:0 12px;font-size:12px;flex-shrink:0;">Buka</button>' +
+          '</div>';
+      });
+    } else {
+      listHtml = '<div style="text-align:center;padding:18px 12px;background:#f8fafc;border-radius:14px;color:#64748b;font-size:13px;margin-bottom:12px;">Belum ada tugas baru yang menunggu konfirmasi.</div>';
+    }
+
+    var overlay = document.createElement('div');
+    overlay.id = 'driver-notif-sheet';
+    overlay.className = 'sheet-backdrop';
+    overlay.innerHTML =
+      '<div class="sheet" role="dialog" aria-modal="true">' +
+        '<div class="sheet-handle"></div>' +
+        '<h3>🔔 Pusat Notifikasi & Suara</h3>' +
+        '<p>Pastikan dering & izin notifikasi aktif agar Anda tidak melewatkan tugas antar baru.</p>' +
+        listHtml +
+        '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:14px;padding:12px;margin-top:8px;">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">' +
+            '<div>' +
+              '<div style="font-size:13px;font-weight:800;color:#166534;">🔊 Dering Alarm Tugas Baru</div>' +
+              '<div style="font-size:11.5px;color:#15803d;margin-top:2px;">Izin Notifikasi HP: <strong>' + (permState === 'granted' ? 'Aktif ✓' : (permState === 'denied' ? 'Diblokir Browser' : 'Belum Diaktifkan')) + '</strong></div>' +
+            '</div>' +
+            '<button type="button" class="primary-btn green" id="btn-test-driver-sound" style="width:auto;min-height:38px;padding:0 14px;font-size:12.5px;">🔊 Tes Bunyi</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="sheet-actions" style="margin-top:16px;">' +
+          '<button type="button" class="secondary-btn" id="btn-close-notif-sheet">Tutup</button>' +
+        '</div>' +
+      '</div>';
+
+    document.body.appendChild(overlay);
+
+    var testBtn = document.getElementById('btn-test-driver-sound');
+    if (testBtn) {
+      testBtn.onclick = function () {
+        if ('Notification' in window && Notification.permission === 'default') {
+          Notification.requestPermission().catch(function () {});
+        }
+        triggerIncomingTaskAlert(null, true);
+        toast('🔊 Bunyi dering tugas baru aktif!');
+      };
+    }
+
+    var closeBtn = document.getElementById('btn-close-notif-sheet');
+    if (closeBtn) {
+      closeBtn.onclick = function () {
+        stopDriverTaskAlarm();
+        overlay.remove();
+      };
+    }
+
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) {
+        overlay.remove();
+        return;
+      }
+      var newBtn = e.target.closest('[data-notif-order]');
+      if (newBtn) {
+        var oid = newBtn.getAttribute('data-notif-order');
+        overlay.remove();
+        var found = state.tasks.find(function (t) { return String(t.order_id) === String(oid); });
+        if (found) {
+          showIncomingTaskModal(found);
+        }
+        return;
+      }
+      var actBtn = e.target.closest('[data-notif-active]');
+      if (actBtn) {
+        var aoid = actBtn.getAttribute('data-notif-active');
+        overlay.remove();
+        state.selectedOrderId = aoid;
+        var aTask = selectedTask();
+        state.page = (aTask && aTask.delivery_status === 'on_delivery') ? 'map' : 'delivery-detail';
+        render();
+      }
+    });
+  }
+
   async function acceptTask() {
+    stopDriverTaskAlarm();
+    closeIncomingTaskModal();
     var task = selectedTask();
     if (!task || state.busy) return;
     state.busy = true;
@@ -1433,10 +1775,13 @@
       var data = await api('/driver/tasks/' + encodeURIComponent(task.order_id) + '/accept', { method: 'POST' });
       state.busy = false;
       state.selectedOrderId = task.order_id;
+      if (window.XentraAudio && typeof window.XentraAudio.orderAccepted === 'function') {
+        window.XentraAudio.orderAccepted();
+      }
       await refreshTasks(false);
       if (data && data.task) state.tasks.push(data.task);
       state.page = 'delivery-detail';
-      toast('Tugas diterima');
+      toast('✓ Tugas diterima! Silakan ambil pesanan.');
       render();
     } catch (err) {
       state.busy = false;
@@ -1446,6 +1791,8 @@
   }
 
   async function rejectTask(reason) {
+    stopDriverTaskAlarm();
+    closeIncomingTaskModal();
     var task = selectedTask();
     if (!task || state.busy) return;
     state.busy = true;
@@ -1513,20 +1860,31 @@
     try {
       var data = await api('/driver/tasks');
       var newTasks = Array.isArray(data.tasks) ? data.tasks : [];
+      state.counts = data.counts || { active: 0, new: 0, accepted: 0 };
 
-      // Check for newly assigned pending tasks to trigger audio alert
+      // Detect newly assigned pending tasks by order_id or count increase
+      var pendingTasks = newTasks.filter(isNewTask);
       var prevCount = state.knownPendingCount || 0;
-      var newPendingCount = newTasks.filter(function (t) {
-        return t.assignment_status === 'pending' || t.status === 'assigned';
-      }).length;
+      var newPendingCount = pendingTasks.length;
 
-      if (newPendingCount > prevCount) {
-        if (window.XentraAudio && typeof window.XentraAudio.deliveryAssigned === 'function') {
-          window.XentraAudio.deliveryAssigned({ text: 'Tugas pengantaran baru!' });
+      var freshlyAssignedTask = pendingTasks.find(function (t) {
+        return !_alertedOrderIds[t.order_id];
+      });
+
+      if (freshlyAssignedTask || newPendingCount > prevCount) {
+        var targetAlertTask = freshlyAssignedTask || pendingTasks[0];
+        if (targetAlertTask) {
+          _alertedOrderIds[targetAlertTask.order_id] = true;
         }
+        triggerIncomingTaskAlert(targetAlertTask, false);
       }
-      state.knownPendingCount = newPendingCount;
 
+      if (newPendingCount === 0) {
+        stopDriverTaskAlarm();
+        closeIncomingTaskModal();
+      }
+
+      state.knownPendingCount = newPendingCount;
       state.tasks = newTasks;
       state.loading = false;
       state.error = null;
@@ -1580,6 +1938,7 @@
       }
       if (state.isOnline) {
         driverLocationService.start();
+        syncWakeLock();
       }
     } catch (err) {
       if (err.status === 401) return;
@@ -1737,6 +2096,10 @@
   }
 
   async function handleAction(action, triggerEl) {
+    if (action === 'open-notifications') {
+      return showDriverNotificationCenter();
+    }
+
     if (action === 'edit-profile' || action === 'edit-vehicle') {
       return showEditProfileSheet();
     }
@@ -1919,9 +2282,15 @@
         });
         if (state.isOnline) {
           driverLocationService.start();
+          syncWakeLock();
+          if ('Notification' in window && Notification.permission === 'default') {
+            try { Notification.requestPermission().catch(function () {}); } catch (_) {}
+          }
           toast('🟢 Status Anda sekarang ONLINE (Siap terima tugas)');
         } else {
           driverLocationService.stop();
+          syncWakeLock();
+          stopDriverTaskAlarm();
           toast('⚪ Status Anda sekarang OFFLINE (Sedang istirahat)');
         }
       } catch (err) {
@@ -1945,43 +2314,21 @@
     refreshTasks(false).then(render);
   });
 
-  var _lastNewTaskCount = 0;
-  function playNewTaskChime() {
-    try {
-      if (typeof window.AudioContext !== 'undefined' || typeof window.webkitAudioContext !== 'undefined') {
-        var AudioCtx = window.AudioContext || window.webkitAudioContext;
-        var ctx = new AudioCtx();
-        var osc = ctx.createOscillator();
-        var gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
-        osc.frequency.setValueAtTime(880.00, ctx.currentTime + 0.12); // A5
-        gain.gain.setValueAtTime(0.3, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.42);
-      }
-      if (navigator.vibrate) {
-        navigator.vibrate([200, 100, 200]);
-      }
-    } catch (_) {}
-  }
-
   loadDriver().then(function () {
-    // Start periodic polling for new tasks every 12 seconds with alert chime
+    // Fast 5-second polling for incoming driver assignments (works even when tab is in background)
     setInterval(function () {
-      if (document.visibilityState === 'hidden' || !token()) return;
+      if (!token()) return;
+      var prevTaskSignature = JSON.stringify((state.tasks || []).map(function (t) {
+        return t.order_id + ':' + t.delivery_status + ':' + t.assignment_status + ':' + (t.arrived_at || '');
+      }));
       refreshTasks(false).then(function () {
-        var newCount = (state.counts && state.counts.new) || 0;
-        if (newCount > _lastNewTaskCount) {
-          playNewTaskChime();
-          toast('🔔 Ada ' + newCount + ' tugas antar baru masuk!');
+        var nextTaskSignature = JSON.stringify((state.tasks || []).map(function (t) {
+          return t.order_id + ':' + t.delivery_status + ':' + t.assignment_status + ':' + (t.arrived_at || '');
+        }));
+        if (state.page === 'tasks' && prevTaskSignature !== nextTaskSignature) {
+          render();
         }
-        _lastNewTaskCount = newCount;
-        if (state.page === 'tasks') render();
       });
-    }, 12000);
+    }, 5000);
   });
 })();

@@ -51,8 +51,51 @@ export default function MenuEditor({
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
   const [imageRemoved, setImageRemoved] = useState(false);
-  const [categoryId, setCategoryId] = useState('');
-  const [originCategoryId, setOriginCategoryId] = useState('');
+  const [categoryId, setCategoryId] = useState(() => {
+    if (typeof window !== 'undefined' && window._ownerMasterMenuState) {
+      if (window._ownerMasterMenuState.preselectedCategoryId) {
+        return String(window._ownerMasterMenuState.preselectedCategoryId);
+      }
+      if (menuId && Array.isArray(window._ownerMasterMenuState.menus)) {
+        const found = window._ownerMasterMenuState.menus.find(
+          (m) => m && String(m.id) === String(menuId)
+        );
+        const catId = found?.category_id || found?.category?.id;
+        if (catId) return String(catId);
+      }
+    }
+    return '';
+  });
+  const [originCategoryId, setOriginCategoryId] = useState(() => {
+    if (typeof window !== 'undefined' && window._ownerMasterMenuState) {
+      if (window._ownerMasterMenuState.preselectedCategoryId) {
+        return String(window._ownerMasterMenuState.preselectedCategoryId);
+      }
+      if (menuId && Array.isArray(window._ownerMasterMenuState.menus)) {
+        const found = window._ownerMasterMenuState.menus.find(
+          (m) => m && String(m.id) === String(menuId)
+        );
+        const catId = found?.category_id || found?.category?.id;
+        if (catId) return String(catId);
+      }
+    }
+    return '';
+  });
+  const [fallbackCategoryName, setFallbackCategoryName] = useState(() => {
+    if (typeof window !== 'undefined' && window._ownerMasterMenuState) {
+      if (window._ownerMasterMenuState.preselectedCategoryName) {
+        return String(window._ownerMasterMenuState.preselectedCategoryName);
+      }
+      if (menuId && Array.isArray(window._ownerMasterMenuState.menus)) {
+        const found = window._ownerMasterMenuState.menus.find(
+          (m) => m && String(m.id) === String(menuId)
+        );
+        const catName = found?.category_name || found?.category?.name;
+        if (catName) return String(catName);
+      }
+    }
+    return '';
+  });
   const [title, setTitle] = useState('');
   const [menuItems, setMenuItems] = useState([]);
   const [pricingType, setPricingType] = useState('FIXED'); // FIXED | RANGE
@@ -159,17 +202,25 @@ export default function MenuEditor({
         }
 
         if (
-          !menuId &&
           typeof window !== 'undefined' &&
           window._ownerMasterMenuState &&
           window._ownerMasterMenuState.preselectedCategoryId
         ) {
           const preCatId = String(window._ownerMasterMenuState.preselectedCategoryId);
+          const preCatName = window._ownerMasterMenuState.preselectedCategoryName
+            ? String(window._ownerMasterMenuState.preselectedCategoryName)
+            : '';
           if (isMounted) {
-            setCategoryId(preCatId);
+            if (!menuId) {
+              setCategoryId(preCatId);
+            }
             setOriginCategoryId(preCatId);
+            if (preCatName) {
+              setFallbackCategoryName(preCatName);
+            }
           }
           delete window._ownerMasterMenuState.preselectedCategoryId;
+          delete window._ownerMasterMenuState.preselectedCategoryName;
         }
 
         // If editing existing menu
@@ -182,11 +233,16 @@ export default function MenuEditor({
               m.title_name || m.package_name || m.title || m.name || '';
             const resolvedCatId =
               m.category_id || (m.category && m.category.id) || '';
+            const resolvedCatName =
+              m.category_name || (m.category && m.category.name) || '';
 
             setTitle(resolvedTitle);
             setCategoryId(resolvedCatId ? String(resolvedCatId) : '');
             if (resolvedCatId) {
               setOriginCategoryId(String(resolvedCatId));
+            }
+            if (resolvedCatName) {
+              setFallbackCategoryName(String(resolvedCatName));
             }
 
             const activeFlag =
@@ -271,7 +327,8 @@ export default function MenuEditor({
     return categories.find((c) => c && String(c.id) === String(categoryId)) || null;
   }, [categories, categoryId]);
 
-  const categoryDisplayName = selectedCategory?.name || '';
+  const categoryDisplayName = selectedCategory?.name || fallbackCategoryName || '';
+  const headerCategorySubtitle = categoryDisplayName || 'Kategori';
 
   useEffect(() => {
     if (!isCategoryDropdownOpen) return;
@@ -680,11 +737,9 @@ export default function MenuEditor({
           <h1 className="font-bold text-[#0F172A] text-lg tracking-[0] leading-[18px] m-0 truncate w-full text-left">
             {isEdit ? 'Ubah menu' : 'Tambah menu'}
           </h1>
-          {categoryDisplayName && (
-            <div className="text-[#94A3B8] text-[11px] font-medium leading-tight truncate w-full text-left">
-              Kategori: {categoryDisplayName}
-            </div>
-          )}
+          <div className="text-[#94A3B8] text-[11px] font-medium leading-tight truncate w-full text-left">
+            Kategori: {headerCategorySubtitle}
+          </div>
         </div>
       </div>
 

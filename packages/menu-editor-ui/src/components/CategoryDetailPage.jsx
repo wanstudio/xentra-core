@@ -122,6 +122,9 @@ export default function CategoryDetailPage({
   const handleAddMenuClick = () => {
     if (window._ownerMasterMenuState) {
       window._ownerMasterMenuState.preselectedCategoryId = categoryId;
+      if (category && category.name) {
+        window._ownerMasterMenuState.preselectedCategoryName = category.name;
+      }
     }
     if (typeof onAddMenu === 'function') {
       onAddMenu(categoryId);
@@ -136,6 +139,12 @@ export default function CategoryDetailPage({
 
   const handleMenuCardClick = (menu) => {
     if (!menu || !menu.id) return;
+    if (window._ownerMasterMenuState) {
+      window._ownerMasterMenuState.preselectedCategoryId = categoryId;
+      if (category && category.name) {
+        window._ownerMasterMenuState.preselectedCategoryName = category.name;
+      }
+    }
     if (typeof onEditMenu === 'function') {
       onEditMenu(menu.id);
       return;

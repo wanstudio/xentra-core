@@ -114,8 +114,13 @@ body.x-owner-mobile-app #tab-catalog-products,
 body.x-owner-mobile-app #tab-catalog-master-menus,
 .x-tab-content#tab-catalog-master-menus,
 #master-menu-editor-view,
+#master-menu-editor-view.x-card-panel,
+#master-menu-editor-view.x-owner-child-page-shell,
+body.x-owner-mobile-app #master-menu-editor-view,
+body.x-owner-mobile-app #master-menu-editor-view.x-card-panel,
 #modern-menu-editor-mount,
 #category-editor-view,
+#category-editor-view.x-card-panel,
 body.x-owner-mobile-app #category-editor-view,
 #tab-business,
 body.x-owner-mobile-app #tab-business,
@@ -123,10 +128,17 @@ body.x-owner-mobile-app #tab-business,
 #owner-business-main-view,
 #modern-business-hub-mount,
 #subpage-catalog-menu-hub {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
   padding-left: 0 !important;
   padding-right: 0 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
   margin-left: 0 !important;
   margin-right: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
   width: 100% !important;
   max-width: 100% !important;
   box-sizing: border-box !important;

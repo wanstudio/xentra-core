@@ -714,7 +714,8 @@ body.x-owner-mobile-app #btn-save-master-menu-active,
   body.x-owner-mobile-app #master-menu-editor-view,
   .x-owner-mobile-app #master-menu-editor-view.x-card-panel,
   .x-owner-mobile-app #master-menu-editor-view {
-    padding: 4px 0 10px !important;
+    padding: 0 !important;
+    margin: 0 !important;
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;

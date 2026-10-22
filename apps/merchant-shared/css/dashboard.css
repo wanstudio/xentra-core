@@ -9549,7 +9549,8 @@ body:not(.x-merchant-app) .x-owner-mobile-page-sub {
 @media (max-width: 768px) {
   #master-menu-editor-view.x-card-panel,
   #master-menu-editor-view {
-    padding: 4px 0 10px !important;
+    padding: 0 !important;
+    margin: 0 !important;
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
@@ -9640,23 +9641,17 @@ body:not(.x-merchant-app) .x-owner-mobile-page-sub {
     position: static !important;
   }
 
-  /* Desktop Header: Tampilkan tombol Back panah kiri seperti di mobile di samping judul & subjudul */
+  /* Modern MenuEditor owns its own header on all viewports */
+  #master-menu-editor-view.x-card-panel,
+  #master-menu-editor-view {
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
   #master-menu-editor-view .x-owner-child-mobile-header {
-    display: block !important;
-    margin-bottom: 24px !important;
-  }
-  #master-menu-editor-view .x-owner-child-mobile-header .x-owner-mobile-page-back {
-    display: inline-flex !important;
-  }
-  #master-menu-editor-view .x-owner-child-mobile-header .x-owner-mobile-page-title {
-    display: flex !important;
-    align-items: center !important;
-    gap: 12px !important;
-    font-size: 22px !important;
-  }
-  #master-menu-editor-view .x-owner-child-mobile-header .x-owner-mobile-page-sub {
-    margin-left: 52px !important;
-    font-size: 13px !important;
+    display: none !important;
   }
   /* Sembunyikan breadcrumb baris kedua karena sudah ada tombol back di samping judul */
   #master-menu-editor-view .x-owner-child-legacy-nav {
