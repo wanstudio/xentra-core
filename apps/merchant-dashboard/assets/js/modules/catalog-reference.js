@@ -102,7 +102,12 @@
     var modernMount = $('modern-categories-page-mount');
     var modernItemMount = $('modern-item-master-page-mount');
     var modernCatEditorMount = $('modern-category-editor-page-mount');
-    if (modernCatEditorMount) modernCatEditorMount.style.display = 'none';
+    if (modernCatEditorMount) {
+      modernCatEditorMount.style.display = 'none';
+      if (typeof window.unmountCategoryEditorPage === 'function') {
+        window.unmountCategoryEditorPage(modernCatEditorMount);
+      }
+    }
     var page = $('master-categories-page');
     var catEditor = $('category-editor-view');
     var productList = $('product-list-view');
@@ -696,18 +701,22 @@
     var legacyEditorContent = $('legacy-category-editor-content');
 
     if (modernEditorMount && typeof window.mountCategoryEditorPage === 'function') {
-      modernEditorMount.style.display = 'block';
-      if (legacyEditorContent) legacyEditorContent.style.display = 'none';
-      window.mountCategoryEditorPage(modernEditorMount, {
-        categoryId: categoryId || null,
-        onBack: function() {
-          navigateTo('catalog/categories');
-        },
-        onSaved: function() {
-          navigateTo('catalog/categories');
-        }
-      });
-      return;
+      try {
+        modernEditorMount.style.display = 'block';
+        if (legacyEditorContent) legacyEditorContent.style.display = 'none';
+        window.mountCategoryEditorPage(modernEditorMount, {
+          categoryId: categoryId || null,
+          onBack: function() {
+            navigateTo('catalog/categories');
+          },
+          onSaved: function() {
+            navigateTo('catalog/categories');
+          }
+        });
+        return;
+      } catch (err) {
+        console.error('[CategoryEditorPage] Failed to mount React editor:', err);
+      }
     } else {
       if (modernEditorMount) modernEditorMount.style.display = 'none';
       if (legacyEditorContent) legacyEditorContent.style.display = 'block';

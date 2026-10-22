@@ -25,19 +25,20 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
     async function loadData() {
       // Pre-fill from memory if available
       if (isEdit && window.state && Array.isArray(window.state.categories)) {
-        const found = window.state.categories.find((c) => String(c.id) === String(categoryId));
-        if (found) {
+        const found = window.state.categories.find((c) => c && String(c.id) === String(categoryId));
+        if (found && isMounted) {
           setName(found.name || '');
           setDescription(found.description || '');
         }
       }
 
-      if (window._ownerMasterMenuState && Array.isArray(window._ownerMasterMenuState.menus)) {
+      if (isEdit && window._ownerMasterMenuState && Array.isArray(window._ownerMasterMenuState.menus)) {
         const related = window._ownerMasterMenuState.menus.filter((m) => {
+          if (!m) return false;
           const mCatId = m.category_id || (m.category && m.category.id);
           return String(mCatId || '') === String(categoryId || '');
         });
-        setCategoryMenus(related);
+        if (isMounted) setCategoryMenus(related);
       }
 
       try {
@@ -51,11 +52,11 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
         ]);
 
         if (catRes && catRes.ok) {
-          const catData = await catRes.json();
-          if (catData.success && Array.isArray(catData.categories)) {
+          const catData = await catRes.json().catch(() => null);
+          if (catData && catData.success && Array.isArray(catData.categories)) {
             if (window.state) window.state.categories = catData.categories;
             if (isEdit) {
-              const found = catData.categories.find((c) => String(c.id) === String(categoryId));
+              const found = catData.categories.find((c) => c && String(c.id) === String(categoryId));
               if (found && isMounted) {
                 setName(found.name || '');
                 setDescription(found.description || '');
@@ -65,14 +66,15 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
         }
 
         if (menuRes && menuRes.ok) {
-          const menuData = await menuRes.json();
-          if (menuData.success && Array.isArray(menuData.menus)) {
+          const menuData = await menuRes.json().catch(() => null);
+          if (menuData && menuData.success && Array.isArray(menuData.menus)) {
             if (window._ownerMasterMenuState) window._ownerMasterMenuState.menus = menuData.menus;
             if (isMounted) {
-              const related = menuData.menus.filter((m) => {
+              const related = isEdit ? menuData.menus.filter((m) => {
+                if (!m) return false;
                 const mCatId = m.category_id || (m.category && m.category.id);
                 return String(mCatId || '') === String(categoryId || '');
-              });
+              }) : [];
               setCategoryMenus(related);
             }
           }
@@ -271,9 +273,10 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
               <label className="font-bold text-[#0F172A] text-sm">
                 Menu dalam kategori ini
               </label>
-              {categoryMenus.length > 0 ? (
+              {categoryMenus && categoryMenus.length > 0 ? (
                 <div className="flex flex-col gap-2 w-full max-h-48 overflow-y-auto pr-1">
                   {categoryMenus.map((m, idx) => {
+                    if (!m) return null;
                     const mTitle = m.title_name || m.package_name || m.title || m.name || `Menu ${idx + 1}`;
                     return (
                       <div
