@@ -6,6 +6,7 @@ import CatalogSubHub from './components/CatalogSubHub';
 import CategoriesPage from './components/CategoriesPage';
 import ItemMasterPage from './components/ItemMasterPage';
 import CategoryEditorPage from './components/CategoryEditorPage';
+import OwnerAppShell from './shell/OwnerAppShell';
 import './index.css';
 
 const roots = new WeakMap();
@@ -124,6 +125,25 @@ export function unmountCategoryEditorPage(container) {
   }
 }
 
+export function mountOwnerAppShell(container, props = {}) {
+  if (!container) return;
+  let root = roots.get(container);
+  if (!root) {
+    root = createRoot(container);
+    roots.set(container, root);
+  }
+  root.render(<OwnerAppShell {...props} />);
+}
+
+export function unmountOwnerAppShell(container) {
+  if (!container) return;
+  const root = roots.get(container);
+  if (root) {
+    root.unmount();
+    roots.delete(container);
+  }
+}
+
 // Attach to window for global access from host Vanilla JS app
 if (typeof window !== 'undefined') {
   window.mountMenuEditor = mountMenuEditor;
@@ -138,5 +158,7 @@ if (typeof window !== 'undefined') {
   window.unmountItemMasterPage = unmountItemMasterPage;
   window.mountCategoryEditorPage = mountCategoryEditorPage;
   window.unmountCategoryEditorPage = unmountCategoryEditorPage;
+  window.mountOwnerAppShell = mountOwnerAppShell;
+  window.unmountOwnerAppShell = unmountOwnerAppShell;
 }
 
