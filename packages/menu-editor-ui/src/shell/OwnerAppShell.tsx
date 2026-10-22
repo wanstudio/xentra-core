@@ -22,8 +22,13 @@ export const OwnerAppShell: React.FC<OwnerAppShellProps> = ({
 }) => {
   const getHashRoute = (): string => {
     if (typeof window === 'undefined') return 'overview';
-    const hash = window.location.hash.replace(/^#\/?/, '');
-    return hash || 'overview';
+    const hash = window.location.hash.replace(/^#\/?/, '').trim();
+    if (hash) return hash;
+    try {
+      const saved = (sessionStorage.getItem('xentra_owner_last_route') || '').replace(/^#\/?/, '').trim();
+      if (saved) return saved;
+    } catch (_) {}
+    return 'overview';
   };
 
   const [currentRoute, setCurrentRoute] = useState<string>(initialRoute || getHashRoute());
@@ -61,7 +66,12 @@ export const OwnerAppShell: React.FC<OwnerAppShellProps> = ({
   }, []);
 
   const navigateTo = useCallback((route: string) => {
-    const cleanRoute = route.replace(/^#\/?/, '');
+    const cleanRoute = route.replace(/^#\/?/, '').trim();
+    try {
+      if (cleanRoute) {
+        sessionStorage.setItem('xentra_owner_last_route', cleanRoute);
+      }
+    } catch (_) {}
     window.location.hash = '#' + cleanRoute;
     setCurrentRoute(cleanRoute);
     if (typeof (window as any).navigateTo === 'function') {

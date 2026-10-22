@@ -364,12 +364,36 @@
     return CLIENT_ROUTE_META;
   }
 
+  var OWNER_LAST_ROUTE_KEY = 'xentra_owner_last_route';
+
+  function getSavedOwnerRoute() {
+    try {
+      return (sessionStorage.getItem(OWNER_LAST_ROUTE_KEY) || '').replace(/^#\/?/, '').trim();
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function saveOwnerRoute(route) {
+    if (!route) return;
+    try {
+      sessionStorage.setItem(OWNER_LAST_ROUTE_KEY, String(route).replace(/^#\/?/, '').trim());
+    } catch (_) {}
+  }
+
   // Parse the active route from the current URL hash
   function getCurrentRoute() {
     var hash = window.location.hash.replace(/^#\/?/, '').trim();
     var meta = getActiveRouteMeta();
 
-    if (!hash) return 'overview';
+    if (!hash) {
+      var savedRoute = getSavedOwnerRoute();
+      if (savedRoute) {
+        hash = savedRoute;
+      } else {
+        return 'overview';
+      }
+    }
 
     if (!isPlatformContext()) {
       if (hash === 'catalog') return 'catalog/master-menus';
@@ -880,6 +904,8 @@
       navigateTo('promo');
       return;
     }
+
+    saveOwnerRoute(route);
 
     var isCategoryEditor = !isPlatform && (
       route === 'catalog/categories/new' ||
@@ -2258,8 +2284,7 @@
       }
 
       // Establish the initial platform/Owner route as the root app entry.
-      ensureOwnerNavigationHistory(getCurrentRoute());
-      applyRoute(getCurrentRoute());
+      ensureOwnerNavigationHistory();
 
     } else {
       // -------------------------------------------------------------
@@ -2278,8 +2303,7 @@
       }).catch(function () {});
 
       // Establish the initial Owner route as the root app entry.
-      ensureOwnerNavigationHistory(getCurrentRoute());
-      applyRoute(getCurrentRoute());
+      ensureOwnerNavigationHistory();
 
       // Initial data fetch if authenticated
       loadBrandSettings();
