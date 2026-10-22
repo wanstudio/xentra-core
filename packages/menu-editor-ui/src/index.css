@@ -42,7 +42,8 @@
 #modern-catalog-subhub-root .hub-card:hover,
 #modern-categories-page-root .hub-card:hover,
 #modern-item-master-page-root .hub-card:hover,
-#modern-category-editor-page-root .hub-card:hover {
+#modern-category-editor-page-root .hub-card:hover,
+#modern-category-sort-page-root .hub-card:hover {
   box-shadow: inset 0 0 0 1px #94A3B8 !important;
 }
 

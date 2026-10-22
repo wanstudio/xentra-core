@@ -304,12 +304,12 @@ export default function CategorySortPage({ onBack, onSaved }) {
                   onDragOver={(e) => handleDragOver(e, index)}
                   onDrop={(e) => handleDrop(e, index)}
                   onDragEnd={handleDragEnd}
-                  className={`w-full p-4 rounded-[12px] border border-[#CBD5E1] bg-white flex items-center justify-between gap-4 select-none transition-all ${
+                  className={`w-full p-4 rounded-[12px] bg-white hub-inset-stroke hub-card flex items-center justify-between gap-4 select-none transition-all ${
                     isDragging
-                      ? 'opacity-60 shadow-md border-emerald-500 scale-[0.99] bg-slate-50'
+                      ? 'opacity-60 shadow-md scale-[0.99] bg-slate-50'
                       : isOver
-                      ? 'border-emerald-400 bg-emerald-50/40'
-                      : 'hover:border-slate-400'
+                      ? 'bg-emerald-50/40'
+                      : ''
                   }`}
                 >
                   {/* Category Info */}

@@ -250,7 +250,7 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
               </p>
             </div>
 
-            <div className="w-full h-12 relative rounded-[14px] border border-[#CBD5E1] bg-white overflow-hidden flex items-center focus-within:border-[#0F172A] transition-colors">
+            <div className="w-full h-12 relative rounded-[14px] bg-white hub-inset-stroke hub-search overflow-hidden flex items-center transition-all">
               <input
                 id="cat-name-input"
                 type="text"
