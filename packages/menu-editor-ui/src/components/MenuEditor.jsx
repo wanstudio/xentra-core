@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import MenuItemCard from './MenuItemCard';
 import PickItemSheet from './PickItemSheet';
 import AturItemModal from './AturItemModal';
@@ -1310,8 +1311,8 @@ export default function MenuEditor({
         </div>
       )}
 
-      {/* Custom Delete Menu Confirmation Modal */}
-      {showDeleteModal && (
+      {/* Custom Delete Menu Confirmation Modal rendered outside body via React Portal */}
+      {showDeleteModal && typeof document !== 'undefined' && createPortal(
         <div
           role="dialog"
           aria-modal="true"
@@ -1498,58 +1499,63 @@ export default function MenuEditor({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* Fixed Bottom Action Bar (Matching Figma Mockup: rounded-t-[20px], top shadow, 48px #00A637 pill button "Simpan") */}
-      <div
-        id="modern-menu-editor-bottom-bar"
-        style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          width: '100%',
-          backgroundColor: '#ffffff',
-          borderTopLeftRadius: '20px',
-          borderTopRightRadius: '20px',
-          boxShadow: '0px 0px 15px rgba(0, 0, 0, 0.15)',
-          zIndex: 200,
-          paddingTop: '24px',
-          paddingBottom: 'max(24px, env(safe-area-inset-bottom, 24px))',
-          paddingLeft: '16px',
-          paddingRight: '16px',
-          boxSizing: 'border-box',
-        }}
-        className="w-full bg-white rounded-t-[20px] z-[200]"
-      >
-        <div className="w-full max-w-lg mx-auto">
-          <button
-            type="button"
-            disabled={isSaving}
-            onClick={handleSaveMenu}
-            style={{
-              width: '100%',
-              height: '48px',
-              borderRadius: '9999px',
-              border: 'none',
-              outline: 'none',
-              backgroundColor: isSaving ? '#94A3B8' : '#00A637',
-              color: '#FFFFFF',
-              fontWeight: 700,
-              fontSize: '14px',
-              cursor: isSaving ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.15s ease',
-            }}
-            className="active:scale-[0.98] hover:bg-[#009230]"
-          >
-            {isSaving ? 'Menyimpan...' : 'Simpan'}
-          </button>
-        </div>
-      </div>
+      {/* Fixed Bottom Action Bar rendered outside body via React Portal */}
+      {typeof document !== 'undefined' && createPortal(
+        <div
+          id="modern-menu-editor-bottom-bar"
+          style={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            width: '100vw',
+            maxWidth: '100vw',
+            backgroundColor: '#ffffff',
+            borderTopLeftRadius: '20px',
+            borderTopRightRadius: '20px',
+            boxShadow: '0px 0px 15px rgba(0, 0, 0, 0.15)',
+            zIndex: 200,
+            paddingTop: '24px',
+            paddingBottom: 'max(24px, env(safe-area-inset-bottom, 24px))',
+            paddingLeft: '16px',
+            paddingRight: '16px',
+            boxSizing: 'border-box',
+          }}
+          className="w-full bg-white rounded-t-[20px] z-[200]"
+        >
+          <div className="w-full max-w-lg mx-auto">
+            <button
+              type="button"
+              disabled={isSaving}
+              onClick={handleSaveMenu}
+              style={{
+                width: '100%',
+                height: '48px',
+                borderRadius: '9999px',
+                border: 'none',
+                outline: 'none',
+                backgroundColor: isSaving ? '#94A3B8' : '#00A637',
+                color: '#FFFFFF',
+                fontWeight: 700,
+                fontSize: '14px',
+                cursor: isSaving ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s ease',
+              }}
+              className="active:scale-[0.98] hover:bg-[#009230]"
+            >
+              {isSaving ? 'Menyimpan...' : 'Simpan'}
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* Modals & Sheets */}
       <PickItemSheet

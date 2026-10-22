@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 
 function getAuthToken() {
   try {
@@ -531,63 +532,67 @@ export default function CategoryMenuSortPage({ categoryId, onBack, onSaved }) {
         )}
       </div>
 
-      {/* 3. Fixed Bottom Action Bar with Simpan Button */}
-      <div
-        id="modern-category-menu-sort-bottom-bar"
-        style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          width: '100%',
-          backgroundColor: '#ffffff',
-          borderTopLeftRadius: '20px',
-          borderTopRightRadius: '20px',
-          boxShadow: '0px 0px 15px rgba(0, 0, 0, 0.15)',
-          zIndex: 200,
-          paddingTop: '24px',
-          paddingBottom: 'max(24px, env(safe-area-inset-bottom, 24px))',
-          paddingLeft: '16px',
-          paddingRight: '16px',
-          boxSizing: 'border-box',
-        }}
-        className="animate-sticky-swipe-up"
-      >
+      {/* 3. Fixed Bottom Action Bar rendered outside body via React Portal */}
+      {typeof document !== 'undefined' && createPortal(
         <div
+          id="modern-category-menu-sort-bottom-bar"
           style={{
-            maxWidth: '512px',
-            margin: '0 auto',
-            display: 'flex',
-            alignItems: 'center',
-            width: '100%',
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            width: '100vw',
+            maxWidth: '100vw',
+            backgroundColor: '#ffffff',
+            borderTopLeftRadius: '20px',
+            borderTopRightRadius: '20px',
+            boxShadow: '0px 0px 15px rgba(0, 0, 0, 0.15)',
+            zIndex: 200,
+            paddingTop: '24px',
+            paddingBottom: 'max(24px, env(safe-area-inset-bottom, 24px))',
+            paddingLeft: '16px',
+            paddingRight: '16px',
+            boxSizing: 'border-box',
           }}
+          className="animate-sticky-swipe-up"
         >
-          <button
-            type="button"
-            disabled={!hasChanged || isSaving}
-            onClick={handleSaveOrder}
+          <div
             style={{
-              width: '100%',
-              height: '48px',
-              borderRadius: '9999px',
-              backgroundColor: hasChanged ? '#00A637' : '#F2F2F2',
-              border: 'none',
-              outline: 'none',
-              color: hasChanged ? '#ffffff' : '#979797',
-              fontSize: '14px',
-              fontWeight: 700,
-              cursor: hasChanged && !isSaving ? 'pointer' : 'not-allowed',
+              maxWidth: '512px',
+              margin: '0 auto',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.2s ease',
+              width: '100%',
             }}
-            className={hasChanged && !isSaving ? 'active:scale-[0.98]' : ''}
           >
-            {isSaving ? 'Menyimpan...' : 'Simpan'}
-          </button>
-        </div>
-      </div>
+            <button
+              type="button"
+              disabled={!hasChanged || isSaving}
+              onClick={handleSaveOrder}
+              style={{
+                width: '100%',
+                height: '48px',
+                borderRadius: '9999px',
+                backgroundColor: hasChanged ? '#00A637' : '#F2F2F2',
+                border: 'none',
+                outline: 'none',
+                color: hasChanged ? '#ffffff' : '#979797',
+                fontSize: '14px',
+                fontWeight: 700,
+                cursor: hasChanged && !isSaving ? 'pointer' : 'not-allowed',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s ease',
+              }}
+              className={hasChanged && !isSaving ? 'active:scale-[0.98]' : ''}
+            >
+              {isSaving ? 'Menyimpan...' : 'Simpan'}
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

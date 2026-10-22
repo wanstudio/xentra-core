@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 function getAuthToken() {
   try {
@@ -371,92 +372,98 @@ export default function CategoriesPage({ onBack, onNavigate }) {
         )}
       </div>
 
-      {/* 3. Dedicated Bottom Action Bar (Exclusive to Kategori & Menu only, full screen width, rounded-t-[20px], margin-x: 16px, top-to-button: 24px, solid pure green stroke on Urutkan) */}
-      <div
-        id="modern-categories-bottom-bar"
-        style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          width: '100%',
-          backgroundColor: '#ffffff',
-          borderTopLeftRadius: '20px',
-          borderTopRightRadius: '20px',
-          borderTop: '1px solid rgba(203, 213, 225, 0.9)',
-          boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.08)',
-          zIndex: 200,
-          paddingTop: '24px',
-          paddingBottom: 'max(20px, env(safe-area-inset-bottom, 20px))',
-          paddingLeft: '16px',
-          paddingRight: '16px',
-          boxSizing: 'border-box'
-        }}
-        className="w-full bg-white rounded-t-[20px] border-t border-slate-200/90 z-[200]"
-      >
+      {/* 3. Dedicated Bottom Action Bar rendered outside page body via React Portal (100% viewport width, unaffected by body padding/animations) */}
+      {typeof document !== 'undefined' && createPortal(
         <div
+          id="modern-categories-bottom-bar"
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '12px',
-            width: '100%',
-            maxWidth: '100%',
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            width: '100vw',
+            maxWidth: '100vw',
+            backgroundColor: '#ffffff',
+            borderTopLeftRadius: '20px',
+            borderTopRightRadius: '20px',
+            borderTop: '1px solid rgba(203, 213, 225, 0.9)',
+            boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.08)',
+            zIndex: 200,
+            paddingTop: '24px',
+            paddingBottom: 'max(20px, env(safe-area-inset-bottom, 20px))',
+            paddingLeft: '16px',
+            paddingRight: '16px',
             boxSizing: 'border-box'
           }}
+          className="w-full bg-white rounded-t-[20px] border-t border-slate-200/90 z-[200]"
         >
-          <button
-            type="button"
-            onClick={handleSortClick}
+          <div
             style={{
-              flex: 1,
-              height: '48px',
-              borderRadius: '9999px',
-              border: '1.5px solid #00A637',
-              outline: 'none',
-              boxShadow: 'none',
-              backgroundColor: '#ffffff',
-              color: '#00A637',
-              fontWeight: 700,
-              fontSize: '14px',
-              cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.15s ease'
+              justifyContent: 'space-between',
+              gap: '12px',
+              width: '100%',
+              maxWidth: '512px',
+              margin: '0 auto',
+              boxSizing: 'border-box'
             }}
           >
-            Urutkan
-          </button>
-          <button
-            type="button"
-            onClick={handleAddCategory}
-            style={{
-              flex: 1,
-              height: '48px',
-              borderRadius: '9999px',
-              border: 'none',
-              outline: 'none',
-              backgroundColor: '#00A637',
-              color: '#ffffff',
-              fontWeight: 700,
-              fontSize: '14px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            Tambah
-          </button>
-        </div>
-      </div>
+            <button
+              type="button"
+              onClick={handleSortClick}
+              style={{
+                flex: 1,
+                height: '48px',
+                borderRadius: '9999px',
+                border: '1.5px solid #00A637',
+                outline: 'none',
+                boxShadow: 'none',
+                backgroundColor: '#ffffff',
+                color: '#00A637',
+                fontWeight: 700,
+                fontSize: '14px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              Urutkan
+            </button>
+            <button
+              type="button"
+              onClick={handleAddCategory}
+              style={{
+                flex: 1,
+                height: '48px',
+                borderRadius: '9999px',
+                border: 'none',
+                outline: 'none',
+                backgroundColor: '#00A637',
+                color: '#ffffff',
+                fontWeight: 700,
+                fontSize: '14px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              Tambah
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
 
-      {/* 4. Action Sheet Modal when "Tambah" clicked (Figma 1:1 spec - currently hidden/inactive, Tambah navigates directly to Tambah Kategori) */}
-      {false && showAddSheet && (
-        <div className="fixed inset-0 z-[250] flex items-end justify-center font-sans">
+      {/* 4. Action Sheet Modal when "Tambah" clicked (Figma 1:1 spec - rendered outside body via React Portal) */}
+      {false && showAddSheet && typeof document !== 'undefined' && createPortal(
+        <div id="modern-menu-portal-root">
+          <div className="fixed inset-0 z-[250] flex items-end justify-center font-sans">
           {/* Backdrop */}
           <div
             className="fixed inset-0 bg-black/50 transition-opacity"
@@ -707,6 +714,8 @@ export default function CategoriesPage({ onBack, onNavigate }) {
             </button>
           </div>
         </div>
+        </div>,
+        document.body
       )}
     </div>
   );

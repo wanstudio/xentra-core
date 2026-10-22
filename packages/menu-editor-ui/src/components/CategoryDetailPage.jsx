@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 function getAuthToken() {
   try {
@@ -475,88 +476,93 @@ export default function CategoryDetailPage({
         )}
       </div>
 
-      {/* 3. Fixed Bottom Action Bar: Urutkan & Tambah */}
-      <div
-        id="modern-category-detail-bottom-bar"
-        style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          width: '100%',
-          backgroundColor: '#ffffff',
-          borderTopLeftRadius: '20px',
-          borderTopRightRadius: '20px',
-          boxShadow: '0px 0px 15px rgba(0, 0, 0, 0.15)',
-          zIndex: 200,
-          paddingTop: '24px',
-          paddingBottom: 'max(24px, env(safe-area-inset-bottom, 24px))',
-          paddingLeft: '16px',
-          paddingRight: '16px',
-          boxSizing: 'border-box',
-        }}
-        className="w-full bg-white rounded-t-[20px] z-[200]"
-      >
+      {/* 3. Fixed Bottom Action Bar: Urutkan & Tambah rendered outside body via React Portal */}
+      {typeof document !== 'undefined' && createPortal(
         <div
+          id="modern-category-detail-bottom-bar"
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '12px',
-            width: '100%',
-            maxWidth: '100%',
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            width: '100vw',
+            maxWidth: '100vw',
+            backgroundColor: '#ffffff',
+            borderTopLeftRadius: '20px',
+            borderTopRightRadius: '20px',
+            boxShadow: '0px 0px 15px rgba(0, 0, 0, 0.15)',
+            zIndex: 200,
+            paddingTop: '24px',
+            paddingBottom: 'max(24px, env(safe-area-inset-bottom, 24px))',
+            paddingLeft: '16px',
+            paddingRight: '16px',
             boxSizing: 'border-box',
           }}
+          className="w-full bg-white rounded-t-[20px] z-[200]"
         >
-          <button
-            type="button"
-            onClick={handleSortClick}
+          <div
             style={{
-              flex: 1,
-              height: '48px',
-              borderRadius: '9999px',
-              border: '1px solid #00A637',
-              outline: 'none',
-              boxShadow: 'none',
-              backgroundColor: '#ffffff',
-              color: '#00A637',
-              fontWeight: 700,
-              fontSize: '14px',
-              cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.15s ease',
+              justifyContent: 'space-between',
+              gap: '12px',
+              width: '100%',
+              maxWidth: '512px',
+              margin: '0 auto',
+              boxSizing: 'border-box',
             }}
-            className="active:scale-98"
           >
-            Urutkan
-          </button>
-          <button
-            type="button"
-            onClick={handleAddMenuClick}
-            style={{
-              flex: 1,
-              height: '48px',
-              borderRadius: '9999px',
-              border: '1px solid #00A637',
-              outline: 'none',
-              backgroundColor: '#00A637',
-              color: '#ffffff',
-              fontWeight: 700,
-              fontSize: '14px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.15s ease',
-            }}
-            className="active:scale-98"
-          >
-            Tambah
-          </button>
-        </div>
-      </div>
+            <button
+              type="button"
+              onClick={handleSortClick}
+              style={{
+                flex: 1,
+                height: '48px',
+                borderRadius: '9999px',
+                border: '1px solid #00A637',
+                outline: 'none',
+                boxShadow: 'none',
+                backgroundColor: '#ffffff',
+                color: '#00A637',
+                fontWeight: 700,
+                fontSize: '14px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s ease',
+              }}
+              className="active:scale-98"
+            >
+              Urutkan
+            </button>
+            <button
+              type="button"
+              onClick={handleAddMenuClick}
+              style={{
+                flex: 1,
+                height: '48px',
+                borderRadius: '9999px',
+                border: '1px solid #00A637',
+                outline: 'none',
+                backgroundColor: '#00A637',
+                color: '#ffffff',
+                fontWeight: 700,
+                fontSize: '14px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s ease',
+              }}
+              className="active:scale-98"
+            >
+              Tambah
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

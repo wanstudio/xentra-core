@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 function getAuthToken() {
   try {
@@ -354,8 +355,8 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
         </form>
       )}
 
-      {/* 2b. Custom Delete Confirmation Modal (Matching Figma Mockup: 353x170px, rounded 16px, trash icon badge, Batal & Hapus buttons) */}
-      {showDeleteModal && (
+      {/* 2b. Custom Delete Confirmation Modal (Matching Figma Mockup: 353x170px, rounded 16px, rendered outside body via React Portal) */}
+      {showDeleteModal && typeof document !== 'undefined' && createPortal(
         <div
           role="dialog"
           aria-modal="true"
@@ -545,58 +546,63 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* 3. Fixed Bottom Action Bar (Matching Figma Mockup: rounded-t-[20px], top shadow, 48px pill button) */}
-      <div
-        id="modern-category-editor-bottom-bar"
-        style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          width: '100%',
-          backgroundColor: '#ffffff',
-          borderTopLeftRadius: '20px',
-          borderTopRightRadius: '20px',
-          boxShadow: '0px 0px 15px rgba(0, 0, 0, 0.15)',
-          zIndex: 200,
-          paddingTop: '24px',
-          paddingBottom: 'max(24px, env(safe-area-inset-bottom, 24px))',
-          paddingLeft: '16px',
-          paddingRight: '16px',
-          boxSizing: 'border-box'
-        }}
-        className="w-full bg-white rounded-t-[20px] z-[200]"
-      >
-        <div className="w-full max-w-lg mx-auto">
-          <button
-            type="button"
-            disabled={saving || !canSubmit}
-            onClick={handleSave}
-            style={{
-              width: '100%',
-              height: '48px',
-              borderRadius: '9999px',
-              border: 'none',
-              outline: 'none',
-              backgroundColor: canSubmit ? '#00A637' : '#F2F2F2',
-              color: canSubmit ? '#FFFFFF' : '#979797',
-              fontWeight: 700,
-              fontSize: '14px',
-              cursor: canSubmit && !saving ? 'pointer' : 'not-allowed',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.15s ease'
-            }}
-            className={canSubmit ? 'active:scale-98 hover:bg-emerald-600' : ''}
-          >
-            {saving ? 'Menyimpan...' : (isEdit ? 'Simpan' : 'Buat kategori')}
-          </button>
-        </div>
-      </div>
+      {/* 3. Fixed Bottom Action Bar rendered outside body via React Portal */}
+      {typeof document !== 'undefined' && createPortal(
+        <div
+          id="modern-category-editor-bottom-bar"
+          style={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            width: '100vw',
+            maxWidth: '100vw',
+            backgroundColor: '#ffffff',
+            borderTopLeftRadius: '20px',
+            borderTopRightRadius: '20px',
+            boxShadow: '0px 0px 15px rgba(0, 0, 0, 0.15)',
+            zIndex: 200,
+            paddingTop: '24px',
+            paddingBottom: 'max(24px, env(safe-area-inset-bottom, 24px))',
+            paddingLeft: '16px',
+            paddingRight: '16px',
+            boxSizing: 'border-box'
+          }}
+          className="w-full bg-white rounded-t-[20px] z-[200]"
+        >
+          <div className="w-full max-w-lg mx-auto">
+            <button
+              type="button"
+              disabled={saving || !canSubmit}
+              onClick={handleSave}
+              style={{
+                width: '100%',
+                height: '48px',
+                borderRadius: '9999px',
+                border: 'none',
+                outline: 'none',
+                backgroundColor: canSubmit ? '#00A637' : '#F2F2F2',
+                color: canSubmit ? '#FFFFFF' : '#979797',
+                fontWeight: 700,
+                fontSize: '14px',
+                cursor: canSubmit && !saving ? 'pointer' : 'not-allowed',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s ease'
+              }}
+              className={canSubmit ? 'active:scale-98 hover:bg-emerald-600' : ''}
+            >
+              {saving ? 'Menyimpan...' : (isEdit ? 'Simpan' : 'Buat kategori')}
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
