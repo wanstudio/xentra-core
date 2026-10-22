@@ -239,73 +239,39 @@ export default function CategoriesPage({ onBack, onNavigate }) {
     <div
       id="modern-categories-page-root"
       style={{
-        width: '100%',
-        maxWidth: '100%',
         boxSizing: 'border-box',
-        paddingLeft: 0,
-        paddingRight: 0,
-        paddingTop: '8px',
         paddingBottom: '160px'
       }}
-      className="relative w-full mx-auto font-sans"
+      className="w-full flex flex-col gap-4 max-w-lg md:mx-auto font-sans select-none"
     >
-      {/* BODY: Dari tombol back dan judul sampai card terluar isi yang bisa di scroll */}
+      {/* 1. Header with Back Arrow and Title (Identical spacing and sizing to CatalogSubHub) */}
+      <div className="flex items-center gap-3 mb-6 pt-1">
+        <button
+          type="button"
+          onClick={handleBack}
+          aria-label="Kembali ke Katalog & Menu"
+          className="w-9 h-9 flex items-center justify-center -ml-2 rounded-full text-slate-900 hover:bg-slate-100 active:scale-95 transition-all border-none bg-transparent cursor-pointer shrink-0"
+        >
+          <img
+            src="/owner/assets/icons/ci_arrow-left-sm.svg"
+            alt="Kembali"
+            className="w-[22px] h-[19px] object-contain"
+          />
+        </button>
+        <h1 className="font-bold text-slate-900 text-lg tracking-[0] leading-[18px] m-0">
+          Kategori &amp; Menu
+        </h1>
+      </div>
+
+      {/* 2. Main Inset Card Container */}
       <div
         id="categories-page-body"
         style={{
           width: '100%',
           boxSizing: 'border-box'
         }}
+        className="w-full rounded-[14px] p-4 bg-white hub-inset-stroke flex flex-col gap-4 shadow-xs"
       >
-        {/* 1. Header with Back Arrow and Title */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '24px', paddingTop: '4px' }}>
-          <button
-            type="button"
-            onClick={handleBack}
-            aria-label="Kembali ke Katalog & Menu"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'transparent',
-              border: 'none',
-              outline: 'none',
-              padding: 0,
-              margin: 0,
-              cursor: 'pointer',
-              width: '24px',
-              height: '24px',
-              flexShrink: 0
-            }}
-            className="active:scale-95 transition-transform"
-          >
-            <img
-              src="/owner/assets/icons/ci_arrow-left-sm.svg"
-              alt="Kembali"
-              style={{ width: '22px', height: '19px', objectFit: 'contain', display: 'block' }}
-            />
-          </button>
-          <h1
-            style={{
-              color: '#0F172A',
-              fontSize: '18px',
-              fontWeight: 700,
-              lineHeight: '18px',
-              margin: 0
-            }}
-          >
-            Kategori &amp; Menu
-          </h1>
-        </div>
-
-        {/* 2. Main Inset Card Container */}
-        <div
-          style={{
-            width: '100%',
-            boxSizing: 'border-box'
-          }}
-          className="w-full rounded-[14px] p-4 bg-white hub-inset-stroke flex flex-col gap-4 shadow-xs"
-        >
         {/* Top Control Bar: Filter Pills (Aktif / Nonaktif) */}
         <div className="flex items-center justify-start w-full gap-1.5">
           <button
@@ -400,7 +366,6 @@ export default function CategoriesPage({ onBack, onNavigate }) {
             })}
           </div>
         )}
-      </div>
       </div>
 
       {/* 3. Dedicated Bottom Action Bar (Exclusive to Kategori & Menu only, full screen width, rounded-t-[20px], margin-x: 16px, top-to-button: 24px, solid pure green stroke on Urutkan) */}

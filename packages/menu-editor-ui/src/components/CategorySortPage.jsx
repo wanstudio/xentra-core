@@ -242,7 +242,7 @@ export default function CategorySortPage({ onBack, onSaved }) {
       className="w-full flex flex-col gap-4 pb-36 max-w-lg md:mx-auto font-sans select-none"
     >
       {/* 1. Header with Back Arrow and Title */}
-      <div className="flex items-center gap-3 mb-2 pt-1">
+      <div className="flex items-center gap-3 mb-6 pt-1">
         <button
           type="button"
           onClick={handleBack}

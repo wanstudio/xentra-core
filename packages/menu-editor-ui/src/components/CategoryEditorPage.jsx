@@ -222,7 +222,11 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
     : 'Tambah Kategori';
 
   return (
-    <div id="modern-category-editor-page-root" className="w-full max-w-lg md:mx-auto py-2 font-sans">
+    <div
+      id="modern-category-editor-page-root"
+      style={{ boxSizing: 'border-box' }}
+      className="w-full flex flex-col gap-4 pb-12 max-w-lg md:mx-auto font-sans select-none"
+    >
       {/* 1. Header with Back Arrow and Title (Identical spacing and sizing to CategoriesPage & CatalogSubHub) */}
       <div className="flex items-center gap-3 mb-6 pt-1">
         <button
