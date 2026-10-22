@@ -467,7 +467,7 @@
       window.Xentra = window.Xentra || {};
       window.Xentra.loadStylesheetOnce = loadStylesheetOnce;
       window.Xentra.ensureOrderReceivedCss = function () {
-        return loadStylesheetOnce('/assets/css/order-received.css');
+        return loadStylesheetOnce('/assets/css/order-received.css?v=20261022_journey');
       };
       window.Xentra.ensureLocationPickerCss = function () {
         return loadStylesheetOnce('/assets/css/location-picker.css');
@@ -576,7 +576,7 @@
 
       var CONTROLLER_SRC = {
         checkout: '/assets/js/pages/checkout.js',
-        'order-received': '/assets/js/pages/order-received.js?v=20261022_arrival',
+        'order-received': '/assets/js/pages/order-received.js?v=20261022_journey',
         affiliate: '/assets/js/pages/aux-pages.js',
         history: '/assets/js/pages/aux-pages.js',
         profile: '/assets/js/pages/aux-pages.js',
@@ -591,7 +591,7 @@
           return Promise.all([
             window.Xentra.ensurePaymentGateway ? window.Xentra.ensurePaymentGateway() : Promise.resolve(),
             (window.Xentra && window.Xentra.Checkout) ? Promise.resolve() : Promise.all([
-              loadScriptOnce('/assets/js/core/fulfillment-environments.js'),
+              loadScriptOnce('/assets/js/core/fulfillment-environments.js?v=20261022_journey'),
               loadScriptOnce('/assets/js/core/delivery-schedule.js'),
               loadScriptOnce(src)
             ])
@@ -600,6 +600,7 @@
         if (view === 'order-received') {
           return Promise.all([
             window.Xentra.ensurePaymentGateway ? window.Xentra.ensurePaymentGateway() : Promise.resolve(),
+            loadScriptOnce('/assets/js/core/fulfillment-environments.js?v=20261022_journey'),
             (window.Xentra && window.Xentra.OrderReceived) ? Promise.resolve() : loadScriptOnce(src)
           ]);
         }

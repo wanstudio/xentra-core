@@ -27,6 +27,7 @@
  * Release 2026-10-21P: Remove viewport-fit=cover and enforce canonical white navigation bar (#ffffff) without stroke or scrim.
  * Release 2026-10-22A: Live driver map tracking in order-received (CSP worker-src blob fix, OSM tile fallback, and multi-angle Gojek-style scooter SVG).
  * Release 2026-10-22B: Driver proximity & arrival alerts (chime + vibrate + popup modal + pesanan-sampai.mp3 support).
+ * Release 2026-10-22C: GoFood/GrabFood-style Customer Order Journey & Stepper UI overhaul (waiting branch confirmation state, pulsing active step, elevated live map hero).
  * When this file changes (new commit), the hash changes → new cache → old purged.
  * No hardcoded version strings. No external endpoints. No manual edits.
  *

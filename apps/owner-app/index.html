@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="/merchant-shared/css/modules/stock.css?v=1.0.3">
   <link rel="stylesheet" href="/merchant-shared/css/modules/catalog.css?v=1.0.4">
   <link rel="stylesheet" href="/merchant-shared/css/ui-primitives.css?v=1.0.1">
-  <link rel="stylesheet" href="/owner/assets/css/owner-app.css?v=1.0.22">
+  <link rel="stylesheet" href="/owner/assets/css/owner-app.css?v=1.0.23">
   <link rel="stylesheet" href="/owner/assets/bundles/menu-editor.css?v=1.0.49">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#ffffff">
@@ -33,7 +33,7 @@
       if (typeof caches !== 'undefined') {
         caches.keys().then(function (names) {
           names.forEach(function (name) {
-            if (name !== 'mybangjo-owner-v1.8.21') {
+            if (name !== 'mybangjo-owner-v1.8.22') {
               caches.delete(name);
             }
           });
@@ -2261,17 +2261,17 @@
 
         <!-- PAGE: ADD / EDIT COMPOSED MENU -->
         <section id="master-menu-editor-view" class="x-card-panel x-owner-child-page-shell" style="display:none;">
-          <div class="x-owner-child-mobile-header">
+          <div class="x-owner-child-mobile-header" id="master-menu-editor-mobile-header" style="display:none;">
             <h3 class="x-owner-mobile-page-title">
               <button type="button" class="x-title-back-btn x-owner-mobile-page-back" id="btn-master-menu-editor-back" aria-label="Kembali" onclick="goBackFromChildPage()">
                 <svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg>
               </button>
               <span id="master-menu-editor-mobile-title">Tambah Menu</span>
             </h3>
-            <p class="x-owner-mobile-page-sub" id="master-menu-editor-mobile-subtitle">Menu adalah entitas komersial customer; Product adalah unit komposisi internal.</p>
+            <p class="x-owner-mobile-page-sub" id="master-menu-editor-mobile-subtitle" style="display:none;">Menu adalah entitas komersial customer; Product adalah unit komposisi internal.</p>
           </div>
 
-          <div class="x-product-editor-breadcrumb-row x-owner-child-legacy-nav" style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+          <div class="x-product-editor-breadcrumb-row x-owner-child-legacy-nav" style="display:none;align-items:center;gap:12px;margin-bottom:20px;">
             <button type="button" class="x-btn-secondary" id="btn-master-menu-editor-desktop-back" style="padding:6px 12px;font-size:13px;">
               <svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg> Kembali ke Menu Master
             </button>
@@ -6565,7 +6565,7 @@
   <script src="/merchant-dashboard/assets/js/modules/marketing-banners.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/marketing.js?v=1.0.1"></script>
   <script src="/owner/assets/bundles/menu-editor.js?v=1.0.49"></script>
-  <script src="/merchant-dashboard/assets/js/modules/master-menu.js?v=1.0.13"></script>
+  <script src="/merchant-dashboard/assets/js/modules/master-menu.js?v=1.0.14"></script>
   <script src="/merchant-dashboard/assets/js/modules/settings.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/brand.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/catalog-reference.js?v=1.0.7"></script>

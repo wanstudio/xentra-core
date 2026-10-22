@@ -146,7 +146,9 @@ body.x-owner-mobile-app .x-owner-mobile-topbar {
 
 /* 8. Sub-hub Cards Container (Katalog & Menu, Bahan & Produksi) matching design mockups */
 #subpage-catalog-menu-hub > .x-subhub-card-container,
-#subpage-catalog-menu-hub > .x-owner-child-mobile-header {
+#subpage-catalog-menu-hub > .x-owner-child-mobile-header,
+#master-menu-editor-view > .x-owner-child-mobile-header,
+#master-menu-editor-view > .x-product-editor-breadcrumb-row {
   display: none !important;
 }
 

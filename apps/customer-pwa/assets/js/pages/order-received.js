@@ -1174,85 +1174,194 @@
     if (btn && Router) btn.onclick = function () { Router.navigate('home'); };
   }
 
-  // ─── Customer fulfillment projection ─────────────────────────────────────
+  // ─── Customer fulfillment projection (GoFood / GrabFood style) ───────────
   // Primary phases come from the shared Fulfillment Environment contract.
-  // Backend status remains authoritative; this function only projects it into
-  // customer-facing language and the appropriate phase count for the order type.
+  // Backend status remains authoritative; this function projects it into
+  // clear Done (✓) vs Active (Pulsing) vs Upcoming (○) states + human subtitle.
   function resolveOrderPhase(status, orderType, context) {
     var FE = window.Xentra && window.Xentra.FulfillmentEnvironments;
     var type = FE && FE.normalize ? FE.normalize(orderType || 'delivery') : (orderType || 'delivery');
+    var ctx = context || {};
+    var delStatus = ctx.deliveryStatus || '';
+    var driverName = ctx.driverName || '';
+    var arrivedAt = ctx.arrivedAt || null;
+    var branchName = ctx.branchName || 'Restoran';
 
-    if (FE && typeof FE.project === 'function') {
-      var projected = FE.project(type, status, context || {});
-      return {
-        title: String(projected.statusLabel || projected.currentPhase.label || '').toUpperCase(),
-        badge: type === 'delivery' ? '🛵' : (type === 'pickup' ? '🛍️' : (type === 'dine_in' ? '🍽️' : '📅')),
-        steps: projected.phases.map(function (p) { return p.label; }),
-        doneCount: projected.currentPhaseIndex + (projected.isException ? 0 : 1)
-      };
-    }
-
-    // Backward-compatible fallback for stale deployments.
     var isPickup = type === 'pickup';
     var isDineIn = type === 'dine_in';
     var isReservation = type === 'reservation';
-    var steps;
-    var idx = 0;
-    if (isPickup) {
-      steps = ['Pesanan diterima', 'Sedang disiapkan', 'Siap diambil', 'Sudah diambil'];
-      if (status === 'preparing') idx = 1;
-      else if (status === 'ready') idx = 2;
-      else if (status === 'completed') idx = 3;
-    } else if (isDineIn) {
-      steps = ['Pesanan diterima', 'Sedang disiapkan', 'Siap disajikan', 'Pesanan selesai'];
-      if (status === 'preparing') idx = 1;
-      else if (status === 'ready') idx = 2;
-      else if (status === 'completed') idx = 3;
-    } else if (isReservation) {
-      steps = ['Reservasi dibuat', 'Reservasi dikonfirmasi', 'Menunggu kedatangan'];
-      if (status === 'confirmed') idx = 1;
-      else if (status === 'active_table') idx = 2;
+
+    var steps = [];
+    if (FE && typeof FE.project === 'function') {
+      var projected = FE.project(type, status, ctx);
+      steps = projected.phases.map(function (p) {
+        return { label: p.label, description: p.description || '' };
+      });
+    } else if (isPickup) {
+      steps = [
+        { label: 'Pesanan diterima resto', description: 'Restoran telah mengonfirmasi pesananmu.' },
+        { label: 'Sedang disiapkan dapur', description: 'Koki sedang memasak dan mengemas pesananmu.' },
+        { label: 'Siap diambil di konter', description: 'Makanan sudah siap diambil di cabang.' },
+        { label: 'Sudah diambil', description: 'Pesanan sudah diserahkan kepada pelanggan.' }
+      ];
     } else {
-      steps = ['Pesanan diterima', 'Sedang disiapkan', 'Siap diantar', 'Sedang diantar', 'Selesai diantar'];
-      if (status === 'preparing') idx = 1;
-      else if (status === 'ready') idx = 2;
-      else if (status === 'out_for_delivery') idx = 3;
-      else if (status === 'completed') idx = 4;
+      steps = [
+        { label: 'Pesanan diterima resto', description: 'Restoran telah mengonfirmasi pesananmu.' },
+        { label: 'Sedang disiapkan dapur', description: 'Koki sedang memasak dan mengemas pesananmu.' },
+        { label: 'Siap diantar kurir', description: 'Makanan sudah matang dan siap dibawa kurir.' },
+        { label: 'Kurir menuju lokasimu', description: 'Kurir sedang dalam perjalanan mengantar pesanan.' },
+        { label: 'Pesanan tiba di tujuan', description: 'Pesanan sudah diterima. Selamat menikmati!' }
+      ];
     }
 
-    var title = 'PESANAN DITERIMA';
-    if (status === 'preparing') title = 'SEDANG DISIAPKAN';
-    else if (status === 'ready') title = isPickup ? 'SIAP DIAMBIL' : (isDineIn ? 'SIAP DISAJIKAN' : 'SIAP DIANTAR');
-    else if (status === 'out_for_delivery') title = 'SEDANG DIANTAR';
-    else if (status === 'completed') title = isPickup ? 'SUDAH DIAMBIL' : (isDineIn ? 'PESANAN SELESAI' : 'SELESAI DIANTAR');
-    else if (status === 'pending') title = 'MENUNGGU DITERIMA';
+    // Determine exact Done count vs Active pulsing index:
+    // - When status === 'pending': branch has NOT accepted yet!
+    //   doneCount = 0, activeIndex = 0 (rendered as "Menunggu konfirmasi resto..." with amber pulse)
+    // - When status === 'confirmed': step 0 is Done (✓), step 1 ("Sedang disiapkan dapur") is Active!
+    // - When status === 'preparing': step 0 is Done (✓), step 1 ("Sedang disiapkan dapur") is Active!
+    // - When status === 'ready': steps 0..1 are Done (✓), step 2 ("Siap diantar/diambil") is Active!
+    // - When status === 'out_for_delivery': steps 0..2 are Done (✓), step 3 ("Kurir menuju lokasimu") is Active!
+    // - When status === 'completed': all steps are Done (✓), activeIndex = -1!
+    var doneCount = 0;
+    var activeIndex = 0;
+    var heroIcon = '⏳';
+    var heroTitle = 'Menunggu Konfirmasi Resto';
+    var heroSubtitle = 'Pesananmu sudah diteruskan ke ' + branchName + '. Mohon tunggu konfirmasi cabang.';
+    var accentColor = '#d97706';
+    var accentBg = '#fef3c7';
+
+    if (status === 'pending') {
+      doneCount = 0;
+      activeIndex = 0;
+      steps[0] = {
+        label: 'Menunggu konfirmasi resto',
+        description: 'Cabang sedang memeriksa pesananmu.'
+      };
+      heroIcon = '⏳';
+      heroTitle = 'Menunggu Konfirmasi Resto';
+      heroSubtitle = 'Pesananmu sudah masuk ke sistem ' + branchName + ' dan menunggu diterima.';
+      accentColor = '#d97706';
+      accentBg = '#fef3c7';
+    } else if (status === 'confirmed') {
+      doneCount = 1;
+      activeIndex = 1;
+      heroIcon = '👨‍🍳';
+      heroTitle = 'Pesanan Diterima Resto!';
+      heroSubtitle = branchName + ' sudah menerima pesananmu dan segera menyiapkannya di dapur.';
+      accentColor = '#059669';
+      accentBg = '#dcfce7';
+    } else if (status === 'preparing') {
+      doneCount = 1;
+      activeIndex = 1;
+      heroIcon = '🍳';
+      heroTitle = 'Sedang Disiapkan di Dapur';
+      heroSubtitle = 'Koki di ' + branchName + ' sedang memasak dan mengemas pesananmu dengan hangat.';
+      accentColor = '#059669';
+      accentBg = '#dcfce7';
+    } else if (status === 'ready') {
+      doneCount = 2;
+      activeIndex = 2;
+      if (isPickup) {
+        heroIcon = '🛍️';
+        heroTitle = 'Pesanan Siap Diambil!';
+        heroSubtitle = 'Makananmu sudah siap di konter ' + branchName + '. Silakan tunjukkan kode pesanan ke staf.';
+      } else if (driverName) {
+        heroIcon = '🛵';
+        heroTitle = 'Kurir Ditugaskan Mengambil Pesanan';
+        heroSubtitle = 'Makanan sudah matang! Kurir ' + driverName + ' sedang mengambil pesananmu di resto.';
+        steps[2].description = 'Kurir ' + driverName + ' sudah ditugaskan dan sedang mengambil pesanan di cabang.';
+      } else {
+        heroIcon = '📦';
+        heroTitle = 'Makanan Siap • Menunggu Kurir';
+        heroSubtitle = 'Makananmu sudah selesai dimasak dan siap diserahkan ke kurir cabang.';
+      }
+      accentColor = '#059669';
+      accentBg = '#dcfce7';
+    } else if (status === 'out_for_delivery' || delStatus === 'on_delivery') {
+      doneCount = 3;
+      activeIndex = 3;
+      if (arrivedAt) {
+        heroIcon = '🔔';
+        heroTitle = 'Kurir Sudah Sampai di Lokasi!';
+        heroSubtitle = (driverName ? ('Kurir ' + driverName) : 'Kurir') + ' sudah tiba di titik tujuan. Yuk temui kurir untuk menerima pesananmu!';
+        steps[3].label = 'Kurir sudah tiba di lokasimu';
+        steps[3].description = 'Silakan temui kurir di titik pengantaran.';
+      } else {
+        heroIcon = '🛵';
+        heroTitle = 'Kurir Sedang Menuju Lokasimu';
+        heroSubtitle = (driverName ? ('Kurir ' + driverName) : 'Kurir kami') + ' sedang dalam perjalanan mengantarkan pesanan ke alamatmu.';
+      }
+      accentColor = '#059669';
+      accentBg = '#dcfce7';
+    } else if (status === 'completed' || delStatus === 'delivered') {
+      doneCount = steps.length;
+      activeIndex = -1;
+      heroIcon = '🎉';
+      heroTitle = isPickup ? 'Pesanan Sudah Diambil' : 'Pesanan Selesai Diantar!';
+      heroSubtitle = 'Terima kasih sudah memesan di ' + branchName + '. Selamat menikmati hidanganmu!';
+      accentColor = '#059669';
+      accentBg = '#dcfce7';
+    }
 
     return {
-      title: title,
+      status: status,
+      title: heroTitle,
+      subtitle: heroSubtitle,
+      heroIcon: heroIcon,
+      accentColor: accentColor,
+      accentBg: accentBg,
       badge: isPickup ? '🛍️' : (isDineIn ? '🍽️' : (isReservation ? '📅' : '🛵')),
       steps: steps,
-      doneCount: idx + 1,
-      currentPhaseIndex: idx,
-      currentPhase: { label: steps[idx] || '', description: '' },
-      label: isPickup ? 'Pickup' : (isDineIn ? 'Dine-in' : (isReservation ? 'Reservasi' : 'Delivery'))
+      doneCount: doneCount,
+      activeIndex: activeIndex,
+      label: isPickup ? 'Pick-up' : (isDineIn ? 'Dine-in' : (isReservation ? 'Reservasi' : 'Delivery'))
     };
   }
 
   function renderPhaseProgress(phase) {
+    var isPendingWait = phase.status === 'pending';
     var html = '<div id="x-order-progress" style="display:flex;flex-direction:column;">';
     for (var i = 0; i < phase.steps.length; i++) {
-      var done = i < phase.doneCount;
+      var stepObj = phase.steps[i];
+      var stepLabel = typeof stepObj === 'string' ? stepObj : stepObj.label;
+      var stepDesc = typeof stepObj === 'object' && stepObj ? stepObj.description : '';
+      var isDone = i < phase.doneCount;
+      var isActive = i === phase.activeIndex;
       var last = i === phase.steps.length - 1;
-      var dot = done
-        ? '<div style="width:22px;height:22px;border-radius:50%;background:var(--x-primary);color:var(--x-primary-text,#111);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;">✓</div>'
-        : '<div style="width:22px;height:22px;border-radius:50%;border:2px solid #e5e7eb;background:#fff;flex-shrink:0;box-sizing:border-box;"></div>';
+
+      var dot = '';
+      if (isDone) {
+        dot = '<div style="width:24px;height:24px;border-radius:50%;background:#10b981;color:#ffffff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;flex-shrink:0;">✓</div>';
+      } else if (isActive) {
+        var pulseCls = isPendingWait ? 'x-gf-pulse-amber' : 'x-gf-pulse-green';
+        var dotBg = isPendingWait ? '#f59e0b' : '#10b981';
+        var innerIcon = isPendingWait ? '⏳' : '●';
+        dot = '<div class="' + pulseCls + '" style="width:24px;height:24px;border-radius:50%;background:' + dotBg + ';color:#ffffff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;flex-shrink:0;">' + innerIcon + '</div>';
+      } else {
+        dot = '<div style="width:24px;height:24px;border-radius:50%;border:2px solid #e2e8f0;background:#f8fafc;color:#94a3b8;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;box-sizing:border-box;">' + (i + 1) + '</div>';
+      }
+
+      var lineColor = isDone ? '#10b981' : '#e2e8f0';
+      var textColor = isDone ? '#0f172a' : (isActive ? (isPendingWait ? '#b45309' : '#047857') : '#94a3b8');
+      var fontWeight = (isDone || isActive) ? '800' : '600';
+
       html +=
-        '<div style="display:flex;align-items:flex-start;gap:10px;">' +
+        '<div style="display:flex;align-items:flex-start;gap:12px;">' +
         '  <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;">' +
         dot +
-        (last ? '' : '<div style="width:2px;flex:1;min-height:16px;background:' + (done && (i + 1) < phase.doneCount ? 'var(--x-primary)' : '#e5e7eb') + ';"></div>') +
+        (last ? '' : '<div style="width:2.5px;flex:1;min-height:' + (isActive && stepDesc ? '28px' : '18px') + ';background:' + lineColor + ';margin:2px 0;"></div>') +
         '  </div>' +
-        '  <div style="font-size:13.5px;font-weight:' + (done ? '700' : '500') + ';color:' + (done ? '#111' : '#9ca3af') + ';padding:2px 0 ' + (last ? '0' : '16px') + ' 0;">' + phase.steps[i] + '</div>' +
+        '  <div style="flex:1;padding:2px 0 ' + (last ? '0' : '14px') + ' 0;">' +
+        '    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' +
+        '      <span style="font-size:13.5px;font-weight:' + fontWeight + ';color:' + textColor + ';">' + UI.escape(stepLabel) + '</span>' +
+        (isActive
+          ? '<span style="padding:2px 8px;border-radius:999px;font-size:10.5px;font-weight:800;background:' + (isPendingWait ? '#fef3c7;color:#b45309;' : '#dcfce7;color:#15803d;') + '">' + (isPendingWait ? 'Menunggu' : 'Saat Ini') + '</span>'
+          : '') +
+        '    </div>' +
+        ((isActive && stepDesc)
+          ? '<div style="font-size:12px;color:#64748b;margin-top:3px;line-height:1.4;">' + UI.escape(stepDesc) + '</div>'
+          : '') +
+        '  </div>' +
         '</div>';
     }
     return html + '</div>';
@@ -1265,9 +1374,7 @@
     return (m / 1000).toFixed(1).replace('.', ',') + ' km';
   }
 
-  // ─── Unified tracking layout (delivery + pickup, any active status) ───
-  // Section order: Header → Dynamic Title → Progress → Route/Location →
-  // DIKIRIM KEPADA → PEMBELIAN → DETAIL PEMBAYARAN → CATATAN → Batalkan.
+  // ─── Unified tracking layout (delivery + pickup, GoFood/GrabFood style) ───
   function renderTrackingOrder(data) {
     if (!targetContainer) return;
     var order = data.order;
@@ -1277,12 +1384,17 @@
     var orderType = order.order_type || 'delivery';
     var isPickup = orderType === 'pickup';
     var status = order.status;
-
-    var phase = resolveOrderPhase(status, orderType);
     var branchName = order.branch_name || 'Restoran';
+    var orderCode = formatPWAOrderCode(order);
+
+    var phase = resolveOrderPhase(status, orderType, {
+      deliveryStatus: delivery.status,
+      driverName: delivery.driver_name,
+      arrivedAt: delivery.arrived_at,
+      branchName: branchName
+    });
+
     var isCash = (payment.payment_method || order.payment_method || 'cash') === 'cash';
-    // Tunai yang dibayar di kasir (dine-in & pickup) bukan COD: labelnya harus
-    // sama dengan yang dipilih konsumen di checkout.
     var cashAtCounter = isCash && (orderType === 'dine_in' || orderType === 'dinein' || orderType === 'pickup');
     var payLabel = isCash ? (cashAtCounter ? '💵 Cash Tunai • Bayar ke kasir' : '💵 Tunai (COD)') : 'Online Pay';
     if (order.payment_status === 'settlement' || order.payment_status === 'paid' || payment.payment_status === 'settlement' || payment.payment_status === 'paid') {
@@ -1292,10 +1404,6 @@
     var dist = fmtDistance(delivery.actual_road_distance_meters);
     var destAddr = delivery.destination_address || delivery.address_text || '';
 
-    // Recipient snapshot first; buyer columns for pre-snapshot legacy orders;
-    // owner session as final fallback (IDOR guard guarantees only the owner
-    // views this order, so the session IS the buyer). Always real profile
-    // data — never a bare placeholder. Phone shown as-is, never masked.
     var sess = null;
     try { sess = Store.getState().customerSession; } catch (_) {}
     var rName = order.recipient_name || order.customer_name || (sess && sess.name) || '';
@@ -1314,36 +1422,65 @@
         '</div>';
     });
 
+    // Pending acceptance countdown (when status === 'pending')
+    var secsRemaining = ACCEPTANCE_TIMEOUT_SECONDS;
+    if (status === 'pending' && order.acceptance_deadline_at) {
+      var msRemaining = new Date(order.acceptance_deadline_at).getTime() - Date.now();
+      secsRemaining = Math.max(0, Math.floor(msRemaining / 1000));
+    }
+
+    var pendingCountdownHtml = status === 'pending'
+      ? '<div style="margin-top:14px;padding:12px 14px;background:#fffbeb;border:1px solid #fde68a;border-radius:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;">' +
+        '  <div style="min-width:0;">' +
+        '    <div style="font-size:12px;font-weight:800;color:#92400e;">⏱️ Batas Waktu Konfirmasi Resto</div>' +
+        '    <div style="font-size:11.5px;color:#b45309;margin-top:2px;">Resto sedang memproses penerimaan pesananmu</div>' +
+        '  </div>' +
+        '  <div id="x-acceptance-countdown" style="font-size:20px;font-weight:900;color:#b45309;font-variant-numeric:tabular-nums;background:#fef3c7;padding:6px 12px;border-radius:10px;flex-shrink:0;">' + fmtCountdown(secsRemaining) + '</div>' +
+        '</div>'
+      : '';
+
     var hasLiveMap = !isPickup && delivery.destination_latitude != null && delivery.destination_longitude != null &&
       (status === 'out_for_delivery' || status === 'ready' || delivery.status === 'on_delivery' || delivery.status === 'picked_up' || delivery.status === 'assigned');
 
-    var liveMapHtml = '';
+    var heroMapAndDriverCardHtml = '';
     if (hasLiveMap) {
       var hasGps = delivery.driver_location && delivery.driver_location.latitude != null;
+      var isArrived = Boolean(delivery.arrived_at);
       var waPhone = delivery.driver_phone ? String(delivery.driver_phone).replace(/[^0-9]/g, '').replace(/^0/, '62') : '';
-      liveMapHtml =
-        '<div style="margin-bottom:14px;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;background:#f8fafc;">' +
+      var badgeLabel = isArrived
+        ? '🔔 Kurir Sudah Sampai'
+        : (hasGps ? '● Live GPS Aktif' : (status === 'out_for_delivery' ? '🛵 Kurir Menuju Lokasi' : '📍 Peta Pengantaran'));
+      var badgeStyle = (isArrived || hasGps) ? 'background:#dcfce7;color:#15803d;' : 'background:#ffffff;color:#374151;';
+      var driverEtaSub = isArrived
+        ? '🔔 Kurir sudah sampai di titik tujuan!'
+        : (status === 'out_for_delivery' ? 'Sedang menuju alamatmu' : 'Sedang mengambil pesanan di resto');
+
+      heroMapAndDriverCardHtml =
+        '<div style="margin:0 14px 12px;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;background:#ffffff;box-shadow:0 4px 14px rgba(0,0,0,0.06);">' +
         '  <div style="position:relative;">' +
-        '    <div id="x-customer-live-map" style="width:100%;height:220px;background:#e8ece8;"></div>' +
+        '    <div id="x-customer-live-map" style="width:100%;height:230px;background:#e8ece8;"></div>' +
         '    <div style="position:absolute;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;align-items:center;pointer-events:none;z-index:2;">' +
-        '      <span id="x-live-gps-badge" style="padding:4px 10px;border-radius:999px;font-size:11px;font-weight:800;box-shadow:0 2px 6px rgba(0,0,0,0.12);' + (hasGps ? 'background:#dcfce7;color:#15803d;' : 'background:#ffffff;color:#374151;') + '">' +
-                 (hasGps ? '● Live GPS Aktif' : (status === 'out_for_delivery' ? '🛵 Kurir Menuju Lokasi' : '📍 Peta Pengantaran')) +
+        '      <span id="x-live-gps-badge" style="padding:5px 11px;border-radius:999px;font-size:11px;font-weight:800;box-shadow:0 2px 6px rgba(0,0,0,0.12);' + badgeStyle + '">' +
+                 badgeLabel +
         '      </span>' +
         '    </div>' +
         '  </div>' +
         (delivery.driver_name
-          ? '  <div style="padding:12px 14px;background:#ffffff;border-top:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;gap:10px;">' +
-            '    <div style="display:flex;align-items:center;gap:10px;min-width:0;">' +
-            '      <div style="width:38px;height:38px;border-radius:50%;background:#ecfdf5;color:#059669;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">🛵</div>' +
+          ? '  <div style="padding:14px 16px;background:#ffffff;border-top:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;gap:10px;">' +
+            '    <div style="display:flex;align-items:center;gap:12px;min-width:0;">' +
+            '      <div style="width:42px;height:42px;border-radius:50%;background:#ecfdf5;border:2px solid #a7f3d0;color:#059669;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">🛵</div>' +
             '      <div style="min-width:0;">' +
-            '        <div style="font-size:14px;font-weight:800;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + UI.escape(delivery.driver_name) + '</div>' +
-            '        <div id="x-live-driver-eta" style="font-size:11.5px;color:#059669;font-weight:700;margin-top:1px;">' + (status === 'out_for_delivery' ? 'Sedang menuju alamatmu' : 'Kurir Cabang') + '</div>' +
+            '        <div style="display:flex;align-items:center;gap:6px;">' +
+            '          <span style="font-size:14.5px;font-weight:800;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + UI.escape(delivery.driver_name) + '</span>' +
+            '          <span style="font-size:10.5px;font-weight:800;padding:2px 6px;border-radius:6px;background:#f1f5f9;color:#475569;">Kurir Resto</span>' +
+            '        </div>' +
+            '        <div id="x-live-driver-eta" style="font-size:12px;color:#059669;font-weight:700;margin-top:2px;">' + driverEtaSub + '</div>' +
             '      </div>' +
             '    </div>' +
             (delivery.driver_phone
-              ? '    <div style="display:flex;gap:6px;flex-shrink:0;">' +
-                (waPhone ? '<a href="https://wa.me/' + encodeURIComponent(waPhone) + '" target="_blank" rel="noopener" style="width:36px;height:36px;border-radius:50%;background:#dcfce7;color:#15803d;display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:15px;" title="Chat WhatsApp">💬</a>' : '') +
-                '      <a href="tel:' + UI.escape(delivery.driver_phone) + '" style="width:36px;height:36px;border-radius:50%;background:#f1f5f9;color:#0f172a;display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:15px;" title="Telepon Kurir">📞</a>' +
+              ? '    <div style="display:flex;gap:8px;flex-shrink:0;">' +
+                (waPhone ? '<a href="https://wa.me/' + encodeURIComponent(waPhone) + '" target="_blank" rel="noopener" style="height:38px;padding:0 12px;border-radius:999px;background:#dcfce7;color:#15803d;display:flex;align-items:center;justify-content:center;gap:5px;text-decoration:none;font-size:12.5px;font-weight:800;" title="Chat WhatsApp">💬 Chat</a>' : '') +
+                '      <a href="tel:' + UI.escape(delivery.driver_phone) + '" style="width:38px;height:38px;border-radius:50%;background:#f1f5f9;color:#0f172a;display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:15px;" title="Telepon Kurir">📞</a>' +
                 '    </div>'
               : '') +
             '  </div>'
@@ -1364,11 +1501,10 @@
         '</div>';
     } else {
       routeHtml =
-        liveMapHtml +
         '<div style="display:flex;gap:10px;align-items:flex-start;">' +
         '  <div style="font-size:20px;line-height:1.3;">🍴</div>' +
         '  <div style="min-width:0;">' +
-        '    <div style="font-size:12px;color:#6b7280;">Alamat restoran</div>' +
+        '    <div style="font-size:12px;color:#6b7280;">Restoran pengirim</div>' +
         '    <div style="font-size:14px;font-weight:700;color:#111;">' + UI.escape(branchName) + '</div>' +
         '  </div>' +
         '</div>' +
@@ -1376,12 +1512,11 @@
         '<div style="display:flex;gap:10px;align-items:flex-start;">' +
         '  <div style="font-size:20px;line-height:1.3;">📍</div>' +
         '  <div style="min-width:0;">' +
-        '    <div style="font-size:12px;color:#6b7280;">Alamat pengiriman' + (dist ? ' · ' + dist : '') + '</div>' +
+        '    <div style="font-size:12px;color:#6b7280;">Alamat tujuan' + (dist ? ' · ' + dist : '') + '</div>' +
         '    <div style="font-size:13.5px;color:#111;line-height:1.45;">' + UI.escape(destAddr || 'Alamat tujuan') + '</div>' +
         (!hasLiveMap && delivery.driver_name
           ? '<div style="margin-top:8px;padding:9px 12px;background:#f0fdf4;border-radius:10px;font-size:13px;color:#166534;">🛵 Kurir: <strong>' + UI.escape(delivery.driver_name) + '</strong>' +
             (delivery.driver_phone ? ' (' + UI.escape(delivery.driver_phone) + ')' : '') +
-            (delivery.tracking_url ? '<div style="margin-top:6px;"><a href="' + UI.escape(delivery.tracking_url) + '" target="_blank" rel="noopener noreferrer" style="color:#16a34a;font-weight:700;text-decoration:underline;">Lacak Pengiriman Langsung →</a></div>' : '') +
             '</div>'
           : '') +
         '  </div>' +
@@ -1392,40 +1527,62 @@
     targetContainer.innerHTML =
       '<div class="x-order-tracking-screen" style="max-width:480px;margin:0 auto;padding-bottom:40px;background:#f8f9fa;min-height:100vh;">' +
 
-      // Top bar (same pattern as the Riwayat Pesanan header)
-      '  <div class="x-aux-header" style="background:#fff;margin-bottom:10px;">' +
-      '    <button type="button" class="x-aux-back-btn" id="x-btn-order-back" aria-label="Kembali">' +
-      '      <img src="/assets/icons/arrowback.svg" alt="Kembali">' +
-      '    </button>' +
-      '    <h1 class="x-aux-title">Pesanan</h1>' +
+      // Top bar with Order Code Pill on the right
+      '  <div class="x-aux-header" style="background:#fff;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;padding-right:16px;">' +
+      '    <div style="display:flex;align-items:center;">' +
+      '      <button type="button" class="x-aux-back-btn" id="x-btn-order-back" aria-label="Kembali">' +
+      '        <img src="/assets/icons/arrowback.svg" alt="Kembali">' +
+      '      </button>' +
+      '      <h1 class="x-aux-title">Status Pesanan</h1>' +
+      '    </div>' +
+      '    <div style="display:flex;align-items:center;gap:6px;">' +
+      '      <span style="padding:4px 10px;border-radius:999px;background:#f1f5f9;color:#0f172a;font-size:12px;font-weight:800;">' + UI.escape(orderCode) + '</span>' +
+      '    </div>' +
       '  </div>' +
 
-      // Header: dynamic status title + progress phases in ONE card.
-      // Order meta (number/branch) and badge icon are hidden by design.
-      '  <div style="background:#fff;padding:20px 18px;margin:0 14px 10px;border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">' +
-      '    <h1 id="x-order-phase-title" style="font-size:20px;font-weight:800;color:#111;margin:0 0 14px;">' + phase.title + '</h1>' +
+      // 1. Live Map & Driver Card right at the top when active (GoFood / GrabFood layout)
+      heroMapAndDriverCardHtml +
+
+      // 2. Hero Status Banner + Stepper Card
+      '  <div style="background:#fff;padding:18px 18px 20px;margin:0 14px 10px;border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">' +
+      '    <div style="display:flex;align-items:flex-start;gap:13px;padding-bottom:15px;margin-bottom:15px;border-bottom:1px solid #f1f5f9;">' +
+      '      <div style="width:46px;height:46px;border-radius:14px;background:' + phase.accentBg + ';color:' + phase.accentColor + ';display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;">' + phase.heroIcon + '</div>' +
+      '      <div style="flex:1;min-width:0;">' +
+      '        <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">' +
+      '          <span style="font-size:11px;font-weight:800;color:' + phase.accentColor + ';background:' + phase.accentBg + ';padding:2px 8px;border-radius:999px;">' + phase.badge + ' ' + UI.escape(phase.label) + '</span>' +
+      '          <span style="font-size:11.5px;color:#64748b;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">• ' + UI.escape(branchName) + '</span>' +
+      '        </div>' +
+      '        <h1 id="x-order-phase-title" style="font-size:18px;font-weight:800;color:#0f172a;margin:0 0 4px;line-height:1.25;">' + UI.escape(phase.title) + '</h1>' +
+      '        <p style="font-size:12.5px;color:#475569;margin:0;line-height:1.45;">' + UI.escape(phase.subtitle) + '</p>' +
+      '      </div>' +
+      '    </div>' +
       renderPhaseProgress(phase) +
+      pendingCountdownHtml +
       '  </div>' +
 
-      // Route / location (no heading)
+      // 3. Route / Location Card
       '  <div style="background:#fff;padding:16px 18px;margin:0 14px 10px;border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">' +
+      '    <div style="font-size:12px;font-weight:800;letter-spacing:.04em;color:#6b7280;margin-bottom:10px;">RUTE PENGANTARAN</div>' +
       routeHtml +
       '  </div>' +
 
-      // Dikirim kepada
+      // 4. Dikirim kepada
       '  <div style="background:#fff;padding:14px 18px;margin:0 14px 10px;border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">' +
-      '    <div style="font-size:12px;font-weight:800;letter-spacing:.04em;color:#6b7280;margin-bottom:6px;">DIKIRIM KEPADA</div>' +
+      '    <div style="font-size:12px;font-weight:800;letter-spacing:.04em;color:#6b7280;margin-bottom:6px;">PENERIMA PESANAN</div>' +
       '    <div style="font-size:14px;font-weight:700;color:#111;">' + UI.escape(rName || 'Pelanggan') + '</div>' +
       (rPhone ? '<div style="font-size:13px;color:#4b5563;margin-top:1px;">' + UI.escape(rPhone) + '</div>' : '') +
       '  </div>' +
 
-      // Pembelian
+      // 5. Pembelian
       '  <div style="background:#fff;padding:14px 18px;margin:0 14px 10px;border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">' +
-      '    <div style="font-size:12px;font-weight:800;letter-spacing:.04em;color:#6b7280;margin-bottom:4px;">PEMBELIAN</div>' +
+      '    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">' +
+      '      <span style="font-size:12px;font-weight:800;letter-spacing:.04em;color:#6b7280;">RINCIAN MENU</span>' +
+      '      <span style="font-size:12px;font-weight:700;color:#64748b;">' + UI.escape(orderCode) + '</span>' +
+      '    </div>' +
       itemsHtml +
       '  </div>' +
 
-      // Detail pembayaran
+      // 6. Detail pembayaran
       '  <div style="background:#fff;padding:14px 18px;margin:0 14px 10px;border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">' +
       '    <div style="font-size:12px;font-weight:800;letter-spacing:.04em;color:#6b7280;margin-bottom:8px;">DETAIL PEMBAYARAN</div>' +
       '    <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;"><span style="color:#6b7280;">Subtotal</span><span style="color:#111;">' + UI.money(order.subtotal || 0) + '</span></div>' +
@@ -1440,7 +1597,7 @@
         : '') +
       '  </div>' +
 
-      // Catatan pengantaran
+      // 7. Catatan pengantaran
       (order.order_note
         ? '  <div style="background:#fff;padding:14px 18px;margin:0 14px 10px;border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">' +
           '    <div style="font-size:12px;font-weight:800;letter-spacing:.04em;color:#6b7280;margin-bottom:6px;">CATATAN PENGANTARAN</div>' +
@@ -1448,10 +1605,15 @@
           '  </div>'
         : '') +
 
-      // Cancel (server allows only while pending)
+      // 8. Bottom Action: Cancel when pending, Reorder when completed
       (status === 'pending'
         ? '  <div style="padding:2px 14px 0;">' +
           '    <button type="button" id="x-btn-cancel-order" style="display:block;width:100%;height:44px;font-size:14px;font-weight:700;border:2px solid #e5e7eb;border-radius:24px;cursor:pointer;background:#fff;color:#6b7280;">Batalkan Pesanan</button>' +
+          '  </div>'
+        : '') +
+      (status === 'completed'
+        ? '  <div style="padding:4px 14px 0;">' +
+          '    <button type="button" id="x-btn-completed-home" style="display:block;width:100%;height:48px;font-size:15px;font-weight:800;border:none;border-radius:24px;cursor:pointer;background:var(--x-primary);color:var(--x-primary-text,#111);box-shadow:0 4px 12px rgba(0,0,0,0.08);">Pesan Menu Lainnya</button>' +
           '  </div>'
         : '') +
 
@@ -1460,8 +1622,15 @@
     var cancelBtn = document.getElementById('x-btn-cancel-order');
     if (cancelBtn) cancelBtn.onclick = function () { confirmCancel(order.id); };
 
+    var homeBtn = document.getElementById('x-btn-completed-home');
+    if (homeBtn && Router) homeBtn.onclick = function () { Router.navigate('home'); };
+
     var backBtn = document.getElementById('x-btn-order-back');
     if (backBtn && Router) backBtn.onclick = function () { Router.navigate('history'); };
+
+    if (status === 'pending') {
+      startCountdown(secsRemaining, order.id);
+    }
 
     lastDeliveryStatus = delivery.status || null;
     lastDriverName = delivery.driver_name || null;
@@ -1972,7 +2141,7 @@
           var newDriverName = (data.delivery && data.delivery.driver_name) || null;
           var newArrivedAt = (data.delivery && data.delivery.arrived_at) || null;
 
-          if (newStatus !== currentStatus || newPayStatus !== currentPayStatus || newDelStatus !== lastDeliveryStatus || newDriverName !== lastDriverName) {
+          if (newStatus !== currentStatus || newPayStatus !== currentPayStatus || newDelStatus !== lastDeliveryStatus || newDriverName !== lastDriverName || newArrivedAt !== lastArrivedAt) {
             stopTimers();
             renderOrder(data);
             currentStatus = newStatus;

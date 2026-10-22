@@ -166,12 +166,14 @@
     var mount = $('modern-menu-editor-mount');
     var legacyForm = $('form-master-menu');
     var legacyHeader = editor ? editor.querySelector('.x-product-editor-header') : null;
+    var legacyMobileHeader = editor ? editor.querySelector('.x-owner-child-mobile-header') : null;
     var legacyBreadcrumb = editor ? editor.querySelector('.x-product-editor-breadcrumb-row') : null;
 
     if (mount && typeof window.mountMenuEditor === 'function') {
       mount.style.display = 'block';
       if (legacyForm) legacyForm.style.display = 'none';
       if (legacyHeader) legacyHeader.style.display = 'none';
+      if (legacyMobileHeader) legacyMobileHeader.style.display = 'none';
       if (legacyBreadcrumb) legacyBreadcrumb.style.display = 'none';
 
       window.mountMenuEditor(mount, {
@@ -217,6 +219,7 @@
     if (mount) mount.style.display = 'none';
     if (legacyForm) legacyForm.style.display = 'block';
     if (legacyHeader) legacyHeader.style.display = '';
+    if (legacyMobileHeader) legacyMobileHeader.style.display = '';
     if (legacyBreadcrumb) legacyBreadcrumb.style.display = '';
 
     if (window.XentraDropdown && typeof window.XentraDropdown.refresh === 'function') {
@@ -1333,6 +1336,10 @@
 
   async function loadOwnerMasterMenuEditor(menuId) {
     showOwnerMasterMenuEditor(menuId);
+    var mount = $('modern-menu-editor-mount');
+    if (mount && typeof window.mountMenuEditor === 'function') {
+      return;
+    }
 
     if (!menuId) {
       ownerMasterMenuResetEditor(_ownerMasterMenuState.createType);

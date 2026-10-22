@@ -467,3 +467,23 @@
 	color: #ef4444;
 	margin-bottom: 16px;
 }
+
+@keyframes xTrackerPulseRing {
+	0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.45); }
+	70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+	100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+@keyframes xTrackerWaitPulse {
+	0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.45); }
+	70% { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+	100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+
+.x-gf-pulse-green {
+	animation: xTrackerPulseRing 1.8s infinite;
+}
+
+.x-gf-pulse-amber {
+	animation: xTrackerWaitPulse 1.8s infinite;
+}

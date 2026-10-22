@@ -43,22 +43,22 @@
     delivery: {
       label: 'Delivery',
       phases: [
-        { key: 'accepted', label: 'Pesanan diterima', description: 'Cabang sudah menerima pesanan.' },
-        { key: 'preparing', label: 'Sedang disiapkan', description: 'Pesanan sedang disiapkan.' },
-        { key: 'ready', label: 'Siap diantar', description: 'Pesanan siap diserahkan untuk pengantaran.' },
-        { key: 'delivering', label: 'Sedang diantar', description: 'Pesanan sedang menuju alamat tujuan.' },
-        { key: 'completed', label: 'Selesai diantar', description: 'Pesanan sudah selesai diantar.' }
+        { key: 'accepted', label: 'Pesanan diterima resto', description: 'Restoran telah mengonfirmasi pesananmu.' },
+        { key: 'preparing', label: 'Sedang disiapkan dapur', description: 'Koki sedang memasak dan mengemas pesananmu.' },
+        { key: 'ready', label: 'Siap diantar kurir', description: 'Makanan sudah matang dan siap dibawa kurir.' },
+        { key: 'delivering', label: 'Kurir menuju lokasimu', description: 'Kurir sedang dalam perjalanan mengantar pesanan.' },
+        { key: 'completed', label: 'Pesanan tiba di tujuan', description: 'Pesanan sudah diterima. Selamat menikmati!' }
       ],
       statusLabels: {
-        pending: 'Menunggu diterima',
-        confirmed: 'Pesanan diterima',
-        preparing: 'Sedang disiapkan',
-        ready: 'Siap diantar',
-        out_for_delivery: 'Sedang diantar',
-        completed: 'Selesai diantar',
+        pending: 'Menunggu konfirmasi resto',
+        confirmed: 'Pesanan diterima resto',
+        preparing: 'Sedang disiapkan dapur',
+        ready: 'Siap diantar kurir',
+        out_for_delivery: 'Kurir menuju lokasimu',
+        completed: 'Pesanan selesai',
         rejected: 'Pesanan ditolak',
         cancelled: 'Pesanan dibatalkan',
-        timeout: 'Waktu habis',
+        timeout: 'Waktu konfirmasi habis',
         fulfillment_exception: 'Perlu penanganan'
       },
       completion: { label: 'Selesai diantar', actor: 'driver' },
@@ -70,20 +70,20 @@
     pickup: {
       label: 'Pickup',
       phases: [
-        { key: 'accepted', label: 'Pesanan diterima', description: 'Cabang sudah menerima pesanan.' },
-        { key: 'preparing', label: 'Sedang disiapkan', description: 'Pesanan sedang disiapkan.' },
-        { key: 'ready', label: 'Siap diambil', description: 'Pesanan sudah siap di konter.' },
+        { key: 'accepted', label: 'Pesanan diterima resto', description: 'Restoran telah mengonfirmasi pesananmu.' },
+        { key: 'preparing', label: 'Sedang disiapkan dapur', description: 'Koki sedang memasak dan mengemas pesananmu.' },
+        { key: 'ready', label: 'Siap diambil di konter', description: 'Makanan sudah siap diambil di cabang.' },
         { key: 'completed', label: 'Sudah diambil', description: 'Pesanan sudah diserahkan kepada pelanggan.' }
       ],
       statusLabels: {
-        pending: 'Menunggu diterima',
-        confirmed: 'Pesanan diterima',
-        preparing: 'Sedang disiapkan',
-        ready: 'Siap diambil',
+        pending: 'Menunggu konfirmasi resto',
+        confirmed: 'Pesanan diterima resto',
+        preparing: 'Sedang disiapkan dapur',
+        ready: 'Siap diambil di konter',
         completed: 'Sudah diambil',
         rejected: 'Pesanan ditolak',
         cancelled: 'Pesanan dibatalkan',
-        timeout: 'Waktu habis',
+        timeout: 'Waktu konfirmasi habis',
         fulfillment_exception: 'Perlu penanganan'
       },
       completion: { label: 'Sudah diambil', actor: 'fulfillment_handoff' },
