@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import MenuItemCard from './MenuItemCard';
 import PickItemSheet from './PickItemSheet';
 import AturItemModal from './AturItemModal';
@@ -62,6 +62,8 @@ export default function MenuEditor({
   const [isActive, setIsActive] = useState(true);
 
   // Sheets and Modals
+  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
+  const categoryDropdownRef = useRef(null);
   const [isPickSheetOpen, setIsPickSheetOpen] = useState(false);
   const [pickItemTargetIndex, setPickItemTargetIndex] = useState(null); // null means adding new item
   const [isAturModalOpen, setIsAturModalOpen] = useState(false);
@@ -270,6 +272,21 @@ export default function MenuEditor({
   }, [categories, categoryId]);
 
   const categoryDisplayName = selectedCategory?.name || '';
+
+  useEffect(() => {
+    if (!isCategoryDropdownOpen) return;
+    const handleClickOutside = (e) => {
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(e.target)) {
+        setIsCategoryDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [isCategoryDropdownOpen]);
 
   // Navigation Back Handler
   const handleBack = () => {
@@ -769,43 +786,114 @@ export default function MenuEditor({
             </div>
 
             <div className="w-full flex items-center gap-4">
-              <div
-                style={{
-                  height: '40px',
-                  borderRadius: '10px',
-                  boxShadow: 'inset 0 0 0 1px #979797',
-                  backgroundColor: '#FFFFFF',
-                }}
-                className="flex-1 relative flex items-center overflow-hidden"
-              >
-                <select
-                  value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
-                  className="w-full h-full pl-4 pr-9 bg-transparent border-none outline-none appearance-none text-[13px] font-bold text-[#0F172A] cursor-pointer"
+              <div ref={categoryDropdownRef} className="flex-1 relative">
+                <button
+                  type="button"
+                  onClick={() => setIsCategoryDropdownOpen((prev) => !prev)}
+                  aria-haspopup="listbox"
+                  aria-expanded={isCategoryDropdownOpen}
+                  style={{
+                    height: '40px',
+                    borderRadius: '10px',
+                    boxShadow: 'inset 0 0 0 1px #979797',
+                    backgroundColor: '#FFFFFF',
+                  }}
+                  className="w-full pl-[17px] pr-9 flex items-center justify-between border-none outline-none cursor-pointer text-left transition-all"
                 >
-                  <option value="">Pilih Kategori</option>
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
-                <svg
-                  width="12"
-                  height="8"
-                  viewBox="0 0 12 8"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="absolute right-3.5 pointer-events-none"
-                >
-                  <path
-                    d="M2.5 2.5L6 6L9.5 2.5"
-                    stroke="#303030"
-                    strokeWidth="1.4"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
+                  <span
+                    className={`text-[13px] font-bold truncate ${
+                      categoryDisplayName ? 'text-[#0F172A]' : 'text-[#94A3B8]'
+                    }`}
+                  >
+                    {categoryDisplayName || 'Pilih Kategori'}
+                  </span>
+                  <svg
+                    width="12"
+                    height="8"
+                    viewBox="0 0 12 8"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    className={`absolute right-3.5 pointer-events-none transition-transform duration-150 ${
+                      isCategoryDropdownOpen ? 'rotate-180' : ''
+                    }`}
+                  >
+                    <path
+                      d="M2.5 2.5L6 6L9.5 2.5"
+                      stroke="#303030"
+                      strokeWidth="1.4"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+
+                {isCategoryDropdownOpen && (
+                  <div
+                    role="listbox"
+                    style={{
+                      top: '45px',
+                      maxHeight: '251px',
+                      padding: '10px',
+                      borderRadius: '10px',
+                      backgroundColor: '#FFFFFF',
+                      boxShadow: '0px 4px 4px 1px rgba(0, 0, 0, 0.15)',
+                      outline: '0.5px solid #F3F6FD',
+                      outlineOffset: '-0.5px',
+                      zIndex: 60,
+                    }}
+                    className="absolute left-0 right-0 flex flex-col items-start gap-[10px] overflow-y-auto"
+                  >
+                    {categories.length === 0 ? (
+                      <div className="w-full px-3 py-2 text-[13px] font-medium text-[#94A3B8] text-left">
+                        Belum ada kategori
+                      </div>
+                    ) : (
+                      categories.map((cat) => {
+                        const isSelected = String(cat.id) === String(categoryId);
+                        return (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            role="option"
+                            aria-selected={isSelected}
+                            onClick={() => {
+                              setCategoryId(String(cat.id));
+                              setIsCategoryDropdownOpen(false);
+                            }}
+                            style={{
+                              borderRadius: '8px',
+                              padding: isSelected ? '10px' : '6px 12px',
+                              backgroundColor: isSelected ? '#F3F6FD' : 'transparent',
+                            }}
+                            className="w-full flex items-center justify-between border-none outline-none cursor-pointer text-left transition-colors hover:bg-[#F3F6FD]/70"
+                          >
+                            <span className="text-[13px] font-bold text-[#0F172A] truncate">
+                              {cat.name}
+                            </span>
+                            {isSelected && (
+                              <svg
+                                width="13"
+                                height="13"
+                                viewBox="0 0 13 13"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="shrink-0 ml-2"
+                              >
+                                <path
+                                  d="M2.17 6.5L5.42 9.75L10.84 3.25"
+                                  stroke="#303030"
+                                  strokeWidth="1.3"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                            )}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
               </div>
 
               <button
