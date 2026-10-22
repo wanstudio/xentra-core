@@ -155,7 +155,7 @@ export const OwnerAppShell: React.FC<OwnerAppShellProps> = ({
       {/* 2. Main Scrollable Content Area */}
       <main
         className={`w-full flex-1 flex flex-col ${
-          !isChildPage ? 'pt-[76px] pb-[116px]' : 'pt-2 pb-6'
+          !isChildPage ? 'pt-[88px] pb-[116px]' : 'pt-[20px] pb-6'
         }`}
       >
         {(currentRoute === 'overview' || currentRoute === '') && (

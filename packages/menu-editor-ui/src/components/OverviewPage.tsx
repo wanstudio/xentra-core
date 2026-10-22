@@ -179,7 +179,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
       className="w-full flex flex-col gap-4 pb-12 max-w-lg md:mx-auto select-none"
     >
       {/* 1. Period Selector & Filter Header */}
-      <div className="flex items-center justify-between gap-2 pt-1 relative">
+      <div className="flex items-center justify-between gap-2 relative">
         <div className="relative">
           <button
             type="button"

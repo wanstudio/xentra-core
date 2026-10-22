@@ -113,6 +113,18 @@ body.x-owner-mobile-app #tab-catalog-products,
 #tab-catalog-master-menus,
 body.x-owner-mobile-app #tab-catalog-master-menus,
 .x-tab-content#tab-catalog-master-menus,
+#tab-business,
+body.x-owner-mobile-app #tab-business,
+.x-tab-content#tab-business {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
 #master-menu-editor-view,
 #master-menu-editor-view.x-card-panel,
 #master-menu-editor-view.x-owner-child-page-shell,
@@ -122,12 +134,12 @@ body.x-owner-mobile-app #master-menu-editor-view.x-card-panel,
 #category-editor-view,
 #category-editor-view.x-card-panel,
 body.x-owner-mobile-app #category-editor-view,
-#tab-business,
-body.x-owner-mobile-app #tab-business,
-.x-tab-content#tab-business,
 #owner-business-main-view,
 #modern-business-hub-mount,
-#subpage-catalog-menu-hub {
+#subpage-catalog-menu-hub,
+#modern-categories-page-mount,
+#modern-item-master-page-mount,
+#modern-category-editor-page-mount {
   padding-top: 0 !important;
   padding-bottom: 0 !important;
   padding-left: 0 !important;
@@ -142,4 +154,18 @@ body.x-owner-mobile-app #tab-business,
   width: 100% !important;
   max-width: 100% !important;
   box-sizing: border-box !important;
+}
+
+@media (max-width: 768px) {
+  #modern-business-hub-root,
+  #modern-catalog-subhub-root,
+  #modern-categories-page-root,
+  #modern-category-detail-page-root,
+  #modern-category-editor-page-root,
+  #modern-category-sort-page-root,
+  #modern-category-menu-sort-page-root,
+  #modern-item-master-page-root,
+  #modern-menu-editor-root {
+    padding-top: 8px !important;
+  }
 }

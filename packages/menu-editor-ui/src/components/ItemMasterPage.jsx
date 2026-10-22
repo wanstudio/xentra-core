@@ -189,7 +189,7 @@ export default function ItemMasterPage({ onBack, onNavigate }) {
       className="w-full flex flex-col gap-4 pb-12 max-w-lg md:mx-auto font-sans select-none"
     >
       {/* 1. Header with Back Arrow and Title (Identical spacing and sizing to CatalogSubHub & CategoriesPage) */}
-      <div className="flex items-center gap-3 mb-6 pt-1">
+      <div className="flex items-center gap-3 mb-6">
         <button
           type="button"
           onClick={handleBack}

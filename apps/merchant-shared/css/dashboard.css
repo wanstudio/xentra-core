@@ -9152,11 +9152,11 @@ body:not(.x-merchant-app) .x-owner-mobile-page-sub {
     background: transparent !important;
     border: 0 !important;
     box-shadow: none !important;
-    padding: 4px 0 10px !important;
+    padding: 8px 0 10px !important;
   }
 
   .x-owner-child-page-header-row {
-    padding: 4px 0 10px !important;
+    padding: 8px 0 10px !important;
   }
 
   .x-owner-child-mobile-header {
