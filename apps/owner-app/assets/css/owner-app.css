@@ -726,6 +726,13 @@ body.x-owner-mobile-app #btn-save-master-menu-active,
     margin-bottom: 12px !important;
     box-sizing: border-box !important;
   }
+
+  .x-owner-command-center,
+  #x-owner-command-center {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+    box-sizing: border-box !important;
+  }
 }
 
 

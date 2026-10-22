@@ -40,7 +40,13 @@
         document.body.appendChild(cleanMount);
       }
 
+      var mountTimer = null;
       function handleRouting() {
+        if (mountTimer) {
+          clearInterval(mountTimer);
+          mountTimer = null;
+        }
+
         var hash = (window.location.hash || '').replace(/^#\/?/, '');
         var isModernRoute =
           hash.startsWith('catalog') ||
@@ -52,22 +58,38 @@
         var dashTopBar = document.querySelector('.x-dash-topbar, .x-owner-mobile-topbar');
         var bottomNav = document.getElementById('x-owner-bottom-nav');
 
-        if (isModernRoute && typeof window.mountOwnerAppShell === 'function') {
-          // Hide legacy UI shell entirely
+        if (isModernRoute) {
+          // Immediately hide legacy UI shell so old layout never shows
           if (dashMain) dashMain.style.display = 'none';
           if (dashTopBar) dashTopBar.style.display = 'none';
           if (bottomNav) bottomNav.style.display = 'none';
 
-          // Show clean React Shell
-          cleanMount.style.display = 'block';
-          window.mountOwnerAppShell(cleanMount, {
-            initialRoute: hash,
-            onNavigate: function (r) {
-              window.location.hash = '#' + r;
+          var tryMount = function () {
+            if (typeof window.mountOwnerAppShell === 'function') {
+              cleanMount.style.display = 'block';
+              window.mountOwnerAppShell(cleanMount, {
+                initialRoute: hash || 'overview',
+                onNavigate: function (r) {
+                  window.location.hash = '#' + r;
+                }
+              });
+              return true;
             }
-          });
+            return false;
+          };
+
+          if (!tryMount()) {
+            var attempts = 0;
+            mountTimer = setInterval(function () {
+              attempts++;
+              if (tryMount() || attempts > 100) {
+                clearInterval(mountTimer);
+                mountTimer = null;
+              }
+            }, 50);
+          }
         } else {
-          // When returning to legacy routes (overview, orders, reports, more)
+          // When returning to legacy routes (orders, reports, more)
           cleanMount.style.display = 'none';
           if (dashMain) dashMain.style.display = '';
           if (dashTopBar) dashTopBar.style.display = '';
