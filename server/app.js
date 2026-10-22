@@ -16,7 +16,7 @@ function isTestExecution() {
 if (isTestExecution()) {
   process.env.NODE_ENV = 'test';
 } else if (process.env.NODE_ENV !== 'test') {
-  dotenv.config();
+  dotenv.config({ override: true });
 }
 
 // Initialize Core Data Access Boundary (concrete persistence stays behind this facade)
@@ -528,10 +528,11 @@ app.get(['/belanja/manifest.json', '/purchasing/manifest.json', '/purchasing-app
     const data = applyCanonicalPwaTheme(JSON.parse(fs.readFileSync(manifestPath, 'utf8')));
     const brand = await resolveBrandForManifest(req);
     if (brand && brand.name) {
-      data.name = brand.customer_pwa_name || (brand.name + ' Belanja');
-      data.short_name = (brand.customer_pwa_name || brand.name + ' Belanja').substring(0, 12);
+      data.name = brand.name + ' Belanja';
+      data.short_name = (brand.name + ' Belanja').substring(0, 12);
     }
-    const iconOverride = brand ? (brand.customer_pwa_icon_url || brand.logo_url || null) : null;
+    // Belanja (purchasing) PWA is isolated from customer PWA icons
+    const iconOverride = null;
     data.icons = buildPwaIcons(iconOverride, '/belanja/assets/icons/icon-192.png', '/belanja/assets/icons/icon-512.png');
     return res.json(data);
   } catch (_) {
@@ -548,18 +549,34 @@ app.get(['/belanja/sw.js', '/purchasing/sw.js', '/purchasing-app/sw.js', '/belan
   res.sendFile(path.join(__dirname, '../apps/purchasing-app/sw.js'));
 });
 
-// Serve Public Static Assets — setHeaders ensures Cloudflare does not cache JS/CSS
-// (express.static default is 'public, max-age=0' which Cloudflare treats as cacheable)
-const _noCacheHeaders = (res) => {
+// Serve Public Static Assets with high-performance caching:
+// - Immutable assets (fonts, media derivatives) cached aggressively (1 year)
+// - Icons & static images cached (1 day) with stale-while-revalidate
+// - JS & CSS cached with ETag revalidation (no-cache, must-revalidate) for instant 304s
+const _smartStaticHeaders = (res, filePath) => {
+  if (filePath) {
+    if (filePath.endsWith('.woff2') || filePath.endsWith('.woff') || filePath.endsWith('.ttf')) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      return;
+    }
+    if (filePath.includes('/derivatives/') || filePath.includes('/uploads/derivatives/')) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      return;
+    }
+    if (filePath.endsWith('.png') || filePath.endsWith('.jpg') || filePath.endsWith('.jpeg') || filePath.endsWith('.svg') || filePath.endsWith('.webp') || filePath.endsWith('.ico')) {
+      res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+      return;
+    }
+  }
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
 };
 app.use('/assets', express.static(path.join(__dirname, '../apps/customer-pwa/assets'), {
-  setHeaders: _noCacheHeaders,
+  setHeaders: _smartStaticHeaders,
 }));
 app.use('/pwa', express.static(path.join(__dirname, '../apps/customer-pwa/assets/pwa'), {
-  setHeaders: _noCacheHeaders,
+  setHeaders: _smartStaticHeaders,
 }));
 
 // Merchant Dashboard Assets
@@ -649,8 +666,7 @@ app.get(['/signup', '/signup/'], (req, res, next) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/signup.html'));
 });
-app.get(['/auth/broker', '/auth/broker/'], (req, res, next) => {
-  if (!isSaaSHost(req)) return next();
+app.get(['/auth/broker', '/auth/broker/'], (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/auth-broker.html'));
 });
@@ -701,6 +717,10 @@ app.use(['/owner-app/assets', '/owner/assets'], express.static(path.join(__dirna
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   }
 }));
+
+app.get(['/owner/download-apk', '/owner/apk'], (req, res) => {
+  res.download(path.join(__dirname, '../apps/owner-app/assets/mybangjo-owner.apk'), 'mybangjo-owner-v1.0.2.apk');
+});
 
 app.get(['/owner/manifest.json', '/owner-app/manifest.json'], (req, res) => {
   res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
