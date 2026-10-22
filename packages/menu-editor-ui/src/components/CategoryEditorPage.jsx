@@ -20,6 +20,7 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -161,12 +162,13 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDeleteClick = () => {
     if (!isEdit || deleting) return;
-    const confirmDelete = window.confirm(
-      `Hapus kategori "${name}"?\nJika dihapus, kategori dan seluruh isi menunya akan ikut terhapus.`
-    );
-    if (!confirmDelete) return;
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!isEdit || deleting) return;
 
     setDeleting(true);
     try {
@@ -183,6 +185,8 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'Gagal menghapus kategori.');
       }
+
+      setShowDeleteModal(false);
 
       if (typeof window.showToast === 'function') {
         window.showToast(`✅ Kategori "${name}" berhasil dihapus.`);
@@ -323,7 +327,7 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
 
               <button
                 type="button"
-                onClick={handleDelete}
+                onClick={handleDeleteClick}
                 disabled={deleting}
                 style={{
                   width: '70px',
@@ -348,6 +352,200 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
             </div>
           )}
         </form>
+      )}
+
+      {/* 2b. Custom Delete Confirmation Modal (Matching Figma Mockup: 353x170px, rounded 16px, trash icon badge, Batal & Hapus buttons) */}
+      {showDeleteModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-cat-modal-title"
+          onClick={() => {
+            if (!deleting) setShowDeleteModal(false);
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.35)',
+            zIndex: 300,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+            boxSizing: 'border-box',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: '353px',
+              minHeight: '170px',
+              paddingLeft: '17px',
+              paddingRight: '17px',
+              paddingTop: '18px',
+              paddingBottom: '18px',
+              backgroundColor: '#FFFFFF',
+              boxShadow: '0px 2px 10px rgba(0, 0, 0, 0.20)',
+              borderRadius: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'flex-start',
+              alignItems: 'flex-start',
+              gap: '17px',
+              boxSizing: 'border-box',
+            }}
+          >
+            {/* Title */}
+            <div
+              id="delete-cat-modal-title"
+              style={{
+                color: '#0F172A',
+                fontSize: '18px',
+                fontWeight: 700,
+                lineHeight: '18px',
+              }}
+            >
+              Hapus kategori
+            </div>
+
+            {/* Body Row: 40x40 Trash Icon Box + Message */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-start',
+                gap: '12px',
+                width: '100%',
+              }}
+            >
+              <div
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '10px',
+                  boxShadow: 'inset 0 0 0 1px rgba(250, 62, 62, 0.30)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <svg
+                  width="17"
+                  height="17"
+                  viewBox="0 0 17 17"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M2.125 4.25H3.54167H14.875"
+                    stroke="#FA3E3E"
+                    strokeWidth="1.25"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M5.66666 4.25008V2.83341C5.66666 2.45769 5.81591 2.09736 6.08159 1.83168C6.34727 1.566 6.7076 1.41675 7.08332 1.41675H9.91666C10.2924 1.41675 10.6527 1.566 10.9184 1.83168C11.1841 2.09736 11.3333 2.45769 11.3333 2.83341V4.25008M13.4583 4.25008V14.1667C13.4583 14.5425 13.3091 14.9028 13.0434 15.1685C12.7777 15.4342 12.4174 15.5834 12.0417 15.5834H4.95832C4.5826 15.5834 4.22227 15.4342 3.95659 15.1685C3.69091 14.9028 3.54166 14.5425 3.54166 14.1667V4.25008H13.4583Z"
+                    stroke="#FA3E3E"
+                    strokeWidth="1.25"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M7.08334 7.79175V12.0417"
+                    stroke="#FA3E3E"
+                    strokeWidth="1.25"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M9.91666 7.79175V12.0417"
+                    stroke="#FA3E3E"
+                    strokeWidth="1.25"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+
+              <div
+                style={{
+                  color: '#737373',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  lineHeight: '1.35',
+                  textAlign: 'left',
+                  wordBreak: 'break-word',
+                }}
+              >
+                <div>Hapus kategori “{name || initialName}”?</div>
+                <div>Tindakan ini tidak dapat dibatalkan.</div>
+              </div>
+            </div>
+
+            {/* Action Buttons Row: Batal & Hapus */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-start',
+                gap: '10px',
+                width: '100%',
+              }}
+            >
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => setShowDeleteModal(false)}
+                style={{
+                  flex: '1 1 0',
+                  height: '40px',
+                  borderRadius: '10px',
+                  backgroundColor: '#F3F6FD',
+                  boxShadow: 'inset 0 0 0 1px #D9D9D9',
+                  border: 'none',
+                  outline: 'none',
+                  color: '#979797',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  cursor: deleting ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                className="active:scale-[0.98] transition-transform"
+              >
+                Batal
+              </button>
+
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={handleConfirmDelete}
+                style={{
+                  flex: '1 1 0',
+                  height: '40px',
+                  borderRadius: '10px',
+                  backgroundColor: 'rgba(250, 62, 62, 0.10)',
+                  boxShadow: 'inset 0 0 0 1px #FA3E3E',
+                  border: 'none',
+                  outline: 'none',
+                  color: '#FA3E3E',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  cursor: deleting ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                className="active:scale-[0.98] transition-transform"
+              >
+                {deleting ? 'Menghapus...' : 'Hapus'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 3. Fixed Bottom Action Bar (Matching Figma Mockup: rounded-t-[20px], top shadow, 48px pill button) */}
