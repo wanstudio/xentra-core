@@ -70,8 +70,16 @@
   animation: none !important;
 }
 
+body.x-categories-active .x-dash-main,
+body:has(#modern-categories-page-mount) .x-dash-main,
+#tab-catalog-categories,
 body.x-owner-mobile-app #tab-catalog-categories,
 .x-tab-content#tab-catalog-categories {
   padding-left: 0 !important;
   padding-right: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
 }

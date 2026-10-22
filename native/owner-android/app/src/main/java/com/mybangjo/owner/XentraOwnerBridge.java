@@ -59,6 +59,18 @@ public class XentraOwnerBridge {
         activity.updateStatusBar(hexColor, darkIcons);
     }
 
+    // ── Dynamic / Adaptive Navigation Bar Control ──
+    @JavascriptInterface
+    public void setNavigationBarColor(String hexColor, boolean darkIcons) {
+        activity.updateNavigationBar(hexColor, darkIcons);
+    }
+
+    @JavascriptInterface
+    public void setSystemBarsColor(String statusBarColor, String navBarColor, boolean darkIcons) {
+        activity.updateStatusBar(statusBarColor, darkIcons);
+        activity.updateNavigationBar(navBarColor, darkIcons);
+    }
+
     // ── Native Google Sign-In (System Account Picker) ──
     @JavascriptInterface
     public void launchGoogleSignIn() {

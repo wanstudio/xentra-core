@@ -126,8 +126,9 @@ public class MainActivity extends AppCompatActivity {
             OrderMonitorService.startMonitoring(this);
         }
 
-        // Initial adaptive status bar: pure white with crisp dark icons
+        // Initial adaptive status bar & navigation bar: pure white with crisp dark icons
         updateStatusBar("#ffffff", true);
+        updateNavigationBar("#ffffff", true);
 
         handleIncomingIntent(getIntent());
     }
@@ -171,6 +172,43 @@ public class MainActivity extends AppCompatActivity {
                             flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
                         } else {
                             flags &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+                        }
+                        decor.setSystemUiVisibility(flags);
+                    }
+                } catch (Exception ignored) {}
+            }
+        });
+    }
+
+    public void updateNavigationBar(String hexColor, boolean darkIcons) {
+        runOnUiThread(() -> {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                try {
+                    int color = Color.parseColor(hexColor);
+                    getWindow().setNavigationBarColor(color);
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        WindowInsetsController controller = getWindow().getInsetsController();
+                        if (controller != null) {
+                            if (darkIcons) {
+                                controller.setSystemBarsAppearance(
+                                    WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,
+                                    WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
+                                );
+                            } else {
+                                controller.setSystemBarsAppearance(
+                                    0,
+                                    WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
+                                );
+                            }
+                        }
+                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        View decor = getWindow().getDecorView();
+                        int flags = decor.getSystemUiVisibility();
+                        if (darkIcons) {
+                            flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+                        } else {
+                            flags &= ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
                         }
                         decor.setSystemUiVisibility(flags);
                     }

@@ -3,7 +3,7 @@
  * Scope: /owner/
  */
 
-var CACHE_NAME = 'mybangjo-owner-v1.6.2';
+var CACHE_NAME = 'mybangjo-owner-v1.6.8';
 
 var STATIC_ASSETS = [
   '/owner/',
@@ -47,8 +47,8 @@ self.addEventListener('activate', function (event) {
 self.addEventListener('fetch', function (event) {
   var url = new URL(event.request.url);
 
-  // Always network-only for APIs, Auth, and dynamic data
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth/')) {
+  // Always network-only for APIs, Auth, and dynamic bundles
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth/') || url.pathname.includes('/bundles/')) {
     return;
   }
 

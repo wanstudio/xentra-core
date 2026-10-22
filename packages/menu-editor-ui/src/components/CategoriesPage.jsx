@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 
 function getAuthToken() {
   try {
@@ -78,6 +77,25 @@ export default function CategoriesPage({ onBack, onNavigate }) {
       setMenus(window._ownerMasterMenuState.menus);
     }
     fetchCategoriesAndMenus();
+
+    document.body.classList.add('x-categories-active');
+
+    try {
+      if (window.XentraNative && typeof window.XentraNative.setNavigationBarColor === 'function') {
+        window.XentraNative.setNavigationBarColor('#ffffff', true);
+      } else if (window.XentraOwnerBridge && typeof window.XentraOwnerBridge.setNavigationBarColor === 'function') {
+        window.XentraOwnerBridge.setNavigationBarColor('#ffffff', true);
+      }
+      if (window.XentraNative && typeof window.XentraNative.setStatusBarColor === 'function') {
+        window.XentraNative.setStatusBarColor('#ffffff', true);
+      } else if (window.XentraOwnerBridge && typeof window.XentraOwnerBridge.setStatusBarColor === 'function') {
+        window.XentraOwnerBridge.setStatusBarColor('#ffffff', true);
+      }
+    } catch (e) {}
+
+    return () => {
+      document.body.classList.remove('x-categories-active');
+    };
   }, []);
 
   const handleBack = () => {
@@ -222,28 +240,77 @@ export default function CategoriesPage({ onBack, onNavigate }) {
   });
 
   return (
-    <div id="modern-categories-page-root" className="relative w-full max-w-[390px] mx-auto px-4 py-2 font-sans pb-36">
-      {/* 1. Header with Back Arrow and Title (Matching Figma Mockup: "Kategori & Menu") */}
-      <div className="flex items-center gap-3 mb-6 pt-1">
-        <button
-          type="button"
-          onClick={handleBack}
-          aria-label="Kembali ke Katalog & Menu"
-          className="w-9 h-9 flex items-center justify-center -ml-2 rounded-full text-slate-900 hover:bg-slate-100 active:scale-95 transition-all border-none bg-transparent cursor-pointer shrink-0"
-        >
-          <img
-            src="/owner/assets/icons/ci_arrow-left-sm.svg"
-            alt="Kembali"
-            className="w-[22px] h-[19px] object-contain"
-          />
-        </button>
-        <h1 className="font-bold text-slate-900 text-lg tracking-[0] leading-[18px] m-0">
-          Kategori &amp; Menu
-        </h1>
-      </div>
+    <div
+      id="modern-categories-page-root"
+      style={{
+        width: '100%',
+        maxWidth: '100%',
+        boxSizing: 'border-box',
+        paddingLeft: 0,
+        paddingRight: 0,
+        paddingTop: '8px',
+        paddingBottom: '160px'
+      }}
+      className="relative w-full mx-auto font-sans"
+    >
+      {/* BODY: Dari tombol back dan judul sampai card terluar isi yang bisa di scroll (Margin Kanan & Kiri 16px) */}
+      <div
+        id="categories-page-body"
+        style={{
+          marginLeft: '16px',
+          marginRight: '16px',
+          boxSizing: 'border-box'
+        }}
+      >
+        {/* 1. Header with Back Arrow and Title */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '24px', paddingTop: '4px' }}>
+          <button
+            type="button"
+            onClick={handleBack}
+            aria-label="Kembali ke Katalog & Menu"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'transparent',
+              border: 'none',
+              outline: 'none',
+              padding: 0,
+              margin: 0,
+              cursor: 'pointer',
+              width: '24px',
+              height: '24px',
+              flexShrink: 0
+            }}
+            className="active:scale-95 transition-transform"
+          >
+            <img
+              src="/owner/assets/icons/ci_arrow-left-sm.svg"
+              alt="Kembali"
+              style={{ width: '22px', height: '19px', objectFit: 'contain', display: 'block' }}
+            />
+          </button>
+          <h1
+            style={{
+              color: '#0F172A',
+              fontSize: '18px',
+              fontWeight: 700,
+              lineHeight: '18px',
+              margin: 0
+            }}
+          >
+            Kategori &amp; Menu
+          </h1>
+        </div>
 
-      {/* 2. Main Inset Card Container */}
-      <div className="w-full rounded-[14px] p-4 bg-white hub-inset-stroke flex flex-col gap-4 shadow-xs">
+        {/* 2. Main Inset Card Container */}
+        <div
+          style={{
+            width: '100%',
+            boxSizing: 'border-box'
+          }}
+          className="w-full rounded-[14px] p-4 bg-white hub-inset-stroke flex flex-col gap-4 shadow-xs"
+        >
         {/* Top Control Bar: Filter Pills (Aktif / Nonaktif) */}
         <div className="flex items-center justify-start w-full gap-1.5">
           <button
@@ -339,92 +406,146 @@ export default function CategoriesPage({ onBack, onNavigate }) {
           </div>
         )}
       </div>
+      </div>
 
-      {/* 3. Dedicated Bottom Action Bar (Fixed at bottom on load, full screen width, mounted directly to body so it never gets trapped by parent transforms) */}
-      {typeof document !== 'undefined' && createPortal(
-        <div id="modern-menu-portal-root">
-          <div id="modern-categories-bottom-bar" className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-slate-200/90 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] z-[200]">
-            <div className="max-w-[420px] mx-auto w-full px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] flex items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={handleSortClick}
-                className={`flex-1 h-12 rounded-full border border-[#00A637] font-bold text-sm active:scale-95 transition-all cursor-pointer flex items-center justify-center ${
-                  isSorting ? 'bg-[#00A637] text-white shadow-sm' : 'bg-white text-[#00A637] hover:bg-emerald-50'
-                }`}
-              >
-                {isSorting ? 'Selesai' : 'Urutkan'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowAddSheet(true)}
-                className="flex-1 h-12 rounded-full border-none bg-[#00A637] text-white font-bold text-sm hover:bg-[#009244] active:scale-95 transition-all cursor-pointer flex items-center justify-center shadow-sm"
-              >
-                Tambah
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+      {/* 3. Dedicated Bottom Action Bar (Exclusive to Kategori & Menu only, full screen width, rounded-t-[20px], margin-x: 16px, top-to-button: 24px, solid pure green stroke on Urutkan) */}
+      <div
+        id="modern-categories-bottom-bar"
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          width: '100%',
+          backgroundColor: '#ffffff',
+          borderTopLeftRadius: '20px',
+          borderTopRightRadius: '20px',
+          borderTop: '1px solid rgba(203, 213, 225, 0.9)',
+          boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.08)',
+          zIndex: 200,
+          paddingTop: '24px',
+          paddingBottom: 'max(20px, env(safe-area-inset-bottom, 20px))',
+          paddingLeft: '16px',
+          paddingRight: '16px',
+          boxSizing: 'border-box'
+        }}
+        className="w-full bg-white rounded-t-[20px] border-t border-slate-200/90 z-[200]"
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            width: '100%',
+            maxWidth: '100%',
+            boxSizing: 'border-box'
+          }}
+        >
+          <button
+            type="button"
+            onClick={handleSortClick}
+            style={{
+              flex: 1,
+              height: '48px',
+              borderRadius: '9999px',
+              border: '1.5px solid #00A637',
+              outline: 'none',
+              boxShadow: 'none',
+              backgroundColor: isSorting ? '#00A637' : '#ffffff',
+              color: isSorting ? '#ffffff' : '#00A637',
+              fontWeight: 700,
+              fontSize: '14px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            {isSorting ? 'Selesai' : 'Urutkan'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowAddSheet(true)}
+            style={{
+              flex: 1,
+              height: '48px',
+              borderRadius: '9999px',
+              border: 'none',
+              outline: 'none',
+              backgroundColor: '#00A637',
+              color: '#ffffff',
+              fontWeight: 700,
+              fontSize: '14px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            Tambah
+          </button>
+        </div>
+      </div>
 
       {/* 4. Action Sheet Modal when "Tambah" clicked */}
-      {showAddSheet && typeof document !== 'undefined' && createPortal(
-        <div id="modern-menu-portal-root">
-          <div className="fixed inset-0 z-[250] flex items-end justify-center">
-            {/* Backdrop */}
-            <div
-              className="fixed inset-0 bg-black/50 transition-opacity"
-              onClick={() => setShowAddSheet(false)}
-            />
-            {/* Sheet */}
-            <div className="relative w-full max-w-[420px] mx-auto bg-white rounded-t-[24px] p-5 pb-[max(20px,env(safe-area-inset-bottom))] flex flex-col gap-3 shadow-2xl z-10 animate-in slide-in-from-bottom duration-200">
-              <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-1" />
-              <div className="font-bold text-slate-900 text-base text-left mb-1">
-                Pilih yang ingin ditambahkan
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAddSheet(false);
-                  handleAddCategory();
-                }}
-                className="w-full p-3.5 rounded-xl border border-slate-200 hover:border-slate-400 bg-white flex items-center gap-3 cursor-pointer text-left transition-colors"
-              >
-                <div className="w-10 h-10 rounded-lg bg-[#34A853] flex items-center justify-center shrink-0">
-                  <img src="/owner/assets/icons/bxs_category.svg" alt="" className="w-5 h-5 filter brightness-0 invert" />
-                </div>
-                <div className="flex flex-col min-w-0">
-                  <span className="font-bold text-slate-900 text-sm">Tambah Kategori Baru</span>
-                  <span className="text-xs text-slate-400 font-medium">Buat pengelompokan menu di storefront</span>
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAddSheet(false);
-                  handleAddMenu();
-                }}
-                className="w-full p-3.5 rounded-xl border border-slate-200 hover:border-slate-400 bg-white flex items-center gap-3 cursor-pointer text-left transition-colors"
-              >
-                <div className="w-10 h-10 rounded-lg bg-[#EA4335] flex items-center justify-center shrink-0">
-                  <img src="/owner/assets/icons/reicon_food-tray-filled.svg" alt="" className="w-5 h-5 filter brightness-0 invert" />
-                </div>
-                <div className="flex flex-col min-w-0">
-                  <span className="font-bold text-slate-900 text-sm">Tambah Menu Baru</span>
-                  <span className="text-xs text-slate-400 font-medium">Buat produk komersial yang dijual</span>
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowAddSheet(false)}
-                className="w-full h-11 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 font-bold text-sm cursor-pointer mt-1 hover:bg-slate-100 transition-colors"
-              >
-                Batal
-              </button>
+      {showAddSheet && (
+        <div className="fixed inset-0 z-[250] flex items-end justify-center">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/50 transition-opacity"
+            onClick={() => setShowAddSheet(false)}
+          />
+          {/* Sheet */}
+          <div className="relative w-full max-w-[420px] mx-auto bg-white rounded-t-[24px] p-5 pb-[max(20px,env(safe-area-inset-bottom))] flex flex-col gap-3 shadow-2xl z-10 animate-in slide-in-from-bottom duration-200">
+            <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-1" />
+            <div className="font-bold text-slate-900 text-base text-left mb-1">
+              Pilih yang ingin ditambahkan
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                setShowAddSheet(false);
+                handleAddCategory();
+              }}
+              className="w-full p-3.5 rounded-xl border border-slate-200 hover:border-slate-400 bg-white flex items-center gap-3 cursor-pointer text-left transition-colors"
+            >
+              <div className="w-10 h-10 rounded-lg bg-[#34A853] flex items-center justify-center shrink-0">
+                <img src="/owner/assets/icons/bxs_category.svg" alt="" className="w-5 h-5 filter brightness-0 invert" />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="font-bold text-slate-900 text-sm">Tambah Kategori Baru</span>
+                <span className="text-xs text-slate-400 font-medium">Buat pengelompokan menu di storefront</span>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowAddSheet(false);
+                handleAddMenu();
+              }}
+              className="w-full p-3.5 rounded-xl border border-slate-200 hover:border-slate-400 bg-white flex items-center gap-3 cursor-pointer text-left transition-colors"
+            >
+              <div className="w-10 h-10 rounded-lg bg-[#EA4335] flex items-center justify-center shrink-0">
+                <img src="/owner/assets/icons/reicon_food-tray-filled.svg" alt="" className="w-5 h-5 filter brightness-0 invert" />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="font-bold text-slate-900 text-sm">Tambah Menu Baru</span>
+                <span className="text-xs text-slate-400 font-medium">Buat produk komersial yang dijual</span>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAddSheet(false)}
+              className="w-full h-11 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 font-bold text-sm cursor-pointer mt-1 hover:bg-slate-100 transition-colors"
+            >
+              Batal
+            </button>
           </div>
-        </div>,
-        document.body
+        </div>
       )}
     </div>
   );

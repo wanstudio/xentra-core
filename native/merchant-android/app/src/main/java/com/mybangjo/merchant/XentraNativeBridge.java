@@ -38,6 +38,22 @@ public class XentraNativeBridge {
         }
     }
 
+    // ── Dynamic / Adaptive Navigation Bar Control ──
+    @JavascriptInterface
+    public void setNavigationBarColor(String hexColor, boolean darkIcons) {
+        if (context instanceof MainActivity) {
+            ((MainActivity) context).updateNavigationBar(hexColor, darkIcons);
+        }
+    }
+
+    @JavascriptInterface
+    public void setSystemBarsColor(String statusBarColor, String navBarColor, boolean darkIcons) {
+        if (context instanceof MainActivity) {
+            ((MainActivity) context).updateStatusBar(statusBarColor, darkIcons);
+            ((MainActivity) context).updateNavigationBar(navBarColor, darkIcons);
+        }
+    }
+
     // ── Native Google Sign-In (System Account Picker) ──
     @JavascriptInterface
     public void launchGoogleSignIn() {

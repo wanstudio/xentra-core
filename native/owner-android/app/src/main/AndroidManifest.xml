@@ -80,6 +80,17 @@
             android:exported="false"
             android:stopWithTask="false" />
 
+        <!-- Background Notification Listener for External Channels (GoFood, GrabFood, ShopeeFood) -->
+        <service
+            android:name=".ChannelNotificationListenerService"
+            android:label="Xentra Ojol Channel Listener"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
     </application>
 
 </manifest>
