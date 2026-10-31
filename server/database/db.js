@@ -891,6 +891,7 @@ function initSchema(targetDb) {
       phone TEXT,
       is_active INTEGER DEFAULT 1,
       is_open_override INTEGER DEFAULT 1,
+      is_online_paused INTEGER NOT NULL DEFAULT 0,
       payment_config_override TEXT,
       is_archived INTEGER DEFAULT 0,
       timezone TEXT NOT NULL DEFAULT 'Asia/Jakarta',
@@ -1193,6 +1194,7 @@ function initSchema(targetDb) {
       sequence_no INTEGER NOT NULL,
       source_channel TEXT NOT NULL DEFAULT 'pos_cashier',
       created_by TEXT,
+      created_by_phone TEXT,
       items_payload TEXT NOT NULL,
       client_transaction_id TEXT,
       subtotal REAL NOT NULL DEFAULT 0,
@@ -1349,6 +1351,28 @@ function initSchema(targetDb) {
     );
     CREATE INDEX IF NOT EXISTS idx_pos_check_payments_check ON pos_check_payments(check_id, payment_status);
     CREATE INDEX IF NOT EXISTS idx_pos_check_payments_order ON pos_check_payments(order_id, payment_status);
+
+    CREATE TABLE IF NOT EXISTS pos_check_payment_intents (
+      id TEXT PRIMARY KEY,
+      gateway_order_id TEXT NOT NULL UNIQUE,
+      order_id TEXT NOT NULL,
+      check_id TEXT NOT NULL,
+      provider TEXT NOT NULL CHECK (provider IN ('midtrans', 'doku')),
+      amount REAL NOT NULL CHECK (amount > 0),
+      payment_status TEXT NOT NULL DEFAULT 'pending',
+      snap_token TEXT,
+      redirect_url TEXT,
+      merchant_id TEXT,
+      transaction_id TEXT,
+      raw_gateway_response TEXT,
+      raw_webhook_response TEXT,
+      settled_at TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+      FOREIGN KEY (check_id) REFERENCES pos_order_checks(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_pos_check_payment_intents_check ON pos_check_payment_intents(check_id, payment_status);
 
     CREATE TABLE IF NOT EXISTS pos_payment_groups (
       id TEXT PRIMARY KEY,
@@ -1547,6 +1571,55 @@ function initSchema(targetDb) {
     CREATE INDEX IF NOT EXISTS idx_prm_redemptions_cust ON promotion_redemptions(promotion_id, customer_phone);
     CREATE INDEX IF NOT EXISTS idx_prm_redemptions_cust_active ON promotion_redemptions(promotion_id, customer_phone) WHERE status = 'active';
     CREATE INDEX IF NOT EXISTS idx_prm_redemptions_order ON promotion_redemptions(order_id);
+
+    -- Member-level promotion claims preserve the legacy order-level ledger while
+    -- allowing different diners on one shared order to redeem the same campaign.
+    CREATE TABLE IF NOT EXISTS promotion_redemption_members (
+      id TEXT PRIMARY KEY,
+      promotion_id TEXT NOT NULL,
+      order_id TEXT NOT NULL,
+      brand_id TEXT NOT NULL,
+      branch_id TEXT NOT NULL,
+      customer_id TEXT,
+      customer_phone TEXT NOT NULL,
+      benefit_amount INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'active',
+      redeemed_at TEXT DEFAULT (datetime('now')),
+      voided_at TEXT,
+      void_reason TEXT,
+      FOREIGN KEY (promotion_id) REFERENCES promotions(id),
+      FOREIGN KEY (order_id) REFERENCES orders(id),
+      UNIQUE (order_id, promotion_id, customer_phone)
+    );
+    CREATE INDEX IF NOT EXISTS idx_prm_member_customer_active
+      ON promotion_redemption_members(promotion_id, customer_phone) WHERE status = 'active';
+    CREATE INDEX IF NOT EXISTS idx_prm_member_order ON promotion_redemption_members(order_id);
+    CREATE TRIGGER IF NOT EXISTS trg_prm_member_to_order_ledger
+    AFTER INSERT ON promotion_redemption_members
+    BEGIN
+      INSERT INTO promotion_redemptions (
+        id, promotion_id, order_id, brand_id, branch_id, customer_phone,
+        benefit_amount, status, redeemed_at, voided_at, void_reason
+      ) VALUES (
+        NEW.id, NEW.promotion_id, NEW.order_id, NEW.brand_id, NEW.branch_id, NEW.customer_phone,
+        NEW.benefit_amount, NEW.status, NEW.redeemed_at, NEW.voided_at, NEW.void_reason
+      )
+      ON CONFLICT(order_id, promotion_id) DO UPDATE SET
+        benefit_amount = (
+          SELECT COALESCE(SUM(benefit_amount), 0)
+          FROM promotion_redemption_members
+          WHERE order_id = NEW.order_id AND promotion_id = NEW.promotion_id AND status = 'active'
+        ),
+        status = CASE
+          WHEN EXISTS (
+            SELECT 1 FROM promotion_redemption_members
+            WHERE order_id = NEW.order_id AND promotion_id = NEW.promotion_id AND status = 'active'
+          ) THEN 'active'
+          ELSE NEW.status
+        END,
+        voided_at = CASE WHEN NEW.status = 'active' THEN NULL ELSE NEW.voided_at END,
+        void_reason = CASE WHEN NEW.status = 'active' THEN NULL ELSE NEW.void_reason END;
+    END;
 
     CREATE TABLE IF NOT EXISTS promotion_branch_scope (
       id TEXT PRIMARY KEY,
@@ -2004,6 +2077,16 @@ function initSchema(targetDb) {
       FOREIGN KEY (table_id) REFERENCES branch_tables(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS dining_session_members (
+      session_id TEXT NOT NULL,
+      customer_id TEXT NOT NULL,
+      joined_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (session_id, customer_id),
+      FOREIGN KEY (session_id) REFERENCES dining_sessions(id) ON DELETE CASCADE,
+      FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_dsm_customer_joined ON dining_session_members(customer_id, joined_at DESC);
+
     CREATE TABLE IF NOT EXISTS user_auth_providers (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -2121,7 +2204,44 @@ function initSchema(targetDb) {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
     CREATE INDEX IF NOT EXISTS idx_push_subs_user ON push_subscriptions(user_id);
+
+    -- Operational messaging between staff apps (Owner / Merchant / Driver / Purchasing).
+    -- Messages are always bound to a work context (order, delivery, purchasing) or are
+    -- one-way broadcasts. Read state reuses notification_recipients.
+    CREATE TABLE IF NOT EXISTS ops_messages (
+      id TEXT PRIMARY KEY,
+      brand_id TEXT NOT NULL,
+      branch_id TEXT,
+      thread_type TEXT NOT NULL,
+      thread_ref_id TEXT,
+      sender_user_id TEXT NOT NULL,
+      sender_role TEXT NOT NULL,
+      sender_name TEXT,
+      target_role TEXT,
+      body TEXT,
+      quick_code TEXT,
+      image_full_key TEXT,
+      image_thumb_key TEXT,
+      is_receipt INTEGER DEFAULT 0,
+      media_purged_at TEXT,
+      retracted_at TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_ops_msg_thread ON ops_messages(brand_id, thread_type, thread_ref_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_ops_msg_branch ON ops_messages(brand_id, branch_id, created_at);
+
+    -- Per-user chat room clear cutoff (WhatsApp "Clear Chat for Me" semantics)
+    CREATE TABLE IF NOT EXISTS ops_thread_clears (
+      user_id TEXT NOT NULL,
+      brand_id TEXT NOT NULL,
+      thread_type TEXT NOT NULL,
+      thread_ref_id TEXT NOT NULL,
+      cleared_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, thread_type, thread_ref_id)
+    );
   `);
+
+  try { targetDb.exec("ALTER TABLE ops_messages ADD COLUMN retracted_at TEXT;"); } catch (_) {}
 
   // Promotion Reward Target migration: Menu is the canonical commercial
   // reward identity. target_product_id remains a legacy compatibility
@@ -2284,6 +2404,8 @@ function initSchema(targetDb) {
   // menjumlahkan kapasitas meja itu pukul rata dan hasilnya bukan kapasitas nyata.
   try { targetDb.exec('ALTER TABLE branches ADD COLUMN reservation_max_guests INTEGER;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE branches ADD COLUMN daily_petty_cash_limit REAL NOT NULL DEFAULT 500000;'); } catch (e) {}
+  // Branch Operational Emergency Guard: Pause online orders only without shutting down in-store dine-in.
+  try { targetDb.exec('ALTER TABLE branches ADD COLUMN is_online_paused INTEGER NOT NULL DEFAULT 0;'); } catch (e) {}
 
   // Penanda akun customer yang sudah dihapus (dari sudut pandang tamu). Barisnya
   // SENGAJA tidak di-DELETE: catatan transaksi resto tetap merujuk padanya, dan
@@ -2343,6 +2465,21 @@ function initSchema(targetDb) {
   try { targetDb.exec('ALTER TABLE promotion_redemptions ADD COLUMN voided_at TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE promotion_redemptions ADD COLUMN void_reason TEXT;'); } catch (e) {}
   try { targetDb.exec("CREATE INDEX IF NOT EXISTS idx_prm_redemptions_cust_active ON promotion_redemptions(promotion_id, customer_phone) WHERE status = 'active';"); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE order_addition_batches ADD COLUMN created_by_phone TEXT;'); } catch (_) {}
+  try {
+    targetDb.exec(`
+      INSERT OR IGNORE INTO promotion_redemption_members (
+        id, promotion_id, order_id, brand_id, branch_id, customer_phone,
+        benefit_amount, status, redeemed_at, voided_at, void_reason
+      )
+      SELECT 'legacy_' || id, promotion_id, order_id, brand_id, branch_id, customer_phone,
+             benefit_amount, status, redeemed_at, voided_at, void_reason
+      FROM promotion_redemptions;
+    `);
+  } catch (migrationErr) {
+    console.error('[Migration Error] Could not backfill member promotion ledger:', migrationErr.message);
+    throw migrationErr;
+  }
   try { targetDb.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_order_payments_order_id ON order_payments(order_id);'); } catch (e) {}
   try { targetDb.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_shifts_unique_active_cashier ON pos_shifts(cashier_id) WHERE status = "open";'); } catch (e) {}
   // C2 IDEMPOTENCY (C2.8): an inventory_movements table created BEFORE the C2
@@ -2712,6 +2849,26 @@ function initSchema(targetDb) {
   try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_customer_sessions_org_id ON customer_sessions(organization_id);'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN customer_id TEXT;'); } catch (e) {}
   try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_orders_customer_id ON orders(customer_id);'); } catch (e) {}
+  // Preserve the identity of existing customers on still-open Dining Sessions
+  // before customer-phone access is removed from the session authorization path.
+  // Rows are derived only from customer_id already attached to an Order; phone
+  // matches are deliberately not treated as proof of session membership.
+  try {
+    targetDb.exec(`
+      INSERT OR IGNORE INTO dining_session_members (session_id, customer_id, joined_at)
+      SELECT ds.id, o.customer_id, COALESCE(o.created_at, ds.opened_at, datetime('now'))
+      FROM dining_sessions ds
+      JOIN orders o ON o.dining_session_id = ds.id
+      WHERE ds.status = 'active'
+        AND o.order_type = 'dine_in'
+        AND o.customer_id IS NOT NULL
+        AND o.customer_id <> ''
+        AND EXISTS (SELECT 1 FROM customers c WHERE c.id = o.customer_id);
+    `);
+  } catch (migrationErr) {
+    console.error('[Migration Error] Could not backfill active dining-session members:', migrationErr.message);
+    throw migrationErr;
+  }
   try { targetDb.exec('ALTER TABLE customers ADD COLUMN organization_id TEXT;'); } catch (e) {}
   try {
     targetDb.exec(`
@@ -3034,7 +3191,15 @@ function bootstrapEssentialTenant(targetDb) {
   try { targetDb.exec("ALTER TABLE order_deliveries ADD COLUMN driver_assignment_responded_at TEXT;"); } catch (_) {}
   try { targetDb.exec("ALTER TABLE order_deliveries ADD COLUMN driver_assignment_rejection_reason TEXT;"); } catch (_) {}
   try { targetDb.exec("ALTER TABLE order_deliveries ADD COLUMN arrived_at TEXT DEFAULT NULL;"); } catch (_) {}
+  try { targetDb.exec("ALTER TABLE order_deliveries ADD COLUMN pod_photo_url TEXT DEFAULT NULL;"); } catch (_) {}
+  try { targetDb.exec("ALTER TABLE order_deliveries ADD COLUMN pod_photo_media_id TEXT DEFAULT NULL;"); } catch (_) {}
+  try { targetDb.exec("ALTER TABLE order_deliveries ADD COLUMN pod_bypass_reason TEXT DEFAULT NULL;"); } catch (_) {}
+  try { targetDb.exec("ALTER TABLE order_deliveries ADD COLUMN pod_note TEXT DEFAULT NULL;"); } catch (_) {}
   try { targetDb.exec("CREATE INDEX IF NOT EXISTS idx_order_deliveries_driver_id ON order_deliveries(driver_id);"); } catch (_) {}
+
+  // Branch Delivery Dispatch Mode Configuration (manual | automatic | hybrid)
+  try { targetDb.exec("ALTER TABLE branch_delivery_settings ADD COLUMN dispatch_mode TEXT DEFAULT 'hybrid';"); } catch (_) {}
+  try { targetDb.exec("ALTER TABLE branch_delivery_settings ADD COLUMN auto_dispatch_timeout_seconds INTEGER DEFAULT 120;"); } catch (_) {}
 
   // Driver Realtime GPS Location & Tracking tables
   try {

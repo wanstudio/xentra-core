@@ -14,6 +14,82 @@ module.exports = function registerPosRoutes(router, deps) {
   const { PosOrderService, PosPaymentGroupService } = require('../../domains/pos');
   const { OrderAdditionService } = require('../../domains/commerce');
 
+router.get('/pos/delivery/lookup-by-qr', requireAuth(['cashier', 'branch_manager', 'owner', 'brand_manager']), (req, res) => {
+  try {
+    const rawCode = String(req.query.code || '').trim();
+    if (!rawCode) {
+      return res.status(400).json({ success: false, error: 'Kode QR / nomor pesanan wajib diisi.' });
+    }
+
+    const userBranchId = req.user ? (req.user.branch_id || req.user.branchId) : null;
+    const isBrandLevel = ['owner', 'brand_manager'].includes(req.user.role);
+
+    let cleanCode = rawCode;
+    if (rawCode.includes('order_id=')) {
+      const match = rawCode.match(/order_id=([^&]+)/);
+      if (match) cleanCode = decodeURIComponent(match[1]);
+    } else if (rawCode.includes('order_number=')) {
+      const match = rawCode.match(/order_number=([^&]+)/);
+      if (match) cleanCode = decodeURIComponent(match[1]);
+    }
+
+    let query = `
+      SELECT o.id, o.order_number, o.status AS order_status, o.order_type, o.payment_method,
+             o.payment_status, o.grand_total, o.customer_name, o.customer_phone, o.branch_id,
+             d.driver_name, d.driver_phone, d.status AS delivery_status,
+             d.cod_collection_status, d.cod_cash_custody, d.cod_collected_amount,
+             d.cod_handed_over_at, d.cod_handed_over_to
+      FROM orders o
+      LEFT JOIN order_deliveries d ON d.order_id = o.id
+      WHERE (o.id = ? OR o.order_number = ?) AND o.brand_id = ?
+    `;
+    const params = [cleanCode, cleanCode, req.brand_id];
+
+    if (!isBrandLevel && userBranchId) {
+      query += ` AND o.branch_id = ?`;
+      params.push(userBranchId);
+    }
+    query += ` LIMIT 1`;
+
+    const row = db.prepare(query).get(...params);
+    if (!row) {
+      return res.status(404).json({ success: false, error: 'Pesanan tidak ditemukan atau berada di luar cabang wewenang Anda.' });
+    }
+
+    res.json({
+      success: true,
+      order: {
+        id: row.id,
+        order_number: row.order_number,
+        order_type: row.order_type,
+        order_status: row.order_status,
+        customer_name: row.customer_name,
+        customer_phone: row.customer_phone,
+        grand_total: Number(row.grand_total || 0),
+        payment_method: row.payment_method,
+        payment_status: row.payment_status
+      },
+      delivery: {
+        driver_name: row.driver_name,
+        driver_phone: row.driver_phone,
+        status: row.delivery_status,
+        cod_collection_status: row.cod_collection_status,
+        cod_cash_custody: row.cod_cash_custody,
+        cod_collected_amount: Number(row.cod_collected_amount || row.grand_total || 0),
+        cod_handed_over_at: row.cod_handed_over_at,
+        is_ready_for_handover: Boolean(
+          row.order_type === 'delivery' &&
+          row.payment_method === 'cash' &&
+          row.delivery_status === 'delivered' &&
+          row.cod_cash_custody === 'driver'
+        )
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.post('/pos/orders/:id/cod-handover', requireAuth(['cashier']), (req, res) => {
   try {
     const orderId = req.params.id;
@@ -72,10 +148,35 @@ router.post('/pos/orders/:id/cod-handover', requireAuth(['cashier']), (req, res)
       received_amount: receivedAmount
     });
 
+    let updatedShift = null;
+    if (!result.idempotent) {
+      // P1 ATOMIC FINANCIAL RECONCILIATION: Cash in movement in POS drawer
+      try {
+        const { PosShiftService } = require('../../domains/pos');
+        updatedShift = PosShiftService.recordCashMovement({
+          shift_id: activeShift.id,
+          type: 'in',
+          amount: receivedAmount,
+          reason: `Setoran COD Kurir: Pesanan #${order.order_number}`,
+          actor_id: cashierId,
+          actor_role: 'cashier'
+        });
+      } catch (shiftErr) {
+        console.warn('[POS COD Handover Shift Move Warning]:', shiftErr.message);
+      }
+
+      // Mark payment status as settlement in orders & order_payments
+      try {
+        db.prepare("UPDATE orders SET payment_status = 'settlement', updated_at = datetime('now') WHERE id = ?").run(orderId);
+        db.prepare("UPDATE order_payments SET payment_status = 'settlement', settled_at = datetime('now'), updated_at = datetime('now') WHERE order_id = ?").run(orderId);
+      } catch (_) {}
+    }
+
     res.json({
       success: true,
-      message: result.idempotent ? 'Handover COD sudah tercatat sebelumnya.' : 'Handover COD berhasil dikonfirmasi.',
-      handover: result
+      message: result.idempotent ? 'Handover COD sudah tercatat sebelumnya.' : 'Handover COD berhasil dikonfirmasi dan kas masuk ke laci kasir.',
+      handover: result,
+      shift: updatedShift
     });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
@@ -670,6 +771,25 @@ router.post('/pos/orders/:id/checks/:checkId/pay', requireAuth(['cashier']), (re
   }
 });
 
+router.post('/pos/orders/:id/checks/:checkId/pay-online', requireAuth(['cashier']), async (req, res) => {
+  try {
+    const branchId = req.user.branch_id || req.user.branchId;
+    if (!branchId) return res.status(400).json({ success: false, error: 'Kasir belum memiliki cabang.' });
+    const { amount, payer_name = null } = req.body || {};
+    if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) return res.status(400).json({ success: false, error: 'amount positif wajib diisi.' });
+    const result = await PosOrderService.createCheckPaymentIntent({
+      order_id: req.params.id,
+      branch_id: branchId,
+      check_id: req.params.checkId,
+      amount: Number(amount),
+      payer_name
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 router.post('/pos/orders/:id/checks/reset', requireAuth(['cashier']), (req, res) => {
   try {
     const branchId = req.user.branch_id || req.user.branchId;
@@ -1069,10 +1189,73 @@ router.post('/pos/shifts/:id/close', requireAuth(['owner', 'brand_manager', 'bra
       actor_role: req.user.role
     });
 
+    // Optional Blind Material Audit submission during closing (F&B Gold Standard)
+    let materialAuditResult = null;
+    if (Array.isArray(req.body.material_counts) && req.body.material_counts.length > 0) {
+      try {
+        const { ShiftMaterialAuditService } = require('../../domains/inventory');
+        materialAuditResult = ShiftMaterialAuditService.submitShiftMaterialAudit({
+          shiftId,
+          branchId: shift.branch_id,
+          actorId: cashierId,
+          counts: req.body.material_counts
+        });
+      } catch (auditErr) {
+        console.error('[Shift Closing Audit Error]:', auditErr.message);
+      }
+    }
+
     res.json({
       success: true,
       message: 'Shift kasir berhasil ditutup.',
-      shift: closedShift
+      shift: closedShift,
+      material_audit: materialAuditResult
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// GET /pos/shifts/:id/blind-audit-checklist
+// Returns blind list of materials for cashier/kitchen to count without exposing theoretical numbers
+router.get('/pos/shifts/:id/blind-audit-checklist', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
+  try {
+    const shift = db.prepare(`
+      SELECT s.*, b.brand_id 
+      FROM pos_shifts s
+      JOIN branches b ON b.id = s.branch_id
+      WHERE s.id = ? AND b.brand_id = ?
+    `).get(req.params.id, req.brand_id);
+
+    if (!shift) {
+      return res.status(404).json({ success: false, error: 'Shift tidak ditemukan.' });
+    }
+
+    const { ShiftMaterialAuditService } = require('../../domains/inventory');
+    const checklist = ShiftMaterialAuditService.getBlindAuditChecklist({ branchId: shift.branch_id });
+
+    res.json({
+      success: true,
+      shift_id: shift.id,
+      branch_id: shift.branch_id,
+      checklist
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// GET /pos/shifts/:id/material-audits
+// Retrieves recorded material audit variance results for a closed shift
+router.get('/pos/shifts/:id/material-audits', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const { ShiftMaterialAuditService } = require('../../domains/inventory');
+    const audits = ShiftMaterialAuditService.getShiftAudits(req.params.id);
+
+    res.json({
+      success: true,
+      shift_id: req.params.id,
+      audits
     });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });

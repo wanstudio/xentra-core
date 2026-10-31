@@ -302,5 +302,105 @@ router.put('/admin/finance/payment-methods', requireAuth(['owner', 'brand_manage
   }
 });
 
+// GET /api/v1/admin/finance/cod-custody
+// COD cash custody liability and POD photo bypass audit log
+router.get('/admin/finance/cod-custody', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const db = require('../database/db');
+    const { branch_id } = req.query;
+    let effectiveBranchId = branch_id;
+    if (req.user.role === 'branch_manager') {
+      effectiveBranchId = req.user.branch_id || req.user.branchId;
+    }
+
+    let branchCondition = '';
+    const params = [req.brand_id];
+    if (effectiveBranchId) {
+      branchCondition = ' AND o.branch_id = ?';
+      params.push(effectiveBranchId);
+    }
+
+    // 1. Total COD Collected (delivered COD orders)
+    const collectedRow = db.prepare(`
+      SELECT
+        COALESCE(SUM(CASE WHEN od.status = 'delivered' THEN COALESCE(od.cod_collected_amount, o.grand_total) ELSE 0 END), 0) AS total_collected,
+        COALESCE(SUM(CASE WHEN od.cod_collection_status = 'handed_over' THEN COALESCE(od.cod_collected_amount, o.grand_total) ELSE 0 END), 0) AS total_handed_over
+      FROM orders o
+      JOIN order_deliveries od ON od.order_id = o.id
+      WHERE o.brand_id = ? AND o.payment_method = 'cash' AND o.order_type = 'delivery'
+        ${branchCondition}
+    `).get(...params);
+
+    const totalCollected = Number(collectedRow?.total_collected || 0);
+    const totalHandedOver = Number(collectedRow?.total_handed_over || 0);
+    const totalInCustody = Math.max(0, totalCollected - totalHandedOver);
+
+    // 2. Breakdown per Driver currently holding COD cash
+    const driverRows = db.prepare(`
+      SELECT
+        od.driver_id,
+        od.driver_name,
+        od.driver_phone,
+        COUNT(od.id) AS unhanded_orders_count,
+        SUM(COALESCE(od.cod_collected_amount, o.grand_total)) AS held_amount,
+        MIN(od.updated_at) AS oldest_delivered_at
+      FROM orders o
+      JOIN order_deliveries od ON od.order_id = o.id
+      WHERE o.brand_id = ? AND o.payment_method = 'cash' AND o.order_type = 'delivery'
+        AND od.status = 'delivered'
+        AND od.cod_collection_status != 'handed_over'
+        ${branchCondition}
+      GROUP BY od.driver_id, od.driver_name, od.driver_phone
+      ORDER BY held_amount DESC
+    `).all(...params);
+
+    // 3. POD Bypass Logs (orders completed without photo POD)
+    const bypassLogs = db.prepare(`
+      SELECT
+        o.id AS order_id,
+        o.order_number,
+        o.branch_id,
+        o.grand_total,
+        o.payment_method,
+        od.driver_name,
+        od.driver_phone,
+        od.pod_bypass_reason,
+        od.pod_note,
+        od.pod_photo_url,
+        od.updated_at AS completed_at
+      FROM orders o
+      JOIN order_deliveries od ON od.order_id = o.id
+      WHERE o.brand_id = ? AND od.pod_bypass_reason IS NOT NULL
+        ${branchCondition}
+      ORDER BY od.updated_at DESC
+      LIMIT 50
+    `).all(...params);
+
+    res.json({
+      success: true,
+      data: {
+        summary: {
+          total_cod_collected: totalCollected,
+          total_cod_handed_over: totalHandedOver,
+          total_cod_in_custody: totalInCustody,
+          drivers_in_custody_count: driverRows.length,
+          pod_bypasses_count: bypassLogs.length
+        },
+        drivers_in_custody: driverRows.map(d => ({
+          driver_id: d.driver_id,
+          driver_name: d.driver_name || 'Driver Cabang',
+          driver_phone: d.driver_phone || '-',
+          unhanded_orders_count: Number(d.unhanded_orders_count || 0),
+          held_amount: Number(d.held_amount || 0),
+          oldest_delivered_at: d.oldest_delivered_at
+        })),
+        pod_bypass_logs: bypassLogs
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // 5. Marketing Overview API
 };

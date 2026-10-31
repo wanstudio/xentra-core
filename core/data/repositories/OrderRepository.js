@@ -92,6 +92,16 @@ class OrderRepository {
     return this.db.queryOne('SELECT * FROM orders WHERE id = ?', [orderId]);
   }
 
+  findCanonicalDineInOrderBySession(diningSessionId) {
+    if (!diningSessionId) return null;
+    return this.db.queryOne(`
+      SELECT * FROM orders
+      WHERE dining_session_id = ? AND order_type = 'dine_in'
+        AND status NOT IN ('cancelled', 'rejected', 'timeout', 'expired', 'fulfillment_exception')
+      ORDER BY created_at ASC, id ASC LIMIT 1
+    `, [diningSessionId]);
+  }
+
   findByOrderNumber(orderNumber) {
     return this.db.queryOne('SELECT * FROM orders WHERE order_number = ?', [orderNumber]);
   }
@@ -165,24 +175,31 @@ class OrderRepository {
     updatedAt,
     codCollectionStatus = null,
     codCashCustody = null,
-    codCollectedAmount = null
+    codCollectedAmount = null,
+    codAmountTendered = null,
+    codChangeGiven = null,
+    podPhotoUrl = null,
+    podBypassReason = null,
+    podNote = null
   }) {
-    if (codCollectionStatus !== null || codCashCustody !== null || codCollectedAmount !== null) {
-      return this.db.execute(`
-        UPDATE order_deliveries
-        SET status = ?,
-            cod_collection_status = COALESCE(?, cod_collection_status),
-            cod_cash_custody = COALESCE(?, cod_cash_custody),
-            cod_collected_amount = COALESCE(?, cod_collected_amount),
-            updated_at = ?
-        WHERE order_id = ?
-      `, [status, codCollectionStatus, codCashCustody, codCollectedAmount, updatedAt, orderId]);
-    }
     return this.db.execute(`
       UPDATE order_deliveries
-      SET status = ?, updated_at = ?
+      SET status = ?,
+          cod_collection_status = COALESCE(?, cod_collection_status),
+          cod_cash_custody = COALESCE(?, cod_cash_custody),
+          cod_collected_amount = COALESCE(?, cod_collected_amount),
+          cod_amount_tendered = COALESCE(?, cod_amount_tendered),
+          cod_change_given = COALESCE(?, cod_change_given),
+          pod_photo_url = COALESCE(?, pod_photo_url),
+          pod_bypass_reason = COALESCE(?, pod_bypass_reason),
+          pod_note = COALESCE(?, pod_note),
+          updated_at = ?
       WHERE order_id = ?
-    `, [status, updatedAt, orderId]);
+    `, [
+      status, codCollectionStatus, codCashCustody, codCollectedAmount,
+      codAmountTendered, codChangeGiven, podPhotoUrl, podBypassReason, podNote,
+      updatedAt, orderId
+    ]);
   }
 
   recordDeliveryCodHandover({ orderId, codHandedOverTo = null, updatedAt }) {
@@ -387,6 +404,8 @@ class OrderRepository {
         o.status,
         o.order_type,
         o.grand_total,
+        (SELECT COUNT(*) FROM order_addition_batches ab
+         WHERE ab.order_id = o.id AND ab.status = 'pending_acceptance') AS pending_addition_count,
         COALESCE(op.paid_amount, 0) AS order_payment_settled_amount,
         COALESCE(pc.paid_amount, 0) AS check_payment_settled_amount
       FROM orders o

@@ -6,6 +6,8 @@
  * from the canonical API router to keep this module isolated.
  */
 
+const crypto = require('crypto');
+
 module.exports = function registerCustomerOrderRoutes(router, deps) {
   const {
     db,
@@ -194,7 +196,11 @@ router.get('/orders/:id', (req, res) => {
     driver_location: liveDriverLocation || null,
     arrived_at: delivery.arrived_at || null,
     tracking_url: delivery.tracking_url || null,
-    status: delivery.status || null
+    status: delivery.status || null,
+    pod_photo_url: delivery.pod_photo_url || null,
+    pod_bypass_reason: delivery.pod_bypass_reason || null,
+    pod_note: delivery.pod_note || null,
+    completed_at: (delivery.status === 'delivered') ? (delivery.updated_at || order.updated_at || null) : null
   } : null;
 
   const safePayment = payment ? {
@@ -220,6 +226,99 @@ router.get('/orders/:id', (req, res) => {
   });
 });
 
+router.get('/orders/:id/messages', (req, res) => {
+  try {
+    const order = db.prepare(`
+      SELECT o.*, b.brand_id, b.name AS branch_name
+      FROM orders o
+      JOIN branches b ON b.id = o.branch_id
+      WHERE (o.id = ? OR o.order_number = ?) AND b.brand_id = ?
+    `).get(req.params.id, req.params.id, req.brand_id);
+
+    if (!order) {
+      return res.status(404).json({ success: false, error: 'Pesanan tidak ditemukan.' });
+    }
+
+    const messages = db.prepare(`
+      SELECT id, brand_id, branch_id, thread_type, thread_ref_id,
+             sender_user_id, sender_role, sender_name, target_role,
+             body, quick_code, created_at
+      FROM ops_messages
+      WHERE brand_id = ? AND thread_type = 'delivery'
+        AND (thread_ref_id = ? OR thread_ref_id = ?)
+      ORDER BY datetime(created_at) ASC
+    `).all(order.brand_id, order.id, order.order_number);
+
+    res.json({
+      success: true,
+      order_id: order.id,
+      order_number: order.order_number,
+      messages: messages.map(m => ({
+        id: m.id,
+        sender_role: m.sender_role,
+        sender_name: m.sender_name || (m.sender_role === 'driver' ? 'Kurir' : 'Pelanggan'),
+        body: m.body,
+        quick_code: m.quick_code || null,
+        created_at: m.created_at
+      }))
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/orders/:id/messages', (req, res) => {
+  try {
+    const text = String(req.body.body || req.body.message || '').trim();
+    if (!text) {
+      return res.status(400).json({ success: false, error: 'Pesan tidak boleh kosong.' });
+    }
+
+    const order = db.prepare(`
+      SELECT o.*, b.brand_id, b.name AS branch_name
+      FROM orders o
+      JOIN branches b ON b.id = o.branch_id
+      WHERE (o.id = ? OR o.order_number = ?) AND b.brand_id = ?
+    `).get(req.params.id, req.params.id, req.brand_id);
+
+    if (!order) {
+      return res.status(404).json({ success: false, error: 'Pesanan tidak ditemukan.' });
+    }
+
+    const msgId = crypto.randomUUID();
+    const senderUserId = order.customer_id || ('customer:' + (order.customer_phone || order.id));
+    const senderName = order.recipient_name || order.customer_name || 'Pelanggan';
+
+    db.prepare(`
+      INSERT INTO ops_messages (
+        id, brand_id, branch_id, thread_type, thread_ref_id,
+        sender_user_id, sender_role, sender_name, target_role, body, created_at
+      ) VALUES (?, ?, ?, 'delivery', ?, ?, 'customer', ?, 'driver', ?, datetime('now'))
+    `).run(
+      msgId,
+      order.brand_id,
+      order.branch_id,
+      order.id,
+      senderUserId,
+      senderName,
+      text
+    );
+
+    res.json({
+      success: true,
+      message: {
+        id: msgId,
+        sender_role: 'customer',
+        sender_name: senderName,
+        body: text,
+        created_at: new Date().toISOString()
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.get('/customer/orders/:orderNumber/live-tracking', (req, res) => {
   try {
     const orderNumber = req.params.orderNumber;
@@ -231,6 +330,7 @@ router.get('/customer/orders/:orderNumber/live-tracking', (req, res) => {
     const delivery = db.prepare(`
       SELECT d.driver_id, d.driver_name, d.driver_phone, d.status as delivery_status,
              d.destination_address, d.destination_latitude, d.destination_longitude,
+             d.pod_photo_url, d.pod_bypass_reason, d.pod_note, d.arrived_at, d.updated_at,
              b.name as branch_name, b.latitude as branch_latitude, b.longitude as branch_longitude
       FROM order_deliveries d
       JOIN orders o ON o.id = d.order_id
@@ -264,6 +364,12 @@ router.get('/customer/orders/:orderNumber/live-tracking', (req, res) => {
         phone: delivery.driver_phone,
         location: driverLocation || null
       } : null,
+      pod: {
+        photo_url: delivery.pod_photo_url || null,
+        bypass_reason: delivery.pod_bypass_reason || null,
+        note: delivery.pod_note || null,
+        completed_at: delivery.delivery_status === 'delivered' ? delivery.updated_at : null
+      },
       destination: {
         address: delivery.destination_address,
         latitude: delivery.destination_latitude ? Number(delivery.destination_latitude) : null,

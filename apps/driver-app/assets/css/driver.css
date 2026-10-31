@@ -413,13 +413,29 @@ body { -webkit-tap-highlight-color: transparent; }
   background: #e8ece8;
 }
 
+#driver-map,
 .driver-map {
-  position: absolute;
-  inset: 0;
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
 }
 
-.driver-map .mapboxgl-canvas {
+#driver-detail-map,
+.driver-detail-map {
+  width: 100% !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+.driver-map .mapboxgl-canvas,
+#driver-detail-map .mapboxgl-canvas {
   outline: none;
+}
+
+.mapboxgl-map {
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .nav-banner {

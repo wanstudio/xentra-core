@@ -163,6 +163,14 @@
 
         <!-- 3, 4, 5, 6, 7. Tools: Indikator, Pesan, Notifikasi, User, Logout -->
         <div class="pos-topbar-actions-tools">
+          <button type="button" class="pos-icon-tool-btn" id="btn-pos-scan-qr-top" title="Scan QR Kurir / Setoran COD" style="color:#059669;">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="7" height="7"></rect>
+              <rect x="14" y="3" width="7" height="7"></rect>
+              <rect x="14" y="14" width="7" height="7"></rect>
+              <rect x="3" y="14" width="7" height="7"></rect>
+            </svg>
+          </button>
           <button type="button" id="pos-connection-badge" class="pos-status caution" aria-label="Status POS: Menghubungkan" aria-haspopup="true" aria-expanded="false">
             <span class="pos-status-pulse" aria-hidden="true"></span>
             <span class="pos-status-tooltip" role="status">
@@ -299,7 +307,16 @@
               <h1>Transaksi &amp; <br class="pos-mobile-br">Pesanan</h1>
               <span class="pos-menu-stats" id="pos-transaksi-stats">0 Transaksi</span>
             </div>
-            <div class="pos-pane-actions">
+            <div class="pos-pane-actions" style="display:flex;gap:8px;align-items:center;">
+              <button type="button" class="pos-btn small" id="btn-pos-scan-driver" title="Scan QR Kurir / Terima Setoran COD" style="background:#059669;color:#ffffff;display:inline-flex;align-items:center;gap:6px;border:none;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="7" height="7"></rect>
+                  <rect x="14" y="3" width="7" height="7"></rect>
+                  <rect x="14" y="14" width="7" height="7"></rect>
+                  <rect x="3" y="14" width="7" height="7"></rect>
+                </svg>
+                <span>Scan Kurir / COD</span>
+              </button>
               <button type="button" class="pos-btn ghost small pos-btn-refresh" id="btn-pos-load-sales" title="Muat ulang transaksi">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <polyline points="23 4 23 10 17 10"></polyline>

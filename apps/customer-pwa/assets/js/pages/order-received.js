@@ -199,15 +199,23 @@
       '  <h2 style="font-size:20px;font-weight:800;color:#0f172a;margin:0 0 8px;">' + titleText + '</h2>' +
       '  <p style="font-size:13.5px;color:#475569;line-height:1.5;margin:0;">' + descText + '</p>' +
       codHtml +
-      '  <div style="display:flex;gap:10px;margin-top:18px;">' +
+      '  <div style="display:flex;gap:8px;margin-top:18px;">' +
+      '    <button type="button" id="x-btn-proximity-chat" style="flex:1;height:46px;border-radius:23px;border:none;background:#10b981;color:#ffffff;font-size:13.5px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">💬 Chat Kurir</button>' +
       (waPhone
-        ? '    <a href="https://wa.me/' + encodeURIComponent(waPhone) + '" target="_blank" rel="noopener" style="flex:1;height:46px;border-radius:23px;background:#ecfdf5;color:#047857;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;border:1.5px solid #a7f3d0;">💬 Chat Kurir</a>'
+        ? '    <a href="https://wa.me/' + encodeURIComponent(waPhone) + '" target="_blank" rel="noopener" style="flex:0.8;height:46px;border-radius:23px;background:#ecfdf5;color:#047857;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:4px;text-decoration:none;border:1.5px solid #a7f3d0;">🟢 WA</a>'
         : '') +
-      '    <button type="button" id="x-btn-dismiss-proximity" style="flex:1.2;height:46px;border-radius:23px;border:none;background:#10b981;color:#ffffff;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 4px 12px rgba(16,185,129,0.3);">Siap, Mengerti</button>' +
+      '    <button type="button" id="x-btn-dismiss-proximity" style="flex:1;height:46px;border-radius:23px;border:1.5px solid #cbd5e1;background:#f8fafc;color:#475569;font-size:13px;font-weight:700;cursor:pointer;">Tutup</button>' +
       '  </div>' +
       '</div>';
 
     document.body.appendChild(overlay);
+    var proxChatBtn = overlay.querySelector('#x-btn-proximity-chat');
+    if (proxChatBtn) {
+      proxChatBtn.onclick = function () {
+        overlay.remove();
+        openCustomerChatModal(order, delivery);
+      };
+    }
     var closeBtn = overlay.querySelector('#x-btn-dismiss-proximity');
     if (closeBtn) closeBtn.onclick = function () { overlay.remove(); };
     overlay.onclick = function (e) {
@@ -1478,9 +1486,10 @@
             '      </div>' +
             '    </div>' +
             (delivery.driver_phone
-              ? '    <div style="display:flex;gap:8px;flex-shrink:0;">' +
-                (waPhone ? '<a href="https://wa.me/' + encodeURIComponent(waPhone) + '" target="_blank" rel="noopener" style="height:38px;padding:0 12px;border-radius:999px;background:#dcfce7;color:#15803d;display:flex;align-items:center;justify-content:center;gap:5px;text-decoration:none;font-size:12.5px;font-weight:800;" title="Chat WhatsApp">💬 Chat</a>' : '') +
-                '      <a href="tel:' + UI.escape(delivery.driver_phone) + '" style="width:38px;height:38px;border-radius:50%;background:#f1f5f9;color:#0f172a;display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:15px;" title="Telepon Kurir">📞</a>' +
+              ? '    <div style="display:flex;gap:6px;flex-shrink:0;">' +
+                '      <button type="button" id="x-btn-chat-driver" style="height:36px;padding:0 12px;border-radius:999px;background:#10b981;color:#ffffff;border:none;display:flex;align-items:center;justify-content:center;gap:4px;font-size:12px;font-weight:800;cursor:pointer;" title="Chat Kurir">💬 Chat</button>' +
+                (waPhone ? '<a href="https://wa.me/' + encodeURIComponent(waPhone) + '" target="_blank" rel="noopener" style="height:36px;padding:0 10px;border-radius:999px;background:#dcfce7;color:#15803d;display:flex;align-items:center;justify-content:center;gap:4px;text-decoration:none;font-size:12px;font-weight:800;" title="Chat WhatsApp">🟢 WA</a>' : '') +
+                '      <a href="tel:' + UI.escape(delivery.driver_phone) + '" style="width:36px;height:36px;border-radius:50%;background:#f1f5f9;color:#0f172a;display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:14px;" title="Telepon Kurir">📞</a>' +
                 '    </div>'
               : '') +
             '  </div>'
@@ -1515,12 +1524,36 @@
         '    <div style="font-size:12px;color:#6b7280;">Alamat tujuan' + (dist ? ' · ' + dist : '') + '</div>' +
         '    <div style="font-size:13.5px;color:#111;line-height:1.45;">' + UI.escape(destAddr || 'Alamat tujuan') + '</div>' +
         (!hasLiveMap && delivery.driver_name
-          ? '<div style="margin-top:8px;padding:9px 12px;background:#f0fdf4;border-radius:10px;font-size:13px;color:#166534;">🛵 Kurir: <strong>' + UI.escape(delivery.driver_name) + '</strong>' +
-            (delivery.driver_phone ? ' (' + UI.escape(delivery.driver_phone) + ')' : '') +
+          ? '<div style="margin-top:8px;padding:9px 12px;background:#f0fdf4;border-radius:10px;font-size:13px;color:#166534;display:flex;align-items:center;justify-content:space-between;gap:8px;">' +
+            '  <div>🛵 Kurir: <strong>' + UI.escape(delivery.driver_name) + '</strong>' +
+            (delivery.driver_phone ? ' (' + UI.escape(delivery.driver_phone) + ')' : '') + '</div>' +
+            '  <button type="button" id="x-btn-chat-driver-fallback" style="height:32px;padding:0 10px;border-radius:999px;background:#10b981;color:#ffffff;border:none;font-size:11.5px;font-weight:800;cursor:pointer;">💬 Chat</button>' +
             '</div>'
           : '') +
         '  </div>' +
         '</div>';
+    }
+
+    var podCardHtml = '';
+    var isDeliveredStatus = (status === 'completed' || delStatus === 'delivered');
+    if (isDeliveredStatus && delivery && (delivery.pod_photo_url || delivery.pod_bypass_reason)) {
+      podCardHtml =
+        '  <div style="background:#fff;padding:16px 18px;margin:0 14px 10px;border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">' +
+        '    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
+        '      <span style="font-size:12px;font-weight:800;letter-spacing:.04em;color:#059669;">📸 BUKTI PENGANTARAN (POD)</span>' +
+        '      <span style="font-size:11px;font-weight:700;color:#64748b;">' + (delivery.completed_at ? UI.escape(delivery.completed_at) : 'Terkirim') + '</span>' +
+        '    </div>' +
+        (delivery.pod_photo_url
+          ? '    <div style="position:relative;border-radius:12px;overflow:hidden;border:1.5px solid #e2e8f0;background:#0f172a;cursor:pointer;" id="x-pod-photo-trigger">' +
+            '      <img src="' + UI.escape(delivery.pod_photo_url) + '" alt="Bukti Foto Pengantaran" style="width:100%;max-height:220px;object-fit:cover;display:block;">' +
+            '      <div style="position:absolute;bottom:8px;right:8px;background:rgba(15,23,42,0.8);color:#fff;padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:700;display:flex;align-items:center;gap:4px;">🔍 Ketuk untuk memperbesar</div>' +
+            '    </div>'
+          : '    <div style="padding:12px;background:#fef3c7;border-radius:10px;color:#92400e;font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:8px;">' +
+            '      <span>⚠️</span>' +
+            '      <span>Diselesaikan tanpa foto: ' + UI.escape(delivery.pod_bypass_reason || 'Permintaan pelanggan') + '</span>' +
+            '    </div>') +
+        (delivery.pod_note ? '<div style="font-size:12px;color:#64748b;margin-top:8px;">Catatan kurir: <em>' + UI.escape(delivery.pod_note) + '</em></div>' : '') +
+        '  </div>';
     }
 
     targetContainer.style.display = 'block';
@@ -1559,6 +1592,9 @@
       renderPhaseProgress(phase) +
       pendingCountdownHtml +
       '  </div>' +
+
+      // 2.5 Bukti Foto Pengantaran (POD)
+      podCardHtml +
 
       // 3. Route / Location Card
       '  <div style="background:#fff;padding:16px 18px;margin:0 14px 10px;border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">' +
@@ -1628,6 +1664,17 @@
     var backBtn = document.getElementById('x-btn-order-back');
     if (backBtn && Router) backBtn.onclick = function () { Router.navigate('history'); };
 
+    var chatBtn = document.getElementById('x-btn-chat-driver');
+    if (chatBtn) chatBtn.onclick = function () { openCustomerChatModal(order, delivery); };
+
+    var chatFallbackBtn = document.getElementById('x-btn-chat-driver-fallback');
+    if (chatFallbackBtn) chatFallbackBtn.onclick = function () { openCustomerChatModal(order, delivery); };
+
+    var podTrigger = document.getElementById('x-pod-photo-trigger');
+    if (podTrigger && delivery && delivery.pod_photo_url) {
+      podTrigger.onclick = function () { openPodLightbox(delivery.pod_photo_url); };
+    }
+
     if (status === 'pending') {
       startCountdown(secsRemaining, order.id);
     }
@@ -1643,6 +1690,177 @@
     } else {
       cleanupTrackingMap();
     }
+  }
+
+  var activeCustomerChatInterval = null;
+
+  function openPodLightbox(photoUrl) {
+    if (!photoUrl) return;
+    var existing = document.getElementById('x-pod-lightbox-modal');
+    if (existing) existing.remove();
+
+    var overlay = document.createElement('div');
+    overlay.id = 'x-pod-lightbox-modal';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.92);backdrop-filter:blur(4px);z-index:999999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;animation:fadeIn 0.2s ease;';
+    overlay.innerHTML =
+      '<div style="width:100%;max-width:540px;display:flex;flex-direction:column;align-items:center;">' +
+      '  <div style="width:100%;display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;color:#fff;">' +
+      '    <div style="font-size:14px;font-weight:700;">📸 Bukti Pengantaran (POD)</div>' +
+      '    <button type="button" id="x-pod-lightbox-close" style="background:rgba(255,255,255,0.2);border:none;color:#fff;width:34px;height:34px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>' +
+      '  </div>' +
+      '  <img src="' + UI.escape(photoUrl) + '" alt="Bukti Foto Pengantaran" style="width:100%;max-height:80vh;object-fit:contain;border-radius:12px;border:1px solid rgba(255,255,255,0.15);box-shadow:0 12px 30px rgba(0,0,0,0.5);">' +
+      '</div>';
+
+    document.body.appendChild(overlay);
+    var closeBtn = overlay.querySelector('#x-pod-lightbox-close');
+    if (closeBtn) closeBtn.onclick = function () { overlay.remove(); };
+    overlay.onclick = function (e) {
+      if (e.target === overlay) overlay.remove();
+    };
+  }
+
+  function openCustomerChatModal(order, delivery) {
+    var ord = order || lastOrderSnapshot;
+    var del = delivery || (ord && ord.delivery) || {};
+    var ordId = ord ? (ord.id || currentOrderId) : currentOrderId;
+    if (!ordId) return;
+
+    var existing = document.getElementById('x-customer-chat-sheet-overlay');
+    if (existing) {
+      var inp = existing.querySelector('#x-cust-chat-input');
+      if (inp) inp.focus();
+      return;
+    }
+
+    var driverName = (del && del.driver_name) || 'Kurir Resto';
+    var orderCode = formatPWAOrderCode(ord);
+
+    var sheet = document.createElement('div');
+    sheet.id = 'x-customer-chat-sheet-overlay';
+    sheet.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.65);z-index:99999;display:flex;flex-direction:column;justify-content:flex-end;animation:fadeIn 0.2s ease;';
+    sheet.innerHTML =
+      '<div style="background:#fff;border-radius:20px 20px 0 0;max-height:85vh;height:540px;display:flex;flex-direction:column;box-shadow:0 -10px 30px rgba(0,0,0,0.25);overflow:hidden;">' +
+      '  <div style="padding:14px 16px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;background:#ffffff;">' +
+      '    <div style="display:flex;align-items:center;gap:10px;">' +
+      '      <div style="width:38px;height:38px;border-radius:50%;background:#ecfdf5;border:1.5px solid #a7f3d0;display:flex;align-items:center;justify-content:center;font-size:18px;">🛵</div>' +
+      '      <div>' +
+      '        <div style="font-size:14.5px;font-weight:800;color:#0f172a;">' + UI.escape(driverName) + '</div>' +
+      '        <div style="font-size:11.5px;color:#64748b;font-weight:600;">Kurir Pengantar • Order #' + UI.escape(orderCode) + '</div>' +
+      '      </div>' +
+      '    </div>' +
+      '    <button type="button" id="x-cust-chat-close-btn" style="background:#f1f5f9;border:none;width:32px;height:32px;border-radius:50%;font-size:16px;color:#64748b;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>' +
+      '  </div>' +
+      '  <div id="x-cust-chat-messages-box" style="flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px;background:#f8fafc;">' +
+      '    <div style="text-align:center;font-size:11px;color:#94a3b8;margin:4px 0;">Percakapan terhubung langsung dengan kurir yang mengantar pesananmu.</div>' +
+      '  </div>' +
+      '  <div style="padding:8px 12px;background:#ffffff;border-top:1px solid #e2e8f0;">' +
+      '    <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:6px;-webkit-overflow-scrolling:touch;">' +
+      '      <button type="button" class="x-cust-chat-chip" data-text="Saya di lantai 2 ya Pak" style="font-size:11.5px;padding:5px 9px;white-space:nowrap;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;font-weight:600;color:#334155;cursor:pointer;">Lantai 2</button>' +
+      '      <button type="button" class="x-cust-chat-chip" data-text="Titip di pos satpam ya Pak" style="font-size:11.5px;padding:5px 9px;white-space:nowrap;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;font-weight:600;color:#334155;cursor:pointer;">Titip di satpam</button>' +
+      '      <button type="button" class="x-cust-chat-chip" data-text="Saya sudah di depan rumah" style="font-size:11.5px;padding:5px 9px;white-space:nowrap;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;font-weight:600;color:#334155;cursor:pointer;">Sudah di depan</button>' +
+      '      <button type="button" class="x-cust-chat-chip" data-text="Tolong ditaruh di atas pagar ya Pak" style="font-size:11.5px;padding:5px 9px;white-space:nowrap;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;font-weight:600;color:#334155;cursor:pointer;">Taruh di pagar</button>' +
+      '    </div>' +
+      '    <div style="display:flex;gap:8px;align-items:center;">' +
+      '      <input type="text" id="x-cust-chat-input" placeholder="Tulis pesan ke kurir..." style="flex:1;padding:10px 14px;border:1.5px solid #cbd5e1;border-radius:20px;font-size:13px;outline:none;font-family:inherit;">' +
+      '      <button type="button" id="x-cust-chat-send-btn" style="background:#10b981;color:#ffffff;border:none;padding:0 16px;height:40px;border-radius:20px;font-weight:800;font-size:13px;cursor:pointer;flex-shrink:0;">Kirim</button>' +
+      '    </div>' +
+      '  </div>' +
+      '</div>';
+
+    document.body.appendChild(sheet);
+
+    var closeBtn = sheet.querySelector('#x-cust-chat-close-btn');
+    var msgBox = sheet.querySelector('#x-cust-chat-messages-box');
+    var input = sheet.querySelector('#x-cust-chat-input');
+    var sendBtn = sheet.querySelector('#x-cust-chat-send-btn');
+
+    function closeSheet() {
+      if (activeCustomerChatInterval) {
+        clearInterval(activeCustomerChatInterval);
+        activeCustomerChatInterval = null;
+      }
+      sheet.remove();
+    }
+
+    closeBtn.onclick = closeSheet;
+    sheet.onclick = function (e) {
+      if (e.target === sheet) closeSheet();
+    };
+
+    function renderMessages(messages) {
+      if (!messages || !messages.length) {
+        msgBox.innerHTML = '<div style="text-align:center;font-size:12px;color:#94a3b8;margin:20px 0;">Belum ada pesan. Ketik pesan atau pilih pesan cepat di bawah.</div>';
+        return;
+      }
+      msgBox.innerHTML = messages.map(function (m) {
+        var isMe = (m.sender_role === 'customer');
+        var bg = isMe ? '#dcfce7' : '#ffffff';
+        var border = isMe ? 'none' : '1px solid #e2e8f0';
+        var align = isMe ? 'flex-end' : 'flex-start';
+        var rad = isMe ? '14px 14px 2px 14px' : '14px 14px 14px 2px';
+        var authorColor = isMe ? '#15803d' : '#64748b';
+        var authorName = isMe ? 'Saya' : (m.sender_name || 'Kurir');
+
+        return '<div style="align-self:' + align + ';max-width:82%;background:' + bg + ';border:' + border + ';border-radius:' + rad + ';padding:9px 12px;font-size:13px;line-height:1.4;box-shadow:0 1px 3px rgba(0,0,0,0.04);">' +
+          '<div style="font-size:10px;font-weight:800;color:' + authorColor + ';margin-bottom:2px;">' + UI.escape(authorName) + '</div>' +
+          '<div style="color:#0f172a;word-break:break-word;">' + UI.escape(m.body) + '</div>' +
+          (m.created_at ? '<div style="font-size:9.5px;color:#94a3b8;text-align:right;margin-top:3px;">' + formatTime(m.created_at) + '</div>' : '') +
+          '</div>';
+      }).join('');
+      msgBox.scrollTop = msgBox.scrollHeight;
+    }
+
+    function formatTime(isoStr) {
+      try {
+        var d = new Date(isoStr);
+        var hh = String(d.getHours()).padStart(2, '0');
+        var mm = String(d.getMinutes()).padStart(2, '0');
+        return hh + ':' + mm;
+      } catch (_) {
+        return '';
+      }
+    }
+
+    function fetchMessages() {
+      API.get('/orders/' + encodeURIComponent(ordId) + '/messages')
+        .then(function (res) {
+          if (res && res.success && res.messages) {
+            renderMessages(res.messages);
+          }
+        })
+        .catch(function () {});
+    }
+
+    function sendMessage(text) {
+      var body = String(text || '').trim();
+      if (!body) return;
+      input.value = '';
+      API.post('/orders/' + encodeURIComponent(ordId) + '/messages', { body: body })
+        .then(function () {
+          fetchMessages();
+        })
+        .catch(function (err) {
+          UI.toast(err.message || 'Gagal mengirim pesan');
+        });
+    }
+
+    sendBtn.onclick = function () { sendMessage(input.value); };
+    input.onkeydown = function (e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        sendMessage(input.value);
+      }
+    };
+
+    sheet.querySelectorAll('.x-cust-chat-chip').forEach(function (btn) {
+      btn.onclick = function () {
+        sendMessage(btn.getAttribute('data-text'));
+      };
+    });
+
+    fetchMessages();
+    if (activeCustomerChatInterval) clearInterval(activeCustomerChatInterval);
+    activeCustomerChatInterval = setInterval(fetchMessages, 3500);
   }
 
   // ─── P7.1 AWAITING BRANCH ACCEPTANCE SURFACE ─────────────────────────────

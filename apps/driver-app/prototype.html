@@ -1,0 +1,2946 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Xentra Driver — Prototype</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    /* CSS Variables: High Contrast Indonesian F&B Theme System */
+    :root, [data-theme="dark"] {
+      --bg-body: #030712;
+      --bg-app: #090D16;
+      --bg-surface: #131B2A;
+      --bg-card: #182234;
+      --bg-subtle: #1E293B;
+      --border-color: #243046;
+      --border-focus: #38BDF8;
+      --text-main: #F1F5F9;
+      --text-sub: #94A3B8;
+      --text-muted: #64748B;
+      
+      --brand-green: #10B981;
+      --brand-green-hover: #059669;
+      --accent-amber: #F59E0B;
+      --accent-blue: #0284C7;
+      --accent-red: #EF4444;
+
+      --slider-bg: #111827;
+      --slider-border: #1F2937;
+      --slider-label: #CBD5E1;
+      --dock-bg: linear-gradient(180deg, rgba(9, 13, 22, 0.75) 0%, #090D16 35%);
+      --sheet-bg: #131B2A;
+      --input-bg: #090D16;
+
+      --radius-lg: 16px;
+      --radius-md: 12px;
+      --radius-sm: 8px;
+    }
+
+    [data-theme="light"] {
+      --bg-body: #E2E8F0;
+      --bg-app: #F8FAFC;
+      --bg-surface: #FFFFFF;
+      --bg-card: #FFFFFF;
+      --bg-subtle: #F1F5F9;
+      --border-color: #E2E8F0;
+      --border-focus: #0284C7;
+      --text-main: #0F172A;
+      --text-sub: #475569;
+      --text-muted: #94A3B8;
+
+      --slider-bg: #E2E8F0;
+      --slider-border: #CBD5E1;
+      --slider-label: #334155;
+      --dock-bg: linear-gradient(180deg, rgba(248, 250, 252, 0.9) 0%, #F8FAFC 45%);
+      --sheet-bg: #FFFFFF;
+      --input-bg: #F8FAFC;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    body, button, input, select, textarea {
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
+    }
+
+    body {
+      background-color: var(--bg-body);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 12px 10px 40px;
+      transition: background-color 0.2s ease;
+    }
+
+    /* Top Switcher Bar for Desk Testing */
+    .sim-bar {
+      width: 100%;
+      max-width: 420px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 6px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      overflow-x: auto;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    }
+    .sim-bar::-webkit-scrollbar { height: 3px; }
+    .sim-bar::-webkit-scrollbar-thumb { background: var(--bg-subtle); border-radius: 3px; }
+    .sim-step-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-sub);
+      padding: 5px 9px;
+      font-size: 11px;
+      font-weight: 700;
+      border-radius: 6px;
+      cursor: pointer;
+      white-space: nowrap;
+      text-align: center;
+      transition: all 0.15s ease;
+    }
+    .sim-step-btn:hover { color: var(--text-main); }
+    .sim-step-btn.active {
+      background: var(--bg-subtle);
+      color: #38BDF8;
+    }
+    .sim-toggle-pill {
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      color: #F59E0B;
+      padding: 4px 8px;
+      font-size: 10px;
+      font-weight: 800;
+      border-radius: 20px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+    .sim-toggle-pill.qris {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.4);
+      color: #10B981;
+    }
+
+    /* Device Shell */
+    .device-shell {
+      width: 100%;
+      max-width: 412px;
+      height: 840px;
+      background: var(--bg-app);
+      border: 1px solid var(--border-color);
+      border-radius: 36px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.5);
+      transition: background-color 0.2s ease, border-color 0.2s ease;
+    }
+
+    /* Status Bar */
+    .status-bar {
+      height: 38px;
+      padding: 0 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-sub);
+      z-index: 50;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-color);
+    }
+    .status-bar .notch {
+      width: 80px;
+      height: 18px;
+      background: var(--text-main);
+      opacity: 0.15;
+      border-radius: 20px;
+    }
+
+    /* App Header */
+    .app-header {
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-color);
+      z-index: 40;
+    }
+    .header-driver-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      text-align: left;
+    }
+    .driver-avatar-img {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #38BDF8;
+      background: var(--bg-subtle);
+    }
+    .driver-meta {
+      display: flex;
+      flex-direction: column;
+    }
+    .driver-name {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--text-main);
+    }
+    .driver-sub {
+      font-size: 11px;
+      color: var(--text-sub);
+    }
+
+    /* Header Action Buttons */
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .icon-btn-header {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--text-main);
+      position: relative;
+      transition: all 0.2s ease;
+      padding: 0;
+    }
+    .icon-btn-header:hover { background: var(--border-color); }
+    .chat-badge {
+      position: absolute;
+      top: -3px;
+      right: -3px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #EF4444;
+      color: #FFF;
+      font-size: 9px;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1.5px solid var(--bg-surface);
+    }
+
+    /* Theme Toggle */
+    .theme-toggle-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--text-main);
+      transition: all 0.2s ease;
+      padding: 0;
+    }
+    .theme-toggle-btn:hover { background: var(--border-color); }
+
+    /* Online/Offline Toggle */
+    .online-toggle {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      user-select: none;
+    }
+    .online-toggle.online {
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: #10B981;
+    }
+    .online-toggle.online .online-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #10B981;
+      box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+    }
+    .online-toggle.offline {
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #EF4444;
+    }
+    .online-toggle.offline .online-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #EF4444;
+      box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+    }
+
+    /* Viewport */
+    .screen-viewport {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 14px 16px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding-bottom: 90px;
+    }
+    .screen-viewport::-webkit-scrollbar { width: 3px; }
+    .screen-viewport::-webkit-scrollbar-thumb { background: var(--bg-subtle); border-radius: 3px; }
+
+    /* Cards */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      transition: background-color 0.2s ease, border-color 0.2s ease;
+    }
+
+    /* Stepper Bar */
+    .stepper-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 8px 12px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .step-node {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      color: var(--text-muted);
+    }
+    .step-node.active { color: #38BDF8; }
+    .step-node.done { color: var(--brand-green); }
+    .step-node.danger { color: #EF4444; }
+    .step-num {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--bg-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: var(--text-main);
+    }
+    .step-node.active .step-num { background: #0284C7; color: #FFF; }
+    .step-node.done .step-num { background: var(--brand-green); color: #042F1E; }
+    .step-node.danger .step-num { background: #EF4444; color: #FFF; }
+    .step-arrow { color: var(--border-color); font-size: 10px; }
+
+    /* Sticky Bottom Action Dock */
+    .bottom-action-dock {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--dock-bg);
+      padding: 12px 18px 20px;
+      backdrop-filter: blur(8px);
+      border-top: 1px solid var(--border-color);
+      z-index: 60;
+    }
+
+    /* Modern Bottom Navigation Bar */
+    .bottom-nav-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 64px;
+      background: var(--bg-surface);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      padding: 0 10px;
+      z-index: 55;
+    }
+    .nav-tab-btn {
+      flex: 1;
+      height: 100%;
+      background: transparent;
+      border: none;
+      color: var(--text-sub);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      position: relative;
+      transition: color 0.15s ease;
+    }
+    .nav-tab-btn:hover { color: var(--text-main); }
+    .nav-tab-btn.active { color: #38BDF8; }
+    .nav-badge {
+      position: absolute;
+      top: 8px;
+      right: 28%;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #0284C7;
+      color: #FFF;
+      font-size: 9px;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Slider Track */
+    .slider-track {
+      position: relative;
+      height: 54px;
+      background: var(--slider-bg);
+      border: 1px solid var(--slider-border);
+      border-radius: 28px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: grab;
+      user-select: none;
+    }
+    .slider-progress-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 0%;
+      background: #0284C7;
+      opacity: 0.25;
+      transition: width 0.05s ease;
+      pointer-events: none;
+    }
+    .slider-label {
+      position: relative;
+      z-index: 10;
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--slider-label);
+      pointer-events: none;
+      letter-spacing: 0.01em;
+    }
+    .slider-thumb {
+      position: absolute;
+      left: 4px;
+      top: 4px;
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: #0284C7;
+      color: #FFF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 800;
+      z-index: 20;
+      transition: transform 0.05s ease;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    }
+    .slider-thumb.green { background: #10B981; color: #042F1E; }
+    .slider-thumb.amber { background: #F59E0B; color: #042F1E; }
+    .slider-thumb.red { background: #EF4444; color: #FFF; }
+
+    /* Buttons */
+    .btn-primary {
+      width: 100%;
+      height: 48px;
+      background: #0284C7;
+      border: none;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 800;
+      color: #FFFFFF;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background 0.15s ease;
+    }
+    .btn-primary.green { background: #10B981; color: #042F1E; }
+    .btn-primary.amber { background: #F59E0B; color: #042F1E; }
+    .btn-primary.red { background: #EF4444; color: #FFF; }
+    .btn-secondary {
+      height: 44px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-main);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.15s ease;
+    }
+    .btn-secondary:hover { background: var(--border-color); }
+    .btn-secondary.danger {
+      border-color: rgba(239, 68, 68, 0.3);
+      color: #EF4444;
+      background: rgba(239, 68, 68, 0.06);
+    }
+    .btn-secondary.danger:hover {
+      background: rgba(239, 68, 68, 0.14);
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .badge-amber {
+      background: rgba(245, 158, 11, 0.15);
+      color: #F59E0B;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+    .badge-green {
+      background: rgba(16, 185, 129, 0.15);
+      color: #10B981;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .badge-blue {
+      background: rgba(56, 189, 248, 0.15);
+      color: #0284C7;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+    .badge-red {
+      background: rgba(239, 68, 68, 0.15);
+      color: #EF4444;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    /* Modal Incoming Alert */
+    .incoming-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(3, 7, 18, 0.85);
+      backdrop-filter: blur(6px);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+    .incoming-modal {
+      background: var(--bg-surface);
+      border-top: 3px solid #F59E0B;
+      border-radius: 24px 24px 0 0;
+      padding: 20px 20px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      box-shadow: 0 -15px 40px rgba(0, 0, 0, 0.6);
+    }
+    .incoming-modal.qris {
+      border-top-color: #10B981;
+    }
+
+    /* COD Header */
+    .cod-box {
+      background: rgba(245, 158, 11, 0.08);
+      border: 1px solid #F59E0B;
+      border-radius: var(--radius-lg);
+      padding: 14px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .cod-amount {
+      font-size: 24px;
+      font-weight: 900;
+      color: var(--accent-amber);
+    }
+
+    /* Non-Tunai / QRIS Box */
+    .prepaid-box {
+      background: rgba(16, 185, 129, 0.08);
+      border: 2px solid #10B981;
+      border-radius: var(--radius-lg);
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      text-align: center;
+    }
+
+    /* Calculator */
+    .calc-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+    }
+    .calc-chips {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+    .calc-chip {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 7px 4px;
+      font-size: 11px;
+      font-weight: 700;
+      border-radius: 8px;
+      cursor: pointer;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .calc-chip.selected {
+      background: #0284C7;
+      border-color: #38BDF8;
+      color: #FFFFFF;
+    }
+    .calc-change-box {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: 8px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .calc-change-val {
+      font-size: 18px;
+      font-weight: 800;
+      color: #10B981;
+    }
+
+    /* Checklist */
+    .checklist-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .checklist-row.checked {
+      border-color: rgba(16, 185, 129, 0.4);
+      background: rgba(16, 185, 129, 0.05);
+    }
+    .check-box {
+      width: 20px;
+      height: 20px;
+      border-radius: 6px;
+      border: 1.5px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      color: transparent;
+    }
+    .checklist-row.checked .check-box {
+      background: var(--brand-green);
+      border-color: var(--brand-green);
+      color: #042F1E;
+      font-weight: 900;
+    }
+
+    /* QR Card */
+    .qr-card {
+      background: #FFFFFF;
+      color: #0F172A;
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 10px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+    .qr-mock {
+      width: 160px;
+      height: 160px;
+      border: 5px solid #0F172A;
+      border-radius: 10px;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      grid-template-rows: repeat(5, 1fr);
+      gap: 4px;
+      padding: 6px;
+      background: #FFF;
+    }
+    .qr-pixel { background: #0F172A; border-radius: 2px; }
+    .qr-pixel.white { background: #FFF; }
+
+    /* Profile Rows */
+    .profile-item-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .profile-item-row:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+    .btn-edit-text {
+      background: transparent;
+      border: none;
+      color: #38BDF8;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 4px 6px;
+    }
+
+    /* Modal Sheet */
+    .sheet-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.72);
+      backdrop-filter: blur(6px);
+      z-index: 120;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+    .sheet-card {
+      background: var(--sheet-bg);
+      border-top: 1px solid var(--border-color);
+      border-radius: 24px 24px 0 0;
+      padding: 20px 20px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      box-shadow: 0 -15px 40px rgba(0, 0, 0, 0.6);
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+    .sheet-card::-webkit-scrollbar { width: 3px; }
+    .sheet-card::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+
+    .form-input {
+      background: var(--input-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 14px;
+      color: var(--text-main);
+      outline: none;
+    }
+    .form-input:focus { border-color: #38BDF8; }
+
+    /* In-App Map Tile Filter (Dark Theme) */
+    [data-theme="dark"] #in-app-map .leaflet-tile-pane {
+      filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7);
+    }
+
+    /* Quick WA Option Card */
+    .wa-option-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 12px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .wa-option-card:hover {
+      border-color: #25D366;
+      background: rgba(37, 211, 102, 0.05);
+    }
+
+    /* Kendala RTS Option Card */
+    .rts-option-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 12px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .rts-option-card.selected {
+      border-color: #EF4444;
+      background: rgba(239, 68, 68, 0.08);
+    }
+    .rts-radio-circle {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 2px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .rts-option-card.selected .rts-radio-circle {
+      border-color: #EF4444;
+      background: #EF4444;
+    }
+    .rts-option-card.selected .rts-radio-circle::after {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #FFF;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Switcher Bar for Desk Testing -->
+  <div class="sim-bar">
+    <button type="button" class="sim-step-btn active" id="sim-btn-hub" onclick="goToStep(0)">Hub Tugas</button>
+    <button type="button" class="sim-step-btn" id="sim-btn-alert" onclick="goToStep(1)">Order Masuk</button>
+    <button type="button" class="sim-step-btn" id="sim-btn-pickup" onclick="goToStep(2)">Ambil Dapur</button>
+    <button type="button" class="sim-step-btn" id="sim-btn-otw" onclick="goToStep(3)">Antar (OTW)</button>
+    <button type="button" class="sim-step-btn" id="sim-btn-arrived" onclick="goToStep(4)">Tiba di Lokasi</button>
+    <button type="button" class="sim-step-btn" id="sim-btn-settle" onclick="goToStep(5)">Setor Kasir</button>
+    <button type="button" class="sim-step-btn" id="sim-btn-rts" onclick="goToStep(6)">Gagal Antar (RTS)</button>
+    <button type="button" class="sim-step-btn" id="sim-btn-history" onclick="switchNavTab('history')">Riwayat</button>
+    <button type="button" class="sim-step-btn" id="sim-btn-chat" onclick="openOpsChat()">Chat Resto</button>
+    <button type="button" class="sim-step-btn" id="sim-btn-chat-cust" onclick="openCustomerChat()">Chat Customer</button>
+    <button type="button" class="sim-step-btn" id="sim-btn-profile" onclick="switchNavTab('profile')">Profil</button>
+    <!-- Live Mode Switcher (COD vs QRIS) -->
+    <button type="button" class="sim-toggle-pill" id="sim-btn-paymode" onclick="togglePaymentMode()" title="Ganti Mode Pembayaran"></button>
+  </div>
+
+  <!-- Device Frame -->
+  <div class="device-shell">
+    
+    <!-- Status Bar -->
+    <div class="status-bar">
+      <span id="clock-display">12:45</span>
+      <div class="notch"></div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <span>5G</span>
+        <span>100%</span>
+      </div>
+    </div>
+
+    <!-- App Header -->
+    <div class="app-header">
+      <button type="button" class="header-driver-btn" onclick="switchNavTab('profile')">
+        <img src="/owner/assets/img/cat-chef-recipe.png" alt="Avatar" class="driver-avatar-img" id="header-avatar-img">
+        <div class="driver-meta">
+          <span class="driver-name" id="header-driver-name">Agus Supriyanto</span>
+          <span class="driver-sub" id="header-driver-branch">MyBangjo Pringsewu</span>
+        </div>
+      </button>
+
+      <div class="header-actions">
+        <!-- Ops Chat Resto Button -->
+        <button type="button" class="icon-btn-header" onclick="openOpsChat()" title="Chat Kasir Cabang">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <span class="chat-badge" id="chat-unread-badge">1</span>
+        </button>
+
+        <!-- Theme Toggle (Sun/Moon Icon) -->
+        <button type="button" class="theme-toggle-btn" id="btn-toggle-theme" onclick="toggleTheme()" title="Ganti Mode Gelap / Terang">
+          <!-- Injected via JS -->
+        </button>
+
+        <!-- Online/Offline Toggle -->
+        <div class="online-toggle online" id="btn-toggle-online" onclick="toggleOnline()">
+          <span class="online-dot"></span>
+          <span id="online-text">Online</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Viewport -->
+    <div class="screen-viewport" id="screen-viewport"></div>
+
+    <!-- Sticky Bottom Dock (For active delivery sliders) -->
+    <div class="bottom-action-dock" id="bottom-action-dock" style="display:none;"></div>
+
+    <!-- Modern Bottom Navigation Bar (For Hub, History, Profile) -->
+    <nav class="bottom-nav-bar" id="bottom-nav-bar">
+      <button type="button" class="nav-tab-btn active" id="nav-btn-tasks" onclick="switchNavTab('tasks')">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+        <span>Tugas</span>
+        <span class="nav-badge" id="task-badge-count">1</span>
+      </button>
+      <button type="button" class="nav-tab-btn" id="nav-btn-history" onclick="switchNavTab('history')">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span>Riwayat</span>
+      </button>
+      <button type="button" class="nav-tab-btn" id="nav-btn-profile" onclick="switchNavTab('profile')">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span>Profil</span>
+      </button>
+    </nav>
+
+    <!-- Modal Sheets Container -->
+    <div id="modal-container"></div>
+
+  </div>
+
+  <script>
+    // SVG Icons
+    var ICON_WHATSAPP = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#25D366;flex-shrink:0;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>`;
+
+    var ICON_PHONE = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#38BDF8;flex-shrink:0;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>`;
+
+    var ICON_SUN = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#F59E0B;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
+
+    var ICON_MOON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#6366F1;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
+
+    // Clock
+    setInterval(function() {
+      var d = new Date();
+      var hh = String(d.getHours()).padStart(2, '0');
+      var mm = String(d.getMinutes()).padStart(2, '0');
+      var el = document.getElementById('clock-display');
+      if (el) el.textContent = hh + ':' + mm;
+    }, 1000);
+
+    // State
+    var state = {
+      theme: 'dark',
+      currentTab: 'tasks', // 'tasks' | 'history' | 'profile'
+      currentStep: 0,      // 0: Hub, 1: Alert, 2: Pickup, 3: OTW, 4: Arrived, 5: Settlement, 6: RTS (Gagal Antar)
+      isOnline: true,
+      
+      // Payment Type: 'COD' | 'QRIS'
+      paymentType: 'COD',
+      orderAmount: 65000,
+      codAmount: 65000,
+      tenderedAmount: 100000, // Customer pays with Rp 100.000 for COD
+      
+      kitchenReady: true,
+      itemsChecked: { 0: false, 1: false, 2: false },
+      photoTaken: false,
+      photoThumbnail: null,
+      photoBypassed: false,
+      cashSettledByKasir: false,
+      driverCashCustody: 455000, // Accumulated from previous COD orders today
+      chatUnreadCount: 1,
+      customerUnreadCount: 1,
+      rtsReason: 'Pelanggan Tidak Merespons (>10 Menit)',
+
+      customerMessages: [
+        { sender: 'customer', name: 'Ibu Siti Rahma', text: 'Halo Pak, nanti kalau sudah sampai tolong panggil ya atau pencet bel depan pagar.', time: '12:35' },
+        { sender: 'driver', name: 'Agus', text: 'Siap Bu Siti, pesanan sedang dalam perjalanan. Perkiraan sampai 5 menit lagi.', time: '12:36' }
+      ],
+
+      opsMessages: [
+        { sender: 'cashier', name: 'Rani (Kasir)', text: 'Pak Agus, order #MB-8921 tolong minta dapur sambal bawangnya dipisah ya.', time: '12:30' },
+        { sender: 'driver', name: 'Agus', text: 'Siap Bu Rani, sudah dikonfirmasi ke bagian packing dapur.', time: '12:32' },
+        { sender: 'cashier', name: 'Rani (Kasir)', text: 'Oke mantap, hati-hati di jalan ya Pak. Pelanggan info bayar uang 100rb, bawa kembalian dari kasir.', time: '12:33' }
+      ],
+
+      historyList: [
+        { id: '#MB-8920', customer: 'Bpk. Hendra Gunawan', address: 'Jl. Jenderal Sudirman No. 88 (1.4 km)', time: '12:15 WIB', type: 'COD', amount: 75000, status: 'Tertahan (Belum Disetor)', settled: false },
+        { id: '#MB-8919', customer: 'Ibu Maya Pratiwi', address: 'Perum Graha Indah Blok C-4 (2.1 km)', time: '11:40 WIB', type: 'Non-Tunai QRIS', amount: 52000, status: 'Terkirim (Non-Tunai)', settled: true },
+        { id: '#MB-8918', customer: 'Bpk. Dimas Prasetyo', address: 'Kantor Notaris Dimas, Jl. Ahmad Yani (800 m)', time: '10:55 WIB', type: 'COD', amount: 120000, status: 'Tertahan (Belum Disetor)', settled: false },
+        { id: '#MB-8917', customer: 'Ibu Ratna Dewi', address: 'Jl. Pemuda No. 12 (1.2 km)', time: '10:15 WIB', type: 'COD', amount: 110000, status: 'Tertahan (Belum Disetor)', settled: false },
+        { id: '#MB-8916', customer: 'Bpk. Surya Utama', address: 'Komplek Permata Hijau B-2 (3.0 km)', time: '09:30 WIB', type: 'COD', amount: 150000, status: 'Tertahan (Belum Disetor)', settled: false }
+      ],
+
+      driverProfile: {
+        avatarUrl: '/owner/assets/img/cat-chef-recipe.png',
+        fullName: 'Agus Supriyanto',
+        phone: '0812-9876-5432',
+        email: 'agus.kurir@mybangjo.com',
+        branchName: 'MyBangjo Cabang Pringsewu',
+        driverId: '#DRV-004',
+        vehicleModel: 'Honda Vario 160',
+        plateNumber: 'BE 2419 XZ',
+        nik: '1803021998040002',
+        simNumber: '9812-2309-0012',
+        simExpiry: '14 Des 2027',
+        bankName: 'BCA',
+        bankAccount: '8210-9912-34'
+      }
+    };
+
+    // Online/Offline Toggle
+    function toggleOnline() {
+      state.isOnline = !state.isOnline;
+      updateOnlineStatusUI();
+      render();
+    }
+
+    function updateOnlineStatusUI() {
+      var btn = document.getElementById('btn-toggle-online');
+      var txt = document.getElementById('online-text');
+      if (!btn || !txt) return;
+
+      if (state.isOnline) {
+        btn.className = 'online-toggle online';
+        txt.textContent = 'Online';
+      } else {
+        btn.className = 'online-toggle offline';
+        txt.textContent = 'Offline';
+      }
+    }
+
+    // Toggle Payment Mode (COD vs QRIS)
+    function togglePaymentMode() {
+      state.paymentType = state.paymentType === 'COD' ? 'QRIS' : 'COD';
+      state.photoTaken = false;
+      state.photoBypassed = false;
+      render();
+    }
+
+    // Theme Toggle
+    function toggleTheme() {
+      state.theme = state.theme === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', state.theme);
+      updateThemeButtonUI();
+      if (window._leafMap) {
+        updateMapTileLayer(state.theme);
+      }
+    }
+
+    function updateThemeButtonUI() {
+      var btn = document.getElementById('btn-toggle-theme');
+      if (!btn) return;
+      btn.innerHTML = state.theme === 'dark' ? ICON_SUN : ICON_MOON;
+      btn.setAttribute('title', state.theme === 'dark' ? 'Ganti ke Mode Terang' : 'Ganti ke Mode Gelap');
+    }
+
+    // Navigation Tabs
+    function switchNavTab(tab) {
+      state.currentTab = tab;
+      if (tab === 'tasks') {
+        state.currentStep = 0; // return to Task Hub
+      }
+      render();
+    }
+
+    function goToStep(step) {
+      state.currentTab = 'tasks';
+      state.currentStep = step;
+      render();
+    }
+
+    function rupiah(num) {
+      return 'Rp ' + Number(num || 0).toLocaleString('id-ID');
+    }
+
+    // Render Orchestrator
+    function render() {
+      // Sync Top Switcher Buttons
+      var simBtns = {
+        0: 'sim-btn-hub',
+        1: 'sim-btn-alert',
+        2: 'sim-btn-pickup',
+        3: 'sim-btn-otw',
+        4: 'sim-btn-arrived',
+        5: 'sim-btn-settle',
+        6: 'sim-btn-rts'
+      };
+      document.querySelectorAll('.sim-step-btn').forEach(function(b) { b.classList.remove('active'); });
+
+      if (state.currentTab === 'history') {
+        var bh = document.getElementById('sim-btn-history');
+        if (bh) bh.classList.add('active');
+      } else if (state.currentTab === 'profile') {
+        var bp = document.getElementById('sim-btn-profile');
+        if (bp) bp.classList.add('active');
+      } else {
+        var targetBtn = document.getElementById(simBtns[state.currentStep] || 'sim-btn-hub');
+        if (targetBtn) targetBtn.classList.add('active');
+      }
+
+      // Sync Payment Mode Pill in Top Bar
+      var payPill = document.getElementById('sim-btn-paymode');
+      if (payPill) {
+        if (state.paymentType === 'COD') {
+          payPill.className = 'sim-toggle-pill';
+          payPill.textContent = '💵 Mode: COD';
+        } else {
+          payPill.className = 'sim-toggle-pill qris';
+          payPill.textContent = '💳 Mode: QRIS (Lunas)';
+        }
+      }
+
+      // Sync Bottom Nav Buttons
+      var navT = document.getElementById('nav-btn-tasks');
+      var navH = document.getElementById('nav-btn-history');
+      var navP = document.getElementById('nav-btn-profile');
+      if (navT) navT.classList.toggle('active', state.currentTab === 'tasks' && state.currentStep === 0);
+      if (navH) navH.classList.toggle('active', state.currentTab === 'history');
+      if (navP) navP.classList.toggle('active', state.currentTab === 'profile');
+
+      // Sync Header
+      var headerImg = document.getElementById('header-avatar-img');
+      var headerName = document.getElementById('header-driver-name');
+      var headerBranch = document.getElementById('header-driver-branch');
+      if (headerImg) headerImg.src = state.driverProfile.avatarUrl;
+      if (headerName) headerName.textContent = state.driverProfile.fullName;
+      if (headerBranch) headerBranch.textContent = state.driverProfile.branchName;
+
+      var chatBadge = document.getElementById('chat-unread-badge');
+      if (chatBadge) {
+        chatBadge.style.display = state.chatUnreadCount > 0 ? 'flex' : 'none';
+        chatBadge.textContent = state.chatUnreadCount;
+      }
+
+      var simChatCust = document.getElementById('sim-btn-chat-cust');
+      if (simChatCust) {
+        simChatCust.innerHTML = 'Chat Customer' + (state.customerUnreadCount > 0 ? ` <span style="background:#EF4444;color:#FFF;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:800;">${state.customerUnreadCount}</span>` : '');
+      }
+
+      updateOnlineStatusUI();
+      updateThemeButtonUI();
+
+      var viewport = document.getElementById('screen-viewport');
+      var dock = document.getElementById('bottom-action-dock');
+      var navBar = document.getElementById('bottom-nav-bar');
+
+      // View Routing
+      if (state.currentTab === 'history') {
+        dock.style.display = 'none';
+        navBar.style.display = 'flex';
+        viewport.style.paddingBottom = '80px';
+        renderHistoryScreen(viewport);
+      } else if (state.currentTab === 'profile') {
+        dock.style.display = 'none';
+        navBar.style.display = 'flex';
+        viewport.style.paddingBottom = '80px';
+        renderProfileScreen(viewport);
+      } else {
+        // Tab: tasks
+        if (state.currentStep === 0) {
+          dock.style.display = 'none';
+          navBar.style.display = 'flex';
+          viewport.style.paddingBottom = '80px';
+          renderTaskHubScreen(viewport);
+        } else {
+          // Inside active order lifecycle (Step 1 to 6)
+          navBar.style.display = 'none';
+          dock.style.display = 'block';
+          viewport.style.paddingBottom = '95px';
+
+          switch (state.currentStep) {
+            case 1: renderStep1_IncomingAlert(viewport, dock); break;
+            case 2: renderStep2_Pickup(viewport, dock); break;
+            case 3: renderStep3_OnTheWay(viewport, dock); break;
+            case 4: renderStep4_ArrivedAndPayment(viewport, dock); break;
+            case 5: renderStep5_KasirSettlement(viewport, dock); break;
+            case 6: renderStep6_ReturnToStore(viewport, dock); break;
+          }
+        }
+      }
+    }
+
+    // ==========================================
+    // TASK HUB SCREEN (Beranda Tugas: Standby & Active Queue)
+    // ==========================================
+    function renderTaskHubScreen(vp) {
+      if (!state.isOnline) {
+        vp.innerHTML = `
+          <div class="card" style="align-items:center;text-align:center;padding:32px 16px;border-color:rgba(239, 68, 68, 0.4);">
+            <div style="width:60px;height:60px;border-radius:50%;background:rgba(239, 68, 68, 0.12);display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:12px;color:#EF4444;">
+              ⛔
+            </div>
+            <div style="font-size:16px;font-weight:800;color:#EF4444;">Status: Offline</div>
+            <div style="font-size:12px;color:var(--text-sub);margin-top:4px;max-width:240px;line-height:1.4;">
+              Aplikasi tidak dapat menerima tugas pengantaran baru saat offline.
+            </div>
+            <button type="button" class="btn-primary green" onclick="toggleOnline()" style="margin-top:16px;width:auto;padding:0 24px;">
+              Nyalakan Mode Online
+            </button>
+          </div>
+        `;
+        return;
+      }
+
+      var isCOD = state.paymentType === 'COD';
+
+      vp.innerHTML = `
+        <!-- Ringkasan Produktivitas Hari Ini -->
+        <div class="card">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div>
+              <div style="font-size:11px;color:var(--text-sub);">Selesai Hari Ini</div>
+              <div style="font-size:20px;font-weight:800;color:#38BDF8;margin-top:2px;">7 Pesanan</div>
+            </div>
+            <div>
+              <div style="font-size:11px;color:var(--text-sub);">Kas Tertahan</div>
+              <div style="font-size:20px;font-weight:800;color:${state.driverCashCustody > 0 ? '#F59E0B' : '#10B981'};margin-top:2px;">
+                ${rupiah(state.driverCashCustody)}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SEKSI 1: SIAP DIAMBIL DI DAPUR (PICKUP QUEUE) -->
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;">
+              Siap Diambil di Dapur (1)
+            </span>
+            <span class="badge ${isCOD ? 'badge-amber' : 'badge-green'}">
+              ${isCOD ? 'COD' : 'QRIS (Lunas)'}
+            </span>
+          </div>
+
+          <div class="card" style="border-left:4px solid ${isCOD ? '#F59E0B' : '#10B981'};cursor:pointer;" onclick="goToStep(2)">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <div style="font-size:15px;font-weight:800;color:var(--text-main);">#MB-8921</div>
+                <div style="font-size:12px;color:var(--text-sub);margin-top:1px;">Ibu Siti Rahma • 2.4 km</div>
+              </div>
+              <span class="badge badge-green">Siap Diambil</span>
+            </div>
+
+            <div style="font-size:12px;color:var(--text-sub);margin-top:2px;">
+              2x Ayam Goreng Kremes, 1x Sambal Bawang, 2x Es Teh
+            </div>
+
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color);">
+              <div>
+                <span style="font-size:12px;font-weight:800;color:${isCOD ? 'var(--accent-amber)' : 'var(--brand-green)'};">
+                  ${isCOD ? 'Tagih COD ' + rupiah(state.codAmount) : 'Sudah Lunas (QRIS)'}
+                </span>
+              </div>
+              <button type="button" class="btn-primary" style="height:36px;width:auto;padding:0 14px;font-size:12px;" onclick="event.stopPropagation(); goToStep(2);">
+                Ambil di Dapur ➔
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Toggle Mode Pembayaran Mini -->
+        <div class="card" style="padding:10px 14px;background:var(--bg-subtle);flex-direction:row;justify-content:space-between;align-items:center;">
+          <div style="font-size:11px;color:var(--text-sub);">
+            Simulasi Tipe Pembayaran: <strong style="color:var(--text-main);">${state.paymentType}</strong>
+          </div>
+          <button type="button" class="sim-toggle-pill ${isCOD ? '' : 'qris'}" onclick="togglePaymentMode()">
+            Ganti ke ${isCOD ? 'QRIS' : 'COD'}
+          </button>
+        </div>
+
+        <!-- Tombol Simulasi Masuk Order Baru -->
+        <div class="card" style="border:1px dashed var(--border-color);background:transparent;text-align:center;padding:16px;">
+          <div style="font-size:12px;color:var(--text-sub);margin-bottom:8px;">Ingin menguji simulasi order baru masuk?</div>
+          <button type="button" class="btn-secondary" onclick="goToStep(1)">
+            Simulasikan Tugas Masuk Baru 🔔
+          </button>
+        </div>
+      `;
+    }
+
+    // ==========================================
+    // STEP 1: ALERT (Order Masuk)
+    // ==========================================
+    function renderStep1_IncomingAlert(vp, dock) {
+      renderTaskHubScreen(vp);
+      var isCOD = state.paymentType === 'COD';
+
+      var modalHtml = document.createElement('div');
+      modalHtml.className = 'incoming-overlay';
+      modalHtml.innerHTML = `
+        <div class="incoming-modal ${isCOD ? '' : 'qris'}">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <span class="badge ${isCOD ? 'badge-amber' : 'badge-green'}">TUGAS PENGANTARAN</span>
+            <span style="font-size:13px;font-weight:800;color:${isCOD ? '#F59E0B' : '#10B981'};">28s</span>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+            <div>
+              <div style="font-size:18px;font-weight:800;color:var(--text-main);">#MB-8921</div>
+              <div style="font-size:12px;color:var(--text-sub);">3 Menu • 2.4 km</div>
+            </div>
+            <div style="text-align:right;">
+              <span class="badge ${isCOD ? 'badge-amber' : 'badge-green'}">${isCOD ? 'COD' : 'QRIS (Lunas)'}</span>
+              <div style="font-size:17px;font-weight:800;color:${isCOD ? 'var(--accent-amber)' : 'var(--brand-green)'};margin-top:2px;">
+                ${rupiah(state.orderAmount)}
+              </div>
+            </div>
+          </div>
+
+          ${!isCOD ? `
+            <div style="background:rgba(16, 185, 129, 0.12);border:1px solid rgba(16, 185, 129, 0.4);border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;color:#10B981;display:flex;align-items:center;gap:6px;">
+              <span>🛡️</span>
+              <span>PESANAN SUDAH LUNAS — DILARANG MENAGIH UANG</span>
+            </div>
+          ` : ''}
+
+          <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;">
+            <div>
+              <div style="font-size:11px;color:var(--text-sub);">Ambil di Resto:</div>
+              <div style="font-size:13px;font-weight:700;color:var(--text-main);">${state.driverProfile.branchName}</div>
+            </div>
+            <div>
+              <div style="font-size:11px;color:var(--text-sub);">Antar ke:</div>
+              <div style="font-size:13px;font-weight:700;color:var(--text-main);">Ibu Siti Rahma</div>
+              <div style="font-size:11px;color:var(--text-sub);">Jl. Melati No. 14, Pringsewu Barat</div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;">
+            <button type="button" class="btn-secondary" onclick="goToStep(0)">Tolak</button>
+            <button type="button" class="btn-primary green" onclick="goToStep(2)">Terima Tugas</button>
+          </div>
+        </div>
+      `;
+
+      vp.appendChild(modalHtml);
+    }
+
+    // ==========================================
+    // STEP 2: PICKUP (Ambil di Dapur & Uang Kembalian Reminder)
+    // ==========================================
+    function renderStep2_Pickup(vp, dock) {
+      var allChecked = state.itemsChecked[0] && state.itemsChecked[1] && state.itemsChecked[2];
+      var canSlide = state.kitchenReady && allChecked;
+      var isCOD = state.paymentType === 'COD';
+
+      vp.innerHTML = `
+        <div class="stepper-bar">
+          <div class="step-node active"><span class="step-num">1</span> Ambil</div>
+          <span class="step-arrow">›</span>
+          <div class="step-node"><span class="step-num">2</span> Antar</div>
+          <span class="step-arrow">›</span>
+          <div class="step-node"><span class="step-num">3</span> Tiba</div>
+          <span class="step-arrow">›</span>
+          <div class="step-node"><span class="step-num">4</span> ${isCOD ? 'Setor' : 'Selesai'}</div>
+        </div>
+
+        <!-- Status Dapur -->
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:11px;color:var(--text-sub);">Status Dapur:</span>
+            <span class="badge ${state.kitchenReady ? 'badge-green' : 'badge-amber'}" style="cursor:pointer;" onclick="toggleKitchenReady()">
+              ${state.kitchenReady ? 'Siap Diambil' : 'Sedang Dimasak'}
+            </span>
+          </div>
+          <div style="font-size:14px;font-weight:700;color:var(--text-main);">${state.driverProfile.branchName}</div>
+        </div>
+
+        <!-- UANG MODAL KEMBALIAN KASIR (Indonesian Cash Float Blind Spot) -->
+        ${isCOD ? `
+          <div class="card" style="border:1.5px dashed #F59E0B;background:rgba(245, 158, 11, 0.08);">
+            <div style="display:flex;align-items:flex-start;gap:10px;">
+              <div style="font-size:20px;line-height:1;">💵</div>
+              <div style="flex:1;">
+                <div style="font-size:12px;font-weight:800;color:#F59E0B;text-transform:uppercase;">
+                  Pengingat Kasir: Bawa Uang Kembalian
+                </div>
+                <div style="font-size:12px;color:var(--text-main);margin-top:3px;line-height:1.4;">
+                  Catatan pembeli: Membayar dengan uang <strong>Rp 100.000</strong>.
+                  <br>
+                  <span style="color:#38BDF8;font-weight:700;">Ambil uang kembalian Rp 35.000 dari kasir sekarang!</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        ` : `
+          <div class="card" style="border:1px solid rgba(16, 185, 129, 0.4);background:rgba(16, 185, 129, 0.06);">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="font-size:20px;">🛡️</div>
+              <div style="flex:1;">
+                <div style="font-size:12px;font-weight:800;color:#10B981;">PESANAN NON-TUNAI (QRIS)</div>
+                <div style="font-size:11px;color:var(--text-sub);margin-top:1px;">
+                  Sudah lunas via aplikasi. Tidak perlu mengambil uang modal kembalian dari kasir.
+                </div>
+              </div>
+            </div>
+          </div>
+        `}
+
+        <!-- Checklist Pesanan -->
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="font-size:12px;font-weight:800;color:var(--text-main);">Checklist Menu Pesanan</div>
+            <button type="button" class="btn-edit-text" style="color:#38BDF8;font-size:11px;cursor:pointer;" onclick="checkAllItems()">
+              ${allChecked ? 'Batal Centang' : 'Centang Semua ✓'}
+            </button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div class="checklist-row ${state.itemsChecked[0] ? 'checked' : ''}" onclick="toggleItem(0)">
+              <div class="check-box">✓</div>
+              <div style="font-weight:700;color:var(--text-main);">2x Ayam Goreng Kremes</div>
+            </div>
+            <div class="checklist-row ${state.itemsChecked[1] ? 'checked' : ''}" onclick="toggleItem(1)">
+              <div class="check-box">✓</div>
+              <div style="font-weight:700;color:var(--text-main);">1x Sambal Bawang Ekstra</div>
+            </div>
+            <div class="checklist-row ${state.itemsChecked[2] ? 'checked' : ''}" onclick="toggleItem(2)">
+              <div class="check-box">✓</div>
+              <div style="font-weight:700;color:var(--text-main);">2x Es Teh Manis Jumbo</div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      dock.innerHTML = `
+        <div class="slider-track" id="slider-track-pickup" style="${canSlide ? '' : 'opacity:0.4;pointer-events:none;'}">
+          <div class="slider-progress-fill" id="slider-fill"></div>
+          <div class="slider-thumb green" id="slider-thumb">➔</div>
+          <span class="slider-label">${canSlide ? 'Geser untuk Berangkat' : 'Menunggu Dapur & Checklist'}</span>
+        </div>
+      `;
+
+      if (canSlide) {
+        initSlider('slider-track-pickup', 'slider-thumb', 'slider-fill', function() {
+          goToStep(3);
+        });
+      }
+    }
+
+    function toggleKitchenReady() {
+      state.kitchenReady = !state.kitchenReady;
+      render();
+    }
+
+    function toggleItem(idx) {
+      state.itemsChecked[idx] = !state.itemsChecked[idx];
+      render();
+    }
+
+    function checkAllItems() {
+      var allChecked = state.itemsChecked[0] && state.itemsChecked[1] && state.itemsChecked[2];
+      state.itemsChecked[0] = !allChecked;
+      state.itemsChecked[1] = !allChecked;
+      state.itemsChecked[2] = !allChecked;
+      render();
+    }
+
+    // ==========================================
+    // STEP 3: OTW (Dalam Perjalanan)
+    // ==========================================
+    function renderStep3_OnTheWay(vp, dock) {
+      var isCOD = state.paymentType === 'COD';
+
+      vp.innerHTML = `
+        <div class="stepper-bar">
+          <div class="step-node done"><span class="step-num">✓</span> Ambil</div>
+          <span class="step-arrow">›</span>
+          <div class="step-node active"><span class="step-num">2</span> Antar</div>
+          <span class="step-arrow">›</span>
+          <div class="step-node"><span class="step-num">3</span> Tiba</div>
+          <span class="step-arrow">›</span>
+          <div class="step-node"><span class="step-num">4</span> ${isCOD ? 'Setor' : 'Selesai'}</div>
+        </div>
+
+        <!-- Info Tujuan & Kontak -->
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:11px;color:var(--text-sub);">Tujuan Pengantaran:</span>
+            <span class="badge ${isCOD ? 'badge-amber' : 'badge-green'}">${isCOD ? 'COD ' + rupiah(state.codAmount) : 'QRIS (LUNAS)'}</span>
+          </div>
+          <div style="font-size:16px;font-weight:800;color:var(--text-main);margin-top:1px;">Ibu Siti Rahma</div>
+          <div style="font-size:13px;color:var(--text-sub);line-height:1.4;">
+            Jl. Melati No. 14, RT 02 / RW 01, Pringsewu Barat
+          </div>
+          <div style="font-size:12px;color:var(--accent-amber);background:rgba(245, 158, 11, 0.1);padding:6px 10px;border-radius:8px;border:1px solid rgba(245, 158, 11, 0.2);">
+            Patokan: Pagar hitam, sebelah warung Bu Sri.
+          </div>
+
+          <!-- Kontak Pelanggan: Chat In-App, WhatsApp, Telepon -->
+          <div style="display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:6px;margin-top:4px;">
+            <button type="button" class="btn-secondary" style="position:relative;border-color:rgba(56, 189, 248, 0.4);background:rgba(56, 189, 248, 0.08);color:#38BDF8;" onclick="openCustomerChat()">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#38BDF8;flex-shrink:0;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <span>Chat In-App</span>
+              ${state.customerUnreadCount > 0 ? `<span class="chat-badge" style="top:2px;right:4px;width:13px;height:13px;font-size:8px;">${state.customerUnreadCount}</span>` : ''}
+            </button>
+            <button type="button" class="btn-secondary" onclick="openWhatsAppTemplateModal()">
+              ${ICON_WHATSAPP}
+              <span>WhatsApp</span>
+            </button>
+            <button type="button" class="btn-secondary" onclick="alert('Menghubungi nomor telepon Siti Rahma (0812-3456-7890)')">
+              ${ICON_PHONE}
+              <span>Telepon</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- In-App Interactive Map -->
+        <div class="card" style="padding:0;overflow:hidden;border-radius:16px;height:210px;position:relative;">
+          <div id="in-app-map" style="width:100%;height:100%;background:var(--bg-app);"></div>
+          <div style="position:absolute;top:10px;left:10px;background:rgba(15,23,42,0.88);backdrop-filter:blur(6px);padding:4px 10px;border-radius:20px;font-size:11px;font-weight:800;color:#FFF;z-index:999;border:1px solid rgba(255,255,255,0.15);display:flex;align-items:center;gap:6px;">
+            <span style="color:#10B981;font-size:12px;">●</span>
+            <span>1.8 km (Est. 5 mnt)</span>
+          </div>
+          <button type="button" onclick="centerMap()" style="position:absolute;bottom:10px;right:10px;width:34px;height:34px;background:var(--bg-surface);border:1px solid var(--border-color);border-radius:8px;color:var(--text-main);display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;z-index:999;" title="Pusatkan Peta">
+            ⌖
+          </button>
+        </div>
+
+        <!-- Link Eksternal Google Maps -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:-6px;padding:0 2px;">
+          <button type="button" class="btn-secondary danger" style="height:32px;padding:0 10px;font-size:11px;" onclick="openRtsKendalaModal()">
+            Laporkan Kendala ⚠️
+          </button>
+          <a href="javascript:void(0)" onclick="alert('Membuka rute di aplikasi Google Maps')" style="color:#38BDF8;font-size:12px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:4px;">
+            Buka di Google Maps ↗
+          </a>
+        </div>
+
+        <!-- Status Pembayaran Tagihan -->
+        ${isCOD ? `
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:12px;color:var(--text-sub);">Wajib Tagih Tunai (COD):</span>
+              <span style="font-size:16px;font-weight:800;color:var(--accent-amber);">${rupiah(state.codAmount)}</span>
+            </div>
+          </div>
+        ` : `
+          <div class="card" style="border-color:rgba(16, 185, 129, 0.4);background:rgba(16, 185, 129, 0.06);">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:12px;font-weight:700;color:#10B981;">STATUS: SUDAH LUNAS (QRIS)</span>
+              <span style="font-size:11px;color:var(--text-sub);">Dilarang minta uang</span>
+            </div>
+          </div>
+        `}
+      `;
+
+      dock.innerHTML = `
+        <div class="slider-track" id="slider-track-arrived">
+          <div class="slider-progress-fill" id="slider-fill"></div>
+          <div class="slider-thumb" id="slider-thumb">➔</div>
+          <span class="slider-label">Geser jika Sudah Tiba di Lokasi</span>
+        </div>
+      `;
+
+      initInAppMap();
+
+      initSlider('slider-track-arrived', 'slider-thumb', 'slider-fill', function() {
+        goToStep(4);
+      });
+    }
+
+    function initInAppMap() {
+      setTimeout(function() {
+        var el = document.getElementById('in-app-map');
+        if (!el || typeof L === 'undefined') return;
+
+        var resto = [-5.3585, 104.9744];
+        var cust = [-5.3645, 104.9820];
+        var courier = [-5.3612, 104.9780];
+
+        if (window._leafMap) {
+          try { window._leafMap.remove(); } catch (_) {}
+          window._leafMap = null;
+        }
+
+        var map = L.map('in-app-map', {
+          zoomControl: false,
+          attributionControl: false
+        }).setView(courier, 15);
+        window._leafMap = map;
+
+        updateMapTileLayer(state.theme);
+
+        L.circleMarker(resto, { radius: 6, fillColor: '#0284C7', color: '#FFF', weight: 2, fillOpacity: 1 }).addTo(map).bindPopup('MyBangjo Pringsewu');
+        L.circleMarker(cust, { radius: 7, fillColor: '#EF4444', color: '#FFF', weight: 2, fillOpacity: 1 }).addTo(map).bindPopup('Tujuan: Ibu Siti Rahma');
+        L.circleMarker(courier, { radius: 7, fillColor: '#10B981', color: '#000', weight: 2, fillOpacity: 1 }).addTo(map).bindPopup('Posisi Kurir');
+
+        var routePts = [
+          resto,
+          [-5.3592, 104.9752],
+          [-5.3600, 104.9765],
+          courier,
+          [-5.3625, 104.9795],
+          [-5.3638, 104.9810],
+          cust
+        ];
+        L.polyline(routePts, { color: '#0284C7', weight: 4, opacity: 0.85, dashArray: '5, 5' }).addTo(map);
+
+        map.fitBounds(L.latLngBounds(routePts), { padding: [20, 20] });
+      }, 80);
+    }
+
+    function updateMapTileLayer(theme) {
+      if (!window._leafMap || typeof L === 'undefined') return;
+      if (window._leafTile) {
+        try { window._leafMap.removeLayer(window._leafTile); } catch (_) {}
+      }
+      var tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+      window._leafTile = L.tileLayer(tileUrl, { maxZoom: 19 }).addTo(window._leafMap);
+    }
+
+    function centerMap() {
+      if (window._leafMap && typeof L !== 'undefined') {
+        window._leafMap.setView([-5.3612, 104.9780], 16);
+      }
+    }
+
+    // ==========================================
+    // STEP 4: TIBA DI LOKASI & PENYELESAIAN (COD vs PREPAID QRIS)
+    // ==========================================
+    function renderStep4_ArrivedAndPayment(vp, dock) {
+      var isCOD = state.paymentType === 'COD';
+      var photoSatisfied = state.photoTaken || state.photoBypassed;
+      var canFinish = photoSatisfied;
+      var change = Math.max(0, state.tenderedAmount - state.codAmount);
+
+      vp.innerHTML = `
+        <div class="stepper-bar">
+          <div class="step-node done"><span class="step-num">✓</span> Ambil</div>
+          <span class="step-arrow">›</span>
+          <div class="step-node done"><span class="step-num">✓</span> Antar</div>
+          <span class="step-arrow">›</span>
+          <div class="step-node active"><span class="step-num">3</span> Tiba</div>
+          <span class="step-arrow">›</span>
+          <div class="step-node"><span class="step-num">4</span> ${isCOD ? 'Setor' : 'Selesai'}</div>
+        </div>
+
+        <!-- Info Pemesan & Kontak Langsung (STANDBY DI PAGAR) -->
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:11px;font-weight:800;color:var(--brand-green);display:flex;align-items:center;gap:4px;">
+              <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--brand-green);"></span>
+              SUDAH DI DEPAN PAGAR
+            </span>
+            <span style="font-size:11px;color:var(--text-sub);">#MB-8921</span>
+          </div>
+          <div style="font-size:16px;font-weight:800;color:var(--text-main);margin-top:2px;">Ibu Siti Rahma</div>
+          <div style="font-size:13px;color:var(--text-sub);line-height:1.4;">
+            Jl. Melati No. 14, RT 02 / RW 01, Pringsewu Barat
+          </div>
+          <div style="font-size:12px;color:var(--accent-amber);background:rgba(245, 158, 11, 0.1);padding:6px 10px;border-radius:8px;border:1px solid rgba(245, 158, 11, 0.2);">
+            Patokan: Pagar hitam, sebelah warung Bu Sri.
+          </div>
+
+          <!-- Tombol Kontak Cepat: Chat In-App, WhatsApp, Telepon -->
+          <div style="display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:6px;margin-top:4px;">
+            <button type="button" class="btn-secondary" style="position:relative;border-color:rgba(56, 189, 248, 0.4);background:rgba(56, 189, 248, 0.08);color:#38BDF8;" onclick="openCustomerChat()">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#38BDF8;flex-shrink:0;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <span>Chat In-App</span>
+              ${state.customerUnreadCount > 0 ? `<span class="chat-badge" style="top:2px;right:4px;width:13px;height:13px;font-size:8px;">${state.customerUnreadCount}</span>` : ''}
+            </button>
+            <button type="button" class="btn-secondary" onclick="openWhatsAppTemplateModal()">
+              ${ICON_WHATSAPP}
+              <span>WhatsApp</span>
+            </button>
+            <button type="button" class="btn-secondary" onclick="alert('Menghubungi Siti Rahma: 0812-3456-7890')">
+              ${ICON_PHONE}
+              <span>Telepon</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- PERBEDAAN EKSTRIM: COD vs NON-TUNAI (QRIS) -->
+        ${isCOD ? `
+          <!-- Penagihan COD & Hitung Kembalian -->
+          <div class="cod-box">
+            <div style="font-size:11px;font-weight:800;color:var(--accent-amber);">TAGIHAN COD:</div>
+            <div class="cod-amount">${rupiah(state.codAmount)}</div>
+          </div>
+
+          <div class="card">
+            <div class="calc-row">
+              <span style="font-size:12px;color:var(--text-sub);">Uang Diterima:</span>
+              <span style="font-weight:800;color:var(--text-main);">${rupiah(state.tenderedAmount)}</span>
+            </div>
+
+            <div class="calc-chips" style="grid-template-columns: repeat(4, 1fr);">
+              <button type="button" class="calc-chip ${state.tenderedAmount === 65000 ? 'selected' : ''}" onclick="setTendered(65000)">Uang Pas</button>
+              <button type="button" class="calc-chip ${state.tenderedAmount === 70000 ? 'selected' : ''}" onclick="setTendered(70000)">70.000</button>
+              <button type="button" class="calc-chip ${state.tenderedAmount === 100000 ? 'selected' : ''}" onclick="setTendered(100000)">100.000</button>
+              <button type="button" class="calc-chip ${[65000, 70000, 100000].indexOf(state.tenderedAmount) === -1 ? 'selected' : ''}" onclick="promptCustomTendered()">Lainnya ✎</button>
+            </div>
+
+            <div class="calc-change-box">
+              <span style="font-size:12px;color:var(--text-sub);">Kembalian:</span>
+              <span class="calc-change-val">${rupiah(change)}</span>
+            </div>
+          </div>
+        ` : `
+          <!-- Non-Tunai / QRIS Warning Box (Anti-Salah Tagih) -->
+          <div class="prepaid-box">
+            <div style="font-size:11px;font-weight:800;color:#10B981;text-transform:uppercase;letter-spacing:0.04em;">
+              Status Pembayaran Online
+            </div>
+            <div style="font-size:22px;font-weight:900;color:#10B981;">
+              SUDAH LUNAS (QRIS)
+            </div>
+            <div style="background:rgba(239, 68, 68, 0.14);border:1px solid rgba(239, 68, 68, 0.35);border-radius:10px;padding:10px 14px;color:#F87171;font-size:12px;font-weight:800;margin-top:2px;">
+              ⛔ DILARANG MENAGIH UANG TUNAI KE PELANGGAN
+            </div>
+            <div style="font-size:12px;color:var(--text-sub);margin-top:4px;">
+              Total Pesanan: ${rupiah(state.orderAmount)} (Telah dibayar via QRIS MyBangjo)
+            </div>
+          </div>
+        `}
+
+        <!-- Bukti Foto Serah Terima (Wajib untuk Semua Pesanan: COD maupun Non-Tunai) -->
+        <div class="card" style="${!photoSatisfied ? 'border-color: rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.04);' : ''}">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div>
+              <div style="font-size:12px; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:6px;">
+                <span>Bukti Foto Serah Terima</span>
+                <span class="badge ${photoSatisfied ? 'badge-green' : 'badge-amber'}">
+                  ${photoSatisfied ? (state.photoBypassed ? 'Dilewati' : 'Terlampir ✓') : 'Wajib Foto'}
+                </span>
+              </div>
+              <div style="font-size:11px; color:var(--text-sub); margin-top:3px; line-height:1.4;">
+                ${photoSatisfied
+                  ? (state.photoBypassed
+                      ? '<span style="color:#F59E0B; font-weight:700;">⚠️ Serah langsung tanpa foto</span>'
+                      : '<span style="color:#10B981; font-weight:700;">✓ Foto paket makanan tersimpan</span>')
+                  : '<span style="color:#F59E0B;">Foto paket makanan di lokasi untuk membuka tombol selesai</span>'}
+              </div>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:6px;">
+              ${state.photoTaken ? `
+                <button type="button" class="btn-primary green" style="height:36px; width:auto; padding:0 12px; font-size:11px;" onclick="triggerPodPhoto()">
+                  ✓ Ganti Foto
+                </button>
+              ` : `
+                <button type="button" class="btn-primary" style="height:36px; width:auto; padding:0 12px; font-size:11px; background:#0284C7; color:#FFF; border:1px solid #38BDF8;" onclick="triggerPodPhoto()">
+                  📷 Ambil Foto
+                </button>
+              `}
+              <input type="file" id="pod-camera-input" accept="image/*" capture="environment" style="display:none;" onchange="handlePodPhotoUpload(event)">
+            </div>
+          </div>
+
+          ${state.photoTaken && state.photoThumbnail ? `
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg-subtle);border-radius:10px;margin-top:2px;">
+              <img src="${state.photoThumbnail}" alt="Bukti Foto" style="width:44px;height:44px;border-radius:8px;object-fit:cover;border:1px solid var(--border-color);">
+              <div style="font-size:11px;color:var(--text-sub);">
+                <div style="font-weight:700;color:var(--text-main);">Foto Paket Makanan #MB-8921</div>
+                <div>Dokumentasi paket di lokasi • Valid ✓</div>
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- Tombol Penyelamat / Fail-Safe Bypass (Kamera bermasalah atau serah langsung) -->
+          <div style="display:flex; justify-content:flex-end; padding-top:6px; border-top:1px dashed var(--border-color); margin-top:2px;">
+            ${state.photoBypassed ? `
+              <button type="button" class="btn-edit-text" style="color:var(--text-sub); font-size:11px;" onclick="resetPhotoState()">
+                Batal lewati (Buka kamera ulang)
+              </button>
+            ` : `
+              <button type="button" class="btn-edit-text" style="color:#38BDF8; font-size:11px; text-decoration:underline;" onclick="openBypassPhotoModal()">
+                Kamera bermasalah? Lewati foto (Serah Langsung) ↗
+              </button>
+            `}
+          </div>
+        </div>
+
+        <!-- Laporkan Kendala / Gagal Antar (RTS) -->
+        <div class="card" style="border:1px solid rgba(239, 68, 68, 0.35);background:rgba(239, 68, 68, 0.06);cursor:pointer;padding:14px 16px;" onclick="openRtsKendalaModal()">
+          <div style="display:flex;align-items:center;justify-content:center;gap:8px;text-align:center;">
+            <span style="font-size:13px;font-weight:700;color:#EF4444;">Pelanggan Tidak Buka Pagar / Laporkan Kendala ⚠️</span>
+          </div>
+        </div>
+      `;
+
+      if (canFinish) {
+        dock.innerHTML = `
+          <div class="slider-track" id="slider-track-finish">
+            <div class="slider-progress-fill" id="slider-fill"></div>
+            <div class="slider-thumb ${isCOD ? 'amber' : 'green'}" id="slider-thumb">➔</div>
+            <span class="slider-label">Geser Selesaikan Pengantaran</span>
+          </div>
+        `;
+
+        initSlider('slider-track-finish', 'slider-thumb', 'slider-fill', function() {
+          if (isCOD) {
+            state.driverCashCustody += state.codAmount;
+            state.cashSettledByKasir = false;
+            goToStep(5);
+          } else {
+            // Prepaid QRIS has NO cashier settlement step! Goes straight to completed
+            state.historyList.unshift({
+              id: '#MB-8921',
+              customer: 'Ibu Siti Rahma',
+              address: 'Jl. Melati No. 14 (1.8 km)',
+              time: String(new Date().getHours()).padStart(2, '0') + ':' + String(new Date().getMinutes()).padStart(2, '0') + ' WIB',
+              type: 'Non-Tunai QRIS',
+              amount: state.orderAmount,
+              status: state.photoBypassed ? 'Terkirim (Tanpa Foto)' : 'Terkirim (Foto Terlampir)',
+              settled: true
+            });
+            openOrderCompleteModal();
+          }
+        });
+      } else {
+        // CTA SLIDER TERKUNCI (DISABLED GATEKEEPER KARENA FOTO BELUM DIAMBIL)
+        dock.innerHTML = `
+          <div class="slider-track" id="slider-track-finish" style="opacity:0.45; cursor:not-allowed;" onclick="alert('Wajib foto bukti serah terima paket terlebih dahulu, atau gunakan opsi Lewati Foto jika kamera bermasalah.')">
+            <div class="slider-thumb" style="background:#64748B; cursor:not-allowed;">🔒</div>
+            <span class="slider-label" style="color:#94A3B8;">📷 Wajib Ambil Foto Bukti Dahulu</span>
+          </div>
+        `;
+      }
+    }
+
+    function triggerPodPhoto() {
+      var input = document.getElementById('pod-camera-input');
+      if (input) {
+        input.click();
+      } else {
+        takePhotoAction();
+      }
+    }
+
+    function handlePodPhotoUpload(event) {
+      var file = event.target.files && event.target.files[0];
+      if (file) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          state.photoThumbnail = e.target.result;
+          state.photoTaken = true;
+          state.photoBypassed = false;
+          render();
+        };
+        reader.readAsDataURL(file);
+      } else {
+        takePhotoAction();
+      }
+    }
+
+    function takePhotoAction() {
+      state.photoThumbnail = '/owner/assets/img/cat-chef-recipe.png';
+      state.photoTaken = true;
+      state.photoBypassed = false;
+      render();
+    }
+
+    function resetPhotoState() {
+      state.photoTaken = false;
+      state.photoThumbnail = null;
+      state.photoBypassed = false;
+      render();
+    }
+
+    function openBypassPhotoModal() {
+      var c = document.getElementById('modal-container');
+      c.innerHTML = `
+        <div class="sheet-backdrop" onclick="closeModal()">
+          <div class="sheet-card" onclick="event.stopPropagation()">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:15px; font-weight:800; color:var(--text-main);">Lewati Foto Bukti?</span>
+              <button type="button" onclick="closeModal()" style="background:transparent; border:none; color:var(--text-sub); font-size:18px; cursor:pointer;">✕</button>
+            </div>
+
+            <div style="background:rgba(245, 158, 11, 0.1); border:1px solid #F59E0B; border-radius:12px; padding:12px;">
+              <div style="font-size:12px; font-weight:800; color:#F59E0B;">⚠️ PERINGATAN SERAH TERIMA</div>
+              <div style="font-size:12px; color:var(--text-main); margin-top:3px; line-height:1.4;">
+                Gunakan opsi ini hanya jika:
+                <br>• Makanan <strong>diserahkan langsung</strong> ke tangan Ibu Siti Rahma.
+                <br>• Kamera HP mengalami gangguan teknis / memori penuh.
+              </div>
+            </div>
+
+            <div style="font-size:12px; color:var(--text-sub); line-height:1.4;">
+              Dengan melewati foto, kurir menyatakan bertanggung jawab bahwa pesanan telah diterima dengan baik oleh pelanggan.
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:4px;">
+              <button type="button" class="btn-secondary" onclick="closeModal()">
+                Batal (Buka Kamera)
+              </button>
+              <button type="button" class="btn-primary green" onclick="confirmBypassPhoto()">
+                Ya, Lewati Foto
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function confirmBypassPhoto() {
+      state.photoBypassed = true;
+      state.photoTaken = false;
+      closeModal();
+      render();
+    }
+
+    function setTendered(amt) {
+      state.tenderedAmount = amt;
+      render();
+    }
+
+    function promptCustomTendered() {
+      var val = prompt('Masukkan nominal uang yang diterima dari pelanggan (Rp):', state.tenderedAmount);
+      if (val !== null) {
+        var num = parseInt(val.replace(/[^0-9]/g, ''), 10);
+        if (!isNaN(num) && num >= state.codAmount) {
+          setTendered(num);
+        } else if (!isNaN(num) && num < state.codAmount) {
+          alert('Nominal uang diterima tidak boleh kurang dari total tagihan COD (' + rupiah(state.codAmount) + ').');
+        }
+      }
+    }
+
+    function openOrderCompleteModal() {
+      var c = document.getElementById('modal-container');
+      c.innerHTML = `
+        <div class="sheet-backdrop" onclick="goToStep(0)">
+          <div class="sheet-card" onclick="event.stopPropagation()" style="text-align:center;align-items:center;padding:28px 20px;">
+            <div style="width:56px;height:56px;border-radius:50%;background:#10B981;color:#042F1E;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:900;margin-bottom:12px;">
+              ✓
+            </div>
+            <div style="font-size:18px;font-weight:800;color:var(--text-main);">Pengantaran Selesai!</div>
+            <div style="font-size:12px;color:var(--text-sub);margin-top:4px;max-width:260px;line-height:1.4;">
+              Pesanan #MB-8921 berhasil diantar ke Ibu Siti Rahma. Pembayaran online QRIS telah tercatat lunas.
+            </div>
+            <button type="button" class="btn-primary green" onclick="closeModal(); goToStep(0);" style="margin-top:20px;">
+              Kembali ke Hub Tugas
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    // ==========================================
+    // STEP 5: SETOR KASIR (Single Order COD Remittance)
+    // ==========================================
+    function renderStep5_KasirSettlement(vp, dock) {
+      vp.innerHTML = `
+        <div class="stepper-bar">
+          <div class="step-node done"><span class="step-num">✓</span> Ambil</div>
+          <span class="step-arrow">›</span>
+          <div class="step-node done"><span class="step-num">✓</span> Antar</div>
+          <span class="step-arrow">›</span>
+          <div class="step-node done"><span class="step-num">✓</span> Tiba</div>
+          <span class="step-arrow">›</span>
+          <div class="step-node active"><span class="step-num">4</span> Setor</div>
+        </div>
+
+        ${state.cashSettledByKasir ? `
+          <div class="card" style="align-items:center;text-align:center;padding:24px;">
+            <div style="width:48px;height:48px;border-radius:50%;background:#10B981;color:#042F1E;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;margin-bottom:8px;">
+              ✓
+            </div>
+            <div style="font-size:17px;font-weight:800;color:var(--text-main);">Setoran Kasir Sukses</div>
+            <div style="font-size:12px;color:var(--text-sub);margin-top:2px;">
+              Kasir Rani • Bukti #SET-041
+            </div>
+            <div style="font-size:12px;color:#10B981;font-weight:700;margin-top:6px;">
+              Uang COD Rp ${Number(state.codAmount).toLocaleString('id-ID')} Telah Diserahkan
+            </div>
+          </div>
+        ` : `
+          <div class="card" style="border-color:#F59E0B;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:12px;color:var(--text-sub);">Uang COD Wajib Disetor:</span>
+              <span style="font-size:18px;font-weight:800;color:#FBBF24;">
+                ${rupiah(state.codAmount)}
+              </span>
+            </div>
+            <div style="font-size:11px;color:var(--text-sub);margin-top:-4px;">
+              Total Kas Tertahan Shift Saat Ini: <strong>${rupiah(state.driverCashCustody)}</strong>
+            </div>
+          </div>
+
+          <div class="qr-card">
+            <div style="font-size:11px;font-weight:800;color:#64748B;">KODE SETORAN KASIR: #KSR-8921</div>
+            <div class="qr-mock">
+              <div class="qr-pixel"></div><div class="qr-pixel"></div><div class="qr-pixel white"></div><div class="qr-pixel"></div><div class="qr-pixel"></div>
+              <div class="qr-pixel"></div><div class="qr-pixel white"></div><div class="qr-pixel"></div><div class="qr-pixel white"></div><div class="qr-pixel"></div>
+              <div class="qr-pixel white"></div><div class="qr-pixel"></div><div class="qr-pixel"></div><div class="qr-pixel"></div><div class="qr-pixel white"></div>
+              <div class="qr-pixel"></div><div class="qr-pixel white"></div><div class="qr-pixel white"></div><div class="qr-pixel"></div><div class="qr-pixel"></div>
+              <div class="qr-pixel"></div><div class="qr-pixel"></div><div class="qr-pixel white"></div><div class="qr-pixel"></div><div class="qr-pixel"></div>
+            </div>
+            <div style="font-size:12px;color:#0F172A;font-weight:700;">Order #MB-8921 • Kasir Rani</div>
+          </div>
+        `}
+      `;
+
+      if (!state.cashSettledByKasir) {
+        dock.innerHTML = `
+          <div style="display:flex;gap:8px;">
+            <button type="button" class="btn-secondary" style="flex:1;" onclick="goToStep(0)">
+              Nanti (Akumulasi Shift)
+            </button>
+            <button type="button" class="btn-primary green" style="flex:1;" onclick="settleCashierSingle()">
+              Validasi Kasir Sekarang
+            </button>
+          </div>
+        `;
+      } else {
+        dock.innerHTML = `
+          <button type="button" class="btn-primary" onclick="goToStep(0)">
+            Kembali ke Hub Tugas
+          </button>
+        `;
+      }
+    }
+
+    function settleCashierSingle() {
+      state.cashSettledByKasir = true;
+      state.driverCashCustody = Math.max(0, state.driverCashCustody - state.codAmount);
+      state.historyList.unshift({
+        id: '#MB-8921',
+        customer: 'Ibu Siti Rahma',
+        address: 'Jl. Melati No. 14 (1.8 km)',
+        time: String(new Date().getHours()).padStart(2, '0') + ':' + String(new Date().getMinutes()).padStart(2, '0') + ' WIB',
+        type: 'COD',
+        amount: state.codAmount,
+        status: 'Lunas & Kasir Settled',
+        settled: true
+      });
+      render();
+    }
+
+    // ==========================================
+    // STEP 6: GAGAL ANTAR / RETURN TO STORE (RTS) SCREEN
+    // ==========================================
+    function renderStep6_ReturnToStore(vp, dock) {
+      vp.innerHTML = `
+        <div class="stepper-bar">
+          <div class="step-node done"><span class="step-num">✓</span> Ambil</div>
+          <span class="step-arrow">›</span>
+          <div class="step-node done"><span class="step-num">✓</span> Antar</div>
+          <span class="step-arrow">›</span>
+          <div class="step-node danger"><span class="step-num">✕</span> Gagal</div>
+          <span class="step-arrow">›</span>
+          <div class="step-node active"><span class="step-num">4</span> Retur Resto</div>
+        </div>
+
+        <!-- Banner Peringatan Gagal Antar -->
+        <div class="card" style="border:2px solid #EF4444;background:rgba(239, 68, 68, 0.08);text-align:center;align-items:center;padding:18px 14px;">
+          <div style="font-size:32px;">⚠️</div>
+          <div style="font-size:16px;font-weight:800;color:#EF4444;margin-top:6px;">
+            PENGANTARAN DIBATALKAN (RETUR)
+          </div>
+          <div style="font-size:12px;color:var(--text-sub);margin-top:2px;">
+            Pesanan #MB-8921 • Ibu Siti Rahma
+          </div>
+          <div style="background:var(--bg-surface);border:1px solid var(--border-color);border-radius:8px;padding:8px 12px;margin-top:10px;font-size:12px;font-weight:700;color:var(--text-main);">
+            Alasan: <span style="color:#F87171;">${state.rtsReason}</span>
+          </div>
+        </div>
+
+        <!-- Instruksi Operasional Driver -->
+        <div class="card">
+          <div style="font-size:12px;font-weight:800;color:var(--text-main);text-transform:uppercase;">
+            Instruksi Pengembalian Makanan (RTS)
+          </div>
+          <div style="font-size:12px;color:var(--text-sub);line-height:1.5;">
+            1. Bawa makanan kembali utuh ke <strong>Kasir &amp; Dapur ${state.driverProfile.branchName}</strong>.
+            <br>
+            2. Tanggungan kas COD otomatis <strong>Rp 0 (Batal Tagih)</strong>.
+            <br>
+            3. Serahkan ke Kasir Rani dan minta verifikasi fisik makanan retur.
+          </div>
+
+          <button type="button" class="btn-secondary" style="margin-top:6px;" onclick="openOpsChat()">
+            Buka Chat dengan Kasir Rani 💬
+          </button>
+        </div>
+      `;
+
+      dock.innerHTML = `
+        <div class="slider-track" id="slider-track-rts">
+          <div class="slider-progress-fill" id="slider-fill"></div>
+          <div class="slider-thumb red" id="slider-thumb">➔</div>
+          <span class="slider-label">Geser Konfirmasi Retur Selesai di Resto</span>
+        </div>
+      `;
+
+      initSlider('slider-track-rts', 'slider-thumb', 'slider-fill', function() {
+        state.historyList.unshift({
+          id: '#MB-8921',
+          customer: 'Ibu Siti Rahma',
+          address: 'Jl. Melati No. 14 (1.8 km)',
+          time: String(new Date().getHours()).padStart(2, '0') + ':' + String(new Date().getMinutes()).padStart(2, '0') + ' WIB',
+          type: state.paymentType === 'COD' ? 'COD (Gagal Antar)' : 'QRIS (Gagal Antar)',
+          amount: 0,
+          status: 'Retur ke Resto (RTS)',
+          settled: true
+        });
+        goToStep(0);
+      });
+    }
+
+    // Modal Sheet: Laporkan Kendala / Gagal Antar
+    function openRtsKendalaModal() {
+      var c = document.getElementById('modal-container');
+      var reasons = [
+        'Pelanggan Tidak Merespons (>10 Menit)',
+        'Alamat Salah / Titik Peta Jauh Meleset',
+        'Pelanggan Menolak Pesanan / Batal di Tempat',
+        'Akses Tertutup (Banjir / Portal Terkunci)'
+      ];
+
+      var optionsHtml = reasons.map(function(r) {
+        var isSel = state.rtsReason === r;
+        return `
+          <div class="rts-option-card ${isSel ? 'selected' : ''}" onclick="selectRtsReason('${r}')">
+            <div class="rts-radio-circle"></div>
+            <div style="font-size:13px;font-weight:700;color:var(--text-main);">${r}</div>
+          </div>
+        `;
+      }).join('');
+
+      c.innerHTML = `
+        <div class="sheet-backdrop" onclick="closeModal()">
+          <div class="sheet-card" onclick="event.stopPropagation()">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:15px;font-weight:800;color:#EF4444;">Laporkan Kendala Pengantaran</span>
+              <button type="button" onclick="closeModal()" style="background:transparent;border:none;color:var(--text-sub);font-size:18px;cursor:pointer;">✕</button>
+            </div>
+            
+            <div style="font-size:12px;color:var(--text-sub);line-height:1.4;">
+              Pilih alasan sebelum membatalkan pengantaran dan memulai alur Retur ke Resto (RTS):
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              ${optionsHtml}
+            </div>
+
+            <div style="display:flex;gap:8px;margin-top:6px;">
+              <button type="button" class="btn-secondary" style="flex:1;" onclick="closeModal()">Batal</button>
+              <button type="button" class="btn-primary red" style="flex:2;" onclick="confirmRts()">
+                Batalkan &amp; Retur ke Resto
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function selectRtsReason(r) {
+      state.rtsReason = r;
+      openRtsKendalaModal();
+    }
+
+    function confirmRts() {
+      closeModal();
+      goToStep(6);
+    }
+
+    // Modal Sheet: WhatsApp Quick Templates
+    function openWhatsAppTemplateModal() {
+      var c = document.getElementById('modal-container');
+      c.innerHTML = `
+        <div class="sheet-backdrop" onclick="closeModal()">
+          <div class="sheet-card" onclick="event.stopPropagation()">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-size:18px;">💬</span>
+                <span style="font-size:15px;font-weight:800;color:var(--text-main);">Pilih Template Pesan WhatsApp</span>
+              </div>
+              <button type="button" onclick="closeModal()" style="background:transparent;border:none;color:var(--text-sub);font-size:18px;cursor:pointer;">✕</button>
+            </div>
+
+            <div style="font-size:12px;color:var(--text-sub);">
+              Kirim pesan langsung ke WhatsApp Siti Rahma (0812-3456-7890):
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div class="wa-option-card" onclick="sendWaTemplate('shareloc')">
+                <div style="font-size:13px;font-weight:800;color:#25D366;">📍 Minta Share Location WA</div>
+                <div style="font-size:11px;color:var(--text-sub);line-height:1.4;">
+                  "Halo Bu Siti, saya kurir MyBangjo mengantar order #MB-8921. Boleh tolong share live location agar cepat sampai? Terima kasih!"
+                </div>
+              </div>
+
+              <div class="wa-option-card" onclick="sendWaTemplate('arrived')">
+                <div style="font-size:13px;font-weight:800;color:#25D366;">🚪 Sudah di Depan Pagar / Rumah</div>
+                <div style="font-size:11px;color:var(--text-sub);line-height:1.4;">
+                  "Halo Bu Siti, pesanan sudah tiba di depan pagar rumah. Saya pakai motor Vario hitam. Ditunggu ya Bu."
+                </div>
+              </div>
+
+              <div class="wa-option-card" onclick="sendWaTemplate('locked')">
+                <div style="font-size:13px;font-weight:800;color:#25D366;">🔔 Pagar Belum Terbuka / Ditunggu</div>
+                <div style="font-size:11px;color:var(--text-sub);line-height:1.4;">
+                  "Permisi Bu Siti, saya sudah di depan pagar tapi belum ada jawaban. Mohon bantuannya untuk mengambil pesanan ya Bu."
+                </div>
+              </div>
+            </div>
+
+            <button type="button" class="btn-secondary" onclick="closeModal()">Tutup</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function sendWaTemplate(type) {
+      closeModal();
+      var texts = {
+        shareloc: 'Halo Bu Siti, saya kurir MyBangjo mengantar order #MB-8921. Boleh tolong share live location agar cepat sampai? Terima kasih!',
+        arrived: 'Halo Bu Siti, pesanan sudah tiba di depan pagar rumah. Saya pakai motor Vario hitam. Ditunggu ya Bu.',
+        locked: 'Permisi Bu Siti, saya sudah di depan pagar tapi belum ada jawaban. Mohon bantuannya untuk mengambil pesanan ya Bu.'
+      };
+      var msg = texts[type] || '';
+      alert('Membuka WhatsApp ke 0812-3456-7890 dengan pesan:\n\n"' + msg + '"');
+    }
+
+    // ==========================================
+    // RIWAYAT SCREEN (History of Delivered Tasks & Shift Remittance)
+    // ==========================================
+    function renderHistoryScreen(vp) {
+      var itemsHtml = state.historyList.map(function(h) {
+        var isRts = h.status.indexOf('Retur') >= 0 || h.status.indexOf('Gagal') >= 0;
+        var badgeCls = isRts ? 'badge-red' : (h.type.indexOf('COD') >= 0 ? (h.settled ? 'badge-green' : 'badge-amber') : 'badge-blue');
+
+        return `
+          <div class="card" style="padding:12px 14px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:13px;font-weight:800;color:var(--text-main);">${h.id}</span>
+              <span class="badge ${badgeCls}">${h.status}</span>
+            </div>
+            <div style="font-size:13px;font-weight:700;color:var(--text-main);margin-top:2px;">${h.customer}</div>
+            <div style="font-size:11px;color:var(--text-sub);">${h.address}</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;padding-top:6px;border-top:1px solid var(--border-color);font-size:11px;">
+              <span style="color:var(--text-muted);">${h.time} • ${h.type}</span>
+              <span style="font-weight:800;color:${isRts ? '#EF4444' : (h.type.indexOf('COD') >= 0 ? '#FBBF24' : '#10B981')};">
+                ${isRts ? 'Rp 0' : rupiah(h.amount)}
+              </span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      vp.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0 6px;">
+          <span style="font-size:14px;font-weight:800;color:var(--text-main);">Riwayat Pengantaran</span>
+          <span class="badge badge-green">Hari Ini</span>
+        </div>
+
+        <!-- Ringkasan Rekap -->
+        <div class="card">
+          <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:8px;text-align:center;">
+            <div>
+              <div style="font-size:10px;color:var(--text-sub);">Pesanan Selesai</div>
+              <div style="font-size:18px;font-weight:800;color:#38BDF8;margin-top:2px;">7 Order</div>
+            </div>
+            <div>
+              <div style="font-size:10px;color:var(--text-sub);">Kas Tertahan</div>
+              <div style="font-size:18px;font-weight:800;color:${state.driverCashCustody > 0 ? '#FBBF24' : '#10B981'};margin-top:2px;">
+                ${state.driverCashCustody > 0 ? Math.round(state.driverCashCustody / 1000) + 'rb' : '0'}
+              </div>
+            </div>
+            <div>
+              <div style="font-size:10px;color:var(--text-sub);">Trip Insentif</div>
+              <div style="font-size:18px;font-weight:800;color:#10B981;margin-top:2px;">35rb</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SETORAN KASIR GABUNGAN (Shift Remittance Blind Spot) -->
+        ${state.driverCashCustody > 0 ? `
+          <div class="card" style="border:1.5px solid #F59E0B;background:rgba(245, 158, 11, 0.08);">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="font-size:10px;font-weight:800;color:#F59E0B;text-transform:uppercase;">
+                  Setoran Kasir Gabungan (Shift)
+                </div>
+                <div style="font-size:20px;font-weight:900;color:var(--text-main);margin-top:2px;">
+                  ${rupiah(state.driverCashCustody)}
+                </div>
+                <div style="font-size:11px;color:var(--text-sub);margin-top:1px;">
+                  Total uang COD di tangan belum diserahkan ke Kasir Rani
+                </div>
+              </div>
+              <button type="button" class="btn-primary" style="height:36px;width:auto;padding:0 12px;font-size:11px;background:#F59E0B;color:#042F1E;" onclick="openBatchSettlementModal()">
+                Setor Kasir ➔
+              </button>
+            </div>
+          </div>
+        ` : `
+          <div class="card" style="border:1px solid rgba(16, 185, 129, 0.3);background:rgba(16, 185, 129, 0.05);padding:10px 14px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="color:#10B981;font-size:16px;">✓</span>
+              <span style="font-size:12px;font-weight:700;color:#10B981;">Semua setoran kasir shift ini telah tuntas (Rp 0 tertahan).</span>
+            </div>
+          </div>
+        `}
+
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;">Daftar Pengantaran Hari Ini</div>
+          ${itemsHtml}
+        </div>
+      `;
+    }
+
+    // Modal Setoran Kasir Gabungan
+    function openBatchSettlementModal() {
+      var c = document.getElementById('modal-container');
+      c.innerHTML = `
+        <div class="sheet-backdrop" onclick="closeModal()">
+          <div class="sheet-card" onclick="event.stopPropagation()">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:15px;font-weight:800;color:var(--text-main);">Setoran Kasir Gabungan (End-of-Shift)</span>
+              <button type="button" onclick="closeModal()" style="background:transparent;border:none;color:var(--text-sub);font-size:18px;cursor:pointer;">✕</button>
+            </div>
+
+            <div style="background:rgba(245, 158, 11, 0.1);border:1px solid #F59E0B;border-radius:12px;padding:12px;text-align:center;">
+              <div style="font-size:11px;color:var(--text-sub);">Total Uang Tunai COD yang Diserahkan:</div>
+              <div style="font-size:24px;font-weight:900;color:#FBBF24;margin-top:2px;">
+                ${rupiah(state.driverCashCustody)}
+              </div>
+              <div style="font-size:11px;color:var(--text-sub);margin-top:2px;">Serahkan uang fisik ini ke Kasir Rani</div>
+            </div>
+
+            <div class="qr-card">
+              <div style="font-size:11px;font-weight:800;color:#64748B;">KODE SETORAN SHIFT: #KSR-BATCH-99</div>
+              <div class="qr-mock">
+                <div class="qr-pixel"></div><div class="qr-pixel"></div><div class="qr-pixel white"></div><div class="qr-pixel"></div><div class="qr-pixel"></div>
+                <div class="qr-pixel"></div><div class="qr-pixel white"></div><div class="qr-pixel"></div><div class="qr-pixel white"></div><div class="qr-pixel"></div>
+                <div class="qr-pixel white"></div><div class="qr-pixel"></div><div class="qr-pixel"></div><div class="qr-pixel"></div><div class="qr-pixel white"></div>
+                <div class="qr-pixel"></div><div class="qr-pixel white"></div><div class="qr-pixel white"></div><div class="qr-pixel"></div><div class="qr-pixel"></div>
+                <div class="qr-pixel"></div><div class="qr-pixel"></div><div class="qr-pixel white"></div><div class="qr-pixel"></div><div class="qr-pixel"></div>
+              </div>
+              <div style="font-size:12px;color:#0F172A;font-weight:700;">MyBangjo Cabang Pringsewu</div>
+            </div>
+
+            <button type="button" class="btn-primary green" onclick="confirmBatchSettlement()">
+              Konfirmasi Kasir Telah Menerima Uang
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function confirmBatchSettlement() {
+      state.driverCashCustody = 0;
+      state.historyList.forEach(function(item) {
+        if (item.type.indexOf('COD') >= 0) {
+          item.status = 'Lunas & Kasir Settled';
+          item.settled = true;
+        }
+      });
+      closeModal();
+      render();
+    }
+
+    // ==========================================
+    // OPS CHAT RESTO (Komunikasi Driver - Kasir Cabang)
+    // ==========================================
+    function openOpsChat() {
+      state.chatUnreadCount = 0;
+      var c = document.getElementById('modal-container');
+
+      var msgs = state.opsMessages.map(function(m) {
+        var isDriver = m.sender === 'driver';
+        return `
+          <div style="align-self:${isDriver ? 'flex-end' : 'flex-start'};max-width:82%;background:${isDriver ? '#0284C7' : 'var(--bg-subtle)'};border:${isDriver ? 'none' : '1px solid var(--border-color)'};border-radius:${isDriver ? '14px 14px 2px 14px' : '14px 14px 14px 2px'};padding:8px 12px;color:${isDriver ? '#FFF' : 'var(--text-main)'};">
+            ${!isDriver ? `<div style="font-size:10px;font-weight:700;color:#38BDF8;margin-bottom:2px;">${m.name}</div>` : ''}
+            <div style="font-size:12px;line-height:1.4;">${m.text}</div>
+            <div style="font-size:9px;opacity:0.75;text-align:right;margin-top:2px;">${m.time} ${isDriver ? '✓✓' : ''}</div>
+          </div>
+        `;
+      }).join('');
+
+      c.innerHTML = `
+        <div class="sheet-backdrop" onclick="closeModal()">
+          <div class="sheet-card" onclick="event.stopPropagation()" style="max-height:85vh;height:520px;padding:16px;">
+            <!-- Header Chat -->
+            <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border-color);padding-bottom:10px;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:34px;height:34px;border-radius:50%;background:#0284C7;color:#FFF;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;">
+                  R
+                </div>
+                <div>
+                  <div style="font-size:13px;font-weight:800;color:var(--text-main);">Rani • Kasir Cabang</div>
+                  <div style="font-size:11px;color:#10B981;">● Online • MyBangjo Pringsewu</div>
+                </div>
+              </div>
+              <button type="button" onclick="closeModal()" style="background:transparent;border:none;color:var(--text-sub);font-size:18px;cursor:pointer;">✕</button>
+            </div>
+
+            <!-- Messages Body -->
+            <div id="ops-chat-messages-container" style="flex:1;overflow-y:auto;padding:10px 0;display:flex;flex-direction:column;gap:8px;">
+              ${msgs}
+            </div>
+
+            <!-- Quick Chips -->
+            <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;">
+              <button type="button" class="calc-chip" onclick="sendQuickChat('Siap, makanan sudah diambil di dapur!')">Siap diambil</button>
+              <button type="button" class="calc-chip" onclick="sendQuickChat('Sudah tiba di lokasi customer')">Sudah di lokasi</button>
+              <button type="button" class="calc-chip" onclick="sendQuickChat('Customer belum buka pagar')">Belum buka pagar</button>
+            </div>
+
+            <!-- Input Box -->
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="text" id="ops-chat-input" class="form-input" placeholder="Tulis pesan ke kasir cabang…" style="flex:1;height:42px;font-size:13px;" onkeypress="if(event.key==='Enter')submitOpsChat()">
+              <button type="button" class="btn-primary" style="width:42px;height:42px;padding:0;border-radius:10px;" onclick="submitOpsChat()">
+                ➔
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      setTimeout(function() {
+        var box = document.getElementById('ops-chat-messages-container');
+        if (box) box.scrollTop = box.scrollHeight;
+      }, 50);
+
+      render();
+    }
+
+    function sendQuickChat(txt) {
+      state.opsMessages.push({
+        sender: 'driver',
+        name: 'Agus',
+        text: txt,
+        time: String(new Date().getHours()).padStart(2, '0') + ':' + String(new Date().getMinutes()).padStart(2, '0')
+      });
+      openOpsChat();
+    }
+
+    function submitOpsChat() {
+      var input = document.getElementById('ops-chat-input');
+      if (!input) return;
+      var val = input.value.trim();
+      if (!val) return;
+      state.opsMessages.push({
+        sender: 'driver',
+        name: 'Agus',
+        text: val,
+        time: String(new Date().getHours()).padStart(2, '0') + ':' + String(new Date().getMinutes()).padStart(2, '0')
+      });
+      openOpsChat();
+    }
+
+    // ==========================================
+    // CUSTOMER IN-APP CHAT (KURIR <-> PELANGGAN)
+    // ==========================================
+    function openCustomerChat() {
+      state.customerUnreadCount = 0;
+      var c = document.getElementById('modal-container');
+
+      var msgs = state.customerMessages.map(function(m) {
+        var isDriver = m.sender === 'driver';
+        return `
+          <div style="align-self:${isDriver ? 'flex-end' : 'flex-start'};max-width:82%;background:${isDriver ? '#0284C7' : 'var(--bg-subtle)'};border:${isDriver ? 'none' : '1px solid var(--border-color)'};border-radius:${isDriver ? '14px 14px 2px 14px' : '14px 14px 14px 2px'};padding:8px 12px;color:${isDriver ? '#FFF' : 'var(--text-main)'};">
+            ${!isDriver ? `<div style="font-size:10px;font-weight:700;color:#10B981;margin-bottom:2px;">${m.name}</div>` : ''}
+            <div style="font-size:12px;line-height:1.4;">${m.text}</div>
+            <div style="font-size:9px;opacity:0.75;text-align:right;margin-top:2px;">${m.time} ${isDriver ? '✓✓' : ''}</div>
+          </div>
+        `;
+      }).join('');
+
+      c.innerHTML = `
+        <div class="sheet-backdrop" onclick="closeModal()">
+          <div class="sheet-card" onclick="event.stopPropagation()" style="max-height:85vh;height:540px;padding:16px;">
+            <!-- Header Chat Pelanggan -->
+            <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border-color);padding-bottom:10px;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:36px;height:36px;border-radius:50%;background:#10B981;color:#FFF;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;">
+                  S
+                </div>
+                <div>
+                  <div style="font-size:13px;font-weight:800;color:var(--text-main);">Ibu Siti Rahma</div>
+                  <div style="font-size:11px;color:#10B981;">● Online di Web Pelacakan • #MB-8921</div>
+                </div>
+              </div>
+              <button type="button" onclick="closeModal()" style="background:transparent;border:none;color:var(--text-sub);font-size:18px;cursor:pointer;">✕</button>
+            </div>
+
+            <!-- Fail-safe Reminder Banner -->
+            <div style="background:rgba(56, 189, 248, 0.08);border:1px solid rgba(56, 189, 248, 0.25);border-radius:8px;padding:6px 10px;font-size:11px;color:#38BDF8;display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:4px;">
+              <div style="line-height:1.3;">
+                💡 <strong>Chat In-App:</strong> Jika pelanggan menutup web / lambat merespons, segera hubungi via WA.
+              </div>
+              <button type="button" class="btn-secondary" style="height:26px;padding:0 8px;font-size:10px;flex-shrink:0;background:rgba(34,197,94,0.15);border-color:#22C55E;color:#22C55E;" onclick="openWhatsAppTemplateModal()">
+                Ke WA ↗
+              </button>
+            </div>
+
+            <!-- Messages Body -->
+            <div id="customer-chat-messages-container" style="flex:1;overflow-y:auto;padding:8px 0;display:flex;flex-direction:column;gap:8px;">
+              ${msgs}
+            </div>
+
+            <!-- Quick Reply Chips -->
+            <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;">
+              <button type="button" class="calc-chip" onclick="sendQuickCustomerChat('Saya sudah sampai di depan pagar ya Bu Siti')">Sudah di depan pagar</button>
+              <button type="button" class="calc-chip" onclick="sendQuickCustomerChat('Mohon maaf, sedang ada hujan deras / macet sebentar')">Ada macet / hujan</button>
+              <button type="button" class="calc-chip" onclick="sendQuickCustomerChat('Pesanan sudah saya serahkan sesuai arahan, terima kasih!')">Pesanan diserahkan</button>
+            </div>
+
+            <!-- Input Box -->
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="text" id="customer-chat-input" class="form-input" placeholder="Tulis pesan ke Ibu Siti Rahma…" style="flex:1;height:42px;font-size:13px;" onkeypress="if(event.key==='Enter')submitCustomerChat()">
+              <button type="button" class="btn-primary" style="width:42px;height:42px;padding:0;border-radius:10px;" onclick="submitCustomerChat()">
+                ➔
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      setTimeout(function() {
+        var box = document.getElementById('customer-chat-messages-container');
+        if (box) box.scrollTop = box.scrollHeight;
+      }, 50);
+
+      render();
+    }
+
+    function sendQuickCustomerChat(txt) {
+      state.customerMessages.push({
+        sender: 'driver',
+        name: 'Agus',
+        text: txt,
+        time: String(new Date().getHours()).padStart(2, '0') + ':' + String(new Date().getMinutes()).padStart(2, '0')
+      });
+      openCustomerChat();
+    }
+
+    function submitCustomerChat() {
+      var input = document.getElementById('customer-chat-input');
+      if (!input) return;
+      var val = input.value.trim();
+      if (!val) return;
+      state.customerMessages.push({
+        sender: 'driver',
+        name: 'Agus',
+        text: val,
+        time: String(new Date().getHours()).padStart(2, '0') + ':' + String(new Date().getMinutes()).padStart(2, '0')
+      });
+      openCustomerChat();
+    }
+
+    // ==========================================
+    // PROFILE SCREEN
+    // ==========================================
+    function renderProfileScreen(vp) {
+      var p = state.driverProfile;
+
+      vp.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:2px 0 6px;">
+          <span style="font-size:14px;font-weight:800;color:var(--text-main);">Profil Pengemudi</span>
+          <span class="badge badge-green">Aktif</span>
+        </div>
+
+        <div class="card" style="align-items:center;text-align:center;padding:18px;">
+          <div style="position:relative;cursor:pointer;display:inline-block;" onclick="openEditAvatarModal()">
+            <img src="${p.avatarUrl}" alt="Avatar" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid #38BDF8;background:var(--bg-subtle);">
+            <div style="position:absolute;bottom:0;right:0;width:26px;height:26px;border-radius:50%;background:#0284C7;border:2px solid var(--bg-card);color:#FFF;display:flex;align-items:center;justify-content:center;font-size:12px;box-shadow:0 2px 4px rgba(0,0,0,0.2);" title="Ganti / Unggah Foto Profil">
+              📷
+            </div>
+          </div>
+          <div style="font-size:16px;font-weight:800;color:var(--text-main);margin-top:8px;">${p.fullName}</div>
+          <div style="font-size:12px;color:var(--text-sub);">${p.driverId} • ${p.branchName}</div>
+          <div style="margin-top:10px;">
+            <button type="button" class="btn-secondary" style="height:32px;padding:0 14px;font-size:11px;" onclick="openEditAvatarModal()">
+              Ganti / Unggah Foto Profil ✎
+            </button>
+          </div>
+        </div>
+
+        <!-- Kontak -->
+        <div class="card">
+          <div style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;">Kontak &amp; Akun</div>
+          
+          <div class="profile-item-row">
+            <div>
+              <div style="font-size:11px;color:var(--text-sub);">WhatsApp</div>
+              <div style="font-size:13px;font-weight:700;color:var(--text-main);">${p.phone}</div>
+            </div>
+            <button type="button" class="btn-edit-text" onclick="openEditPhoneModal()">Edit</button>
+          </div>
+
+          <div class="profile-item-row">
+            <div>
+              <div style="font-size:11px;color:var(--text-sub);">NIK KTP</div>
+              <div style="font-size:13px;font-weight:700;color:var(--text-main);">${p.nik}</div>
+            </div>
+            <span style="font-size:11px;color:var(--text-muted);">Tervalidasi</span>
+          </div>
+        </div>
+
+        <!-- Kendaraan -->
+        <div class="card">
+          <div style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;">Kendaraan</div>
+          
+          <div class="profile-item-row">
+            <div>
+              <div style="font-size:11px;color:var(--text-sub);">Plat Nomor</div>
+              <div style="font-size:14px;font-weight:800;color:#FBBF24;">${p.plateNumber}</div>
+            </div>
+            <button type="button" class="btn-edit-text" onclick="openEditVehicleModal()">Ganti</button>
+          </div>
+
+          <div class="profile-item-row">
+            <div>
+              <div style="font-size:11px;color:var(--text-sub);">Model Motor</div>
+              <div style="font-size:13px;font-weight:700;color:var(--text-main);">${p.vehicleModel}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Legalitas -->
+        <div class="card">
+          <div style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;">Dokumen Legalitas</div>
+          
+          <div class="profile-item-row">
+            <div>
+              <div style="font-size:11px;color:var(--text-sub);">SIM C</div>
+              <div style="font-size:13px;font-weight:700;color:var(--text-main);">${p.simNumber}</div>
+              <div style="font-size:11px;color:#10B981;">Berlaku s/d ${p.simExpiry}</div>
+            </div>
+            <button type="button" class="btn-edit-text" onclick="openEditSimModal()">Perbarui</button>
+          </div>
+        </div>
+
+        <!-- Rekening -->
+        <div class="card">
+          <div style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;">Pencairan Insentif</div>
+          
+          <div class="profile-item-row">
+            <div>
+              <div style="font-size:11px;color:var(--text-sub);">${p.bankName}</div>
+              <div style="font-size:13px;font-weight:700;color:var(--text-main);">${p.bankAccount}</div>
+              <div style="font-size:11px;color:var(--text-sub);">${p.fullName}</div>
+            </div>
+            <button type="button" class="btn-edit-text" onclick="openEditBankModal()">Edit</button>
+          </div>
+        </div>
+      `;
+    }
+
+    // Modal Handlers
+    function closeModal() {
+      document.getElementById('modal-container').innerHTML = '';
+    }
+
+    function openEditAvatarModal() {
+      var c = document.getElementById('modal-container');
+      var presets = [
+        { label: 'Kucing Koki', url: '/owner/assets/img/cat-chef-recipe.png' },
+        { label: 'Kucing Santai', url: '/merchant/assets/img/sleepy-cat-closed.png' },
+        { label: 'Robot Gesit', url: 'https://api.dicebear.com/7.x/bottts/svg?seed=AgusKurir&backgroundColor=b6e3f4' },
+        { label: 'Kurir Topi', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=DriverAgus&backgroundColor=c0aede' },
+        { label: 'Emoji Senyum', url: 'https://api.dicebear.com/7.x/fun-emoji/svg?seed=AgusSuper&backgroundColor=ffd5dc' },
+        { label: 'Robot Kurir', url: 'https://api.dicebear.com/7.x/bottts/svg?seed=ExpressDelivery&backgroundColor=ffdfbf' }
+      ];
+
+      var grid = presets.map(function(p) {
+        var isCurrent = state.driverProfile.avatarUrl === p.url;
+        return `
+          <div style="text-align:center;cursor:pointer;" onclick="selectAvatar('${p.url}')">
+            <div style="position:relative;width:68px;height:68px;margin:0 auto;border-radius:50%;border:${isCurrent ? '3px solid #38BDF8' : '2px solid var(--border-color)'};background:var(--bg-subtle);overflow:hidden;padding:2px;box-shadow:${isCurrent ? '0 0 10px rgba(56, 189, 248, 0.4)' : 'none'};">
+              <img src="${p.url}" alt="${p.label}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">
+              ${isCurrent ? '<div style="position:absolute;bottom:2px;right:2px;width:16px;height:16px;border-radius:50%;background:#0284C7;color:#FFF;font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center;">✓</div>' : ''}
+            </div>
+            <div style="font-size:11px;font-weight:700;color:${isCurrent ? '#38BDF8' : 'var(--text-main)'};margin-top:4px;">${p.label}</div>
+          </div>
+        `;
+      }).join('');
+
+      c.innerHTML = `
+        <div class="sheet-backdrop" onclick="closeModal()">
+          <div class="sheet-card" onclick="event.stopPropagation()" style="max-height:85vh;overflow-y:auto;padding:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border-color);padding-bottom:10px;">
+              <div>
+                <span style="font-size:15px;font-weight:800;color:var(--text-main);">Foto Profil Pengemudi</span>
+                <div style="font-size:11px;color:var(--text-sub);margin-top:1px;">Ganti avatar kartun atau unggah foto sendiri</div>
+              </div>
+              <button type="button" onclick="closeModal()" style="background:transparent;border:none;color:var(--text-sub);font-size:18px;cursor:pointer;">✕</button>
+            </div>
+
+            <!-- Upload Box: Unggah Foto Sendiri -->
+            <div style="border:2px dashed #0284C7;border-radius:12px;padding:14px;text-align:center;background:rgba(2, 132, 199, 0.06);cursor:pointer;margin-top:12px;" onclick="document.getElementById('avatar-file-input').click()">
+              <div style="font-size:24px;">📤</div>
+              <div style="font-size:13px;font-weight:800;color:var(--text-main);margin-top:2px;">Unggah Foto Profil Baru</div>
+              <div style="font-size:11px;color:var(--text-sub);margin-top:2px;">Pilih foto dari galeri / file perangkat HP</div>
+              <button type="button" class="btn-primary" style="height:36px;width:auto;padding:0 16px;font-size:12px;margin:8px auto 0;background:#0284C7;" onclick="event.stopPropagation();document.getElementById('avatar-file-input').click()">
+                Pilih File Foto 📁
+              </button>
+              <input type="file" id="avatar-file-input" accept="image/*" style="display:none;" onchange="handleAvatarUpload(event)">
+            </div>
+
+            <!-- Divider -->
+            <div style="display:flex;align-items:center;gap:8px;margin:14px 0 10px;font-size:11px;color:var(--text-muted);font-weight:800;letter-spacing:0.04em;">
+              <span style="flex:1;height:1px;background:var(--border-color);"></span>
+              PILIH TEMPLATE AVATAR KARTUN
+              <span style="flex:1;height:1px;background:var(--border-color);"></span>
+            </div>
+
+            <!-- Cartoon Grid -->
+            <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:12px;padding-bottom:4px;">
+              ${grid}
+            </div>
+
+            <div style="margin-top:14px;">
+              <button type="button" class="btn-secondary" style="width:100%;" onclick="closeModal()">Tutup</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function handleAvatarUpload(event) {
+      var file = event.target.files && event.target.files[0];
+      if (!file) return;
+      if (!file.type.startsWith('image/')) {
+        alert('Mohon pilih file gambar (JPG, PNG, atau WEBP).');
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var dataUrl = e.target.result;
+        state.driverProfile.avatarUrl = dataUrl;
+        closeModal();
+        render();
+        setTimeout(function() {
+          alert('✅ Foto profil berhasil diunggah!');
+        }, 100);
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function selectAvatar(url) {
+      state.driverProfile.avatarUrl = url;
+      closeModal();
+      render();
+    }
+
+    function openEditPhoneModal() {
+      var c = document.getElementById('modal-container');
+      c.innerHTML = `
+        <div class="sheet-backdrop" onclick="closeModal()">
+          <div class="sheet-card" onclick="event.stopPropagation()">
+            <div style="font-size:15px;font-weight:800;color:var(--text-main);">Nomor WhatsApp</div>
+            <input type="tel" id="input-edit-phone" class="form-input" value="${state.driverProfile.phone}" placeholder="08xxxxxxxx">
+            <button type="button" class="btn-primary green" onclick="savePhone()">Simpan</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function savePhone() {
+      var val = document.getElementById('input-edit-phone').value.trim();
+      if (val) state.driverProfile.phone = val;
+      closeModal();
+      render();
+    }
+
+    function openEditVehicleModal() {
+      var c = document.getElementById('modal-container');
+      c.innerHTML = `
+        <div class="sheet-backdrop" onclick="closeModal()">
+          <div class="sheet-card" onclick="event.stopPropagation()">
+            <div style="font-size:15px;font-weight:800;color:var(--text-main);">Kendaraan</div>
+            <input type="text" id="input-edit-plate" class="form-input" value="${state.driverProfile.plateNumber}" placeholder="Plat Nomor">
+            <input type="text" id="input-edit-model" class="form-input" value="${state.driverProfile.vehicleModel}" placeholder="Model Motor">
+            <button type="button" class="btn-primary green" onclick="saveVehicle()">Simpan</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function saveVehicle() {
+      var p = document.getElementById('input-edit-plate').value.trim().toUpperCase();
+      var m = document.getElementById('input-edit-model').value.trim();
+      if (p) state.driverProfile.plateNumber = p;
+      if (m) state.driverProfile.vehicleModel = m;
+      closeModal();
+      render();
+    }
+
+    function openEditSimModal() {
+      var c = document.getElementById('modal-container');
+      c.innerHTML = `
+        <div class="sheet-backdrop" onclick="closeModal()">
+          <div class="sheet-card" onclick="event.stopPropagation()">
+            <div style="font-size:15px;font-weight:800;color:var(--text-main);">SIM C</div>
+            <input type="text" id="input-edit-sim" class="form-input" value="${state.driverProfile.simNumber}" placeholder="Nomor SIM">
+            <input type="text" id="input-edit-sim-exp" class="form-input" value="${state.driverProfile.simExpiry}" placeholder="Masa Berlaku">
+            <button type="button" class="btn-primary green" onclick="saveSim()">Simpan</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function saveSim() {
+      var s = document.getElementById('input-edit-sim').value.trim();
+      var e = document.getElementById('input-edit-sim-exp').value.trim();
+      if (s) state.driverProfile.simNumber = s;
+      if (e) state.driverProfile.simExpiry = e;
+      closeModal();
+      render();
+    }
+
+    function openEditBankModal() {
+      var c = document.getElementById('modal-container');
+      c.innerHTML = `
+        <div class="sheet-backdrop" onclick="closeModal()">
+          <div class="sheet-card" onclick="event.stopPropagation()">
+            <div style="font-size:15px;font-weight:800;color:var(--text-main);">Rekening Bank</div>
+            <input type="text" id="input-edit-bank" class="form-input" value="${state.driverProfile.bankName}" placeholder="Nama Bank">
+            <input type="text" id="input-edit-acc" class="form-input" value="${state.driverProfile.bankAccount}" placeholder="Nomor Rekening">
+            <button type="button" class="btn-primary green" onclick="saveBank()">Simpan</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function saveBank() {
+      var b = document.getElementById('input-edit-bank').value.trim();
+      var a = document.getElementById('input-edit-acc').value.trim();
+      if (b) state.driverProfile.bankName = b;
+      if (a) state.driverProfile.bankAccount = a;
+      closeModal();
+      render();
+    }
+
+    // Slider Engine
+    function initSlider(trackId, thumbId, fillId, onComplete) {
+      setTimeout(function() {
+        var track = document.getElementById(trackId);
+        var thumb = document.getElementById(thumbId);
+        var fill = document.getElementById(fillId);
+        if (!track || !thumb || !fill) return;
+
+        var isDragging = false;
+        var startX = 0;
+        var maxSlide = track.clientWidth - thumb.clientWidth - 8;
+
+        function startDrag(e) {
+          isDragging = true;
+          startX = (e.touches ? e.touches[0].clientX : e.clientX);
+          thumb.style.transition = 'none';
+          fill.style.transition = 'none';
+        }
+
+        function moveDrag(e) {
+          if (!isDragging) return;
+          var curX = (e.touches ? e.touches[0].clientX : e.clientX);
+          var diff = curX - startX;
+          if (diff < 0) diff = 0;
+          if (diff > maxSlide) diff = maxSlide;
+
+          thumb.style.transform = 'translateX(' + diff + 'px)';
+          fill.style.width = (diff + 24) + 'px';
+
+          if (diff >= maxSlide * 0.92) {
+            isDragging = false;
+            thumb.style.transform = 'translateX(' + maxSlide + 'px)';
+            fill.style.width = '100%';
+            onComplete();
+          }
+        }
+
+        function stopDrag() {
+          if (!isDragging) return;
+          isDragging = false;
+          thumb.style.transition = 'transform 0.2s ease';
+          fill.style.transition = 'width 0.2s ease';
+          thumb.style.transform = 'translateX(0px)';
+          fill.style.width = '0%';
+        }
+
+        thumb.onmousedown = startDrag;
+        thumb.ontouchstart = startDrag;
+        window.onmousemove = moveDrag;
+        window.ontouchmove = moveDrag;
+        window.onmouseup = stopDrag;
+        window.ontouchend = stopDrag;
+      }, 50);
+    }
+
+    // Deep linking URL query parameters
+    try {
+      var urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.has('step')) {
+        state.currentStep = parseInt(urlParams.get('step'), 10) || 0;
+      }
+      if (urlParams.has('tab')) {
+        state.currentTab = urlParams.get('tab') || 'tasks';
+      }
+      if (urlParams.has('theme')) {
+        state.theme = urlParams.get('theme') === 'light' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', state.theme);
+      }
+      if (urlParams.has('online')) {
+        state.isOnline = urlParams.get('online') === '1' || urlParams.get('online') === 'true';
+      }
+      if (urlParams.has('pay')) {
+        state.paymentType = urlParams.get('pay').toUpperCase() === 'QRIS' ? 'QRIS' : 'COD';
+      }
+      if (urlParams.has('chat')) {
+        setTimeout(openOpsChat, 100);
+      }
+      if (urlParams.has('chat_cust')) {
+        setTimeout(openCustomerChat, 100);
+      }
+      if (urlParams.has('wa')) {
+        setTimeout(openWhatsAppTemplateModal, 100);
+      }
+      if (urlParams.has('rts_modal')) {
+        setTimeout(openRtsKendalaModal, 100);
+      }
+      if (urlParams.has('photo')) {
+        state.photoTaken = urlParams.get('photo') === '1' || urlParams.get('photo') === 'true';
+      }
+      if (urlParams.has('bypass')) {
+        state.photoBypassed = urlParams.get('bypass') === '1' || urlParams.get('bypass') === 'true';
+      }
+      if (urlParams.has('bypass_modal')) {
+        setTimeout(openBypassPhotoModal, 100);
+      }
+      if (urlParams.has('avatar_modal')) {
+        state.currentTab = 'profile';
+        setTimeout(openEditAvatarModal, 100);
+      }
+    } catch (_) {}
+
+    render();
+  </script>
+</body>
+</html>

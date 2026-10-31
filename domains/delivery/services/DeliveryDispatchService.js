@@ -51,8 +51,8 @@ class DeliveryDispatchService {
     if (order.order_type !== 'delivery') {
       throw new Error('[DeliveryDispatchService] Hanya Order Fulfillment Environment delivery yang dapat diberi driver.');
     }
-    if (order.status !== 'ready') {
-      throw new Error('[DeliveryDispatchService] Driver hanya dapat di-assign setelah pesanan berstatus ready.');
+    if (!['confirmed', 'preparing', 'ready'].includes(order.status)) {
+      throw new Error('[DeliveryDispatchService] Driver hanya dapat di-assign saat pesanan berstatus confirmed, preparing, atau ready.');
     }
     if (provider_type === DeliveryModel.PROVIDER_TYPES.BRANCH_DRIVER) {
       return BranchDriverProvider.assignDriver({
@@ -70,8 +70,8 @@ class DeliveryDispatchService {
   static acceptAssignment({ order_id, actor_id }) {
     const order = orderRepository.findById(order_id);
     if (!order) throw new Error('[DeliveryDispatchService] Order "' + order_id + '" tidak ditemukan.');
-    if (order.status !== 'ready') {
-      throw new Error('[DeliveryDispatchService] Driver assignment hanya dapat diterima/ditolak saat pesanan masih berstatus ready.');
+    if (!['confirmed', 'preparing', 'ready'].includes(order.status)) {
+      throw new Error('[DeliveryDispatchService] Driver assignment hanya dapat diterima/ditolak saat pesanan masih dalam proses aktif.');
     }
     const delivery = orderRepository.findDeliveryByOrderId(order_id);
     if (!delivery || delivery.status !== DeliveryModel.STATUS.ASSIGNED) {
@@ -103,8 +103,8 @@ class DeliveryDispatchService {
   static rejectAssignment({ order_id, actor_id, reason = '' }) {
     const order = orderRepository.findById(order_id);
     if (!order) throw new Error('[DeliveryDispatchService] Order "' + order_id + '" tidak ditemukan.');
-    if (order.status !== 'ready') {
-      throw new Error('[DeliveryDispatchService] Driver assignment hanya dapat diterima/ditolak saat pesanan masih berstatus ready.');
+    if (!['confirmed', 'preparing', 'ready'].includes(order.status)) {
+      throw new Error('[DeliveryDispatchService] Driver assignment hanya dapat diterima/ditolak saat pesanan masih dalam proses aktif.');
     }
     const delivery = orderRepository.findDeliveryByOrderId(order_id);
     if (!delivery || delivery.status !== DeliveryModel.STATUS.ASSIGNED) {
@@ -130,6 +130,29 @@ class DeliveryDispatchService {
       producer: 'delivery',
       payload: { order_id, branch_id: order.branch_id, driver_id: delivery.driver_id || null, actor_id, reason: rejectionReason, rejected_at: now }
     }).catch(() => {});
+
+    try {
+      const db = orderRepository.db;
+      if (db && db.prepare) {
+        const bds = db.prepare('SELECT dispatch_mode FROM branch_delivery_settings WHERE branch_id = ?').get(order.branch_id);
+        if (bds && bds.dispatch_mode === 'hybrid') {
+          events.EventBus.publish({
+            type: 'delivery.dispatch.fallback_to_manual',
+            producer: 'delivery',
+            payload: {
+              order_id,
+              order_number: order.order_number,
+              branch_id: order.branch_id,
+              driver_id: delivery.driver_id || null,
+              reason: 'DRIVER_REJECTED',
+              rejection_reason: rejectionReason,
+              message: `Kurir menolak tugas (alasan: ${rejectionReason}). Penugasan dialihkan ke Manual BM.`
+            }
+          }).catch(() => {});
+        }
+      }
+    } catch (_) {}
+
     return { success: true, order_id, status: 'unassigned', assignment_status: 'rejected', rejected_at: now };
   }
 
@@ -145,7 +168,10 @@ class DeliveryDispatchService {
     status,
     notes = '',
     actor_id = null,
-    cod_amount_tendered = null
+    cod_amount_tendered = null,
+    pod_photo_url = null,
+    pod_bypass_reason = null,
+    pod_note = null
   }) {
     if (!DeliveryModel.isValidStatus(status)) {
       throw new Error('[DeliveryDispatchService] Delivery status "' + status + '" tidak valid.');
@@ -192,6 +218,16 @@ class DeliveryDispatchService {
         if (latestOrder.status !== 'out_for_delivery') {
           throw new Error('[DeliveryDispatchService] Delivery hanya dapat diselesaikan setelah status pengantaran dimulai.');
         }
+
+        // Gatekeeper: Wajib Foto Bukti POD ATAU Sertakan Alasan Bypass Resmi
+        const cleanPodPhoto = pod_photo_url ? String(pod_photo_url).trim() : null;
+        const cleanBypassReason = pod_bypass_reason ? String(pod_bypass_reason).trim() : null;
+        const cleanPodNote = pod_note ? String(pod_note).trim() : null;
+
+        if (!cleanPodPhoto && !cleanBypassReason) {
+          throw new Error('[POD_PHOTO_OR_BYPASS_REQUIRED]: Foto bukti pengantaran wajib diambil atau sertakan alasan bypass kendala.');
+        }
+
         if (latestOrder.payment_method === 'cash') {
           const tendered = Number(cod_amount_tendered != null ? cod_amount_tendered : latestOrder.grand_total);
           const expected = Number(latestOrder.grand_total);
@@ -208,10 +244,18 @@ class DeliveryDispatchService {
             codCashCustody: DeliveryModel.COD_CASH_CUSTODY.DRIVER,
             codCollectedAmount: expected,
             codAmountTendered: tendered,
-            codChangeGiven: change
+            codChangeGiven: change,
+            podPhotoUrl: cleanPodPhoto,
+            podBypassReason: cleanBypassReason,
+            podNote: cleanPodNote
           });
         } else {
-          orderRepository.updateDeliveryStatus({ orderId: order_id, status, updatedAt: now });
+          orderRepository.updateDeliveryStatus({
+            orderId: order_id, status, updatedAt: now,
+            podPhotoUrl: cleanPodPhoto,
+            podBypassReason: cleanBypassReason,
+            podNote: cleanPodNote
+          });
         }
         OrderStateMachine.transition({
           order_id, target_status: 'completed', actor_type: 'driver', actor_id,
@@ -269,6 +313,187 @@ class DeliveryDispatchService {
       payload: { order_id, branch_id: order.branch_id, cashier_id, amount: collected, handed_over_at: now }
     }).catch(() => {});
     return { success: true, order_id, cod_collection_status: 'handed_over', cod_cash_custody: 'cashier', cod_handed_over_at: now, cod_handed_over_to: cashier_id };
+  }
+
+  /**
+   * Find the best online driver for a given branch
+   * Ranked by lowest number of currently active delivery jobs, then most recently active
+   */
+  static findBestAvailableDriver(branchId) {
+    if (!branchId) return null;
+    const db = orderRepository.db;
+    if (!db || !db.prepare) return null;
+
+    const sql = `
+      SELECT u.id, u.full_name, u.phone,
+        COALESCE(dl.is_online, 0) AS is_online,
+        COALESCE(active_tasks.count, 0) AS active_task_count
+      FROM users u
+      LEFT JOIN driver_locations dl ON dl.driver_id = u.id
+      LEFT JOIN (
+        SELECT od.driver_id, COUNT(*) AS count
+        FROM order_deliveries od
+        WHERE od.status IN ('assigned', 'picked_up', 'on_delivery')
+          AND od.driver_id IS NOT NULL
+        GROUP BY od.driver_id
+      ) active_tasks ON active_tasks.driver_id = u.id
+      WHERE u.role = 'driver'
+        AND u.status = 'active'
+        AND u.branch_id = ?
+        AND COALESCE(dl.is_online, 0) = 1
+      ORDER BY active_task_count ASC, COALESCE(dl.updated_at, u.created_at) DESC
+      LIMIT 1
+    `;
+    return db.prepare(sql).get(branchId) || null;
+  }
+
+  /**
+   * Automatically assigns a delivery order according to branch settings (automatic or hybrid)
+   */
+  static autoAssign({ order_id, branch_id = null }) {
+    const order = orderRepository.findById(order_id);
+    if (!order) throw new Error('[DeliveryDispatchService] Order "' + order_id + '" tidak ditemukan.');
+    const targetBranchId = branch_id || order.branch_id;
+
+    const db = orderRepository.db;
+    let settings = null;
+    try {
+      settings = db.prepare('SELECT dispatch_mode, auto_dispatch_timeout_seconds FROM branch_delivery_settings WHERE branch_id = ?').get(targetBranchId);
+    } catch (_) {}
+
+    const dispatchMode = (settings && settings.dispatch_mode) || 'hybrid';
+    const timeoutSeconds = (settings && settings.auto_dispatch_timeout_seconds) || 120;
+
+    if (dispatchMode === 'manual') {
+      return { success: false, mode: 'manual', message: 'Cabang dikonfigurasi menggunakan mode penugasan manual.' };
+    }
+
+    const bestDriver = this.findBestAvailableDriver(targetBranchId);
+    if (!bestDriver) {
+      if (dispatchMode === 'hybrid') {
+        events.EventBus.publish({
+          type: 'delivery.dispatch.fallback_to_manual',
+          producer: 'delivery',
+          payload: {
+            order_id,
+            order_number: order.order_number,
+            branch_id: targetBranchId,
+            reason: 'NO_ONLINE_DRIVER_AVAILABLE',
+            message: 'Tidak ada kurir online yang tersedia di cabang ini. Penugasan dialihkan ke Manual BM.'
+          }
+        }).catch(() => {});
+      }
+      return {
+        success: false,
+        mode: dispatchMode,
+        driver_found: false,
+        message: 'Tidak ada driver online yang tersedia di cabang ini.'
+      };
+    }
+
+    const assignResult = this.assign({
+      order_id,
+      driver_id: bestDriver.id,
+      driver_name: bestDriver.full_name,
+      driver_phone: bestDriver.phone,
+      assigned_by: 'system:auto_dispatch'
+    });
+
+    events.EventBus.publish({
+      type: 'delivery.dispatch.auto_assigned',
+      producer: 'delivery',
+      payload: {
+        order_id,
+        order_number: order.order_number,
+        branch_id: targetBranchId,
+        driver_id: bestDriver.id,
+        driver_name: bestDriver.full_name,
+        dispatch_mode: dispatchMode,
+        timeout_seconds: timeoutSeconds
+      }
+    }).catch(() => {});
+
+    return {
+      success: true,
+      mode: dispatchMode,
+      timeout_seconds: timeoutSeconds,
+      driver: {
+        id: bestDriver.id,
+        name: bestDriver.full_name,
+        phone: bestDriver.phone,
+        active_tasks: bestDriver.active_task_count
+      },
+      assignment: assignResult
+    };
+  }
+
+  /**
+   * Check orders assigned via hybrid dispatch that exceeded timeout seconds
+   */
+  static checkHybridTimeouts({ branch_id = null } = {}) {
+    const db = orderRepository.db;
+    if (!db || !db.prepare) return [];
+
+    let sql = `
+      SELECT od.id as delivery_id, od.order_id, od.driver_id, od.driver_name, od.created_at, od.updated_at,
+             o.order_number, o.branch_id,
+             COALESCE(bds.dispatch_mode, 'hybrid') as dispatch_mode,
+             COALESCE(bds.auto_dispatch_timeout_seconds, 120) as timeout_seconds
+      FROM order_deliveries od
+      JOIN orders o ON o.id = od.order_id
+      LEFT JOIN branch_delivery_settings bds ON bds.branch_id = o.branch_id
+      WHERE od.status = 'assigned'
+        AND od.driver_assignment_status = 'pending'
+        AND COALESCE(bds.dispatch_mode, 'hybrid') = 'hybrid'
+    `;
+    const params = [];
+    if (branch_id) {
+      sql += ' AND o.branch_id = ?';
+      params.push(branch_id);
+    }
+
+    const pendingDeliveries = db.prepare(sql).all(...params);
+    const timedOut = [];
+    const now = Date.now();
+
+    for (const d of pendingDeliveries) {
+      const assignedTime = new Date(d.updated_at || d.created_at).getTime();
+      const elapsedSeconds = Math.floor((now - assignedTime) / 1000);
+      if (elapsedSeconds >= d.timeout_seconds) {
+        db.prepare(`
+          UPDATE order_deliveries
+          SET status = 'unassigned',
+              driver_assignment_status = 'timed_out',
+              driver_assignment_rejection_reason = 'AUTO_DISPATCH_TIMEOUT',
+              updated_at = datetime('now')
+          WHERE id = ?
+        `).run(d.delivery_id);
+
+        events.EventBus.publish({
+          type: 'delivery.dispatch.fallback_to_manual',
+          producer: 'delivery',
+          payload: {
+            order_id: d.order_id,
+            order_number: d.order_number,
+            branch_id: d.branch_id,
+            driver_id: d.driver_id,
+            driver_name: d.driver_name,
+            reason: 'AUTO_DISPATCH_TIMEOUT',
+            elapsed_seconds: elapsedSeconds,
+            message: `Kurir ${d.driver_name || ''} tidak merespons dalam ${elapsedSeconds} detik. Penugasan dialihkan ke Manual BM.`
+          }
+        }).catch(() => {});
+
+        timedOut.push({
+          order_id: d.order_id,
+          order_number: d.order_number,
+          driver_name: d.driver_name,
+          elapsed_seconds: elapsedSeconds
+        });
+      }
+    }
+
+    return timedOut;
   }
 }
 module.exports = DeliveryDispatchService;

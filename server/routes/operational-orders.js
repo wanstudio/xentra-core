@@ -74,9 +74,9 @@ router.patch('/kitchen/orders/:id/status', requireAuth(['owner', 'brand_manager'
     // dedicated recovery flow.
     const ROLE_ALLOWED_TARGET_STATUSES = {
       kitchen: ['preparing', 'ready'],
-      branch_manager: ['preparing', 'ready', 'out_for_delivery', 'completed'],
-      brand_manager: ['preparing', 'ready', 'out_for_delivery', 'completed'],
-      owner: ['preparing', 'ready', 'out_for_delivery', 'completed']
+      branch_manager: ['preparing', 'ready', 'out_for_delivery', 'completed', 'cancelled'],
+      brand_manager: ['preparing', 'ready', 'out_for_delivery', 'completed', 'cancelled'],
+      owner: ['preparing', 'ready', 'out_for_delivery', 'completed', 'cancelled']
     };
 
     const allowedTargetStatuses = ROLE_ALLOWED_TARGET_STATUSES[req.user.role] || [];
@@ -120,6 +120,109 @@ router.patch('/kitchen/orders/:id/status', requireAuth(['owner', 'brand_manager'
       actor_id,
       note
     });
+
+    if (status === 'ready') {
+      try {
+        const fullOrd = db.prepare('SELECT order_type, branch_id FROM orders WHERE id = ?').get(req.params.id);
+        if (fullOrd && fullOrd.order_type === 'delivery') {
+          const dlv = db.prepare('SELECT status, driver_id FROM order_deliveries WHERE order_id = ?').get(req.params.id);
+          if (!dlv || dlv.status === 'unassigned' || !dlv.driver_id) {
+            const { DeliveryDispatchService } = require('../../domains/delivery');
+            DeliveryDispatchService.autoAssign({ order_id: req.params.id, branch_id: fullOrd.branch_id });
+          }
+        }
+      } catch (autoAssignErr) {
+        console.warn('[AutoAssign on Ready Warning]:', autoAssignErr.message);
+      }
+    }
+
+    if (status === 'out_for_delivery') {
+      try {
+        const now = new Date().toISOString();
+        db.prepare(`
+          UPDATE order_deliveries
+          SET status = 'on_delivery', updated_at = ?
+          WHERE order_id = ? AND status IN ('unassigned', 'assigned', 'picked_up')
+        `).run(now, req.params.id);
+
+        const dlvRow = db.prepare('SELECT driver_id FROM order_deliveries WHERE order_id = ?').get(req.params.id);
+        if (dlvRow && dlvRow.driver_id) {
+          db.prepare(`
+            UPDATE driver_locations
+            SET active_order_id = ?, updated_at = datetime('now')
+            WHERE driver_id = ?
+          `).run(req.params.id, dlvRow.driver_id);
+        }
+      } catch (outSyncErr) {
+        console.warn('[Delivery Sync On Out For Delivery Warning]:', outSyncErr.message);
+      }
+    }
+
+    if (status === 'completed') {
+      try {
+        const now = new Date().toISOString();
+        const ordRow = db.prepare('SELECT order_type, payment_method, grand_total FROM orders WHERE id = ?').get(req.params.id);
+        if (ordRow && ordRow.order_type === 'delivery') {
+          const dlv = db.prepare('SELECT id, status, cod_collection_status FROM order_deliveries WHERE order_id = ?').get(req.params.id);
+          if (dlv && dlv.status !== 'delivered') {
+            if (ordRow.payment_method === 'cash') {
+              db.prepare(`
+                UPDATE order_deliveries
+                SET status = 'delivered',
+                    cod_collection_status = COALESCE(cod_collection_status, 'collected'),
+                    cod_cash_custody = COALESCE(cod_cash_custody, 'driver'),
+                    cod_collected_amount = COALESCE(cod_collected_amount, ?),
+                    updated_at = ?
+                WHERE order_id = ?
+              `).run(ordRow.grand_total, now, req.params.id);
+            } else {
+              db.prepare(`
+                UPDATE order_deliveries
+                SET status = 'delivered', updated_at = ?
+                WHERE order_id = ?
+              `).run(now, req.params.id);
+            }
+          }
+        }
+        try {
+          db.prepare("UPDATE driver_locations SET active_order_id = NULL WHERE active_order_id = ?").run(req.params.id);
+        } catch (_) {}
+      } catch (delivSyncErr) {
+        console.warn('[Delivery Sync On Complete Warning]:', delivSyncErr.message);
+      }
+    }
+
+    if (status === 'cancelled') {
+      try {
+        const now = new Date().toISOString();
+        db.prepare("UPDATE order_deliveries SET status = 'cancelled', updated_at = ? WHERE order_id = ? AND status != 'delivered'").run(now, req.params.id);
+        db.prepare("UPDATE driver_locations SET active_order_id = NULL WHERE active_order_id = ?").run(req.params.id);
+        db.prepare("UPDATE pos_held_orders SET status = 'cancelled', updated_at = ? WHERE order_id = ? AND status = 'held'").run(now, req.params.id);
+
+        const ordRow = db.prepare('SELECT branch_id, order_type, dining_session_id FROM orders WHERE id = ?').get(req.params.id);
+        if (ordRow) {
+          const { DiningTableService } = require('../../domains/dining');
+          try {
+            DiningTableService.releaseHold({
+              branch_id: ordRow.branch_id,
+              hold_reference_id: req.params.id,
+              reason: 'cancelled'
+            });
+          } catch (relErr) {
+            db.prepare("UPDATE branch_table_holds SET status = 'cancelled', updated_at = ? WHERE hold_reference_id = ? AND status = 'active'").run(now, req.params.id);
+          }
+          if (ordRow.dining_session_id) {
+            try {
+              DiningTableService.completeDiningSession(ordRow.dining_session_id, actor_id);
+            } catch (_) {
+              db.prepare("UPDATE dining_sessions SET status = 'completed', closed_at = ?, updated_at = ? WHERE id = ?").run(now, now, ordRow.dining_session_id);
+            }
+          }
+        }
+      } catch (cancelSyncErr) {
+        console.warn('[Cancel Cleanup Warning]:', cancelSyncErr.message);
+      }
+    }
 
     res.json({ success: true, ...result });
   } catch (err) {
@@ -337,6 +440,11 @@ router.post('/orders/:id/branch-acceptance', requireAuth(['owner', 'brand_manage
           result.dining_session_id = sessionResult.session_id;
         }
 
+        const estimatedMinutes = Math.max(5, Math.min(180, Number(req.body && (req.body.prep_time_minutes || req.body.prepTimeMinutes || req.body.estimated_minutes || req.body.estimatedMinutes)) || 20));
+        const slotEnd = new Date(Date.now() + estimatedMinutes * 60 * 1000).toISOString();
+        db.prepare("UPDATE orders SET scheduled_slot_end = ?, updated_at = ? WHERE id = ?")
+          .run(slotEnd, new Date().toISOString(), order.id);
+
         orderRepo.commitTransaction();
         return res.json({ success: true, decision, ...result });
       }
@@ -507,8 +615,8 @@ router.post('/admin/orders/:id/assign-driver', requireAuth(['owner', 'brand_mana
       return res.status(400).json({ success: false, error: 'Penugasan driver hanya berlaku untuk pesanan delivery.' });
     }
 
-    if (order.status !== 'ready') {
-      return res.status(400).json({ success: false, error: 'Driver hanya dapat ditugaskan saat pesanan sudah berstatus ready.' });
+    if (!['confirmed', 'preparing', 'ready'].includes(order.status)) {
+      return res.status(400).json({ success: false, error: 'Driver hanya dapat ditugaskan saat pesanan berstatus confirmed, preparing, atau ready.' });
     }
 
     let resolvedDriverName = driver_name ? String(driver_name).trim() : '';
@@ -566,6 +674,47 @@ router.post('/admin/orders/:id/assign-driver', requireAuth(['owner', 'brand_mana
     });
   } catch (err) {
     return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/v1/admin/orders/:id/auto-dispatch
+// Trigger automatic/hybrid driver dispatch manually for an order
+router.post('/admin/orders/:id/auto-dispatch', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const order = db.prepare('SELECT * FROM orders WHERE id = ? AND brand_id = ?').get(orderId, req.brand_id);
+    if (!order) return res.status(404).json({ success: false, error: 'Pesanan tidak ditemukan.' });
+
+    if (req.user.role === 'branch_manager' && req.user.branchId && String(req.user.branchId) !== String(order.branch_id)) {
+      return res.status(403).json({ success: false, error: 'Akses ditolak: Pesanan berada di luar cabang wewenang Anda.' });
+    }
+
+    const { DeliveryDispatchService } = require('../../domains/delivery');
+    const result = DeliveryDispatchService.autoAssign({ order_id: order.id, branch_id: order.branch_id });
+    const deliveryRecord = db.prepare('SELECT * FROM order_deliveries WHERE order_id = ?').get(order.id);
+
+    return res.json({
+      success: result.success,
+      order_id: order.id,
+      order_number: order.order_number,
+      delivery: deliveryRecord,
+      ...result
+    });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/v1/admin/orders/check-hybrid-timeouts
+// Watchdog endpoint to process hybrid dispatch timeouts and trigger BM manual fallback
+router.post('/admin/orders/check-hybrid-timeouts', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const { DeliveryDispatchService } = require('../../domains/delivery');
+    const branchId = req.user.role === 'branch_manager' ? (req.user.branchId || req.user.branch_id) : (req.query.branch_id || null);
+    const timedOut = DeliveryDispatchService.checkHybridTimeouts({ branch_id: branchId });
+    return res.json({ success: true, timed_out_count: timedOut.length, timed_out_orders: timedOut });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 

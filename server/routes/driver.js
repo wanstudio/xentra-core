@@ -33,7 +33,7 @@ function registerDriverRoutes(router, deps = {}) {
       'd.destination_longitude, d.actual_road_distance_meters, d.actual_duration_seconds, ' +
       'd.cod_collection_status, d.cod_cash_custody, d.cod_collected_amount, d.cod_amount_tendered, ' +
       'd.cod_change_given, d.cod_handed_over_at, d.cod_handed_over_to, ' +
-      'd.arrived_at, d.created_at AS delivery_created_at, d.updated_at AS delivery_updated_at, ' +
+      'd.arrived_at, d.pod_photo_url, d.pod_bypass_reason, d.pod_note, d.created_at AS delivery_created_at, d.updated_at AS delivery_updated_at, ' +
       'o.order_number, o.status AS order_status, o.order_type, o.customer_id, o.customer_name, ' +
       'o.customer_phone, o.recipient_name, o.recipient_phone, o.grand_total, o.payment_method, ' +
       'o.branch_id, b.name AS branch_name, b.address_text AS branch_address, b.latitude AS branch_latitude, b.longitude AS branch_longitude ' +
@@ -41,6 +41,7 @@ function registerDriverRoutes(router, deps = {}) {
       'JOIN orders o ON o.id = d.order_id ' +
       'LEFT JOIN branches b ON b.id = o.branch_id ' +
       'WHERE d.order_id = ? AND d.driver_id = ? AND o.brand_id = ? AND o.order_type = ? AND o.branch_id = ? ' +
+      "AND o.status NOT IN ('cancelled', 'rejected', 'timeout') " +
       'LIMIT 1'
     ).get(orderId, driverId, brandId, 'delivery', driverBranchId);
 
@@ -101,6 +102,11 @@ function registerDriverRoutes(router, deps = {}) {
       distance_meters: task.actual_road_distance_meters !== null ? Number(task.actual_road_distance_meters) : null,
       duration_seconds: task.actual_duration_seconds !== null ? Number(task.actual_duration_seconds) : null,
       arrived_at: task.arrived_at || null,
+      pod: {
+        photo_url: task.pod_photo_url || null,
+        bypass_reason: task.pod_bypass_reason || null,
+        note: task.pod_note || null
+      },
       created_at: task.delivery_created_at,
       updated_at: task.delivery_updated_at
     };
@@ -210,6 +216,11 @@ function registerDriverRoutes(router, deps = {}) {
           updates.push('vehicle_type = ?');
           params.push(cleanVehicle);
         }
+      }
+
+      if (typeof body.avatar_url === 'string') {
+        updates.push('avatar_url = ?');
+        params.push(body.avatar_url.trim());
       }
 
       if (!updates.length) {
@@ -347,6 +358,7 @@ function registerDriverRoutes(router, deps = {}) {
         'JOIN orders o ON o.id = d.order_id ' +
         'WHERE d.driver_id = ? AND o.brand_id = ? AND o.order_type = ? AND o.branch_id = ? ' +
         'AND d.status IN (?, ?, ?) ' +
+        "AND o.status NOT IN ('cancelled', 'rejected', 'timeout') " +
         'ORDER BY CASE WHEN d.status = ? THEN 0 WHEN d.status = ? THEN 1 ELSE 2 END, ' +
         'datetime(d.updated_at) DESC, d.rowid DESC'
       ).all(
@@ -523,11 +535,20 @@ function registerDriverRoutes(router, deps = {}) {
   router.post('/driver/tasks/:orderId/complete', driverAuth, (req, res) => {
     const rawTendered = req.body && req.body.cod_amount_tendered;
     const hasTendered = rawTendered !== undefined && rawTendered !== null && rawTendered !== '';
+    const podPhotoUrl = req.body && (req.body.pod_photo_url || req.body.pod_photo);
+    const podBypassReason = req.body && req.body.pod_bypass_reason;
+    const podNote = req.body && req.body.pod_note;
+
     executeDeliveryTransition(
       req,
       res,
       DeliveryModel.STATUS.DELIVERED,
-      hasTendered ? { cod_amount_tendered: Number(rawTendered) } : {}
+      {
+        ...(hasTendered ? { cod_amount_tendered: Number(rawTendered) } : {}),
+        pod_photo_url: podPhotoUrl || null,
+        pod_bypass_reason: podBypassReason || null,
+        pod_note: podNote || null
+      }
     );
     try {
       db.prepare("UPDATE driver_locations SET active_order_id = NULL WHERE driver_id = ? AND active_order_id = ?").run(actorId(req), req.params.orderId);
@@ -645,10 +666,33 @@ function registerDriverRoutes(router, deps = {}) {
         `).run(logId, driverId, activeOrderId, lat, lng, acc, head, spd, mock, bat);
       }
 
+      // Check for incoming pending driver assignments needing alert
+      const pendingTask = db.prepare(`
+        SELECT d.order_id, o.order_number, c.name AS customer_name,
+               d.destination_address, o.total_amount,
+               (SELECT COUNT(*) FROM order_items oi WHERE oi.order_id = o.id) AS item_count
+        FROM order_deliveries d
+        JOIN orders o ON o.id = d.order_id
+        LEFT JOIN customers c ON c.id = o.customer_id
+        WHERE d.driver_id = ? AND o.brand_id = ?
+          AND d.status = ?
+          AND d.driver_assignment_status = ?
+        ORDER BY datetime(d.updated_at) DESC
+        LIMIT 1
+      `).get(driverId, brandId, DeliveryModel.STATUS.ASSIGNED, DeliveryModel.ASSIGNMENT_RESPONSES.PENDING);
+
       res.json({
         success: true,
         recorded_at: new Date().toISOString(),
         active_order_id: activeOrderId,
+        pending_assignment: pendingTask ? {
+          order_id: pendingTask.order_id,
+          order_number: pendingTask.order_number,
+          customer_name: pendingTask.customer_name || 'Pelanggan',
+          destination_address: pendingTask.destination_address || '',
+          item_count: Number(pendingTask.item_count || 0),
+          total: Number(pendingTask.total_amount || 0)
+        } : null,
         is_mock: Boolean(mock)
       });
     } catch (err) {
