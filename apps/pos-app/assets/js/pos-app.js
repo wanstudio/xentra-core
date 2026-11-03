@@ -5461,7 +5461,13 @@
     if($('pos-user-profile-btn')) $('pos-user-profile-btn').onclick=openCashierProfileModal;
     $('btn-pos-logout').onclick=function(){clearPosSessionAndReturnToPin();};
     bindPosStatus();
-    $('pos-modal').onclick=function(e){if(e.target===this)hideModal();};
+    $('pos-modal').onclick=function(e){
+      if(e.target!==this)return;
+      // Profile & settings contains device setup controls; on touch screens an
+      // edge tap/scroll can land on the backdrop. Require an explicit close.
+      if(this.classList.contains('pos-modal-profile-settings'))return;
+      hideModal();
+    };
     if($('pos-mcart-trigger-order')){
       $('pos-mcart-trigger-order').onclick=function(e){
         e.stopPropagation();
