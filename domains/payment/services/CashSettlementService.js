@@ -56,7 +56,7 @@ class CashSettlementService {
       // Order completion does not close the payment lifecycle for cash/COD.
       // Non-COD orders (dine_in, take_away, etc.) in 'completed' state must strictly reject cash settlement.
       if (order.order_type !== 'delivery') {
-        throw new Error(`[CashSettlementService] Tidak dapat menyelesaikan pembayaran tunai untuk pesanan yang sudah berada pada status terminal "${order.status}".`);
+        throw new Error('[CashSettlementService] Pesanan sudah selesai. Pelunasan tunai hanya tersedia untuk COD delivery yang belum disetor ke kasir.');
       }
       if (order.payment_method !== 'cash') {
         throw new Error(`[CashSettlementService] Tidak dapat menyelesaikan pembayaran tunai untuk pesanan "${order_id}" yang sudah selesai dan bukan pembayaran tunai/COD.`);

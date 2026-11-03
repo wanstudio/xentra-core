@@ -4049,20 +4049,8 @@
   function updateTransaksiStats(){
     var badge=$('pos-transaksi-stats');
     if(!badge)return;
-    var shiftStart = (state.shift && state.shift.opened_at) ? new Date(state.shift.opened_at).getTime() : 0;
-    var todayStart = new Date();
-    todayStart.setHours(0,0,0,0);
-    var startTime = (shiftStart > 0) ? shiftStart : todayStart.getTime();
-    var sales = state.sales || [];
-    var count = sales.filter(function(s){
-      var t = s.created_at ? new Date(s.created_at).getTime() : 0;
-      var ps = (s.payment_status || '').toLowerCase();
-      var isPaid = !ps || ps === 'paid' || ps === 'settled' || ps === 'settlement';
-      var st = (s.status || '').toLowerCase();
-      var isNotCancelled = !['cancelled','rejected','timeout','expired','fulfillment_exception','void'].includes(st);
-      return t >= startTime && isPaid && isNotCancelled;
-    }).length;
-    badge.textContent = count + ' Transaksi';
+    var count = (state.sales || []).length;
+    badge.textContent = count + ' Tagihan Berjalan';
   }
 
   async function loadSales(){
@@ -4079,7 +4067,7 @@
   function renderSales(){
     updateTransaksiStats();
     var box=$('pos-sales-list');if(!box)return;
-    if(!state.sales.length){box.innerHTML='<div class="pos-empty">Belum ada transaksi POS.</div>';return;}
+    if(!state.sales.length){box.innerHTML='<div class="pos-empty">Tidak ada pembayaran yang perlu ditangani saat ini.</div>';return;}
     box.innerHTML=state.sales.map(function(s){
       var isOjol = s.order_channel === 'gofood' || s.order_channel === 'grabfood' || s.order_channel === 'shopeefood';
       var orderStatus = String(s.status || '').toLowerCase();
@@ -4549,8 +4537,16 @@
       var d = res.delivery || null;
       var p = res.payment || {};
       var items = res.items || [];
-      var isCodPending = o.order_type === 'delivery' && o.payment_method === 'cash' && p.payment_status !== 'settlement' && p.payment_status !== 'paid';
-      var isUnpaid = !isCodPending && p.payment_status !== 'settlement' && p.payment_status !== 'paid' && o.payment_status !== 'settlement' && o.payment_status !== 'paid';
+      var orderStatus = String(o.status || '').toLowerCase();
+      var isTerminalOrder = ['pending','cancelled','rejected','timeout','expired','fulfillment_exception'].includes(orderStatus);
+      var paymentMethod = String(p.payment_method || o.payment_method || '').toLowerCase();
+      var hasUnsettledPayment = p.payment_status !== 'settlement' && p.payment_status !== 'paid' && o.payment_status !== 'settlement' && o.payment_status !== 'paid';
+      var canSettleCash = !isTerminalOrder && paymentMethod === 'cash' && (
+        o.order_type === 'delivery' ||
+        ((o.order_type === 'dine_in' || o.order_type === 'pickup') && orderStatus !== 'completed')
+      );
+      var isCodPending = canSettleCash && o.order_type === 'delivery' && hasUnsettledPayment;
+      var isUnpaid = canSettleCash && !isCodPending && hasUnsettledPayment;
 
       var isOjol = o.order_channel === 'gofood' || o.order_channel === 'grabfood' || o.order_channel === 'shopeefood';
       var oChannelName = isOjol

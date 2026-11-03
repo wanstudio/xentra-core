@@ -18,7 +18,7 @@ var STATIC_ASSETS = [
   "/merchant-shared/js/audio-alerts.js?v=1.0.1",
   "/pos/assets/js/TransactionComposer.js?v=1.0.11",
   "/pos/assets/js/PosOfflineStore.js?v=1.0.0",
-  "/pos/assets/js/pos-app.js?v=1.0.40"
+  "/pos/assets/js/pos-app.js?v=1.0.41"
 ];
 
 var _cacheNamePromise = null;
