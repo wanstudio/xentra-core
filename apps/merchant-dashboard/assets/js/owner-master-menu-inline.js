@@ -209,17 +209,152 @@
     return product;
   }
 
-  async function createCategoryInline() {
-    var result = await requestFieldsSheet({
-      id: 'master-menu-inline-category',
-      title: 'Buat Kategori',
-      eyebrow: 'Taxonomy',
-      description: 'Kategori adalah parent taxonomy untuk mengelompokkan Menu.',
-      saveLabel: 'Simpan & Pilih Kategori',
-      fields: [{ name: 'name', label: 'Nama Kategori', placeholder: 'Contoh: Makanan', required: true }]
+  function openAddCategoryModal() {
+    return new Promise(function(resolve) {
+      var existing = document.getElementById('xentra-add-category-modal-backdrop');
+      if (existing) existing.remove();
+
+      var backdrop = document.createElement('div');
+      backdrop.id = 'xentra-add-category-modal-backdrop';
+      backdrop.setAttribute('style', 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,0.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;');
+
+      var card = document.createElement('div');
+      card.setAttribute('style', 'width:353px;max-width:calc(100vw - 32px);max-height:90vh;overflow-y:auto;background:white;box-shadow:0px 2px 10px rgba(0,0,0,0.20);border-radius:16px;padding:18px 17px;display:flex;flex-direction:column;gap:17px;box-sizing:border-box;font-family:\'Plus Jakarta Sans\',sans-serif;');
+
+      var title = document.createElement('div');
+      title.setAttribute('style', 'color:#0F172A;font-size:18px;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:700;line-height:18px;text-align:left;');
+      title.textContent = 'Tambah kategori';
+
+      var formBody = document.createElement('div');
+      formBody.setAttribute('style', 'align-self:stretch;display:flex;flex-direction:column;gap:16px;width:100%;box-sizing:border-box;');
+
+      // Card 1: Nama Kategori
+      var card1 = document.createElement('div');
+      card1.setAttribute('style', 'align-self:stretch;min-height:123px;padding:16px;background:white;border-radius:14px;outline:0.50px #D9D9D9 solid;outline-offset:-0.50px;display:flex;flex-direction:column;justify-content:space-between;box-sizing:border-box;width:100%;');
+
+      var card1Inner = document.createElement('div');
+      card1Inner.setAttribute('style', 'width:100%;display:flex;flex-direction:column;gap:4px;');
+
+      var label = document.createElement('div');
+      label.setAttribute('style', 'align-self:stretch;text-align:left;');
+      label.innerHTML = '<span style="color:#0F172A;font-size:16px;font-weight:700;">Nama kategori </span><span style="color:#FA3E3E;font-size:16px;font-weight:700;">*</span>';
+
+      var inputWrapper = document.createElement('div');
+      inputWrapper.setAttribute('style', 'align-self:stretch;height:48px;position:relative;overflow:hidden;border-radius:14px;outline:1px #CBD5E1 solid;outline-offset:-1px;display:flex;align-items:center;background:white;box-sizing:border-box;');
+
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.maxLength = 150;
+      input.placeholder = 'Cth. Makanan Berat';
+      input.setAttribute('style', 'width:100%;height:100%;border:none;outline:none;background:transparent;padding:0 16px;font-size:13px;font-weight:500;color:#0F172A;font-family:\'Plus Jakarta Sans\',sans-serif;box-sizing:border-box;');
+
+      inputWrapper.appendChild(input);
+
+      var counter = document.createElement('div');
+      counter.setAttribute('style', 'align-self:stretch;text-align:right;color:#94A3B8;font-size:10px;font-weight:400;');
+      counter.textContent = '0/150';
+
+      card1Inner.appendChild(label);
+      card1Inner.appendChild(inputWrapper);
+      card1Inner.appendChild(counter);
+      card1.appendChild(card1Inner);
+
+      // Card 2: Aktifkan Kategori
+      var card2 = document.createElement('div');
+      card2.setAttribute('style', 'align-self:stretch;padding:16px;background:white;border-radius:14px;outline:0.50px #D9D9D9 solid;outline-offset:-0.50px;display:flex;justify-content:space-between;align-items:center;box-sizing:border-box;width:100%;');
+
+      var card2Text = document.createElement('div');
+      card2Text.setAttribute('style', 'display:flex;flex-direction:column;gap:4px;text-align:left;max-width:248px;');
+      card2Text.innerHTML = '<div style="color:black;font-size:16px;font-weight:700;">Aktifkan kategori</div><div style="color:#94A3B8;font-size:13px;font-weight:500;">Kategori menu yang aktif akan terlihat</div>';
+
+      var toggleBtn = document.createElement('button');
+      toggleBtn.type = 'button';
+      var isActive = true;
+      function renderToggle() {
+        toggleBtn.setAttribute('style', 'width:35px;height:21px;padding:2px;border-radius:100px;background:' + (isActive ? '#00A637' : '#E2E8F0') + ';outline:0.50px ' + (isActive ? '#009A33' : '#CBD5E1') + ' solid;outline-offset:-0.50px;box-shadow:' + (isActive ? '-1px 2px 5px rgba(0,0,0,0.15)' : 'none') + ';display:flex;align-items:center;justify-content:' + (isActive ? 'flex-end' : 'flex-start') + ';border:none;cursor:pointer;position:relative;box-sizing:border-box;transition:all 0.2s;');
+        toggleBtn.innerHTML = '<div style="width:21px;height:21px;background:white;border-radius:9999px;box-shadow:0px 4px 15px rgba(0,0,0,0.15);position:relative;' + (isActive ? 'transform:translateX(14px);' : 'transform:translateX(0px);') + 'transition:transform 0.2s ease-out;"><div style="width:7px;height:0px;left:6px;top:7px;position:absolute;transform:rotate(90deg);outline:1px white solid;outline-offset:-0.50px;opacity:' + (isActive ? '1' : '0') + ';"></div></div>';
+      }
+      renderToggle();
+      toggleBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        isActive = !isActive;
+        renderToggle();
+      });
+
+      card2.appendChild(card2Text);
+      card2.appendChild(toggleBtn);
+
+      formBody.appendChild(card1);
+      formBody.appendChild(card2);
+
+      // Card 3: Submit Button
+      var submitBtn = document.createElement('button');
+      submitBtn.type = 'button';
+      submitBtn.setAttribute('style', 'align-self:stretch;height:48px;padding:12px 24px;background:#F2F2F2;color:#979797;border-radius:9999px;border:none;font-size:14px;font-weight:700;font-family:\'Plus Jakarta Sans\',sans-serif;display:flex;justify-content:center;align-items:center;cursor:not-allowed;width:100%;box-sizing:border-box;');
+      submitBtn.textContent = 'Buat kategori';
+
+      function updateSubmitState() {
+        var val = input.value.trim();
+        counter.textContent = input.value.length + '/150';
+        if (val.length > 0) {
+          submitBtn.style.background = '#0F172A';
+          submitBtn.style.color = '#FFFFFF';
+          submitBtn.style.cursor = 'pointer';
+        } else {
+          submitBtn.style.background = '#F2F2F2';
+          submitBtn.style.color = '#979797';
+          submitBtn.style.cursor = 'not-allowed';
+        }
+      }
+
+      input.addEventListener('input', updateSubmitState);
+
+      function closeModal() {
+        backdrop.remove();
+        document.removeEventListener('keydown', onEsc);
+      }
+
+      function onEsc(e) {
+        if (e.key === 'Escape') {
+          closeModal();
+          resolve(null);
+        }
+      }
+      document.addEventListener('keydown', onEsc);
+
+      backdrop.addEventListener('click', function(e) {
+        if (e.target === backdrop) {
+          closeModal();
+          resolve(null);
+        }
+      });
+
+      submitBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        var val = input.value.trim();
+        if (!val) return;
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Menyimpan...';
+        closeModal();
+        resolve({ name: val, is_active: isActive ? 1 : 0 });
+      });
+
+      card.appendChild(title);
+      card.appendChild(formBody);
+      card.appendChild(submitBtn);
+      backdrop.appendChild(card);
+      document.body.appendChild(backdrop);
+
+      setTimeout(function() {
+        input.focus();
+      }, 50);
     });
+  }
+
+  async function createCategoryInline() {
+    var result = await openAddCategoryModal();
     if (!result) return;
-    var data = await requestJson('/admin/categories', { method: 'POST', body: JSON.stringify({ name: result.name }) });
+    var data = await requestJson('/admin/categories', { method: 'POST', body: JSON.stringify({ name: result.name, is_active: result.is_active }) });
     var category = data.category;
     var menuApi = window.XentraOwnerMasterMenu;
     if (menuApi && typeof menuApi.upsertDependency === 'function') {

@@ -3,13 +3,14 @@
  * Scope: /owner/
  */
 
-var CACHE_NAME = 'mybangjo-owner-v1.8.29';
+var CACHE_NAME = 'mybangjo-owner-v1.8.111';
 
 var STATIC_ASSETS = [
   '/owner/',
   '/owner/manifest.json',
   '/owner/assets/icons/icon-192.png',
   '/owner/assets/icons/icon-512.png',
+  '/owner/assets/img/cat-chef-recipe.png',
   '/owner/assets/css/owner-app.css',
   '/owner/assets/js/owner-app.js',
   '/merchant-shared/fonts/plus-jakarta-sans.css',
@@ -47,9 +48,10 @@ self.addEventListener('activate', function (event) {
 self.addEventListener('fetch', function (event) {
   var url = new URL(event.request.url);
 
-  // Always network-only for APIs, Auth, dynamic bundles, scripts, and versioned assets
+  // Always network-only for APIs, Admin endpoints, Auth, dynamic bundles, scripts, and versioned assets
   if (
     url.pathname.startsWith('/api/') ||
+    url.pathname.startsWith('/admin/') ||
     url.pathname.startsWith('/auth/') ||
     url.pathname.includes('/bundles/') ||
     url.pathname.includes('/assets/js/') ||

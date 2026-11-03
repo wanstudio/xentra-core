@@ -17,11 +17,15 @@
         <ProgressBar
             android:id="@+id/progressBar"
             style="?android:attr/progressBarStyleHorizontal"
-            android:layout_width="match_parent"
-            android:layout_height="4dp"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:alpha="0"
             android:indeterminate="false"
             android:max="100"
-            android:progressDrawable="@color/primary"
+            android:progressDrawable="@android:color/transparent"
+            android:progressTint="@android:color/transparent"
+            android:progressBackgroundTint="@android:color/transparent"
+            android:indeterminateTint="@android:color/transparent"
             android:visibility="gone" />
 
     </FrameLayout>

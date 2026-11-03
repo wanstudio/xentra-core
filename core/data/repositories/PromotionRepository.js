@@ -69,7 +69,7 @@ class PromotionRepository {
       const rewards = this.findRewards(p.id);
       const scopes = this.findBranchScopes(p.id);
       const redemptionsCount = this.db.queryOne(
-        "SELECT COUNT(*) as cnt, COALESCE(SUM(benefit_amount), 0) as total_benefit FROM promotion_redemptions WHERE promotion_id = ? AND status = 'active'",
+        "SELECT COUNT(*) as cnt, COALESCE(SUM(benefit_amount), 0) as total_benefit FROM promotion_redemption_members WHERE promotion_id = ? AND status = 'active'",
         [p.id]
       );
       return {
@@ -155,7 +155,13 @@ class PromotionRepository {
 
     const countRow = this.db.queryOne(`
       SELECT COUNT(*) as total
-      FROM promotion_redemptions pr
+      FROM (
+        SELECT id, promotion_id, brand_id, branch_id, order_id, customer_phone, benefit_amount, status, redeemed_at
+        FROM promotion_redemptions
+        UNION
+        SELECT id, promotion_id, brand_id, branch_id, order_id, customer_phone, benefit_amount, status, redeemed_at
+        FROM promotion_redemption_members
+      ) pr
       ${whereSql}
     `, params);
 
@@ -176,7 +182,13 @@ class PromotionRepository {
         pr.benefit_amount as discount_amount,
         pr.status,
         pr.redeemed_at
-      FROM promotion_redemptions pr
+      FROM (
+        SELECT id, promotion_id, brand_id, branch_id, order_id, customer_phone, benefit_amount, status, redeemed_at
+        FROM promotion_redemptions
+        UNION
+        SELECT id, promotion_id, brand_id, branch_id, order_id, customer_phone, benefit_amount, status, redeemed_at
+        FROM promotion_redemption_members
+      ) pr
       JOIN promotions p ON pr.promotion_id = p.id
       LEFT JOIN branches b ON pr.branch_id = b.id
       ${whereSql}
@@ -229,11 +241,32 @@ class PromotionRepository {
 
   countCustomerRedemptions({ promotionId, customerPhone }) {
     const row = this.db.queryOne(`
-      SELECT COUNT(*) as count
-      FROM promotion_redemptions
-      WHERE promotion_id = ? AND customer_phone = ? AND status = 'active'
-    `, [promotionId, customerPhone]);
+      SELECT (
+        SELECT COUNT(*) FROM promotion_redemption_members
+        WHERE promotion_id = ? AND customer_phone = ? AND status = 'active'
+      ) + (
+        SELECT COUNT(*) FROM promotion_redemptions legacy
+        WHERE promotion_id = ? AND customer_phone = ? AND status = 'active'
+          AND NOT EXISTS (
+            SELECT 1 FROM promotion_redemption_members member
+            WHERE member.order_id = legacy.order_id
+              AND member.promotion_id = legacy.promotion_id
+              AND member.customer_phone = legacy.customer_phone
+          )
+      ) AS count
+    `, [promotionId, customerPhone, promotionId, customerPhone]);
     return Number(row?.count || 0);
+  }
+
+  hasOrderMemberRedemption({ orderId, promotionId, customerPhone }) {
+    return Boolean(this.db.queryOne(`
+      SELECT 1 AS found FROM promotion_redemption_members
+      WHERE order_id = ? AND promotion_id = ? AND customer_phone = ? AND status = 'active'
+      UNION ALL
+      SELECT 1 AS found FROM promotion_redemptions
+      WHERE order_id = ? AND promotion_id = ? AND customer_phone = ? AND status = 'active'
+      LIMIT 1
+    `, [orderId, promotionId, customerPhone, orderId, promotionId, customerPhone]));
   }
 
   findPromotion(promotionId) {
@@ -251,7 +284,7 @@ class PromotionRepository {
     const rewards = this.findRewards(promo.id);
     const scopes = this.findBranchScopes(promo.id);
     const redemptionsCount = this.db.queryOne(
-      "SELECT COUNT(*) as cnt, COALESCE(SUM(benefit_amount), 0) as total_benefit FROM promotion_redemptions WHERE promotion_id = ? AND status = 'active'",
+      "SELECT COUNT(*) as cnt, COALESCE(SUM(benefit_amount), 0) as total_benefit FROM promotion_redemption_members WHERE promotion_id = ? AND status = 'active'",
       [promo.id]
     );
 
@@ -512,29 +545,30 @@ class PromotionRepository {
     orderId,
     brandId,
     branchId,
+    customerId = null,
     customerPhone,
     benefitAmount
   }) {
+    const cleanPhone = String(customerPhone || '').trim();
+    if (!cleanPhone) throw new Error('[PromotionRepository] Customer phone is required for a member redemption.');
     return this.db.execute(`
-      INSERT INTO promotion_redemptions (
-        id, promotion_id, order_id, brand_id, branch_id, customer_phone,
+      /* promotion_redemptions order summary is kept in sync by the ledger trigger. */
+      INSERT INTO promotion_redemption_members (
+        id, promotion_id, order_id, brand_id, branch_id, customer_id, customer_phone,
         benefit_amount, status, redeemed_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', datetime('now'))
-      ON CONFLICT(order_id, promotion_id) DO NOTHING
-    `, [
-      redemptionId,
-      promotionId,
-      orderId,
-      brandId,
-      branchId,
-      customerPhone || '',
-      benefitAmount
-    ]);
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', datetime('now'))
+      ON CONFLICT(order_id, promotion_id, customer_phone) DO NOTHING
+    `, [redemptionId, promotionId, orderId, brandId, branchId, customerId || null, cleanPhone, benefitAmount]);
   }
 
   voidRedemptions({ orderId, reason }) {
-    return this.db.execute(`
+    this.db.execute(`
       UPDATE promotion_redemptions
+      SET status = 'voided', voided_at = datetime('now'), void_reason = ?
+      WHERE order_id = ? AND status = 'active'
+    `, [reason, orderId]);
+    return this.db.execute(`
+      UPDATE promotion_redemption_members
       SET status = 'voided', voided_at = datetime('now'), void_reason = ?
       WHERE order_id = ? AND status = 'active'
     `, [reason, orderId]);

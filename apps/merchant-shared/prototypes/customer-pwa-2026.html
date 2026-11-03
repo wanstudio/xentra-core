@@ -1,0 +1,2579 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Customer PWA — Interactive 1:1 Prototype | MyBangjo</title>
+  
+  <!-- Typography: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    /* ==========================================================================
+       XENTRA / BANGJO CUSTOMER PWA DESIGN TOKENS
+       1:1 Match with apps/customer-pwa/assets/css/tokens.css
+       ========================================================================== */
+    :root {
+      --x-font: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      
+      /* Bangjo Official Lime Brand Primary */
+      --x-primary: #b6ff00;
+      --x-primary-dark: #98d600;
+      --x-primary-bg: #f7ffd9;
+      --x-primary-text: #111111;
+      --x-primary-shadow: rgba(182, 255, 0, 0.35);
+
+      /* Neutrals */
+      --x-black: #111111;
+      --x-charcoal: #222222;
+      --x-gray-900: #1c1c1c;
+      --x-gray-700: #475569;
+      --x-gray-500: #64748b;
+      --x-gray-400: #94a3b8;
+      --x-gray-200: #e2e8f0;
+      --x-gray-100: #f1f5f9;
+      --x-gray-bg: #f8fafc;
+      --x-white: #ffffff;
+      
+      --x-danger: #e11d48;
+      --x-success: #08a94f;
+      --x-amber: #f59e0b;
+
+      --x-radius-sm: 12px;
+      --x-radius-md: 16px;
+      --x-radius-lg: 20px;
+      --x-radius-xl: 26px;
+      --x-radius-pill: 9999px;
+
+      --x-shadow-card: 0 4px 16px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.02);
+      --x-shadow-dock: 0 -8px 24px rgba(15, 23, 42, 0.08);
+      --x-shadow-sheet: 0 -12px 36px rgba(0, 0, 0, 0.25);
+    }
+
+    [data-theme="dark"] {
+      --x-gray-bg: #0b0f19;
+      --x-white: #131c2e;
+      --x-black: #f8fafc;
+      --x-charcoal: #e2e8f0;
+      --x-gray-900: #cbd5e1;
+      --x-gray-700: #94a3b8;
+      --x-gray-200: #1e293b;
+      --x-gray-100: #182235;
+      --x-shadow-card: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      font-family: var(--x-font);
+      background: #090e17;
+      color: var(--x-black);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 20px 16px 60px;
+      overflow-x: hidden;
+    }
+
+    /* ==========================================================================
+       PRESENTATION / DEMO CONTROL HARNESS (TOP BAR)
+       ========================================================================== */
+    .proto-bar {
+      width: 100%;
+      max-width: 960px;
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: var(--x-radius-pill);
+      padding: 10px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 20px;
+      color: #ffffff;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+      z-index: 1000;
+    }
+
+    .proto-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .proto-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: var(--x-primary);
+      color: #111;
+      font-size: 11px;
+      font-weight: 900;
+      border-radius: 99px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .proto-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow-x: auto;
+    }
+
+    .proto-btn {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #fff;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: var(--x-radius-pill);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+    }
+
+    .proto-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .proto-btn.active {
+      background: #ffffff;
+      color: #0f172a;
+      border-color: #ffffff;
+      font-weight: 800;
+    }
+
+    /* ==========================================================================
+       MOBILE DEVICE CONTAINER (IPHONE / PIXEL CHASSIS)
+       ========================================================================== */
+    .device-shell {
+      width: 100%;
+      max-width: 420px;
+      height: 870px;
+      background: var(--x-gray-bg);
+      border-radius: 46px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 35px 90px -20px rgba(0, 0, 0, 0.7), 0 0 0 10px #1a2234, 0 0 0 12px #2d3748;
+      display: flex;
+      flex-direction: column;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .device-shell.fullscreen-mode {
+      max-width: 480px;
+      height: auto;
+      min-height: 100vh;
+      border-radius: 0;
+      box-shadow: none;
+    }
+
+    /* Device Speaker / Dynamic Island */
+    .device-notch {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 120px;
+      height: 26px;
+      background: #000000;
+      border-radius: 20px;
+      z-index: 9999;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 14px;
+    }
+    .device-camera {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: #111e38;
+      border: 1.5px solid #202b42;
+    }
+
+    /* Main Scrollable App Container */
+    .app-scroll-body {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+      background: var(--x-gray-bg);
+      padding-bottom: 120px;
+      -webkit-overflow-scrolling: touch;
+      position: relative;
+    }
+    .app-scroll-body::-webkit-scrollbar {
+      display: none;
+    }
+
+    /* ==========================================================================
+       1. HERO HEADER (LIME BRAND BANNER & CLOCK)
+       Exact Match with apps/customer-pwa/assets/css/home.css
+       ========================================================================== */
+    .x-hero-header {
+      background: var(--x-primary);
+      padding: 40px 18px 0;
+      position: relative;
+      margin-bottom: 34px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .x-hero-top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    /* Location Pill */
+    .x-hero-loc-pill {
+      background: #ffffff;
+      border: none;
+      outline: none;
+      border-radius: var(--x-radius-pill);
+      padding: 7px 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      color: #111111;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+      transition: all 0.2s ease;
+    }
+    .x-hero-loc-pill:active {
+      transform: scale(0.97);
+    }
+    .x-hero-loc-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .x-hero-loc-text {
+      max-width: 140px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Header Circular Action Icons */
+    .x-hero-action-icons {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .x-hero-icon-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: none;
+      outline: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .x-hero-icon-btn:active {
+      transform: scale(0.92);
+    }
+
+    /* Digital Clock (Kecilkan 50% dari 58px -> 29px) */
+    .x-hero-clock-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 2px 0 6px;
+    }
+    .x-hero-time {
+      font-size: 29px;
+      font-weight: 900;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+      color: #111111;
+      font-variant-numeric: tabular-nums;
+    }
+    .x-hero-date {
+      font-size: 11px;
+      font-weight: 700;
+      color: #1e293b;
+      margin-top: 3px;
+    }
+
+    /* ==========================================================================
+       SEARCH BAR (DI BAWAH JAM / TANGGAL)
+       ========================================================================== */
+    .x-search-wrap {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 0;
+      margin-top: -6px;
+      transform: translateY(50%);
+      position: relative;
+      z-index: 30;
+    }
+    .x-search-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #ffffff;
+      border: none;
+      border-radius: var(--x-radius-pill, 100px);
+      padding: 0 18px;
+      height: 40px;
+      box-sizing: border-box;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .x-search-bar:focus-within {
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+    }
+    .x-search-icon {
+      width: 17px;
+      height: 17px;
+      color: #111111;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .x-search-icon svg {
+      width: 17px;
+      height: 17px;
+      stroke: #111111;
+    }
+    .x-search-input {
+      flex: 1;
+      border: none;
+      outline: none;
+      background: transparent;
+      font-family: inherit;
+      font-size: 13px;
+      font-style: normal;
+      font-weight: 500;
+      color: #111111;
+    }
+    .x-search-input::placeholder {
+      color: #979797;
+      font-size: 13px;
+      font-style: normal;
+      font-weight: 500;
+    }
+    .x-search-clear {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #f1f5f9;
+      color: #979797;
+      border: none;
+      cursor: pointer;
+      padding: 3px;
+      transition: all 0.15s ease;
+    }
+    .x-search-clear:hover {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+    .x-search-clear.is-visible {
+      display: inline-flex;
+    }
+    .x-search-empty-notice {
+      text-align: center;
+      padding: 32px 16px;
+      background: var(--x-white);
+      border-radius: var(--x-radius-card);
+      border: 1px dashed var(--x-gray-200);
+      margin: 8px 0 20px;
+    }
+
+    /* ==========================================================================
+       PROMO TICKER & INSTALL BANNER
+       ========================================================================== */
+    .promo-install-ticker {
+      margin: -14px 18px 12px;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(12px);
+      border-radius: var(--x-radius-pill);
+      padding: 6px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.05);
+      z-index: 10;
+      cursor: pointer;
+    }
+    .ticker-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11.5px;
+      color: #334155;
+      font-weight: 600;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+    .ticker-btn {
+      background: #111111;
+      color: #ffffff;
+      font-family: inherit;
+      font-size: 10.5px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 99px;
+      border: none;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    /* ==========================================================================
+       2. CAROUSEL BANNER (MASCOT BANNER)
+       ========================================================================== */
+    .x-carousel-container {
+      position: relative;
+      margin: 0 18px 18px;
+      z-index: 20;
+    }
+    .x-carousel-slide {
+      width: 100%;
+      aspect-ratio: 640 / 330;
+      border-radius: 22px;
+      overflow: hidden;
+      background: #f1f5f9;
+      box-shadow: 0 10px 25px -4px rgba(0, 0, 0, 0.08);
+      position: relative;
+    }
+    .x-carousel-slide img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .x-carousel-dots {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 10px;
+    }
+    .x-carousel-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #cbd5e1;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .x-carousel-dot.active {
+      width: 22px;
+      border-radius: 3px;
+      background: #111111;
+    }
+
+    /* ==========================================================================
+       3. CATEGORY NAVIGATION TRACK
+       Horizontal scroll with rounded cards and lime green active line
+       ========================================================================== */
+    .x-cat-wrap {
+      margin-bottom: 14px;
+      width: 100%;
+    }
+    .x-cat-track {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      overflow-x: auto;
+      padding: 0 18px;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+    .x-cat-track::-webkit-scrollbar {
+      display: none;
+    }
+
+    .x-cat {
+      background: transparent;
+      border: none;
+      outline: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      padding: 4px 2px 8px;
+      flex-shrink: 0;
+      position: relative;
+    }
+    .x-cat-image-circle {
+      width: 62px;
+      height: 62px;
+      border-radius: 20px;
+      background: #ffffff;
+      border: 1px solid var(--x-gray-200);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+      transition: all 0.2s ease;
+    }
+    .x-cat:hover .x-cat-image-circle,
+    .x-cat.active .x-cat-image-circle {
+      border-color: var(--x-primary-dark);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px var(--x-primary-shadow);
+    }
+    .x-cat-image-circle img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .x-cat-name {
+      font-size: 11px;
+      font-weight: 700;
+      color: #334155;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .x-cat.active .x-cat-name {
+      color: #0f172a;
+      font-weight: 800;
+    }
+    .x-cat-line {
+      width: 0;
+      height: 3px;
+      border-radius: 2px;
+      background: var(--x-primary);
+      transition: width 0.25s ease;
+    }
+    .x-cat.active .x-cat-line {
+      width: 28px;
+      background: #000000;
+    }
+
+    /* ==========================================================================
+       4. PRODUCT LIST & MENU CARDS
+       1:1 Specification from apps/customer-pwa/assets/css/home.css
+       ========================================================================== */
+    .x-products {
+      padding: 0 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .x-product-card {
+      background: var(--x-white);
+      border-radius: 22px;
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border: 1px solid rgba(0, 0, 0, 0.04);
+      box-shadow: var(--x-shadow-card);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .x-product-card:active {
+      transform: scale(0.985);
+    }
+
+    .x-product-info {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .x-product-name {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--x-black);
+      line-height: 1.3;
+    }
+    .x-product-desc {
+      font-size: 11px;
+      color: var(--x-gray-500);
+      line-height: 1.4;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* Spice Indicator (Horizontal 4-dot intensity) */
+    .x-spice-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      color: #e11d48;
+      margin: 2px 0;
+    }
+    .x-spice-dots {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .x-spice-dot {
+      width: 5.5px;
+      height: 5.5px;
+      border-radius: 50%;
+      background: #e2e8f0;
+    }
+    .x-spice-dot.is-filled {
+      background: #e11d48;
+    }
+
+    .x-product-price {
+      font-size: 13.5px;
+      font-weight: 900;
+      color: var(--x-black);
+      margin-top: 4px;
+    }
+
+    /* Right Side: Food Image & Tambah Stepper */
+    .x-product-side {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+      width: 95px;
+    }
+    .x-product-thumb {
+      width: 95px;
+      height: 95px;
+      border-radius: 18px;
+      overflow: hidden;
+      background: #f1f5f9;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    }
+    .x-product-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    /* Tambah Button (Lime Green Pill) */
+    .x-btn-add {
+      width: 100%;
+      background: var(--x-primary);
+      color: #111111;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 800;
+      padding: 6px 12px;
+      border-radius: var(--x-radius-pill);
+      border: none;
+      outline: none;
+      cursor: pointer;
+      box-shadow: 0 4px 12px var(--x-primary-shadow);
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .x-btn-add:active {
+      transform: scale(0.95);
+    }
+
+    /* Active Stepper Control [- QTY +] */
+    .x-stepper-wrap {
+      width: 100%;
+      display: none;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .x-stepper-wrap.show {
+      display: flex;
+    }
+    .x-stepper-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #ffffff;
+      border: 1.5px solid #000000;
+      border-radius: var(--x-radius-pill);
+      padding: 2px 4px;
+    }
+    .x-step-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #f1f5f9;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 800;
+      color: #111;
+    }
+    .x-step-val {
+      font-size: 12px;
+      font-weight: 800;
+      color: #111;
+      min-width: 16px;
+      text-align: center;
+    }
+    .x-btn-note-pill {
+      font-size: 9.5px;
+      font-weight: 700;
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      color: #475569;
+      padding: 3px 6px;
+      border-radius: var(--x-radius-pill);
+      cursor: pointer;
+      text-align: center;
+    }
+    .x-btn-note-pill.has-note {
+      background: #ecfdf5;
+      border-color: #08a94f;
+      color: #08a94f;
+    }
+
+    /* ==========================================================================
+       5. FLOATING CART DOCK (STICKY BOTTOM BAR)
+       ========================================================================== */
+    .x-cart-dock {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: transparent;
+      padding: 10px 16px 24px;
+      z-index: 1500;
+      pointer-events: none;
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      animation: slideUpDock 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .x-cart-dock.show {
+      display: flex;
+      pointer-events: auto;
+    }
+
+    @keyframes slideUpDock {
+      from { transform: translateY(40px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    /* Promo progress pill */
+    .x-promo-dock {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(16px);
+      border-radius: var(--x-radius-pill);
+      padding: 7px 14px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .x-promo-icon {
+      font-size: 14px;
+    }
+    .x-promo-text {
+      flex: 1;
+      font-size: 11px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .x-promo-track {
+      width: 70px;
+      height: 5px;
+      border-radius: 99px;
+      background: #e2e8f0;
+      overflow: hidden;
+    }
+    .x-promo-fill {
+      height: 100%;
+      background: #08a94f;
+      border-radius: 99px;
+      width: 65%;
+    }
+
+    /* Main Cart Bar */
+    .x-cart-bar {
+      background: #111111;
+      border-radius: var(--x-radius-pill);
+      padding: 8px 12px 8px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #ffffff;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .x-cart-bar:active {
+      transform: scale(0.98);
+    }
+
+    .x-cart-summary-text {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .x-cart-count-badge {
+      font-size: 13.5px;
+      font-weight: 900;
+      color: var(--x-primary);
+    }
+    .x-cart-hint-sub {
+      font-size: 10.5px;
+      color: #94a3b8;
+      font-weight: 500;
+    }
+    .x-cart-total-badge {
+      font-size: 15px;
+      font-weight: 900;
+      color: #ffffff;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .x-cart-icon-btn {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: var(--x-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      margin-left: 12px;
+    }
+    .x-cart-icon-btn svg {
+      width: 20px;
+      height: 20px;
+      fill: #111111;
+    }
+    .x-cart-badge-dot {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      background: #e11d48;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 800;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid #111;
+    }
+
+    /* ==========================================================================
+       6. BOTTOM SHEETS & MODALS (OVERLAYS)
+       ========================================================================== */
+    .x-sheet-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+      z-index: 2000;
+      display: none;
+      animation: fadeIn 0.2s ease;
+    }
+    .x-sheet-backdrop.show {
+      display: block;
+    }
+
+    .x-bottom-sheet {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--x-white);
+      border-top-left-radius: 32px;
+      border-top-right-radius: 32px;
+      padding: 16px 20px 28px;
+      z-index: 2100;
+      display: none;
+      flex-direction: column;
+      box-shadow: var(--x-shadow-sheet);
+      max-height: 85vh;
+      animation: slideUpSheet 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .x-bottom-sheet.show {
+      display: flex;
+    }
+
+    @keyframes slideUpSheet {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .x-sheet-handle {
+      width: 38px;
+      height: 4px;
+      border-radius: 2px;
+      background: #cbd5e1;
+      margin: 0 auto 14px;
+    }
+
+    .x-sheet-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--x-gray-200);
+      margin-bottom: 12px;
+    }
+    .x-sheet-title {
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--x-black);
+    }
+    .x-sheet-close-btn {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: var(--x-gray-100);
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--x-gray-500);
+      font-weight: 800;
+    }
+
+    /* Cart Items in Bottom Sheet */
+    .x-sheet-items-list {
+      overflow-y: auto;
+      max-height: 38vh;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding-right: 2px;
+      margin-bottom: 14px;
+    }
+    .x-cart-item-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--x-gray-100);
+    }
+    .x-cart-item-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+    .x-cart-item-img {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      object-fit: cover;
+      background: #f1f5f9;
+      flex-shrink: 0;
+    }
+    .x-cart-item-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+    .x-cart-item-name {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--x-black);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .x-cart-item-sub {
+      font-size: 11px;
+      color: var(--x-gray-500);
+      font-weight: 600;
+    }
+
+    .x-cart-item-stepper {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Total Summary Box */
+    .x-sheet-total-box {
+      background: var(--x-gray-100);
+      border-radius: 18px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+    .x-summary-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--x-gray-700);
+    }
+    .x-summary-row.bold {
+      font-size: 14px;
+      font-weight: 900;
+      color: var(--x-black);
+      border-top: 1px dashed var(--x-gray-200);
+      padding-top: 6px;
+      margin-top: 2px;
+    }
+
+    /* Checkout Main Button */
+    .x-btn-checkout-primary {
+      width: 100%;
+      background: #111111;
+      color: #ffffff;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 800;
+      padding: 14px 20px;
+      border-radius: var(--x-radius-pill);
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+      transition: all 0.2s ease;
+    }
+    .x-btn-checkout-primary:active {
+      transform: scale(0.98);
+    }
+
+    /* ==========================================================================
+       7. CHECKOUT VIEW (SLIDE-IN SPA VIEW)
+       ========================================================================== */
+    .x-view-overlay-page {
+      position: absolute;
+      inset: 0;
+      background: var(--x-gray-bg);
+      z-index: 1800;
+      display: none;
+      flex-direction: column;
+      overflow-y: auto;
+      padding: 50px 18px 40px;
+      animation: slideInRight 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .x-view-overlay-page.show {
+      display: flex;
+    }
+
+    @keyframes slideInRight {
+      from { transform: translateX(100%); }
+      to { transform: translateX(0); }
+    }
+
+    .x-page-header-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .x-btn-back {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 1px solid var(--x-gray-200);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .x-page-header-title {
+      font-size: 18px;
+      font-weight: 900;
+      color: var(--x-black);
+    }
+
+    /* Order Type Selector Pills (Delivery / Pick-up / Dine-in) */
+    .fulfillment-pills-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      background: var(--x-gray-100);
+      padding: 4px;
+      border-radius: var(--x-radius-md);
+      margin-bottom: 16px;
+    }
+    .fulfillment-btn {
+      padding: 9px 4px;
+      border-radius: var(--x-radius-sm);
+      border: none;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--x-gray-700);
+      background: transparent;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      transition: all 0.2s ease;
+    }
+    .fulfillment-btn.active {
+      background: #ffffff;
+      color: #111111;
+      font-weight: 800;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    /* Card Panels in Checkout */
+    .checkout-card {
+      background: var(--x-white);
+      border-radius: 20px;
+      padding: 16px;
+      border: 1px solid var(--x-gray-200);
+      margin-bottom: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .checkout-card-title {
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--x-gray-500);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Payment Methods */
+    .payment-option-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1.5px solid var(--x-gray-200);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .payment-option-row.selected {
+      border-color: #111111;
+      background: var(--x-primary-bg);
+    }
+
+    /* Live Order Status Stepper */
+    .order-tracker-box {
+      background: #ffffff;
+      border-radius: 24px;
+      padding: 20px;
+      border: 1px solid var(--x-gray-200);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .tracker-step-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      position: relative;
+    }
+    .tracker-step-item:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      left: 14px;
+      top: 30px;
+      bottom: -10px;
+      width: 2px;
+      background: #e2e8f0;
+    }
+    .tracker-step-item.done:not(:last-child)::after {
+      background: #08a94f;
+    }
+    .tracker-icon-circle {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: #f1f5f9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 800;
+      z-index: 2;
+    }
+    .tracker-step-item.active .tracker-icon-circle {
+      background: var(--x-primary);
+      color: #111;
+      box-shadow: 0 0 0 4px var(--x-primary-bg);
+    }
+    .tracker-step-item.done .tracker-icon-circle {
+      background: #08a94f;
+      color: #ffffff;
+    }
+
+    /* Floating Toast */
+    .app-toast {
+      position: absolute;
+      top: 50px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-30px);
+      background: #111111;
+      color: #ffffff;
+      padding: 10px 18px;
+      border-radius: var(--x-radius-pill);
+      font-size: 12px;
+      font-weight: 700;
+      z-index: 9999;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .app-toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    @media (max-width: 600px) {
+      body {
+        padding: 0;
+        background: var(--x-gray-bg);
+      }
+      .proto-bar {
+        display: none;
+      }
+      .device-shell {
+        max-width: 100vw;
+        height: 100vh;
+        border-radius: 0;
+        box-shadow: none;
+      }
+      .device-notch {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==========================================================================
+       PRESENTATION CONTROL BAR (PROTOTYPE HARNESS)
+       ========================================================================== -->
+  <header class="proto-bar">
+    <div class="proto-meta">
+      <span class="proto-badge">Customer PWA 2026</span>
+      <span>Bangjo Interactive Prototype (1:1 Exact)</span>
+    </div>
+
+    <div class="proto-controls">
+      <button type="button" class="proto-btn active" id="btn-view-home" onclick="switchPrototypeView('home')">🏠 Katalog</button>
+      <button type="button" class="proto-btn" id="btn-view-detail" onclick="openDemoDetailSheet()">🍗 Detail Modal</button>
+      <button type="button" class="proto-btn" id="btn-view-cart" onclick="openCartSheet()">🛒 Keranjang</button>
+      <button type="button" class="proto-btn" id="btn-view-checkout" onclick="switchPrototypeView('checkout')">💳 Checkout</button>
+      <button type="button" class="proto-btn" id="btn-view-tracker" onclick="switchPrototypeView('tracker')">🛵 Tracking</button>
+      <button type="button" class="proto-btn" id="btn-toggle-frame" onclick="toggleDeviceFrame()">📱 Frame</button>
+      <button type="button" class="proto-btn" id="btn-toggle-theme" onclick="toggleTheme()">🌙 Theme</button>
+    </div>
+  </header>
+
+  <!-- ==========================================================================
+       MOBILE DEVICE CONTAINER
+       ========================================================================== -->
+  <main class="device-shell" id="device-shell">
+    <!-- iPhone Speaker / Dynamic Island -->
+    <div class="device-notch">
+      <div class="device-camera"></div>
+    </div>
+
+    <!-- Floating Toast Notification -->
+    <div class="app-toast" id="app-toast">
+      <span id="toast-icon">✓</span>
+      <span id="toast-text">Item ditambahkan ke keranjang</span>
+    </div>
+
+    <!-- MAIN SCROLLABLE APP BODY -->
+    <div class="app-scroll-body" id="app-scroll-body">
+      
+      <!-- ── 1. HERO HEADER (LIME BRAND & DIGITAL CLOCK) ── -->
+      <section class="x-hero-header">
+        <div class="x-hero-top-row">
+          <!-- Location Pill -->
+          <button type="button" class="x-hero-loc-pill" onclick="openLocationSheet()" aria-label="Pilih lokasi pengiriman">
+            <span class="x-hero-loc-icon">
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.5 0.9375C6.13298 0.939113 4.8224 1.48288 3.85577 2.44951C2.88913 3.41615 2.34537 4.72672 2.34375 6.09375C2.3425 7.21082 2.70737 8.29753 3.3825 9.1875C3.3825 9.1875 3.52313 9.37266 3.5461 9.39937L7.5 14.0625L11.4558 9.39703C11.4764 9.37219 11.6175 9.1875 11.6175 9.1875L11.618 9.18609C12.2927 8.29645 12.6573 7.21029 12.6563 6.09375C12.6546 4.72672 12.1109 3.41615 11.1442 2.44951C10.1776 1.48288 8.86703 0.939113 7.5 0.9375ZM7.5 7.96875C7.12916 7.96875 6.76665 7.85878 6.45831 7.65276C6.14997 7.44673 5.90964 7.15389 5.76773 6.81128C5.62581 6.46867 5.58868 6.09167 5.66103 5.72796C5.73338 5.36424 5.91195 5.03015 6.17418 4.76792C6.4364 4.5057 6.77049 4.32712 7.13421 4.25478C7.49792 4.18243 7.87492 4.21956 8.21753 4.36148C8.56015 4.50339 8.85298 4.74371 9.05901 5.05206C9.26504 5.3604 9.375 5.72291 9.375 6.09375C9.37438 6.59084 9.17664 7.06739 8.82514 7.41889C8.47365 7.77039 7.99709 7.96813 7.5 7.96875Z" fill="#111111"/></svg>
+            </span>
+            <span class="x-hero-loc-text" id="header-loc-name">MyBangjo Pringsewu</span>
+          </button>
+
+          <!-- Circular Actions -->
+          <div class="x-hero-action-icons">
+            <!-- Share / Affiliate -->
+            <button type="button" class="x-hero-icon-btn" onclick="openShareSheet()" title="Bagikan & Affiliate">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="18" cy="5" r="3"></circle>
+                <circle cx="6" cy="12" r="3"></circle>
+                <circle cx="18" cy="19" r="3"></circle>
+                <line x1="8.6" y1="10.7" x2="15.4" y2="6.3"></line>
+                <line x1="8.6" y1="13.3" x2="15.4" y2="17.7"></line>
+              </svg>
+            </button>
+            <!-- Scan QR Meja -->
+            <button type="button" class="x-hero-icon-btn" onclick="openQrModal()" title="Scan QR Meja">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 9V6.5A2.5 2.5 0 0 1 6.5 4H9"></path><path d="M15 4h2.5A2.5 2.5 0 0 1 20 6.5V9"></path>
+                <path d="M20 15v2.5a2.5 2.5 0 0 1-2.5 2.5H15"></path><path d="M9 20H6.5A2.5 2.5 0 0 1 4 17.5V15"></path>
+                <path d="M4 12h16"></path>
+              </svg>
+            </button>
+            <!-- Riwayat Pesanan -->
+            <button type="button" class="x-hero-icon-btn" onclick="switchPrototypeView('tracker')" title="Riwayat Pesanan">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+              </svg>
+            </button>
+            <!-- Profil Saya -->
+            <button type="button" class="x-hero-icon-btn" onclick="openProfileSheet()" title="Profil Saya">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Giant Digital Clock (Real-time ticking) -->
+        <div class="x-hero-clock-wrap">
+          <div class="x-hero-time" id="live-time-display">11.45</div>
+          <div class="x-hero-date" id="live-date-display">Kamis, 29 Oktober 2026</div>
+        </div>
+
+        <!-- Search Bar (Under Clock / Date) -->
+        <div class="x-search-wrap">
+          <form class="x-search-bar" id="x-home-search-bar" action="javascript:void(0);" role="search" onsubmit="executePrototypeSearchAndScroll(event)">
+            <button type="submit" class="x-search-icon" aria-label="Cari menu" style="background:transparent;border:none;padding:0;cursor:pointer;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </button>
+            <input 
+              type="search" 
+              id="home-search-input" 
+              class="x-search-input" 
+              placeholder="Cari menu favorit kamu..." 
+              autocomplete="off"
+              enterkeyhint="search"
+              oninput="handleSearchMenu(this.value)"
+              onkeydown="if(event.key==='Enter'||event.keyCode===13){executePrototypeSearchAndScroll(event);}"
+            />
+            <button type="button" class="x-search-clear" id="home-search-clear" onclick="clearSearchMenu()" aria-label="Hapus pencarian">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </form>
+        </div>
+      </section>
+
+      <!-- ── PROMO TICKER BAR ── -->
+      <div class="promo-install-ticker" onclick="showToast('Install App', 'PWA siap di-install ke layar utama HP')">
+        <div class="ticker-left">
+          <span>🎁</span>
+          <span>Install &amp; dapatkan gratis es teh • S&amp;K berlaku</span>
+        </div>
+        <button type="button" class="ticker-btn">Install</button>
+      </div>
+
+      <!-- ── 2. CAROUSEL BANNER (MASCOT BANNER) ── -->
+      <section class="x-carousel-container">
+        <div class="x-carousel-slide">
+          <img src="/assets/uploads/originals/brand_bangjo/med_2bb4cad4f5de8f9b_1789744922498.png" alt="Promo Bangjo Spesial Ayam Tulang Lunak">
+        </div>
+        <div class="x-carousel-dots">
+          <button type="button" class="x-carousel-dot active"></button>
+          <button type="button" class="x-carousel-dot"></button>
+          <button type="button" class="x-carousel-dot"></button>
+        </div>
+      </section>
+
+      <!-- ── 3. CATEGORY TABS (HORIZONTAL TRACK) ── -->
+      <section class="x-cat-wrap">
+        <div class="x-cat-track" id="cat-track">
+          <!-- Cat 1: Rekom -->
+          <button type="button" class="x-cat active" onclick="selectCategory(this, 'rekom')">
+            <div class="x-cat-image-circle">
+              <img src="/assets/uploads/products/prod_1789452222041-1789452222332.png" alt="Rekom">
+            </div>
+            <span class="x-cat-name">Rekom</span>
+            <span class="x-cat-line"></span>
+          </button>
+
+          <!-- Cat 2: Paket Spesial -->
+          <button type="button" class="x-cat" onclick="selectCategory(this, 'spesial')">
+            <div class="x-cat-image-circle">
+              <img src="/assets/uploads/products/prod_1789452133261-1789452133627.png" alt="Paket Spesial">
+            </div>
+            <span class="x-cat-name">Paket Spesial</span>
+            <span class="x-cat-line"></span>
+          </button>
+
+          <!-- Cat 3: Paket Favorit -->
+          <button type="button" class="x-cat" onclick="selectCategory(this, 'favorit')">
+            <div class="x-cat-image-circle">
+              <img src="/assets/uploads/products/prod_1789460441443-1789460442100.png" alt="Paket Favorit">
+            </div>
+            <span class="x-cat-name">Paket Favorit</span>
+            <span class="x-cat-line"></span>
+          </button>
+
+          <!-- Cat 4: Paket Hemat -->
+          <button type="button" class="x-cat" onclick="selectCategory(this, 'hemat')">
+            <div class="x-cat-image-circle">
+              <img src="/assets/uploads/products/prod_1789452367859-1789452368118.png" alt="Paket Hemat">
+            </div>
+            <span class="x-cat-name">Paket Hemat</span>
+            <span class="x-cat-line"></span>
+          </button>
+
+          <!-- Cat 5: Ayam Tulang Lunak -->
+          <button type="button" class="x-cat" onclick="selectCategory(this, 'tulang-lunak')">
+            <div class="x-cat-image-circle">
+              <img src="/assets/uploads/products/272-1789351623131.png" alt="Ayam Tulang Lunak">
+            </div>
+            <span class="x-cat-name">Ayam Tulang Lunak</span>
+            <span class="x-cat-line"></span>
+          </button>
+
+          <!-- Cat 6: Mie Bang Jo -->
+          <button type="button" class="x-cat" onclick="selectCategory(this, 'mie')">
+            <div class="x-cat-image-circle">
+              <img src="/assets/uploads/products/346-1789464614436.png" alt="Mie Bang Jo">
+            </div>
+            <span class="x-cat-name">Mie Bang Jo</span>
+            <span class="x-cat-line"></span>
+          </button>
+
+          <!-- Cat 7: Minuman -->
+          <button type="button" class="x-cat" onclick="selectCategory(this, 'minuman')">
+            <div class="x-cat-image-circle">
+              <img src="/assets/uploads/products/401-1789466032747.png" alt="Minuman">
+            </div>
+            <span class="x-cat-name">Minuman</span>
+            <span class="x-cat-line"></span>
+          </button>
+        </div>
+      </section>
+
+      <!-- ── 4. PRODUCT CARDS LIST (AUTHENTIC MENU) ── -->
+      <section class="x-products" id="product-list-container">
+        
+        <!-- Item 1: Paket Bagong Ayam Negri -->
+        <article class="x-product-card" data-id="p1" onclick="openItemDetail('p1')">
+          <div class="x-product-info">
+            <h3 class="x-product-name">Paket Bagong Ayam Negri</h3>
+            <p class="x-product-desc">Ayam Negri + Tempe Goreng + Lalapan + Sambal Terasi + Nasi Putih + Es Teh Manis</p>
+            <div class="x-spice-indicator">
+              <span>Pedas</span>
+              <div class="x-spice-dots">
+                <span class="x-spice-dot is-filled"></span>
+                <span class="x-spice-dot is-filled"></span>
+                <span class="x-spice-dot"></span>
+                <span class="x-spice-dot"></span>
+              </div>
+            </div>
+            <div class="x-product-price">Rp38.000</div>
+          </div>
+          <div class="x-product-side" onclick="event.stopPropagation()">
+            <div class="x-product-thumb" onclick="openItemDetail('p1')">
+              <img src="/assets/uploads/products/prod_1789452222041-1789452222332.png" alt="Paket Bagong Ayam Negri">
+            </div>
+            <button type="button" class="x-btn-add" id="btn-add-p1" onclick="addToCart('p1')">Tambah</button>
+            <div class="x-stepper-wrap" id="stepper-p1">
+              <div class="x-stepper-row">
+                <button type="button" class="x-step-btn" onclick="updateQty('p1', -1)">−</button>
+                <span class="x-step-val" id="qty-val-p1">1</span>
+                <button type="button" class="x-step-btn" onclick="updateQty('p1', 1)">+</button>
+              </div>
+              <button type="button" class="x-btn-note-pill" id="note-pill-p1" onclick="openNoteModal('p1')">Catatan</button>
+            </div>
+          </div>
+        </article>
+
+        <!-- Item 2: Paket Gareng Ayam Negri -->
+        <article class="x-product-card" data-id="p2" onclick="openItemDetail('p2')">
+          <div class="x-product-info">
+            <h3 class="x-product-name">Paket Gareng Ayam Negri</h3>
+            <p class="x-product-desc">Ayam Negri + Tempe Goreng + Lalapan + Sambal Terasi + Nasi Putih</p>
+            <div class="x-spice-indicator">
+              <span>Pedas</span>
+              <div class="x-spice-dots">
+                <span class="x-spice-dot is-filled"></span>
+                <span class="x-spice-dot is-filled"></span>
+                <span class="x-spice-dot is-filled"></span>
+                <span class="x-spice-dot"></span>
+              </div>
+            </div>
+            <div class="x-product-price">Rp32.000</div>
+          </div>
+          <div class="x-product-side" onclick="event.stopPropagation()">
+            <div class="x-product-thumb" onclick="openItemDetail('p2')">
+              <img src="/assets/uploads/products/prod_1789452367859-1789452368118.png" alt="Paket Gareng Ayam Negri">
+            </div>
+            <button type="button" class="x-btn-add" id="btn-add-p2" onclick="addToCart('p2')">Tambah</button>
+            <div class="x-stepper-wrap" id="stepper-p2">
+              <div class="x-stepper-row">
+                <button type="button" class="x-step-btn" onclick="updateQty('p2', -1)">−</button>
+                <span class="x-step-val" id="qty-val-p2">1</span>
+                <button type="button" class="x-step-btn" onclick="updateQty('p2', 1)">+</button>
+              </div>
+              <button type="button" class="x-btn-note-pill" id="note-pill-p2" onclick="openNoteModal('p2')">Catatan</button>
+            </div>
+          </div>
+        </article>
+
+        <!-- Item 3: Paket Petruk Ayam Negri -->
+        <article class="x-product-card" data-id="p3" onclick="openItemDetail('p3')">
+          <div class="x-product-info">
+            <h3 class="x-product-name">Paket Petruk Ayam Negri</h3>
+            <p class="x-product-desc">Ayam Negri + Tempe Goreng + Lalapan + Sambal Terasi + Es Teh Manis + Telor Ceplok</p>
+            <div class="x-spice-indicator">
+              <span>Pedas</span>
+              <div class="x-spice-dots">
+                <span class="x-spice-dot is-filled"></span>
+                <span class="x-spice-dot is-filled"></span>
+                <span class="x-spice-dot"></span>
+                <span class="x-spice-dot"></span>
+              </div>
+            </div>
+            <div class="x-product-price">Rp38.000</div>
+          </div>
+          <div class="x-product-side" onclick="event.stopPropagation()">
+            <div class="x-product-thumb" onclick="openItemDetail('p3')">
+              <img src="/assets/uploads/products/prod_1789460441443-1789460442100.png" alt="Paket Petruk Ayam Negri">
+            </div>
+            <button type="button" class="x-btn-add" id="btn-add-p3" onclick="addToCart('p3')">Tambah</button>
+            <div class="x-stepper-wrap" id="stepper-p3">
+              <div class="x-stepper-row">
+                <button type="button" class="x-step-btn" onclick="updateQty('p3', -1)">−</button>
+                <span class="x-step-val" id="qty-val-p3">1</span>
+                <button type="button" class="x-step-btn" onclick="updateQty('p3', 1)">+</button>
+              </div>
+              <button type="button" class="x-btn-note-pill" id="note-pill-p3" onclick="openNoteModal('p3')">Catatan</button>
+            </div>
+          </div>
+        </article>
+
+        <!-- Item 4: Paket Semar Ayam Negri -->
+        <article class="x-product-card" data-id="p4" onclick="openItemDetail('p4')">
+          <div class="x-product-info">
+            <h3 class="x-product-name">Paket Semar Ayam Negri</h3>
+            <p class="x-product-desc">Ayam Negri + Tempe Goreng + Lalapan + Sambal Terasi + Nasi Putih + Es Teh Manis + Telor Ceplok</p>
+            <div class="x-spice-indicator">
+              <span>Pedas</span>
+              <div class="x-spice-dots">
+                <span class="x-spice-dot is-filled"></span>
+                <span class="x-spice-dot is-filled"></span>
+                <span class="x-spice-dot is-filled"></span>
+                <span class="x-spice-dot"></span>
+              </div>
+            </div>
+            <div class="x-product-price">Rp44.000</div>
+          </div>
+          <div class="x-product-side" onclick="event.stopPropagation()">
+            <div class="x-product-thumb" onclick="openItemDetail('p4')">
+              <img src="/assets/uploads/products/prod_1789452133261-1789452133627.png" alt="Paket Semar Ayam Negri">
+            </div>
+            <button type="button" class="x-btn-add" id="btn-add-p4" onclick="addToCart('p4')">Tambah</button>
+            <div class="x-stepper-wrap" id="stepper-p4">
+              <div class="x-stepper-row">
+                <button type="button" class="x-step-btn" onclick="updateQty('p4', -1)">−</button>
+                <span class="x-step-val" id="qty-val-p4">1</span>
+                <button type="button" class="x-step-btn" onclick="updateQty('p4', 1)">+</button>
+              </div>
+              <button type="button" class="x-btn-note-pill" id="note-pill-p4" onclick="openNoteModal('p4')">Catatan</button>
+            </div>
+          </div>
+        </article>
+
+        <!-- Item 5: Ayam Tulang Lunak Kremes (Master Signature) -->
+        <article class="x-product-card" data-id="p5" onclick="openItemDetail('p5')">
+          <div class="x-product-info">
+            <h3 class="x-product-name">Ayam Tulang Lunak Kremes</h3>
+            <p class="x-product-desc">Ayam Tulang Lunak Gurih Empuk + Tempe Goreng + Lalapan Segar + Kremesan Renyah + Sambal Terasi</p>
+            <div class="x-spice-indicator">
+              <span>Pedas</span>
+              <div class="x-spice-dots">
+                <span class="x-spice-dot is-filled"></span>
+                <span class="x-spice-dot is-filled"></span>
+                <span class="x-spice-dot is-filled"></span>
+                <span class="x-spice-dot is-filled"></span>
+              </div>
+            </div>
+            <div class="x-product-price">Rp50.000</div>
+          </div>
+          <div class="x-product-side" onclick="event.stopPropagation()">
+            <div class="x-product-thumb" onclick="openItemDetail('p5')">
+              <img src="/assets/uploads/products/272-1789351623131.png" alt="Ayam Tulang Lunak Kremes">
+            </div>
+            <button type="button" class="x-btn-add" id="btn-add-p5" onclick="addToCart('p5')">Tambah</button>
+            <div class="x-stepper-wrap" id="stepper-p5">
+              <div class="x-stepper-row">
+                <button type="button" class="x-step-btn" onclick="updateQty('p5', -1)">−</button>
+                <span class="x-step-val" id="qty-val-p5">1</span>
+                <button type="button" class="x-step-btn" onclick="updateQty('p5', 1)">+</button>
+              </div>
+              <button type="button" class="x-btn-note-pill" id="note-pill-p5" onclick="openNoteModal('p5')">Catatan</button>
+            </div>
+          </div>
+        </article>
+
+        <!-- Item 6: Mie Bang Jo -->
+        <article class="x-product-card" data-id="p6" onclick="openItemDetail('p6')">
+          <div class="x-product-info">
+            <h3 class="x-product-name">Mie Bang Jo</h3>
+            <p class="x-product-desc">Mie Pangsit Original gurih dengan Taburan Ayam Cincang dan Keripik Pangsit Renyah + Sambal</p>
+            <div class="x-spice-indicator">
+              <span>Pedas</span>
+              <div class="x-spice-dots">
+                <span class="x-spice-dot is-filled"></span>
+                <span class="x-spice-dot"></span>
+                <span class="x-spice-dot"></span>
+                <span class="x-spice-dot"></span>
+              </div>
+            </div>
+            <div class="x-product-price">Rp16.000</div>
+          </div>
+          <div class="x-product-side" onclick="event.stopPropagation()">
+            <div class="x-product-thumb" onclick="openItemDetail('p6')">
+              <img src="/assets/uploads/products/346-1789464614436.png" alt="Mie Bang Jo">
+            </div>
+            <button type="button" class="x-btn-add" id="btn-add-p6" onclick="addToCart('p6')">Tambah</button>
+            <div class="x-stepper-wrap" id="stepper-p6">
+              <div class="x-stepper-row">
+                <button type="button" class="x-step-btn" onclick="updateQty('p6', -1)">−</button>
+                <span class="x-step-val" id="qty-val-p6">1</span>
+                <button type="button" class="x-step-btn" onclick="updateQty('p6', 1)">+</button>
+              </div>
+              <button type="button" class="x-btn-note-pill" id="note-pill-p6" onclick="openNoteModal('p6')">Catatan</button>
+            </div>
+          </div>
+        </article>
+
+        <!-- Item 7: Es Teh Manis Jumbo -->
+        <article class="x-product-card" data-id="p7" onclick="openItemDetail('p7')">
+          <div class="x-product-info">
+            <h3 class="x-product-name">Es Teh Manis Jumbo</h3>
+            <p class="x-product-desc">Teh manis dingin menyegarkan, racikan daun teh wangi melati pilihan khas Bangjo.</p>
+            <div class="x-product-price">Rp7.500</div>
+          </div>
+          <div class="x-product-side" onclick="event.stopPropagation()">
+            <div class="x-product-thumb" onclick="openItemDetail('p7')">
+              <img src="/assets/uploads/products/401-1789466032747.png" alt="Es Teh Manis">
+            </div>
+            <button type="button" class="x-btn-add" id="btn-add-p7" onclick="addToCart('p7')">Tambah</button>
+            <div class="x-stepper-wrap" id="stepper-p7">
+              <div class="x-stepper-row">
+                <button type="button" class="x-step-btn" onclick="updateQty('p7', -1)">−</button>
+                <span class="x-step-val" id="qty-val-p7">1</span>
+                <button type="button" class="x-step-btn" onclick="updateQty('p7', 1)">+</button>
+              </div>
+              <button type="button" class="x-btn-note-pill" id="note-pill-p7" onclick="openNoteModal('p7')">Catatan</button>
+            </div>
+          </div>
+        </article>
+      </section>
+    </div>
+
+    <!-- ── 5. FLOATING CART DOCK (Sticky bottom bar) ── -->
+    <div class="x-cart-dock" id="x-cart-dock">
+      <!-- Promo progress pill -->
+      <div class="x-promo-dock">
+        <span class="x-promo-icon">🎁</span>
+        <span class="x-promo-text" id="promo-dock-text">Kurang Rp 12.000 lagi untuk gratis ongkir</span>
+        <div class="x-promo-track">
+          <div class="x-promo-fill" id="promo-dock-fill"></div>
+        </div>
+      </div>
+
+      <!-- Main Cart Bar -->
+      <div class="x-cart-bar" onclick="openCartSheet()">
+        <div class="x-cart-summary-text">
+          <span class="x-cart-count-badge" id="dock-item-count">1 Item</span>
+          <span class="x-cart-hint-sub">Lihat pesanan kamu</span>
+        </div>
+        <div style="display: flex; align-items: center;">
+          <span class="x-cart-total-badge" id="dock-total-price">Rp 38.000</span>
+          <div class="x-cart-icon-btn">
+            <svg viewBox="0 0 24 24"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/></svg>
+            <span class="x-cart-badge-dot" id="dock-badge-number">1</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 6. BOTTOM SHEET 1: CART DETAILS & SUMMARY ── -->
+    <div class="x-sheet-backdrop" id="cart-sheet-backdrop" onclick="closeAllSheets()"></div>
+    <div class="x-bottom-sheet" id="cart-sheet">
+      <div class="x-sheet-handle"></div>
+      <div class="x-sheet-header">
+        <h3 class="x-sheet-title">Keranjang Belanja</h3>
+        <button type="button" class="x-sheet-close-btn" onclick="closeAllSheets()">✕</button>
+      </div>
+
+      <div style="font-size: 11.5px; font-weight: 700; color: #64748b; margin-bottom: 8px;">
+        📍 Outlet: <strong style="color: #0f172a;">MyBangjo Pringsewu</strong>
+      </div>
+
+      <!-- Items List -->
+      <div class="x-sheet-items-list" id="cart-sheet-items">
+        <!-- Rendered dynamically by script -->
+      </div>
+
+      <!-- Order Summary Box -->
+      <div class="x-sheet-total-box">
+        <div class="x-summary-row">
+          <span>Subtotal Menu</span>
+          <strong id="summary-subtotal">Rp 38.000</strong>
+        </div>
+        <div class="x-summary-row">
+          <span>Biaya Pengantaran (3.2 km)</span>
+          <strong id="summary-shipping">Rp 8.000</strong>
+        </div>
+        <div class="x-summary-row" style="color: #08a94f;">
+          <span>Diskon Promo PWA</span>
+          <strong>- Rp 5.000</strong>
+        </div>
+        <div class="x-summary-row bold">
+          <span>Total Pembayaran</span>
+          <strong id="summary-grandtotal" style="color: #0f172a;">Rp 41.000</strong>
+        </div>
+      </div>
+
+      <button type="button" class="x-btn-checkout-primary" onclick="proceedToCheckout()">
+        <span>Lanjut ke Pembayaran</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </div>
+
+    <!-- ── 7. BOTTOM SHEET 2: ITEM DETAIL MODAL ── -->
+    <div class="x-sheet-backdrop" id="detail-sheet-backdrop" onclick="closeAllSheets()"></div>
+    <div class="x-bottom-sheet" id="detail-sheet">
+      <div class="x-sheet-handle"></div>
+      <div class="x-sheet-header">
+        <h3 class="x-sheet-title" id="detail-title">Paket Bagong Ayam Negri</h3>
+        <button type="button" class="x-sheet-close-btn" onclick="closeAllSheets()">✕</button>
+      </div>
+
+      <div style="overflow-y: auto; max-height: 60vh; padding-right: 2px;">
+        <div style="width: 100%; height: 210px; border-radius: 20px; overflow: hidden; background: #f1f5f9; margin-bottom: 12px;">
+          <img src="/assets/uploads/products/prod_1789452222041-1789452222332.png" id="detail-image" alt="" style="width: 100%; height: 100%; object-fit: cover;">
+        </div>
+
+        <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px;">
+          <span style="font-size: 20px; font-weight: 900; color: #0f172a;" id="detail-price">Rp 38.000</span>
+          <span style="font-size: 11px; font-weight: 800; color: #08a94f; background: #ecfdf5; padding: 2px 8px; border-radius: 99px;">Tersedia di Pringsewu</span>
+        </div>
+
+        <p style="font-size: 12px; color: #64748b; line-height: 1.5; margin-bottom: 12px;" id="detail-desc">
+          Ayam Negri empuk bumbu rempah + Tempe Goreng renyah + Lalapan Segar + Sambal Terasi Khas Bangjo + Nasi Putih Pulen + Es Teh Manis Segar.
+        </p>
+
+        <!-- Level Pedas Indicator -->
+        <div style="background: #f8fafc; border-radius: 14px; padding: 10px 12px; margin-bottom: 12px; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between;">
+          <span style="font-size: 11.5px; font-weight: 700; color: #334155;">Tingkat Kepedasan:</span>
+          <div class="x-spice-indicator">
+            <span style="font-weight: 800;">Level 2 Sedang</span>
+            <div class="x-spice-dots">
+              <span class="x-spice-dot is-filled"></span>
+              <span class="x-spice-dot is-filled"></span>
+              <span class="x-spice-dot"></span>
+              <span class="x-spice-dot"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notes textarea -->
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; font-size: 11.5px; font-weight: 800; color: #334155; margin-bottom: 6px;">
+            Catatan untuk Dapur (Opsional)
+          </label>
+          <textarea id="detail-note-input" placeholder="Cth: Sambal dipisah, ayam bagian paha, dsb..." style="width: 100%; height: 60px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 8px 10px; font-family: inherit; font-size: 11.5px; resize: none;"></textarea>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 10px; padding-top: 10px; border-top: 1px solid #e2e8f0;">
+        <div class="x-stepper-row" style="width: 100px; padding: 4px 6px;">
+          <button type="button" class="x-step-btn" onclick="updateDetailModalQty(-1)">−</button>
+          <span class="x-step-val" id="detail-modal-qty">1</span>
+          <button type="button" class="x-step-btn" onclick="updateDetailModalQty(1)">+</button>
+        </div>
+        <button type="button" class="x-btn-checkout-primary" style="flex: 1; padding: 12px 14px; font-size: 13px;" onclick="confirmDetailAddToCart()">
+          <span>+ Tambah ke Keranjang</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ── 8. BOTTOM SHEET 3: LOCATION PICKER SHEET ── -->
+    <div class="x-sheet-backdrop" id="loc-sheet-backdrop" onclick="closeAllSheets()"></div>
+    <div class="x-bottom-sheet" id="loc-sheet">
+      <div class="x-sheet-handle"></div>
+      <div class="x-sheet-header">
+        <h3 class="x-sheet-title">Pilih Lokasi &amp; Cabang</h3>
+        <button type="button" class="x-sheet-close-btn" onclick="closeAllSheets()">✕</button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px;">
+        <button type="button" style="display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 16px; border: 1.5px solid #08a94f; background: #f0fdf4; text-align: left; cursor: pointer;" onclick="setBranchLocation('MyBangjo Pringsewu', 'Outlet Utama • Jl. Sudirman No. 45')">
+          <span style="font-size: 20px;">🍗</span>
+          <div style="flex: 1;">
+            <strong style="display: block; font-size: 13px; color: #0f172a;">MyBangjo Pringsewu (Utama)</strong>
+            <span style="font-size: 11px; color: #08a94f; font-weight: 700;">🟢 Buka • Siap Delivery &amp; Pick-up</span>
+          </div>
+          <span style="color: #08a94f; font-weight: 800;">✓</span>
+        </button>
+
+        <button type="button" style="display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 16px; border: 1px solid #e2e8f0; background: #ffffff; text-align: left; cursor: pointer;" onclick="setBranchLocation('MyBangjo Gadingrejo', 'Rest Area Gading • Km 12')">
+          <span style="font-size: 20px;">🏪</span>
+          <div style="flex: 1;">
+            <strong style="display: block; font-size: 13px; color: #0f172a;">MyBangjo Gadingrejo</strong>
+            <span style="font-size: 11px; color: #08a94f; font-weight: 700;">🟢 Buka • Dapur Normal (10 mnt)</span>
+          </div>
+        </button>
+
+        <button type="button" style="display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 16px; border: 1px solid #e2e8f0; background: #ffffff; text-align: left; cursor: pointer;" onclick="setBranchLocation('MyBangjo Kemiling', 'Jl. Imam Bonjol No. 12B')">
+          <span style="font-size: 20px;">🛵</span>
+          <div style="flex: 1;">
+            <strong style="display: block; font-size: 13px; color: #0f172a;">MyBangjo Kemiling</strong>
+            <span style="font-size: 11px; color: #08a94f; font-weight: 700;">🟢 Buka • 2 Driver Siap Antar</span>
+          </div>
+        </button>
+      </div>
+
+      <button type="button" style="width: 100%; padding: 12px; border-radius: var(--x-radius-pill); background: #f1f5f9; border: 1px dashed #cbd5e1; font-family: inherit; font-size: 12px; font-weight: 700; color: #475569; cursor: pointer;" onclick="showToast('Deteksi GPS', 'Mendeteksi titik koordinat akurat HP Anda...')">
+        📍 Gunakan Titik GPS Lokasi Saat Ini
+      </button>
+    </div>
+
+    <!-- ── 9. VIEW OVERLAY: CHECKOUT PAGE ── -->
+    <section class="x-view-overlay-page" id="view-checkout">
+      <div class="x-page-header-row">
+        <button type="button" class="x-btn-back" onclick="switchPrototypeView('home')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <h2 class="x-page-header-title">Konfirmasi Checkout</h2>
+      </div>
+
+      <!-- Fulfillment Environment Selector -->
+      <div class="fulfillment-pills-grid">
+        <button type="button" class="fulfillment-btn active" id="btn-ful-delivery" onclick="setFulfillment('delivery')">
+          <span>🛵 Delivery</span>
+          <span style="font-size: 9px; opacity: 0.8;">Antar ke Rumah</span>
+        </button>
+        <button type="button" class="fulfillment-btn" id="btn-ful-pickup" onclick="setFulfillment('pickup')">
+          <span>🛍️ Pick-up</span>
+          <span style="font-size: 9px; opacity: 0.8;">Ambil di Toko</span>
+        </button>
+        <button type="button" class="fulfillment-btn" id="btn-ful-dinein" onclick="setFulfillment('dinein')">
+          <span>🍽️ Dine-in</span>
+          <span style="font-size: 9px; opacity: 0.8;">Makan di Meja</span>
+        </button>
+      </div>
+
+      <!-- Destination Card -->
+      <div class="checkout-card">
+        <span class="checkout-card-title">Alamat Pengantaran</span>
+        <div style="display: flex; items-center; justify-content: space-between;">
+          <strong style="font-size: 13.5px; color: #0f172a;">Jl. Kenanga No. 14, Pringsewu Barat</strong>
+          <span style="font-size: 11px; font-weight: 700; color: #08a94f; cursor: pointer;" onclick="openLocationSheet()">Ubah</span>
+        </div>
+        <p style="font-size: 11px; color: #64748b; margin: 0;">Pagar hitam depan pos satpam, dekat masjid Al-Falah.</p>
+      </div>
+
+      <!-- Recipient Contact -->
+      <div class="checkout-card">
+        <span class="checkout-card-title">Data Penerima</span>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <div>
+            <label style="font-size: 10px; color: #64748b; font-weight: 700;">Nama Penerima</label>
+            <input type="text" value="Budi Pratama" style="width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 6px 8px; font-family: inherit; font-size: 12px; font-weight: 700;">
+          </div>
+          <div>
+            <label style="font-size: 10px; color: #64748b; font-weight: 700;">Nomor WhatsApp</label>
+            <input type="tel" value="0812-3456-7890" style="width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 6px 8px; font-family: inherit; font-size: 12px; font-weight: 700;">
+          </div>
+        </div>
+      </div>
+
+      <!-- Payment Method -->
+      <div class="checkout-card">
+        <span class="checkout-card-title">Metode Pembayaran</span>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div class="payment-option-row selected" onclick="selectPayment(this)">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 16px;">🟢</span>
+              <div>
+                <strong style="font-size: 12.5px; color: #0f172a; display: block;">QRIS (Instant Settlement)</strong>
+                <span style="font-size: 10.5px; color: #64748b;">BCA, Mandiri, GoPay, OVO, ShopeePay</span>
+              </div>
+            </div>
+            <span style="font-size: 12px; font-weight: 800; color: #08a94f;">✓</span>
+          </div>
+
+          <div class="payment-option-row" onclick="selectPayment(this)">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 16px;">💵</span>
+              <div>
+                <strong style="font-size: 12.5px; color: #0f172a; display: block;">Tunai / COD (Bayar ke Driver)</strong>
+                <span style="font-size: 10.5px; color: #64748b;">Siapkan uang pas saat pesanan tiba</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Checkout Items Recap -->
+      <div class="checkout-card">
+        <span class="checkout-card-title">Rincian Pembayaran</span>
+        <div style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #475569;">
+          <div style="display: flex; justify-content: space-between;">
+            <span>Subtotal Menu (2 item)</span>
+            <strong id="chk-subtotal">Rp 38.000</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span>Ongkir Delivery Bangjo</span>
+            <strong id="chk-shipping">Rp 8.000</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; color: #08a94f;">
+            <span>Diskon Promo PWA</span>
+            <strong>- Rp 5.000</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 900; color: #0f172a; border-top: 1px dashed #cbd5e1; padding-top: 6px;">
+            <span>Total Tagihan</span>
+            <strong id="chk-grandtotal">Rp 41.000</strong>
+          </div>
+        </div>
+      </div>
+
+      <button type="button" class="x-btn-checkout-primary" onclick="placeOrderAndTrack()">
+        <span>Bayar &amp; Pesan Sekarang</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+      </button>
+    </section>
+
+    <!-- ── 10. VIEW OVERLAY: LIVE ORDER TRACKING (ORDER RECEIVED) ── -->
+    <section class="x-view-overlay-page" id="view-tracker">
+      <div class="x-page-header-row">
+        <button type="button" class="x-btn-back" onclick="switchPrototypeView('home')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <h2 class="x-page-header-title">Status Pesanan</h2>
+      </div>
+
+      <!-- Order ID Card -->
+      <div style="background: linear-gradient(135deg, #111111 0%, #1e293b 100%); color: #ffffff; border-radius: 24px; padding: 18px; margin-bottom: 14px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <span style="font-size: 11px; font-weight: 700; color: var(--x-primary); text-transform: uppercase;">Pesanan Berjalan</span>
+          <span style="font-size: 11px; background: rgba(182, 255, 0, 0.2); color: var(--x-primary); padding: 3px 8px; border-radius: 99px; font-weight: 800;">Estimasi 18 Mnt</span>
+        </div>
+        <div style="font-size: 22px; font-weight: 900; letter-spacing: -0.02em;">#MB-9042</div>
+        <span style="font-size: 11.5px; color: #cbd5e1;">MyBangjo Pringsewu • Transaksi QRIS Lunas</span>
+      </div>
+
+      <!-- Step Progress Box -->
+      <div class="order-tracker-box">
+        <!-- Step 1 -->
+        <div class="tracker-step-item done">
+          <div class="tracker-icon-circle">✓</div>
+          <div>
+            <strong style="display: block; font-size: 13px; color: #0f172a;">Pesanan Diterima</strong>
+            <span style="font-size: 11px; color: #64748b;">11:42 WIB • Kasir Pringsewu telah memverifikasi pesanan</span>
+          </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="tracker-step-item active">
+          <div class="tracker-icon-circle">🍳</div>
+          <div>
+            <strong style="display: block; font-size: 13px; color: #0f172a;">Sedang Dimasak di Dapur</strong>
+            <span style="font-size: 11px; color: #08a94f; font-weight: 700;">Koki sedang menggoreng ayam &amp; menyiapkan kremesan</span>
+          </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="tracker-step-item">
+          <div class="tracker-icon-circle">🛵</div>
+          <div>
+            <strong style="display: block; font-size: 13px; color: #0f172a;">Pengantaran oleh Driver</strong>
+            <span style="font-size: 11px; color: #64748b;">Driver Bangjo (Ahmad) standby di resto</span>
+          </div>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="tracker-step-item">
+          <div class="tracker-icon-circle">🏁</div>
+          <div>
+            <strong style="display: block; font-size: 13px; color: #0f172a;">Pesanan Sampai &amp; Selesai</strong>
+            <span style="font-size: 11px; color: #64748b;">Selamat menikmati sajian spesial Bangjo</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Driver & Resto Contact -->
+      <div class="checkout-card" style="margin-top: 14px;">
+        <span class="checkout-card-title">Bantuan &amp; Komunikasi</span>
+        <div style="display: flex; gap: 8px; margin-top: 4px;">
+          <button type="button" style="flex: 1; padding: 10px; border-radius: 12px; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;" onclick="showToast('WhatsApp Resto', 'Menghubungkan ke WhatsApp CS Cabang Pringsewu')">
+            💬 Chat Outlet
+          </button>
+          <button type="button" style="flex: 1; padding: 10px; border-radius: 12px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;" onclick="showToast('Hubungi Driver', 'Menghubungkan ke Driver Ahmad (0813-xxx)')">
+            📞 Hubungi Driver
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==========================================================================
+       INTERACTIVE CLIENT CONTROLLER (VANILLA JS)
+       ========================================================================== */ -->
+  <script>
+    // Product Catalog Database
+    const PRODUCTS_DATA = {
+      p1: { name: 'Paket Bagong Ayam Negri', price: 38000, img: '/assets/uploads/products/prod_1789452222041-1789452222332.png', desc: 'Ayam Negri + Tempe Goreng + Lalapan + Sambal Terasi + Nasi Putih + Es Teh Manis' },
+      p2: { name: 'Paket Gareng Ayam Negri', price: 32000, img: '/assets/uploads/products/prod_1789452367859-1789452368118.png', desc: 'Ayam Negri + Tempe Goreng + Lalapan + Sambal Terasi + Nasi Putih' },
+      p3: { name: 'Paket Petruk Ayam Negri', price: 38000, img: '/assets/uploads/products/prod_1789460441443-1789460442100.png', desc: 'Ayam Negri + Tempe Goreng + Lalapan + Sambal Terasi + Es Teh Manis + Telor Ceplok' },
+      p4: { name: 'Paket Semar Ayam Negri', price: 44000, img: '/assets/uploads/products/prod_1789452133261-1789452133627.png', desc: 'Ayam Negri + Tempe Goreng + Lalapan + Sambal Terasi + Nasi Putih + Es Teh Manis + Telor Ceplok' },
+      p5: { name: 'Ayam Tulang Lunak Kremes', price: 50000, img: '/assets/uploads/products/272-1789351623131.png', desc: 'Ayam Tulang Lunak Gurih Empuk + Tempe Goreng + Lalapan Segar + Kremesan Renyah + Sambal Terasi' },
+      p6: { name: 'Mie Bang Jo', price: 16000, img: '/assets/uploads/products/346-1789464614436.png', desc: 'Mie Pangsit Original gurih dengan Taburan Ayam Cincang dan Keripik Pangsit Renyah + Sambal' },
+      p7: { name: 'Es Teh Manis Jumbo', price: 7500, img: '/assets/uploads/products/401-1789466032747.png', desc: 'Teh manis dingin menyegarkan, racikan daun teh wangi melati pilihan khas Bangjo.' }
+    };
+
+    // Client State
+    let cart = {}; // { p1: { qty: 1, note: '' } }
+    let activeModalProductId = null;
+    let detailModalQty = 1;
+    let isDarkTheme = false;
+    let isFrameMode = true;
+
+    // Toast Engine
+    let toastTimer = null;
+    function showToast(icon, text) {
+      const toast = document.getElementById('app-toast');
+      document.getElementById('toast-icon').textContent = icon;
+      document.getElementById('toast-text').textContent = text;
+      toast.classList.add('show');
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2600);
+    }
+
+    // Live Digital Clock Engine
+    function updateLiveClock() {
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const timeDisplay = document.getElementById('live-time-display');
+      if (timeDisplay) timeDisplay.textContent = `${hours}.${minutes}`;
+
+      const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+      const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+      const dayName = days[now.getDay()];
+      const dayNum = now.getDate();
+      const monthName = months[now.getMonth()];
+      const year = now.getFullYear();
+      const dateDisplay = document.getElementById('live-date-display');
+      if (dateDisplay) dateDisplay.textContent = `${dayName}, ${dayNum} ${monthName} ${year}`;
+    }
+    setInterval(updateLiveClock, 1000);
+    updateLiveClock();
+
+    // Add to Cart
+    function addToCart(pId) {
+      if (!cart[pId]) {
+        cart[pId] = { qty: 1, note: '' };
+      } else {
+        cart[pId].qty += 1;
+      }
+      renderCardControls(pId);
+      updateCartDock();
+      showToast('✓', `${PRODUCTS_DATA[pId].name} ditambahkan`);
+    }
+
+    // Update Quantity
+    function updateQty(pId, delta) {
+      if (!cart[pId]) return;
+      cart[pId].qty += delta;
+      if (cart[pId].qty <= 0) {
+        delete cart[pId];
+      }
+      renderCardControls(pId);
+      updateCartDock();
+      renderCartSheetItems();
+    }
+
+    // Render Card Controls (+ vs [- qty +])
+    function renderCardControls(pId) {
+      const btnAdd = document.getElementById(`btn-add-${pId}`);
+      const stepper = document.getElementById(`stepper-${pId}`);
+      const qtyVal = document.getElementById(`qty-val-${pId}`);
+      const notePill = document.getElementById(`note-pill-${pId}`);
+
+      if (cart[pId] && cart[pId].qty > 0) {
+        if (btnAdd) btnAdd.style.display = 'none';
+        if (stepper) stepper.classList.add('show');
+        if (qtyVal) qtyVal.textContent = cart[pId].qty;
+        if (notePill) {
+          if (cart[pId].note) {
+            notePill.classList.add('has-note');
+            notePill.textContent = 'Catatan ✓';
+          } else {
+            notePill.classList.remove('has-note');
+            notePill.textContent = 'Catatan';
+          }
+        }
+      } else {
+        if (btnAdd) btnAdd.style.display = 'flex';
+        if (stepper) stepper.classList.remove('show');
+      }
+    }
+
+    // Update Floating Cart Dock
+    function updateCartDock() {
+      const dock = document.getElementById('x-cart-dock');
+      const countBadge = document.getElementById('dock-item-count');
+      const totalBadge = document.getElementById('dock-total-price');
+      const iconNumber = document.getElementById('dock-badge-number');
+      const promoText = document.getElementById('promo-dock-text');
+      const promoFill = document.getElementById('promo-dock-fill');
+
+      let totalItems = 0;
+      let totalPrice = 0;
+      for (const id in cart) {
+        totalItems += cart[id].qty;
+        totalPrice += cart[id].qty * PRODUCTS_DATA[id].price;
+      }
+
+      if (totalItems > 0) {
+        dock.classList.add('show');
+        countBadge.textContent = `${totalItems} Item`;
+        totalBadge.textContent = formatRupiah(totalPrice);
+        iconNumber.textContent = totalItems;
+
+        // Promo calculation: target Rp 50.000 for free shipping
+        const freeTarget = 50000;
+        if (totalPrice >= freeTarget) {
+          promoText.textContent = '🎉 Selamat! Anda berhak Gratis Ongkir';
+          promoFill.style.width = '100%';
+        } else {
+          const diff = freeTarget - totalPrice;
+          promoText.textContent = `Kurang ${formatRupiah(diff)} lagi untuk gratis ongkir`;
+          promoFill.style.width = `${Math.min(100, Math.round((totalPrice / freeTarget) * 100))}%`;
+        }
+      } else {
+        dock.classList.remove('show');
+      }
+    }
+
+    // Item Detail Bottom Sheet
+    function openItemDetail(pId) {
+      activeModalProductId = pId;
+      detailModalQty = cart[pId] ? cart[pId].qty : 1;
+      const data = PRODUCTS_DATA[pId];
+
+      document.getElementById('detail-title').textContent = data.name;
+      document.getElementById('detail-price').textContent = formatRupiah(data.price);
+      document.getElementById('detail-desc').textContent = data.desc;
+      document.getElementById('detail-image').src = data.img;
+      document.getElementById('detail-modal-qty').textContent = detailModalQty;
+      document.getElementById('detail-note-input').value = cart[pId] ? cart[pId].note : '';
+
+      closeAllSheets();
+      document.getElementById('detail-sheet-backdrop').classList.add('show');
+      document.getElementById('detail-sheet').classList.add('show');
+    }
+
+    function openDemoDetailSheet() {
+      openItemDetail('p5'); // Open Ayam Tulang Lunak Kremes
+    }
+
+    function updateDetailModalQty(delta) {
+      detailModalQty = Math.max(1, detailModalQty + delta);
+      document.getElementById('detail-modal-qty').textContent = detailModalQty;
+    }
+
+    function confirmDetailAddToCart() {
+      const pId = activeModalProductId;
+      const note = document.getElementById('detail-note-input').value.trim();
+      cart[pId] = { qty: detailModalQty, note: note };
+
+      renderCardControls(pId);
+      updateCartDock();
+      closeAllSheets();
+      showToast('✓', `${PRODUCTS_DATA[pId].name} (${detailModalQty}x) disimpan`);
+    }
+
+    // Cart Bottom Sheet
+    function openCartSheet() {
+      renderCartSheetItems();
+      closeAllSheets();
+      document.getElementById('cart-sheet-backdrop').classList.add('show');
+      document.getElementById('cart-sheet').classList.add('show');
+    }
+
+    function renderCartSheetItems() {
+      const container = document.getElementById('cart-sheet-items');
+      container.innerHTML = '';
+
+      let subtotal = 0;
+      let hasItems = false;
+
+      for (const id in cart) {
+        hasItems = true;
+        const item = cart[id];
+        const data = PRODUCTS_DATA[id];
+        const itemTotal = item.qty * data.price;
+        subtotal += itemTotal;
+
+        const row = document.createElement('div');
+        row.className = 'x-cart-item-row';
+        row.innerHTML = `
+          <div class="x-cart-item-left">
+            <img src="${data.img}" class="x-cart-item-img" alt="${data.name}">
+            <div class="x-cart-item-info">
+              <span class="x-cart-item-name">${data.name}</span>
+              <span class="x-cart-item-sub">${item.qty} × ${formatRupiah(data.price)}${item.note ? ' • <em>' + item.note + '</em>' : ''}</span>
+            </div>
+          </div>
+          <div class="x-cart-item-stepper">
+            <div class="x-stepper-row" style="padding: 2px 4px;">
+              <button type="button" class="x-step-btn" onclick="updateQty('${id}', -1)">−</button>
+              <span class="x-step-val">${item.qty}</span>
+              <button type="button" class="x-step-btn" onclick="updateQty('${id}', 1)">+</button>
+            </div>
+          </div>
+        `;
+        container.appendChild(row);
+      }
+
+      if (!hasItems) {
+        container.innerHTML = '<div style="text-align: center; color: #94a3b8; font-size: 13px; padding: 24px 0;">Keranjang belanja masih kosong</div>';
+      }
+
+      const shipping = hasItems ? 8000 : 0;
+      const discount = hasItems ? 5000 : 0;
+      const grandTotal = Math.max(0, subtotal + shipping - discount);
+
+      document.getElementById('summary-subtotal').textContent = formatRupiah(subtotal);
+      document.getElementById('summary-shipping').textContent = formatRupiah(shipping);
+      document.getElementById('summary-grandtotal').textContent = formatRupiah(grandTotal);
+
+      // Sync with checkout page totals
+      document.getElementById('chk-subtotal').textContent = formatRupiah(subtotal);
+      document.getElementById('chk-shipping').textContent = formatRupiah(shipping);
+      document.getElementById('chk-grandtotal').textContent = formatRupiah(grandTotal);
+    }
+
+    function proceedToCheckout() {
+      closeAllSheets();
+      switchPrototypeView('checkout');
+    }
+
+    // Location Picker Sheet
+    function openLocationSheet() {
+      closeAllSheets();
+      document.getElementById('loc-sheet-backdrop').classList.add('show');
+      document.getElementById('loc-sheet').classList.add('show');
+    }
+
+    function setBranchLocation(name, sub) {
+      document.getElementById('header-loc-name').textContent = name;
+      closeAllSheets();
+      showToast('📍 Lokasi Terpilih', name);
+    }
+
+    // Note Modal
+    function openNoteModal(pId) {
+      const current = (cart[pId] && cart[pId].note) || '';
+      const res = prompt('Catatan untuk menu ini (cth. Sambal dipisah):', current);
+      if (res !== null) {
+        if (cart[pId]) cart[pId].note = res.trim();
+        renderCardControls(pId);
+        showToast('📝 Catatan Disimpan', res ? `"${res}"` : 'Catatan dihapus');
+      }
+    }
+
+    // Modal QR Scanner
+    function openQrModal() {
+      showToast('📷 Scan QR Meja', 'Membuka kamera scanner...');
+      setTimeout(() => {
+        showToast('✓ Meja Terhubung', 'Meja 08 (Area Indoor AC) berhasil di-scan');
+      }, 900);
+    }
+
+    function openShareSheet() {
+      showToast('➦ Bagikan Menu', 'Link afiliasi pesanan disalin ke clipboard');
+    }
+
+    function openProfileSheet() {
+      showToast('👤 Profil Pelanggan', 'Budi Pratama • Member Bangjo Loyal ⭐️');
+    }
+
+    // Close All Bottom Sheets
+    function closeAllSheets() {
+      document.querySelectorAll('.x-sheet-backdrop').forEach(b => b.classList.remove('show'));
+      document.querySelectorAll('.x-bottom-sheet').forEach(s => s.classList.remove('show'));
+    }
+
+    // Search Menu Engine (Smart Multi-Word & Phonetic Normalization)
+    function normalizePrototypeText(str) {
+      if (!str) return '';
+      return String(str)
+        .toLowerCase()
+        .replace(/[\+\-\,\.\(\)\/\_\:\;\"\'\!]/g, ' ')
+        .replace(/\bnegeri\b/g, 'negri')
+        .replace(/\bpedes\b/g, 'pedas')
+        .replace(/\bcabai\b/g, 'cabe')
+        .replace(/\beste?h\b/g, 'es teh')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    function executePrototypeSearchAndScroll(e) {
+      if (e && e.preventDefault) e.preventDefault();
+      const input = document.getElementById('home-search-input');
+      if (input) {
+        handleSearchMenu(input.value);
+        input.blur();
+      }
+      setTimeout(() => {
+        const target = document.getElementById('product-list-container');
+        if (target) {
+          const rect = target.getBoundingClientRect();
+          const targetY = Math.max(0, rect.top + window.pageYOffset - 16);
+          window.scrollTo({ top: targetY, behavior: 'smooth' });
+        }
+      }, 120);
+    }
+
+    function handleSearchMenu(query) {
+      const q = (query || '').trim();
+      const qNorm = normalizePrototypeText(q);
+      const tokens = qNorm ? qNorm.split(' ').filter(Boolean) : [];
+      const clearBtn = document.getElementById('home-search-clear');
+      if (clearBtn) {
+        if (q.length > 0) {
+          clearBtn.classList.add('is-visible');
+        } else {
+          clearBtn.classList.remove('is-visible');
+        }
+      }
+
+      let matchCount = 0;
+      const cards = document.querySelectorAll('.x-products .x-product-card');
+      cards.forEach(card => {
+        const pId = card.getAttribute('data-id');
+        const prod = PRODUCTS_DATA[pId];
+        if (!prod) return;
+        const text = normalizePrototypeText((prod.name || '') + ' ' + (prod.desc || '') + ' ' + (prod.cat || ''));
+        const matchesAll = !tokens.length || tokens.every(tok => text.includes(tok));
+        if (matchesAll) {
+          card.style.display = 'flex';
+          matchCount++;
+        } else {
+          card.style.display = 'none';
+        }
+      });
+
+      let emptyNotice = document.getElementById('search-empty-state');
+      if (matchCount === 0 && q.length > 0) {
+        if (!emptyNotice) {
+          emptyNotice = document.createElement('div');
+          emptyNotice.id = 'search-empty-state';
+          emptyNotice.className = 'x-search-empty-notice';
+          document.getElementById('product-list-container').appendChild(emptyNotice);
+        }
+        emptyNotice.innerHTML = `
+          <div style="font-size:30px;margin-bottom:8px;">🔍</div>
+          <div style="font-weight:700;font-size:14.5px;margin-bottom:4px;color:var(--x-black);">Menu tidak ditemukan</div>
+          <div style="font-size:12.5px;color:var(--x-gray-700);margin-bottom:14px;">Tidak ada menu yang sesuai dengan "<strong>${q.replace(/[&<>'"]/g, '')}</strong>"</div>
+          <button type="button" onclick="clearSearchMenu()" style="background:#111111;color:#ffffff;border:none;border-radius:20px;padding:8px 18px;font-size:12px;font-weight:700;cursor:pointer;">Lihat Semua Menu</button>
+        `;
+        emptyNotice.style.display = 'block';
+      } else if (emptyNotice) {
+        emptyNotice.style.display = 'none';
+      }
+    }
+
+    function clearSearchMenu() {
+      const input = document.getElementById('home-search-input');
+      if (input) {
+        input.value = '';
+        handleSearchMenu('');
+        input.focus();
+      }
+    }
+
+    // Category Selector
+    function selectCategory(btn, catKey) {
+      document.querySelectorAll('.x-cat').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const catName = btn.querySelector('.x-cat-name').textContent;
+      showToast('Kategori', catName);
+    }
+
+    // View Switcher (Katalog, Checkout, Tracker)
+    function switchPrototypeView(view) {
+      document.querySelectorAll('.proto-btn').forEach(b => b.classList.remove('active'));
+      const btn = document.getElementById(`btn-view-${view}`);
+      if (btn) btn.classList.add('active');
+
+      const vCheckout = document.getElementById('view-checkout');
+      const vTracker = document.getElementById('view-tracker');
+
+      if (view === 'home') {
+        vCheckout.classList.remove('show');
+        vTracker.classList.remove('show');
+      } else if (view === 'checkout') {
+        vCheckout.classList.add('show');
+        vTracker.classList.remove('show');
+      } else if (view === 'tracker') {
+        vCheckout.classList.remove('show');
+        vTracker.classList.add('show');
+      }
+    }
+
+    // Fulfillment switcher (delivery vs pickup vs dinein)
+    function setFulfillment(type) {
+      document.querySelectorAll('.fulfillment-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById(`btn-ful-${type}`).classList.add('active');
+      showToast('Layanan', type === 'delivery' ? 'Mode Delivery Diaktifkan' : type === 'pickup' ? 'Mode Pick-up Diaktifkan' : 'Mode Dine-in Diaktifkan');
+    }
+
+    // Select payment option
+    function selectPayment(el) {
+      document.querySelectorAll('.payment-option-row').forEach(r => r.classList.remove('selected'));
+      el.classList.add('selected');
+    }
+
+    // Place Order & Open Live Tracker
+    function placeOrderAndTrack() {
+      showToast('⚡ Pesanan Dibuat', 'Order #MB-9042 berhasil dikirim ke dapur resto');
+      setTimeout(() => {
+        switchPrototypeView('tracker');
+      }, 500);
+    }
+
+    // Presentation Bar Toggles
+    function toggleDeviceFrame() {
+      isFrameMode = !isFrameMode;
+      const shell = document.getElementById('device-shell');
+      const btn = document.getElementById('btn-toggle-frame');
+      if (isFrameMode) {
+        shell.classList.remove('fullscreen-mode');
+        btn.classList.add('active');
+      } else {
+        shell.classList.add('fullscreen-mode');
+        btn.classList.remove('active');
+      }
+    }
+
+    function toggleTheme() {
+      isDarkTheme = !isDarkTheme;
+      const btn = document.getElementById('btn-toggle-theme');
+      if (isDarkTheme) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        btn.textContent = '☀️ Light';
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+        btn.textContent = '🌙 Dark';
+      }
+    }
+
+    function formatRupiah(num) {
+      return 'Rp ' + Number(num || 0).toLocaleString('id-ID');
+    }
+
+    // Deep-linking URL handler (query param or hash)
+    function handleDeepLinks() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const hash = (window.location.hash || '').replace('#', '').toLowerCase();
+      const view = urlParams.get('view') || (['checkout', 'tracker', 'home'].includes(hash) ? hash : null);
+      const sheet = urlParams.get('sheet') || (['cart', 'detail'].includes(hash) ? hash : null);
+
+      if (view === 'checkout') {
+        switchPrototypeView('checkout');
+      } else if (view === 'tracker') {
+        switchPrototypeView('tracker');
+      } else if (sheet === 'cart') {
+        openCartSheet();
+      } else if (sheet === 'detail') {
+        openDemoDetailSheet();
+      }
+    }
+    window.addEventListener('DOMContentLoaded', () => setTimeout(handleDeepLinks, 120));
+    window.addEventListener('hashchange', handleDeepLinks);
+
+    // Initialize with 1 demo item in cart
+    addToCart('p1');
+  </script>
+</body>
+</html>

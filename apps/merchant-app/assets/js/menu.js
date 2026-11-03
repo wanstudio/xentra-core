@@ -29,6 +29,7 @@
     menuView: 'home',
     selectedCategoryId: null,
     categoryStatusFilter: 'active',
+    isSorting: false,
     addCatalogSearchQuery: '',
     fetchSeq: 0
   };
@@ -49,6 +50,14 @@
       el.hidden = !active;
       el.classList.toggle('is-active', active);
     });
+
+    var isSubView = (view === 'categories' || view === 'detail');
+    document.body.classList.toggle('is-bm-menu-subview', isSubView);
+    var mobileNav = $('x-merchant-mobile-nav');
+    if (mobileNav) {
+      mobileNav.style.display = isSubView ? 'none' : '';
+    }
+
     if (view === 'categories') renderBMMenuCategoriesBar();
     if (view === 'detail') renderBMMenuTable();
   }
@@ -110,7 +119,13 @@
     var homeBack = $('btn-bm-menu-categories-back');
     if (homeBack && !homeBack.dataset.bound) {
       homeBack.dataset.bound = '1';
-      homeBack.addEventListener('click', function () { window.openBMMenuHome(); });
+      homeBack.addEventListener('click', function () {
+        if (_bmMenuState.isSorting) {
+          window.toggleBMCategorySortMode(false, true);
+          return;
+        }
+        window.openBMMenuHome();
+      });
     }
 
     var detailBack = $('btn-bm-menu-category-detail-back');
@@ -123,6 +138,45 @@
     if (addCategory && !addCategory.dataset.bound) {
       addCategory.dataset.bound = '1';
       addCategory.addEventListener('click', function () { promptAddBMBranchCategory(); });
+    }
+
+    /* Edit button di header detail kategori */
+    var detailEditBtn = $('btn-bm-cat-detail-edit');
+    if (detailEditBtn && !detailEditBtn.dataset.bound) {
+      detailEditBtn.dataset.bound = '1';
+      detailEditBtn.addEventListener('click', function () {
+        var catId = _bmMenuState.selectedCategoryId;
+        var cat = (_bmMenuState.categories || []).find(function (c) {
+          return String(c.id) === String(catId);
+        });
+        if (cat && typeof window.openBCESubpageEdit === 'function') {
+          window.openBCESubpageEdit(cat);
+        }
+      });
+    }
+
+    var dockSort = $('btn-bm-categories-sort');
+    if (dockSort && !dockSort.dataset.bound) {
+      dockSort.dataset.bound = '1';
+      dockSort.addEventListener('click', function () { window.toggleBMCategorySortMode(); });
+    }
+
+    var dockAdd = $('btn-bm-categories-add');
+    if (dockAdd && !dockAdd.dataset.bound) {
+      dockAdd.dataset.bound = '1';
+      dockAdd.addEventListener('click', function () { promptAddBMBranchCategory(); });
+    }
+
+    var dockSave = $('btn-bm-categories-save-order');
+    if (dockSave && !dockSave.dataset.bound) {
+      dockSave.dataset.bound = '1';
+      dockSave.addEventListener('click', function () { window.saveBMCategorySortOrder(); });
+    }
+
+    var dockCancelSort = $('btn-bm-categories-cancel-sort');
+    if (dockCancelSort && !dockCancelSort.dataset.bound) {
+      dockCancelSort.dataset.bound = '1';
+      dockCancelSort.addEventListener('click', function () { window.toggleBMCategorySortMode(false, true); });
     }
 
     var addCatalog = $('btn-bm-menu-add-catalog');
@@ -141,6 +195,7 @@
       if (tab.dataset.bound) return;
       tab.dataset.bound = '1';
       tab.addEventListener('click', function () {
+        if (_bmMenuState.isSorting) return;
         Array.prototype.forEach.call(document.querySelectorAll('[data-menu-category-status]'), function (x) {
           x.classList.toggle('is-active', x === tab);
         });
@@ -331,15 +386,27 @@
     var bar = $('bm-menu-categories-bar');
     if (!bar) return;
 
+    var statusFilter = _bmMenuState.categoryStatusFilter || 'active';
     var categories = (_bmMenuState.categories || []).filter(function (cat) {
-      if (_bmMenuState.categoryStatusFilter === 'inactive') return cat.is_active === 0 || cat.is_active === false;
+      if (statusFilter === 'inactive') return cat.is_active === 0 || cat.is_active === false;
       return !(cat.is_active === 0 || cat.is_active === false);
     });
+    categories.sort(function (a, b) {
+      return (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0);
+    });
+
+    // Synchronize tab UI buttons
+    var activeTab = document.querySelector('[data-menu-category-status="active"]');
+    var inactiveTab = document.querySelector('[data-menu-category-status="inactive"]');
+    if (activeTab && inactiveTab) {
+      activeTab.classList.toggle('is-active', statusFilter !== 'inactive');
+      inactiveTab.classList.toggle('is-active', statusFilter === 'inactive');
+    }
 
     if (!categories.length) {
       bar.classList.add('is-empty');
       bar.innerHTML = '<div class="x-menu-empty-state">' +
-        (_bmMenuState.categoryStatusFilter === 'inactive'
+        (statusFilter === 'inactive'
           ? 'Belum ada kategori nonaktif.'
           : 'Belum ada kategori aktif. Tambahkan kategori untuk mulai mengelompokkan menu.') +
         '</div>';
@@ -348,50 +415,609 @@
 
     bar.classList.remove('is-empty');
 
-    bar.innerHTML = categories.map(function (cat) {
+    var isSorting = Boolean(_bmMenuState.isSorting);
+
+    // In sort mode, ONLY ACTIVE categories are sorted! Nonactive categories are never included.
+    var effectiveStatus = isSorting ? 'active' : statusFilter;
+    var categories = (_bmMenuState.categories || []).filter(function (cat) {
+      var isActive = cat.is_active !== 0 && cat.is_active !== false;
+      return effectiveStatus === 'inactive' ? !isActive : isActive;
+    });
+
+    if (!categories.length) {
+      bar.classList.add('is-empty');
+      bar.innerHTML = '<div class="x-menu-empty-state">' +
+        (isSorting
+          ? 'Belum ada kategori untuk diurutkan.'
+          : (statusFilter === 'inactive'
+              ? 'Belum ada kategori nonaktif.'
+              : 'Belum ada kategori aktif. Tambahkan kategori untuk mulai mengelompokkan menu.')) +
+        '</div>';
+      return;
+    }
+
+    bar.classList.remove('is-empty');
+
+    bar.innerHTML = categories.map(function (cat, idx) {
       var count = (_bmMenuState.products || []).filter(function (p) {
         var ids = Array.isArray(p.category_ids) ? p.category_ids.map(String) : [];
         return ids.indexOf(String(cat.id)) !== -1;
       }).length;
 
-      return '<div class="x-menu-category-row" data-category-id="' + esc(cat.id) + '">' +
-        '<div class="x-menu-category-main" role="button" tabindex="0">' +
-          '<span class="x-menu-category-copy">' +
-            '<strong>' + esc(cat.name) + '</strong>' +
-            '<small>' + count + ' menu</small>' +
-          '</span>' +
-          '<span class="x-menu-category-row-actions">' +
-            '<button type="button" class="x-menu-category-edit" aria-label="Ubah ' + esc(cat.name) + '" title="Ubah kategori">' +
-              '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>' +
-            '</button>' +
-            '<svg class="x-menu-hub-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>' +
-          '</span>' +
+      var isActive = cat.is_active !== 0 && cat.is_active !== false;
+      var toggleIconSrc = isActive
+        ? '/merchant-app/assets/icons/green-toggle.svg'
+        : '/merchant-app/assets/icons/red-toggle.svg';
+
+      var actionContent = '';
+      if (isSorting) {
+        // Drag handle asset from Owner App (gravity-ui_equal.svg - Bodyas.svg)
+        actionContent =
+          '<div class="x-menu-category-drag-handle" data-drag-handle="1" aria-label="Geser untuk mengatur urutan" title="Geser untuk mengatur urutan">' +
+            '<svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
+              '<path d="M10.9688 8.9375C11.1304 8.9375 11.2854 8.8733 11.3996 8.75902C11.5139 8.64474 11.5781 8.48974 11.5781 8.32812C11.5781 8.16651 11.5139 8.01151 11.3996 7.89723C11.2854 7.78295 11.1304 7.71875 10.9688 7.71875H2.03125C1.86963 7.71875 1.71464 7.78295 1.60036 7.89723C1.48608 8.01151 1.42188 8.16651 1.42188 8.32812C1.42188 8.48974 1.48608 8.64474 1.60036 8.75902C1.71464 8.8733 1.86963 8.9375 2.03125 8.9375H10.9688ZM10.9688 5.28125C11.1304 5.28125 11.2854 5.21705 11.3996 5.10277C11.5139 4.98849 11.5781 4.83349 11.5781 4.67188C11.5781 4.51026 11.5139 4.35526 11.3996 4.24098C11.2854 4.1267 11.1304 4.0625 10.9688 4.0625H2.03125C1.86963 4.0625 1.71464 4.1267 1.60036 4.24098C1.48608 4.35526 1.42188 4.51026 1.42188 4.67188C1.42188 4.83349 1.48608 4.98849 1.60036 5.10277C1.71464 5.21705 1.86963 5.28125 2.03125 5.28125H10.9688Z" fill-rule="evenodd" clip-rule="evenodd" fill="#303030"/>' +
+            '</svg>' +
+          '</div>';
+      } else {
+        actionContent =
+          '<button type="button" class="x-menu-category-toggle-btn" role="switch" aria-checked="' + (isActive ? 'true' : 'false') + '" aria-label="Ubah status ' + esc(cat.name) + '" data-toggle-cat-id="' + esc(cat.id) + '" data-current-active="' + (isActive ? 1 : 0) + '">' +
+            '<img src="' + toggleIconSrc + '" alt="' + (isActive ? 'Aktif' : 'Nonaktif') + '" class="x-menu-category-toggle-img" width="45" height="31" draggable="false">' +
+          '</button>' +
+          '<svg class="x-menu-category-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#303030" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>';
+      }
+
+      return '<div class="x-menu-category-card x-menu-category-row' + (isSorting ? ' is-drag-sorting' : '') + '" data-category-id="' + esc(cat.id) + '" data-category-index="' + idx + '">' +
+        '<div class="x-menu-category-card-main x-menu-category-main" role="button" tabindex="0">' +
+          '<div class="x-menu-category-info x-menu-category-copy">' +
+            '<strong class="x-menu-category-title">' + esc(cat.name) + '</strong>' +
+            '<span class="x-menu-category-menu-count"><small>' + count + ' menu</small></span>' +
+          '</div>' +
+          '<div class="x-menu-category-actions-group x-menu-category-row-actions">' +
+            actionContent +
+          '</div>' +
         '</div>' +
       '</div>';
     }).join('');
 
-    Array.prototype.forEach.call(bar.querySelectorAll('.x-menu-category-row'), function (row) {
+    Array.prototype.forEach.call(bar.querySelectorAll('.x-menu-category-card'), function (row, idx) {
       var catId = row.getAttribute('data-category-id');
-      var cat = (_bmMenuState.categories || []).find(function (c) { return String(c.id) === String(catId); });
-      var main = row.querySelector('.x-menu-category-main');
-      if (main) {
-        main.addEventListener('click', function () { window.openBMMenuCategoryDetail(catId); });
-        main.addEventListener('keydown', function (event) {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            window.openBMMenuCategoryDetail(catId);
-          }
-        });
-      }
-      var edit = row.querySelector('.x-menu-category-edit');
-      if (edit && cat) {
-        edit.addEventListener('click', function (event) {
-          event.stopPropagation();
-          openBranchCategoryEditModal(cat);
-        });
+      var main = row.querySelector('.x-menu-category-card-main');
+
+      if (isSorting) {
+        bindCategoryDrag(row, catId, idx);
+      } else {
+        if (main) {
+          main.addEventListener('click', function () { window.openBMMenuCategoryDetail(catId); });
+          main.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              window.openBMMenuCategoryDetail(catId);
+            }
+          });
+        }
+        var toggleBtn = row.querySelector('[data-toggle-cat-id]');
+        if (toggleBtn) {
+          toggleBtn.addEventListener('click', function (event) {
+            event.stopPropagation();
+            var current = parseInt(this.getAttribute('data-current-active'), 10);
+            window.toggleBMBranchCategoryStatus(catId, current, event);
+          });
+        }
       }
     });
   }
+
+  // Pointer Drag & FLIP reorder engine (Owner App Parity: CategorySortPage.jsx)
+  var _bmDragState = {
+    activeId: null,
+    session: null,
+    isSettling: false
+  };
+
+  function triggerHaptic(ms) {
+    try {
+      if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+        navigator.vibrate(ms || 8);
+      }
+    } catch (_) {}
+  }
+
+  function syncCategoriesFromDOM() {
+    var bar = $('bm-menu-categories-bar');
+    if (!bar) return;
+    var domIds = Array.from(bar.querySelectorAll('.x-menu-category-card')).map(function (c) {
+      return c.getAttribute('data-category-id');
+    });
+    var catMap = {};
+    (_bmMenuState.categories || []).forEach(function (c) {
+      catMap[String(c.id)] = c;
+    });
+    var activeSorted = domIds.map(function (id) { return catMap[id]; }).filter(Boolean);
+    var inactives = (_bmMenuState.categories || []).filter(function (c) {
+      return c.is_active === 0 || c.is_active === false;
+    });
+    _bmMenuState.categories = activeSorted.concat(inactives);
+  }
+
+  function checkCategorySortHasChanged() {
+    var initial = _bmMenuState.initialSortOrder || [];
+    var bar = $('bm-menu-categories-bar');
+    if (!bar) return false;
+    var currentActiveIds = Array.from(bar.querySelectorAll('.x-menu-category-card')).map(function (c) {
+      return c.getAttribute('data-category-id');
+    });
+    if (!initial.length || initial.length !== currentActiveIds.length) return false;
+    for (var i = 0; i < currentActiveIds.length; i++) {
+      if (currentActiveIds[i] !== initial[i]) return true;
+    }
+    return false;
+  }
+
+  function updateCategorySaveButtonState() {
+    var saveBtn = $('btn-bm-categories-save-order');
+    if (!saveBtn) return;
+    var hasChanged = checkCategorySortHasChanged();
+    if (hasChanged) {
+      saveBtn.classList.add('has-changed');
+    } else {
+      saveBtn.classList.remove('has-changed');
+    }
+  }
+
+  function getBMScrollContainer(el) {
+    var cur = el;
+    while (cur && cur !== document.body && cur !== document.documentElement) {
+      var style = window.getComputedStyle(cur);
+      var ov = style.overflowY;
+      if (ov === 'auto' || ov === 'scroll' || ov === 'overlay') {
+        return cur;
+      }
+      cur = cur.parentElement;
+    }
+    return window;
+  }
+
+  var _bmAutoScrollState = {
+    rafId: null,
+    speed: 0
+  };
+
+  function updateAutoScrollSpeed(clientY) {
+    var topThreshold = 120;
+    var bottomThreshold = window.innerHeight - 130;
+
+    if (clientY < topThreshold) {
+      var dist = topThreshold - clientY;
+      _bmAutoScrollState.speed = -Math.min(16, Math.max(3, dist * 0.22));
+    } else if (clientY > bottomThreshold) {
+      var dist = clientY - bottomThreshold;
+      _bmAutoScrollState.speed = Math.min(16, Math.max(3, dist * 0.22));
+    } else {
+      _bmAutoScrollState.speed = 0;
+    }
+  }
+
+  function startAutoScroll(bar, cardEl) {
+    if (_bmAutoScrollState.rafId) return;
+
+    function step() {
+      var session = _bmDragState.session;
+      if (!session) {
+        _bmAutoScrollState.rafId = null;
+        _bmAutoScrollState.speed = 0;
+        return;
+      }
+
+      var speed = _bmAutoScrollState.speed;
+      if (speed !== 0) {
+        var sc = session.scrollContainer;
+        var actual = 0;
+        if (sc === window) {
+          var before = window.scrollY;
+          window.scrollBy(0, speed);
+          actual = window.scrollY - before;
+        } else if (sc && typeof sc.scrollTop === 'number') {
+          var before = sc.scrollTop;
+          sc.scrollTop += speed;
+          actual = sc.scrollTop - before;
+        }
+
+        if (actual !== 0) {
+          session.anchorY -= actual;
+          evaluateDragAt(session.lastClientY, bar, cardEl);
+        }
+      }
+
+      _bmAutoScrollState.rafId = requestAnimationFrame(step);
+    }
+
+    _bmAutoScrollState.rafId = requestAnimationFrame(step);
+  }
+
+  function stopAutoScroll() {
+    if (_bmAutoScrollState.rafId) {
+      cancelAnimationFrame(_bmAutoScrollState.rafId);
+      _bmAutoScrollState.rafId = null;
+    }
+    _bmAutoScrollState.speed = 0;
+  }
+
+  function evaluateDragAt(currentY, bar, cardEl) {
+    var session = _bmDragState.session;
+    if (!session || typeof currentY !== 'number') return;
+
+    var dy = currentY - session.anchorY;
+    var threshold = session.pitch * 0.52;
+    var currentCards = bar.querySelectorAll('.x-menu-category-card');
+
+    var maxSteps = 4;
+    while (dy > threshold && session.currentIndex < currentCards.length - 1 && maxSteps > 0) {
+      maxSteps--;
+      var toIdx = session.currentIndex + 1;
+
+      // 1. Capture tops of all cards before DOM move
+      var prevTops = new Map();
+      Array.prototype.forEach.call(bar.querySelectorAll('.x-menu-category-card'), function (c) {
+        prevTops.set(c.getAttribute('data-category-id'), c.getBoundingClientRect().top);
+      });
+
+      // 2. Move cardEl in the DOM: insert after target sibling
+      var targetSibling = cardEl.nextElementSibling;
+      if (targetSibling) {
+        bar.insertBefore(cardEl, targetSibling.nextElementSibling);
+      }
+
+      // 3. Sync memory array from DOM sequence
+      syncCategoriesFromDOM();
+
+      // 4. Update session anchor & index
+      session.currentIndex = toIdx;
+      session.anchorY += session.pitch;
+      dy = currentY - session.anchorY;
+
+      // 5. Haptic feedback
+      triggerHaptic(6);
+
+      // 6. Sibling FLIP transition
+      Array.prototype.forEach.call(bar.querySelectorAll('.x-menu-category-card'), function (c) {
+        var id = c.getAttribute('data-category-id');
+        if (id === session.id) return;
+        var prevTop = prevTops.get(id);
+        if (typeof prevTop !== 'number') return;
+        var newTop = c.getBoundingClientRect().top;
+        var deltaY = prevTop - newTop;
+        if (Math.abs(deltaY) > 1) {
+          c.style.transition = 'none';
+          c.style.transform = 'translate3d(0, ' + deltaY + 'px, 0)';
+          void c.offsetHeight; // force reflow
+          c.style.transition = 'transform 260ms cubic-bezier(0.22, 1, 0.36, 1)';
+          c.style.transform = 'translate3d(0, 0, 0)';
+        }
+      });
+
+      // 7. Update Save button
+      updateCategorySaveButtonState();
+      currentCards = bar.querySelectorAll('.x-menu-category-card');
+    }
+
+    while (dy < -threshold && session.currentIndex > 0 && maxSteps > 0) {
+      maxSteps--;
+      var toIdx = session.currentIndex - 1;
+
+      // 1. Capture tops of all cards before DOM move
+      var prevTops = new Map();
+      Array.prototype.forEach.call(bar.querySelectorAll('.x-menu-category-card'), function (c) {
+        prevTops.set(c.getAttribute('data-category-id'), c.getBoundingClientRect().top);
+      });
+
+      // 2. Move cardEl in the DOM: insert before previous sibling
+      var targetSibling = cardEl.previousElementSibling;
+      if (targetSibling) {
+        bar.insertBefore(cardEl, targetSibling);
+      }
+
+      // 3. Sync memory array from DOM sequence
+      syncCategoriesFromDOM();
+
+      // 4. Update session anchor & index
+      session.currentIndex = toIdx;
+      session.anchorY -= session.pitch;
+      dy = currentY - session.anchorY;
+
+      // 5. Haptic feedback
+      triggerHaptic(6);
+
+      // 6. Sibling FLIP transition
+      Array.prototype.forEach.call(bar.querySelectorAll('.x-menu-category-card'), function (c) {
+        var id = c.getAttribute('data-category-id');
+        if (id === session.id) return;
+        var prevTop = prevTops.get(id);
+        if (typeof prevTop !== 'number') return;
+        var newTop = c.getBoundingClientRect().top;
+        var deltaY = prevTop - newTop;
+        if (Math.abs(deltaY) > 1) {
+          c.style.transition = 'none';
+          c.style.transform = 'translate3d(0, ' + deltaY + 'px, 0)';
+          void c.offsetHeight; // force reflow
+          c.style.transition = 'transform 260ms cubic-bezier(0.22, 1, 0.36, 1)';
+          c.style.transform = 'translate3d(0, 0, 0)';
+        }
+      });
+
+      // 7. Update Save button
+      updateCategorySaveButtonState();
+      currentCards = bar.querySelectorAll('.x-menu-category-card');
+    }
+
+    cardEl.style.transform = 'translate3d(0, ' + dy + 'px, 0) scale(1.025)';
+  }
+
+  function bindCategoryDrag(cardEl, catId) {
+    function startDrag(e) {
+      if (e.button !== undefined && e.button !== 0) return;
+      if (!_bmMenuState.isSorting) return;
+      if (_bmDragState.session || _bmDragState.isSettling) return;
+
+      var isHandle = !!(e.target && e.target.closest && (e.target.closest('.x-menu-category-drag-handle') || e.target.closest('.x-menu-category-actions-group')));
+      if (e.pointerType === 'touch' && !isHandle) {
+        // Allow mobile vertical scroll gesture on the card body!
+        return;
+      }
+      if (e.cancelable) e.preventDefault();
+
+      var bar = $('bm-menu-categories-bar');
+      if (!bar) return;
+
+      // Clear any rogue active drag/settle classes across all cards
+      Array.prototype.forEach.call(bar.querySelectorAll('.x-menu-category-card'), function (c) {
+        c.classList.remove('is-dragging', 'is-settling');
+        c.style.transition = '';
+        c.style.transform = '';
+        c.style.zIndex = '';
+      });
+
+      var allCards = Array.from(bar.querySelectorAll('.x-menu-category-card'));
+      var currentIndex = allCards.indexOf(cardEl);
+      if (currentIndex === -1) return;
+
+      var clientY = e.clientY;
+      var pointerId = e.pointerId;
+      var rect = cardEl.getBoundingClientRect();
+      var pitch = (rect.height || 73) + 12;
+      var scrollContainer = getBMScrollContainer(cardEl);
+
+      _bmDragState.session = {
+        id: String(catId),
+        el: cardEl,
+        pointerId: pointerId,
+        currentIndex: currentIndex,
+        anchorY: clientY,
+        lastClientY: clientY,
+        pitch: pitch,
+        scrollContainer: scrollContainer
+      };
+      _bmDragState.activeId = String(catId);
+      _bmDragState.isSettling = false;
+
+      cardEl.classList.add('is-dragging');
+      cardEl.style.zIndex = '50';
+      cardEl.style.willChange = 'transform';
+      cardEl.style.transition = 'none';
+      cardEl.style.transform = 'translate3d(0, 0, 0) scale(1.025)';
+      triggerHaptic(10);
+
+      if (pointerId !== undefined && typeof cardEl.setPointerCapture === 'function') {
+        try { cardEl.setPointerCapture(pointerId); } catch (_) {}
+      }
+
+      function onPointerMove(moveEvent) {
+        var session = _bmDragState.session;
+        if (!session) return;
+        if (moveEvent.pointerId !== undefined && session.pointerId !== undefined && moveEvent.pointerId !== session.pointerId) {
+          return;
+        }
+        if (moveEvent.cancelable) moveEvent.preventDefault();
+        var currentY = moveEvent.clientY;
+        if (typeof currentY !== 'number') return;
+
+        session.lastClientY = currentY;
+        updateAutoScrollSpeed(currentY);
+        if (_bmAutoScrollState.speed !== 0) {
+          startAutoScroll(bar, cardEl);
+        }
+
+        evaluateDragAt(currentY, bar, cardEl);
+      }
+
+      function onPointerUp(upEvent) {
+        var session = _bmDragState.session;
+        if (!session) return;
+        if (upEvent && upEvent.pointerId !== undefined && session.pointerId !== undefined && upEvent.pointerId !== session.pointerId) {
+          return;
+        }
+
+        stopAutoScroll();
+
+        window.removeEventListener('pointermove', onPointerMove);
+        window.removeEventListener('pointerup', onPointerUp);
+        window.removeEventListener('pointercancel', onPointerUp);
+
+        if (upEvent && upEvent.pointerId !== undefined && typeof cardEl.releasePointerCapture === 'function') {
+          try { cardEl.releasePointerCapture(upEvent.pointerId); } catch (_) {}
+        }
+
+        _bmDragState.session = null;
+        _bmDragState.isSettling = true;
+
+        cardEl.classList.remove('is-dragging');
+        cardEl.classList.add('is-settling');
+        cardEl.style.transition = 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 220ms ease';
+        cardEl.style.transform = 'translate3d(0, 0, 0) scale(1)';
+
+        setTimeout(function () {
+          cardEl.classList.remove('is-settling');
+          cardEl.style.transition = '';
+          cardEl.style.transform = '';
+          cardEl.style.willChange = '';
+          cardEl.style.zIndex = '';
+          _bmDragState.activeId = null;
+          _bmDragState.isSettling = false;
+          updateCategorySaveButtonState();
+        }, 220);
+      }
+
+      window.addEventListener('pointermove', onPointerMove, { passive: false });
+      window.addEventListener('pointerup', onPointerUp);
+      window.addEventListener('pointercancel', onPointerUp);
+    }
+
+    cardEl.addEventListener('pointerdown', startDrag);
+  }
+
+  var _lastSortToggleTime = 0;
+  window.toggleBMCategorySortMode = function (forceState, isCancelling) {
+    var now = Date.now();
+    if (typeof forceState !== 'boolean' && (now - _lastSortToggleTime < 300)) {
+      return;
+    }
+    _lastSortToggleTime = now;
+
+    if (typeof forceState === 'boolean') {
+      _bmMenuState.isSorting = forceState;
+    } else {
+      _bmMenuState.isSorting = !_bmMenuState.isSorting;
+    }
+
+    var banner = $('bm-menu-category-sort-banner');
+    var tabs = document.querySelector('#bm-menu-categories-view .x-menu-category-tabs');
+    var activeTabBtn = tabs ? tabs.querySelector('[data-menu-category-status="active"]') : null;
+    var inactiveTabBtn = tabs ? tabs.querySelector('[data-menu-category-status="inactive"]') : null;
+    var sortBtn = $('btn-bm-categories-sort');
+    var addBtn = $('btn-bm-categories-add');
+    var cancelSortBtn = $('btn-bm-categories-cancel-sort');
+    var saveBtn = $('btn-bm-categories-save-order');
+
+    if (_bmMenuState.isSorting) {
+      _bmMenuState.categoryStatusFilter = 'active';
+      if (activeTabBtn) activeTabBtn.classList.add('is-active');
+      if (inactiveTabBtn) {
+        inactiveTabBtn.classList.remove('is-active');
+        inactiveTabBtn.disabled = true;
+        inactiveTabBtn.classList.add('is-disabled');
+      }
+
+      var activeCats = (_bmMenuState.categories || []).filter(function (c) {
+        return c.is_active !== 0 && c.is_active !== false;
+      });
+      _bmMenuState.initialSortOrder = activeCats.map(function (c) { return String(c.id); });
+
+      if (banner) banner.style.display = 'flex';
+      if (tabs) tabs.style.display = 'flex';
+      if (sortBtn) sortBtn.style.display = 'none';
+      if (addBtn) addBtn.style.display = 'none';
+      if (cancelSortBtn) cancelSortBtn.style.display = 'flex';
+      if (saveBtn) {
+        saveBtn.style.display = 'flex';
+        saveBtn.classList.remove('has-changed');
+        saveBtn.textContent = 'Simpan';
+      }
+    } else {
+      stopAutoScroll();
+      if (_bmDragState.session) {
+        _bmDragState.session = null;
+        _bmDragState.isSettling = false;
+        _bmDragState.activeId = null;
+      }
+      if (inactiveTabBtn) {
+        inactiveTabBtn.disabled = false;
+        inactiveTabBtn.classList.remove('is-disabled');
+      }
+
+      if (isCancelling && _bmMenuState.initialSortOrder) {
+        var initialMap = {};
+        _bmMenuState.initialSortOrder.forEach(function (id, idx) { initialMap[id] = idx; });
+        _bmMenuState.categories.sort(function (a, b) {
+          var idxA = initialMap[String(a.id)];
+          var idxB = initialMap[String(b.id)];
+          if (idxA !== undefined && idxB !== undefined) return idxA - idxB;
+          return 0;
+        });
+      }
+
+      if (banner) banner.style.display = 'none';
+      if (tabs) tabs.style.display = 'flex';
+      if (sortBtn) sortBtn.style.display = '';
+      if (addBtn) addBtn.style.display = '';
+      if (cancelSortBtn) cancelSortBtn.style.display = 'none';
+      if (saveBtn) saveBtn.style.display = 'none';
+    }
+
+    renderBMMenuCategoriesBar();
+    updateCategorySaveButtonState();
+  };
+
+  window.saveBMCategorySortOrder = async function () {
+    var hasChanged = checkCategorySortHasChanged();
+    if (!hasChanged) {
+      showToast('ℹ️ Urutan kategori belum diubah');
+      return;
+    }
+
+    var saveBtn = $('btn-bm-categories-save-order');
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Menyimpan...';
+    }
+
+    var orderedIds = (_bmMenuState.categories || []).map(function (c) { return String(c.id); });
+    await saveBMBranchCategoryOrder(orderedIds);
+
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Simpan';
+    }
+
+    window.toggleBMCategorySortMode(false);
+  };
+
+  window.toggleBMBranchCategoryStatus = async function (catId, currentActive, event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    var branchId = getBMTargetBranchId();
+    var nextActive = (currentActive === 1 || currentActive === true) ? 0 : 1;
+
+    // Optimistic UI update
+    var cat = (_bmMenuState.categories || []).find(function (c) { return String(c.id) === String(catId); });
+    if (cat) cat.is_active = nextActive;
+    renderBMMenuCategoriesBar();
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/categories/' + encodeURIComponent(catId), {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ is_active: nextActive })
+      });
+      var data = await res.json();
+      if (!data.success) {
+        var fbRes = await adminFetch(API_BASE + '/admin/categories/' + encodeURIComponent(catId) + '/status', {
+          method: 'PATCH',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ is_active: nextActive })
+        });
+        var fbData = await fbRes.json();
+        if (!fbData.success) {
+          throw new Error(data.error || fbData.error || 'Gagal mengubah status kategori.');
+        }
+      }
+      showToast(nextActive === 1 ? '✓ Kategori diaktifkan.' : '✓ Kategori dinonaktifkan.');
+    } catch (err) {
+      if (cat) cat.is_active = currentActive;
+      renderBMMenuCategoriesBar();
+      showToast('❌ ' + (err.message || 'Gagal mengubah status kategori.'));
+    }
+  };
 
   async function saveBMBranchCategoryOrder(orderedIds) {
     var branchId = getBMTargetBranchId();
@@ -428,7 +1054,13 @@
       return;
     }
     XentraMerchantBranchCatalog.state.branchId = branchId;
-    openBranchCategoryCreateModal();
+    // Buka subpage penuh (Frame 324) untuk tambah kategori baru
+    if (typeof window.openBCESubpageCreate === 'function') {
+      window.openBCESubpageCreate();
+    } else {
+      // fallback ke modal lama jika subpage belum siap
+      openBranchCategoryCreateModal();
+    }
   };
 
   window.deleteBMBranchCategory = async function (catId, catName) {
@@ -603,8 +1235,8 @@
           '</div>' +
         '</div>' +
         '<div class="x-master-inline-sheet-actions">' +
-          '<button type="button" class="x-btn-secondary" data-action="cancel">Batal</button>' +
-          '<button type="button" class="x-btn-primary" data-action="save">Simpan</button>' +
+          '<button type="button" class="x-btn-secondary" data-action="cancel" style="display:none;">Batal</button>' +
+          '<button type="button" class="x-btn-primary" data-action="save" style="width:100%; height:44px; justify-content:center;">Simpan</button>' +
         '</div>' +
       '</div>';
     var field = wrap.querySelector('#bm-display-name-input');

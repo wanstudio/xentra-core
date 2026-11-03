@@ -11,6 +11,8 @@ const { isConsumingOrderStatus } = require('../../../core/domain/OrderStatusCont
 const PaymentModel = require('../models/PaymentModel');
 const MidtransGateway = require('../gateways/MidtransGateway');
 const DokuGateway = require('../gateways/DokuGateway');
+const PosBillRepository = require('../../../core/data/repositories/PosBillRepository');
+const posBillRepository = new PosBillRepository();
 
 const paymentRepository = new PaymentRepository();
 const { OrderRepository } = require('../../../core/data/repositories');
@@ -25,6 +27,89 @@ function releaseClaimIfNeverAccepted(orderId, orderStatus, reason) {
 }
 
 class PaymentGatewayService {
+  static handleCheckPaymentWebhook(webhookData, intent, { skipSignatureCheck = false, provider, headers = {}, notificationPath = '' } = {}) {
+    const order = paymentRepository.findOrder(intent.order_id);
+    const check = posBillRepository.findCheck(intent.check_id);
+    if (!order || !check || check.order_id !== order.id) throw new Error('[PaymentGatewayService] Check payment intent tidak terhubung ke bill aktif.');
+    if (intent.provider !== provider) throw new Error('[PaymentGatewayService] Provider callback tidak sesuai payment intent.');
+    const config = this.resolvePaymentConfig(order.branch_id, order.brand_id);
+    const gateway = provider === 'doku' ? new DokuGateway(this._gatewayConfig(config)) : new MidtransGateway(this._gatewayConfig(config));
+    if (!skipSignatureCheck) {
+      if (provider === 'doku') {
+        if (!config.secret_key || !gateway.verifySignature(headers, webhookData, notificationPath)) throw new Error('[PaymentGatewayService] Signature webhook DOKU check payment tidak valid.');
+      } else if (!config.server_key || !webhookData.signature_key || !gateway.verifySignature(webhookData)) {
+        throw new Error('[PaymentGatewayService] Signature webhook Midtrans check payment tidak valid.');
+      }
+    }
+    const { mappedStatus, shouldSettle } = gateway.parseWebhookStatus(webhookData);
+    const nextStatus = shouldSettle ? PaymentModel.STATUSES.SETTLEMENT : ['cancel', 'deny', 'expire'].includes(mappedStatus) ? mappedStatus : mappedStatus === 'challenge' ? PaymentModel.STATUSES.CHALLENGE : PaymentModel.STATUSES.PENDING;
+    if (intent.payment_status === PaymentModel.STATUSES.SETTLEMENT && shouldSettle) return { success: true, idempotent: true, order_id: order.id, check_id: check.id, payment_status: 'settlement' };
+    if (intent.payment_status === nextStatus) return { success: true, idempotent: true, order_id: order.id, check_id: check.id, payment_status: nextStatus };
+    if (!PaymentModel.canTransition(intent.payment_status, nextStatus)) throw new Error(`[PaymentGatewayService] Invalid check payment transition: ${intent.payment_status} -> ${nextStatus}.`);
+    if (shouldSettle) {
+      const gross = Number(provider === 'doku' ? webhookData.order && webhookData.order.amount : webhookData.gross_amount);
+      if (!Number.isFinite(gross) || Math.round(gross) !== Math.round(Number(intent.amount)) || gross > Number(order.grand_total)) throw new Error('[PAYMENT_AMOUNT_MISMATCH]: Nominal callback tidak sama dengan alokasi check atau melebihi total bill.');
+    }
+    const now = new Date().toISOString();
+    posBillRepository.beginTransaction();
+    try {
+      const currentIntent = posBillRepository.findCheckPaymentIntentByGatewayOrderId(intent.gateway_order_id);
+      if (!currentIntent) throw new Error('[PaymentGatewayService] Check payment intent tidak ditemukan lagi.');
+      if (currentIntent.payment_status === PaymentModel.STATUSES.SETTLEMENT && shouldSettle) {
+        posBillRepository.commit();
+        return { success: true, idempotent: true, order_id: order.id, check_id: check.id, payment_status: 'settlement' };
+      }
+      if (!PaymentModel.canTransition(currentIntent.payment_status, nextStatus)) throw new Error(`[PaymentGatewayService] Invalid locked check payment transition: ${currentIntent.payment_status} -> ${nextStatus}.`);
+      const locked = posBillRepository.findCheck(intent.check_id);
+      const alreadyPaid = posBillRepository.findCheckPaidAmount(intent.check_id);
+      if (shouldSettle && Number(intent.amount) + alreadyPaid > Number(locked.allocated_amount) + 0.000001) throw new Error('[PaymentGatewayService] Settlement melampaui sisa alokasi Check.');
+      const paidAcrossOrder = posBillRepository.findOrderPaidAmount(order.id);
+      if (shouldSettle && paidAcrossOrder + Number(intent.amount) > Number(order.grand_total) + 0.000001) throw new Error('[PaymentGatewayService] Settlement melampaui sisa bill meja.');
+      posBillRepository.updateCheckPaymentIntentWebhook({ gatewayOrderId: intent.gateway_order_id, paymentStatus: nextStatus, rawResponse: JSON.stringify(webhookData), settledAt: now, updatedAt: now });
+      if (shouldSettle) {
+        posBillRepository.createCheckPayment({ id: `pcp_${intent.id}`, checkId: intent.check_id, orderId: order.id, paymentMethod: provider, provider, amount: Number(intent.amount), payerName: null, actorId: null, rawPayment: JSON.stringify({ gateway_order_id: intent.gateway_order_id, intent_id: intent.id }), settledAt: now, now });
+        const checkPaid = alreadyPaid + Number(intent.amount);
+        if (checkPaid >= Number(locked.allocated_amount) - 0.000001) posBillRepository.setCheckStatus(locked.id, 'paid', now);
+        const orderPaid = posBillRepository.findOrderPaidAmount(order.id);
+        if (orderPaid >= Number(order.grand_total) - 0.000001) paymentRepository.settleOrderFromCheckPayments({ orderId: order.id, amount: Number(order.grand_total), settledAt: now, rawPayment: JSON.stringify({ source: 'pos_check_payment_gateway', order_paid: orderPaid }), updatedAt: now });
+      }
+      posBillRepository.commit();
+    } catch (err) { try { posBillRepository.rollback(); } catch (_) {} throw err; }
+    return { success: true, order_id: order.id, check_id: check.id, payment_status: nextStatus };
+  }
+
+  static async createCheckPaymentTransaction({ order, check, amount, payer_name = null }) {
+    const config = this.resolvePaymentConfig(order.branch_id, order.brand_id);
+    const provider = this._resolveProvider(config);
+    if (!provider || !['midtrans', 'doku'].includes(provider)) throw new Error('[PaymentGatewayService] Gateway online aktif tidak ditemukan.');
+    const gatewayOrderId = `pc_${crypto.randomBytes(16).toString('hex')}`;
+    const now = new Date().toISOString();
+    posBillRepository.beginTransaction();
+    try {
+      const lockedCheck = posBillRepository.findCheck(check.id);
+      if (!lockedCheck || lockedCheck.order_id !== order.id || lockedCheck.status !== 'open') throw new Error('[PaymentGatewayService] Check tidak lagi terbuka.');
+      const checkPaid = posBillRepository.findCheckPaidAmount(check.id);
+      const pendingAmount = posBillRepository.findPendingCheckIntentAmount(check.id);
+      const remaining = Number(lockedCheck.allocated_amount) - checkPaid - pendingAmount;
+      const orderPaid = posBillRepository.findOrderPaidAmount(order.id);
+      const orderPending = posBillRepository.findOrderPendingCheckIntentAmount(order.id);
+      const orderRemaining = Number(order.grand_total) - orderPaid - orderPending;
+      if (Number(amount) <= 0 || Number(amount) > remaining + 0.000001 || Number(amount) > orderRemaining + 0.000001) throw new Error('[PaymentGatewayService] Nominal online melebihi saldo Check atau bill yang belum dibayar/sedang diproses.');
+      posBillRepository.createCheckPaymentIntent({ id: `pci_${crypto.randomBytes(10).toString('hex')}`, gatewayOrderId, orderId: order.id, checkId: check.id, provider, amount: Number(amount), now });
+      posBillRepository.commit();
+    } catch (err) { try { posBillRepository.rollback(); } catch (_) {} throw err; }
+    try {
+      const gateway = this._getGateway(config, provider);
+      const gatewayOrder = { id: gatewayOrderId, grand_total: Number(amount), payment_method: provider, order_type: order.order_type, branch_id: order.branch_id, brand_id: order.brand_id, customer_name: payer_name || 'Pembayaran Check', customer_phone: '' };
+      const result = await gateway.createTransaction(gatewayOrder, [{ id: check.id, product_name: `Pembayaran meja - Check ${check.check_number}`, unit_price: Number(amount), quantity: 1 }], { name: payer_name || 'Pelanggan', phone: '' });
+      posBillRepository.updateCheckPaymentIntentGateway({ gatewayOrderId, snapToken: result.snap_token, redirectUrl: result.redirect_url, merchantId: result.merchant_id, transactionId: result.transaction_id || null, rawResponse: JSON.stringify(result), updatedAt: new Date().toISOString() });
+      return { success: true, payment: { provider, status: 'pending', amount: Number(amount), gateway_order_id: gatewayOrderId, snap_token: result.snap_token || null, redirect_url: result.redirect_url || null, merchant_id: result.merchant_id || null } };
+    } catch (err) {
+      posBillRepository.updateCheckPaymentIntentStatus({ gatewayOrderId, paymentStatus: 'cancel', updatedAt: new Date().toISOString() });
+      throw err;
+    }
+  }
+
   static resolvePaymentConfig(branch_id, brand_id) {
     if (branch_id) {
       let branch = null;
@@ -199,6 +284,8 @@ class PaymentGatewayService {
     const orderId = provider === 'doku'
       ? (webhookData.order && webhookData.order.invoice_number) || ''
       : (webhookData.order_id || '');
+    const checkIntent = posBillRepository.findCheckPaymentIntentByGatewayOrderId(orderId);
+    if (checkIntent) return this.handleCheckPaymentWebhook(webhookData, checkIntent, { skipSignatureCheck, provider, headers, notificationPath });
     const grossAmount = provider === 'doku'
       ? (webhookData.order && webhookData.order.amount)
       : webhookData.gross_amount;
@@ -261,7 +348,12 @@ class PaymentGatewayService {
       const gatewayAmount = Number(grossAmount);
       const orderAmount = order ? Number(order.grand_total) : null;
       const paymentAmount = Number(payment.amount);
-      if (!Number.isFinite(gatewayAmount) || (orderAmount !== null && Math.round(gatewayAmount) !== Math.round(orderAmount)) || Math.round(gatewayAmount) !== Math.round(paymentAmount)) throw new Error(`[PAYMENT_AMOUNT_MISMATCH]: Nominal pembayaran gateway (Rp ${gatewayAmount}) tidak cocok dengan tagihan order (Rp ${orderAmount}) atau payment record (Rp ${paymentAmount}). Transaksi settlement ditolak demi integritas finansial.`);
+      const sharedDineInCycle = Boolean(order && order.order_type === 'dine_in' && order.dining_session_id);
+      const exceedsCurrentSharedBill = sharedDineInCycle && orderAmount !== null && Math.round(gatewayAmount) > Math.round(orderAmount);
+      const changedNonSharedOrderTotal = !sharedDineInCycle && orderAmount !== null && Math.round(gatewayAmount) !== Math.round(orderAmount);
+      if (!Number.isFinite(gatewayAmount) || changedNonSharedOrderTotal || exceedsCurrentSharedBill || Math.round(gatewayAmount) !== Math.round(paymentAmount)) {
+        throw new Error(`[PAYMENT_AMOUNT_MISMATCH]: Nominal pembayaran gateway (Rp ${gatewayAmount}) tidak cocok dengan snapshot payment (Rp ${paymentAmount}) atau melebihi tagihan saat ini (Rp ${orderAmount}). Settlement ditolak demi integritas finansial.`);
+      }
     }
 
     const now = new Date().toISOString();
@@ -279,6 +371,9 @@ class PaymentGatewayService {
       });
 
       if (shouldSettle) {
+        try {
+          paymentRepository.db.execute("UPDATE orders SET payment_status = 'settlement', updated_at = ? WHERE id = ?", [now, orderId]);
+        } catch (_) {}
         let currentOrderState = paymentRepository.findOrderStatus(orderId);
         // Payment settlement is financially authoritative only. It must never
         // perform Branch Acceptance (pending -> confirmed) or activate Dining.
@@ -368,7 +463,33 @@ class PaymentGatewayService {
 
     if (shouldSettle) {
       if (orderStatusAfterSettlement === 'fulfillment_exception') events.EventBus.publish({ type: 'payment.fulfillment_exception', producer: 'payment', payload: { payment_id: payment.id, order_id: orderId, branch_id: order?.branch_id, brand_id: order?.brand_id, provider: gateway.name, amount: Number(grossAmount || payment.amount), error: `Settlement arrived after order left AWAITING (${orderStatusAfterSettlement}).`, settled_at: now } }).catch(() => {});
-      else events.EventBus.publish({ type: 'payment.settled', producer: 'payment', payload: { payment_id: payment.id, order_id: orderId, branch_id: order?.branch_id, brand_id: order?.brand_id, provider: gateway.name, payment_method: gateway.name, amount: Number(grossAmount || payment.amount), settled_at: now } }).catch(() => {});
+      else {
+        events.EventBus.publish({ type: 'payment.settled', producer: 'payment', payload: { payment_id: payment.id, order_id: orderId, branch_id: order?.branch_id, brand_id: order?.brand_id, provider: gateway.name, payment_method: gateway.name, amount: Number(grossAmount || payment.amount), settled_at: now } }).catch(() => {});
+
+        // Trigger notification for merchant staff upon confirmed online payment (GoFood/GrabFood standard)
+        if (order && order.branch_id) {
+          try {
+            const NotificationService = require('../../../core/notification/NotificationService');
+            const notifService = new NotificationService(paymentRepository.db);
+            const displayCode = String(order.order_number || '').startsWith('#') ? order.order_number : ('#' + (order.order_number || orderId.slice(-3)));
+            notifService.createNotification({
+              brand_id: order.brand_id || null,
+              branch_id: order.branch_id || null,
+              source_type: 'order',
+              title: 'Ada Pesanan Baru Masuk (Lunas)!',
+              body: `Pesanan ${displayCode} (${order.order_type === 'delivery' ? 'Delivery' : order.order_type === 'dine_in' ? 'Dine In' : 'Takeaway'}) senilai Rp ${Number(grossAmount || payment.amount || order.grand_total || 0).toLocaleString('id-ID')}`,
+              priority: 'high',
+              target_role: null,
+              target_scope: 'branch',
+              related_entity_type: 'order',
+              related_entity_id: orderId,
+              action_url: `/merchant/orders/${orderId}`
+            });
+          } catch (notifErr) {
+            console.error('[Payment Settlement Notification Error]:', notifErr.message);
+          }
+        }
+      }
     } else if (['cancel', 'deny', 'expire'].includes(newPaymentStatus)) {
       events.EventBus.publish({ type: 'payment.failed', producer: 'payment', payload: { payment_id: payment.id, order_id: orderId, branch_id: order?.branch_id, provider: gateway.name, status: newPaymentStatus } }).catch(() => {});
     }
@@ -436,12 +557,55 @@ class PaymentGatewayService {
     }
   }
 
+  static async reconcileCheckPaymentIntent(intent) {
+    const order = paymentRepository.findOrder(intent.order_id);
+    if (!order) throw new Error(`[PaymentGatewayService] Order intent ${intent.order_id} tidak ditemukan.`);
+    const config = this.resolvePaymentConfig(order.branch_id, order.brand_id);
+    const gateway = intent.provider === 'doku'
+      ? new DokuGateway(this._gatewayConfig(config))
+      : new MidtransGateway(this._gatewayConfig(config));
+    try {
+      const data = await gateway.checkTransactionStatus(intent.gateway_order_id);
+      if (!data) return { success: true, order_id: order.id, check_id: intent.check_id, payment_status: intent.payment_status };
+      if (intent.provider === 'midtrans') {
+        return this.handleWebhook({ ...data, order_id: intent.gateway_order_id }, { skipSignatureCheck: true, provider: 'midtrans' });
+      }
+      let txStatus = data.transaction?.status || data.response?.status;
+      if (!txStatus && data.order?.status === 'ORDER_EXPIRED') txStatus = 'EXPIRED';
+      if (!txStatus && data.order?.status === 'ORDER_GENERATED') txStatus = 'PENDING';
+      const dokuData = {
+        ...data,
+        order: { ...(data.order || {}), invoice_number: intent.gateway_order_id, amount: (data.order && data.order.amount) || intent.amount },
+        transaction: { ...(data.transaction || {}), status: txStatus || 'PENDING' }
+      };
+      return this.handleWebhook(dokuData, { skipSignatureCheck: true, provider: 'doku' });
+    } catch (err) {
+      if (err.response?.status === 404) {
+        const now = new Date().toISOString();
+        posBillRepository.beginTransaction();
+        try {
+          const current = posBillRepository.findCheckPaymentIntentByGatewayOrderId(intent.gateway_order_id);
+          if (current && ['pending', 'challenge', 'reconciliation_pending'].includes(current.payment_status)) {
+            posBillRepository.updateCheckPaymentIntentWebhook({ gatewayOrderId: intent.gateway_order_id, paymentStatus: 'cancel', rawResponse: JSON.stringify({ reconciliation: 'gateway_not_found' }), settledAt: null, updatedAt: now });
+          }
+          posBillRepository.commit();
+        } catch (updateError) { try { posBillRepository.rollback(); } catch (_) {} throw updateError; }
+        return { success: true, order_id: order.id, check_id: intent.check_id, payment_status: 'cancel', message: 'Gateway tidak menemukan intent; reservasi nominal dilepas.' };
+      }
+      throw new Error(`[PaymentGatewayService] Gagal merekonsiliasi intent check ${intent.gateway_order_id}: ${err.message}`);
+    }
+  }
+
   static async reconcilePendingPayments() {
     const pendingList = paymentRepository.findPendingReconciliationPayments();
     const results = [];
     for (const row of pendingList) {
       try { results.push({ order_id: row.order_id, success: true, result: await this.checkTransactionStatus(row.order_id) }); }
       catch (err) { results.push({ order_id: row.order_id, success: false, error: err.message }); }
+    }
+    for (const intent of posBillRepository.findCheckPaymentIntentsForReconciliation()) {
+      try { results.push({ order_id: intent.order_id, check_id: intent.check_id, gateway_order_id: intent.gateway_order_id, success: true, result: await this.reconcileCheckPaymentIntent(intent) }); }
+      catch (err) { results.push({ order_id: intent.order_id, check_id: intent.check_id, gateway_order_id: intent.gateway_order_id, success: false, error: err.message }); }
     }
     return results;
   }

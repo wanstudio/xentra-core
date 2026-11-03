@@ -276,4 +276,45 @@ test('AFFILIATE DOMAIN SUITE', async (t) => {
     const statusRejected = await service.getCustomerStatus({ brandId, customerId: customerD });
     assert.equal(statusRejected.status, 'REJECTED');
   });
+
+  await t.test('8. Modern 2026 Flow: Instant 1-Tap Activation, Public Program Info & Tier Gamification', async () => {
+    // 1. Instant 1-Tap Activation on new customer
+    const customerE = 'cust_aff_e_' + Date.now();
+    const activeProf = await service.activateInstantPartner({
+      brandId,
+      customerId: customerE,
+      customerName: 'Eko Purnomo'
+    });
+    assert.equal(activeProf.status, 'ACTIVE');
+    assert.ok(activeProf.referral_code.startsWith('EKO'));
+
+    // 2. Reactivating rejected profile directly to ACTIVE (instant re-activation)
+    const customerD = 'cust_aff_d_' + Date.now();
+    await service.applyForAffiliate({
+      brandId,
+      customerId: customerD,
+      customerName: 'Dodi',
+      socialMedia: 'ig/dodi',
+      bankName: 'BCA',
+      accountNumber: '123',
+      accountHolder: 'Dodi'
+    });
+    const reactivated = await service.activateInstantPartner({
+      brandId,
+      customerId: customerD
+    });
+    assert.equal(reactivated.status, 'ACTIVE');
+
+    // 3. Public program info and social proof feed
+    const pubInfo = await service.getPublicProgramInfo({ brandId });
+    assert.equal(pubInfo.brand_id, brandId);
+    assert.ok(pubInfo.recent_payouts.length > 0);
+    assert.ok(pubInfo.recent_payouts[0].amount > 0);
+
+    // 4. Tier gamification in getCustomerStats
+    const stats = await service.getCustomerStats({ brandId, customerId: customerE });
+    assert.ok(stats.tier);
+    assert.equal(stats.tier.name, 'Foodie Pemula');
+    assert.equal(stats.tier.level, 1);
+  });
 });

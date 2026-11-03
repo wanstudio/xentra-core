@@ -1,0 +1,25 @@
+4 XentraGovemance SIMULASI INTERAKTIF
+
+1. Harga Cabang (LSP) 2.Menu Habis (86)
+
+LayarHP Owner Layar Kasir Cabang
+
+HP OWNER (KONTROL PUSAT)
+
+Edit Menu: Ayam Bakar Madu
+
+HARGA MASTER PUSAT (HOLDING)
+
+Rp 30.000
+
+Harga di Cabang Mall (Rp):
+35000
+415% (Mall) +25% (Bandara)
+‘Sama dgn Pusat
+
+Lihat Tampilan di Layar Kasir Cabang >
+
+Konsep inti LSP: Menu master tetap I dat
+pusat. Owner bisa menentukan ha
+-abang mall/ruko tanpa peru mer
+

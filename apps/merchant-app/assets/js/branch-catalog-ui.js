@@ -938,4 +938,341 @@
     },
     setBmMenuState: function (s) { bmMenuState = s; }
   };
+
+  /* =========================================================================
+     SUBPAGE: TAMBAH / UBAH KATEGORI CABANG (Frame 324)
+     Route: navigateTo('add-category') | navigateTo('edit-category')
+     State: _bceSp* vars below, set before navigateTo
+     ========================================================================= */
+  (function initBCESubpage() {
+    var _bceSpSelectedFile = null;   // staged File for upload
+    var _bceSpCropSpec    = null;    // CropSpec from XentraCropEditor
+    var _bceSpEditCat     = null;    // category object when editing, null when creating
+    var _bceSpIsActive    = true;    // current toggle state
+    var _bceSpIsSaving    = false;
+    var _bceSpIsDeleting  = false;
+
+    var $ = function (id) { return document.getElementById(id); };
+
+    /* ---- helpers ---- */
+
+    function updateSaveBtn() {
+      var saveBtn = $('btn-bce-sp-save');
+      if (!saveBtn) return;
+      var name = ($('bce-sp-name') || {}).value || '';
+      var valid = name.trim().length > 0 && !_bceSpIsSaving;
+      saveBtn.disabled = !valid;
+      saveBtn.textContent = _bceSpIsSaving
+        ? 'Menyimpan...'
+        : (_bceSpEditCat ? 'Simpan' : 'Buat kategori');
+    }
+
+    function setToggleUI(isActive) {
+      _bceSpIsActive = !!isActive;
+      var toggleBtn = $('bce-sp-toggle-btn');
+      var toggleImg = $('bce-sp-toggle-img');
+      var hiddenInput = $('bce-sp-is-active');
+      if (toggleBtn) toggleBtn.setAttribute('aria-checked', _bceSpIsActive ? 'true' : 'false');
+      if (toggleImg) {
+        toggleImg.src = _bceSpIsActive
+          ? '/merchant-app/assets/icons/green-toggle.svg'
+          : '/merchant-app/assets/icons/red-toggle.svg';
+        toggleImg.alt = _bceSpIsActive ? 'Aktif' : 'Nonaktif';
+      }
+      if (hiddenInput) hiddenInput.value = _bceSpIsActive ? '1' : '0';
+    }
+
+    function setPreviewPhoto(src) {
+      var img    = $('bce-sp-image-preview');
+      var mono   = $('bce-sp-image-mono');
+      var label  = $('bce-sp-photo-label');
+      if (!img || !mono) return;
+      if (src) {
+        img.src = src;
+        img.style.display = 'block';
+        mono.style.display = 'none';
+      } else {
+        img.src = '';
+        img.style.display = 'none';
+        mono.style.display = 'flex';
+      }
+      if (label) label.textContent = src ? 'Ganti foto' : 'Upload foto';
+    }
+
+    /* ---- public: open create ---- */
+    window.openBCESubpageCreate = function () {
+      _bceSpSelectedFile = null;
+      _bceSpCropSpec     = null;
+      _bceSpEditCat      = null;
+      _bceSpIsSaving     = false;
+      _bceSpIsDeleting   = false;
+
+      var titleEl = $('bce-page-title');
+      if (titleEl) titleEl.textContent = 'Tambah kategori';
+      var catIdInput = $('bce-sp-cat-id');
+      if (catIdInput) catIdInput.value = '';
+      var nameInput = $('bce-sp-name');
+      if (nameInput) nameInput.value = '';
+
+      setToggleUI(true);
+      setPreviewPhoto(null);
+
+      var deleteCard = $('bce-sp-delete-card');
+      if (deleteCard) deleteCard.classList.add('bce-card-hidden');
+
+      updateSaveBtn();
+      if (typeof navigateTo === 'function') navigateTo('add-category');
+    };
+
+    /* ---- public: open edit ---- */
+    window.openBCESubpageEdit = function (cat) {
+      if (!cat) return;
+      _bceSpSelectedFile = null;
+      _bceSpCropSpec     = null;
+      _bceSpEditCat      = cat;
+      _bceSpIsSaving     = false;
+      _bceSpIsDeleting   = false;
+
+      var titleEl = $('bce-page-title');
+      if (titleEl) titleEl.textContent = 'Ubah kategori';
+      var catIdInput = $('bce-sp-cat-id');
+      if (catIdInput) catIdInput.value = cat.id || '';
+      var nameInput = $('bce-sp-name');
+      if (nameInput) nameInput.value = cat.name || '';
+
+      var isActive = cat.is_active !== 0 && cat.is_active !== false;
+      setToggleUI(isActive);
+      setPreviewPhoto(cat.image_url || null);
+
+      var deleteCard = $('bce-sp-delete-card');
+      if (deleteCard) deleteCard.classList.remove('bce-card-hidden');
+
+      updateSaveBtn();
+      if (typeof navigateTo === 'function') navigateTo('edit-category');
+    };
+
+    /* ---- wire DOM on DOMContentLoaded ---- */
+    function initDOM() {
+      /* Back button */
+      var backBtn = $('btn-bce-back');
+      if (backBtn && !backBtn.dataset.bound) {
+        backBtn.dataset.bound = '1';
+        backBtn.addEventListener('click', function () {
+          if (typeof navigateBackFromSubpage === 'function') navigateBackFromSubpage();
+        });
+      }
+
+      /* Name input — enable/disable save button */
+      var nameInput = $('bce-sp-name');
+      if (nameInput && !nameInput.dataset.bound) {
+        nameInput.dataset.bound = '1';
+        nameInput.addEventListener('input', updateSaveBtn);
+      }
+
+      /* Toggle aktif/nonaktif */
+      var toggleBtn = $('bce-sp-toggle-btn');
+      if (toggleBtn && !toggleBtn.dataset.bound) {
+        toggleBtn.dataset.bound = '1';
+        toggleBtn.addEventListener('click', function () {
+          setToggleUI(!_bceSpIsActive);
+        });
+      }
+
+      /* File input (hidden) triggered by photo button */
+      var photoBtn  = $('btn-bce-sp-photo');
+      var fileInput = $('bce-sp-image-file');
+      if (photoBtn && fileInput && !photoBtn.dataset.bound) {
+        photoBtn.dataset.bound = '1';
+        photoBtn.addEventListener('click', function () {
+          fileInput.click();
+        });
+        fileInput.addEventListener('change', function () {
+          var file = fileInput.files && fileInput.files[0];
+          if (!file) { _bceSpSelectedFile = null; _bceSpCropSpec = null; return; }
+          var allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+          if (allowed.indexOf(file.type) === -1) {
+            if (typeof showToast === 'function') showToast('❌ Format gambar tidak didukung. Gunakan JPG, PNG, atau WEBP.');
+            fileInput.value = '';
+            return;
+          }
+          if (file.size > 15 * 1024 * 1024) {
+            if (typeof showToast === 'function') showToast('❌ Ukuran gambar melebihi batas maksimal 15 MB.');
+            fileInput.value = '';
+            return;
+          }
+          _bceSpSelectedFile = file;
+          if (window.XentraCropEditor && typeof window.XentraCropEditor.open === 'function') {
+            window.XentraCropEditor.open({
+              source: file,
+              assetType: 'category',
+              aspectRatio: 1.0,
+              title: 'Potong & Posisikan Foto Kategori (1:1)',
+              onConfirm: function (cropSpec, previewDataUrl) {
+                _bceSpCropSpec = cropSpec;
+                setPreviewPhoto(previewDataUrl || URL.createObjectURL(file));
+                if (typeof showToast === 'function') showToast('✓ Foto kategori siap diupload.');
+              },
+              onCancel: function () {
+                _bceSpSelectedFile = null;
+                _bceSpCropSpec     = null;
+                fileInput.value    = '';
+              }
+            });
+          } else {
+            // Fallback jika XentraCropEditor belum load
+            _bceSpCropSpec = null;
+            var reader = new FileReader();
+            reader.onload = function (e) { setPreviewPhoto(e.target.result); };
+            reader.readAsDataURL(file);
+          }
+        });
+      }
+
+      /* Tombol Hapus */
+      var deleteBtn = $('btn-bce-sp-delete');
+      if (deleteBtn && !deleteBtn.dataset.bound) {
+        deleteBtn.dataset.bound = '1';
+        deleteBtn.addEventListener('click', function () {
+          if (!_bceSpEditCat || _bceSpIsDeleting) return;
+          if (!confirm('Hapus kategori "' + (_bceSpEditCat.name || '') + '"? Produk di kategori ini tidak akan dihapus, hanya dipindah ke tanpa kategori.')) return;
+          handleDelete();
+        });
+      }
+
+      /* Tombol Simpan */
+      var saveBtn = $('btn-bce-sp-save');
+      if (saveBtn && !saveBtn.dataset.bound) {
+        saveBtn.dataset.bound = '1';
+        saveBtn.addEventListener('click', handleSave);
+      }
+    }
+
+    /* ---- save handler ---- */
+    async function handleSave() {
+      if (_bceSpIsSaving) return;
+      var nameInput = $('bce-sp-name');
+      var newName   = nameInput ? nameInput.value.trim() : '';
+      if (!newName) {
+        if (typeof showToast === 'function') showToast('❌ Nama kategori wajib diisi.');
+        return;
+      }
+      var activeBranchId = getActiveBranchId();
+      if (!activeBranchId) {
+        if (typeof showToast === 'function') showToast('❌ Cabang tidak valid atau belum dipilih.');
+        return;
+      }
+
+      _bceSpIsSaving = true;
+      updateSaveBtn();
+
+      try {
+        var catId = ($('bce-sp-cat-id') || {}).value || '';
+        var statusVal = _bceSpIsActive ? 1 : 0;
+        var targetCatId = catId;
+
+        if (!catId) {
+          // CREATE
+          var createRes  = await CatalogClient.createBranchCategory(activeBranchId, { name: newName });
+          var createData = await createRes.json();
+          if (!createRes.ok || !createData.success) {
+            if (typeof showToast === 'function') showToast('❌ ' + (createData.error || createData.message || 'Gagal membuat kategori cabang.'));
+            return;
+          }
+          targetCatId = createData.category && createData.category.id;
+        } else {
+          // UPDATE name + status
+          var renameRes  = await CatalogClient.updateBranchCategory(activeBranchId, catId, { name: newName, is_active: statusVal });
+          var renameData = {};
+          try { renameData = await renameRes.json(); } catch (_) { renameData = { success: false, error: 'Respon server tidak valid.' }; }
+          if (!renameRes.ok || !renameData.success) {
+            if (typeof showToast === 'function') showToast('❌ ' + (renameData.error || renameData.message || 'Gagal mengubah kategori.'));
+            return;
+          }
+        }
+
+        // Upload foto jika ada file baru yang di-stage
+        if (_bceSpSelectedFile && targetCatId) {
+          var base64 = await new Promise(function (resolve, reject) {
+            var reader = new FileReader();
+            reader.onload  = function () { resolve(reader.result); };
+            reader.onerror = function () { reject(new Error('Gagal membaca file gambar.')); };
+            reader.readAsDataURL(_bceSpSelectedFile);
+          });
+          var catImgPayload = { image_base64: base64, mime_type: _bceSpSelectedFile.type };
+          if (_bceSpCropSpec) catImgPayload.crop_spec = _bceSpCropSpec;
+          var imageRes  = await CatalogClient.uploadBranchCategoryImage(activeBranchId, targetCatId, catImgPayload);
+          var imageData = {};
+          try { imageData = await imageRes.json(); } catch (_) { imageData = { success: false, error: 'Respon server tidak valid saat mengunggah gambar.' }; }
+          if (!imageRes.ok || !imageData.success) {
+            if (typeof showToast === 'function') showToast('❌ ' + (imageData.error || imageData.message || 'Gagal mengunggah gambar kategori.'));
+            return;
+          }
+        }
+
+        if (typeof showToast === 'function') {
+          showToast(catId ? '✅ Kategori berhasil diperbarui!' : '✅ Kategori cabang berhasil dibuat!');
+        }
+
+        // Kembali ke halaman menu
+        if (typeof navigateTo === 'function') navigateTo('menu');
+
+        // Refresh data di background
+        if (typeof hooks.refreshBMMenu === 'function') {
+          hooks.refreshBMMenu();
+        } else if (typeof window.loadBMMenu === 'function') {
+          window.loadBMMenu();
+        }
+        if (typeof loadInlineBranchCatalog === 'function') loadInlineBranchCatalog();
+
+      } catch (err) {
+        console.error('[BCESubpage Save Error]:', err);
+        if (typeof showToast === 'function') showToast('❌ ' + (err.message || 'Kesalahan jaringan saat menyimpan.'));
+      } finally {
+        _bceSpIsSaving = false;
+        updateSaveBtn();
+      }
+    }
+
+    /* ---- delete handler ---- */
+    async function handleDelete() {
+      if (!_bceSpEditCat || _bceSpIsDeleting) return;
+      var activeBranchId = getActiveBranchId();
+      if (!activeBranchId) return;
+
+      _bceSpIsDeleting = true;
+      var deleteBtn = $('btn-bce-sp-delete');
+      if (deleteBtn) { deleteBtn.disabled = true; deleteBtn.textContent = '...'; }
+
+      try {
+        var catId  = _bceSpEditCat.id;
+        var catName = _bceSpEditCat.name || 'Kategori';
+        var res  = await CatalogClient.deleteBranchCategory(activeBranchId, catId);
+        var data = {};
+        try { data = await res.json(); } catch (_) { data = { success: false, error: 'Respon server tidak valid.' }; }
+        if (!res.ok || !data.success) {
+          if (typeof showToast === 'function') showToast('❌ ' + (data.error || 'Gagal menghapus kategori.'));
+          return;
+        }
+        if (typeof showToast === 'function') showToast('✅ Kategori "' + catName + '" berhasil dihapus.');
+        if (typeof navigateTo === 'function') navigateTo('menu');
+        if (typeof hooks.refreshBMMenu === 'function') hooks.refreshBMMenu();
+        else if (typeof window.loadBMMenu === 'function') window.loadBMMenu();
+        if (typeof loadInlineBranchCatalog === 'function') loadInlineBranchCatalog();
+      } catch (err) {
+        console.error('[BCESubpage Delete Error]:', err);
+        if (typeof showToast === 'function') showToast('❌ ' + (err.message || 'Kesalahan jaringan saat menghapus.'));
+      } finally {
+        _bceSpIsDeleting = false;
+        if (deleteBtn) { deleteBtn.disabled = false; deleteBtn.textContent = 'Hapus'; }
+      }
+    }
+
+    // Init ketika DOM siap
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initDOM);
+    } else {
+      initDOM();
+    }
+  })();
+
 })();

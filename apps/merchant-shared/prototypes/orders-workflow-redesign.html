@@ -1,0 +1,3031 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Prototype Tab Pesanan: Alur Hibrida Produksi & Kitchen UX — Xentra</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --brand-green: #00A637;
+      --brand-green-dark: #00882d;
+      --brand-green-light: #e6f7ec;
+      --slate-900: #0F172A;
+      --slate-800: #1E293B;
+      --slate-700: #334155;
+      --slate-600: #475569;
+      --slate-500: #64748B;
+      --slate-400: #94A3B8;
+      --slate-200: #E2E8F0;
+      --slate-100: #F1F5F9;
+      --slate-50: #F8FAFC;
+      --danger: #EF4444;
+      --danger-light: #FEE2E2;
+      --warning: #F59E0B;
+      --warning-light: #FEF3C7;
+      --info: #3B82F6;
+      --info-light: #DBEAFE;
+    }
+
+    *, button, input, select, textarea {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: #0b1120;
+      color: var(--slate-900);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0;
+      margin: 0;
+      overflow-x: hidden;
+    }
+
+    /* TOP PROTO-RIBBON (Controller & Architecture Notes) */
+    .proto-ribbon {
+      width: 100%;
+      background: #111827;
+      border-bottom: 1px solid #1f2937;
+      position: sticky;
+      top: 0;
+      z-index: 300;
+      padding: 10px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+
+    .proto-ribbon-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .proto-title-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .proto-title-badge h1 {
+      font-size: 13.5px;
+      font-weight: 800;
+      color: #F9FAFB;
+      letter-spacing: -0.2px;
+    }
+
+    .proto-pill {
+      background: #00A637;
+      color: #FFFFFF;
+      font-size: 10px;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .proto-scenarios {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+      scrollbar-width: none;
+    }
+    .proto-scenarios::-webkit-scrollbar { display: none; }
+
+    .proto-btn {
+      background: #1f2937;
+      color: #cbd5e1;
+      border: 1px solid #374151;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 11.5px;
+      font-weight: 700;
+      white-space: nowrap;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+    .proto-btn:hover {
+      background: #374151;
+      color: #fff;
+    }
+    .proto-btn.active {
+      background: #00A637;
+      color: #fff;
+      border-color: #00A637;
+    }
+
+    .proto-explainer-banner {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 10px 14px;
+      color: #cbd5e1;
+      font-size: 12px;
+      line-height: 1.5;
+      margin-top: 2px;
+    }
+    .proto-explainer-banner strong {
+      color: #38bdf8;
+    }
+
+    /* PHONE CONTAINER SHELL */
+    .phone-viewport {
+      width: 100%;
+      max-width: 412px;
+      min-height: 100vh;
+      background: #f8fafc;
+      position: relative;
+      box-shadow: 0 0 50px rgba(0,0,0,0.5);
+      display: flex;
+      flex-direction: column;
+      padding-bottom: 84px; /* Space for bottom nav */
+    }
+
+    /* ========================================================
+       TOPBAR REDESIGN - FIGMA FRAME 312 & 208 SPECIFICATION
+       ======================================================== */
+    .topbar-wrapper {
+      background: #ffffff;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0px 4px 25px 5px rgba(0, 0, 0, 0.10);
+      padding: 16px 16px 0 16px; /* Base for other tabs: 0 bottom padding so active tab indicator sits flush to bottom edge */
+      display: flex;
+      flex-direction: column;
+      border-bottom: none;
+      transition: padding 0.15s ease;
+    }
+    .topbar-wrapper.has-subfilters {
+      padding: 16px 16px 16px 16px; /* Exact 16px bottom padding on 'Dalam proses' per Figma spec */
+    }
+
+    /* ROW 1: BRAND IDENTITY & TOPBAR ACTIONS */
+    .topbar-main-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px; /* Exact 16px vertical gap from Figma Frame 312 */
+    }
+
+    .branch-pill {
+      width: 196px;
+      height: 35px;
+      border-radius: 17.5px;
+      background: #ffffff;
+      border: 1px solid #E5E7EB;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      display: flex;
+      align-items: center;
+      padding: 0 12px 0 5px;
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+    .branch-pill:active {
+      background: #F9FAFB;
+      transform: scale(0.98);
+    }
+
+    .branch-logo-img {
+      width: 22px;
+      height: 22px;
+      border-radius: 5px;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+
+    .branch-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: #111827;
+      letter-spacing: -0.2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+    }
+
+    .branch-chevron {
+      flex-shrink: 0;
+      color: #6B7280;
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .topbar-action-icon-btn {
+      width: 34px;
+      height: 34px;
+      border: none;
+      background: transparent;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      position: relative;
+      border-radius: 50%;
+      transition: background 0.15s ease;
+    }
+    .topbar-action-icon-btn:active {
+      background: #F3F4F6;
+    }
+
+    .pos-relative {
+      position: relative;
+    }
+
+    .topbar-red-badge {
+      position: absolute;
+      top: 0px;
+      right: 0px;
+      min-width: 18px;
+      height: 18px;
+      border-radius: 9px;
+      background: #FA3E3E;
+      color: #ffffff;
+      font-size: 10px;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 4px;
+      line-height: 1;
+      border: 1.5px solid #ffffff;
+      box-shadow: 0 2px 5px rgba(250, 62, 62, 0.35);
+    }
+
+    /* ROW 2: OPERATIONAL STATUS SWITCH CAPSULES (Figma 88x29 & 134x29) */
+    .operational-switches-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px; /* Exact 12px vertical gap from Figma Frame 312 */
+    }
+
+    .op-switch-card {
+      height: 29px;
+      border-radius: 14.5px;
+      background: #ffffff;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+      border: 1px solid rgba(0, 0, 0, 0.04);
+      display: inline-flex;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+    .op-switch-card:active {
+      transform: scale(0.98);
+    }
+
+    .op-switch-left {
+      width: 88px; /* Exact Figma Frame 312 width */
+      padding-left: 5px;
+      padding-right: 12px;
+      justify-content: flex-start;
+      gap: 8px;
+    }
+
+    .op-switch-right {
+      width: 134px; /* Exact Figma Frame 312 width */
+      padding-left: 10px;
+      padding-right: 5px;
+      justify-content: space-between;
+    }
+
+    .op-switch-text {
+      font-size: 12px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      white-space: nowrap;
+      color: #303030;
+    }
+    .op-switch-text.bold {
+      font-weight: 700;
+    }
+    .op-switch-text.medium {
+      font-weight: 700;
+    }
+
+    /* CANONICAL FIGMA TOGGLE SWITCH (100% Exact to green toggle.svg & red toggle.svg) */
+    .switch-box {
+      width: 35px;
+      height: 21px;
+      position: relative;
+      display: inline-flex;
+      flex-shrink: 0;
+    }
+    .switch-svg {
+      position: absolute;
+      top: -5px;
+      left: -5px;
+      width: 45px;
+      height: 31px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .switch-bg {
+      transition: fill 0.2s ease;
+    }
+    .switch-border {
+      transition: stroke 0.2s ease;
+    }
+    .switch-knob {
+      transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .switch-line {
+      transition: transform 0.2s ease;
+    }
+
+    /* Toggle Inactive/Closed State (red toggle.svg exact match) */
+    .switch-svg.is-off .switch-bg {
+      fill: #FA3E3E;
+    }
+    .switch-svg.is-off .switch-border {
+      stroke: #FF0000;
+    }
+    .switch-svg.is-off .switch-knob {
+      transform: translateX(-14px);
+    }
+    .switch-svg.is-off .switch-line {
+      transform: translateX(22px);
+    }
+
+    /* ROW 3: 4 STATUS NAVIGATION TABS (Single Line, 24h Cycle Throughput Badges - Exact Figma Specs) */
+    .pesanan-nav-tabs {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 22px; /* Exact 22px gap from Figma Frame 312 */
+      border-top: none;
+      padding: 0;
+      margin-bottom: 0; /* Flush to bottom edge of topbar on other tabs */
+      background: transparent;
+      position: relative;
+      transition: margin-bottom 0.15s ease;
+    }
+    .pesanan-nav-tabs.has-subfilters {
+      margin-bottom: 12px; /* Exact 12px gap to row 4 subfilters on 'Dalam proses' */
+    }
+
+    .pesanan-nav-tab {
+      flex: 0 0 auto;
+      border: none;
+      background: transparent;
+      padding: 4px 0 10px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #979797;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 4px;
+      position: relative;
+      white-space: nowrap;
+      transition: color 0.15s ease;
+    }
+    .pesanan-nav-tab.active {
+      color: #303030;
+      font-weight: 700;
+    }
+    .pesanan-nav-tab.active::after {
+      content: "";
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: #2F2F2F;
+      border-top-left-radius: 20px;
+      border-top-right-radius: 20px;
+    }
+
+    .tab-badge-pill {
+      width: 18px;
+      height: 18px;
+      border-radius: 100px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 700;
+      color: #ffffff;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .tab-badge-pill.active {
+      background: #303030;
+    }
+    .tab-badge-pill.inactive {
+      background: #979797;
+    }
+
+    /* ROW 4: KITCHEN STAGE SUB-FILTER CAPSULES (75x30 each, gap 10px - Exact Figma Specs) */
+    .stage-subfilter-bar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 10px; /* Exact 10px gap from Figma Frame 312 */
+      width: 100%;
+      padding: 0;
+      margin: 0;
+      box-sizing: border-box;
+      background: transparent;
+      border: none;
+    }
+
+    .stage-subfilter-btn {
+      width: 75px; /* Exact 75px width */
+      height: 30px; /* Exact 30px height */
+      border-radius: 20px; /* Exact 20px radius */
+      background: #ffffff;
+      outline: 1px #D9D9D9 solid;
+      outline-offset: -1px;
+      border: none;
+      color: #979797;
+      font-size: 11px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      user-select: none;
+      white-space: nowrap;
+      flex-shrink: 0;
+      padding: 0;
+    }
+    .stage-subfilter-btn:active {
+      transform: scale(0.97);
+    }
+    .stage-subfilter-btn.active {
+      background: #00A637;
+      outline: none;
+      border: none;
+      color: #ffffff;
+      font-weight: 700;
+      box-shadow: 0 1px 4px rgba(0, 166, 55, 0.25);
+    }
+
+    /* SEARCH & SERVICE FILTER CARDS */
+    .filter-section {
+      background: #ffffff;
+      padding: 10px 16px 12px;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .search-input-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .search-input-wrap svg {
+      position: absolute;
+      left: 12px;
+      color: var(--slate-400);
+      pointer-events: none;
+    }
+    .search-input {
+      width: 100%;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 8px 34px 8px 36px;
+      font-size: 12.5px;
+      color: var(--slate-900);
+      outline: none;
+    }
+    .search-input:focus {
+      border-color: var(--brand-green);
+      background: #fff;
+    }
+    .search-clear {
+      position: absolute;
+      right: 10px;
+      background: transparent;
+      border: none;
+      color: var(--slate-400);
+      cursor: pointer;
+      font-size: 14px;
+      display: none;
+    }
+
+    .service-chips {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .service-chips::-webkit-scrollbar { display: none; }
+
+    .service-chip {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      color: var(--slate-600);
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 11.5px;
+      font-weight: 700;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .service-chip.active {
+      background: #0f172a;
+      border-color: #0f172a;
+      color: #ffffff;
+    }
+
+    /* FEED & ORDER CARDS */
+    .orders-feed {
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* SECTION HEADER FOR INCOMING TRIAGE & KITCHEN COOKING */
+    .subgroup-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 4px;
+      margin-bottom: 2px;
+    }
+    .subgroup-title {
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .subgroup-count {
+      font-size: 11px;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 999px;
+    }
+
+    /* ORDER CARD CONTAINER (FIGMA EXACT STYLING) */
+    .order-card {
+      background: #ffffff;
+      border-radius: 20px;
+      border: none;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: relative;
+      cursor: pointer;
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+    .order-card:active {
+      transform: scale(0.99);
+    }
+
+    /* Urgent Countdown Banner for Incoming Orders */
+    .urgent-timer-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #FF8736;
+      border-radius: 9.5px;
+      height: 38px;
+      padding: 0 14px;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+    .urgent-timer-bar .pulse-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #ffffff;
+      animation: pulse 1.2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.4); opacity: 0.5; }
+    }
+
+    /* Card Header */
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .card-meta-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .channel-avatar-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      object-fit: contain;
+      background: #f8fafc;
+      flex-shrink: 0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+
+    .order-meta-info {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .order-code {
+      font-size: 14.5px;
+      font-weight: 800;
+      color: #111827;
+      letter-spacing: -0.2px;
+      line-height: 1.2;
+    }
+
+    .order-divider {
+      display: none;
+    }
+
+    .order-channel-text {
+      font-size: 13px;
+      font-weight: 700;
+      color: #374151;
+    }
+
+    .channel-pill-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 1px 8px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 700;
+      width: fit-content;
+      line-height: 1.4;
+    }
+    .channel-pill-badge.delivery {
+      background: #DBEAFF;
+      color: #1E5EB2;
+      border: 1px solid rgba(30, 94, 178, 0.2);
+    }
+    .channel-pill-badge.dine_in {
+      background: #F1F5F9;
+      color: #334155;
+      border: 1px solid #CBD5E1;
+    }
+    .channel-pill-badge.takeaway {
+      background: #FEF3C7;
+      color: #B45309;
+      border: 1px solid #FCD34D;
+    }
+    .channel-pill-badge.reservation {
+      background: #EDE9FE;
+      color: #6D28D9;
+      border: 1px solid #DDD6FE;
+    }
+
+    .card-time {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #9ca3af;
+      white-space: nowrap;
+    }
+
+    /* INLINE ITEM PREVIEW (FIGMA GRAY CONTAINER) */
+    .card-items-box {
+      background: #F6F7F7;
+      border-radius: 15.5px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      border: 1px solid #E5E7EB;
+    }
+
+    .item-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #111827;
+      line-height: 1.35;
+    }
+
+    .item-qty {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      background: #E6E6E6;
+      font-weight: 800;
+      color: #111827;
+      font-size: 11px;
+      flex-shrink: 0;
+    }
+
+    .item-name {
+      font-weight: 600;
+      color: #111827;
+    }
+
+    .item-notes-box {
+      font-size: 11.5px;
+      color: #64748B;
+      font-weight: 500;
+      margin-left: 30px;
+      margin-top: 2px;
+    }
+
+    /* CARD ACTION BUTTONS (FIGMA CAPSULE 39px) */
+    .card-actions-dual {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      width: 100%;
+    }
+    .card-actions-single {
+      display: flex;
+      width: 100%;
+    }
+    .card-actions-single .btn-act {
+      width: 100%;
+    }
+
+    .btn-act {
+      border: none;
+      border-radius: 19.5px;
+      height: 39px;
+      padding: 0 16px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+      user-select: none;
+    }
+    .btn-act:active { transform: scale(0.97); }
+
+    /* Neutral Outline (Tolak, Batal, Ganti Kurir, Secondary) */
+    .btn-act-reject,
+    .btn-act-secondary {
+      background: #ffffff;
+      color: #374151;
+      border: 1.5px solid #E5E7EB;
+      font-weight: 600;
+    }
+    .btn-act-reject:hover,
+    .btn-act-secondary:hover {
+      background: #F9FAFB;
+      border-color: #D1D5DB;
+    }
+
+    /* Green: START (Gerbang Masuk) & FINISH (Gerbang Selesai) ONLY */
+    .btn-act-accept,
+    .btn-act-finish {
+      background: #00A637;
+      color: #ffffff;
+    }
+    .btn-act-accept:hover,
+    .btn-act-finish:hover {
+      background: #008f30;
+    }
+
+    /* Blue: Kitchen / Cooking / Production Execution */
+    .btn-act-cook {
+      background: #1E5EB2;
+      color: #ffffff;
+    }
+    .btn-act-cook:hover {
+      background: #184c8f;
+    }
+
+    /* Red: Bottleneck / Urgent Blocker Needing Intervention */
+    .btn-act-alert {
+      background: #FA3E3E;
+      color: #ffffff;
+    }
+    .btn-act-alert:hover {
+      background: #e02f2f;
+    }
+
+    /* Dark Slate: Floor / Table / On-Premise Service */
+    .btn-act-floor {
+      background: #1E293B;
+      color: #ffffff;
+    }
+    .btn-act-floor:hover {
+      background: #0f172a;
+    }
+
+    /* Amber / Orange: In-Transit Courier Handover */
+    .btn-act-transit {
+      background: #D97706;
+      color: #ffffff;
+    }
+    .btn-act-transit:hover {
+      background: #b45309;
+    }
+
+
+
+    /* FILTER SECTION WRAPPER */
+    .filter-section {
+      background: #ffffff;
+      margin: 10px 16px 2px;
+      padding: 14px 14px 12px;
+      border-radius: 20px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
+      border: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .service-chip {
+      background: #ffffff;
+      border: 1px solid #E5E7EB;
+      color: #4B5563;
+      border-radius: 14.5px;
+      height: 29px;
+      padding: 0 14px;
+      font-size: 11.5px;
+      font-weight: 700;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .service-chip.active {
+      background: #00A637;
+      border-color: #00A637;
+      color: #ffffff;
+    }
+
+    /* EMPTY STATE */
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    .empty-state-icon {
+      font-size: 40px;
+      margin-bottom: 4px;
+    }
+    .empty-state h3 {
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--slate-800);
+    }
+    .empty-state p {
+      font-size: 12px;
+      color: var(--slate-500);
+      max-width: 260px;
+    }
+
+    /* RESTO CLOSED OVERLAY (Sleepy Cat Protection) */
+    .closed-shop-overlay {
+      background: #ffffff;
+      padding: 40px 20px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      margin: 16px;
+      border-radius: 20px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    }
+    .closed-cat-icon {
+      font-size: 54px;
+    }
+    .closed-shop-overlay h3 {
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--slate-900);
+    }
+    .closed-shop-overlay p {
+      font-size: 12.5px;
+      color: var(--slate-500);
+      max-width: 280px;
+      line-height: 1.4;
+    }
+    .btn-open-shop {
+      background: #00A637;
+      color: #fff;
+      font-weight: 800;
+      font-size: 13px;
+      padding: 10px 20px;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      margin-top: 6px;
+    }
+
+    /* BOTTOM NAVIGATION BAR (Exact Master Geometry) */
+    .x-merchant-mobile-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      max-width: 412px;
+      margin: 0 auto;
+      height: 76px;
+      background: #ffffff;
+      border-top-left-radius: 20px;
+      border-top-right-radius: 20px;
+      box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.15);
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: stretch;
+      gap: 17px;
+      padding: 0 14px;
+      z-index: 200;
+    }
+
+    .x-merchant-mobile-nav-item {
+      height: 76px;
+      width: 55px;
+      flex: 0 0 55px;
+      border: none;
+      background: transparent;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 16px 0 0 0;
+      cursor: pointer;
+      position: relative;
+    }
+    .x-merchant-mobile-nav-item[data-route="menu"] {
+      width: 75px;
+      flex: 0 0 75px;
+    }
+
+    .x-merchant-mobile-nav-item .x-nav-icon-box {
+      height: 22px;
+      width: 24px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      margin-bottom: 9px;
+      position: relative;
+    }
+
+    .x-merchant-mobile-nav-item svg {
+      color: #0F172A;
+      fill: currentColor;
+    }
+
+    .x-merchant-mobile-nav-item span {
+      width: 100%;
+      height: 14px;
+      line-height: 14px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #0F172A;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    /* Active Tab */
+    .x-merchant-mobile-nav-item.active svg {
+      color: #00A637 !important;
+      fill: #00A637 !important;
+    }
+    .x-merchant-mobile-nav-item.active::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 40px;
+      height: 5px;
+      border-radius: 0 0 5px 5px;
+      background: #00A637;
+      z-index: 10;
+    }
+
+    .nav-badge {
+      position: absolute;
+      top: -4px;
+      right: -8px;
+      background: #ef4444;
+      color: #fff;
+      font-size: 9px;
+      font-weight: 800;
+      padding: 1px 5px;
+      border-radius: 999px;
+      border: 2px solid #fff;
+    }
+
+    /* DETAIL SLIDE-UP MODAL */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 400;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .modal-backdrop.is-open { display: flex; }
+
+    .modal-sheet {
+      width: 100%;
+      max-width: 412px;
+      max-height: 85vh;
+      background: #ffffff;
+      border-top-left-radius: 24px;
+      border-top-right-radius: 24px;
+      overflow-y: auto;
+      padding: 20px 18px 30px;
+      box-shadow: 0 -10px 40px rgba(0,0,0,0.2);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      animation: slideUp 0.25s ease-out;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+
+    .sheet-handle {
+      width: 40px;
+      height: 5px;
+      background: #cbd5e1;
+      border-radius: 999px;
+      align-self: center;
+      margin-bottom: 4px;
+    }
+
+    .sheet-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+    .sheet-title {
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--slate-900);
+    }
+    .sheet-subtitle {
+      font-size: 12px;
+      color: var(--slate-500);
+      margin-top: 2px;
+    }
+    .sheet-close-btn {
+      background: #f1f5f9;
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--slate-700);
+    }
+
+    /* REJECT CONFIRMATION MODAL */
+    .reject-reasons-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 6px;
+    }
+    .reason-option {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--slate-800);
+    }
+    .reason-option:hover { background: #f8fafc; }
+    .reason-option input { cursor: pointer; }
+
+    /* TOAST FEEDBACK */
+    .toast-container {
+      position: fixed;
+      top: 64px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 500;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      pointer-events: none;
+      width: 90%;
+      max-width: 380px;
+    }
+    .toast-pill {
+      background: #0f172a;
+      color: #ffffff;
+      padding: 10px 16px;
+      border-radius: 12px;
+      font-size: 12.5px;
+      font-weight: 700;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      animation: fadeInDown 0.2s ease-out;
+    }
+    @keyframes fadeInDown {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ======================================================== -->
+  <!-- 1. TOP PROTO-RIBBON (CONTROLLER & QC SIMULATOR)         -->
+  <!-- ======================================================== -->
+  <header class="proto-ribbon">
+    <div class="proto-ribbon-head">
+      <div class="proto-title-badge">
+        <span class="proto-pill">Hybrid Prototype</span>
+        <h1>Tab Pesanan: Gabungan Logika Produksi + Kecepatan Dapur</h1>
+      </div>
+      <div style="font-size:11px; color:#9ca3af;">
+        Kompilasi Rekomendasi Solusi UX
+      </div>
+    </div>
+
+    <!-- Scenario Switchers -->
+    <div class="proto-scenarios">
+      <button type="button" class="proto-btn active" onclick="setScenario('all', this)">Semua Skenario</button>
+      <button type="button" class="proto-btn" onclick="setScenario('dinein_flow', this)">Dine-in (Saji &amp; Tutup Meja)</button>
+      <button type="button" class="proto-btn" onclick="setScenario('takeaway_flow', this)">Takeaway Counter</button>
+      <button type="button" class="proto-btn" onclick="setScenario('delivery_flow', this)">Delivery &amp; Kurir OTW</button>
+      <button type="button" class="proto-btn" onclick="setScenario('reservation_flow', this)">Reservasi (Check-in &amp; No-Show)</button>
+      <button type="button" class="proto-btn" onclick="setScenario('scheduled_orders', this)">Pesanan Terjadwal</button>
+      <button type="button" class="proto-btn" onclick="setScenario('addon_order', this)">Tambahan Menu</button>
+      <button type="button" class="proto-btn" onclick="simulateNewOrder()">Simulasi Order Baru</button>
+      <button type="button" class="proto-btn" onclick="toggleShopClosedSim()">Tutup Toko</button>
+      <button type="button" class="proto-btn" onclick="resetPrototypeData()" style="color:#ef4444;">Reset Data</button>
+    </div>
+
+    <div class="proto-explainer-banner">
+      <strong>Sistem Kromatik CTA:</strong> Hijau (<code>#00A637</code>) khusus <strong>Start</strong> (Terima) &amp; <strong>Finish</strong> (Serahkan / Tutup Meja / Terkirim). Proses Tengah: <strong>Biru</strong> (Dapur Siap/Masak), <strong>Merah</strong> (Tugaskan Kurir / Blocker), <strong>Hitam Slate</strong> (Sajikan ke Meja / Check-in), <strong>Oranye</strong> (Handover Kurir). Tipografi: <em>Plus Jakarta Sans</em>.
+    </div>
+  </header>
+
+  <!-- ======================================================== -->
+  <!-- 2. MOBILE PHONE VIEWPORT SHELL                          -->
+  <!-- ======================================================== -->
+  <main class="phone-viewport" id="phone-viewport">
+
+    <!-- TOPBAR: RESTO IDENTITY & OPERATIONAL SWITCHES (FIGMA FRAME 208 SPEC) -->
+    <header class="topbar-wrapper has-subfilters" id="topbar-wrapper">
+      <!-- ROW 1: Resto Identity & Quick Actions -->
+      <div class="topbar-main-row">
+        <div class="branch-pill" onclick="showToast('📍 Pilih Cabang Restoran')">
+          <img src="/assets/upload-aset/branding/Logo app mybangjo.png" class="branch-logo-img" alt="MyBangjo">
+          <span class="branch-name" id="branch-name-label">MyBangjo Pringsewu</span>
+        </div>
+        <div class="topbar-actions">
+          <button type="button" class="topbar-action-icon-btn" onclick="showToast('💬 Membuka Kotak Pesan Ops Chat...')" title="Ops Chat">
+            <svg width="20" height="20" viewBox="255 64 18 18" fill="none">
+              <path d="M269.529 76.0583L270.959 71.7667C272.209 68.0183 272.834 66.1442 271.844 65.155C270.854 64.1658 268.981 64.79 265.232 66.04L260.941 67.47C257.916 68.4783 256.403 68.9833 255.974 69.7225C255.774 70.0681 255.668 70.4605 255.668 70.86C255.668 71.2595 255.774 71.6519 255.974 71.9975C256.403 72.7375 257.916 73.2417 260.941 74.2508C261.316 74.3758 261.738 74.2858 262.019 74.0083L266.607 69.4625C266.668 69.397 266.741 69.3444 266.822 69.3079C266.903 69.2714 266.991 69.2518 267.08 69.2502C267.169 69.2486 267.257 69.2651 267.34 69.2986C267.422 69.3322 267.497 69.3821 267.56 69.4454C267.622 69.5087 267.671 69.5841 267.704 69.6669C267.737 69.7497 267.752 69.8383 267.75 69.9273C267.747 70.0163 267.727 70.1039 267.689 70.1847C267.652 70.2655 267.599 70.3379 267.532 70.3975L263.019 74.8692C262.869 75.0232 262.764 75.2158 262.716 75.4257C262.669 75.6355 262.68 75.8545 262.749 76.0583C263.757 79.0833 264.262 80.5967 265.002 81.0267C265.347 81.2273 265.74 81.333 266.139 81.333C266.539 81.333 266.932 81.2273 267.277 81.0267C268.017 80.5967 268.52 79.0842 269.529 76.0583Z" fill="#303030"/>
+            </svg>
+          </button>
+          <button type="button" class="topbar-action-icon-btn pos-relative" onclick="showToast('🔔 Notifikasi Sistem: 12 Pesanan/Pesan Masuk')" title="Notifikasi">
+            <svg width="20" height="20" viewBox="301 64 17 17" fill="none">
+              <path d="M309.5 81C310.064 81 310.604 80.7761 311.003 80.3776C311.401 79.9791 311.625 79.4386 311.625 78.875H307.375C307.375 79.4386 307.599 79.9791 307.997 80.3776C308.396 80.7761 308.936 81 309.5 81ZM310.557 65.1677C310.572 65.0199 310.556 64.8707 310.509 64.7297C310.463 64.5886 310.388 64.4589 310.288 64.3488C310.188 64.2387 310.067 64.1507 309.931 64.0904C309.795 64.0302 309.648 63.9991 309.5 63.9991C309.352 63.9991 309.205 64.0302 309.069 64.0904C308.933 64.1507 308.812 64.2387 308.712 64.3488C308.612 64.4589 308.537 64.5886 308.491 64.7297C308.444 64.8707 308.428 65.0199 308.443 65.1677C307.242 65.4116 306.162 66.0633 305.386 67.0123C304.611 67.9614 304.187 69.1494 304.188 70.375C304.188 71.5416 303.656 76.75 302.062 77.8125H316.938C315.344 76.75 314.812 71.5416 314.812 70.375C314.812 67.8037 312.985 65.6575 310.557 65.1677Z" fill="#303030"/>
+            </svg>
+            <span class="topbar-red-badge" id="topbar-bell-badge">12</span>
+          </button>
+          <button type="button" class="topbar-action-icon-btn" onclick="showToast('👤 Profil Merchant / Shift Kasir')" title="Profil Pengguna">
+            <svg width="20" height="20" viewBox="346 64 17 17" fill="none">
+              <path d="M354.5 64.1667C353.395 64.1667 352.335 64.6057 351.554 65.3871C350.772 66.1685 350.333 67.2283 350.333 68.3334C350.333 69.4385 350.772 70.4983 351.554 71.2797C352.335 72.0611 353.395 72.5001 354.5 72.5001C355.605 72.5001 356.665 72.0611 357.446 71.2797C358.228 70.4983 358.667 69.4385 358.667 68.3334C358.667 67.2283 358.228 66.1685 357.446 65.3871C356.665 64.6057 355.605 64.1667 354.5 64.1667ZM352.417 73.5417C351.312 73.5417 350.252 73.9807 349.47 74.7621C348.689 75.5435 348.25 76.6033 348.25 77.7084V78.7501C348.25 79.3026 348.469 79.8325 348.86 80.2232C349.251 80.6139 349.781 80.8334 350.333 80.8334H358.667C359.219 80.8334 359.749 80.6139 360.14 80.2232C360.531 79.8325 360.75 79.3026 360.75 78.7501V77.7084C360.75 76.6033 360.311 75.5435 359.53 74.7621C358.748 73.9807 357.688 73.5417 356.583 73.5417H352.417Z" fill-rule="evenodd" clip-rule="evenodd" fill="#303030"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- ROW 2: Operational Status Switches (Figma Frame 312 88x29 & 134x29 Capsules) -->
+      <div class="operational-switches-row">
+        <div class="op-switch-card op-switch-left" id="btn-toggle-shop" onclick="toggleShopOpen()">
+          <div class="switch-box">
+            <svg class="switch-svg" id="ios-switch-shop" width="45" height="31" viewBox="0 0 45 31" fill="none">
+              <defs>
+                <filter id="f_s_shop" x="0" y="0" width="45" height="31" filterUnits="userSpaceOnUse">
+                  <feOffset dx="-1" dy="2"/><feGaussianBlur stdDeviation="2.5"/><feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.15 0"/><feBlend mode="normal" in2="SourceGraphic"/>
+                </filter>
+              </defs>
+              <g filter="url(#f_s_shop)">
+                <rect class="switch-bg" x="6" y="3" width="35" height="21" rx="10.5" fill="#00A637"/>
+                <path class="switch-line" d="M12.5 10L12.5 17" stroke="white"/>
+                <circle class="switch-knob" cx="30.5" cy="13.5" r="10.5" fill="white"/>
+                <rect class="switch-border" x="6.25" y="3.25" width="34.5" height="20.5" rx="10.25" stroke="#009A33" stroke-width="0.5"/>
+              </g>
+            </svg>
+          </div>
+          <span class="op-switch-text bold" id="lbl-shop-status">Buka</span>
+        </div>
+        <div class="op-switch-card op-switch-right" id="btn-toggle-online" onclick="toggleOnlineOrder()">
+          <span class="op-switch-text bold" id="lbl-online-title">Order online:</span>
+          <div class="switch-box">
+            <svg class="switch-svg" id="ios-switch-online" width="45" height="31" viewBox="0 0 45 31" fill="none">
+              <defs>
+                <filter id="f_s_online" x="0" y="0" width="45" height="31" filterUnits="userSpaceOnUse">
+                  <feOffset dx="-1" dy="2"/><feGaussianBlur stdDeviation="2.5"/><feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.15 0"/><feBlend mode="normal" in2="SourceGraphic"/>
+                </filter>
+              </defs>
+              <g filter="url(#f_s_online)">
+                <rect class="switch-bg" x="6" y="3" width="35" height="21" rx="10.5" fill="#00A637"/>
+                <path class="switch-line" d="M12.5 10L12.5 17" stroke="white"/>
+                <circle class="switch-knob" cx="30.5" cy="13.5" r="10.5" fill="white"/>
+                <rect class="switch-border" x="6.25" y="3.25" width="34.5" height="20.5" rx="10.25" stroke="#009A33" stroke-width="0.5"/>
+              </g>
+            </svg>
+          </div>
+          <span id="lbl-online-status" style="display: none;">Aktif</span>
+        </div>
+      </div>
+
+      <!-- ROW 3: 4 Main Status Tabs (Figma Frame 208 Typography & 24h Shift Cycle Badges) -->
+      <nav class="pesanan-nav-tabs has-subfilters" id="pesanan-nav-tabs" role="tablist">
+        <button type="button" class="pesanan-nav-tab active" id="tab-in-process" onclick="switchMainTab('in_process')">
+          <span>Dalam proses</span>
+          <span class="tab-badge-pill active" id="badge-in-process">0</span>
+        </button>
+        <button type="button" class="pesanan-nav-tab" id="tab-scheduled" onclick="switchMainTab('scheduled')">
+          <span>Terjadwal</span>
+          <span class="tab-badge-pill inactive" id="badge-scheduled">0</span>
+        </button>
+        <button type="button" class="pesanan-nav-tab" id="tab-completed" onclick="switchMainTab('completed')">
+          <span>Selesai</span>
+          <span class="tab-badge-pill inactive" id="badge-completed">0</span>
+        </button>
+        <button type="button" class="pesanan-nav-tab" id="tab-cancelled" onclick="switchMainTab('cancelled')">
+          <span>Batal</span>
+          <span class="tab-badge-pill inactive" id="badge-cancelled">0</span>
+        </button>
+      </nav>
+
+      <!-- ROW 4: Kitchen Stage Sub-Filter (Hanya di tab 'Dalam proses', Figma Frame 312) -->
+      <div class="stage-subfilter-bar" id="stage-subfilter-bar">
+        <button type="button" class="stage-subfilter-btn active" data-stage="all" onclick="setStageSubfilter('all', this)">
+          Semua
+          <span id="subbadge-all" style="display: none;">4</span>
+        </button>
+        <button type="button" class="stage-subfilter-btn" data-stage="incoming" onclick="setStageSubfilter('incoming', this)">
+          Masuk
+          <span id="subbadge-incoming" style="display: none;">2</span>
+        </button>
+        <button type="button" class="stage-subfilter-btn" data-stage="cooking" onclick="setStageSubfilter('cooking', this)">
+          Dimasak
+          <span id="subbadge-cooking" style="display: none;">1</span>
+        </button>
+        <button type="button" class="stage-subfilter-btn" data-stage="ready" onclick="setStageSubfilter('ready', this)">
+          Siap
+          <span id="subbadge-ready" style="display: none;">1</span>
+        </button>
+      </div>
+    </header>
+    <!-- SEARCH & SERVICE CHANNEL FILTER (Lapis ke-2 Filter) -->
+    <section class="filter-section" id="filter-section">
+      <div class="search-input-wrap">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" class="search-input" id="search-input" placeholder="Cari no pesanan, nama tamu, meja..." oninput="handleSearch(this.value)">
+        <button type="button" class="search-clear" id="search-clear" onclick="clearSearch()">✕</button>
+      </div>
+
+      <div class="service-chips" role="tablist">
+        <button type="button" class="service-chip active" data-channel="all" onclick="setChannelFilter('all', this)">Semua Layanan</button>
+        <button type="button" class="service-chip" data-channel="delivery" onclick="setChannelFilter('delivery', this)">Delivery</button>
+        <button type="button" class="service-chip" data-channel="dine_in" onclick="setChannelFilter('dine_in', this)">Dine-In</button>
+        <button type="button" class="service-chip" data-channel="takeaway" onclick="setChannelFilter('takeaway', this)">Takeaway</button>
+        <button type="button" class="service-chip" data-channel="reservation" onclick="setChannelFilter('reservation', this)">Reservasi</button>
+      </div>
+    </section>
+
+    <!-- CLOSED SHOP PROTECTION OVERLAY -->
+    <div id="closed-shop-banner" class="closed-shop-overlay" style="display:none;">
+      <div class="closed-cat-icon" style="font-size:32px;">⏸️</div>
+      <h3>Restoran Sedang Ditutup</h3>
+      <p>Pelanggan Customer PWA &amp; kasir POS tidak dapat membuat pesanan baru selama resto tutup.</p>
+      <button type="button" class="btn-open-shop" onclick="toggleShopOpen()">Buka Restoran Sekarang</button>
+    </div>
+
+    <!-- MAIN FEED CONTAINER -->
+    <div class="orders-feed" id="orders-feed">
+      <!-- Dinamis di-render oleh script JS -->
+    </div>
+
+    <!-- BOTTOM NAVBAR (CANONICAL FIGMA REVERSE-ENGINEERED) -->
+    <nav class="x-merchant-mobile-nav" aria-label="Navigasi Utama">
+      <button type="button" class="x-merchant-mobile-nav-item" onclick="showToast('Navigasi ke Beranda')">
+        <div class="x-nav-icon-box">
+          <svg width="22" height="22" viewBox="0 0 25 25" fill="currentColor">
+            <path d="M13.3518 2.83594C12.8713 2.39062 12.1291 2.39062 11.6525 2.83594L2.90255 10.9609C2.52755 11.3125 2.40255 11.8555 2.59005 12.332C2.77755 12.8086 3.23458 13.125 3.75021 13.125H4.37521V20C4.37521 21.3789 5.4963 22.5 6.87521 22.5H18.1252C19.5041 22.5 20.6252 21.3789 20.6252 20V13.125H21.2502C21.7658 13.125 22.2268 12.8086 22.4143 12.332C22.6018 11.8555 22.4768 11.3086 22.1018 10.9609L13.3518 2.83594ZM11.8752 15H13.1252C14.1604 15 15.0002 15.8398 15.0002 16.875V20.625H10.0002V16.875C10.0002 15.8398 10.8401 15 11.8752 15Z"/>
+          </svg>
+        </div>
+        <span>Beranda</span>
+      </button>
+
+      <button type="button" class="x-merchant-mobile-nav-item active">
+        <div class="x-nav-icon-box">
+          <svg width="22" height="22" viewBox="0 0 25 25" fill="currentColor">
+            <path d="M10 6.25C10 5.58696 10.2634 4.95107 10.7322 4.48223C11.2011 4.01339 11.837 3.75 12.5 3.75C13.163 3.75 13.7989 4.01339 14.2678 4.48223C14.7366 4.95107 15 5.58696 15 6.25V7.2375C18.615 8.3125 21.25 11.6613 21.25 15.625C21.25 15.7908 21.1842 15.9497 21.0669 16.0669C20.9497 16.1842 20.7908 16.25 20.625 16.25H4.375C4.20924 16.25 4.05027 16.1842 3.93306 16.0669C3.81585 15.9497 3.75 15.7908 3.75 15.625C3.74952 13.7403 4.35759 11.9058 5.48372 10.3945C6.60986 8.88326 8.19386 7.77599 10 7.2375V6.25ZM4.375 17.5C3.87772 17.5 3.40081 17.6975 3.04917 18.0492C2.69754 18.4008 2.5 18.8777 2.5 19.375C2.5 19.8723 2.69754 20.3492 3.04917 20.7008C3.40081 21.0525 3.87772 21.25 4.375 21.25H20.625C21.1223 21.25 21.5992 21.0525 21.9508 20.7008C22.3025 20.3492 22.5 19.8723 22.5 19.375C22.5 18.8777 22.3025 18.4008 21.9508 18.0492C21.5992 17.6975 21.1223 17.5 20.625 17.5H4.375Z"/>
+          </svg>
+          <span class="nav-badge" id="nav-bottom-badge">4</span>
+        </div>
+        <span>Pesanan</span>
+      </button>
+
+      <button type="button" class="x-merchant-mobile-nav-item" onclick="showToast('Navigasi ke Menu')">
+        <div class="x-nav-icon-box">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M13.9676 8.74767C14.3782 8.74879 14.785 8.66845 15.1644 8.51128C15.5438 8.35411 15.8882 8.12324 16.1777 7.83204L19.1856 4.82618C19.4234 4.58829 19.4453 4.20118 19.2188 3.95157C19.1619 3.88886 19.0929 3.83836 19.0159 3.80313C18.9389 3.7679 18.8555 3.74868 18.7709 3.74664C18.6863 3.74459 18.6021 3.75976 18.5235 3.79123C18.4449 3.8227 18.3735 3.86981 18.3137 3.9297L15.6328 6.6086C15.5428 6.69851 15.4208 6.74901 15.2936 6.74901C15.1663 6.74901 15.0443 6.69851 14.9543 6.6086C14.7672 6.42188 14.7774 6.10626 14.9641 5.91954L17.6332 3.2504C17.693 3.19057 17.7401 3.11921 17.7715 3.04065C17.803 2.96208 17.8181 2.87796 17.8161 2.79337C17.814 2.70878 17.7948 2.62549 17.7596 2.54854C17.7244 2.47159 17.674 2.40259 17.6113 2.34571C17.4982 2.24312 17.3508 2.18667 17.1981 2.18751C17.1124 2.18755 17.0275 2.20447 16.9484 2.23731C16.8692 2.27016 16.7973 2.31827 16.7367 2.37892L14.0699 5.04532C13.9799 5.13523 13.8579 5.18572 13.7307 5.18572C13.6035 5.18572 13.4814 5.13523 13.3914 5.04532C13.2047 4.8586 13.2145 4.54298 13.4012 4.35626L16.0703 1.6879C16.1302 1.62807 16.1772 1.55671 16.2086 1.47815C16.2401 1.39959 16.2552 1.31546 16.2532 1.23087C16.2511 1.14628 16.2319 1.06299 16.1967 0.986037C16.1615 0.909088 16.1111 0.840085 16.0484 0.783212C15.9353 0.680619 15.7879 0.624169 15.6352 0.625009C15.4621 0.625214 15.2962 0.694049 15.1738 0.816415L12.168 3.82227C11.8768 4.11188 11.6459 4.45638 11.4887 4.83583C11.3316 5.21527 11.2512 5.62212 11.2524 6.03282V6.35431C11.2524 6.4365 11.2363 6.5179 11.2048 6.59384C11.1734 6.66979 11.1273 6.73878 11.0692 6.79688L9.67814 8.18829L2.68829 1.41915C2.57147 1.30219 2.41307 1.23628 2.24776 1.23584C2.08246 1.2354 1.92371 1.30047 1.80626 1.41681C1.21447 2.00313 0.898451 2.83087 0.898451 3.81017C0.894545 5.42735 1.74454 7.28673 3.11681 8.65704L6.4547 11.9949C6.92914 12.4683 7.57197 12.7343 8.2422 12.7344C8.45587 12.7345 8.66867 12.7072 8.8754 12.6531C8.92731 12.6395 8.98073 12.6326 9.03439 12.6324C9.19129 12.6325 9.34239 12.6918 9.45743 12.7984L9.90236 13.2094C10.0171 13.3266 10.0816 13.484 10.082 13.6481V13.8645C10.0809 14.3564 10.2742 14.8289 10.6199 15.17"/>
+          </svg>
+        </div>
+        <span>Menu</span>
+      </button>
+
+      <button type="button" class="x-merchant-mobile-nav-item" onclick="showToast('Navigasi ke Stock')">
+        <div class="x-nav-icon-box">
+          <svg width="21" height="21" viewBox="0 0 21 21" fill="currentColor">
+            <path d="M18.2865 8.61885L18.8027 17.2726C18.8202 17.5088 18.7065 17.6663 18.6452 17.7363C18.5752 17.8151 18.4265 17.9376 18.1815 17.9376H15.7927L17.6827 8.61885H18.2865ZM19.249 5.2501L19.2402 5.2676C19.2577 5.4776 19.2402 5.69635 19.1877 5.9151L12.739 17.7538C12.636 18.1818 12.3922 18.5626 12.0462 18.8341C11.7002 19.1057 11.2725 19.2524 10.8315 19.2501H18.1815C18.4485 19.2508 18.7131 19.1965 18.9577 19.0901C19.2023 18.9837 19.4228 18.8279 19.6039 18.6322C19.785 18.4365 19.9239 18.2054 20.0123 17.9534C20.1006 17.7013 20.1364 17.4338 20.1152 17.1676L19.249 5.2501ZM10.0177 1.96098C10.1052 1.61098 9.88648 1.25223 9.53648 1.16473C9.18648 1.08598 8.82773 1.29598 8.74023 1.64598L8.30273 3.45723H9.65023L10.0177 1.96098ZM15.7927 1.93298C15.8715 1.57423 15.644 1.23298 15.2852 1.15423C15.2008 1.13628 15.1136 1.13517 15.0287 1.15098C14.9438 1.16679 14.8629 1.19919 14.7905 1.24634C14.7182 1.29348 14.6558 1.35444 14.6071 1.42573C14.5584 1.49701 14.5242 1.57721 14.5065 1.66173L14.1127 3.47298H15.4602L15.7927 1.93298Z"/>
+          </svg>
+        </div>
+        <span>Stock</span>
+      </button>
+
+      <button type="button" class="x-merchant-mobile-nav-item" onclick="showToast('Navigasi ke Promo')">
+        <div class="x-nav-icon-box">
+          <svg width="21" height="18" viewBox="0 0 21 18" fill="currentColor">
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M17.2101 7.03835C17.1566 7.03587 17.1031 7.03496 17.0497 7.0356H14.8176C12.9916 7.0356 11.4277 8.48485 11.4277 10.375C11.4277 12.2652 12.9916 13.7144 14.8185 13.7144H17.0487C17.105 13.715 17.1584 13.7138 17.2092 13.7108C17.5859 13.6863 17.941 13.5259 18.2084 13.2593C18.4758 12.9928 18.6373 12.6382 18.663 12.2615C18.6667 12.2074 18.6667 12.1497 18.6667 12.0965V8.65352C18.6667 8.60035 18.6667 8.5426 18.663 8.48852C18.6374 8.11197 18.476 7.75751 18.2088 7.49097C17.9415 7.22443 17.5867 7.06393 17.2101 7.03927M14.6223 11.266C15.0926 11.266 15.4748 10.8682 15.4748 10.3759C15.4748 9.88368 15.0926 9.48585 14.6223 9.48585C14.1521 9.48585 13.7707 9.88368 13.7707 10.3759C13.7707 10.8682 14.1512 11.266 14.6223 11.266Z"/>
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M17.0485 15.0499C17.0792 15.0488 17.1097 15.055 17.1376 15.0679C17.1655 15.0808 17.19 15.1 17.2091 15.1241C17.2282 15.1482 17.2413 15.1764 17.2475 15.2065C17.2537 15.2366 17.2527 15.2678 17.2447 15.2974C17.0668 15.9318 16.7854 16.4726 16.3335 16.9273C15.6726 17.5937 14.8338 17.8898 13.798 18.03C12.7915 18.1666 11.5063 18.1666 9.88198 18.1666H8.01473C6.39132 18.1666 5.10523 18.1666 4.09873 18.03C3.0629 17.8898 2.22415 17.5937 1.56323 16.9273C0.902318 16.2627 0.608984 15.4166 0.469651 14.3734C0.333984 13.3578 0.333984 12.0616 0.333984 10.4253V10.3245C0.333984 8.68825 0.333984 7.39117 0.469651 6.37734C0.608984 5.33325 0.902318 4.48992 1.56232 3.82167C2.22323 3.15617 3.06198 2.85917 4.09782 2.71984C5.10523 2.58325 6.39132 2.58325 8.01473 2.58325H9.88198C11.5054 2.58325 12.7915 2.58325 13.798 2.71984C14.8338 2.86009 15.6726 3.15617 16.3335 3.82167C16.7854 4.27725 17.0668 4.81808 17.2447 5.45333C17.2525 5.48293 17.2534 5.51396 17.2471 5.54394C17.2409 5.57392 17.2277 5.60202 17.2086 5.62599C17.1895 5.64996 17.1651 5.66913 17.1373 5.68197C17.1095 5.6948 17.0791 5.70095 17.0485 5.69992H14.8182C12.3121 5.69992 10.1038 7.6955 10.1038 10.3749C10.1038 13.0543 12.313 15.0499 14.8192 15.0499H17.0485ZM3.64682 6.14542C3.55954 6.14578 3.47319 6.16333 3.3927 6.19706C3.31221 6.23079 3.23915 6.28005 3.17769 6.34201C3.11623 6.40398 3.06758 6.47745 3.03452 6.55822C3.00145 6.63899 2.98462 6.72548 2.98498 6.81275C2.98498 7.18217 3.28107 7.481 3.64682 7.481H7.18148C7.54815 7.481 7.84423 7.18217 7.84423 6.81275C7.84472 6.63641 7.7752 6.46708 7.65093 6.34196C7.52667 6.21683 7.35783 6.14615 7.18148 6.14542H3.64682Z"/>
+          </svg>
+        </div>
+        <span>Promo</span>
+      </button>
+    </nav>
+
+  </main>
+
+  <!-- ======================================================== -->
+  <!-- 3. DETAIL BOTTOM SHEET MODAL                            -->
+  <!-- ======================================================== -->
+  <div class="modal-backdrop" id="detail-modal" onclick="closeDetailModal(event)">
+    <div class="modal-sheet" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <img id="sheet-order-icon" src="" alt="Channel" style="width:40px; height:40px; border-radius:12px; object-fit:contain; background:#f8fafc; flex-shrink:0;">
+          <div>
+            <div class="sheet-title" id="sheet-order-code">#MB-2045</div>
+            <div class="sheet-subtitle" id="sheet-order-channel">DINE-IN MEJA 4 • Masuk 2 mnt lalu</div>
+          </div>
+        </div>
+        <button type="button" class="sheet-close-btn" onclick="closeDetailModal()">✕</button>
+      </div>
+
+      <!-- Customer & Table Card -->
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-size:14px; font-weight:800; color:#0f172a;" id="sheet-customer-name">Budi Santoso</div>
+            <div style="font-size:12px; color:#64748b;" id="sheet-customer-phone">+62 812-3456-7890</div>
+          </div>
+          <button type="button" class="btn-act btn-act-secondary" onclick="showToast('💬 Membuka Ops Chat dengan Tamu')" style="font-size:11px; padding:6px 10px;">
+            Hubungi
+          </button>
+        </div>
+      </div>
+
+      <!-- Itemized Breakdown -->
+      <div>
+        <div style="font-size:12px; font-weight:800; color:#475569; text-transform:uppercase; margin-bottom:8px;">
+          Rincian Menu Pesanan
+        </div>
+        <div id="sheet-items-list" style="display:flex; flex-direction:column; gap:8px;">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Bill Breakdown -->
+      <div style="border-top:1px dashed #e2e8f0; padding-top:12px; display:flex; flex-direction:column; gap:6px; font-size:12.5px;">
+        <div style="display:flex; justify-content:space-between; color:#64748b;">
+          <span>Subtotal</span>
+          <span id="sheet-subtotal">Rp 0</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; color:#64748b;">
+          <span>Ongkir / Biaya Layanan</span>
+          <span id="sheet-delivery-fee">Rp 0</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; color:#16a34a; font-weight:700;">
+          <span>Diskon Promo</span>
+          <span id="sheet-discount">-Rp 0</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:15px; font-weight:800; color:#0f172a; margin-top:4px; padding-top:8px; border-top:1px solid #f1f5f9;">
+          <span>Total Pembayaran</span>
+          <span id="sheet-grand-total">Rp 0</span>
+        </div>
+        <div style="font-size:11.5px; color:#16a34a; font-weight:700; margin-top:2px;" id="sheet-payment-method">
+          ✓ Lunas via QRIS Midtrans
+        </div>
+      </div>
+
+      <!-- Kitchen / Thermal Print Actions -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:4px;">
+        <button type="button" class="btn-act btn-act-secondary" onclick="showToast('🖨️ Mencetak Tiket Dapur (KDS Ticket)...')">
+          Tiket Dapur
+        </button>
+        <button type="button" class="btn-act btn-act-secondary" onclick="showToast('🧾 Mencetak Struk Tamu (Kasir)...')">
+          Struk Kasir
+        </button>
+      </div>
+
+      <div id="sheet-action-footer" style="margin-top:6px;">
+        <!-- Dynamic main transition button -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 4. MODAL REJECT REASON                                   -->
+  <!-- ======================================================== -->
+  <div class="modal-backdrop" id="reject-modal" onclick="closeRejectModal(event)">
+    <div class="modal-sheet" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <div>
+          <div class="sheet-title">Tolak Pesanan Ini?</div>
+          <div class="sheet-subtitle">Pilih alasan penolakan untuk dikabarkan ke pelanggan</div>
+        </div>
+        <button type="button" class="sheet-close-btn" onclick="closeRejectModal()">✕</button>
+      </div>
+
+      <div class="reject-reasons-list">
+        <label class="reason-option">
+          <input type="radio" name="reject_reason" value="Bahan baku habis (86)" checked>
+          <span>Bahan baku habis / menu sedang kosong (86)</span>
+        </label>
+        <label class="reason-option">
+          <input type="radio" name="reject_reason" value="Dapur overload / antrean penuh">
+          <span>Dapur cabang sedang overload (antrean penuh)</span>
+        </label>
+        <label class="reason-option">
+          <input type="radio" name="reject_reason" value="Restoran bersiap tutup operasional">
+          <span>Restoran sudah melewati jam batas operasional</span>
+        </label>
+        <label class="reason-option">
+          <input type="radio" name="reject_reason" value="Permintaan kustom tamu di luar kemampuan">
+          <span>Catatan kustom tamu tidak dapat dipenuhi</span>
+        </label>
+      </div>
+
+      <div style="display:flex; gap:10px; margin-top:10px;">
+        <button type="button" class="btn-act btn-act-secondary" style="flex:1;" onclick="closeRejectModal()">Batal</button>
+        <button type="button" class="btn-act btn-act-reject" style="flex:1.5;" onclick="confirmRejectOrder()">Konfirmasi Tolak</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 4B. MODAL ASSIGN DRIVER (PENUGASAN KURIR)               -->
+  <!-- ======================================================== -->
+  <div class="modal-backdrop" id="assign-driver-modal" onclick="closeAssignDriverModal(event)">
+    <div class="modal-sheet" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <div>
+          <div class="sheet-title" id="assign-driver-title">Tugaskan Kurir Antar</div>
+          <div class="sheet-subtitle" id="assign-driver-subtitle">Pilih driver cabang atau input kurir manual</div>
+        </div>
+        <button type="button" class="sheet-close-btn" onclick="closeAssignDriverModal()">✕</button>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <div style="font-size:11.5px; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">
+          Driver Internal Cabang (Aktif)
+        </div>
+        <div id="driver-list-options" style="display:flex; flex-direction:column; gap:8px;">
+          <label style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; cursor:pointer;">
+            <input type="radio" name="selected_driver" value="Rian Hidayat (B 4521 SAA)" checked style="width:16px; height:16px; accent-color:#00A637;">
+            <div style="flex:1;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <strong style="font-size:13px; color:#0f172a;">Rian Hidayat</strong>
+                <span style="font-size:10.5px; background:#dcfce7; color:#15803d; padding:2px 7px; border-radius:999px; font-weight:700;">🟢 Standby (0 Antar)</span>
+              </div>
+              <div style="font-size:11.5px; color:#64748b; margin-top:2px;">Honda Vario • B 4521 SAA (0812-8899-0011)</div>
+            </div>
+          </label>
+
+          <label style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; cursor:pointer;">
+            <input type="radio" name="selected_driver" value="Agus Santoso (B 6789 KRD)" style="width:16px; height:16px; accent-color:#00A637;">
+            <div style="flex:1;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <strong style="font-size:13px; color:#0f172a;">Agus Santoso</strong>
+                <span style="font-size:10.5px; background:#fef3c7; color:#b45309; padding:2px 7px; border-radius:999px; font-weight:700;">🟡 Sedang Antar (1 Antar)</span>
+              </div>
+              <div style="font-size:11.5px; color:#64748b; margin-top:2px;">Yamaha Jupiter • B 6789 KRD (0857-3344-5566)</div>
+            </div>
+          </label>
+        </div>
+
+        <div style="border-top:1px dashed #e2e8f0; padding-top:10px;">
+          <button type="button" class="btn-act btn-act-secondary" onclick="toggleManualDriverInput()" style="width:100%; font-size:11.5px; justify-content:center;">
+            Input Kurir Manual / Pihak Ketiga
+          </button>
+          <div id="manual-driver-box" style="display:none; margin-top:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:12px; flex-direction:column; gap:8px;">
+            <div>
+              <label style="font-size:11.5px; font-weight:700; color:#475569;">Nama Kurir / Layanan:</label>
+              <input type="text" id="manual-driver-name" placeholder="Misal: Kurir Toko Pak Hendro / Lalamove" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px; font-size:12px; margin-top:4px; outline:none;">
+            </div>
+            <div>
+              <label style="font-size:11.5px; font-weight:700; color:#475569;">No. HP / WhatsApp Kurir:</label>
+              <input type="tel" id="manual-driver-phone" placeholder="Misal: 081234567890" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px; font-size:12px; margin-top:4px; outline:none;">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:10px; margin-top:12px;">
+        <button type="button" class="btn-act btn-act-secondary" style="flex:1;" onclick="closeAssignDriverModal()">Batal</button>
+        <button type="button" class="btn-act" style="flex:1.6; background:#fa3e3e; color:#fff;" onclick="confirmAssignDriver()">Konfirmasi Penugasan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 5. TOAST NOTIFICATION CONTAINER                         -->
+  <!-- ======================================================== -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- ======================================================== -->
+  <!-- 6. INTERACTIVE SIMULATION SCRIPT                        -->
+  <!-- ======================================================== -->
+  <script>
+    // State Store (Full Real-world F&B dataset)
+    const INITIAL_ORDERS = [
+      {
+        id: "OD-745",
+        channel: "delivery",
+        channel_label: "Delivery",
+        customer: "Siti Rahmawati",
+        phone: "+62 857-1122-3344",
+        time_ago: "1 menit lalu",
+        status: "incoming",
+        countdown: 140,
+        items: [
+          { qty: 1, name: "Ayam Geprek Sambal Bawang", notes: "sambal dipisah" },
+          { qty: 1, name: "Ayam Tulang Lunak Sambal Terasi + Nasi", notes: null }
+        ],
+        subtotal: 48000,
+        delivery_fee: 10000,
+        discount: 0,
+        total: 58000,
+        payment: "GoPay Lunas"
+      },
+      {
+        id: "DI-122",
+        channel: "dine_in",
+        channel_label: "Meja 4",
+        customer: "Budi Santoso",
+        phone: "+62 812-9988-1122",
+        time_ago: "1 menit lalu",
+        status: "incoming",
+        countdown: 140,
+        items: [
+          { qty: 1, name: "Ayam Geprek Sambal Bawang", notes: "sambal dipisah" },
+          { qty: 1, name: "Ayam Tulang Lunak Sambal Terasi", notes: "sambal dipisah" }
+        ],
+        subtotal: 52000,
+        delivery_fee: 0,
+        discount: 0,
+        total: 52000,
+        payment: "Tunai di Kasir (Belum Bayar)"
+      },
+      {
+        id: "TK-112",
+        channel: "takeaway",
+        channel_label: "Takeaway",
+        customer: "Bayu Pratama",
+        phone: "+62 856-7788-9900",
+        time_ago: "1 menit lalu",
+        status: "cooking",
+        countdown: null,
+        items: [
+          { qty: 1, name: "Ayam Geprek Sambal Bawang", notes: "sambal dipisah" },
+          { qty: 1, name: "Ayam Tulang Lunak Sambal Terasi", notes: "sambal dipisah" }
+        ],
+        subtotal: 52000,
+        delivery_fee: 0,
+        discount: 0,
+        total: 52000,
+        payment: "QRIS Lunas",
+        pickup_pin: "12"
+      },
+      {
+        id: "TK-111",
+        channel: "takeaway",
+        channel_label: "Takeaway",
+        customer: "Dewi Lestari",
+        phone: "+62 812-4433-2211",
+        time_ago: "1 menit lalu",
+        status: "ready",
+        countdown: null,
+        items: [
+          { qty: 1, name: "Ayam Geprek Sambal Bawang", notes: "sambal dipisah" },
+          { qty: 1, name: "Ayam Tulang Lunak Sambal Terasi", notes: "sambal dipisah" }
+        ],
+        subtotal: 52000,
+        delivery_fee: 0,
+        discount: 0,
+        total: 52000,
+        payment: "QRIS Lunas",
+        pickup_pin: "11"
+      },
+      {
+        id: "OD-746",
+        channel: "delivery",
+        channel_label: "Delivery",
+        customer: "Rizky Ramadhan",
+        phone: "+62 821-5566-7788",
+        time_ago: "1 menit lalu",
+        status: "ready",
+        countdown: null,
+        items: [
+          { qty: 1, name: "Ayam Geprek Sambal Bawang", notes: "sambal dipisah" },
+          { qty: 1, name: "Ayam Tulang Lunak Sambal Terasi + Nasi", notes: null }
+        ],
+        subtotal: 48000,
+        delivery_fee: 10000,
+        discount: 0,
+        total: 58000,
+        payment: "QRIS Lunas",
+        driver: null
+      },
+      {
+        id: "DI-120",
+        channel: "dine_in",
+        channel_label: "Meja 2",
+        customer: "Kevin Pratama",
+        phone: "+62 813-4455-6677",
+        time_ago: "8 menit lalu",
+        status: "cooking",
+        countdown: null,
+        items: [
+          { qty: 3, name: "Bebek Goreng Sambal Ijo", notes: "Goreng garing renyah" },
+          { qty: 3, name: "Nasi Putih Hangat", notes: null }
+        ],
+        subtotal: 110000,
+        delivery_fee: 0,
+        discount: 0,
+        total: 110000,
+        payment: "Tunai di Kasir (Belum Bayar)",
+        pending_additions: [
+          { qty: 2, name: "Es Jeruk Murni (Tambahan)", price: 18000 },
+          { qty: 1, name: "Tahu Tempe Goreng (Tambahan)", price: 12000 }
+        ]
+      },
+      {
+        id: "DI-118",
+        channel: "dine_in",
+        channel_label: "Meja 8",
+        customer: "Ratna Sari",
+        phone: "+62 822-1234-8899",
+        time_ago: "Siap 3 menit lalu",
+        status: "ready",
+        sub_status: null, // Siap disajikan ke meja
+        countdown: null,
+        items: [
+          { qty: 2, name: "Gurame Asam Manis", notes: "Bumbu dipisah" },
+          { qty: 2, name: "Cah Kangkung Terasi", notes: null }
+        ],
+        subtotal: 95000,
+        delivery_fee: 0,
+        discount: 0,
+        total: 95000,
+        payment: "Tunai di Kasir (Belum Bayar)"
+      },
+      {
+        id: "DI-115",
+        channel: "dine_in",
+        channel_label: "Meja 3",
+        customer: "Hendra & Rekan",
+        phone: "+62 812-7788-3344",
+        time_ago: "Tersaji 15 menit lalu",
+        status: "ready",
+        sub_status: "served", // Makanan sudah di meja, tamu makan
+        countdown: null,
+        items: [
+          { qty: 4, name: "Paket Ayam Bakar Madu", notes: null },
+          { qty: 4, name: "Nasi Liwet Solo", notes: null }
+        ],
+        subtotal: 140000,
+        delivery_fee: 0,
+        discount: 0,
+        total: 140000,
+        payment: "Tunai di Kasir (Belum Bayar)"
+      },
+      {
+        id: "OD-740",
+        channel: "delivery",
+        channel_label: "Delivery GrabFood",
+        customer: "Ahmad Dani",
+        phone: "+62 878-3344-5566",
+        time_ago: "Siap 6 menit lalu",
+        status: "ready",
+        sub_status: null, // Standby di resto
+        countdown: null,
+        items: [
+          { qty: 2, name: "Paket Hemat Geprek Komplit", notes: null }
+        ],
+        subtotal: 48000,
+        delivery_fee: 12000,
+        discount: 0,
+        total: 60000,
+        payment: "OVO Lunas",
+        driver: "Pak Joko (Grab)"
+      },
+      {
+        id: "OD-738",
+        channel: "delivery",
+        channel_label: "Delivery GoFood",
+        customer: "Bambang Irawan",
+        phone: "+62 813-2211-9988",
+        time_ago: "Diantar 10 menit lalu",
+        status: "ready",
+        sub_status: "on_delivery", // Kurir OTW jalan
+        countdown: null,
+        items: [
+          { qty: 2, name: "Ayam Goreng Kalasan", notes: null }
+        ],
+        subtotal: 46000,
+        delivery_fee: 10000,
+        discount: 0,
+        total: 56000,
+        payment: "GoPay Lunas",
+        driver: "Rian Hidayat (Kurir Resto)"
+      },
+      {
+        id: "RSV-102",
+        channel: "reservation",
+        channel_label: "Reservasi Meja 6 & 7",
+        customer: "Ibu Linda (Family Dinner)",
+        phone: "+62 811-2233-4455",
+        time_ago: "Jadwal: 19:00 WIB",
+        scheduled_time: "19:00 WIB",
+        status: "scheduled",
+        countdown: null,
+        items: [
+          { qty: 4, name: "Gurame Bakar Cobek Sedap", notes: "Ukuran sedang" },
+          { qty: 6, name: "Nasi Liwet Kastrol Spesial", notes: null }
+        ],
+        subtotal: 280000,
+        delivery_fee: 0,
+        discount: 20000,
+        total: 260000,
+        payment: "DP Rp 100.000 Lunas"
+      },
+      {
+        id: "PO-301",
+        channel: "delivery",
+        channel_label: "Katering Terjadwal",
+        customer: "PT Semen Baturaja",
+        phone: "+62 813-7799-0022",
+        time_ago: "Jadwal Kirim: 12:30 WIB",
+        scheduled_time: "12:30 WIB",
+        status: "scheduled",
+        countdown: null,
+        items: [
+          { qty: 15, name: "Nasi Kotak Ayam Bakar Komplit", notes: "Pakai buah pisang" }
+        ],
+        subtotal: 450000,
+        delivery_fee: 25000,
+        discount: 25000,
+        total: 450000,
+        payment: "Invoice Corporate (Lunas)"
+      },
+      {
+        id: "PO-302",
+        channel: "takeaway",
+        channel_label: "Pre-Order Takeaway",
+        customer: "dr. Aris Munandar",
+        phone: "+62 819-3322-1100",
+        time_ago: "Jadwal Ambil: 17:30 WIB",
+        scheduled_time: "17:30 WIB",
+        status: "scheduled",
+        countdown: null,
+        items: [
+          { qty: 3, name: "Paket Bebek Goreng Utuh Sambal Ijo", notes: "Potong 4 bagian" }
+        ],
+        subtotal: 210000,
+        delivery_fee: 0,
+        discount: 10000,
+        total: 200000,
+        payment: "QRIS Lunas"
+      },
+      {
+        id: "MB-2035",
+        channel: "takeaway",
+        channel_label: "Takeaway",
+        customer: "Hendra Wijaya",
+        phone: "+62 819-7788-9900",
+        time_ago: "Selesai 25 mnt lalu",
+        status: "completed",
+        countdown: null,
+        items: [
+          { qty: 2, name: "Nasi Goreng Spesial Pedas", notes: "Telur ceplok matang" }
+        ],
+        subtotal: 50000,
+        delivery_fee: 0,
+        discount: 0,
+        total: 50000,
+        payment: "QRIS Lunas"
+      },
+      {
+        id: "MB-2034",
+        channel: "dine_in",
+        channel_label: "Meja 1",
+        customer: "Budi Santoso",
+        phone: "+62 811-2233-4455",
+        time_ago: "Selesai 45 mnt lalu",
+        status: "completed",
+        countdown: null,
+        items: [
+          { qty: 2, name: "Paket Bebek Bakar Madu", notes: "Sambal terpisah" },
+          { qty: 2, name: "Es Jeruk Murni", notes: "Gula sedikit" }
+        ],
+        subtotal: 96000,
+        delivery_fee: 0,
+        discount: 0,
+        total: 96000,
+        payment: "Tunai Kasir"
+      },
+      {
+        id: "MB-2033",
+        channel: "delivery",
+        channel_label: "Delivery MyBangjo",
+        customer: "Siti Rahma",
+        phone: "+62 852-9988-7766",
+        time_ago: "Selesai 1 jam lalu",
+        status: "completed",
+        countdown: null,
+        items: [
+          { qty: 1, name: "Ayam Bakar Taliwang Paha", notes: "Ekstra lalapan" },
+          { qty: 1, name: "Nasi Liwet Gurih", notes: null }
+        ],
+        subtotal: 42000,
+        delivery_fee: 8000,
+        discount: 0,
+        total: 50000,
+        payment: "Saldo Bangjo Lunas"
+      },
+      {
+        id: "MB-2032",
+        channel: "dine_in",
+        channel_label: "Meja 4",
+        customer: "Agus Pratama",
+        phone: "+62 878-1122-3344",
+        time_ago: "Selesai 1.5 jam lalu",
+        status: "completed",
+        countdown: null,
+        items: [
+          { qty: 4, name: "Soto Betawi Kuah Santan Daging", notes: "Emping banyak" },
+          { qty: 4, name: "Nasi Putih", notes: null }
+        ],
+        subtotal: 168000,
+        delivery_fee: 0,
+        discount: 0,
+        total: 168000,
+        payment: "Debit BCA"
+      },
+      {
+        id: "MB-2031",
+        channel: "delivery",
+        channel_label: "Delivery GrabFood",
+        customer: "Rizky Fauzi",
+        phone: "+62 821-4455-6677",
+        time_ago: "Selesai 2 jam lalu",
+        status: "completed",
+        countdown: null,
+        items: [
+          { qty: 2, name: "Paket Nasi Kulit Krispi Sambal Bawang", notes: null },
+          { qty: 2, name: "Es Teh Manis", notes: null }
+        ],
+        subtotal: 58000,
+        delivery_fee: 10000,
+        discount: 5000,
+        total: 63000,
+        payment: "OVO Lunas"
+      },
+      {
+        id: "MB-2030",
+        channel: "takeaway",
+        channel_label: "Takeaway",
+        customer: "Dewi Lestari",
+        phone: "+62 813-5566-7788",
+        time_ago: "Selesai 2.5 jam lalu",
+        status: "completed",
+        countdown: null,
+        items: [
+          { qty: 1, name: "Mie Goreng Jawa Spesial Seafood", notes: "Pedas sedang" }
+        ],
+        subtotal: 35000,
+        delivery_fee: 0,
+        discount: 0,
+        total: 35000,
+        payment: "QRIS Lunas"
+      },
+      {
+        id: "MB-2029",
+        channel: "delivery",
+        channel_label: "Delivery ShopeeFood",
+        customer: "Maya Sari",
+        phone: "+62 812-0000-1111",
+        time_ago: "Dibatalkan 1 jam lalu",
+        status: "cancelled",
+        cancel_reason: "Ditolak Toko: Stok Cabai Rawit Habis (86)",
+        countdown: null,
+        items: [
+          { qty: 1, name: "Ayam Geprek Lv 5 (Super Pedas)", notes: null }
+        ],
+        subtotal: 22000,
+        delivery_fee: 10000,
+        discount: 0,
+        total: 32000,
+        payment: "Refund Sukses"
+      },
+      {
+        id: "MB-2028",
+        channel: "reservation",
+        channel_label: "Reservasi Meja VIP",
+        customer: "Ferry Salim (6 Pax)",
+        phone: "+62 819-3322-1100",
+        time_ago: "Dibatalkan 3 jam lalu",
+        status: "cancelled",
+        cancel_reason: "Tamu No-Show: Melebihi Toleransi Waktu 30 Menit",
+        countdown: null,
+        items: [
+          { qty: 6, name: "Paket Makan Siang Keluarga VIP", notes: "DP Reservasi hangus sesuai regulasi" }
+        ],
+        subtotal: 450000,
+        delivery_fee: 0,
+        discount: 0,
+        total: 450000,
+        payment: "DP Dibatalkan"
+      }
+    ];
+
+    let orders = JSON.parse(JSON.stringify(INITIAL_ORDERS));
+    let currentMainTab = 'in_process'; // in_process | scheduled | completed | cancelled
+    let currentStageSubfilter = 'all'; // all | incoming | cooking | ready
+    let currentChannel = 'all'; // all | delivery | dine_in | takeaway | reservation
+    let searchQuery = '';
+    let isShopOpen = true;
+    let isOnlineOpen = true;
+    let pendingRejectOrderId = null;
+    let activeDetailOrderId = null;
+
+    // Countdown Timer Interval
+    setInterval(() => {
+      let updated = false;
+      orders.forEach(o => {
+        if (o.status === 'incoming' && o.countdown > 0) {
+          o.countdown--;
+          updated = true;
+        }
+      });
+      if (updated && currentMainTab === 'in_process') {
+        renderOrders();
+      }
+    }, 1000);
+
+    // Helpers
+    function formatRp(num) {
+      return 'Rp ' + Number(num || 0).toLocaleString('id-ID');
+    }
+
+    function showToast(msg) {
+      const container = document.getElementById('toast-container');
+      const el = document.createElement('div');
+      el.className = 'toast';
+      el.innerHTML = msg;
+      container.appendChild(el);
+      setTimeout(() => {
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(8px)';
+        el.style.transition = 'all 0.25s ease';
+        setTimeout(() => el.remove(), 250);
+      }, 3000);
+    }
+
+    // UI Tab & Filter Handlers
+    function switchMainTab(tab) {
+      currentMainTab = tab;
+      document.querySelectorAll('.pesanan-nav-tab').forEach(b => {
+        b.classList.remove('active');
+      });
+      const target = document.getElementById('tab-' + tab.replace('_', '-'));
+      if (target) target.classList.add('active');
+
+      // Update badge visual active/inactive states across all 4 operational tabs
+      const tabs = ['in_process', 'scheduled', 'completed', 'cancelled'];
+      tabs.forEach(t => {
+        const id = 'badge-' + t.replace('_', '-');
+        const badge = document.getElementById(id);
+        if (badge) {
+          if (t === tab) {
+            badge.className = 'tab-badge-pill active';
+          } else {
+            badge.className = 'tab-badge-pill inactive';
+          }
+        }
+      });
+
+      const topbar = document.getElementById('topbar-wrapper') || document.querySelector('.topbar-wrapper');
+      const tabsNav = document.getElementById('pesanan-nav-tabs') || document.querySelector('.pesanan-nav-tabs');
+      const stageBar = document.getElementById('stage-subfilter-bar');
+
+      if (tab === 'in_process') {
+        // Tab "Dalam proses": Masukkan kembali kapsul subfilter (Semua, Masuk, Dimasak, Siap) ke dalam topbar
+        if (stageBar) stageBar.style.display = 'flex';
+        if (topbar) topbar.classList.add('has-subfilters');
+        if (tabsNav) tabsNav.classList.add('has-subfilters');
+      } else {
+        // Tab selain "Dalam proses" (Terjadwal, Selesai, Batal): Sembunyikan subfilter & indikator hitam menempel flush di tepi bawah top bar
+        if (stageBar) stageBar.style.display = 'none';
+        if (topbar) topbar.classList.remove('has-subfilters');
+        if (tabsNav) tabsNav.classList.remove('has-subfilters');
+      }
+
+      renderOrders();
+    }
+
+    function setStageSubfilter(stage, btn) {
+      currentStageSubfilter = stage;
+      document.querySelectorAll('.stage-subfilter-btn').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      renderOrders();
+    }
+
+    function setChannelFilter(channel, btn) {
+      currentChannel = channel;
+      document.querySelectorAll('.service-chip').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      renderOrders();
+    }
+
+    function handleSearch(val) {
+      searchQuery = (val || '').trim().toLowerCase();
+      document.getElementById('search-clear').style.display = searchQuery ? 'block' : 'none';
+      renderOrders();
+    }
+
+    function clearSearch() {
+      const inp = document.getElementById('search-input');
+      inp.value = '';
+      searchQuery = '';
+      document.getElementById('search-clear').style.display = 'none';
+      renderOrders();
+    }
+
+    // Operational Status Handlers (iOS-Style Toggle Sliders)
+    function toggleShopOpen() {
+      isShopOpen = !isShopOpen;
+      const btn = document.getElementById('btn-toggle-shop');
+      const sw = document.getElementById('ios-switch-shop');
+      const lbl = document.getElementById('lbl-shop-status');
+      const banner = document.getElementById('closed-shop-banner');
+      const feed = document.getElementById('orders-feed');
+      const filters = document.getElementById('filter-section');
+
+      if (isShopOpen) {
+        if (btn) btn.classList.add('is-active');
+        if (sw) sw.classList.remove('is-off');
+        if (lbl) lbl.textContent = 'Resto';
+        if (banner) banner.style.display = 'none';
+        if (feed) feed.style.display = 'flex';
+        if (filters) filters.style.display = 'flex';
+        showToast('Restoran dibuka kembali.');
+      } else {
+        if (btn) btn.classList.remove('is-active');
+        if (sw) sw.classList.add('is-off');
+        if (lbl) lbl.textContent = 'Resto';
+        if (banner) banner.style.display = 'flex';
+        if (feed) feed.style.display = 'none';
+        if (filters) filters.style.display = 'none';
+        showToast('Restoran ditutup sementara.');
+      }
+    }
+
+    function toggleOnlineOrder() {
+      isOnlineOpen = !isOnlineOpen;
+      const btn = document.getElementById('btn-toggle-online');
+      const sw = document.getElementById('ios-switch-online');
+      const lbl = document.getElementById('lbl-online-status');
+      if (isOnlineOpen) {
+        if (btn) btn.classList.add('is-active');
+        if (sw) sw.classList.remove('is-off');
+        if (lbl) lbl.textContent = 'Aktif';
+        showToast('Order online diaktifkan.');
+      } else {
+        if (btn) btn.classList.remove('is-active');
+        if (sw) sw.classList.add('is-off');
+        if (lbl) lbl.textContent = 'Pause';
+        showToast('Order online dijeda.');
+      }
+    }
+
+    // Badge Counters Update
+    function updateBadges() {
+      const inProcessCount = orders.filter(o => ['incoming', 'cooking', 'ready'].includes(o.status)).length;
+      const scheduledCount = orders.filter(o => o.status === 'scheduled').length;
+      const completedCount = orders.filter(o => o.status === 'completed').length;
+      const cancelledCount = orders.filter(o => o.status === 'cancelled').length;
+
+      document.getElementById('badge-in-process').textContent = inProcessCount;
+      document.getElementById('badge-scheduled').textContent = scheduledCount;
+      document.getElementById('badge-completed').textContent = completedCount;
+      document.getElementById('badge-cancelled').textContent = cancelledCount;
+      document.getElementById('nav-bottom-badge').textContent = inProcessCount;
+
+      // Stage Subfilter Badges
+      const incomingCount = orders.filter(o => o.status === 'incoming').length;
+      const cookingCount = orders.filter(o => o.status === 'cooking').length;
+      const readyCount = orders.filter(o => o.status === 'ready').length;
+
+      if (document.getElementById('subbadge-all')) document.getElementById('subbadge-all').textContent = inProcessCount;
+      if (document.getElementById('subbadge-incoming')) document.getElementById('subbadge-incoming').textContent = incomingCount;
+      if (document.getElementById('subbadge-cooking')) document.getElementById('subbadge-cooking').textContent = cookingCount;
+      if (document.getElementById('subbadge-ready')) document.getElementById('subbadge-ready').textContent = readyCount;
+    }
+
+    // Main Render Loop (Figma Aesthetic: Focus on Items, Kitchen Notes & Actions)
+    function renderOrders() {
+      updateBadges();
+      const feed = document.getElementById('orders-feed');
+      if (!isShopOpen) return;
+
+      // Filter by Main Tab
+      let filtered = orders.filter(o => {
+        if (currentMainTab === 'in_process') {
+          return ['incoming', 'cooking', 'ready'].includes(o.status);
+        }
+        return o.status === currentMainTab;
+      });
+
+      // Filter by Channel
+      if (currentChannel !== 'all') {
+        filtered = filtered.filter(o => o.channel === currentChannel);
+      }
+
+      // Filter by Search Query
+      if (searchQuery) {
+        filtered = filtered.filter(o => {
+          return o.id.toLowerCase().includes(searchQuery) ||
+                 o.customer.toLowerCase().includes(searchQuery) ||
+                 o.channel_label.toLowerCase().includes(searchQuery) ||
+                 o.phone.toLowerCase().includes(searchQuery);
+        });
+      }
+
+      // Empty State
+      if (filtered.length === 0) {
+        feed.innerHTML = `
+          <div class="empty-state">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.8" style="margin: 0 auto 10px;"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 14.14 14.14"/></svg>
+            <h3>Tidak Ada Pesanan</h3>
+            <p>Tidak ada antrean pesanan pada kategori ini.</p>
+          </div>
+        `;
+        return;
+      }
+
+      // Render based on Tab
+      if (currentMainTab === 'in_process') {
+        renderInProcessGroups(feed, filtered);
+      } else {
+        renderStandardList(feed, filtered);
+      }
+    }
+
+    function getChannelIcon(channel) {
+      switch (channel) {
+        case 'delivery': return '/assets/upload-aset/merchant icon/delivery.png';
+        case 'dine_in': return '/assets/upload-aset/merchant icon/dine-in.png';
+        case 'takeaway': return '/assets/upload-aset/merchant icon/takeaway.png';
+        case 'reservation': return '/assets/upload-aset/merchant icon/reservasi 1.png';
+        default: return '/assets/upload-aset/merchant icon/dine-in.png';
+      }
+    }
+
+    // Render Tab "Dalam Proses" (Divided into 3 Kitchen Ergonomics Groups from Figma)
+    function renderInProcessGroups(feed, list) {
+      const incoming = list.filter(o => o.status === 'incoming');
+      const cooking = list.filter(o => o.status === 'cooking');
+      const ready = list.filter(o => o.status === 'ready');
+
+      let html = '';
+
+      // 1. GROUP: INCOMING (PERLU KONFIRMASI)
+      if ((currentStageSubfilter === 'all' || currentStageSubfilter === 'incoming') && incoming.length > 0) {
+        html += `
+          <div class="subgroup-header">
+            <span class="subgroup-title" style="color:#b45309;">
+              ⚠️ Perlu konfirmasi segera
+            </span>
+            <span class="subgroup-count" style="background:#fef3c7; color:#b45309;">${incoming.length} Baru</span>
+          </div>
+        `;
+        incoming.forEach(ord => {
+          const m = Math.floor(ord.countdown / 60);
+          const s = ord.countdown % 60;
+          const timeStr = `${m}:${s < 10 ? '0' : ''}${s}`;
+          html += `
+            <article class="order-card" onclick="openDetailModal('${ord.id}')">
+              <div class="urgent-timer-bar">
+                <span style="display:flex; align-items:center; gap:6px;">
+                  <span class="pulse-dot"></span>
+                  Batas terima pesanan:
+                </span>
+                <strong>${timeStr}</strong>
+              </div>
+
+              <div class="card-head">
+                <div class="card-meta-left">
+                  <img src="${getChannelIcon(ord.channel)}" alt="${ord.channel_label}" class="channel-avatar-icon" onerror="this.style.display='none'">
+                  <div class="order-meta-info">
+                    <span class="order-code">#${ord.id}</span>
+                    <span class="channel-pill-badge ${ord.channel}">${ord.channel_label}</span>
+                  </div>
+                </div>
+                <span class="card-time">${ord.time_ago}</span>
+              </div>
+
+              <!-- Inline Kitchen Menu Preview -->
+              <div class="card-items-box">
+                ${ord.items.map(it => `
+                  <div>
+                    <div class="item-row">
+                      <span class="item-qty">${it.qty}x</span>
+                      <strong class="item-name">${it.name}</strong>
+                    </div>
+                    ${it.notes ? `<div class="item-notes-box">Catatan: ${it.notes}</div>` : ''}
+                  </div>
+                `).join('')}
+              </div>
+
+              <div class="card-actions-dual" onclick="event.stopPropagation()">
+                <button type="button" class="btn-act btn-act-reject" onclick="openRejectModal('${ord.id}')">Tolak</button>
+                <button type="button" class="btn-act btn-act-accept" onclick="acceptOrder('${ord.id}')">Terima</button>
+              </div>
+            </article>
+          `;
+        });
+      }
+
+      // 2. GROUP: COOKING (SEDANG DIMASAK)
+      if ((currentStageSubfilter === 'all' || currentStageSubfilter === 'cooking') && cooking.length > 0) {
+        html += `
+          <div class="subgroup-header" style="margin-top:14px;">
+            <span class="subgroup-title" style="color:#1d4ed8;">
+              🕒 Sedang dimasak
+            </span>
+            <span class="subgroup-count" style="background:#dbeafe; color:#1e40af;">${cooking.length} Antrean</span>
+          </div>
+        `;
+        cooking.forEach(ord => {
+          html += `
+            <article class="order-card" onclick="openDetailModal('${ord.id}')">
+              <div class="card-head">
+                <div class="card-meta-left">
+                  <img src="${getChannelIcon(ord.channel)}" alt="${ord.channel_label}" class="channel-avatar-icon" onerror="this.style.display='none'">
+                  <div class="order-meta-info">
+                    <span class="order-code">#${ord.id}</span>
+                    <span class="channel-pill-badge ${ord.channel}">${ord.channel_label}</span>
+                  </div>
+                </div>
+                <span class="card-time">${ord.time_ago}</span>
+              </div>
+
+              <!-- Inline Kitchen Menu Preview -->
+              <div class="card-items-box">
+                ${ord.items.map(it => `
+                  <div>
+                    <div class="item-row">
+                      <span class="item-qty">${it.qty}x</span>
+                      <strong class="item-name">${it.name}</strong>
+                    </div>
+                    ${it.notes ? `<div class="item-notes-box">Catatan: ${it.notes}</div>` : ''}
+                  </div>
+                `).join('')}
+              </div>
+
+              <!-- Pending Addon Alert for Dine-in -->
+              ${ord.pending_additions && ord.pending_additions.length > 0 ? `
+                <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:12px; padding:10px 12px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <strong style="font-size:12px; color:#1d4ed8;">Tambahan Menu Tamu (+${ord.pending_additions.length} item)</strong>
+                    <span style="font-size:11.5px; font-weight:800; color:#2563eb;">Lihat Detail</span>
+                  </div>
+                  <div style="font-size:11.5px; color:#334155; margin-top:4px;">
+                    ${ord.pending_additions.map(a => `<div>• <strong>${a.qty}x</strong> ${a.name}</div>`).join('')}
+                  </div>
+                  <div style="display:flex; gap:8px; margin-top:8px;">
+                    <button type="button" class="btn-act btn-act-reject" style="flex:1; height:34px; font-size:11.5px;" onclick="event.stopPropagation(); rejectAddon('${ord.id}')">Tolak</button>
+                    <button type="button" class="btn-act btn-act-accept" style="flex:1.5; height:34px; font-size:11.5px;" onclick="event.stopPropagation(); acceptAddon('${ord.id}')">Terima Tambahan</button>
+                  </div>
+                </div>
+              ` : ''}
+
+              <div class="card-actions-single" onclick="event.stopPropagation()">
+                <button type="button" class="btn-act btn-act-cook" onclick="markReady('${ord.id}')">Pesanan siap</button>
+              </div>
+            </article>
+          `;
+        });
+      }
+
+      // 3. GROUP: READY (SAJIKAN / TUNGGU KURIR)
+      if ((currentStageSubfilter === 'all' || currentStageSubfilter === 'ready') && ready.length > 0) {
+        html += `
+          <div class="subgroup-header" style="margin-top:14px;">
+            <span class="subgroup-title" style="color:#047857;">
+              Sajikan/Tunggu Kurir
+            </span>
+            <span class="subgroup-count" style="background:#dcfce7; color:#15803d;">${ready.length} Siap</span>
+          </div>
+        `;
+        ready.forEach(ord => {
+          let actionBtnsHtml = '';
+
+          if (ord.channel === 'delivery') {
+            if (!ord.driver) {
+              actionBtnsHtml = `
+                <button type="button" class="btn-act btn-act-alert" onclick="openAssignDriverModal('${ord.id}')">Tugaskan kurir</button>
+              `;
+            } else if (ord.sub_status === 'on_delivery') {
+              actionBtnsHtml = `
+                <button type="button" class="btn-act btn-act-finish" onclick="completeDelivery('${ord.id}')">Pesanan Terkirim</button>
+              `;
+            } else {
+              actionBtnsHtml = `
+                <div style="display:flex; gap:8px; width:100%;">
+                  <button type="button" class="btn-act btn-act-secondary" style="flex:1;" onclick="openAssignDriverModal('${ord.id}')">Ganti Kurir</button>
+                  <button type="button" class="btn-act btn-act-transit" style="flex:1.5;" onclick="handoverToDriver('${ord.id}')">Serahkan ke Kurir</button>
+                </div>
+              `;
+            }
+          } else if (ord.channel === 'takeaway') {
+            actionBtnsHtml = `
+              <button type="button" class="btn-act btn-act-finish" onclick="settleAndCompleteTakeaway('${ord.id}')">Serahkan</button>
+            `;
+          } else if (ord.channel === 'dine_in') {
+            if (ord.sub_status === 'served') {
+              actionBtnsHtml = `
+                <button type="button" class="btn-act btn-act-finish" onclick="closeTable('${ord.id}')">Tutup Meja</button>
+              `;
+            } else {
+              actionBtnsHtml = `
+                <button type="button" class="btn-act btn-act-floor" onclick="serveToTable('${ord.id}')">Sajikan ke Meja</button>
+              `;
+            }
+          } else {
+            actionBtnsHtml = `
+              <button type="button" class="btn-act btn-act-finish" onclick="completeOrder('${ord.id}')">Selesaikan</button>
+            `;
+          }
+
+          html += `
+            <article class="order-card" onclick="openDetailModal('${ord.id}')">
+              <div class="card-head">
+                <div class="card-meta-left">
+                  <img src="${getChannelIcon(ord.channel)}" alt="${ord.channel_label}" class="channel-avatar-icon" onerror="this.style.display='none'">
+                  <div class="order-meta-info">
+                    <span class="order-code">#${ord.id}</span>
+                    <span class="channel-pill-badge ${ord.channel}">${ord.channel_label}</span>
+                  </div>
+                </div>
+                <span class="card-time">${ord.time_ago}</span>
+              </div>
+
+              ${ord.driver ? `
+                <div style="font-size:11.5px; font-weight:700; color:#166534; background:#f0fdf4; border-radius:8px; padding:5px 10px;">
+                  Kurir: ${ord.driver}
+                </div>
+              ` : ''}
+
+              <!-- Inline Kitchen Menu Preview -->
+              <div class="card-items-box">
+                ${ord.items.map(it => `
+                  <div>
+                    <div class="item-row">
+                      <span class="item-qty">${it.qty}x</span>
+                      <strong class="item-name">${it.name}</strong>
+                    </div>
+                    ${it.notes ? `<div class="item-notes-box">Catatan: ${it.notes}</div>` : ''}
+                  </div>
+                `).join('')}
+              </div>
+
+              <div class="card-actions-single" onclick="event.stopPropagation()">
+                ${actionBtnsHtml}
+              </div>
+            </article>
+          `;
+        });
+      }
+
+      if (html === '') {
+        let emptyTitle = 'Tidak Ada Pesanan';
+        let emptySub = 'Semua antrean dalam proses telah selesai.';
+        if (currentStageSubfilter === 'incoming') {
+          emptyTitle = 'Tidak Ada Pesanan Baru';
+          emptySub = 'Semua pesanan masuk sudah dikonfirmasi atau belum ada yang baru.';
+        } else if (currentStageSubfilter === 'cooking') {
+          emptyTitle = 'Dapur Sedang Kosong';
+          emptySub = 'Belum ada menu yang sedang dimasak di atas kompor.';
+        } else if (currentStageSubfilter === 'ready') {
+          emptyTitle = 'Tidak Ada Pesanan Siap Saji';
+          emptySub = 'Semua pesanan matang sudah diserahkan ke kurir atau tamu meja.';
+        }
+        feed.innerHTML = `
+          <div class="empty-state">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.8" style="margin: 0 auto 10px;"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 14.14 14.14"/></svg>
+            <h3>${emptyTitle}</h3>
+            <p>${emptySub}</p>
+          </div>
+        `;
+        return;
+      }
+
+      feed.innerHTML = html;
+    }
+
+    // Render Standard List (Scheduled, Completed, Cancelled)
+    function renderStandardList(feed, list) {
+      feed.innerHTML = list.map(ord => `
+        <article class="order-card" onclick="openDetailModal('${ord.id}')">
+          <div class="card-head">
+            <div class="card-meta-left">
+              <img src="${getChannelIcon(ord.channel)}" alt="${ord.channel_label}" class="channel-avatar-icon" onerror="this.style.display='none'">
+              <div class="order-meta-info">
+                <span class="order-code">#${ord.id}</span>
+                <span class="channel-pill-badge ${ord.channel}">${ord.channel_label}</span>
+              </div>
+            </div>
+            <span class="card-time">${ord.time_ago}</span>
+          </div>
+
+          ${ord.cancel_reason ? `
+            <div style="background:#fff1f2; border-radius:10px; padding:8px 12px; font-size:12px; color:#9f1239; font-weight:700;">
+              Alasan: ${ord.cancel_reason}
+            </div>
+          ` : ''}
+
+          <!-- Items List Preview -->
+          <div class="card-items-box">
+            ${ord.items.map(it => `
+              <div>
+                <div class="item-row">
+                  <span class="item-qty">${it.qty}x</span>
+                  <strong class="item-name">${it.name}</strong>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="card-actions-single" onclick="event.stopPropagation()">
+            ${ord.status === 'scheduled' ? (
+              ord.channel === 'reservation' ? `
+                <div style="display:flex; gap:8px; width:100%;">
+                  <button type="button" class="btn-act btn-act-secondary" style="flex:1;" onclick="noShowReservation('${ord.id}')">Batal (No-Show)</button>
+                  <button type="button" class="btn-act btn-act-floor" style="flex:1.5;" onclick="checkInReservation('${ord.id}')">Check-in Tamu</button>
+                </div>
+              ` : `
+                <button type="button" class="btn-act btn-act-cook" onclick="startScheduledCooking('${ord.id}')">Mulai Masak</button>
+              `
+            ) : ''}
+            ${ord.status === 'completed' ? `
+              <button type="button" class="btn-act btn-act-secondary" onclick="showToast('Mencetak struk kasir...')">Cetak Struk</button>
+            ` : ''}
+            ${ord.status === 'cancelled' ? `
+              <button type="button" class="btn-act btn-act-secondary" onclick="openDetailModal('${ord.id}')">Detail Pesanan</button>
+            ` : ''}
+          </div>
+        </article>
+      `).join('');
+    }
+
+    // Order State Transitions
+    function acceptOrder(id) {
+      const o = orders.find(x => x.id === id);
+      if (o) {
+        o.status = 'cooking';
+        o.time_ago = 'Sedang dimasak';
+        showToast('Pesanan #' + id + ' diterima. Tiket dikirim ke dapur.');
+        renderOrders();
+      }
+    }
+
+    function markReady(id) {
+      const o = orders.find(x => x.id === id);
+      if (o) {
+        o.status = 'ready';
+        o.time_ago = 'Siap baru saja';
+        showToast('Pesanan #' + id + ' siap saji.');
+        renderOrders();
+      }
+    }
+
+    function serveToTable(id) {
+      const o = orders.find(x => x.id === id);
+      if (o) {
+        o.sub_status = 'served';
+        o.time_ago = 'Tersaji di meja';
+        showToast('Pesanan #' + id + ' telah disajikan ke meja tamu.');
+        renderOrders();
+      }
+    }
+
+    function closeTable(id) {
+      const o = orders.find(x => x.id === id);
+      if (o) {
+        o.status = 'completed';
+        o.sub_status = null;
+        o.time_ago = 'Selesai baru saja';
+        if (!o.payment.includes('Lunas')) {
+          o.payment = 'Tunai di Kasir (Lunas)';
+        }
+        showToast('Meja untuk pesanan #' + id + ' telah ditutup.');
+        renderOrders();
+      }
+    }
+
+    function settleAndCompleteTakeaway(id) {
+      const o = orders.find(x => x.id === id);
+      if (o) {
+        o.status = 'completed';
+        o.payment = 'Tunai di Kasir (Lunas)';
+        o.time_ago = 'Selesai baru saja';
+        showToast('Pesanan takeaway #' + id + ' diserahkan.');
+        renderOrders();
+      }
+    }
+
+    function completeOrder(id) {
+      const o = orders.find(x => x.id === id);
+      if (o) {
+        o.status = 'completed';
+        o.sub_status = null;
+        o.time_ago = 'Selesai baru saja';
+        showToast('Pesanan #' + id + ' diselesaikan.');
+        renderOrders();
+      }
+    }
+
+    function handoverToDriver(id) {
+      const o = orders.find(x => x.id === id);
+      if (o) {
+        o.sub_status = 'on_delivery';
+        o.time_ago = 'Sedang diantar kurir';
+        showToast('Pesanan #' + id + ' diserahkan ke kurir. Sedang dalam perjalanan.');
+        renderOrders();
+      }
+    }
+
+    function completeDelivery(id) {
+      const o = orders.find(x => x.id === id);
+      if (o) {
+        o.status = 'completed';
+        o.sub_status = null;
+        o.time_ago = 'Terkirim baru saja';
+        showToast('Pesanan delivery #' + id + ' berhasil sampai di tujuan.');
+        renderOrders();
+      }
+    }
+
+    function checkInReservation(id) {
+      const o = orders.find(x => x.id === id);
+      if (o) {
+        o.status = 'cooking';
+        o.channel = 'dine_in';
+        o.channel_label = o.channel_label.replace('Reservasi', 'Dine-In');
+        o.time_ago = 'Tamu baru tiba & duduk';
+        showToast('Tamu reservasi #' + id + ' telah check-in.');
+        setChannelFilter('all', document.querySelector('.service-chip[data-channel="all"]'));
+        switchMainTab('in_process');
+        setStageSubfilter('cooking', document.querySelector('.stage-subfilter-btn[data-stage="cooking"]'));
+        renderOrders();
+      }
+    }
+
+    function noShowReservation(id) {
+      const o = orders.find(x => x.id === id);
+      if (o) {
+        o.status = 'cancelled';
+        o.cancel_reason = 'Tamu tidak hadir (No-Show melebihi batas toleransi)';
+        o.time_ago = 'Dibatalkan (No-Show)';
+        showToast('Reservasi #' + id + ' dibatalkan (No-Show). Meja telah dilepas.');
+        renderOrders();
+      }
+    }
+
+    function startScheduledCooking(id) {
+      const o = orders.find(x => x.id === id);
+      if (o) {
+        o.status = 'cooking';
+        o.time_ago = 'Mulai dimasak (Jadwal: ' + (o.scheduled_time || 'Hari ini') + ')';
+        showToast('Pesanan terjadwal #' + id + ' mulai dimasak di dapur.');
+        setChannelFilter('all', document.querySelector('.service-chip[data-channel="all"]'));
+        switchMainTab('in_process');
+        setStageSubfilter('cooking', document.querySelector('.stage-subfilter-btn[data-stage="cooking"]'));
+        renderOrders();
+      }
+    }
+
+    function acceptAddon(id) {
+      const o = orders.find(x => x.id === id);
+      if (o && o.pending_additions) {
+        const addedTotal = o.pending_additions.reduce((sum, it) => sum + it.price, 0);
+        o.pending_additions.forEach(it => {
+          o.items.push({ qty: it.qty, name: it.name, notes: 'Tambahan dari meja' });
+        });
+        o.subtotal += addedTotal;
+        o.total += addedTotal;
+        o.pending_additions = null;
+        showToast('Tambahan menu untuk #' + id + ' diterima.');
+        renderOrders();
+      }
+    }
+
+    function rejectAddon(id) {
+      const o = orders.find(x => x.id === id);
+      if (o && o.pending_additions) {
+        o.pending_additions = null;
+        showToast('Tambahan menu untuk #' + id + ' ditolak.');
+        renderOrders();
+      }
+    }
+
+    // Reject Flow
+    function openRejectModal(id) {
+      pendingRejectOrderId = id;
+      document.getElementById('reject-modal').classList.add('is-open');
+    }
+
+    function closeRejectModal(e) {
+      if (e && e.target !== e.currentTarget) return;
+      document.getElementById('reject-modal').classList.remove('is-open');
+      pendingRejectOrderId = null;
+    }
+
+    function confirmRejectOrder() {
+      if (!pendingRejectOrderId) return;
+      const selected = document.querySelector('input[name="reject_reason"]:checked');
+      const reason = selected ? selected.value : 'Ditolak Toko';
+
+      const o = orders.find(x => x.id === pendingRejectOrderId);
+      if (o) {
+        o.status = 'cancelled';
+        o.cancel_reason = reason;
+        o.time_ago = 'Dibatalkan baru saja';
+        showToast('Pesanan #' + pendingRejectOrderId + ' ditolak: ' + reason);
+      }
+      closeRejectModal();
+      renderOrders();
+    }
+
+    // Driver Assignment Flow
+    let pendingAssignOrderId = null;
+
+    function openAssignDriverModal(id) {
+      pendingAssignOrderId = id;
+      const o = orders.find(x => x.id === id);
+      if (o) {
+        document.getElementById('assign-driver-title').textContent = 'Tugaskan Kurir untuk #' + o.id;
+        document.getElementById('assign-driver-subtitle').textContent = 'Tujuan: ' + o.customer + ' (' + o.channel_label + ')';
+      }
+      document.getElementById('assign-driver-modal').classList.add('is-open');
+    }
+
+    function closeAssignDriverModal(e) {
+      if (e && e.target !== e.currentTarget) return;
+      document.getElementById('assign-driver-modal').classList.remove('is-open');
+      pendingAssignOrderId = null;
+    }
+
+    function toggleManualDriverInput() {
+      const box = document.getElementById('manual-driver-box');
+      const isHidden = (box.style.display === 'none' || !box.style.display);
+      box.style.display = isHidden ? 'flex' : 'none';
+      if (isHidden) {
+        document.querySelectorAll('input[name="selected_driver"]').forEach(r => r.checked = false);
+      }
+    }
+
+    function confirmAssignDriver() {
+      if (!pendingAssignOrderId) return;
+      const o = orders.find(x => x.id === pendingAssignOrderId);
+      if (!o) return;
+
+      const manualBox = document.getElementById('manual-driver-box');
+      const manualName = document.getElementById('manual-driver-name').value.trim();
+      const manualPhone = document.getElementById('manual-driver-phone').value.trim();
+
+      let driverName = '';
+      if (manualBox && manualBox.style.display === 'flex' && manualName) {
+        driverName = 'Kurir Manual: ' + manualName + (manualPhone ? ' (' + manualPhone + ')' : '');
+      } else {
+        const selected = document.querySelector('input[name="selected_driver"]:checked');
+        driverName = selected ? selected.value : 'Kurir Resto';
+      }
+
+      o.driver = driverName;
+      o.sub_status = null; // standby di resto
+      showToast('Kurir ' + driverName + ' ditugaskan ke pesanan #' + o.id + '.');
+      closeAssignDriverModal();
+      renderOrders();
+    }
+
+    // Modal Detail Sheet (LEVEL 2 DEEP DIVE: Prices, Customer, WhatsApp, Receipts)
+    function openDetailModal(id) {
+      const o = orders.find(x => x.id === id);
+      if (!o) return;
+      activeDetailOrderId = id;
+
+      document.getElementById('sheet-order-code').textContent = '#' + o.id;
+      document.getElementById('sheet-order-channel').textContent = o.channel_label + ' • ' + o.time_ago;
+      const sheetIcon = document.getElementById('sheet-order-icon');
+      if (sheetIcon) sheetIcon.src = getChannelIcon(o.channel);
+      document.getElementById('sheet-customer-name').textContent = o.customer;
+      document.getElementById('sheet-customer-phone').textContent = o.phone;
+
+      // Render Items in Modal
+      const itemsContainer = document.getElementById('sheet-items-list');
+      itemsContainer.innerHTML = o.items.map(it => `
+        <div class="sheet-item-row">
+          <div>
+            <div class="sheet-item-title">${it.qty}x ${it.name}</div>
+            ${it.notes ? `<div class="sheet-item-notes">Catatan: ${it.notes}</div>` : ''}
+          </div>
+        </div>
+      `).join('');
+
+      // Addon in modal
+      if (o.pending_additions && o.pending_additions.length > 0) {
+        itemsContainer.innerHTML += `
+          <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:8px 10px; margin-top:6px;">
+            <div style="font-size:11.5px; font-weight:700; color:#1d4ed8;">Tambahan Baru dari Tamu:</div>
+            ${o.pending_additions.map(a => `<div style="font-size:11px; color:#334155;">• ${a.qty}x ${a.name} (+${formatRp(a.price)})</div>`).join('')}
+          </div>
+        `;
+      }
+
+      document.getElementById('sheet-subtotal').textContent = formatRp(o.subtotal);
+      document.getElementById('sheet-delivery-fee').textContent = formatRp(o.delivery_fee);
+      document.getElementById('sheet-discount').textContent = o.discount ? '-' + formatRp(o.discount) : 'Rp 0';
+      document.getElementById('sheet-grand-total').textContent = formatRp(o.total);
+      document.getElementById('sheet-payment-method').textContent = (o.payment.includes('Lunas') ? '✓ ' : '') + o.payment;
+
+      // Dynamic Action Footer
+      const footer = document.getElementById('sheet-action-footer');
+      if (o.status === 'incoming') {
+        footer.innerHTML = `
+          <div style="display:flex; gap:8px;">
+            <button type="button" class="btn-act btn-act-reject" style="flex:1;" onclick="closeDetailModal(); openRejectModal('${o.id}')">Tolak</button>
+            <button type="button" class="btn-act btn-act-accept" style="flex:2;" onclick="acceptOrder('${o.id}'); closeDetailModal();">Terima</button>
+          </div>
+        `;
+      } else if (o.status === 'cooking') {
+        footer.innerHTML = `
+          <button type="button" class="btn-act btn-act-cook" style="width:100%; padding:12px;" onclick="markReady('${o.id}'); closeDetailModal();">
+            Pesanan siap
+          </button>
+        `;
+      } else if (o.status === 'ready') {
+        if (o.channel === 'delivery') {
+          if (!o.driver) {
+            footer.innerHTML = `
+              <button type="button" class="btn-act btn-act-alert" style="width:100%; padding:12px;" onclick="closeDetailModal(); openAssignDriverModal('${o.id}');">
+                Tugaskan kurir
+              </button>
+            `;
+          } else if (o.sub_status === 'on_delivery') {
+            footer.innerHTML = `
+              <button type="button" class="btn-act btn-act-finish" style="width:100%; padding:12px;" onclick="completeDelivery('${o.id}'); closeDetailModal();">
+                Pesanan Terkirim
+              </button>
+            `;
+          } else {
+            footer.innerHTML = `
+              <div style="display:flex; gap:8px;">
+                <button type="button" class="btn-act btn-act-secondary" style="flex:1;" onclick="closeDetailModal(); openAssignDriverModal('${o.id}');">Ganti Kurir</button>
+                <button type="button" class="btn-act btn-act-transit" style="flex:2;" onclick="handoverToDriver('${o.id}'); closeDetailModal();">Serahkan ke Kurir</button>
+              </div>
+            `;
+          }
+        } else if (o.channel === 'takeaway') {
+          footer.innerHTML = `
+            <button type="button" class="btn-act btn-act-finish" style="width:100%; padding:12px;" onclick="settleAndCompleteTakeaway('${o.id}'); closeDetailModal();">
+              Serahkan
+            </button>
+          `;
+        } else if (o.channel === 'dine_in') {
+          if (o.sub_status === 'served') {
+            footer.innerHTML = `
+              <button type="button" class="btn-act btn-act-finish" style="width:100%; padding:12px;" onclick="closeTable('${o.id}'); closeDetailModal();">
+                Tutup Meja
+              </button>
+            `;
+          } else {
+            footer.innerHTML = `
+              <button type="button" class="btn-act btn-act-floor" style="width:100%; padding:12px;" onclick="serveToTable('${o.id}'); closeDetailModal();">
+                Sajikan ke Meja
+              </button>
+            `;
+          }
+        } else {
+          footer.innerHTML = `
+            <button type="button" class="btn-act btn-act-finish" style="width:100%; padding:12px;" onclick="completeOrder('${o.id}'); closeDetailModal();">
+              Selesaikan
+            </button>
+          `;
+        }
+      } else if (o.status === 'scheduled') {
+        if (o.channel === 'reservation') {
+          footer.innerHTML = `
+            <div style="display:flex; gap:8px;">
+              <button type="button" class="btn-act btn-act-secondary" style="flex:1;" onclick="noShowReservation('${o.id}'); closeDetailModal();">Batal (No-Show)</button>
+              <button type="button" class="btn-act btn-act-floor" style="flex:2;" onclick="checkInReservation('${o.id}'); closeDetailModal();">Check-in Tamu</button>
+            </div>
+          `;
+        } else {
+          footer.innerHTML = `
+            <button type="button" class="btn-act btn-act-cook" style="width:100%; padding:12px;" onclick="startScheduledCooking('${o.id}'); closeDetailModal();">
+              Mulai Masak
+            </button>
+          `;
+        }
+      } else {
+        footer.innerHTML = `
+          <button type="button" class="btn-act btn-act-secondary" style="width:100%; padding:10px;" onclick="closeDetailModal()">
+            Tutup Rincian
+          </button>
+        `;
+      }
+
+      document.getElementById('detail-modal').classList.add('is-open');
+    }
+
+    function closeDetailModal(e) {
+      if (e && e.target !== e.currentTarget) return;
+      document.getElementById('detail-modal').classList.remove('is-open');
+      activeDetailOrderId = null;
+    }
+
+    // QC Simulation Scenarios
+    function setScenario(sc, btn) {
+      document.querySelectorAll('.proto-btn').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+
+      if (sc === 'all') {
+        orders = JSON.parse(JSON.stringify(INITIAL_ORDERS));
+        switchMainTab('in_process');
+        setStageSubfilter('all', document.querySelector('.stage-subfilter-btn[data-stage="all"]'));
+        setChannelFilter('all', document.querySelector('.service-chip[data-channel="all"]'));
+        showToast('Menampilkan seluruh antrean pesanan aktif.');
+      } else if (sc === 'dinein_flow') {
+        switchMainTab('in_process');
+        setStageSubfilter('ready', document.querySelector('.stage-subfilter-btn[data-stage="ready"]'));
+        setChannelFilter('dine_in', document.querySelector('.service-chip[data-channel="dine_in"]'));
+        showToast('Skenario Dine-In: Siap saji ke meja dan penutupan meja.');
+      } else if (sc === 'takeaway_flow') {
+        switchMainTab('in_process');
+        setStageSubfilter('all', document.querySelector('.stage-subfilter-btn[data-stage="all"]'));
+        setChannelFilter('takeaway', document.querySelector('.service-chip[data-channel="takeaway"]'));
+        showToast('Skenario Takeaway: Pengambilan counter dan serahkan pesanan.');
+      } else if (sc === 'delivery_flow') {
+        switchMainTab('in_process');
+        setStageSubfilter('ready', document.querySelector('.stage-subfilter-btn[data-stage="ready"]'));
+        setChannelFilter('delivery', document.querySelector('.service-chip[data-channel="delivery"]'));
+        showToast('Skenario Delivery: Penugasan kurir dan status pengantaran.');
+      } else if (sc === 'reservation_flow') {
+        switchMainTab('scheduled');
+        setChannelFilter('all', document.querySelector('.service-chip[data-channel="all"]'));
+        showToast('Skenario Reservasi: Opsi Check-in Tamu atau Batal (No-Show).');
+      } else if (sc === 'scheduled_orders') {
+        switchMainTab('scheduled');
+        setChannelFilter('all', document.querySelector('.service-chip[data-channel="all"]'));
+        showToast('Skenario Terjadwal: Katering dan Takeaway yang siap dimasak.');
+      } else if (sc === 'addon_order') {
+        switchMainTab('in_process');
+        setStageSubfilter('cooking', document.querySelector('.stage-subfilter-btn[data-stage="cooking"]'));
+        setChannelFilter('dine_in', document.querySelector('.service-chip[data-channel="dine_in"]'));
+        showToast('Skenario Tambahan Menu: Tamu di Meja 2 memesan menu tambahan.');
+      }
+      renderOrders();
+    }
+
+    function simulateNewOrder() {
+      const newId = 'OD-' + (750 + Math.floor(Math.random() * 50));
+      const newOrder = {
+        id: newId,
+        channel: Math.random() > 0.5 ? 'delivery' : 'dine_in',
+        channel_label: Math.random() > 0.5 ? 'Delivery' : 'Meja 5',
+        customer: 'Pelanggan Baru',
+        phone: '+62 899-1234-5678',
+        time_ago: 'Baru saja',
+        status: 'incoming',
+        countdown: 140,
+        items: [
+          { qty: 2, name: 'Paket Ayam Geprek Krispi', notes: 'Sambal matah level 2' },
+          { qty: 2, name: 'Es Teh Manis', notes: null }
+        ],
+        subtotal: 54000,
+        delivery_fee: 10000,
+        discount: 0,
+        total: 64000,
+        payment: 'QRIS Lunas'
+      };
+
+      orders.unshift(newOrder);
+      switchMainTab('in_process');
+      showToast('Ada pesanan baru masuk: #' + newId);
+      renderOrders();
+    }
+
+    function toggleShopClosedSim() {
+      toggleShopOpen();
+    }
+
+    function resetPrototypeData() {
+      orders = JSON.parse(JSON.stringify(INITIAL_ORDERS));
+      isShopOpen = true;
+      isOnlineOpen = true;
+      currentStageSubfilter = 'all';
+      document.querySelectorAll('.stage-subfilter-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.stage === 'all');
+      });
+      document.getElementById('btn-toggle-shop').classList.add('is-active');
+      document.getElementById('lbl-shop-status').textContent = 'Resto';
+      document.getElementById('closed-shop-banner').style.display = 'none';
+      document.getElementById('orders-feed').style.display = 'flex';
+      document.getElementById('filter-section').style.display = 'flex';
+      switchMainTab('in_process');
+      setChannelFilter('all', document.querySelector('.service-chip[data-channel="all"]'));
+      clearSearch();
+      showToast('Data prototype berhasil di-reset ke kondisi awal.');
+    }
+
+    // Initial Launch
+    renderOrders();
+  </script>
+</body>
+</html>

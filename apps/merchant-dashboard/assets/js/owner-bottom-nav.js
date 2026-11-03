@@ -75,7 +75,9 @@
     if (route.indexOf('catalog/') === 0 ||
         route.indexOf('branches/') === 0 ||
         route.indexOf('marketing/') === 0 ||
-        route.indexOf('customers/') === 0) return 'bisnis';
+        route.indexOf('customers/') === 0 ||
+        route.indexOf('business/') === 0 ||
+        route.indexOf('materials/') === 0) return 'bisnis';
 
     if (route.indexOf('finance/') === 0) return 'keuangan';
     if (route.indexOf('orders/') === 0) return 'pesanan';
@@ -138,6 +140,35 @@
         }
       });
     });
+  }
+
+  // Global click delegation using capture phase to guarantee clicks on bottom nav
+  // always dispatch navigation regardless of script load order or DOM re-renders.
+  document.addEventListener('click', function (e) {
+    var btn = e.target && e.target.closest('#x-owner-bottom-nav .x-owner-nav-item[data-route]');
+    if (!btn) return;
+    var route = btn.getAttribute('data-route') || (btn.dataset && btn.dataset.route);
+    if (!route) return;
+    e.preventDefault();
+    if (typeof window.navigateTo === 'function') {
+      window.navigateTo(route);
+    } else {
+      window.location.hash = '#' + route;
+    }
+  }, true);
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () {
+      initOwnerBottomNav();
+      if (typeof window !== 'undefined' && window.location) {
+        syncOwnerBottomNavActive(window.location.hash);
+      }
+    });
+  } else {
+    initOwnerBottomNav();
+    if (typeof window !== 'undefined' && window.location) {
+      syncOwnerBottomNavActive(window.location.hash);
+    }
   }
 
   window.initOwnerBottomNav = initOwnerBottomNav;

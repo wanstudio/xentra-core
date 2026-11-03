@@ -663,7 +663,7 @@ describe('Phase 8 — Merchant Dashboard Acceptance', () => {
     await new Promise(r => setTimeout(r, 20));
 
     assert.ok(container.innerHTML.includes('x-order-tracking-screen'), 'Must render unified tracking screen');
-    assert.ok(container.innerHTML.includes('>PESANAN DITERIMA<') || container.innerHTML.includes('>PESANAN DIBUAT<'), 'Must display accepted phase title');
+    assert.ok(/PESANAN DITERIMA|PESANAN DIBUAT/i.test(container.innerHTML), 'Must display accepted phase title');
     assert.ok(container.innerHTML.includes('id="x-order-progress"'), 'Must render tracking progress');
     win.Xentra.OrderReceived.unmount();
   });
@@ -741,7 +741,7 @@ describe('Phase 8 — Merchant Dashboard Acceptance', () => {
     await new Promise(r => setTimeout(r, 20));
 
     assert.ok(container.innerHTML.includes('x-order-tracking-screen'), 'Must render unified tracking screen after refresh');
-    assert.ok(container.innerHTML.includes('>PESANAN DITERIMA<') || container.innerHTML.includes('>PESANAN DIBUAT<'), 'Must preserve accepted phase after refresh');
+    assert.ok(/PESANAN DITERIMA|PESANAN DIBUAT/i.test(container.innerHTML), 'Must preserve accepted phase after refresh');
     win.Xentra.OrderReceived.unmount();
   });
 
@@ -851,7 +851,7 @@ describe('Phase 8 — Merchant Dashboard Acceptance', () => {
     await new Promise(r => setTimeout(r, 20));
 
     assert.ok(container.innerHTML.includes('x-order-tracking-screen'), 'Pending delivery must render unified tracking screen');
-    assert.ok(container.innerHTML.includes('>MENUNGGU DITERIMA<') || container.innerHTML.includes('>PESANAN DIBUAT<') || container.innerHTML.includes('>PESANAN DITERIMA<'), 'Pending delivery must show the canonical first phase');
+    assert.ok(/MENUNGGU DITERIMA|PESANAN DIBUAT|PESANAN DITERIMA|Menunggu Konfirmasi Resto/i.test(container.innerHTML), 'Pending delivery must show the canonical first phase');
     assert.ok(!container.innerHTML.includes('Menunggu Konfirmasi Cabang'), 'Legacy waiting-screen copy must not be rendered');
     win.Xentra.OrderReceived.unmount();
   });

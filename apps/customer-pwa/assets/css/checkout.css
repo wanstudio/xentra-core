@@ -3276,16 +3276,16 @@ body:has(#x-checkout-note-overlay.open){
 }
 
 .x-toast-inner{
-	background:#fff0f2;
-	border:1px solid #ffd4d8;
-	color:#1f1f1f;
+	background:#fff5f7;
+	border:1.5px solid #fda4af;
+	color:#1f2937;
 	font-family:'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
 	font-size:14px;
 	font-weight:600;
 	line-height:20px;
-	padding:18px 28px;
+	padding:16px 26px;
 	border-radius:18px;
-	box-shadow:0 12px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.04);
+	box-shadow:0 12px 32px rgba(244, 114, 182, 0.18), 0 4px 12px rgba(0, 0, 0, 0.05);
 	text-align:center;
 }
 
@@ -3902,4 +3902,27 @@ body:has(#x-checkout-note-overlay.open){
 .x-tender-confirm-btn:not(:disabled):active {
   transform: scale(0.98);
 }
+
+/* ── Card Validation Highlight Pulse (Auto-Scroll & Soft Highlight) ── */
+@keyframes xCardHighlightPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(244, 114, 182, 0.45), 0 2px 12px rgba(0, 0, 0, 0.04);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 3px #fda4af, 0 0 0 7px rgba(244, 114, 182, 0.25), 0 8px 24px rgba(244, 114, 182, 0.18);
+    transform: scale(1.012);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(244, 114, 182, 0), 0 2px 12px rgba(0, 0, 0, 0.04);
+    transform: scale(1);
+  }
+}
+
+.x-card-highlight {
+  animation: xCardHighlightPulse 1s ease-in-out 2 !important;
+  box-shadow: 0 0 0 2.5px #fda4af, 0 4px 16px rgba(244, 114, 182, 0.2) !important;
+  transition: box-shadow 0.35s ease, transform 0.35s ease;
+}
+
 

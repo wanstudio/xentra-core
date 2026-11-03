@@ -23,6 +23,9 @@ class ManualQrisSettlementService {
     paymentRepository.beginTransaction();
     try {
       paymentRepository.updatePaymentWebhook({ orderId: order_id, paymentStatus: 'settlement', webhookResponse: JSON.stringify({ mode: 'qris_static_manual', cashier_id, reference_note: String(reference_note || '').trim(), verified_at: now }), settledAt: now, updatedAt: now, provider: 'qris_static', paymentMethod: 'qris_static' });
+      try {
+        paymentRepository.db.execute("UPDATE orders SET payment_status = 'settlement', updated_at = ? WHERE id = ?", [now, order_id]);
+      } catch (_) {}
       // Static QRIS verification settles the payment only. It must not turn
       // AWAITING_BRANCH_ACCEPTANCE into ACCEPTED.
       if (['confirmed', 'preparing', 'ready', 'out_for_delivery', 'completed'].includes(order.status)) {

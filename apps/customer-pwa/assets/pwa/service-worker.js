@@ -28,6 +28,16 @@
  * Release 2026-10-22A: Live driver map tracking in order-received (CSP worker-src blob fix, OSM tile fallback, and multi-angle Gojek-style scooter SVG).
  * Release 2026-10-22B: Driver proximity & arrival alerts (chime + vibrate + popup modal + pesanan-sampai.mp3 support).
  * Release 2026-10-22C: GoFood/GrabFood-style Customer Order Journey & Stepper UI overhaul (waiting branch confirmation state, pulsing active step, elevated live map hero).
+ * Release 2026-10-23A: GoFood/GrabFood-grade clean menu sharing (anti-redundant text, dynamic Open Graph og:image injection, auto-open shared menu detail).
+ * Release 2026-10-23B: Custom In-App Share Sheet with Rich Menu Preview (image + name + price) before calling native Android share sheet.
+ * Release 2026-11-01A: Move table floor plan to reservation flow with [ ] Pilih meja toggle; simplify dine-in to cashier QR scan.
+ * Release 2026-11-01B: Reservation bottom sheet saves draft with "Konfirmasi" button; dedicated "Ringkasan reservasi" card and "Reservasi sekarang" CTA bar on checkout.
+ * Release 2026-11-01C: Non-destructive Table QR scanner (overlay on top of bottom sheet, auto-returns on close, auto-joins on scan).
+ * Release 2026-11-01D: Elegant Modern Soft Slate closed branch warning banner (replaces aggressive solid pink/rose alert).
+ * Release 2026-11-01E: Soft pink-to-white warning toast (#fff5f7) with pink stroke (#fda4af) replacing jarring solid pink block.
+ * Release 2026-11-01F: Soft pink-to-white warning banner and toast styling with gentle pink stroke.
+ * Release 2026-11-01G: Active CTA with auto-scroll and gentle heartbeat card highlight on missing checkout requirements.
+ * Release 2026-11-01H: GoFood/GrabFood online payment merchant gate (orders enter merchant queue & chime only after payment is confirmed/settled).
  * When this file changes (new commit), the hash changes → new cache → old purged.
  * No hardcoded version strings. No external endpoints. No manual edits.
  *

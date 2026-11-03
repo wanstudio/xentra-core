@@ -132,6 +132,13 @@
    * so the dashboard never keeps rendering empty UI with an expired session.
    */
   function adminFetch(url, options) {
+    options = Object.assign({}, options || {});
+    options.cache = 'no-store';
+    var headers = Object.assign({}, options.headers || {});
+    headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+    headers['Pragma'] = 'no-cache';
+    options.headers = headers;
+
     return fetch(url, options).then(function (res) {
       if (res.status === 401) {
         clearStoredSession();
@@ -295,15 +302,12 @@
       }
     }
 
-    // Clean leading emoji if already present so it doesn't duplicate icon
-    var cleanText = text.replace(/^[✅✓❌⚡⚠️\s]+/, '');
-    var icon = resolvedType === 'error' ? '❌'
-      : (resolvedType === 'success' ? '✅'
-      : (resolvedType === 'warning' ? '⚠️' : '⚡'));
+    // Clean leading emoji if already present so toast text is purely clean
+    var cleanText = text.replace(/^[✅✓❌✕xX⚡⚠️\s]+/, '');
 
     var toast = document.createElement('div');
     toast.className = 'x-toast' + (resolvedType ? ' x-toast-' + resolvedType : '');
-    toast.innerHTML = '<span>' + icon + '</span> <span>' + esc(cleanText || text) + '</span>';
+    toast.innerHTML = '<span class="x-toast-msg">' + esc(cleanText || text) + '</span>';
     container.appendChild(toast);
 
     setTimeout(function () {

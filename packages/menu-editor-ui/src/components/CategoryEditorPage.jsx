@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import DeleteConfirmationModal from './DeleteConfirmationModal';
 
 function getAuthToken() {
   try {
@@ -13,15 +14,52 @@ function getAuthToken() {
 
 export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
   const isEdit = !!categoryId;
-  const [name, setName] = useState('');
-  const [initialName, setInitialName] = useState('');
-  const [description, setDescription] = useState('');
-  const [isActive, setIsActive] = useState(true);
-  const [initialIsActive, setInitialIsActive] = useState(true);
-  const [loading, setLoading] = useState(isEdit);
+  const cachedCat = isEdit && typeof window !== 'undefined' && window.state && Array.isArray(window.state.categories)
+    ? window.state.categories.find((c) => c && String(c.id) === String(categoryId))
+    : null;
+  const cachedActive = cachedCat
+    ? (cachedCat.is_active !== 0 && cachedCat.is_active !== false && cachedCat.is_active !== '0')
+    : true;
+  const [name, setName] = useState(cachedCat ? (cachedCat.name || '') : '');
+  const [initialName, setInitialName] = useState(cachedCat ? (cachedCat.name || '') : '');
+  const [description, setDescription] = useState(cachedCat ? (cachedCat.description || '') : '');
+  const [initialDescription, setInitialDescription] = useState(cachedCat ? (cachedCat.description || '') : '');
+  const [isActive, setIsActive] = useState(cachedActive);
+  const [initialIsActive, setInitialIsActive] = useState(cachedActive);
+  const [loading, setLoading] = useState(isEdit && !cachedCat);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  useEffect(() => {
+    const closeDeleteSheet = () => setShowDeleteModal(false);
+    window.addEventListener('popstate', closeDeleteSheet);
+    window.addEventListener('hashchange', closeDeleteSheet);
+    return () => {
+      window.removeEventListener('popstate', closeDeleteSheet);
+      window.removeEventListener('hashchange', closeDeleteSheet);
+    };
+  }, []);
+
+  // Lock body scroll and close on Escape key when Delete Modal is active
+  useEffect(() => {
+    if (!showDeleteModal) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && !deleting) {
+        e.preventDefault();
+        setShowDeleteModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showDeleteModal, deleting]);
 
   useEffect(() => {
     let isMounted = true;
@@ -36,6 +74,7 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
           setName(foundName);
           setInitialName(foundName);
           setDescription(found.description || '');
+          setInitialDescription(found.description || '');
           setIsActive(foundActive);
           setInitialIsActive(foundActive);
         }
@@ -46,7 +85,32 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
         const headers = { 'Accept': 'application/json' };
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
-        const catRes = await fetch('/api/v1/admin/categories', { headers }).catch(() => null);
+        // Attempt direct detail fetch if editing
+        if (isEdit) {
+          const detailRes = await fetch(`/api/v1/admin/categories/${encodeURIComponent(categoryId)}?_t=${Date.now()}`, {
+            headers,
+            cache: 'no-store'
+          }).catch(() => null);
+
+          if (detailRes && detailRes.ok) {
+            const detailData = await detailRes.json().catch(() => null);
+            if (detailData && detailData.success && detailData.category && isMounted) {
+              const cat = detailData.category;
+              const catName = cat.name || '';
+              const catActive = cat.is_active !== 0 && cat.is_active !== false && cat.is_active !== '0';
+              setName(catName);
+              setInitialName(catName);
+              setDescription(cat.description || '');
+              setInitialDescription(cat.description || '');
+              setIsActive(catActive);
+              setInitialIsActive(catActive);
+              setLoading(false);
+              return;
+            }
+          }
+        }
+
+        const catRes = await fetch(`/api/v1/admin/categories?_t=${Date.now()}`, { headers, cache: 'no-store' }).catch(() => null);
 
         if (catRes && catRes.ok) {
           const catData = await catRes.json().catch(() => null);
@@ -60,6 +124,7 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
                 setName(foundName);
                 setInitialName(foundName);
                 setDescription(found.description || '');
+                setInitialDescription(found.description || '');
                 setIsActive(foundActive);
                 setInitialIsActive(foundActive);
               }
@@ -89,19 +154,34 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
       : 'catalog/categories';
     if (typeof window.navigateTo === 'function') {
       window.navigateTo(fallbackRoute);
-      return;
     }
-    window.location.hash = `#${fallbackRoute}`;
   };
 
   const trimmedName = name.trim();
-  const canSubmit = isEdit
-    ? Boolean(trimmedName) && (trimmedName !== initialName.trim() || isActive !== initialIsActive)
-    : Boolean(trimmedName);
+  const trimmedDesc = (description || '').trim();
+  const initialTrimmedDesc = (initialDescription || '').trim();
+  const hasChanges = isEdit
+    ? (trimmedName !== initialName.trim() || isActive !== initialIsActive || trimmedDesc !== initialTrimmedDesc)
+    : true;
+  const canSubmit = Boolean(trimmedName) && hasChanges;
 
   const handleSave = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
-    if (!trimmedName || saving) return;
+    if (saving) return;
+
+    if (!trimmedName) {
+      if (typeof window !== 'undefined' && typeof window.showToast === 'function') {
+        window.showToast('⚠️ Nama kategori wajib diisi', 'error');
+      }
+      return;
+    }
+
+    if (isEdit && !hasChanges) {
+      if (typeof window !== 'undefined' && typeof window.showToast === 'function') {
+        window.showToast('ℹ️ Tidak ada perubahan untuk disimpan', 'info');
+      }
+      return;
+    }
 
     setSaving(true);
     try {
@@ -148,8 +228,21 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
         }
       }
 
+      const savedCat = data.category || {
+        id: categoryId,
+        name: trimmedName,
+        description: description.trim(),
+        is_active: isActive ? 1 : 0
+      };
+
+      // Modern Mobile: Dispatch reactive sync events
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('categories-updated', { detail: savedCat }));
+        window.dispatchEvent(new CustomEvent('category-updated', { detail: savedCat }));
+      }
+
       if (typeof onSaved === 'function') {
-        onSaved(data.category);
+        onSaved(savedCat);
       } else {
         handleBack();
       }
@@ -203,10 +296,14 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
         });
       }
 
+      // Modern Mobile: Dispatch delete sync events
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('categories-updated', { detail: { id: categoryId, _deleted: true } }));
+        window.dispatchEvent(new CustomEvent('category-updated', { detail: { id: categoryId, _deleted: true } }));
+      }
+
       if (typeof window.navigateTo === 'function') {
         window.navigateTo('catalog/categories');
-      } else {
-        window.location.hash = '#catalog/categories';
       }
     } catch (err) {
       console.error('[CategoryEditorPage] Delete error:', err);
@@ -225,7 +322,7 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
       id="modern-category-editor-page-root"
       style={{
         boxSizing: 'border-box',
-        paddingBottom: '150px'
+        paddingBottom: '96px'
       }}
       className="w-full flex flex-col gap-4 max-w-lg md:mx-auto font-sans select-none"
     >
@@ -355,200 +452,15 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
         </form>
       )}
 
-      {/* 2b. Custom Delete Confirmation Modal (Matching Figma Mockup: 353x170px, rounded 16px, rendered outside body via React Portal) */}
-      {showDeleteModal && typeof document !== 'undefined' && createPortal(
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="delete-cat-modal-title"
-          onClick={() => {
-            if (!deleting) setShowDeleteModal(false);
-          }}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(15, 23, 42, 0.35)',
-            zIndex: 300,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px',
-            boxSizing: 'border-box',
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: '100%',
-              maxWidth: '353px',
-              minHeight: '170px',
-              paddingLeft: '17px',
-              paddingRight: '17px',
-              paddingTop: '18px',
-              paddingBottom: '18px',
-              backgroundColor: '#FFFFFF',
-              boxShadow: '0px 2px 10px rgba(0, 0, 0, 0.20)',
-              borderRadius: '16px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'flex-start',
-              alignItems: 'flex-start',
-              gap: '17px',
-              boxSizing: 'border-box',
-            }}
-          >
-            {/* Title */}
-            <div
-              id="delete-cat-modal-title"
-              style={{
-                color: '#0F172A',
-                fontSize: '18px',
-                fontWeight: 700,
-                lineHeight: '18px',
-              }}
-            >
-              Hapus kategori
-            </div>
-
-            {/* Body Row: 40x40 Trash Icon Box + Message */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'flex-start',
-                gap: '12px',
-                width: '100%',
-              }}
-            >
-              <div
-                style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '10px',
-                  boxShadow: 'inset 0 0 0 1px rgba(250, 62, 62, 0.30)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <svg
-                  width="17"
-                  height="17"
-                  viewBox="0 0 17 17"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M2.125 4.25H3.54167H14.875"
-                    stroke="#FA3E3E"
-                    strokeWidth="1.25"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M5.66666 4.25008V2.83341C5.66666 2.45769 5.81591 2.09736 6.08159 1.83168C6.34727 1.566 6.7076 1.41675 7.08332 1.41675H9.91666C10.2924 1.41675 10.6527 1.566 10.9184 1.83168C11.1841 2.09736 11.3333 2.45769 11.3333 2.83341V4.25008M13.4583 4.25008V14.1667C13.4583 14.5425 13.3091 14.9028 13.0434 15.1685C12.7777 15.4342 12.4174 15.5834 12.0417 15.5834H4.95832C4.5826 15.5834 4.22227 15.4342 3.95659 15.1685C3.69091 14.9028 3.54166 14.5425 3.54166 14.1667V4.25008H13.4583Z"
-                    stroke="#FA3E3E"
-                    strokeWidth="1.25"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M7.08334 7.79175V12.0417"
-                    stroke="#FA3E3E"
-                    strokeWidth="1.25"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M9.91666 7.79175V12.0417"
-                    stroke="#FA3E3E"
-                    strokeWidth="1.25"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
-
-              <div
-                style={{
-                  color: '#737373',
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  lineHeight: '1.35',
-                  textAlign: 'left',
-                  wordBreak: 'break-word',
-                }}
-              >
-                <div>Hapus kategori “{name || initialName}”?</div>
-                <div>Tindakan ini tidak dapat dibatalkan.</div>
-              </div>
-            </div>
-
-            {/* Action Buttons Row: Batal & Hapus */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'flex-start',
-                gap: '10px',
-                width: '100%',
-              }}
-            >
-              <button
-                type="button"
-                disabled={deleting}
-                onClick={() => setShowDeleteModal(false)}
-                style={{
-                  flex: '1 1 0',
-                  height: '40px',
-                  borderRadius: '10px',
-                  backgroundColor: '#F3F6FD',
-                  boxShadow: 'inset 0 0 0 1px #D9D9D9',
-                  border: 'none',
-                  outline: 'none',
-                  color: '#979797',
-                  fontSize: '14px',
-                  fontWeight: 700,
-                  cursor: deleting ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-                className="active:scale-[0.98] transition-transform"
-              >
-                Batal
-              </button>
-
-              <button
-                type="button"
-                disabled={deleting}
-                onClick={handleConfirmDelete}
-                style={{
-                  flex: '1 1 0',
-                  height: '40px',
-                  borderRadius: '10px',
-                  backgroundColor: 'rgba(250, 62, 62, 0.10)',
-                  boxShadow: 'inset 0 0 0 1px #FA3E3E',
-                  border: 'none',
-                  outline: 'none',
-                  color: '#FA3E3E',
-                  fontSize: '14px',
-                  fontWeight: 700,
-                  cursor: deleting ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-                className="active:scale-[0.98] transition-transform"
-              >
-                {deleting ? 'Menghapus...' : 'Hapus'}
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+      {/* Standard Confirmation Modal for Delete Category */}
+      <DeleteConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleConfirmDelete}
+        isDeleting={deleting}
+        title="Hapus Kategori?"
+        description={`Kategori "${name || initialName}" akan dihapus permanen. Aksi ini tidak dapat dibatalkan.`}
+      />
 
       {/* 3. Fixed Bottom Action Bar rendered outside body via React Portal */}
       {typeof document !== 'undefined' && createPortal(
@@ -577,7 +489,7 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
           <div className="w-full max-w-lg mx-auto">
             <button
               type="button"
-              disabled={saving || !canSubmit}
+              disabled={saving}
               onClick={handleSave}
               style={{
                 width: '100%',
@@ -589,13 +501,13 @@ export default function CategoryEditorPage({ categoryId, onBack, onSaved }) {
                 color: canSubmit ? '#FFFFFF' : '#979797',
                 fontWeight: 700,
                 fontSize: '14px',
-                cursor: canSubmit && !saving ? 'pointer' : 'not-allowed',
+                cursor: saving ? 'not-allowed' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 transition: 'all 0.15s ease'
               }}
-              className={canSubmit ? 'active:scale-98 hover:bg-emerald-600' : ''}
+              className={canSubmit && !saving ? 'active:scale-98 hover:bg-emerald-600' : 'active:scale-[0.99]'}
             >
               {saving ? 'Menyimpan...' : (isEdit ? 'Simpan' : 'Buat kategori')}
             </button>

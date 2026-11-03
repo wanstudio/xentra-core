@@ -1,0 +1,1776 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Prototype: Menu Assembly & Atur Varian Modal (2 POV) — Xentra / MyBangjo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #00A637;
+      --primary-hover: #008f2f;
+      --primary-bg: #EAF7EE;
+      --dark: #0F172A;
+      --muted: #64748B;
+      --light-border: #E2E8F0;
+      --bg-page: #F8FAFC;
+      --card-bg: #FFFFFF;
+      --danger: #EF4444;
+      --danger-bg: #FEE2E2;
+      --blue: #2563EB;
+      --blue-bg: #EFF6FF;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: #0B0F19;
+      color: var(--dark);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 10px 40px;
+    }
+
+    /* Outer Wrapper / Device Shell */
+    .prototype-container {
+      width: 100%;
+      max-width: 440px;
+      background: var(--bg-page);
+      border-radius: 36px;
+      overflow: hidden;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 0 10px #1E293B;
+      position: relative;
+      min-height: 870px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top Bar Phone Status Simulation */
+    .phone-status-bar {
+      height: 38px;
+      background: #FFFFFF;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 24px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--dark);
+      border-bottom: 1px solid #F1F5F9;
+    }
+
+    /* App Header */
+    .app-header {
+      background: #FFFFFF;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid var(--light-border);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .btn-back-header {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: none;
+      background: #F1F5F9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--dark);
+    }
+
+    .header-info h1 {
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--dark);
+      line-height: 1.2;
+    }
+
+    .header-info p {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* Page Content */
+    .page-content {
+      padding: 16px;
+      flex: 1;
+      overflow-y: auto;
+      padding-bottom: 90px;
+    }
+
+    /* Banner Studi Kasus */
+    .case-banner {
+      background: linear-gradient(135deg, #1E293B, #0F172A);
+      color: #FFFFFF;
+      border-radius: 18px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.15);
+    }
+
+    .case-badge {
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.15);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 20px;
+      margin-bottom: 8px;
+      color: #38BDF8;
+    }
+
+    .case-title {
+      font-size: 16px;
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+
+    .case-desc {
+      font-size: 12px;
+      color: #94A3B8;
+      line-height: 1.4;
+    }
+
+    /* Section Card */
+    .assembly-section {
+      background: #FFFFFF;
+      border-radius: 20px;
+      border: 1px solid var(--light-border);
+      padding: 18px;
+      margin-bottom: 16px;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .section-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--dark);
+    }
+
+    .section-badge {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--primary);
+      background: var(--primary-bg);
+      padding: 3px 8px;
+      border-radius: 20px;
+    }
+
+    .section-subtext {
+      font-size: 11.5px;
+      color: var(--muted);
+      margin-bottom: 14px;
+      line-height: 1.4;
+    }
+
+    /* Item Component Row */
+    .item-card {
+      background: #FFFFFF;
+      border: 1.5px solid #E2E8F0;
+      border-radius: 16px;
+      padding: 14px;
+      margin-bottom: 12px;
+      transition: all 0.2s ease;
+    }
+
+    .item-card.has-variant {
+      border-color: #CBD5E1;
+      background: #FCFDFE;
+    }
+
+    .item-card.highlight {
+      border-color: #38BDF8;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+    }
+
+    .item-top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .item-title-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .item-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: #F1F5F9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .item-name {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--dark);
+    }
+
+    .item-sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .item-stepper {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #F8FAFC;
+      border: 1px solid #CBD5E1;
+      border-radius: 8px;
+      padding: 3px 8px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    /* Variant Box Inside Card */
+    .variant-preview-box {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px dashed #E2E8F0;
+    }
+
+    .variant-badge-active {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+
+    .badge-customer {
+      background: #EFF6FF;
+      border: 1px solid #BFDBFE;
+      color: #1E40AF;
+    }
+
+    .badge-merchant {
+      background: #F1F5F9;
+      border: 1px solid #CBD5E1;
+      color: #334155;
+    }
+
+    .variant-chips-list {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .variant-chip {
+      background: #FFFFFF;
+      border: 1px solid #CBD5E1;
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--dark);
+    }
+
+    .variant-chip.price-tag {
+      color: #059669;
+      background: #ECFDF5;
+      border-color: #A7F3D0;
+    }
+
+    .variant-chip.locked-tag {
+      color: #1E293B;
+      background: #F1F5F9;
+      border-color: #94A3B8;
+      font-weight: 700;
+    }
+
+    /* Action Buttons in Item Card */
+    .item-card-actions {
+      margin-top: 10px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .btn-atur-variant {
+      flex: 1;
+      height: 36px;
+      border-radius: 10px;
+      border: 1px solid #CBD5E1;
+      background: #F8FAFC;
+      color: var(--dark);
+      font-size: 12.5px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn-atur-variant:hover {
+      background: #E2E8F0;
+      border-color: #94A3B8;
+    }
+
+    .btn-atur-variant.primary-action {
+      background: #EAF7EE;
+      border-color: #A7F3D0;
+      color: #047857;
+    }
+
+    .btn-atur-variant.primary-action:hover {
+      background: #D1FAE5;
+    }
+
+    .btn-delete-variant {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      border: 1px solid #FECACA;
+      background: #FFF5F5;
+      color: var(--danger);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    /* Bottom Sticky Bar */
+    .sticky-footer {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #FFFFFF;
+      border-top: 1px solid var(--light-border);
+      padding: 14px 20px;
+      display: flex;
+      gap: 12px;
+      box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.05);
+      z-index: 20;
+    }
+
+    .btn-simpan-menu {
+      flex: 1;
+      height: 48px;
+      background: var(--primary);
+      color: #FFFFFF;
+      border: none;
+      border-radius: 14px;
+      font-size: 14.5px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0, 166, 55, 0.25);
+    }
+
+    /* ============================================================ */
+    /* BOTTOM SHEET MODAL (THE HERO ELEMENT)                         */
+    /* ============================================================ */
+    .modal-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+
+    .modal-backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .bottom-sheet {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #FFFFFF;
+      border-top-left-radius: 28px;
+      border-top-right-radius: 28px;
+      box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.25);
+      transform: translateY(100%);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 101;
+      max-height: 88%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .bottom-sheet.open {
+      transform: translateY(0);
+    }
+
+    .sheet-handle-bar {
+      width: 44px;
+      height: 5px;
+      background: #CBD5E1;
+      border-radius: 10px;
+      margin: 10px auto 4px;
+    }
+
+    .sheet-header {
+      padding: 12px 20px 14px;
+      border-bottom: 1px solid var(--light-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .sheet-header-title {
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--dark);
+    }
+
+    .sheet-header-sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .btn-close-sheet {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #F1F5F9;
+      border: none;
+      color: var(--dark);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .sheet-body {
+      padding: 18px 20px 24px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    /* Segmented Control / Who Decides */
+    .mode-toggle-group {
+      background: #F1F5F9;
+      padding: 4px;
+      border-radius: 14px;
+      display: flex;
+      gap: 4px;
+      margin-bottom: 14px;
+    }
+
+    .mode-toggle-btn {
+      flex: 1;
+      height: 40px;
+      border: none;
+      border-radius: 11px;
+      background: transparent;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .mode-toggle-btn.active {
+      background: #FFFFFF;
+      color: var(--dark);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .mode-help-text {
+      font-size: 11.5px;
+      line-height: 1.45;
+      margin-bottom: 18px;
+      padding: 11px 14px;
+      border-radius: 12px;
+      transition: all 0.2s ease;
+    }
+
+    .mode-help-merchant {
+      background: #F1F5F9;
+      border: 1px solid #CBD5E1;
+      color: #334155;
+    }
+
+    .mode-help-customer {
+      background: #EFF6FF;
+      border: 1px solid #BFDBFE;
+      color: #1E40AF;
+    }
+
+    /* Template Presets Bar */
+    .template-presets-container {
+      margin-bottom: 18px;
+    }
+
+    .template-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .template-chips-row {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .preset-chip-btn {
+      white-space: nowrap;
+      border: 1px solid #CBD5E1;
+      background: #FFFFFF;
+      border-radius: 20px;
+      padding: 6px 12px;
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--dark);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .preset-chip-btn:hover {
+      border-color: var(--primary);
+      background: var(--primary-bg);
+      color: var(--primary);
+    }
+
+    .preset-chip-btn.selected {
+      background: #0F172A;
+      color: #FFFFFF;
+      border-color: #0F172A;
+    }
+
+    /* ============================================================ */
+    /* UI KHUSUS POV 1: KAMU MENGATUR (SINGLE FIXED VALUE LOCK)     */
+    /* ============================================================ */
+    .merchant-lock-container {
+      background: #FFFFFF;
+      border: 1.5px solid #CBD5E1;
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .merchant-lock-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--dark);
+      margin-bottom: 4px;
+    }
+
+    .merchant-lock-sub {
+      font-size: 11.5px;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    /* 5 Level Squares for Pedas in Merchant Mode */
+    .pedas-boxes-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .pedas-box-btn {
+      flex: 1;
+      height: 48px;
+      border-radius: 12px;
+      border: 1.5px solid #CBD5E1;
+      background: #FFFFFF;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .pedas-box-btn .lvl-num {
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--dark);
+    }
+
+    .pedas-box-btn .lvl-txt {
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .pedas-box-btn.active {
+      background: #0F172A;
+      border-color: #0F172A;
+      box-shadow: 0 4px 10px rgba(15, 23, 42, 0.2);
+    }
+
+    .pedas-box-btn.active .lvl-num,
+    .pedas-box-btn.active .lvl-txt {
+      color: #FFFFFF;
+    }
+
+    /* Radio List for Suhu / Sambal in Merchant Mode */
+    .merchant-radio-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .merchant-radio-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      border: 1.5px solid #CBD5E1;
+      border-radius: 12px;
+      background: #FFFFFF;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .merchant-radio-card.active {
+      border-color: #0F172A;
+      background: #F8FAFC;
+    }
+
+    .merchant-radio-card .label-text {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--dark);
+    }
+
+    .merchant-radio-card .radio-indicator {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 2px solid #CBD5E1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .merchant-radio-card.active .radio-indicator {
+      border-color: #0F172A;
+      background: #0F172A;
+    }
+
+    .merchant-radio-card.active .radio-indicator::after {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #FFFFFF;
+    }
+
+    .lock-summary-box {
+      background: #F1F5F9;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 11.5px;
+      color: #334155;
+      line-height: 1.4;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* ============================================================ */
+    /* UI KHUSUS POV 2: PELANGGAN MEMILIH (MULTI-CHOICE & PRICING) */
+    /* ============================================================ */
+    .customer-options-container {
+      background: #F8FAFC;
+      border: 1.5px solid var(--light-border);
+      border-radius: 16px;
+      padding: 14px;
+      margin-bottom: 16px;
+    }
+
+    .option-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .option-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .option-name-input {
+      flex: 1;
+      height: 40px;
+      border-radius: 10px;
+      border: 1px solid #CBD5E1;
+      background: #FFFFFF;
+      padding: 0 12px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--dark);
+    }
+
+    .option-price-input {
+      width: 110px;
+      height: 40px;
+      border-radius: 10px;
+      border: 1px solid #CBD5E1;
+      background: #FFFFFF;
+      padding: 0 10px;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #059669;
+      text-align: right;
+    }
+
+    .btn-remove-choice {
+      width: 36px;
+      height: 40px;
+      border-radius: 10px;
+      border: 1px solid #FECACA;
+      background: #FFFFFF;
+      color: var(--danger);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-add-choice-inline {
+      width: 100%;
+      height: 38px;
+      border: 1px dashed #94A3B8;
+      border-radius: 10px;
+      background: #FFFFFF;
+      color: var(--muted);
+      font-size: 12.5px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .btn-add-choice-inline:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+      background: var(--primary-bg);
+    }
+
+    /* Recipe / BOM Integration Note */
+    .recipe-impact-alert {
+      background: #FEF3C7;
+      border: 1px solid #FCD34D;
+      border-radius: 12px;
+      padding: 10px 14px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      margin-bottom: 20px;
+    }
+
+    .recipe-impact-alert span {
+      font-size: 11.5px;
+      color: #92400E;
+      line-height: 1.4;
+      font-weight: 600;
+    }
+
+    /* Modal Sticky Action Buttons */
+    .sheet-footer {
+      padding: 14px 20px;
+      border-top: 1px solid var(--light-border);
+      background: #FFFFFF;
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn-sheet-cancel {
+      flex: 1;
+      height: 46px;
+      border-radius: 12px;
+      border: 1px solid #CBD5E1;
+      background: #F8FAFC;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .btn-sheet-save {
+      flex: 1.5;
+      height: 46px;
+      border-radius: 12px;
+      border: none;
+      background: var(--primary);
+      font-size: 14px;
+      font-weight: 800;
+      color: #FFFFFF;
+      cursor: pointer;
+      box-shadow: 0 3px 10px rgba(0, 166, 55, 0.25);
+    }
+
+    /* Simulation Drawer (Customer/Cashier POV) */
+    .customer-preview-overlay {
+      position: absolute;
+      inset: 0;
+      background: #FFFFFF;
+      z-index: 150;
+      display: flex;
+      flex-direction: column;
+      transform: translateX(100%);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .customer-preview-overlay.open {
+      transform: translateX(0);
+    }
+
+    .customer-header {
+      padding: 16px;
+      border-bottom: 1px solid #F1F5F9;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .customer-badge {
+      background: #818CF8;
+      color: #FFFFFF;
+      font-size: 10.5px;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 12px;
+    }
+
+    /* Notification Toast */
+    .toast-msg {
+      position: absolute;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-20px);
+      background: #0F172A;
+      color: #FFFFFF;
+      padding: 10px 18px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      opacity: 0;
+      transition: all 0.25s ease;
+      z-index: 200;
+      pointer-events: none;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    .toast-msg.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- PROTOTYPE DEVICE FRAME -->
+  <div class="prototype-container">
+
+    <!-- Phone Status Bar -->
+    <div class="phone-status-bar">
+      <span>09:41</span>
+      <span>📶 5G 🔋 98%</span>
+    </div>
+
+    <!-- App Header -->
+    <header class="app-header">
+      <button class="btn-back-header" title="Kembali">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <div class="header-info">
+        <h1>Perakitan Menu</h1>
+        <p>Menu Editor • 2 POV Varian</p>
+      </div>
+      <button onclick="toggleCustomerSimulation()" style="margin-left:auto;border:none;background:#EFF6FF;color:#2563EB;font-size:11px;font-weight:700;padding:6px 10px;border-radius:10px;cursor:pointer;">
+        👁️ Tes Kasir
+      </button>
+    </header>
+
+    <!-- Page Body -->
+    <main class="page-content">
+
+      <!-- Case Study Context Banner -->
+      <div class="case-banner">
+        <div class="case-badge">Studi Kasus 2 POV Varian</div>
+        <div class="case-title">Ayam Sambel Geprek Nasi + Es Teh</div>
+        <div class="case-desc">Buktikan perbedaan UI nyata antara <strong>"Kamu Mengatur"</strong> (kunci 1 nilai) vs <strong>"Pelanggan Memilih"</strong> (daftar opsi & harga +Rp).</div>
+      </div>
+
+      <!-- ASSEMBLY SECTION -->
+      <div class="assembly-section">
+        <div class="section-header">
+          <div class="section-title">Komponen Item (6 Item)</div>
+          <div class="section-badge">Assembly Mode</div>
+        </div>
+        <div class="section-subtext">
+          Klik tombol <strong>[⚙️ Atur Varian]</strong> pada Sambel Geprek untuk membandingkan UI mode <em>Kamu Mengatur</em> vs <em>Pelanggan Memilih</em>.
+        </div>
+
+        <!-- 1. AYAM GORENG (Polos / Tanpa Varian) -->
+        <div class="item-card" id="card-ayam">
+          <div class="item-top-row">
+            <div class="item-title-group">
+              <div class="item-icon">🍗</div>
+              <div>
+                <div class="item-name">Ayam Goreng Crispy</div>
+                <div class="item-sub">Dapur Utama / Fryer • Polos (Tanpa varian)</div>
+              </div>
+            </div>
+            <div class="item-stepper">1x</div>
+          </div>
+          <div class="item-card-actions">
+            <button class="btn-atur-variant" onclick="openVariantSheet('Ayam Goreng Crispy', 'ayam')">
+              <span>⚙️ Atur Varian Item</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. SAMBEL GEPREK (THE HERO WITH 2 POV VARIANT) -->
+        <div class="item-card highlight" id="card-sambel">
+          <div class="item-top-row">
+            <div class="item-title-group">
+              <div class="item-icon">🌶️</div>
+              <div>
+                <div class="item-name">Sambel Geprek</div>
+                <div class="item-sub">Stasiun Cobek • Mengatur kepedasan cabai</div>
+              </div>
+            </div>
+            <div class="item-stepper">1x</div>
+          </div>
+
+          <!-- Dynamic Variant View for Sambel -->
+          <div id="sambel-variant-view" style="display:none;">
+            <div class="variant-preview-box">
+              <div id="sambel-badge-mode" class="variant-badge-active badge-customer">
+                <span>✓ Level Pedas (Pelanggan Memilih)</span>
+              </div>
+              <div class="variant-chips-list" id="sambel-chips-container">
+                <!-- dynamic chips -->
+              </div>
+            </div>
+          </div>
+
+          <div class="item-card-actions" id="sambel-actions-empty">
+            <button class="btn-atur-variant primary-action" onclick="openVariantSheet('Sambel Geprek', 'sambel')">
+              <span>🔥 + Atur Varian Pedas (Coba 2 POV Disini)</span>
+            </button>
+          </div>
+
+          <div class="item-card-actions" id="sambel-actions-configured" style="display:none;">
+            <button class="btn-atur-variant" onclick="openVariantSheet('Sambel Geprek', 'sambel')">
+              <span>✏️ Ubah Varian</span>
+            </button>
+            <button class="btn-delete-variant" onclick="resetVariant('sambel')" title="Hapus varian">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- 3. LALAPAN (Polos) -->
+        <div class="item-card" id="card-lalapan">
+          <div class="item-top-row">
+            <div class="item-title-group">
+              <div class="item-icon">🥒</div>
+              <div>
+                <div class="item-name">Lalapan (Timun & Kemangi)</div>
+                <div class="item-sub">Plating • Polos / Tanpa varian</div>
+              </div>
+            </div>
+            <div class="item-stepper">1x</div>
+          </div>
+          <div class="item-card-actions">
+            <button class="btn-atur-variant" onclick="openVariantSheet('Lalapan', 'lalapan')">
+              <span>⚙️ Atur Varian Item</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 4. TEMPE GORENG (Polos) -->
+        <div class="item-card" id="card-tempe">
+          <div class="item-top-row">
+            <div class="item-title-group">
+              <div class="item-icon">🟫</div>
+              <div>
+                <div class="item-name">Tempe Goreng</div>
+                <div class="item-sub">Stasiun Goreng • Polos / Tanpa varian</div>
+              </div>
+            </div>
+            <div class="item-stepper">1x</div>
+          </div>
+          <div class="item-card-actions">
+            <button class="btn-atur-variant" onclick="openVariantSheet('Tempe Goreng', 'tempe')">
+              <span>⚙️ Atur Varian Item</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 5. NASI PUTIH (Polos) -->
+        <div class="item-card" id="card-nasi">
+          <div class="item-top-row">
+            <div class="item-title-group">
+              <div class="item-icon">🍚</div>
+              <div>
+                <div class="item-name">Nasi Putih Pulen</div>
+                <div class="item-sub">Rice Cooker • 1 Porsi (200 gr)</div>
+              </div>
+            </div>
+            <div class="item-stepper">1x</div>
+          </div>
+          <div class="item-card-actions">
+            <button class="btn-atur-variant" onclick="openVariantSheet('Nasi Putih Pulen', 'nasi')">
+              <span>⚙️ Atur Varian Item</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 6. ES TEH MANIS (HERO DENGAN SUHU / GULA) -->
+        <div class="item-card" id="card-esteh">
+          <div class="item-top-row">
+            <div class="item-title-group">
+              <div class="item-icon">🥤</div>
+              <div>
+                <div class="item-name">Es Teh Manis</div>
+                <div class="item-sub">Bar Minuman • Resep: Teh celup & gula cair</div>
+              </div>
+            </div>
+            <div class="item-stepper">1x</div>
+          </div>
+
+          <!-- Dynamic Variant Container for Es Teh -->
+          <div id="esteh-variant-view" style="display:none;">
+            <div class="variant-preview-box">
+              <div id="esteh-badge-mode" class="variant-badge-active badge-customer">
+                <span>✓ Suhu Minuman (Pelanggan Memilih)</span>
+              </div>
+              <div class="variant-chips-list" id="esteh-chips-container">
+                <!-- dynamic chips -->
+              </div>
+            </div>
+          </div>
+
+          <div class="item-card-actions" id="esteh-actions-empty">
+            <button class="btn-atur-variant" onclick="openVariantSheet('Es Teh Manis', 'esteh')">
+              <span>🧊 + Atur Suhu / Manis</span>
+            </button>
+          </div>
+
+          <div class="item-card-actions" id="esteh-actions-configured" style="display:none;">
+            <button class="btn-atur-variant" onclick="openVariantSheet('Es Teh Manis', 'esteh')">
+              <span>✏️ Ubah Varian</span>
+            </button>
+            <button class="btn-delete-variant" onclick="resetVariant('esteh')" title="Hapus varian">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+
+    <!-- Sticky Bottom Bar -->
+    <div class="sticky-footer">
+      <button class="btn-simpan-menu" onclick="showToast('✅ Menu Assembly Disimpan!')">
+        Simpan Menu Assembly
+      </button>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- ATUR VARIAN BOTTOM SHEET (THE MODAL PROTOTYPE)                -->
+    <!-- ============================================================ -->
+    <div class="modal-backdrop" id="modalBackdrop" onclick="closeVariantSheet()"></div>
+
+    <div class="bottom-sheet" id="variantSheet">
+      <div class="sheet-handle-bar"></div>
+
+      <div class="sheet-header">
+        <div>
+          <div class="sheet-header-title">Atur Varian Item</div>
+          <div class="sheet-header-sub" id="sheetTargetItemName">Sambel Geprek</div>
+        </div>
+        <button class="btn-close-sheet" onclick="closeVariantSheet()">✕</button>
+      </div>
+
+      <div class="sheet-body">
+
+        <!-- 1. The 2 POV Mode Selector (Merchant vs Customer) -->
+        <label class="template-label">Siapa yang Menentukan Pilihan?</label>
+        <div class="mode-toggle-group">
+          <button class="mode-toggle-btn" id="btnModeMerchant" onclick="setSheetMode('MERCHANT')">
+            <span>🔵 Kamu Mengatur</span>
+          </button>
+          <button class="mode-toggle-btn active" id="btnModeCustomer" onclick="setSheetMode('CUSTOMER')">
+            <span>🔴 Pelanggan Memilih</span>
+          </button>
+        </div>
+
+        <div class="mode-help-text mode-help-customer" id="modeHelpText">
+          👉 <strong>Pelanggan Memilih:</strong> Opsi ini akan muncul sebagai pop-up pilihan saat kasir POS menginput pesanan atau tamu memesan via QR Order. Anda dapat menentukan harga ekstra (+Rp) per opsi.
+        </div>
+
+        <!-- 2. One-Click Template Presets -->
+        <div class="template-presets-container">
+          <div class="template-label">
+            <span>Pilihan Template Varian:</span>
+          </div>
+          <div class="template-chips-row">
+            <button class="preset-chip-btn selected" id="chipPresetPedas" onclick="applyPreset('PEDAS')">
+              🔥 Level Pedas (1-5)
+            </button>
+            <button class="preset-chip-btn" id="chipPresetSambal" onclick="applyPreset('SAMBAL_TYPE')">
+              🌶️ Jenis Sambal
+            </button>
+            <button class="preset-chip-btn" id="chipPresetSuhu" onclick="applyPreset('SUHU')">
+              🧊 Suhu Minuman
+            </button>
+          </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- VIEW 1: UI KHUSUS "KAMU MENGATUR" (KUNCI 1 NILAI FIX)        -->
+        <!-- ============================================================ -->
+        <div id="merchantLockView" style="display:none;">
+          <div class="merchant-lock-container">
+            <div class="merchant-lock-title" id="merchantLockHeadline">Kunci Tingkat Kepedasan Dapur</div>
+            <div class="merchant-lock-sub">Klik 1 kotak di bawah untuk mengunci nilai default standar dapur:</div>
+
+            <!-- Pedas 5 Boxes for Merchant Mode -->
+            <div id="merchantPedasBoxes" class="pedas-boxes-row">
+              <button class="pedas-box-btn" onclick="selectMerchantPedasLevel(1)">
+                <span class="lvl-num">1</span>
+                <span class="lvl-txt">Biasa</span>
+              </button>
+              <button class="pedas-box-btn" onclick="selectMerchantPedasLevel(2)">
+                <span class="lvl-num">2</span>
+                <span class="lvl-txt">Sedang</span>
+              </button>
+              <button class="pedas-box-btn active" onclick="selectMerchantPedasLevel(3)">
+                <span class="lvl-num">3</span>
+                <span class="lvl-txt">Pedas</span>
+              </button>
+              <button class="pedas-box-btn" onclick="selectMerchantPedasLevel(4)">
+                <span class="lvl-num">4</span>
+                <span class="lvl-txt">Nampol</span>
+              </button>
+              <button class="pedas-box-btn" onclick="selectMerchantPedasLevel(5)">
+                <span class="lvl-num">5</span>
+                <span class="lvl-txt">Mampus</span>
+              </button>
+            </div>
+
+            <!-- Radio List for Non-Pedas in Merchant Mode (Suhu / Sambal) -->
+            <div id="merchantRadioList" class="merchant-radio-list" style="display:none;">
+              <!-- injected dynamically -->
+            </div>
+
+            <!-- Lock Summary Notice -->
+            <div class="lock-summary-box">
+              <span>🔒</span>
+              <span id="merchantLockSummaryText">Dapur menetapkan <strong>Level 3</strong> secara fix. Pelanggan tidak akan ditanya lagi saat memesan, dan harga tetap sesuai harga dasar menu.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- VIEW 2: UI KHUSUS "PELANGGAN MEMILIH" (LIST + HARGA +RP)      -->
+        <!-- ============================================================ -->
+        <div id="customerChoiceView">
+          <div class="customer-options-container">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding:0 4px;">
+              <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;">Daftar Pilihan Pelanggan</span>
+              <span style="font-size:11px;font-weight:700;color:#059669;text-transform:uppercase;">Tambahan Harga (+Rp)</span>
+            </div>
+
+            <div id="optionsListContainer">
+              <!-- Dynamic Rows with Name + Extra Price Input -->
+            </div>
+
+            <button class="btn-add-choice-inline" onclick="addNewOptionRow()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <span>+ Tambah Pilihan Opsi Pelanggan</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Recipe / Inventory Connection Note -->
+        <div class="recipe-impact-alert">
+          <div style="font-size:16px;">💡</div>
+          <span id="recipeImpactText">
+            <strong>Resep Otomatis Terhubung:</strong> Pilihan Level 4 & 5 akan secara otomatis memotong stok <strong>+15 gram Cabai Rawit Merah</strong> di gudang dapur saat pesanan terjual.
+          </span>
+        </div>
+
+      </div>
+
+      <!-- Sheet Footer -->
+      <div class="sheet-footer">
+        <button class="btn-sheet-cancel" onclick="closeVariantSheet()">Batal</button>
+        <button class="btn-sheet-save" onclick="saveVariantConfig()">Simpan Varian</button>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SIMULATION: CUSTOMER / CASHIER ORDERING SCREEN                -->
+    <!-- ============================================================ -->
+    <div class="customer-preview-overlay" id="customerOverlay">
+      <div class="customer-header">
+        <button class="btn-back-header" onclick="toggleCustomerSimulation()">✕</button>
+        <div style="text-align:center;">
+          <div style="font-size:13px;font-weight:800;">Simulasi Layar Kasir / QR Tamu</div>
+          <div class="customer-badge">Customer Ordering Flow</div>
+        </div>
+        <div style="width:36px;"></div>
+      </div>
+
+      <div style="padding:20px;flex:1;overflow-y:auto;">
+        <div style="font-size:18px;font-weight:800;margin-bottom:4px;">Ayam Sambel Geprek Nasi + Es Teh</div>
+        <div style="font-size:15px;font-weight:700;color:#00A637;margin-bottom:14px;" id="simBasePrice">Rp 25.000</div>
+
+        <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:14px;padding:12px;margin-bottom:16px;font-size:12px;color:#475569;line-height:1.4;">
+          Lihat perbedaan nyata pada layar tamu berdasarkan POV yang Anda setting di Menu Editor:
+        </div>
+
+        <!-- Sambel Geprek Section in Simulation -->
+        <div id="simSambelContainer" style="margin-bottom:20px;">
+          <!-- Dynamically filled: either locked bullet OR radio choices -->
+        </div>
+
+        <!-- Es Teh Section in Simulation -->
+        <div id="simEsTehContainer" style="margin-bottom:20px;">
+          <!-- Dynamically filled: either locked bullet OR radio choices -->
+        </div>
+
+      </div>
+
+      <div style="padding:16px;border-top:1px solid #F1F5F9;background:#FFFFFF;">
+        <button id="btnSimCheckout" style="width:100%;height:46px;border-radius:12px;background:#00A637;color:#FFFFFF;border:none;font-weight:800;font-size:14px;cursor:pointer;" onclick="toggleCustomerSimulation(); showToast('🛒 Pesanan Masuk Keranjang!');">
+          Tambah ke Keranjang — Rp 25.000
+        </button>
+      </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div class="toast-msg" id="toastMsg">Notifikasi</div>
+
+  </div>
+
+  <script>
+    let currentTargetKey = 'sambel';
+    let currentPresetType = 'PEDAS';
+
+    // State per item: stores mode and configurations
+    const itemVariantState = {
+      sambel: {
+        mode: 'CUSTOMER', // 'MERCHANT' or 'CUSTOMER'
+        presetType: 'PEDAS',
+        merchantLockedValue: 'Level 3 (Pedas)',
+        customerOptions: [
+          { name: 'Level 1 - 3 (Sedang)', price: 0 },
+          { name: 'Level 4 (Pedas Banget)', price: 2000 },
+          { name: 'Level 5 (Super Mampus)', price: 3000 }
+        ]
+      },
+      esteh: {
+        mode: 'CUSTOMER',
+        presetType: 'SUHU',
+        merchantLockedValue: 'Dingin (Pakai Es Batu)',
+        customerOptions: [
+          { name: 'Dingin (Pakai Es Batu)', price: 0 },
+          { name: 'Hangat (No Ice / Skip Es)', price: 0 }
+        ]
+      }
+    };
+
+    const defaultPresets = {
+      PEDAS: {
+        headline: 'Kunci Tingkat Kepedasan Dapur',
+        merchantDefault: 'Level 3 (Pedas)',
+        merchantList: [
+          { name: 'Level 1 (Biasa)' },
+          { name: 'Level 2 (Sedang)' },
+          { name: 'Level 3 (Pedas)' },
+          { name: 'Level 4 (Nampol)' },
+          { name: 'Level 5 (Mampus)' }
+        ],
+        customerDefaults: [
+          { name: 'Level 1 - 3 (Sedang)', price: 0 },
+          { name: 'Level 4 (Pedas Banget)', price: 2000 },
+          { name: 'Level 5 (Super Mampus)', price: 3000 }
+        ]
+      },
+      SAMBAL_TYPE: {
+        headline: 'Kunci Jenis Sambal Dapur',
+        merchantDefault: 'Sambal Bawang Geprek',
+        merchantList: [
+          { name: 'Sambal Bawang Geprek' },
+          { name: 'Sambal Matah Bali' },
+          { name: 'Sambal Ijo Terasi' }
+        ],
+        customerDefaults: [
+          { name: 'Sambal Bawang Geprek', price: 0 },
+          { name: 'Sambal Matah Bali', price: 1000 },
+          { name: 'Sambal Ijo Terasi', price: 0 }
+        ]
+      },
+      SUHU: {
+        headline: 'Kunci Suhu Minuman Dapur',
+        merchantDefault: 'Dingin (Pakai Es Batu)',
+        merchantList: [
+          { name: 'Dingin (Pakai Es Batu)' },
+          { name: 'Hangat (Tanpa Es Batu)' }
+        ],
+        customerDefaults: [
+          { name: 'Dingin (Pakai Es Batu)', price: 0 },
+          { name: 'Hangat (No Ice / Skip Es)', price: 0 }
+        ]
+      }
+    };
+
+    // Temporary modal working state
+    let tempMode = 'CUSTOMER';
+    let tempCustomerOptions = [];
+    let tempMerchantValue = '';
+
+    function openVariantSheet(itemName, key) {
+      currentTargetKey = key;
+      document.getElementById('sheetTargetItemName').innerText = itemName;
+
+      // Hydrate state
+      const state = itemVariantState[key] || {
+        mode: 'CUSTOMER',
+        presetType: (key === 'esteh' ? 'SUHU' : 'PEDAS'),
+        merchantLockedValue: (key === 'esteh' ? 'Dingin (Pakai Es Batu)' : 'Level 3 (Pedas)'),
+        customerOptions: JSON.parse(JSON.stringify(defaultPresets[key === 'esteh' ? 'SUHU' : 'PEDAS'].customerDefaults))
+      };
+
+      currentPresetType = state.presetType;
+      tempMode = state.mode;
+      tempCustomerOptions = JSON.parse(JSON.stringify(state.customerOptions));
+      tempMerchantValue = state.merchantLockedValue;
+
+      // Highlight active preset chip
+      document.getElementById('chipPresetPedas').classList.toggle('selected', currentPresetType === 'PEDAS');
+      document.getElementById('chipPresetSambal').classList.toggle('selected', currentPresetType === 'SAMBAL_TYPE');
+      document.getElementById('chipPresetSuhu').classList.toggle('selected', currentPresetType === 'SUHU');
+
+      // Update UI for the mode
+      updateModeUI();
+
+      document.getElementById('modalBackdrop').classList.add('open');
+      document.getElementById('variantSheet').classList.add('open');
+    }
+
+    function closeVariantSheet() {
+      document.getElementById('modalBackdrop').classList.remove('open');
+      document.getElementById('variantSheet').classList.remove('open');
+    }
+
+    function setSheetMode(mode) {
+      tempMode = mode;
+      updateModeUI();
+    }
+
+    function updateModeUI() {
+      const isMerchant = (tempMode === 'MERCHANT');
+      document.getElementById('btnModeMerchant').classList.toggle('active', isMerchant);
+      document.getElementById('btnModeCustomer').classList.toggle('active', !isMerchant);
+
+      const helpText = document.getElementById('modeHelpText');
+      const merchantView = document.getElementById('merchantLockView');
+      const customerView = document.getElementById('customerChoiceView');
+
+      if (isMerchant) {
+        // POV 1: KAMU MENGATUR
+        helpText.className = 'mode-help-text mode-help-merchant';
+        helpText.innerHTML = '👉 <strong>🔵 Mode Kamu Mengatur (Dapur):</strong> Cukup pilih <strong>1 nilai standar</strong> di bawah. Menu akan disajikan dengan nilai ini secara mutlak tanpa membebani pelanggan untuk memilih saat memesan.';
+        merchantView.style.display = 'block';
+        customerView.style.display = 'none';
+        renderMerchantLockUI();
+      } else {
+        // POV 2: PELANGGAN MEMILIH
+        helpText.className = 'mode-help-text mode-help-customer';
+        helpText.innerHTML = '👉 <strong>🔴 Mode Pelanggan Memilih:</strong> Buat daftar opsi pilihan untuk pelanggan. Anda dapat memasukkan <strong>Tambahan Harga (+Rp)</strong> untuk opsi ekstra (misal level pedas tinggi). Opsi ini akan muncul saat checkout.';
+        merchantView.style.display = 'none';
+        customerView.style.display = 'block';
+        renderCustomerOptionsList();
+      }
+    }
+
+    function applyPreset(presetType) {
+      currentPresetType = presetType;
+      document.getElementById('chipPresetPedas').classList.toggle('selected', presetType === 'PEDAS');
+      document.getElementById('chipPresetSambal').classList.toggle('selected', presetType === 'SAMBAL_TYPE');
+      document.getElementById('chipPresetSuhu').classList.toggle('selected', presetType === 'SUHU');
+
+      const preset = defaultPresets[presetType];
+      tempMerchantValue = preset.merchantDefault;
+      tempCustomerOptions = JSON.parse(JSON.stringify(preset.customerDefaults));
+
+      updateModeUI();
+    }
+
+    /* RENDER POV 1: MERCHANT LOCK */
+    function renderMerchantLockUI() {
+      const headline = document.getElementById('merchantLockHeadline');
+      const pedasBoxes = document.getElementById('merchantPedasBoxes');
+      const radioList = document.getElementById('merchantRadioList');
+      const summaryText = document.getElementById('merchantLockSummaryText');
+
+      headline.innerText = defaultPresets[currentPresetType].headline;
+
+      if (currentPresetType === 'PEDAS') {
+        pedasBoxes.style.display = 'flex';
+        radioList.style.display = 'none';
+        // Highlight chosen level
+        const currentLvlNum = parseInt((tempMerchantValue.match(/\d+/) || [3])[0], 10);
+        document.querySelectorAll('.pedas-box-btn').forEach((btn, i) => {
+          btn.classList.toggle('active', (i + 1) === currentLvlNum);
+        });
+        summaryText.innerHTML = `Dapur menetapkan <strong>Level ${currentLvlNum}</strong> secara fix. Pelanggan langsung mendapat Level ${currentLvlNum} tanpa ditanya saat pesan.`;
+      } else {
+        pedasBoxes.style.display = 'none';
+        radioList.style.display = 'flex';
+        radioList.innerHTML = '';
+        defaultPresets[currentPresetType].merchantList.forEach(item => {
+          const isAct = (item.name === tempMerchantValue);
+          const card = document.createElement('div');
+          card.className = 'merchant-radio-card' + (isAct ? ' active' : '');
+          card.innerHTML = `
+            <span class="label-text">${item.name}</span>
+            <span class="radio-indicator"></span>
+          `;
+          card.onclick = () => {
+            tempMerchantValue = item.name;
+            renderMerchantLockUI();
+          };
+          radioList.appendChild(card);
+        });
+        summaryText.innerHTML = `Dapur menetapkan <strong>${tempMerchantValue}</strong> secara fix. Pelanggan langsung disajikan pilihan ini.`;
+      }
+    }
+
+    function selectMerchantPedasLevel(lvl) {
+      const names = ['', 'Level 1 (Biasa)', 'Level 2 (Sedang)', 'Level 3 (Pedas)', 'Level 4 (Nampol)', 'Level 5 (Mampus)'];
+      tempMerchantValue = names[lvl] || `Level ${lvl}`;
+      renderMerchantLockUI();
+    }
+
+    /* RENDER POV 2: CUSTOMER OPTIONS */
+    function renderCustomerOptionsList() {
+      const container = document.getElementById('optionsListContainer');
+      container.innerHTML = '';
+
+      tempCustomerOptions.forEach((opt, idx) => {
+        const row = document.createElement('div');
+        row.className = 'option-row';
+        row.innerHTML = `
+          <input type="text" class="option-name-input" value="${opt.name}" placeholder="Nama opsi..." oninput="updateOptionName(${idx}, this.value)">
+          <input type="text" class="option-price-input" value="${opt.price ? '+Rp ' + Number(opt.price).toLocaleString('id-ID') : 'Rp 0'}" placeholder="+Rp 0" onfocus="this.value = tempCustomerOptions[${idx}].price || ''" onblur="formatOptionPrice(${idx}, this)">
+          <button class="btn-remove-choice" onclick="removeOptionRow(${idx})" title="Hapus opsi">✕</button>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function updateOptionName(idx, val) {
+      if (tempCustomerOptions[idx]) tempCustomerOptions[idx].name = val;
+    }
+
+    function formatOptionPrice(idx, input) {
+      const num = parseInt(input.value.replace(/\D/g, ''), 10) || 0;
+      tempCustomerOptions[idx].price = num;
+      input.value = num > 0 ? '+Rp ' + num.toLocaleString('id-ID') : 'Rp 0';
+    }
+
+    function removeOptionRow(idx) {
+      if (tempCustomerOptions.length <= 1) {
+        showToast('Minimal harus ada 1 opsi pilihan');
+        return;
+      }
+      tempCustomerOptions.splice(idx, 1);
+      renderCustomerOptionsList();
+    }
+
+    function addNewOptionRow() {
+      tempCustomerOptions.push({ name: 'Pilihan Baru ' + (tempCustomerOptions.length + 1), price: 0 });
+      renderCustomerOptionsList();
+    }
+
+    /* SAVE CONFIG TO CARD */
+    function saveVariantConfig() {
+      closeVariantSheet();
+
+      itemVariantState[currentTargetKey] = {
+        mode: tempMode,
+        presetType: currentPresetType,
+        merchantLockedValue: tempMerchantValue,
+        customerOptions: JSON.parse(JSON.stringify(tempCustomerOptions))
+      };
+
+      const isMerchant = (tempMode === 'MERCHANT');
+
+      if (currentTargetKey === 'sambel') {
+        const view = document.getElementById('sambel-variant-view');
+        const badge = document.getElementById('sambel-badge-mode');
+        const chipsContainer = document.getElementById('sambel-chips-container');
+
+        view.style.display = 'block';
+        document.getElementById('sambel-actions-empty').style.display = 'none';
+        document.getElementById('sambel-actions-configured').style.display = 'flex';
+        document.getElementById('card-sambel').classList.add('has-variant');
+
+        chipsContainer.innerHTML = '';
+
+        if (isMerchant) {
+          badge.className = 'variant-badge-active badge-merchant';
+          badge.innerHTML = `<span>🔒 Kamu Mengatur (Dapur Kunci: ${tempMerchantValue})</span>`;
+          chipsContainer.innerHTML = `<span class="variant-chip locked-tag">Nilai Fix Dapur: ${tempMerchantValue} (Pelanggan tidak ditanya)</span>`;
+          showToast(`🔒 Sambel Dikunci di ${tempMerchantValue}!`);
+        } else {
+          badge.className = 'variant-badge-active badge-customer';
+          badge.innerHTML = `<span>✓ Level Pedas (Pelanggan Memilih saat Order)</span>`;
+          tempCustomerOptions.forEach(opt => {
+            const isFree = !opt.price || opt.price === 0;
+            chipsContainer.innerHTML += `<span class="variant-chip ${isFree ? '' : 'price-tag'}">${opt.name} (${isFree ? '+Rp0' : '+Rp' + Number(opt.price).toLocaleString('id-ID')})</span>`;
+          });
+          showToast(`🔴 Varian Pelanggan Memilih Aktif untuk Sambel!`);
+        }
+
+      } else if (currentTargetKey === 'esteh') {
+        const view = document.getElementById('esteh-variant-view');
+        const badge = document.getElementById('esteh-badge-mode');
+        const chipsContainer = document.getElementById('esteh-chips-container');
+
+        view.style.display = 'block';
+        document.getElementById('esteh-actions-empty').style.display = 'none';
+        document.getElementById('esteh-actions-configured').style.display = 'flex';
+        document.getElementById('card-esteh').classList.add('has-variant');
+
+        chipsContainer.innerHTML = '';
+
+        if (isMerchant) {
+          badge.className = 'variant-badge-active badge-merchant';
+          badge.innerHTML = `<span>🔒 Kamu Mengatur (Dapur Kunci: ${tempMerchantValue})</span>`;
+          chipsContainer.innerHTML = `<span class="variant-chip locked-tag">Fix Dapur: ${tempMerchantValue}</span>`;
+          showToast(`🔒 Es Teh Dikunci di ${tempMerchantValue}!`);
+        } else {
+          badge.className = 'variant-badge-active badge-customer';
+          badge.innerHTML = `<span>✓ Suhu Minuman (Pelanggan Memilih)</span>`;
+          tempCustomerOptions.forEach(opt => {
+            chipsContainer.innerHTML += `<span class="variant-chip">${opt.name}</span>`;
+          });
+          showToast(`🔴 Pilihan Suhu Aktif untuk Es Teh!`);
+        }
+      }
+    }
+
+    function resetVariant(key) {
+      if (key === 'sambel') {
+        document.getElementById('sambel-variant-view').style.display = 'none';
+        document.getElementById('sambel-actions-empty').style.display = 'flex';
+        document.getElementById('sambel-actions-configured').style.display = 'none';
+        document.getElementById('card-sambel').classList.remove('has-variant');
+        showToast('Varian Sambel Direset');
+      } else if (key === 'esteh') {
+        document.getElementById('esteh-variant-view').style.display = 'none';
+        document.getElementById('esteh-actions-empty').style.display = 'flex';
+        document.getElementById('esteh-actions-configured').style.display = 'none';
+        document.getElementById('card-esteh').classList.remove('has-variant');
+        showToast('Varian Es Teh Direset');
+      }
+    }
+
+    /* SIMULATION: HOW IT APPEARS IN CUSTOMER / CASHIER ORDERING SCREEN */
+    function toggleCustomerSimulation() {
+      const overlay = document.getElementById('customerOverlay');
+      const isOpen = overlay.classList.contains('open');
+
+      if (!isOpen) {
+        // Build simulation based on active state of Sambel & Es Teh!
+        renderSimulationScreen();
+      }
+
+      overlay.classList.toggle('open');
+    }
+
+    let simExtraPrice = 0;
+
+    function renderSimulationScreen() {
+      const sambelBox = document.getElementById('simSambelContainer');
+      const estehBox = document.getElementById('simEsTehContainer');
+      const sState = itemVariantState.sambel;
+      const eState = itemVariantState.esteh;
+      simExtraPrice = 0;
+
+      // 1. Sambel Simulation
+      if (sState.mode === 'MERCHANT') {
+        // Merchant Locked -> Customer DOES NOT CHOOSE!
+        sambelBox.innerHTML = `
+          <div style="background:#F1F5F9;border:1px solid #CBD5E1;border-radius:12px;padding:12px 14px;">
+            <div style="font-size:11px;font-weight:700;color:#64748B;text-transform:uppercase;">Komponen Sambal:</div>
+            <div style="font-size:13.5px;font-weight:800;color:#0F172A;margin-top:2px;">
+              🌶️ Sambel Geprek (${sState.merchantLockedValue})
+            </div>
+            <div style="font-size:11px;color:#64748B;margin-top:4px;">
+              🔒 <em>Ditentukan oleh dapur — tamu tidak perlu memilih.</em>
+            </div>
+          </div>
+        `;
+      } else {
+        // Customer Chooses -> Interactive Radio list with extra price!
+        let radioItems = '';
+        sState.customerOptions.forEach((opt, i) => {
+          const isDefault = (i === 0);
+          radioItems += `
+            <label style="display:flex;justify-content:space-between;align-items:center;background:#FFFFFF;border:1px solid #CBD5E1;padding:10px 14px;border-radius:12px;cursor:pointer;" onclick="setSimExtra(${opt.price}, this)">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <input type="radio" name="sim_sambel_radio" ${isDefault ? 'checked' : ''} style="accent-color:#2563EB;">
+                <span style="font-size:13px;font-weight:700;color:#0F172A;">${opt.name}</span>
+              </div>
+              <span style="font-size:12px;font-weight:800;color:${opt.price > 0 ? '#059669' : '#64748B'};">
+                ${opt.price > 0 ? '+Rp ' + Number(opt.price).toLocaleString('id-ID') : 'Gratis'}
+              </span>
+            </label>
+          `;
+        });
+
+        sambelBox.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <span style="font-size:13px;font-weight:800;color:var(--dark);">Pilih Level Pedas Sambel:</span>
+            <span style="font-size:10px;font-weight:800;color:#DC2626;background:#FEE2E2;padding:2px 8px;border-radius:10px;">Wajib Pilih 1</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            ${radioItems}
+          </div>
+        `;
+      }
+
+      // 2. Es Teh Simulation
+      if (eState.mode === 'MERCHANT') {
+        estehBox.innerHTML = `
+          <div style="background:#F1F5F9;border:1px solid #CBD5E1;border-radius:12px;padding:12px 14px;">
+            <div style="font-size:11px;font-weight:700;color:#64748B;text-transform:uppercase;">Komponen Minuman:</div>
+            <div style="font-size:13.5px;font-weight:800;color:#0F172A;margin-top:2px;">
+              🥤 Es Teh Manis (${eState.merchantLockedValue})
+            </div>
+            <div style="font-size:11px;color:#64748B;margin-top:4px;">
+              🔒 <em>Suhu minuman fix sesuai standar dapur.</em>
+            </div>
+          </div>
+        `;
+      } else {
+        let radioItems = '';
+        eState.customerOptions.forEach((opt, i) => {
+          const isDefault = (i === 0);
+          radioItems += `
+            <label style="display:flex;justify-content:space-between;align-items:center;background:#FFFFFF;border:1px solid #CBD5E1;padding:10px 14px;border-radius:12px;cursor:pointer;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <input type="radio" name="sim_esteh_radio" ${isDefault ? 'checked' : ''} style="accent-color:#2563EB;">
+                <span style="font-size:13px;font-weight:700;color:#0F172A;">${opt.name}</span>
+              </div>
+              <span style="font-size:12px;font-weight:700;color:#64748B;">Default</span>
+            </label>
+          `;
+        });
+
+        estehBox.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <span style="font-size:13px;font-weight:800;color:var(--dark);">Penyajian Minuman:</span>
+            <span style="font-size:10px;font-weight:800;color:#DC2626;background:#FEE2E2;padding:2px 8px;border-radius:10px;">Wajib Pilih 1</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            ${radioItems}
+          </div>
+        `;
+      }
+
+      updateSimTotal(0);
+    }
+
+    function setSimExtra(extraPrice, labelElem) {
+      document.querySelectorAll('#simSambelContainer label').forEach(l => l.style.borderColor = '#CBD5E1');
+      if (labelElem) labelElem.style.borderColor = '#2563EB';
+      updateSimTotal(extraPrice);
+    }
+
+    function updateSimTotal(extra) {
+      const total = 25000 + (extra || 0);
+      document.getElementById('btnSimCheckout').innerText = `Tambah ke Keranjang — Rp ${total.toLocaleString('id-ID')}`;
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toastMsg');
+      toast.innerText = msg;
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2500);
+    }
+  </script>
+</body>
+</html>

@@ -99,6 +99,7 @@ class AffiliateRepository {
     // Schema migrations for existing databases
     try { this.db.exec("ALTER TABLE affiliate_programs ADD COLUMN commission_type TEXT DEFAULT 'FIXED_PER_ITEM';"); } catch (_) {}
     try { this.db.exec("ALTER TABLE affiliate_programs ADD COLUMN commission_per_item REAL DEFAULT 1000.0;"); } catch (_) {}
+    try { this.db.exec("ALTER TABLE affiliate_programs ADD COLUMN featured_product_id TEXT;"); } catch (_) {}
     try { this.db.exec("ALTER TABLE affiliate_conversions ADD COLUMN total_items INTEGER DEFAULT 1;"); } catch (_) {}
     try { this.db.exec("ALTER TABLE affiliate_profiles ADD COLUMN status TEXT DEFAULT 'PENDING';"); } catch (_) {}
     try { this.db.exec("ALTER TABLE affiliate_profiles ADD COLUMN social_media TEXT;"); } catch (_) {}
@@ -112,26 +113,44 @@ class AffiliateRepository {
   // 1. Program methods
   findProgram(brandId) {
     return this.db.queryOne(
-      "SELECT brand_id, commission_type, commission_rate, commission_per_item, cookie_days, min_payout_amount, is_active, created_at, updated_at " +
+      "SELECT brand_id, commission_type, commission_rate, commission_per_item, cookie_days, min_payout_amount, is_active, featured_product_id, created_at, updated_at " +
       "FROM affiliate_programs WHERE brand_id = ?",
       [brandId]
     );
   }
 
-  upsertProgram({ brandId, commissionType = 'FIXED_PER_ITEM', commissionRate = 1000.0, commissionPerItem = 1000.0, cookieDays = 14, minPayoutAmount = 50000, isActive = 1 }) {
-    this.db.execute(
-      "INSERT INTO affiliate_programs (brand_id, commission_type, commission_rate, commission_per_item, cookie_days, min_payout_amount, is_active, updated_at) " +
-      "VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now')) " +
-      "ON CONFLICT(brand_id) DO UPDATE SET " +
-      "commission_type = excluded.commission_type, " +
-      "commission_rate = excluded.commission_rate, " +
-      "commission_per_item = excluded.commission_per_item, " +
-      "cookie_days = excluded.cookie_days, " +
-      "min_payout_amount = excluded.min_payout_amount, " +
-      "is_active = excluded.is_active, " +
-      "updated_at = datetime('now')",
-      [brandId, commissionType, commissionRate, commissionPerItem, cookieDays, minPayoutAmount, isActive ? 1 : 0]
-    );
+  upsertProgram({ brandId, commissionType = 'FIXED_PER_ITEM', commissionRate = 1000.0, commissionPerItem = 1000.0, cookieDays = 14, minPayoutAmount = 50000, isActive = 1, featuredProductId }) {
+    var hasFeatured = featuredProductId !== undefined;
+    if (hasFeatured) {
+      this.db.execute(
+        "INSERT INTO affiliate_programs (brand_id, commission_type, commission_rate, commission_per_item, cookie_days, min_payout_amount, is_active, featured_product_id, updated_at) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now')) " +
+        "ON CONFLICT(brand_id) DO UPDATE SET " +
+        "commission_type = excluded.commission_type, " +
+        "commission_rate = excluded.commission_rate, " +
+        "commission_per_item = excluded.commission_per_item, " +
+        "cookie_days = excluded.cookie_days, " +
+        "min_payout_amount = excluded.min_payout_amount, " +
+        "is_active = excluded.is_active, " +
+        "featured_product_id = excluded.featured_product_id, " +
+        "updated_at = datetime('now')",
+        [brandId, commissionType, commissionRate, commissionPerItem, cookieDays, minPayoutAmount, isActive ? 1 : 0, featuredProductId || null]
+      );
+    } else {
+      this.db.execute(
+        "INSERT INTO affiliate_programs (brand_id, commission_type, commission_rate, commission_per_item, cookie_days, min_payout_amount, is_active, updated_at) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now')) " +
+        "ON CONFLICT(brand_id) DO UPDATE SET " +
+        "commission_type = excluded.commission_type, " +
+        "commission_rate = excluded.commission_rate, " +
+        "commission_per_item = excluded.commission_per_item, " +
+        "cookie_days = excluded.cookie_days, " +
+        "min_payout_amount = excluded.min_payout_amount, " +
+        "is_active = excluded.is_active, " +
+        "updated_at = datetime('now')",
+        [brandId, commissionType, commissionRate, commissionPerItem, cookieDays, minPayoutAmount, isActive ? 1 : 0]
+      );
+    }
     return this.findProgram(brandId);
   }
 
@@ -199,6 +218,15 @@ class AffiliateRepository {
       "UPDATE affiliate_profiles SET status = 'ACTIVE', approved_at = datetime('now'), approved_by = ?, rejection_reason = NULL, updated_at = datetime('now') " +
       "WHERE id = ?",
       [approvedBy, profileId]
+    );
+    return this.findProfileById(profileId);
+  }
+
+  activateProfile(profileId) {
+    this.db.execute(
+      "UPDATE affiliate_profiles SET status = 'ACTIVE', approved_at = COALESCE(approved_at, datetime('now')), rejection_reason = NULL, updated_at = datetime('now') " +
+      "WHERE id = ?",
+      [profileId]
     );
     return this.findProfileById(profileId);
   }
@@ -346,16 +374,20 @@ class AffiliateRepository {
 
   // 5. Payout methods
   createPayout({ id, brandId, profileId, amount, bankName, accountNumber, accountHolder, notes = null }) {
+    // Deduct atomically first; prevents race condition / double-withdrawal
+    const deductRes = this.db.execute(
+      "UPDATE affiliate_profiles SET balance_payable = balance_payable - ?, updated_at = datetime('now') WHERE id = ? AND balance_payable >= ?",
+      [amount, profileId, amount]
+    );
+
+    if (!deductRes || deductRes.changes === 0) {
+      throw new Error('INSUFFICIENT_PAYABLE_BALANCE');
+    }
+
     this.db.execute(
       "INSERT INTO affiliate_payouts (id, brand_id, affiliate_profile_id, amount, bank_name, bank_account_number, bank_account_holder, status, notes, requested_at) " +
       "VALUES (?, ?, ?, ?, ?, ?, ?, 'REQUESTED', ?, datetime('now'))",
       [id, brandId, profileId, amount, bankName, accountNumber, accountHolder, notes]
-    );
-
-    // Deduct immediately from balance_payable to prevent double withdrawal
-    this.db.execute(
-      "UPDATE affiliate_profiles SET balance_payable = MAX(0, balance_payable - ?), updated_at = datetime('now') WHERE id = ?",
-      [amount, profileId]
     );
 
     return this.findPayoutById(id);
@@ -394,6 +426,19 @@ class AffiliateRepository {
       "WHERE " + clauses.join(' AND ') + " " +
       "ORDER BY py.requested_at DESC",
       params
+    );
+  }
+
+  listRecentPaidPayouts({ brandId, limit = 8 }) {
+    return this.db.queryMany(
+      "SELECT py.id, py.amount, py.bank_name, py.processed_at, py.requested_at, pr.referral_code, " +
+      "COALESCE(c.display_name, 'Foodie Partner') AS customer_name " +
+      "FROM affiliate_payouts py " +
+      "JOIN affiliate_profiles pr ON pr.id = py.affiliate_profile_id " +
+      "LEFT JOIN customers c ON c.id = pr.customer_id " +
+      "WHERE py.brand_id = ? AND py.status = 'PAID' " +
+      "ORDER BY COALESCE(py.processed_at, py.requested_at) DESC LIMIT ?",
+      [brandId, Number(limit) || 8]
     );
   }
 

@@ -71,6 +71,7 @@ router.get('/admin/overview', requireAuth(['owner', 'brand_manager', 'branch_man
     const timeline = overviewReportingRepo.getSalesTimeline(filter);
     const byChannel = overviewReportingRepo.getSalesByChannel(filter);
     const byFulfillment = overviewReportingRepo.getSalesByFulfillment(filter);
+    const paymentBreakdown = overviewReportingRepo.getPaymentBreakdown(filter);
 
     // 3. Branch Performance (Only for Owner/Brand Manager if All Branches, or scoped to branch)
     let branchPerformance = [];
@@ -138,7 +139,8 @@ router.get('/admin/overview', requireAuth(['owner', 'brand_manager', 'branch_man
         sales_performance: {
           timeline,
           by_channel: byChannel,
-          by_fulfillment: byFulfillment
+          by_fulfillment: byFulfillment,
+          payment_breakdown: paymentBreakdown
         },
         branch_performance: branchPerformance,
         top_products: topProducts,

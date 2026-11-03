@@ -54,7 +54,7 @@ export interface ComposedProduct {
   is_active?: boolean | number;
 }
 
-export type OverviewPeriod = 'today' | '7d' | '30d' | 'custom';
+export type OverviewPeriod = 'today' | '7d' | '30d' | 'all' | 'custom';
 
 export interface OverviewKPIs {
   net_sales: number;

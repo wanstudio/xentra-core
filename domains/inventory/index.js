@@ -7,6 +7,10 @@ const PurchaseOrderService = require('./services/PurchaseOrderService');
 const CostResolutionService = require('./services/CostResolutionService');
 const GoodsReceiptCostPostingService = require('./services/GoodsReceiptCostPostingService');
 const InventorySalePostingService = require('./services/InventorySalePostingService');
+const RecipeConsumptionService = require('./services/RecipeConsumptionService');
+const RecipeConsumptionWorker = require('./workers/RecipeConsumptionWorker');
+const ShiftMaterialAuditService = require('./services/ShiftMaterialAuditService');
+const KitchenWasteService = require('./services/KitchenWasteService');
 
 const INVENTORY_IDENTITY = {
   name: 'inventory',
@@ -60,5 +64,9 @@ module.exports = {
   PurchaseOrderService,
   CostResolutionService,
   GoodsReceiptCostPostingService,
-  InventorySalePostingService
+  InventorySalePostingService,
+  RecipeConsumptionService,
+  RecipeConsumptionWorker,
+  ShiftMaterialAuditService,
+  KitchenWasteService
 };

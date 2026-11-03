@@ -73,6 +73,19 @@
 
     printText: function (text) {
       if (!this.isNative()) {
+        try {
+          var printWin = window.open('', '_blank', 'width=360,height=520');
+          if (printWin) {
+            printWin.document.write('<!DOCTYPE html><html><head><title>Cetak Struk</title><style>body{font-family:monospace;font-size:12px;white-space:pre;margin:12px;line-height:1.3;}</style></head><body>' +
+              String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') +
+              '</body></html>');
+            printWin.document.close();
+            printWin.focus();
+            printWin.print();
+            printWin.close();
+            return true;
+          }
+        } catch (_) {}
         window.print();
         return true;
       }
@@ -110,6 +123,14 @@
       order = order || {};
       storeInfo = storeInfo || {};
       var storeName = storeInfo.name || 'MYBANGJO RESTO';
+      var branchName = storeInfo.branch || '';
+      var orderTypeMap = {
+        dine_in: 'Dine In',
+        takeaway: 'Takeaway',
+        pickup: 'Pickup',
+        delivery: 'Delivery',
+        reservation: 'Reservasi'
+      };
       var orderNum = order.order_number || '';
       if (!orderNum && order.id) {
         var digits = String(order.id).replace(/\D/g, '');
@@ -118,7 +139,7 @@
         orderNum = pfx + '-' + num;
       }
       if (orderNum && !orderNum.startsWith('#')) orderNum = '#' + orderNum;
-      if (!orderNum) orderNum = 'Pesanan';
+      if (!orderNum) orderNum = '#Pesanan';
       var orderType = orderTypeMap[order.order_type] || 'Pesanan';
       var customer = order.customer_name || 'Pelanggan';
       var table = (order.table_name || order.table_number) ? ('Meja ' + (order.table_name || order.table_number)) : '';
@@ -135,10 +156,12 @@
 
       var lines = [];
       lines.push('================================');
-      lines.push(storeName.toUpperCase().padStart((32 + storeName.length) / 2));
-      lines.push(branchName.padStart((32 + branchName.length) / 2));
+      lines.push(storeName.toUpperCase().padStart(Math.floor((32 + storeName.length) / 2)));
+      if (branchName) {
+        lines.push(branchName.padStart(Math.floor((32 + branchName.length) / 2)));
+      }
       lines.push('================================');
-      lines.push('No. Pesanan : #' + orderNum);
+      lines.push('No. Pesanan : ' + orderNum);
       lines.push('Waktu       : ' + (timeStr || new Date().toLocaleString('id-ID')));
       lines.push('Tipe        : ' + orderType + (table ? ' (' + table + ')' : ''));
       lines.push('Pelanggan   : ' + customer);
@@ -177,6 +200,67 @@
       lines.push('================================\n\n');
 
       return lines.join('\n');
+    },
+
+    formatKitchenTicket: function (order, storeInfo) {
+      order = order || {};
+      storeInfo = storeInfo || {};
+      var branchName = storeInfo.branch || '';
+      var orderTypeMap = {
+        dine_in: 'DINE IN',
+        takeaway: 'TAKEAWAY',
+        pickup: 'PICKUP',
+        delivery: 'DELIVERY',
+        reservation: 'RESERVASI'
+      };
+      var orderNum = order.order_number || '';
+      if (!orderNum && order.id) {
+        var digits = String(order.id).replace(/\D/g, '');
+        var num = digits.length >= 3 ? digits.slice(-3) : '100';
+        var pfx = (order.order_type === 'dine_in' ? 'DI' : (order.order_type === 'reservation' ? 'RS' : (order.order_type === 'takeaway' ? 'TK' : 'OD')));
+        orderNum = pfx + '-' + num;
+      }
+      if (orderNum && !orderNum.startsWith('#')) orderNum = '#' + orderNum;
+      if (!orderNum) orderNum = '#Pesanan';
+      var orderType = orderTypeMap[order.order_type] || 'PESANAN';
+      var customer = order.customer_name || 'Pelanggan';
+      var table = (order.table_name || order.table_number) ? ('MEJA ' + (order.table_name || order.table_number)) : '';
+      var timeStr = (order.created_at || '').substring(0, 16).replace('T', ' ');
+
+      var lines = [];
+      lines.push('================================');
+      lines.push('          TIKET DAPUR           ');
+      if (branchName) {
+        lines.push(branchName.padStart(Math.floor((32 + branchName.length) / 2)));
+      }
+      lines.push('================================');
+      lines.push('No. Pesanan : ' + orderNum);
+      lines.push('Tipe        : ' + orderType + (table ? ' [' + table + ']' : ''));
+      lines.push('Waktu       : ' + (timeStr || new Date().toLocaleString('id-ID')));
+      lines.push('Pelanggan   : ' + customer);
+      lines.push('--------------------------------');
+
+      var items = order.items || [];
+      items.forEach(function (it) {
+        var qty = it.quantity || 1;
+        var name = it.product_name || it.item_name || 'Menu';
+        lines.push('[' + qty + 'x] ' + name.toUpperCase());
+        if (it.note) {
+          lines.push('  ** CATATAN: ' + it.note + ' **');
+        }
+      });
+
+      lines.push('================================');
+      lines.push('         HARAP SEGERA           ');
+      lines.push('          DIPROSES              ');
+      lines.push('================================\n\n');
+
+      return lines.join('\n');
+    },
+
+    printKitchenTicket: function (order, storeInfo) {
+      var ticketText = this.formatKitchenTicket(order, storeInfo);
+      return this.printText(ticketText);
     },
 
     printOrder: function (order, storeInfo) {

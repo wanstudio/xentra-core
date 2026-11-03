@@ -15,7 +15,7 @@ class EligibilityRepository {
 
   findBranchEligibilityContext({ branchId, brandId }) {
     return this.db.queryOne(`
-      SELECT b.id, b.brand_id, b.name, b.is_active, b.is_open_override,
+      SELECT b.id, b.brand_id, b.name, b.is_active, b.is_open_override, b.is_online_paused,
              s.is_delivery_active, s.is_pickup_active
       FROM branches b
       LEFT JOIN branch_delivery_settings s ON s.branch_id = b.id

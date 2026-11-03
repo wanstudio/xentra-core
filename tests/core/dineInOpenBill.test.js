@@ -132,8 +132,10 @@ test('Dine-in: satu meja = satu bill', async (t) => {
 
 const CUST_ID = 'cst_bill_test';
 const OTHER_CUST_ID = 'cst_bill_other';
+const FRESH_CUST_ID = 'cst_bill_fresh';
 const CUST_PHONE = '08120000009';
 const OTHER_PHONE = '08129999999';
+const FRESH_PHONE = '08128888888';
 const RESUME_TABLE = 'tbl_bill_resume';
 const RESUME_QR = 'qr_bill_resume';
 
@@ -141,6 +143,7 @@ let server;
 let baseUrl;
 let CUST_TOKEN;
 let OTHER_TOKEN;
+let FRESH_TOKEN;
 
 function api(method, path, token, body) {
   return new Promise((resolve, reject) => {
@@ -168,6 +171,8 @@ test('Konsumen bisa kembali ke bill mejanya yang masih terbuka', async (t) => {
       .run(CUST_ID, orgId, 'brand_bangjo', CUST_PHONE, 'Rina', 'rina.bill@test.local');
     db.prepare('INSERT OR REPLACE INTO customers (id, organization_id, brand_id, phone, display_name, email) VALUES (?, ?, ?, ?, ?, ?)')
       .run(OTHER_CUST_ID, orgId, 'brand_bangjo', OTHER_PHONE, 'Budi', 'budi.bill@test.local');
+    db.prepare('INSERT OR REPLACE INTO customers (id, organization_id, brand_id, phone, display_name, email) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(FRESH_CUST_ID, orgId, 'brand_bangjo', FRESH_PHONE, 'Dewi', 'dewi.bill@test.local');
 
     await new Promise((resolve) => {
       server = require('../../server/app').listen(0, resolve);
@@ -177,6 +182,7 @@ test('Konsumen bisa kembali ke bill mejanya yang masih terbuka', async (t) => {
     const Store = global.TokenSessionStore;
     CUST_TOKEN = Store.createCustomerSession(CUST_PHONE, 'brand_bangjo', 3600, { customerId: CUST_ID, organizationId: orgId }).token;
     OTHER_TOKEN = Store.createCustomerSession(OTHER_PHONE, 'brand_bangjo', 3600, { customerId: OTHER_CUST_ID, organizationId: orgId }).token;
+    FRESH_TOKEN = Store.createCustomerSession(FRESH_PHONE, 'brand_bangjo', 3600, { customerId: FRESH_CUST_ID, organizationId: orgId }).token;
   });
 
   t.after(async () => {
@@ -187,7 +193,7 @@ test('Konsumen bisa kembali ke bill mejanya yang masih terbuka', async (t) => {
     });
     db.prepare('DELETE FROM branch_table_states WHERE table_id = ?').run(RESUME_TABLE);
     db.prepare('DELETE FROM branch_tables WHERE id = ?').run(RESUME_TABLE);
-    db.prepare('DELETE FROM customers WHERE id IN (?, ?)').run(CUST_ID, OTHER_CUST_ID);
+    db.prepare('DELETE FROM customers WHERE id IN (?, ?, ?)').run(CUST_ID, OTHER_CUST_ID, FRESH_CUST_ID);
   });
 
   await t.test('tanpa bill terbuka: session null, bukan error', async () => {
@@ -223,7 +229,7 @@ test('Konsumen bisa kembali ke bill mejanya yang masih terbuka', async (t) => {
     assert.equal(other.body.session, null, 'bill konsumen lain tidak boleh terbaca');
   });
 
-  await t.test('QR meja menyambungkan kembali ke bill (kasus ganti HP)', async () => {
+  await t.test('QR aktif mengizinkan customer lain bergabung ke bill bersama', async () => {
     const noToken = await api('POST', '/api/v1/customer/dining-session/claim', CUST_TOKEN, {});
     assert.equal(noToken.status, 400, 'tanpa qr_token harus ditolak');
 
@@ -234,11 +240,16 @@ test('Konsumen bisa kembali ke bill mejanya yang masih terbuka', async (t) => {
     assert.equal(res.status, 200, JSON.stringify(res.body));
     assert.equal(res.body.table_id, RESUME_TABLE);
     assert.equal(res.body.table.table_number, '903', 'QR harus membawa identitas mejanya');
+    assert.equal(res.body.joined, true, 'customer login harus bergabung ke sesi meja aktif');
+    assert.equal(res.body.session.session_id, createdSessions[createdSessions.length - 1]);
+    assert.equal(Object.hasOwn(res.body.session, 'customer_name'), false,
+      'bill bersama tidak boleh membocorkan nama primary customer');
+    assert.equal(res.body.session.total_bill, 0, 'anggota melihat saldo bill bersama');
 
-    // Keamanan: kartu QR ditempel PERMANEN di meja, jadi QR bukan rahasia dan
-    // bukan kunci — ia tidak boleh membuka tagihan siapa pun.
-    assert.equal(res.body.session, null, 'QR tidak boleh membuka tagihan');
-    assert.ok(!JSON.stringify(res.body).includes('total_bill'), 'isi tagihan tidak boleh ikut terbawa');
+    const repeat = await api('POST', '/api/v1/customer/dining-session/claim', OTHER_TOKEN, { qr_token: RESUME_QR });
+    assert.equal(repeat.status, 200, JSON.stringify(repeat.body));
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM dining_session_members WHERE session_id = ? AND customer_id = ?')
+      .get(repeat.body.session.session_id, OTHER_CUST_ID).n, 1, 'scan berulang tidak menggandakan membership');
 
     // Tamu yang memang pemiliknya tetap bisa membuka tagihannya, lewat identitas.
     const mine = await api('GET', '/api/v1/customer/dining-session', CUST_TOKEN);
@@ -246,25 +257,25 @@ test('Konsumen bisa kembali ke bill mejanya yang masih terbuka', async (t) => {
   });
 
   await t.test('kode meja manusiawi: "meja903" dikenali di cabang yang dipakai', async () => {
-    const meja = await api('POST', '/api/v1/customer/dining-session/claim', CUST_TOKEN, { qr_token: 'meja903', branch_id: BRANCH });
+    const meja = await api('POST', '/api/v1/customer/dining-session/claim', FRESH_TOKEN, { qr_token: 'meja903', branch_id: BRANCH });
     assert.equal(meja.status, 200, JSON.stringify(meja.body));
     assert.equal(meja.body.table.id, RESUME_TABLE, 'meja903 harus menunjuk Meja 903');
-    assert.equal(meja.body.session, null, 'kode meja tetap bukan kunci: tidak membuka tagihan');
+    assert.equal(meja.body.joined, true, 'kode meja memetakan meja dan bergabung ke siklus aktif');
 
-    const angka = await api('POST', '/api/v1/customer/dining-session/claim', CUST_TOKEN, { qr_token: '903', branch_id: BRANCH });
+    const angka = await api('POST', '/api/v1/customer/dining-session/claim', FRESH_TOKEN, { qr_token: '903', branch_id: BRANCH });
     assert.equal(angka.status, 200, 'angka saja juga boleh');
     assert.equal(angka.body.table.id, RESUME_TABLE);
 
-    const besar = await api('POST', '/api/v1/customer/dining-session/claim', CUST_TOKEN, { qr_token: 'Meja 903', branch_id: BRANCH });
+    const besar = await api('POST', '/api/v1/customer/dining-session/claim', FRESH_TOKEN, { qr_token: 'Meja 903', branch_id: BRANCH });
     assert.equal(besar.status, 200, 'spasi dan huruf besar-kecil tidak masalah');
   });
 
   await t.test('kode meja tanpa cabang ditolak (nomor meja tidak unik antar cabang)', async () => {
-    const res = await api('POST', '/api/v1/customer/dining-session/claim', CUST_TOKEN, { qr_token: 'meja903' });
+    const res = await api('POST', '/api/v1/customer/dining-session/claim', FRESH_TOKEN, { qr_token: 'meja903' });
     assert.equal(res.status, 400, 'tanpa cabang harus ditolak, bukan ditebak');
     assert.equal(res.body.error, 'BRANCH_REQUIRED');
 
-    const tidakAda = await api('POST', '/api/v1/customer/dining-session/claim', CUST_TOKEN, { qr_token: 'meja999', branch_id: BRANCH });
+    const tidakAda = await api('POST', '/api/v1/customer/dining-session/claim', FRESH_TOKEN, { qr_token: 'meja999', branch_id: BRANCH });
     assert.equal(tidakAda.status, 404, 'meja yang tidak ada di cabang itu harus ditolak');
   });
 
@@ -276,7 +287,7 @@ test('Konsumen bisa kembali ke bill mejanya yang masih terbuka', async (t) => {
     assert.equal(empty.status, 404, 'QR tak dikenal tetap ditolak');
 
     seedTable('tbl_bill_kosong', '905', 'qr_bill_kosong');
-    const res = await api('POST', '/api/v1/customer/dining-session/claim', CUST_TOKEN, { qr_token: 'qr_bill_kosong' });
+    const res = await api('POST', '/api/v1/customer/dining-session/claim', null, { qr_token: 'qr_bill_kosong' });
     assert.equal(res.status, 200, JSON.stringify(res.body));
     assert.equal(res.body.session, null, 'meja kosong belum punya bill');
     assert.equal(res.body.table.id, 'tbl_bill_kosong');

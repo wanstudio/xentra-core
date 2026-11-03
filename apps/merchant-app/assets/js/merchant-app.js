@@ -39,15 +39,21 @@
     "hari-ini":         { title: "Hari Ini",         sub: "Ringkasan operasional dan kendali resto hari ini", tab: "hari-ini" },
     "pesanan":          { title: "Pesanan",          sub: "Antrean pesanan masuk dan status pesanan",       tab: "bm-pesanan" },
     "meja":             { title: "Meja",             sub: "Status dan ketersediaan meja makan (dine-in)",   tab: "bm-meja" },
-    "menu":             { title: "Menu",             sub: "Katalog menu dan pengaturan etalase",            tab: "bm-menu" },
+    "menu":             { title: "Menu & Stok",      sub: "Katalog menu dan pengaturan etalase",            tab: "bm-menu" },
     "promo":            { title: "Promo",            sub: "Daftar promosi dan diskon yang sedang aktif",    tab: "bm-promo" },
     "stok":             { title: "Inventaris",       sub: "Sisa porsi menu dan bahan baku dapur cabang",    tab: "bm-stok" },
-    "belanja":          { title: "Belanja Pasar",    sub: "Catatan belanja bahan baku dan kasbon",          tab: "bm-belanja" },
-    "purchasing":       { title: "Belanja Pasar",    sub: "Catatan belanja bahan baku dan kasbon",          tab: "bm-belanja" },
+    "belanja":          { title: "Tugas Belanja",    sub: "Kelola mandat & verifikasi serah terima belanja staf", tab: "bm-belanja" },
+    "purchasing":       { title: "Tugas Belanja",    sub: "Kelola mandat & verifikasi serah terima belanja staf", tab: "bm-belanja" },
     "staff":            { title: "Staff",            sub: "Daftar akun kasir dan staf resto",               tab: "bm-staff" },
+    "add-staff":        { title: "Tambah Staf & Kasir", sub: "Tambahkan akun staf baru untuk operasional cabang ini", tab: "bm-add-staff" },
     "reports":          { title: "Laporan",          sub: "Laporan transaksi dan omzet penjualan",          tab: "bm-reports" },
     "jam-operasional":  { title: "Jam Operasional",  sub: "Jadwal buka dan jam operasional resto",          tab: "bm-jam-operasional" },
-    "pengaturan":       { title: "Pengaturan",       sub: "Pengaturan profil dan preferensi aplikasi",      tab: "bm-settings" },
+    "edit-jam-operasional": { title: "Ubah Jam Operasional", sub: "Atur jam buka rutin dan hari libur cabang", tab: "bm-edit-jam" },
+    "add-category":     { title: "Tambah kategori",  sub: "Buat kategori baru untuk menu cabang",           tab: "bm-category-editor" },
+    "edit-category":    { title: "Ubah kategori",    sub: "Edit nama, foto, dan status kategori cabang",    tab: "bm-category-editor" },
+    "pengaturan":       { title: "Lainnya",          sub: "Kelola operasional dan fasilitas cabang",        tab: "bm-settings" },
+    "app-settings":     { title: "Pengaturan Aplikasi", sub: "Preferensi sistem, layar, dan notifikasi",    tab: "bm-app-settings" },
+    "sound-settings":   { title: "Suara & Notifikasi", sub: "Volume dering dan nada alarm pesanan",        tab: "bm-sound-settings" },
     "printer":          { title: "Printer Struk",    sub: "Pengaturan printer kasir dan cetak struk",       tab: "bm-printer" },
     "bantuan":          { title: "Bantuan",          sub: "Pusat bantuan operasional merchant",             tab: "bm-help" },
     "ketentuan":        { title: "Ketentuan",        sub: "Syarat layanan dan kebijakan privasi",          tab: "bm-terms" }
@@ -83,14 +89,17 @@
 
   function navigateTo(route) {
     if (!route) return;
+    var cleanRoute = String(route).replace(/^#\/?/, '');
     closeMobileSidebar();
     closeMobileAccount();
-    if (window.location.hash === '#' + route) {
-      applyRoute(route);
-    } else {
-      window.location.hash = route;
-      applyRoute(route);
+    if (window.location.hash !== '#' + cleanRoute) {
+      if (window.history && typeof window.history.pushState === 'function') {
+        window.history.pushState({ xentraRoute: cleanRoute }, '', '#' + cleanRoute);
+      } else {
+        window.location.hash = cleanRoute;
+      }
     }
+    applyRoute(cleanRoute);
   }
   window.navigateTo = navigateTo;
 
@@ -111,12 +120,19 @@
 
   var BM_SUBPAGE_ROUTES = {
     'jam-operasional': true,
+    'edit-jam-operasional': true,
     'staff': true,
-    'pengaturan': true,
+    'add-staff': true,
+    'add-category': true,
+    'edit-category': true,
     'printer': true,
     'bantuan': true,
     'ketentuan': true,
-    'reports': true
+    'reports': true,
+    'meja': true,
+    'promo': true,
+    'app-settings': true,
+    'sound-settings': true
   };
 
   function applyRoute(route) {
@@ -131,6 +147,9 @@
 
     var isSubpage = !!BM_SUBPAGE_ROUTES[route];
     document.body.classList.toggle('is-subpage-view', isSubpage);
+    if (tabId !== 'bm-menu') {
+      document.body.classList.remove('is-bm-menu-subview');
+    }
     if (isSubpage) {
       var activeSection = document.getElementById('tab-' + tabId);
       if (activeSection) activeSection.scrollTop = 0;
@@ -144,7 +163,17 @@
 
     // Bottom navigation active state (mobile)
     document.querySelectorAll('#x-merchant-mobile-nav .x-merchant-mobile-nav-item[data-route]').forEach(function (btn) {
-      var isActive = btn.dataset.route === route;
+      var r = btn.dataset.route;
+      var isActive = false;
+      if (r === route) {
+        isActive = true;
+      } else if (r === 'menu' && (route === 'menu' || route === 'stok')) {
+        isActive = true;
+      } else if (r === 'belanja' && (route === 'belanja' || route === 'purchasing')) {
+        isActive = true;
+      } else if (r === 'pengaturan' && (route === 'pengaturan' || route === 'staff' || route === 'add-staff' || route === 'reports' || route === 'printer' || route === 'jam-operasional' || route === 'edit-jam-operasional' || route === 'bantuan' || route === 'ketentuan' || route === 'meja' || route === 'promo')) {
+        isActive = true;
+      }
       btn.classList.toggle('active', isActive);
       btn.setAttribute('aria-current', isActive ? 'page' : 'false');
     });
@@ -176,10 +205,26 @@
       if (typeof loadBMMaterials === 'function') loadBMMaterials(true);
     }
     if (tabId === 'bm-belanja') {
-      document.body.classList.add('is-belanja-active');
-      if (typeof loadPurchasingChecklist === 'function') loadPurchasingChecklist();
+      var pTopbar = $('purchasing-mobile-topbar');
+      if (pTopbar) pTopbar.style.display = 'none';
+      var u = getStoredUser ? getStoredUser() : null;
+      var belanjaBranchEl = $('belanja-topbar-brand-name');
+      if (belanjaBranchEl && u) {
+        var bName = u.branch_name || '';
+        var brName = u.brand_name || '';
+        if (bName && brName && !bName.toLowerCase().includes(brName.toLowerCase())) {
+          belanjaBranchEl.textContent = brName + ' ' + bName;
+        } else {
+          belanjaBranchEl.textContent = bName || brName || 'MyBangjo Pringsewu';
+        }
+      }
+      if (typeof loadBMMandates === 'function') loadBMMandates();
+      if (typeof fetchAndApplyBrandLogo === 'function') fetchAndApplyBrandLogo();
     } else {
-      document.body.classList.remove('is-belanja-active');
+      var pTopbar = $('purchasing-mobile-topbar');
+      if (pTopbar && !document.body.classList.contains('is-purchasing-mode')) {
+        pTopbar.style.display = 'none';
+      }
       if (!document.body.classList.contains('is-purchasing-mode')) {
         var pBottomBar = $('purchasing-bottom-bar');
         if (pBottomBar) {
@@ -189,14 +234,16 @@
       }
     }
     if (tabId === 'bm-promo' && typeof loadBMPromotions === 'function') loadBMPromotions();
-    if (tabId === 'hari-ini') {
-      if (typeof loadHariIni === 'function') loadHariIni();
-      if (typeof startHariIniPolling === 'function') startHariIniPolling();
-    } else {
-      if (typeof stopHariIniPolling === 'function') stopHariIniPolling();
-    }
+    if (tabId === 'hari-ini' && typeof loadHariIni === 'function') loadHariIni();
     if (tabId === 'bm-staff' && typeof loadBMStaff === 'function') loadBMStaff();
+    if (tabId === 'bm-add-staff') {
+      if (typeof updateAddStaffSaveButtonState === 'function') updateAddStaffSaveButtonState();
+      if (window.XentraDropdown && typeof window.XentraDropdown.refresh === 'function') {
+        setTimeout(function () { window.XentraDropdown.refresh(); }, 50);
+      }
+    }
     if (tabId === 'bm-jam-operasional' && typeof loadBMJamOperasional === 'function') loadBMJamOperasional();
+    if (tabId === 'bm-edit-jam' && typeof renderJamEditorForm === 'function') renderJamEditorForm();
     if (tabId === 'bm-reports' && typeof loadBMReports === 'function') loadBMReports();
     if (tabId === 'bm-printer' && typeof initBMPrinterView === 'function') initBMPrinterView();
   }
@@ -304,6 +351,38 @@
 
 
 
+  function updateBrandLogoUI(logoUrl) {
+    if (!logoUrl) return;
+    try {
+      localStorage.setItem('xentra_merchant_brand_logo', logoUrl);
+    } catch (_) {}
+    document.querySelectorAll('.x-mobile-branch-logo').forEach(function (img) {
+      if (img.src !== logoUrl && !img.src.endsWith(logoUrl)) {
+        img.src = logoUrl;
+      }
+    });
+  }
+
+  async function fetchAndApplyBrandLogo() {
+    var cached = null;
+    try { cached = localStorage.getItem('xentra_merchant_brand_logo'); } catch (_) {}
+    if (cached) updateBrandLogoUI(cached);
+
+    var user = getStoredUser();
+    if (user && (user.brand_logo || user.logo_url)) {
+      updateBrandLogoUI(user.brand_logo || user.logo_url);
+    }
+
+    try {
+      var res = await fetch('/api/v1/brand/info');
+      if (res.ok) {
+        var data = await res.json();
+        var logo = data && data.brand && (data.brand.logo_url || data.brand.merchant_pwa_icon_url);
+        if (logo) updateBrandLogoUI(logo);
+      }
+    } catch (_) {}
+  }
+
   /**
    * Branch-Manager-only shell adjustments (this surface has a single role).
    * RBAC/scope are still enforced server-side; this is presentation + the
@@ -312,6 +391,8 @@
   function applyRoleBasedUI() {
     var user = getStoredUser();
     if (!user) return;
+
+    fetchAndApplyBrandLogo();
 
     var titleEl = $('dash-brand-title');
     if (titleEl && user.brand_name) titleEl.textContent = user.brand_name;
@@ -365,7 +446,13 @@
     var branchSelectorWrap = $('x-branch-selector');
     if (branchSelectorWrap) branchSelectorWrap.style.display = 'none';
     var bmBranchBadge = $('dash-bm-branch-badge');
-    if (bmBranchBadge) bmBranchBadge.style.display = 'flex';
+    if (bmBranchBadge) {
+      if (document.body.classList.contains('x-merchant-app')) {
+        bmBranchBadge.style.setProperty('display', 'none', 'important');
+      } else {
+        bmBranchBadge.style.display = 'flex';
+      }
+    }
     var bId = (typeof window.getBMTargetBranchId === 'function' ? window.getBMTargetBranchId() : null) || (user ? (user.branch_id || user.branchId) : null);
     if (bId) {
       if (Catalog && Catalog.state) Catalog.state.branchId = bId;
@@ -387,14 +474,34 @@
   window.__subpageReturnToAccount = false;
   function navigateBackFromSubpage() {
     document.body.classList.remove('is-subpage-view');
+    var currentHash = window.location.hash.replace(/^#\/?/, '').trim().toLowerCase();
+    if (currentHash === 'sound-settings') {
+      navigateTo('app-settings');
+      return;
+    }
+    if (currentHash === 'edit-jam-operasional') {
+      navigateTo('jam-operasional');
+      return;
+    }
+    if (currentHash === 'add-staff') {
+      navigateTo('staff');
+      return;
+    }
+    if (currentHash === 'add-category' || currentHash === 'edit-category') {
+      navigateTo('menu');
+      return;
+    }
     if (window.__subpageReturnToAccount) {
       window.__subpageReturnToAccount = false;
-      window.location.hash = 'hari-ini';
-      applyRoute('hari-ini');
-      openMobileAccount();
-    } else {
       navigateTo('hari-ini');
+      openMobileAccount();
+      return;
     }
+    if (currentHash === 'app-settings' || currentHash === 'printer' || currentHash === 'jam-operasional' || currentHash === 'staff' || currentHash === 'meja' || currentHash === 'promo' || currentHash === 'reports' || currentHash === 'bantuan' || currentHash === 'ketentuan') {
+      navigateTo('pengaturan');
+      return;
+    }
+    navigateTo('hari-ini');
   }
   window.navigateBackFromSubpage = navigateBackFromSubpage;
 
@@ -406,6 +513,192 @@
   }
   window.closeMerchantSettings = closeMerchantSettings;
 
+  function syncSoundSettingsUI() {
+    if (!window.XentraAudio || typeof window.XentraAudio.getSoundConfig !== 'function') return;
+    var config = window.XentraAudio.getSoundConfig();
+
+    // Master Switch
+    var masterSwitch = $('switch-sound-master');
+    if (masterSwitch) {
+      masterSwitch.classList.toggle('is-on', Boolean(config.enabled));
+      masterSwitch.classList.toggle('is-off', !config.enabled);
+    }
+
+    // Volume Slider
+    var volSlider = $('bm-sound-volume-slider');
+    var volBadge = $('bm-sound-volume-badge');
+    var volIcon = $('bm-sound-vol-icon');
+    var vol = (config.volume !== undefined) ? Number(config.volume) : 80;
+    if (volSlider) volSlider.value = vol;
+    if (volBadge) volBadge.textContent = vol + '%';
+    if (volIcon) {
+      if (vol === 0 || !config.enabled) {
+        volIcon.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>';
+      } else if (vol <= 50) {
+        volIcon.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>';
+      } else {
+        volIcon.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>';
+      }
+    }
+
+    // Presets
+    var presetBtns = document.querySelectorAll('.x-vol-preset-btn');
+    presetBtns.forEach(function (btn) {
+      var targetVol = Number(btn.getAttribute('data-vol'));
+      btn.classList.toggle('active', targetVol === vol);
+    });
+
+    // Sound Type Radios
+    var typeRadios = document.querySelectorAll('input[name="bm_sound_type"]');
+    typeRadios.forEach(function (r) {
+      r.checked = (r.value === config.soundType);
+      var parentLabel = r.closest('.x-sound-option-card');
+      if (parentLabel) {
+        parentLabel.classList.toggle('is-selected', r.value === config.soundType);
+        parentLabel.style.borderColor = (r.value === config.soundType) ? '#059669' : '#e2e8f0';
+        parentLabel.style.background = (r.value === config.soundType) ? '#f0fdf4' : '#ffffff';
+      }
+    });
+
+    // Repeat Mode Radios
+    var repeatRadios = document.querySelectorAll('input[name="bm_repeat_mode"]');
+    repeatRadios.forEach(function (r) {
+      r.checked = (r.value === config.repeatMode);
+      var parentLabel = r.closest('.x-repeat-option-card');
+      if (parentLabel) {
+        parentLabel.classList.toggle('is-selected', r.value === config.repeatMode);
+        parentLabel.style.borderColor = (r.value === config.repeatMode) ? '#059669' : '#e2e8f0';
+        parentLabel.style.background = (r.value === config.repeatMode) ? '#f0fdf4' : '#ffffff';
+      }
+    });
+
+    // Summary Badge in App Settings
+    var summaryEl = $('bm-app-settings-sound-summary');
+    if (summaryEl) {
+      if (!config.enabled) {
+        summaryEl.textContent = 'Nonaktif';
+        summaryEl.style.color = '#ef4444';
+        summaryEl.style.background = '#fef2f2';
+      } else {
+        var toneMap = { voice: 'Vokal', bell: 'Denting', siren: 'Sirene' };
+        var toneLabel = toneMap[config.soundType] || 'Vokal';
+        summaryEl.textContent = vol + '% • ' + toneLabel;
+        summaryEl.style.color = '#059669';
+        summaryEl.style.background = '#ecfdf5';
+      }
+    }
+  }
+
+  function bindSoundSettingsControls() {
+    var toggleBtn = $('btn-toggle-sound-master');
+    if (toggleBtn && !toggleBtn.dataset.bound) {
+      toggleBtn.dataset.bound = '1';
+      toggleBtn.addEventListener('click', function () {
+        if (!window.XentraAudio) return;
+        var cfg = window.XentraAudio.getSoundConfig();
+        var updated = window.XentraAudio.setSoundConfig({ enabled: !cfg.enabled });
+        syncSoundSettingsUI();
+        if (typeof showToast === 'function') {
+          showToast(updated.enabled ? 'Suara pesanan baru diaktifkan' : 'Suara pesanan baru dinonaktifkan', updated.enabled ? 'success' : 'info');
+        }
+      });
+    }
+
+    var volSlider = $('bm-sound-volume-slider');
+    if (volSlider && !volSlider.dataset.bound) {
+      volSlider.dataset.bound = '1';
+      volSlider.addEventListener('input', function () {
+        var v = Number(volSlider.value);
+        var badge = $('bm-sound-volume-badge');
+        if (badge) badge.textContent = v + '%';
+      });
+      volSlider.addEventListener('change', function () {
+        var v = Number(volSlider.value);
+        if (window.XentraAudio) {
+          window.XentraAudio.setSoundConfig({ volume: v });
+          syncSoundSettingsUI();
+          window.XentraAudio.testAlertSound();
+        }
+      });
+    }
+
+    var presetBtns = document.querySelectorAll('.x-vol-preset-btn');
+    presetBtns.forEach(function (btn) {
+      if (btn.dataset.bound) return;
+      btn.dataset.bound = '1';
+      btn.addEventListener('click', function () {
+        var v = Number(btn.getAttribute('data-vol'));
+        if (window.XentraAudio) {
+          window.XentraAudio.setSoundConfig({ volume: v });
+          syncSoundSettingsUI();
+          window.XentraAudio.testAlertSound();
+        }
+      });
+    });
+
+    var typeRadios = document.querySelectorAll('input[name="bm_sound_type"]');
+    typeRadios.forEach(function (radio) {
+      if (radio.dataset.bound) return;
+      radio.dataset.bound = '1';
+      radio.addEventListener('change', function () {
+        if (radio.checked && window.XentraAudio) {
+          window.XentraAudio.setSoundConfig({ soundType: radio.value });
+          syncSoundSettingsUI();
+          window.XentraAudio.testAlertSound(radio.value);
+        }
+      });
+    });
+
+    var repeatRadios = document.querySelectorAll('input[name="bm_repeat_mode"]');
+    repeatRadios.forEach(function (radio) {
+      if (radio.dataset.bound) return;
+      radio.dataset.bound = '1';
+      radio.addEventListener('change', function () {
+        if (radio.checked && window.XentraAudio) {
+          window.XentraAudio.setSoundConfig({ repeatMode: radio.value });
+          syncSoundSettingsUI();
+          if (typeof showToast === 'function') {
+            showToast(radio.value === 'single' ? 'Mode dering: 1 kali' : 'Mode dering: berulang sampai diterima', 'info');
+          }
+        }
+      });
+    });
+
+    var testPlayBtn = $('btn-sound-test-play');
+    if (testPlayBtn && !testPlayBtn.dataset.bound) {
+      testPlayBtn.dataset.bound = '1';
+      testPlayBtn.addEventListener('click', function () {
+        if (window.XentraAudio) {
+          window.XentraAudio.orderIncoming({ force: true });
+          var status = $('bm-sound-test-status');
+          if (status) {
+            status.textContent = '🔊 Sedang membunyikan suara alarm...';
+            status.style.color = '#059669';
+            status.style.background = '#ecfdf5';
+          }
+        }
+      });
+    }
+
+    var testStopBtn = $('btn-sound-test-stop');
+    if (testStopBtn && !testStopBtn.dataset.bound) {
+      testStopBtn.dataset.bound = '1';
+      testStopBtn.addEventListener('click', function () {
+        if (window.XentraAudio) {
+          window.XentraAudio.stopOrderAlert();
+          var status = $('bm-sound-test-status');
+          if (status) {
+            status.textContent = '⏹️ Suara dihentikan';
+            status.style.color = '#64748b';
+            status.style.background = '#f8fafc';
+          }
+        }
+      });
+    }
+
+    syncSoundSettingsUI();
+  }
+
   function bindMerchantSettingsControls() {
     var settingsBtn = $('btn-mobile-account-settings');
     if (settingsBtn && !settingsBtn.dataset.bound) {
@@ -413,7 +706,7 @@
       settingsBtn.addEventListener('click', function () {
         window.__subpageReturnToAccount = true;
         closeMobileAccount();
-        navigateTo('pengaturan');
+        navigateTo('app-settings');
       });
     }
     var backBtn = $('btn-bm-settings-back');
@@ -435,10 +728,12 @@
       refreshBtn.dataset.bound = '1';
       refreshBtn.addEventListener('click', function () {
         refreshBtn.disabled = true;
-        refreshBtn.textContent = 'Menyegarkan...';
+        refreshBtn.textContent = 'Menyinkronkan...';
         window.location.reload();
       });
     }
+
+    bindSoundSettingsControls();
   }
 
   if (document.readyState === 'loading') {
@@ -463,17 +758,117 @@
     if (phoneEl) phoneEl.textContent = user.phone || user.phone_number || '-';
   }
 
-  function closeMobileAccount() {
+  window.__accountHistoryPushed = false;
+  function closeMobileAccount(fromPopstate) {
     document.body.classList.remove('x-mobile-account-open');
     var page = $('x-mobile-account-page');
-    if (page) page.setAttribute('aria-hidden', 'true');
+    if (page) {
+      page.setAttribute('aria-hidden', 'true');
+      page.style.removeProperty('--account-slide-x');
+      page.style.transition = '';
+    }
+    if (!fromPopstate && window.__accountHistoryPushed) {
+      window.__accountHistoryPushed = false;
+      if (window.history && typeof window.history.back === 'function') {
+        window.history.back();
+      }
+    } else {
+      window.__accountHistoryPushed = false;
+    }
   }
 
   function openMobileAccount() {
     populateMobileAccount();
     document.body.classList.add('x-mobile-account-open');
     var page = $('x-mobile-account-page');
-    if (page) page.setAttribute('aria-hidden', 'false');
+    if (page) {
+      page.setAttribute('aria-hidden', 'false');
+      page.style.removeProperty('--account-slide-x');
+      page.style.transition = '';
+    }
+    if (window.history && typeof window.history.pushState === 'function') {
+      window.__accountHistoryPushed = true;
+      window.history.pushState({ xentraModal: 'account' }, '', window.location.href);
+    }
+  }
+
+  window.addEventListener('popstate', function () {
+    if (document.body.classList.contains('x-mobile-account-open')) {
+      closeMobileAccount(true);
+    }
+  });
+
+  function bindAccountSwipeGesture() {
+    var page = $('x-mobile-account-page');
+    if (!page || page.dataset.swipeBound) return;
+    page.dataset.swipeBound = '1';
+
+    var startX = 0;
+    var startY = 0;
+    var startTime = 0;
+    var isSwiping = false;
+
+    page.addEventListener('touchstart', function (e) {
+      if (!document.body.classList.contains('x-mobile-account-open')) return;
+      if (e.touches.length !== 1) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      startTime = Date.now();
+      isSwiping = false;
+    }, { passive: true });
+
+    page.addEventListener('touchmove', function (e) {
+      if (!document.body.classList.contains('x-mobile-account-open')) return;
+      if (e.touches.length !== 1) return;
+      var curX = e.touches[0].clientX;
+      var curY = e.touches[0].clientY;
+      var diffX = curX - startX;
+      var diffY = curY - startY;
+
+      if (!isSwiping) {
+        // Left hand thumb gesture: swipe to the right
+        if (diffX > 10 && diffX > Math.abs(diffY) * 1.2 && startX <= Math.max(180, window.innerWidth * 0.85)) {
+          isSwiping = true;
+        } else if (Math.abs(diffY) > 10) {
+          return;
+        }
+      }
+
+      if (isSwiping && diffX > 0) {
+        if (e.cancelable) e.preventDefault();
+        page.style.transition = 'none';
+        page.style.setProperty('--account-slide-x', diffX + 'px');
+      }
+    }, { passive: false });
+
+    function handleTouchEnd(e) {
+      if (!isSwiping) return;
+      isSwiping = false;
+      var endX = (e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0].clientX : startX;
+      var diffX = endX - startX;
+      var duration = Date.now() - startTime;
+      var velocity = duration > 0 ? diffX / duration : 0;
+
+      if (diffX >= 70 || (velocity > 0.25 && diffX >= 35)) {
+        page.style.transition = 'transform 200ms cubic-bezier(0.2, 0.9, 0.3, 1)';
+        page.style.setProperty('--account-slide-x', '100%');
+        setTimeout(function () {
+          closeMobileAccount();
+          page.style.removeProperty('--account-slide-x');
+          page.style.transition = '';
+        }, 200);
+      } else {
+        page.style.transition = 'transform 180ms cubic-bezier(0.2, 0.9, 0.3, 1)';
+        page.style.setProperty('--account-slide-x', '0px');
+        setTimeout(function () {
+          page.style.removeProperty('--account-slide-x');
+          page.style.transition = '';
+        }, 180);
+      }
+    }
+
+    page.addEventListener('touchend', handleTouchEnd, { passive: true });
+    page.addEventListener('touchcancel', handleTouchEnd, { passive: true });
   }
 
   function logoutFromMobileAccount() {
@@ -487,6 +882,7 @@
 
   function initMobileAccount() {
     var profile = $('mobile-user-profile');
+    var pesananProfile = $('pesanan-mobile-user-profile');
     var back = $('btn-mobile-account-back');
     var logout = $('btn-mobile-account-logout');
     var profileCard = $('mobile-account-profile-card');
@@ -498,10 +894,15 @@
     var helpBtn = $('btn-mobile-account-help');
     var termsBtn = $('btn-mobile-account-terms');
     var versionBtn = $('btn-mobile-account-version');
+    bindAccountSwipeGesture();
 
     if (profile && !profile.dataset.accountBound) {
       profile.dataset.accountBound = '1';
       profile.addEventListener('click', openMobileAccount);
+    }
+    if (pesananProfile && !pesananProfile.dataset.accountBound) {
+      pesananProfile.dataset.accountBound = '1';
+      pesananProfile.addEventListener('click', openMobileAccount);
     }
     if (back && !back.dataset.accountBound) {
       back.dataset.accountBound = '1';
@@ -623,7 +1024,7 @@
     if (versionBtn && !versionBtn.dataset.accountBound) {
       versionBtn.dataset.accountBound = '1';
       versionBtn.addEventListener('click', function () {
-        showToast('Xentra Core Merchant App v1.4.7 (Versi Terbaru)', 'success');
+        showToast('Xentra Core Merchant App v1.5.0 (Versi Terbaru)', 'success');
       });
     }
   }
@@ -712,14 +1113,16 @@
     var branchId = user ? (user.branch_id || user.branchId) : null;
     if (!branchId) return;
     try {
-      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/orders?status=pending', {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/orders?status=all', {
         headers: getAuthHeaders()
       });
       var data = await res.json();
       if (data && data.success && Array.isArray(data.orders)) {
-        var count = data.orders.filter(function (o) {
-          return o.status === 'pending' || Number(o.pending_additions_count || 0) > 0;
-        }).length;
+        var count = typeof window.countMobileInProcessOrders === 'function'
+          ? window.countMobileInProcessOrders(data.orders)
+          : data.orders.filter(function (o) {
+            return ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery'].indexOf(String(o.status || '')) !== -1;
+          }).length;
         updateMobileOrdersBadge(count);
         if (typeof checkAndNotifyNewPendingOrders === 'function') {
           checkAndNotifyNewPendingOrders(data.orders);
@@ -1053,6 +1456,14 @@
     }
   }
 
+  window.openOpsChat = function () {
+    if (window.XentraOpsChat && typeof window.XentraOpsChat.openInbox === 'function') {
+      window.XentraOpsChat.openInbox();
+    } else {
+      console.warn('[merchant-app] XentraOpsChat not loaded');
+    }
+  };
+
   window.addEventListener('merchant:home-ready', function () {
     if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
       window.Xentra.hideSplash();
@@ -1060,6 +1471,7 @@
   });
 
   window.addEventListener('hashchange', function () { applyRoute(getCurrentRoute()); });
+  window.addEventListener('popstate', function () { applyRoute(getCurrentRoute()); });
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);

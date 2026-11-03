@@ -409,7 +409,7 @@
           <div class="x-form-group">
             <label for="username">Username / Email Restaurant</label>
             <div class="x-input-wrap">
-              <input type="text" id="username" class="x-input" placeholder="Masukkan username atau email" required autocomplete="username">
+              <input type="text" id="username" class="x-input" placeholder="Masukkan username atau email" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false">
             </div>
           </div>
 
@@ -557,7 +557,7 @@
           // Owner / Brand Manager -> Dedicated Owner Surface (/owner/) on Mobile / APK, /dashboard/ on Desktop
           if (role === 'owner' || role === 'brand_manager') {
             var isMobile = window.innerWidth <= 1024 || !!(window.XentraNative || window.XentraOwnerBridge || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent));
-            var targetOwnerPath = isMobile ? '/owner/' : '/dashboard/';
+            var targetOwnerPath = isMobile ? '/owner/#overview' : '/dashboard/#overview';
             if (prefix === 'owner' || prefix === 'm' || prefix === 'merchant') return targetOwnerPath;
             return protocol + '//m.' + baseDomain + targetOwnerPath;
           }
@@ -574,6 +574,8 @@
         }
 
         if (role === 'purchasing') return '/belanja/';
+        var isMobileManager = window.innerWidth <= 1024 || !!(window.XentraNative || window.XentraOwnerBridge || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent));
+        if (isMobileManager && (role === 'owner' || role === 'brand_manager')) return '/owner/#overview';
         return fallback;
       }
 
@@ -857,16 +859,15 @@
               return;
             }
             var redirectParam = urlParams.get('redirect');
+            var isMobileAuto = window.innerWidth <= 1024 || !!(window.XentraNative || window.XentraOwnerBridge || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent));
             var target = (redirectParam && redirectParam.startsWith('/') && !redirectParam.startsWith('//'))
               ? redirectParam
-              : postLoginTarget(d, (d && d.landing) || '/dashboard/');
+              : postLoginTarget(d, (d && d.landing) || (isMobileAuto ? '/owner/#overview' : '/dashboard/#overview'));
             window.location.href = target;
           })
-          .catch(function () {
-            localStorage.removeItem(TOKEN_KEY);
-            localStorage.removeItem(USER_KEY);
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
+          .catch(function (err) {
+            console.warn('[Existing token validation network error]:', err);
+            // Do not delete valid session tokens on temporary network connection hiccups
           });
         return;
       }
@@ -903,7 +904,8 @@
         btn.disabled = true;
         btn.innerHTML = '<span>Memverifikasi kredensial...</span>';
 
-        var username = document.getElementById('username').value.trim();
+        var rawUsername = document.getElementById('username').value.trim();
+        var username = rawUsername.includes('@') ? rawUsername.toLowerCase() : rawUsername;
         var password = document.getElementById('password').value.trim();
 
         try {
@@ -932,6 +934,17 @@
             // Backward compatibility
             localStorage.setItem('token', data.token);
             localStorage.setItem('user', JSON.stringify(data.user));
+
+            // Ensure route always starts fresh at Beranda/Home (#overview)
+            try { sessionStorage.removeItem('xentra_owner_last_route'); } catch (_) {}
+
+            // Synchronize token to Native Android Bridge if present
+            if (window.XentraOwnerBridge && typeof window.XentraOwnerBridge.syncAuth === 'function') {
+              window.XentraOwnerBridge.syncAuth(data.token, (data.user && data.user.branch_id) || '');
+            }
+            if (window.XentraNative && typeof window.XentraNative.syncAuth === 'function') {
+              window.XentraNative.syncAuth(data.token, (data.user && data.user.branch_id) || '');
+            }
 
             if (claimDomain) {
               btn.innerHTML = '<span>Menyelesaikan klaim bisnis...</span>';
@@ -966,7 +979,7 @@
               }
             }
 
-            btn.innerHTML = '<span>Login berhasil! Mengalihkan...</span>';
+            btn.innerHTML = '<span>Login berhasil! Mengalihkan ke Beranda...</span>';
 
             // If there was a pending Google link request (ACCOUNT_NOT_LINKED from broker),
             // initiate the Google account linking flow via the broker.
@@ -1000,10 +1013,11 @@
             }
 
             setTimeout(function () {
+              var isMobileSubmit = window.innerWidth <= 1024 || !!(window.XentraNative || window.XentraOwnerBridge || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent));
               var redirectParam = urlParams.get('redirect');
               var target = (redirectParam && redirectParam.startsWith('/') && !redirectParam.startsWith('//'))
                 ? redirectParam
-                : postLoginTarget(data, data.redirect_url || data.landing || '/dashboard/');
+                : postLoginTarget(data, data.redirect_url || data.landing || (isMobileSubmit ? '/owner/#overview' : '/dashboard/#overview'));
               window.location.href = target;
             }, 250);
             return;
@@ -1017,6 +1031,7 @@
         // would validate it, get 401, and bounce straight back here (login loop).
         errorBox.textContent = '❌ ' + ((data && (data.error || data.message)) || 'Username atau password yang Anda masukkan salah.');
         errorBox.style.display = 'block';
+        try { errorBox.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {}
         btn.disabled = false;
         btn.innerHTML = '<span>Masuk ke Dashboard</span>';
       });
@@ -1167,6 +1182,9 @@
                 localStorage.setItem('user', JSON.stringify(data.user));
               }
 
+              // Ensure route always starts fresh at Beranda/Home (#overview)
+              try { sessionStorage.removeItem('xentra_owner_last_route'); } catch (_) {}
+
               // Synchronize token to Native Android Bridge if present
               if (window.XentraOwnerBridge && typeof window.XentraOwnerBridge.syncAuth === 'function') {
                 window.XentraOwnerBridge.syncAuth(data.token, (data.user && data.user.branch_id) || '');
@@ -1176,12 +1194,12 @@
               }
 
               if (googleStatus) {
-                googleStatus.textContent = 'Login Google berhasil! Mengalihkan ke Home...';
+                googleStatus.textContent = 'Login Google berhasil! Mengalihkan ke Beranda...';
                 googleStatus.style.color = '#166534';
                 googleStatus.style.display = 'block';
               }
               setTimeout(function () {
-                window.location.href = postLoginTarget(data, data.redirect_url || data.landing || '/owner/');
+                window.location.href = postLoginTarget(data, data.redirect_url || data.landing || '/owner/#overview');
               }, 250);
               return;
             }

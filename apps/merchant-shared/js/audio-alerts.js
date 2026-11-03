@@ -19,11 +19,45 @@
   var _orderAlertPauseMs = 1000;
   var _orderAlertTimer = null;
 
+  var DEFAULT_SOUND_CONFIG = {
+    enabled: true,
+    volume: 80,
+    soundType: 'voice', // 'voice' | 'bell' | 'siren'
+    repeatMode: 'loop'  // 'loop' | 'single'
+  };
+
+  function getSoundConfig() {
+    try {
+      var raw = localStorage.getItem('xentra_merchant_sound_config');
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        return Object.assign({}, DEFAULT_SOUND_CONFIG, parsed);
+      }
+    } catch (_) {}
+    return Object.assign({}, DEFAULT_SOUND_CONFIG);
+  }
+
+  function setSoundConfig(config) {
+    try {
+      var current = getSoundConfig();
+      var merged = Object.assign({}, current, config);
+      localStorage.setItem('xentra_merchant_sound_config', JSON.stringify(merged));
+      if (_orderAudio) {
+        _orderAudio.volume = Math.max(0, Math.min(1, (merged.volume !== undefined ? merged.volume : 80) / 100));
+      }
+      return merged;
+    } catch (_) {
+      return config;
+    }
+  }
+
   function getOrderAudio() {
     if (!_orderAudio && typeof Audio !== 'undefined') {
       try {
         _orderAudio = new Audio('/merchant-shared/audio/ada-pesanan-baru.mp3');
         _orderAudio.preload = 'auto';
+        var cfg = getSoundConfig();
+        _orderAudio.volume = Math.max(0, Math.min(1, (cfg.volume !== undefined ? cfg.volume : 80) / 100));
         _orderAudio.onerror = function () {
           if (_orderAudio && _orderAudio.src && _orderAudio.src.indexOf('/merchant-shared/') !== -1) {
             _orderAudio.src = '/merchant-app/assets/audio/ada-pesanan-baru.mp3';
@@ -110,9 +144,9 @@
   }
 
   /**
-   * Synthesize a melodic chime (fallback)
+   * Synthesize a melodic chime (fallback & sound choice)
    */
-  function playChime(tones, durationPerTone, type) {
+  function playChime(tones, durationPerTone, type, volumeGain) {
     var ctx = getAudioContext();
     if (!ctx || ctx.state === 'suspended') return;
 
@@ -120,6 +154,7 @@
       var now = ctx.currentTime;
       var duration = durationPerTone || 0.16;
       tones = tones || [587.33, 880, 1174.66]; // D5, A5, D6
+      var targetGain = (volumeGain !== undefined ? volumeGain : 0.4);
 
       tones.forEach(function (freq, idx) {
         var osc = ctx.createOscillator();
@@ -129,7 +164,7 @@
         osc.frequency.setValueAtTime(freq, now + idx * duration);
 
         gain.gain.setValueAtTime(0.001, now + idx * duration);
-        gain.gain.exponentialRampToValueAtTime(0.4, now + idx * duration + 0.03);
+        gain.gain.exponentialRampToValueAtTime(Math.max(0.001, targetGain), now + idx * duration + 0.03);
         gain.gain.exponentialRampToValueAtTime(0.001, now + (idx + 1) * duration + 0.08);
 
         osc.connect(gain);
@@ -190,11 +225,46 @@
     }
     _orderAlertRepeatCount++;
 
+    var config = getSoundConfig();
+    var vol = (options && options.volume !== undefined)
+      ? Number(options.volume) / 100
+      : (config.volume !== undefined ? config.volume : 80) / 100;
+    var soundType = (options && options.soundType) || config.soundType || 'voice';
+
+    var isSingle = !!(options && (options.single || options.maxRepeats === 1 || (config.repeatMode === 'single')));
+
+    if (soundType === 'bell') {
+      playChime([523.25, 659.25, 783.99, 1046.50], 0.14, 'sine', 0.5 * vol);
+      if (!isSingle) {
+        scheduleNextOrderAlert(options);
+      } else {
+        _orderAlertActive = false;
+      }
+      return;
+    }
+
+    if (soundType === 'siren') {
+      playChime([880, 1174.66, 880, 1174.66], 0.14, 'triangle', 0.6 * vol);
+      if (!isSingle) {
+        scheduleNextOrderAlert(options);
+      } else {
+        _orderAlertActive = false;
+      }
+      return;
+    }
+
+    // Default 'voice': MP3 "Ada pesanan baru.mp3"
     var audio = getOrderAudio();
     if (audio) {
       try {
+        audio.loop = false;
+        audio.volume = Math.max(0, Math.min(1, vol));
         audio.currentTime = 0;
         audio.onended = function () {
+          if (isSingle || _orderAlertRepeatCount >= _orderAlertMaxRepeats) {
+            _orderAlertActive = false;
+            return;
+          }
           scheduleNextOrderAlert(options);
         };
         var playPromise = audio.play();
@@ -208,7 +278,11 @@
             }
             if (!_orderAlertActive) return;
             fallbackOrderAlert(options);
-            scheduleNextOrderAlert(options);
+            if (!isSingle && _orderAlertRepeatCount < _orderAlertMaxRepeats) {
+              scheduleNextOrderAlert(options);
+            } else {
+              _orderAlertActive = false;
+            }
           });
           return;
         }
@@ -217,22 +291,38 @@
         if (err && (err.name === 'AbortError' || err.code === 20)) return;
         if (!_orderAlertActive) return;
         fallbackOrderAlert(options);
-        scheduleNextOrderAlert(options);
+        if (!isSingle && _orderAlertRepeatCount < _orderAlertMaxRepeats) {
+          scheduleNextOrderAlert(options);
+        } else {
+          _orderAlertActive = false;
+        }
         return;
       }
     }
     if (!_orderAlertActive) return;
     fallbackOrderAlert(options);
-    scheduleNextOrderAlert(options);
+    if (!isSingle && _orderAlertRepeatCount < _orderAlertMaxRepeats) {
+      scheduleNextOrderAlert(options);
+    } else {
+      _orderAlertActive = false;
+    }
   }
 
   /**
-   * Play the genuine recorded MP3 "Ada pesanan baru.mp3"
-   * Repeats with 1s pause between loops up to max 5x, or stops when accepted/rejected.
+   * Play the genuine recorded MP3 "Ada pesanan baru.mp3" or selected ringtone
+   * Repeats with 1s pause between loops up to max repeats, or stops when accepted/rejected.
    */
   function playOrderAlertAudio(options) {
     options = options || {};
-    if (window.XentraNative && typeof window.XentraNative.playOrderAlarm === 'function') {
+    var config = getSoundConfig();
+    if (!config.enabled && !options.force) {
+      return;
+    }
+    var isSingle = !!(options.single || (config.repeatMode === 'single') || (options.maxRepeats === 1));
+
+    // Only invoke native alarm service for repeating merchant alarms.
+    // For single alerts (Owner App / notification chime), do NOT trigger native loop alarm.
+    if (!isSingle && window.XentraNative && typeof window.XentraNative.playOrderAlarm === 'function') {
       try { window.XentraNative.playOrderAlarm(); } catch (_) {}
     }
     // If an alert is already actively playing and not finished, do not double-trigger or overlap
@@ -242,17 +332,39 @@
     stopOrderAlert();
     _orderAlertActive = true;
     _orderAlertRepeatCount = 0;
+
     _orderAlertMaxRepeats = (options.maxRepeats !== undefined)
       ? Number(options.maxRepeats)
-      : (options.single ? 1 : 5);
+      : (isSingle ? 1 : 5);
     _orderAlertPauseMs = (options.pauseMs !== undefined) ? Number(options.pauseMs) : 1000;
 
     playOrderAlertStep(options);
   }
 
   function fallbackOrderAlert(options) {
+    var config = getSoundConfig();
+    var vol = (config.volume !== undefined ? config.volume : 80) / 100;
     // Only synthesize chime if MP3 fails to load; NEVER speak robot voice to avoid messy overlap
-    playChime([523.25, 659.25, 783.99, 1046.50], 0.12, 'sine');
+    playChime([523.25, 659.25, 783.99, 1046.50], 0.12, 'sine', 0.4 * vol);
+  }
+
+  function testAlertSound(soundType, volume) {
+    stopOrderAlert();
+    var current = getSoundConfig();
+    var targetType = soundType || current.soundType || 'voice';
+    var targetVol = (volume !== undefined ? volume : current.volume);
+
+    _orderAlertActive = true;
+    _orderAlertRepeatCount = 0;
+    _orderAlertMaxRepeats = 1;
+    _orderAlertPauseMs = 1000;
+
+    playOrderAlertStep({
+      force: true,
+      single: true,
+      soundType: targetType,
+      volume: targetVol
+    });
   }
 
   /**
@@ -328,7 +440,12 @@
           speakIndonesian(options.text);
         }, 450);
       }
-    }
+    },
+
+    // 7. Sound Configuration & Testing API
+    getSoundConfig: getSoundConfig,
+    setSoundConfig: setSoundConfig,
+    testAlertSound: testAlertSound
   };
 
   window.XentraAudio = XentraAudio;

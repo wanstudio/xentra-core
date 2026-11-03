@@ -164,7 +164,8 @@
       'payouts': 'finance-view-payouts',
       'reconciliation': 'finance-view-reconciliation',
       'payment-methods': 'finance-view-payment-methods',
-      'channels': 'finance-view-channels'
+      'channels': 'finance-view-channels',
+      'cod-custody': 'finance-view-cod-custody'
     };
 
     Object.keys(views).forEach(function (key) {
@@ -178,6 +179,7 @@
     else if (subtab === 'reconciliation') loadFinanceReconciliation();
     else if (subtab === 'payment-methods') loadFinancePaymentMethods();
     else if (subtab === 'channels') loadFinanceChannels();
+    else if (subtab === 'cod-custody') loadFinCodCustody();
   }
 
   function loadFinanceCurrentSubtab() {
@@ -420,6 +422,64 @@
       showToast('Gagal memuat daftar payment methods.');
     }
   }
+
+  async function loadFinCodCustody() {
+    var inCustodyVal = $('fin-cod-in-custody-val');
+    var handedOverVal = $('fin-cod-handed-over-val');
+    var driversTbody = $('fin-cod-drivers-tbody');
+    var bypassTbody = $('fin-cod-bypass-tbody');
+
+    try {
+      var branchId = getEffectiveBranchId();
+      var query = branchId && branchId !== 'all' ? '?branch_id=' + encodeURIComponent(branchId) : '';
+      var res = await adminFetch(API_BASE + '/admin/finance/cod-custody' + query, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      var json = await res.json();
+      if (!json || !json.success) return;
+
+      if (inCustodyVal) inCustodyVal.textContent = formatMoney(json.in_custody_cash || 0);
+      if (handedOverVal) handedOverVal.textContent = formatMoney(json.total_handed_over_to_cashier || 0);
+
+      if (driversTbody) {
+        var drivers = json.drivers_holding_cash || [];
+        if (!drivers.length) {
+          driversTbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:#15803d;font-weight:600;">✓ Tidak ada kurir yang memegang kas COD (Semua kas telah disetor).</td></tr>';
+        } else {
+          driversTbody.innerHTML = drivers.map(function (d) {
+            return '<tr>' +
+              '<td style="font-weight:700;color:#0f172a;">' + esc(d.driver_name || 'Kurir') + '</td>' +
+              '<td>' + esc(d.branch_name || d.branch_id || '-') + '</td>' +
+              '<td>' + esc(d.phone || '-') + '</td>' +
+              '<td><span style="background:#fef3c7;color:#b45309;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:700;">' + Number(d.active_cod_orders_count || 0) + ' order</span></td>' +
+              '<td style="text-align:right;font-weight:800;color:#b45309;">' + formatMoney(d.unsettled_cod_cash || 0) + '</td>' +
+            '</tr>';
+          }).join('');
+        }
+      }
+
+      if (bypassTbody) {
+        var logs = json.pod_bypass_audit_logs || [];
+        if (!logs.length) {
+          bypassTbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:#64748b;">Belum ada log bypass foto POD.</td></tr>';
+        } else {
+          bypassTbody.innerHTML = logs.map(function (l) {
+            var dateStr = l.updated_at ? new Date(l.updated_at).toLocaleString('id-ID') : '-';
+            return '<tr>' +
+              '<td style="font-size:12px;color:#64748b;">' + esc(dateStr) + '</td>' +
+              '<td style="font-weight:700;">#' + esc(l.order_number || l.order_id) + '</td>' +
+              '<td>' + esc(l.driver_name || '-') + '</td>' +
+              '<td><span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:10px;font-size:11.5px;font-weight:700;">' + esc(l.pod_bypass_reason || 'Bypass') + '</span></td>' +
+              '<td style="font-size:12px;color:#475569;">' + esc(l.pod_note || '-') + '</td>' +
+            '</tr>';
+          }).join('');
+        }
+      }
+    } catch (err) {
+      console.warn('[Finance COD Custody Load Error]:', err);
+      if (driversTbody) driversTbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:#dc2626;">Gagal memuat data COD kurir.</td></tr>';
+    }
+  }
+  window.loadFinCodCustody = loadFinCodCustody;
 
   async function togglePaymentMethodType(checkbox) {
     var provider = checkbox.dataset.provider;

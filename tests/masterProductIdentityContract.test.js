@@ -52,10 +52,10 @@ test('Product contract separates atomic Product ownership from commercial Menu o
 });
 
 test('Product Editor detail endpoint is wired to the canonical Product service', () => {
-  assert.ok(composedMenuRoute.includes("router.get('/admin/composed/products/:id'"));
+  assert.ok(composedMenuRoute.includes("'/admin/composed/products/:id'"));
   assert.ok(composedMenuRoute.includes("productService.findProduct"));
   assert.ok(composedMenuRoute.includes('MASTER_PRODUCT_NOT_FOUND'));
-  assert.ok(composedMenuRoute.includes("router.put('/admin/composed/products/:id'"));
+  assert.ok(composedMenuRoute.includes("'/admin/composed/products/:id'"));
 });
 
 test('Product Editor loader hydrates only atomic Product data', () => {

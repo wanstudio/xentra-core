@@ -32,6 +32,10 @@
         </div>
       </div>
       <div class="purchasing-topbar-actions">
+        <button type="button" class="purchasing-icon-btn" data-ops-chat-inbox="1" title="Kotak Pesan & Pengumuman" aria-label="Kotak Pesan" style="position:relative;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <span data-ops-chat-badge style="display:none;position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:#ef4444;color:#fff;font-size:10px;font-weight:800;line-height:16px;text-align:center;">0</span>
+        </button>
         <button type="button" class="purchasing-icon-btn" onclick="refreshPurchasingActiveView()" title="Segarkan Data" aria-label="Segarkan">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
         </button>
@@ -62,9 +66,14 @@
         </div>
 
         <!-- Section Header -->
-        <div class="purchasing-section-header">
-          <strong style="font-size:13.5px; color:#0f172a;" id="purchasing-list-title">Tugas Mandat Belanja</strong>
-          <span style="font-size:12px; font-weight:700; color:#64748b;"><span id="purchasing-item-count">0</span> item</span>
+        <div class="purchasing-section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <strong style="font-size:13.5px; color:#0f172a;" id="purchasing-list-title">Tugas Mandat Belanja</strong>
+            <span style="font-size:12px; font-weight:700; color:#64748b;">(<span id="purchasing-item-count">0</span> item)</span>
+          </div>
+          <button type="button" id="btn-purchasing-ops-chat" data-ops-chat-thread="purchasing" data-ops-chat-ref="daily" data-ops-chat-title="Belanja Pasar & Foto Struk" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:999px; padding:5px 11px; font-size:11.5px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:5px;">
+            💬 Chat &amp; Foto Struk
+          </button>
         </div>
 
         <!-- Checklist List Items Container -->
@@ -114,8 +123,17 @@
         </div>
       </section>
 
-      <!-- View 4: Kalkulator Kasir Pasar (Keypad Interaktif Fisik & Quick Cash) -->
+      <!-- View 4: Kalkulator Kasir Pasar (Fullscreen Keypad & Quick Cash) -->
       <section id="purchasing-view-calc" class="purchasing-subview" style="display:none;">
+        <div class="purchasing-calc-head">
+          <div class="purchasing-calc-head-copy">
+            <span class="purchasing-calc-head-title">Kalkulator Pasar</span>
+            <span class="purchasing-calc-head-sub">Hitung belanja &amp; kembalian</span>
+          </div>
+          <button type="button" class="purchasing-calc-close" onclick="closePurchasingCalc()" aria-label="Tutup kalkulator" title="Tutup">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
         <div class="purchasing-calc-card">
           <div class="purchasing-calc-display-box">
             <div class="purchasing-calc-display-formula" id="purchasing-calc-formula">0</div>
@@ -241,15 +259,19 @@
           <strong style="font-size:14px; color:#1e293b;" id="purchasing-update-price-old-price">Rp 0</strong>
         </div>
         <div>
-          <label style="display:block; font-size:12px; font-weight:700; color:#0f172a; margin-bottom:6px;">Jumlah Dibeli (Qty):</label>
+          <label style="display:block; font-size:12px; font-weight:700; color:#0f172a; margin-bottom:6px;">Jumlah / Berat Dibeli (Qty):</label>
           <div style="display:flex; align-items:center; gap:8px;">
-            <input type="number" id="input-purchasing-modal-qty" class="x-input" placeholder="1" step="any" min="0.01" style="font-size:16px; font-weight:700; padding:10px 14px; flex:1;">
+            <input type="number" id="input-purchasing-modal-qty" class="x-input" placeholder="1" step="any" min="0.01" style="font-size:16px; font-weight:700; padding:10px 14px; flex:1;" oninput="onPurchasingModalInputChanged()">
             <span id="purchasing-update-price-modal-uom-suffix" style="font-size:13px; font-weight:700; color:#475569; min-width:36px;">unit</span>
           </div>
         </div>
         <div>
-          <label style="display:block; font-size:12px; font-weight:700; color:#0f172a; margin-bottom:6px;">Harga Beli Riil di Pasar (Rp):</label>
-          <input type="text" id="input-purchasing-modal-price" class="x-input" placeholder="0" inputmode="numeric" pattern="[0-9]*" autocomplete="off" style="font-size:17px; font-weight:800; padding:10px 14px;" oninput="this.value = this.value ? formatNumberWithDots(this.value.replace(/\D/g,'')) : ''">
+          <label style="display:block; font-size:12px; font-weight:700; color:#0f172a; margin-bottom:6px;">Total Bayar di Nota Pasar (Rp):</label>
+          <input type="text" id="input-purchasing-modal-price" class="x-input" placeholder="0" inputmode="numeric" pattern="[0-9]*" autocomplete="off" style="font-size:17px; font-weight:800; padding:10px 14px;" oninput="this.value = this.value ? formatNumberWithDots(this.value.replace(/\D/g,'')) : ''; onPurchasingModalInputChanged();">
+          <p style="font-size:11px; color:#64748b; margin:4px 0 0;">Cukup ketik total nominal di struk/karcis pasar. Sistem membagi harga satuan otomatis.</p>
+        </div>
+        <div id="purchasing-modal-calc-preview" style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:8px 12px; font-size:12px; color:#166534; display:none;">
+          <span>Harga Satuan Riil: </span><strong id="purchasing-modal-calc-unit-price">Rp 0</strong> <span id="purchasing-modal-calc-uom">/ unit</span>
         </div>
       </div>
       <div style="padding:12px 18px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; gap:8px; justify-content:flex-end;">
@@ -426,7 +448,9 @@
   </div>
 
   <!-- Standalone Purchasing Controller -->
-  <script src="/belanja/assets/js/purchasing-app.js?v=1.1.0"></script>
+  <script src="/merchant-shared/js/audio-alerts.js?v=1.0.6"></script>
+  <script src="/merchant-shared/js/ops-chat.js?v=2.0.0"></script>
+  <script src="/belanja/assets/js/purchasing-app.js?v=1.1.2"></script>
 </body>
 </html>
 

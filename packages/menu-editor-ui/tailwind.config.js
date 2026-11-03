@@ -3,7 +3,7 @@ export default {
   content: [
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
-  important: ':is(#xentra-owner-app-root, #modern-menu-editor-root, #modern-menu-portal-root, #modern-business-hub-root, #modern-catalog-subhub-root, #modern-categories-page-root, #modern-item-master-page-root, #modern-category-editor-page-root, #modern-category-sort-page-root, #modern-category-detail-page-root, #modern-category-menu-sort-page-root)',
+  important: ':is(body.x-owner-mobile-app, #xentra-owner-app-mount, #xentra-owner-app-root, [id^="modern-"], [id*="-portal-root"])',
   corePlugins: {
     preflight: false,
   },

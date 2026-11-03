@@ -52,10 +52,26 @@ function computeAcceptanceDeadlineAt(order) {
   if (!order || order.status !== 'pending' || !order.created_at) {
     return null;
   }
+  const isReservation = order.order_type === 'reservation';
+  const method = String(order.payment_method || 'cash').toLowerCase();
+  const isOnline = method !== 'cash' && !isReservation;
+
+  let baseTime = null;
+  if (isOnline) {
+    const payStatus = String(order.payment_status || (order.payment && order.payment.payment_status) || '').toLowerCase();
+    if (payStatus !== 'settlement') {
+      return null;
+    }
+    baseTime = order.settled_at || (order.payment && order.payment.settled_at) || order.updated_at || order.created_at;
+  } else {
+    baseTime = order.created_at;
+  }
+
+  if (!baseTime) return null;
   try {
-    const createdMs = new Date(order.created_at).getTime();
-    if (!isNaN(createdMs)) {
-      return new Date(createdMs + ACCEPTANCE_TIMEOUT_SECONDS * 1000).toISOString();
+    const baseMs = new Date(baseTime).getTime();
+    if (!isNaN(baseMs)) {
+      return new Date(baseMs + ACCEPTANCE_TIMEOUT_SECONDS * 1000).toISOString();
     }
   } catch (_) {}
   return null;

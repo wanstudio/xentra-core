@@ -377,9 +377,12 @@ module.exports = function registerMerchantAuthRoutes(router, deps) {
       if (!username || !password) {
         return res.status(400).json({ success: false, error: 'Username dan password wajib diisi.' });
       }
+
+      const cleanUsername = String(username).trim();
+      const normalizedUsername = cleanUsername.toLowerCase();
   
       // Rate limiting: 5 attempts per 5 minutes per username+brand
-      const rateLimitKey = `login:${req.brand_id}:${username}`;
+      const rateLimitKey = `login:${req.brand_id}:${normalizedUsername}`;
       const rateCheck = RateLimiter.check(rateLimitKey, 5, 300);
       if (!rateCheck.allowed) {
         return res.status(429).json({ 
@@ -392,7 +395,7 @@ module.exports = function registerMerchantAuthRoutes(router, deps) {
       // Use WorkforceService for authentication (bcrypt + account lockout + status check)
       const { WorkforceService } = require('../../core/identity');
       const workforce = new WorkforceService();
-      const authResult = workforce.authenticate(username, password, req.brand_id);
+      const authResult = workforce.authenticate(cleanUsername, password, req.brand_id);
   
       if (!authResult.success) {
         // Log failed attempt
@@ -1600,11 +1603,12 @@ module.exports = function registerMerchantAuthRoutes(router, deps) {
   
   router.get('/auth/config', (req, res) => {
     const rawGoogleClientId = process.env.GOOGLE_CLIENT_ID || '';
-    const googleClientId = rawGoogleClientId.split(',')[0].trim();
+    const clientIds = rawGoogleClientId.split(',').map(s => s.trim()).filter(Boolean);
+    const googleClientId = clientIds.find(id => id.startsWith('329718658193')) || clientIds[0] || null;
     res.json({
       success: true,
       google_enabled: Boolean(googleClientId),
-      google_client_id: googleClientId || null
+      google_client_id: googleClientId
     });
   });
 };

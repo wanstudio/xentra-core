@@ -1,0 +1,1246 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Evolusi Program Affiliate 2026 — Modern Referral Hub | MyBangjo</title>
+  
+  <!-- Font: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --x-font: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      --x-lime: #b6ff00;
+      --x-lime-soft: #f4ffe0;
+      --x-lime-dark: #8ec800;
+      --x-primary-text: #111111;
+      
+      --x-black: #0f172a;
+      --x-gray-900: #1e293b;
+      --x-gray-700: #334155;
+      --x-gray-500: #64748b;
+      --x-gray-400: #94a3b8;
+      --x-gray-200: #e2e8f0;
+      --x-gray-100: #f1f5f9;
+      --x-gray-50: #f8fafc;
+      --x-white: #ffffff;
+      
+      --x-emerald: #10b981;
+      --x-emerald-soft: #ecfdf5;
+      --x-amber: #f59e0b;
+      --x-amber-soft: #fef3c7;
+      --x-rose: #f43f5e;
+      --x-rose-soft: #ffe4e6;
+
+      --x-radius-sm: 12px;
+      --x-radius-md: 18px;
+      --x-radius-lg: 24px;
+      --x-radius-pill: 9999px;
+
+      --x-shadow-card: 0 4px 20px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
+      --x-shadow-elevated: 0 12px 32px -4px rgba(15, 23, 42, 0.12), 0 4px 12px -2px rgba(15, 23, 42, 0.04);
+      --x-shadow-glow: 0 8px 24px -4px rgba(182, 255, 0, 0.45);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      font-family: var(--x-font);
+      background: #090e17;
+      color: var(--x-black);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 80px;
+    }
+
+    /* ── Presentation Harness (Top Bar) ── */
+    .proto-nav {
+      width: 100%;
+      max-width: 900px;
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: var(--x-radius-pill);
+      padding: 10px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 24px;
+      color: #ffffff;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.4);
+      z-index: 1000;
+    }
+
+    .proto-nav-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .proto-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: var(--x-lime);
+      color: #111;
+      font-size: 11px;
+      font-weight: 900;
+      border-radius: 99px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .proto-toggles {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .proto-tab-btn {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #fff;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: var(--x-radius-pill);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .proto-tab-btn:hover {
+      background: rgba(255, 255, 255, 0.18);
+    }
+
+    .proto-tab-btn.active {
+      background: #ffffff;
+      color: #0f172a;
+      border-color: #ffffff;
+      font-weight: 800;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    /* ── Mobile Device Shell ── */
+    .device-shell {
+      width: 100%;
+      max-width: 412px;
+      background: #ffffff;
+      border-radius: 44px;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.6), 0 0 0 10px #1e293b;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      min-height: 870px;
+    }
+
+    /* Status Bar */
+    .status-bar {
+      height: 44px;
+      padding: 10px 24px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      font-weight: 700;
+      color: #111827;
+      background: #ffffff;
+      z-index: 50;
+    }
+
+    .status-bar.lime-bg {
+      background: var(--x-lime);
+    }
+
+    /* Page View Containers */
+    .view-content {
+      flex: 1;
+      display: none;
+      flex-direction: column;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-bottom: 30px;
+    }
+
+    .view-content.active {
+      display: flex;
+    }
+
+    /* ── App Top Header ── */
+    .app-header {
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #ffffff;
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+
+    .app-header.lime-bg {
+      background: var(--x-lime);
+    }
+
+    .app-back-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: none;
+      background: #f1f5f9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: #1e293b;
+    }
+
+    .app-back-btn.white-pill {
+      background: #ffffff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    }
+
+    .app-title {
+      font-size: 16px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+
+    /* ═════════════════════════════════════════════════════════════════════
+       STATE 1: "FOODIE PARTNER" TEASER & ONBOARDING (VALUE-FIRST)
+       ═════════════════════════════════════════════════════════════════════ */
+    
+    /* Hero Banner with Lime Punch */
+    .teaser-hero {
+      background: var(--x-lime);
+      padding: 12px 20px 28px;
+      position: relative;
+      border-bottom-left-radius: 32px;
+      border-bottom-right-radius: 32px;
+      overflow: hidden;
+    }
+
+    .teaser-hero::after {
+      content: '';
+      position: absolute;
+      right: -20px;
+      bottom: -30px;
+      width: 140px;
+      height: 140px;
+      background: radial-gradient(circle, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 70%);
+      pointer-events: none;
+    }
+
+    .teaser-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #111111;
+      color: #ffffff;
+      font-size: 11.5px;
+      font-weight: 800;
+      padding: 5px 12px;
+      border-radius: var(--x-radius-pill);
+      margin-bottom: 12px;
+    }
+
+    .teaser-title {
+      font-size: 24px;
+      font-weight: 900;
+      line-height: 1.22;
+      color: #111111;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+
+    .teaser-desc {
+      font-size: 13.5px;
+      color: #334155;
+      line-height: 1.5;
+      font-weight: 500;
+      margin-bottom: 18px;
+    }
+
+    /* 3 Floating Value Pills */
+    .value-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .value-card {
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 12px 10px;
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+
+    .value-card-amount {
+      font-size: 14px;
+      font-weight: 900;
+      color: #0f172a;
+      line-height: 1.2;
+    }
+
+    .value-card-label {
+      font-size: 10.5px;
+      font-weight: 600;
+      color: #64748b;
+      margin-top: 2px;
+    }
+
+    /* Interactive Calculator Card */
+    .section-wrap {
+      padding: 20px 18px;
+    }
+
+    .calc-card {
+      background: #ffffff;
+      border-radius: 24px;
+      padding: 20px;
+      box-shadow: var(--x-shadow-card);
+      border: 1px solid var(--x-gray-200);
+      margin-bottom: 20px;
+    }
+
+    .calc-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .calc-title {
+      font-size: 14.5px;
+      font-weight: 800;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .calc-badge {
+      font-size: 11px;
+      font-weight: 700;
+      background: var(--x-emerald-soft);
+      color: var(--x-emerald);
+      padding: 3px 8px;
+      border-radius: 99px;
+    }
+
+    .calc-slider-wrap {
+      margin: 16px 0 18px;
+    }
+
+    .calc-slider-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 700;
+      color: #475569;
+      margin-bottom: 8px;
+    }
+
+    .calc-slider-val {
+      font-size: 13.5px;
+      font-weight: 900;
+      color: #0f172a;
+    }
+
+    input[type=range].modern-slider {
+      width: 100%;
+      height: 8px;
+      border-radius: 4px;
+      background: #e2e8f0;
+      outline: none;
+      -webkit-appearance: none;
+    }
+
+    input[type=range].modern-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: #111111;
+      border: 3px solid var(--x-lime);
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    }
+
+    .calc-result-box {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      border-radius: 18px;
+      padding: 16px 18px;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .calc-result-label {
+      font-size: 11.5px;
+      color: #94a3b8;
+      font-weight: 600;
+    }
+
+    .calc-result-number {
+      font-size: 22px;
+      font-weight: 900;
+      color: var(--x-lime);
+      letter-spacing: -0.02em;
+    }
+
+    .calc-result-hint {
+      font-size: 10.5px;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+
+    /* Live Social Ticker */
+    .ticker-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--x-lime-soft);
+      border: 1px solid rgba(182, 255, 0, 0.4);
+      border-radius: 14px;
+      padding: 10px 14px;
+      margin-bottom: 22px;
+    }
+
+    .ticker-dot {
+      width: 8px;
+      height: 8px;
+      background: #15803d;
+      border-radius: 50%;
+      animation: pulse 1.5s infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    .ticker-text {
+      font-size: 12px;
+      font-weight: 600;
+      color: #1e293b;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* 3 Simple Steps */
+    .steps-section {
+      margin-bottom: 24px;
+    }
+
+    .steps-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 14px;
+    }
+
+    .steps-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .step-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      background: #ffffff;
+      border: 1px solid var(--x-gray-200);
+      border-radius: 18px;
+      padding: 14px 16px;
+    }
+
+    .step-icon-wrap {
+      width: 40px;
+      height: 40px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .step-item-title {
+      font-size: 13.5px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+
+    .step-item-desc {
+      font-size: 12px;
+      color: #64748b;
+      line-height: 1.45;
+      margin-top: 3px;
+    }
+
+    /* Primary CTA Button */
+    .bottom-cta-dock {
+      position: sticky;
+      bottom: 0;
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      padding: 14px 18px 20px;
+      border-top: 1px solid var(--x-gray-200);
+      z-index: 40;
+    }
+
+    .btn-super-cta {
+      width: 100%;
+      height: 52px;
+      border-radius: var(--x-radius-pill);
+      border: none;
+      background: #111111;
+      color: #ffffff;
+      font-family: inherit;
+      font-size: 14.5px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+      transition: all 0.15s ease;
+    }
+
+    .btn-super-cta:active {
+      transform: scale(0.98);
+    }
+
+    .btn-super-cta .accent-pill {
+      background: var(--x-lime);
+      color: #111;
+      padding: 3px 8px;
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    /* ═════════════════════════════════════════════════════════════════════
+       STATE 2: "CREATOR COMMAND CENTER" (ACTIVE AFFILIATE DASHBOARD)
+       ═════════════════════════════════════════════════════════════════════ */
+    .dash-hero {
+      background: #0f172a;
+      color: #ffffff;
+      padding: 16px 20px 24px;
+      border-bottom-left-radius: 28px;
+      border-bottom-right-radius: 28px;
+      position: relative;
+    }
+
+    .dash-user-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+
+    .dash-avatar-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .dash-avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: var(--x-lime);
+      color: #111;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 17px;
+      font-weight: 900;
+    }
+
+    .dash-username {
+      font-size: 14.5px;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .dash-tier-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(255, 255, 255, 0.12);
+      padding: 3px 10px;
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--x-lime);
+    }
+
+    /* Wallet Balance Box */
+    .wallet-card {
+      background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.04) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 22px;
+      padding: 18px 20px;
+      backdrop-filter: blur(10px);
+    }
+
+    .wallet-top-label {
+      font-size: 12px;
+      color: #94a3b8;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .wallet-balance-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .wallet-amount {
+      font-size: 28px;
+      font-weight: 900;
+      color: #ffffff;
+      letter-spacing: -0.02em;
+    }
+
+    .wallet-pending-tag {
+      font-size: 11.5px;
+      color: #cbd5e1;
+      background: rgba(0, 0, 0, 0.25);
+      padding: 3px 9px;
+      border-radius: 8px;
+    }
+
+    .btn-withdraw {
+      width: 100%;
+      height: 42px;
+      background: var(--x-lime);
+      color: #111111;
+      border: none;
+      border-radius: var(--x-radius-pill);
+      font-family: inherit;
+      font-size: 13.5px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+      box-shadow: var(--x-shadow-glow);
+    }
+
+    /* Instant Link Sharing Hub */
+    .share-hub-card {
+      background: #ffffff;
+      border-radius: 24px;
+      padding: 20px;
+      box-shadow: var(--x-shadow-card);
+      border: 1px solid var(--x-gray-200);
+      margin-top: -10px;
+      position: relative;
+      z-index: 10;
+    }
+
+    .share-hub-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 4px;
+    }
+
+    .share-hub-desc {
+      font-size: 12px;
+      color: #64748b;
+      margin-bottom: 14px;
+    }
+
+    .ref-link-box {
+      background: #f8fafc;
+      border: 1.5px dashed #cbd5e1;
+      border-radius: 16px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .ref-code-display {
+      font-family: monospace;
+      font-size: 14px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+
+    .btn-copy-ref {
+      background: #111111;
+      color: #ffffff;
+      border: none;
+      border-radius: 12px;
+      padding: 7px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* Direct Social Share Channels */
+    .quick-share-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .share-btn-tile {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 12px 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .share-btn-tile:active {
+      transform: scale(0.96);
+      background: #f1f5f9;
+    }
+
+    .share-btn-tile .icon-wrap {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .share-btn-tile .label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #334155;
+    }
+
+    /* Funnel Metric Stats */
+    .metric-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin: 18px 0;
+    }
+
+    .metric-box {
+      background: #ffffff;
+      border: 1px solid var(--x-gray-200);
+      border-radius: 18px;
+      padding: 14px 12px;
+      text-align: center;
+    }
+
+    .metric-val {
+      font-size: 18px;
+      font-weight: 900;
+      color: #0f172a;
+    }
+
+    .metric-lbl {
+      font-size: 11px;
+      font-weight: 600;
+      color: #64748b;
+      margin-top: 2px;
+    }
+
+    /* Pre-written Copywriting Templates */
+    .templates-section {
+      background: #ffffff;
+      border-radius: 20px;
+      border: 1px solid var(--x-gray-200);
+      padding: 16px 18px;
+      margin-bottom: 20px;
+    }
+
+    .templates-header {
+      font-size: 13.5px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .template-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 12px;
+      margin-bottom: 8px;
+      font-size: 12px;
+      color: #334155;
+      line-height: 1.5;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .template-card:last-child {
+      margin-bottom: 0;
+    }
+
+    /* Gamified QR Story Card Promo */
+    .story-card-promo {
+      background: linear-gradient(135deg, #f7fee7 0%, #ecfccb 100%);
+      border: 1px solid #d9f99d;
+      border-radius: 20px;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+
+    .story-promo-qr {
+      width: 52px;
+      height: 52px;
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 5px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+      flex-shrink: 0;
+    }
+
+    .story-promo-text {
+      flex: 1;
+    }
+
+    .story-promo-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: #1e3a1e;
+    }
+
+    .story-promo-desc {
+      font-size: 11px;
+      color: #3f6212;
+      margin-top: 2px;
+      line-height: 1.4;
+    }
+
+    /* Toast Notification */
+    .toast-popup {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: #0f172a;
+      color: #ffffff;
+      padding: 10px 20px;
+      border-radius: 99px;
+      font-size: 12.5px;
+      font-weight: 700;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+      z-index: 9999;
+      opacity: 0;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+
+    .toast-popup.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Presentation Harness (Interactive Switcher) ── -->
+  <div class="proto-nav">
+    <div class="proto-nav-meta">
+      <span class="proto-badge">Riset UX 2026</span>
+      <span>Modern Affiliate Hub Concept</span>
+    </div>
+    <div class="proto-toggles">
+      <button type="button" class="proto-tab-btn active" id="btn-tab-teaser" onclick="switchTab('teaser')">
+        1. Halaman Awal (Calon Partner)
+      </button>
+      <button type="button" class="proto-tab-btn" id="btn-tab-dashboard" onclick="switchTab('dashboard')">
+        2. Dashboard (Member Aktif)
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Device Shell ── -->
+  <div class="device-shell">
+    
+    <!-- Status Bar -->
+    <div class="status-bar" id="status-bar">
+      <span>09:41</span>
+      <span>📶 5G  100%</span>
+    </div>
+
+    <!-- ═════════════════════════════════════════════════════════════════
+         VIEW 1: TEASER / VALUE-FIRST ONBOARDING (NON-MEMBER)
+         ═════════════════════════════════════════════════════════════════ -->
+    <div class="view-content active" id="view-teaser">
+      
+      <!-- Top Header -->
+      <div class="app-header lime-bg">
+        <button type="button" class="app-back-btn white-pill" aria-label="Kembali">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <span class="app-title" style="color:#111;">Bagi Info, Dapat Cuan</span>
+        <div style="width:36px;"></div>
+      </div>
+
+      <!-- Hero Header -->
+      <div class="teaser-hero">
+        <div class="teaser-badge">🍗 Foodie Partner Bangjo</div>
+        <h1 class="teaser-title">Suka Makan di Sini?<br>Ajak Teman, Panen Cuan!</h1>
+        <p class="teaser-desc">
+          Cukup bagikan rekomendasi menu favoritmu ke WhatsApp. Dapatkan komisi tunai instan tiap kali teman memesan.
+        </p>
+
+        <!-- 3 Value Cards -->
+        <div class="value-cards-grid">
+          <div class="value-card">
+            <div class="value-card-amount" style="color:#059669;">Rp1.000</div>
+            <div class="value-card-label">Tiap Porsi Menu</div>
+          </div>
+          <div class="value-card">
+            <div class="value-card-amount">⚡ Instan</div>
+            <div class="value-card-label">0 Formulir Ribet</div>
+          </div>
+          <div class="value-card">
+            <div class="value-card-amount">BCA / E-Wallet</div>
+            <div class="value-card-label">Tarik Kapan Saja</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Body Content -->
+      <div class="section-wrap">
+        
+        <!-- Live Ticker -->
+        <div class="ticker-bar">
+          <div class="ticker-dot"></div>
+          <div class="ticker-text">🔥 <b>Dimas</b> baru saja mencairkan komisi <b>Rp45.000</b> via GoPay</div>
+        </div>
+
+        <!-- Interactive Calculator -->
+        <div class="calc-card">
+          <div class="calc-header">
+            <div class="calc-title">
+              <span>🧮 Hitung Potensi Cuanmu</span>
+            </div>
+            <span class="calc-badge">Simulasi</span>
+          </div>
+
+          <div class="calc-slider-wrap">
+            <div class="calc-slider-labels">
+              <span>Porsi dipesan temanmu/hari:</span>
+              <span class="calc-slider-val" id="slider-display">10 Porsi</span>
+            </div>
+            <input type="range" class="modern-slider" id="porsi-slider" min="2" max="50" value="10" step="2" oninput="updateCalculator(this.value)">
+          </div>
+
+          <div class="calc-result-box">
+            <div>
+              <div class="calc-result-label">POTENSI KOMISI BULANAN</div>
+              <div class="calc-result-number" id="calc-monthly">Rp300.000</div>
+              <div class="calc-result-hint" id="calc-daily">≈ Rp10.000 setiap hari</div>
+            </div>
+            <div style="font-size:28px;">💰</div>
+          </div>
+        </div>
+
+        <!-- 3 Simple Steps -->
+        <div class="steps-section">
+          <h3 class="steps-title">Cara Mulai dalam 30 Detik:</h3>
+          <div class="steps-list">
+            <div class="step-item">
+              <div class="step-icon-wrap" style="background:#eff6ff;color:#2563eb;">1️⃣</div>
+              <div>
+                <div class="step-item-title">Aktifkan Kode Unikmu</div>
+                <div class="step-item-desc">Sekali tap langsung aktif, tanpa tunggu review 1x24 jam.</div>
+              </div>
+            </div>
+            <div class="step-item">
+              <div class="step-icon-wrap" style="background:#fef3c7;color:#d97706;">2️⃣</div>
+              <div>
+                <div class="step-item-title">Bagikan ke Teman / Grup WA</div>
+                <div class="step-item-desc">Kirim saat jam lapar kantor, teman kos, atau keluarga.</div>
+              </div>
+            </div>
+            <div class="step-item">
+              <div class="step-icon-wrap" style="background:#ecfdf5;color:#059669;">3️⃣</div>
+              <div>
+                <div class="step-item-title">Komisi Tunai Masuk Saldo</div>
+                <div class="step-item-desc">Tarik uang langsung ke rekening BCA, Mandiri, atau E-Wallet.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Sticky Bottom CTA -->
+      <div class="bottom-cta-dock">
+        <button type="button" class="btn-super-cta" onclick="activateAndGoToDashboard()">
+          <span>Mulai Jadi Partner</span>
+          <span class="accent-pill">1-Tap Aktif ⚡</span>
+        </button>
+      </div>
+
+    </div>
+
+
+    <!-- ═════════════════════════════════════════════════════════════════
+         VIEW 2: "CREATOR COMMAND CENTER" (MEMBER DASHBOARD)
+         ═════════════════════════════════════════════════════════════════ -->
+    <div class="view-content" id="view-dashboard">
+      
+      <!-- Top Header -->
+      <div class="app-header" style="background:#0f172a;color:#fff;">
+        <button type="button" class="app-back-btn" style="background:rgba(255,255,255,0.12);color:#fff;" aria-label="Kembali" onclick="switchTab('teaser')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <span class="app-title" style="color:#fff;">Partner Dashboard</span>
+        <button type="button" style="background:none;border:none;color:#94a3b8;font-size:12px;font-weight:700;cursor:pointer;" onclick="showToast('Bantuan', 'Tim CS siap membantumu di WA')">Bantuan</button>
+      </div>
+
+      <!-- Dark Executive Hero with Wallet -->
+      <div class="dash-hero">
+        <div class="dash-user-row">
+          <div class="dash-avatar-meta">
+            <div class="dash-avatar">B</div>
+            <div>
+              <div class="dash-username">Halo, Budi Santoso 👋</div>
+              <div class="dash-tier-badge">⭐ Foodie Star • Level 2</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="wallet-card">
+          <div class="wallet-top-label">TOTAL KOMISI TERSEDIA</div>
+          <div class="wallet-balance-row">
+            <div class="wallet-amount">Rp84.000</div>
+            <div class="wallet-pending-tag">⏳ Rp12.000 menunggu selesai</div>
+          </div>
+          <button type="button" class="btn-withdraw" onclick="openWithdrawModal()">
+            <span>💸 Tarik ke Rekening / E-Wallet</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Body Content -->
+      <div class="section-wrap" style="padding-top:14px;">
+        
+        <!-- Sharing Hub Card -->
+        <div class="share-hub-card">
+          <div class="share-hub-title">🔗 Link Rekomendasi Kamu</div>
+          <div class="share-hub-desc">Bagikan link ini agar temanmu mendapatkan diskon & komisimu otomatis tercatat:</div>
+
+          <div class="ref-link-box">
+            <span class="ref-code-display">bangjo.id/ref/BUDI88</span>
+            <button type="button" class="btn-copy-ref" onclick="copyRefLink()">
+              <span>📋 Salin</span>
+            </button>
+          </div>
+
+          <div class="quick-share-grid">
+            <div class="share-btn-tile" onclick="shareWhatsApp()">
+              <div class="icon-wrap" style="background:#25D366;color:#fff;">💬</div>
+              <span class="label">WhatsApp</span>
+            </div>
+            <div class="share-btn-tile" onclick="shareInstagramStory()">
+              <div class="icon-wrap" style="background:linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);color:#fff;">📸</div>
+              <span class="label">IG Story</span>
+            </div>
+            <div class="share-btn-tile" onclick="downloadQrCard()">
+              <div class="icon-wrap" style="background:#0f172a;color:#fff;">🏷️</div>
+              <span class="label">Kartu QR</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Metric Funnel (Transparansi Real-Time) -->
+        <div class="metric-row">
+          <div class="metric-box">
+            <div class="metric-val">142</div>
+            <div class="metric-lbl">Total Klik</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-val" style="color:#059669;">84</div>
+            <div class="metric-lbl">Menu Terjual</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-val" style="color:#2563eb;">Rp84.000</div>
+            <div class="metric-lbl">Total Ditarik</div>
+          </div>
+        </div>
+
+        <!-- Ready-to-Use Copywriting Templates -->
+        <div class="templates-section">
+          <div class="templates-header">
+            <span>✍️ Template Pesan WhatsApp Siap Pakai</span>
+          </div>
+
+          <div class="template-card">
+            <div>
+              <b>💼 Mode Makan Siang Kantor:</b><br>
+              "Gais makan siang apa hari ini? Cobain Ayam Tulang Lunak Bangjo yuk, ada diskon delivery lewat link aku..."
+            </div>
+            <button type="button" class="btn-copy-ref" style="padding:5px 10px;font-size:11px;" onclick="copyTemplate('kantor')">Kirim</button>
+          </div>
+
+          <div class="template-card">
+            <div>
+              <b>🍗 Mode Rekomen Geprek:</b><br>
+              "Sumpah sambel geprek lombok ijo di Bangjo nagih bgt! Pesen langsung lewat link ini gratis ongkir:"
+            </div>
+            <button type="button" class="btn-copy-ref" style="padding:5px 10px;font-size:11px;" onclick="copyTemplate('geprek')">Kirim</button>
+          </div>
+        </div>
+
+        <!-- Downloadable QR Story Card Promo -->
+        <div class="story-card-promo">
+          <div class="story-promo-qr">
+            <svg viewBox="0 0 24 24" fill="#0f172a" width="100%" height="100%"><path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm13-2h3v2h-3v-2zm-5 0h2v3h-2v-3zm2 3h3v3h-3v-3zm3 3h3v2h-3v-2zm-5 0h2v2h-2v-2zm3-3h2v3h-2v-3z"/></svg>
+          </div>
+          <div class="story-promo-text">
+            <div class="story-promo-title">Download Kartu Story QR</div>
+            <div class="story-promo-desc">Pasang di WhatsApp Status atau Instagram Story dengan 1 klik.</div>
+          </div>
+          <button type="button" style="background:#111;color:#fff;border:none;border-radius:12px;padding:8px 12px;font-size:11.5px;font-weight:700;cursor:pointer;" onclick="downloadQrCard()">Unduh</button>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast-popup" id="toast-popup">
+    <span id="toast-icon">✅</span>
+    <span id="toast-msg">Link berhasil disalin!</span>
+  </div>
+
+  <script>
+    // Tab Switcher between Teaser (Guest) and Dashboard (Active)
+    function switchTab(tab) {
+      document.querySelectorAll('.proto-tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.view-content').forEach(v => v.classList.remove('active'));
+      const statusBar = document.getElementById('status-bar');
+
+      if (tab === 'teaser') {
+        document.getElementById('btn-tab-teaser').classList.add('active');
+        document.getElementById('view-teaser').classList.add('active');
+        statusBar.className = 'status-bar lime-bg';
+      } else {
+        document.getElementById('btn-tab-dashboard').classList.add('active');
+        document.getElementById('view-dashboard').classList.add('active');
+        statusBar.className = 'status-bar';
+        statusBar.style.background = '#0f172a';
+        statusBar.style.color = '#ffffff';
+      }
+    }
+
+    // Instant 1-Tap Activation
+    function activateAndGoToDashboard() {
+      showToast('🚀 Akun Aktif!', 'Selamat! Kamu resmi jadi Foodie Partner Bangjo');
+      setTimeout(() => {
+        switchTab('dashboard');
+      }, 700);
+    }
+
+    // Interactive Slider Calculator
+    function updateCalculator(val) {
+      const porsi = Number(val);
+      document.getElementById('slider-display').textContent = porsi + ' Porsi';
+      
+      const daily = porsi * 1000;
+      const monthly = daily * 30;
+
+      document.getElementById('calc-monthly').textContent = 'Rp' + monthly.toLocaleString('id-ID');
+      document.getElementById('calc-daily').textContent = '≈ Rp' + daily.toLocaleString('id-ID') + ' setiap hari';
+    }
+
+    // Action Toast Handlers
+    function showToast(title, msg) {
+      const toast = document.getElementById('toast-popup');
+      document.getElementById('toast-msg').innerHTML = '<b>' + title + '</b> ' + msg;
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2500);
+    }
+
+    function copyRefLink() {
+      showToast('Tersalin!', 'Link rekomendasi bangjo.id/ref/BUDI88 disalin');
+    }
+
+    function shareWhatsApp() {
+      showToast('WhatsApp', 'Membuka WhatsApp dengan pesan template...');
+    }
+
+    function shareInstagramStory() {
+      showToast('Instagram', 'Membuat layout poster QR untuk Instagram Story...');
+    }
+
+    function downloadQrCard() {
+      showToast('Tersimpan', 'Kartu QR promosi siap diposting ke status WhatsApp!');
+    }
+
+    function copyTemplate(type) {
+      showToast('Template Tersalin!', 'Siap di-paste ke chat grup WhatsApp');
+    }
+
+    function openWithdrawModal() {
+      showToast('Pencairan', 'Saldo Rp84.000 siap dicairkan ke Rekening BCA / GoPay');
+    }
+  </script>
+</body>
+</html>

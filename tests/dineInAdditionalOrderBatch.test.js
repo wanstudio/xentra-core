@@ -71,6 +71,16 @@ describe('Dine-in Additional Order Batch contract', () => {
     assert.ok(customerRoutes.includes('active_order_id: activeOrders.length ? activeOrders[activeOrders.length - 1].id : null'));
   });
 
+  it('shows only the signed-in member their submissions and the whole table balance', () => {
+    assert.ok(customerRoutes.includes('my_submissions: buildMySubmissions(session.id, customerId, customerPhone)'));
+    assert.ok(customerRoutes.includes('created_by'));
+    assert.ok(customerCheckoutJs.includes('renderMyDiningSubmissions()'));
+    assert.ok(customerCheckoutJs.includes('PESANAN KAMU'));
+    assert.ok(customerCheckoutJs.includes('x-open-bill-outstanding'));
+    assert.ok(customerCheckoutJs.includes('x-open-bill-empty'), 'the member can still see their bill after their cart is cleared');
+    assert.ok(customerCheckoutJs.includes('UI.escape(item.name'));
+  });
+
   it('persists an idempotency key for additional batches', () => {
     const schema = fs.readFileSync(path.join(ROOT, 'server/database/db.js'), 'utf8');
     assert.ok(schema.includes('order_addition_batches'));

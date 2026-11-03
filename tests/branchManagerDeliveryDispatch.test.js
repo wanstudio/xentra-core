@@ -116,7 +116,7 @@ test('Branch Manager Delivery Dispatch API suite', async (t) => {
     assert.strictEqual(res.body.delivery.driver_assignment_status, 'pending');
   });
 
-  await t.test('POST /admin/orders/:id/assign-driver rejects assignment if order is not ready', async () => {
+  await t.test('POST /admin/orders/:id/assign-driver allows assigning driver while preparing', async () => {
     const orderId = 'order_test_delivery_preparing';
     db.prepare(`
       INSERT OR REPLACE INTO orders (id, brand_id, branch_id, order_number, customer_name, customer_phone, order_type, status, subtotal, grand_total, payment_status, payment_method)
@@ -128,9 +128,26 @@ test('Branch Manager Delivery Dispatch API suite', async (t) => {
       driver_id: driverId
     });
 
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.success, true);
+    assert.strictEqual(res.body.delivery.driver_id, driverId);
+    assert.strictEqual(res.body.delivery.status, 'assigned');
+  });
+
+  await t.test('POST /admin/orders/:id/assign-driver rejects assignment if order is not in active fulfillment stage (e.g. pending)', async () => {
+    const orderId = 'order_test_delivery_pending';
+    db.prepare(`
+      INSERT OR REPLACE INTO orders (id, brand_id, branch_id, order_number, customer_name, customer_phone, order_type, status, subtotal, grand_total, payment_status, payment_method)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(orderId, brandId, branchId, 'DEL-002B', 'Budi', '0812345678', 'delivery', 'pending', 50000, 50000, 'paid', 'qris');
+
+    currentUser = { id: 'bm_user_1', role: 'branch_manager', branchId: branchId };
+    const res = await apiCall('POST', `/admin/orders/${orderId}/assign-driver`, {
+      driver_id: driverId
+    });
+
     assert.strictEqual(res.status, 400);
     assert.strictEqual(res.body.success, false);
-    assert.match(res.body.error, /ready/i);
   });
 
   await t.test('POST /admin/orders/:id/assign-driver rejects driver from another branch', async () => {

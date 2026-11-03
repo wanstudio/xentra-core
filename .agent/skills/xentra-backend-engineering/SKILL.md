@@ -43,3 +43,8 @@ Pair schema changes with the application code that depends on them. Check nullab
 
 ## Backend completion check
 Trace the changed request end-to-end and verify authorization scope, domain owner, persistence, concurrency/idempotency, side effects, and response contract before considering the implementation complete.
+
+When supporting user-facing UI screens, adhere to [docs/XENTRA_UI_TO_BACKEND_EXECUTION_STANDPOINT.md](file:///home/ubuntu/xentra-core/docs/XENTRA_UI_TO_BACKEND_EXECUTION_STANDPOINT.md):
+- Provide the complete 5-endpoint suite: List (`GET`), Detail (`GET /:id`), Create (`POST`), Update (`PUT /:id`), and Status (`PATCH/PUT /:id/status`).
+- Update all associated projections and valuation balances atomically in a single transaction.
+- Attach `Cache-Control: no-store, no-cache, must-revalidate` headers to all dynamic admin endpoints.

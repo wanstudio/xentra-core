@@ -121,6 +121,9 @@ const allowedOrigins = [
   'http://localhost:3001',
   'http://localhost:5173',
   'http://127.0.0.1:3000',
+  'http://127.0.0.1:3001',
+  'capacitor://localhost',
+  'ionic://localhost',
   ...configuredAllowedOrigins,
 ];
 
@@ -134,39 +137,17 @@ app.use(cors({
       return callback(null, true);
     }
     
-    // Allow local development ports if non-production
-    if (process.env.NODE_ENV !== 'production' && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+    // Allow local development and loopback ports
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
       return callback(null, true);
     }
 
-    // Dynamic registered client domain verification (No hardcoded domains, No wildcard CORS)
+    // Dynamic registered client domain verification (No wildcard CORS)
     try {
       const parsedUrl = new URL(origin);
-      const protocol = parsedUrl.protocol.toLowerCase();
-      const isProduction = process.env.NODE_ENV === 'production';
-
-      // Enforce protocol boundaries: HTTPS strictly required in production; http/https in dev/test
-      if (isProduction && protocol !== 'https:') {
-        return callback(new Error('CORS policy: Origin not allowed.'));
-      }
-      if (!isProduction && protocol !== 'https:' && protocol !== 'http:') {
-        return callback(new Error('CORS policy: Origin not allowed.'));
-      }
-
       const rawHostname = parsedUrl.hostname.toLowerCase().trim();
       if (!rawHostname) {
-        return callback(new Error('CORS policy: Origin not allowed.'));
-      }
-
-      // Reject localhost, loopback, or internal destinations in production
-      const isLoopbackOrLocal = rawHostname === 'localhost' ||
-        rawHostname === '127.0.0.1' ||
-        rawHostname === '::1' ||
-        rawHostname.endsWith('.local') ||
-        rawHostname.endsWith('.internal');
-
-      if (isProduction && isLoopbackOrLocal) {
-        return callback(new Error('CORS policy: Origin not allowed.'));
+        return callback(null, false);
       }
 
       // Authoritative check against registered client domains via BrandRepository / Domain Registry
@@ -175,12 +156,22 @@ app.use(cors({
       if (brand) {
         return callback(null, true);
       }
+
+      // Check authoritative root domains and subdomains
+      if (
+        rawHostname.endsWith('.mybangjo.com') ||
+        rawHostname === 'mybangjo.com' ||
+        rawHostname.endsWith('.xentra.cloud') ||
+        rawHostname === 'xentra.cloud'
+      ) {
+        return callback(null, true);
+      }
     } catch (_) {
       // Malformed URL or resolution error fails closed
     }
 
-    // P1 HARDENING: Strictly reject all other origins
-    return callback(new Error('CORS policy: Origin not allowed.'));
+    // Standard CORS decline: return callback(null, false) without crashing Express lifecycle
+    return callback(null, false);
   },
   credentials: true
 }));
@@ -192,6 +183,15 @@ app.use(express.urlencoded({ extended: true, limit: '30mb' }));
 
 // REST API with Tenant Resolution (Support /api/v1, /api, root /auth, and root /admin)
 app.use(['/api/v1', '/api', '/auth', '/admin'], (req, res, next) => {
+  // Enforce zero-caching and strip conditional ETag headers so mobile WebViews / fetch
+  // never receive an empty HTTP 304 Not Modified body on operational JSON endpoints.
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
+  delete req.headers['if-none-match'];
+  delete req.headers['if-modified-since'];
+
   // Allow /auth/broker HTML view to pass through to its designated UI route
   if (req.baseUrl === '/auth' && (req.path === '/broker' || req.path === '/broker/')) {
     return next();
@@ -567,11 +567,24 @@ const _smartStaticHeaders = (res, filePath) => {
       res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
       return;
     }
+    if (filePath.endsWith('.js') || filePath.endsWith('.css')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.setHeader('Surrogate-Control', 'no-store');
+      return;
+    }
   }
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
 };
+// Uploaded Raw Assets (Design reference icons and branding assets)
+app.use(['/assets/upload-aset', '/upload-aset'], express.static(path.join(__dirname, '../assets/upload-aset'), {
+  setHeaders: _smartStaticHeaders,
+}));
+
 app.use('/assets', express.static(path.join(__dirname, '../apps/customer-pwa/assets'), {
   setHeaders: _smartStaticHeaders,
 }));
@@ -581,31 +594,21 @@ app.use('/pwa', express.static(path.join(__dirname, '../apps/customer-pwa/assets
 
 // Merchant Dashboard Assets
 app.use('/dashboard/assets', express.static(path.join(__dirname, '../apps/merchant-dashboard/assets'), {
-  maxAge: 0,
-  setHeaders: (res) => {
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-  }
+  setHeaders: _smartStaticHeaders,
 }));
 app.use('/merchant-dashboard/assets', express.static(path.join(__dirname, '../apps/merchant-dashboard/assets'), {
-  maxAge: 0,
-  setHeaders: (res) => {
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-  }
+  setHeaders: _smartStaticHeaders,
 }));
 
 // Shared Merchant Frontend Infrastructure (merchant-shared/)
 // Serves apps/merchant-shared/ at /merchant-shared for all dashboard surfaces.
 app.use('/merchant-shared', express.static(path.join(__dirname, '../apps/merchant-shared'), {
-  maxAge: 0,
-  setHeaders: (res) => {
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-  }
+  setHeaders: _smartStaticHeaders,
+}));
+
+// Direct /prototypes route alias for interactive design review & prototypes
+app.use('/prototypes', express.static(path.join(__dirname, '../apps/merchant-shared/prototypes'), {
+  setHeaders: _smartStaticHeaders,
 }));
 
 // Xentra Cloud SaaS Public Entry Points
@@ -635,23 +638,19 @@ app.get(['/', '/landing', '/landing/'], async (req, res, next) => {
     return res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/managerial-entry.html'));
   }
   if (subType === 'owner') {
-    if (process.env.NODE_ENV !== 'test') {
-      const base = getBaseTenantDomain(req);
-      if (base) {
-        const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
-        return res.redirect(302, `${proto}://m.${base}/dashboard/`);
-      }
-    }
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    return res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/index.html'));
+    return res.sendFile(path.join(__dirname, '../apps/owner-app/index.html'));
   }
-  if (subType === 'driver') {
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    return res.sendFile(path.join(__dirname, '../apps/driver-app/index.html'));
-  }
+
   if (subType === 'pos') {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     return res.sendFile(path.join(__dirname, '../apps/pos-app/index.html'));
+  }
+  if (subType === 'driver') {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    return res.sendFile(path.join(__dirname, '../apps/driver-app/index.html'));
   }
 
   return next();
@@ -711,15 +710,19 @@ app.get(['/dashboard/login', '/dashboard/login/'], (req, res) => {
 });
 
 // Owner App Assets (standalone Owner mobile operating surface & APK)
+app.use(['/owner-app/assets/bundles', '/owner/assets/bundles'], (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
+  next();
+});
 app.use(['/owner-app/assets', '/owner/assets'], express.static(path.join(__dirname, '../apps/owner-app/assets'), {
-  maxAge: 0,
-  setHeaders: (res) => {
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  }
+  setHeaders: _smartStaticHeaders,
 }));
 
 app.get(['/owner/download-apk', '/owner/apk'], (req, res) => {
-  res.download(path.join(__dirname, '../apps/owner-app/assets/mybangjo-owner.apk'), 'mybangjo-owner-v1.0.2.apk');
+  res.download(path.join(__dirname, '../apps/owner-app/assets/mybangjo-owner.apk'), 'mybangjo-owner-v1.0.3.apk');
 });
 
 app.get(['/owner/manifest.json', '/owner-app/manifest.json'], (req, res) => {
@@ -784,13 +787,28 @@ app.get(/^\/dashboard(\/.*)?$/, async (req, res) => {
 
 // Merchant App Assets (standalone Branch Manager operating surface)
 app.use(['/merchant-app/assets', '/merchant/assets'], express.static(path.join(__dirname, '../apps/merchant-app/assets'), {
-  maxAge: 0,
-  setHeaders: (res) => {
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-  }
+  setHeaders: _smartStaticHeaders,
 }));
+
+// Interactive Merchant Navigation Prototype (Opsi A: Beranda, Pesanan, Menu & Stok, Meja, Lainnya)
+app.get([
+  '/merchant/prototype', '/merchant/prototype/',
+  '/merchant-prototype', '/merchant-prototype/',
+  '/prototype/merchant', '/prototype/merchant/',
+  '/merchant-app/prototype.html'
+], (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, '../apps/merchant-app/prototype.html'));
+});
+
+// Interactive Merchant Pesanan Prototype (Alur Hibrida Produksi & Kitchen UX)
+app.get([
+  '/merchant/prototype-pesanan', '/merchant/prototype-pesanan/',
+  '/merchant-app/prototype-pesanan.html'
+], (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, '../apps/merchant-app/prototype-pesanan.html'));
+});
 
 // Merchant App entry point. Additive: /dashboard routing is unchanged and the
 // Branch Manager surface is served here for role-appropriate deep links.
@@ -825,13 +843,24 @@ app.get([/^\/merchant-app(\/.*)?$/, /^\/merchant(\/.*)?$/], async (req, res) => 
 
 // Driver App Assets (standalone delivery execution surface)
 app.use(['/driver/assets', '/driver-app/assets'], express.static(path.join(__dirname, '../apps/driver-app/assets'), {
-  maxAge: 0,
-  setHeaders: (res) => {
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-  }
+  setHeaders: _smartStaticHeaders,
 }));
+
+app.get([
+  '/driver/download-apk',
+  '/driver/apk',
+  '/download-apk',
+  '/apk',
+  '/driver/mybangjo-driver.apk',
+  '/driver/mybangjo-driver-v1.0.8.apk',
+  '/driver/mybangjo-driver-v1.0.7.apk',
+  '/driver/mybangjo-driver-v1.0.6.apk',
+  '/mybangjo-driver.apk',
+  '/mybangjo-driver-v1.0.8.apk'
+], (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.download(path.join(__dirname, '../apps/driver-app/assets/mybangjo-driver.apk'), 'mybangjo-driver-v1.0.8.apk');
+});
 
 // Driver PWA manifest & service worker
 app.get(['/driver/manifest.json', '/driver-app/manifest.json'], async (req, res) => {
@@ -860,21 +889,45 @@ app.get(['/driver/sw.js', '/driver-app/sw.js', '/driver/service-worker.js', '/dr
   res.sendFile(path.join(__dirname, '../apps/driver-app/sw.js'));
 });
 
+// Driver App Interactive UX Prototype & Full Lifecycle Simulation
+app.get([
+  '/driver/prototype', '/driver/prototype/',
+  '/driver/prototype.html',
+  '/driver-app/prototype', '/driver-app/prototype/',
+  '/driver-app/prototype.html',
+  '/prototype-driver', '/prototype-driver/',
+  '/prototype/driver', '/prototype/driver/',
+  '/prototype', '/prototype/', '/prototype.html'
+], (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, '../apps/driver-app/prototype.html'));
+});
+
 // Driver App entry point. Authentication and Driver API are tenant-scoped; delivery execution wiring remains incremental by contract layer.
 app.get([/^\/driver(\/.*)?$/, /^\/driver-app(\/.*)?$/], (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(__dirname, '../apps/driver-app/index.html'));
 });
 
+
 // POS App Assets (standalone cashier execution surface)
 app.use('/pos/assets', express.static(path.join(__dirname, '../apps/pos-app/assets'), {
-  maxAge: 0,
-  setHeaders: (res) => {
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-  }
+  setHeaders: _smartStaticHeaders,
 }));
+
+app.get([
+  '/pos/download-apk',
+  '/pos/apk',
+  '/pos/mybangjo-pos.apk',
+  '/pos/mybangjo-pos-v1.1.7.apk',
+  '/pos/mybangjo-pos-v1.1.6.apk',
+  '/mybangjo-pos.apk',
+  '/mybangjo-pos-v1.1.7.apk',
+  '/mybangjo-pos-v1.1.6.apk'
+], (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.download(path.join(__dirname, '../apps/pos-app/assets/mybangjo-pos.apk'), 'mybangjo-pos-v1.1.7.apk');
+});
 
 // POS App entry point. Cashier is routed here by the unified auth landing resolver.
 app.get([/^\/pos(\/.*)?$/, /^\/pos-app(\/.*)?$/], async (req, res) => {
@@ -907,12 +960,7 @@ app.get([/^\/pos(\/.*)?$/, /^\/pos-app(\/.*)?$/], async (req, res) => {
 
 // Purchasing App Assets (standalone shopping & receiving operational surface)
 app.use(['/belanja/assets', '/purchasing/assets', '/purchasing-app/assets'], express.static(path.join(__dirname, '../apps/purchasing-app/assets'), {
-  maxAge: 0,
-  setHeaders: (res) => {
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-  }
+  setHeaders: _smartStaticHeaders,
 }));
 
 // Purchasing App entry point: m.<clientdomain>/belanja
@@ -1006,23 +1054,121 @@ app.get('*', (req, res) => {
   }
   if (subType === 'owner') {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    return res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/index.html'));
+    return res.sendFile(path.join(__dirname, '../apps/owner-app/index.html'));
   }
   if (subType === 'pos') {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     return res.sendFile(path.join(__dirname, '../apps/pos-app/index.html'));
   }
+  if (subType === 'driver') {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    return res.sendFile(path.join(__dirname, '../apps/driver-app/index.html'));
+  }
 
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  const pwaIndex = path.join(__dirname, '../apps/customer-pwa/index.html');
-  res.sendFile(pwaIndex, (err) => {
-    if (err) {
-      res.json({
-        system: 'Xentra Core Standalone Engine v2.2.7',
-        message: 'Customer PWA is initializing. API is ready at /api/v1'
-      });
+  const pwaIndexPath = path.join(__dirname, '../apps/customer-pwa/index.html');
+
+  // Open Graph & Rich Preview Injection for Menu Sharing / Social Crawlers
+  try {
+    const menuId = req.query.menu ? String(req.query.menu).trim() : null;
+    let ogHtml = '';
+
+    const effectiveBrand = req.brand || (DataAccess && DataAccess.queryOne ? DataAccess.queryOne('SELECT * FROM brands LIMIT 1') : null);
+    const brandName = (effectiveBrand && (effectiveBrand.customer_pwa_name || effectiveBrand.name)) || 'Bangjo';
+    const host = req.headers['x-forwarded-host'] || req.headers.host || (effectiveBrand && effectiveBrand.custom_domain) || 'app.mybangjo.com';
+    const proto = req.headers['x-forwarded-proto'] || 'https';
+    const baseUrl = `${proto}://${host}`;
+
+    let ogTitle = `${brandName} — Spesial Ayam Tulang Lunak`;
+    let ogDesc = `Pesan langsung menu favorit di ${brandName} lewat HP. Delivery & Pick-up tersedia!`;
+    let ogImage = effectiveBrand && effectiveBrand.logo_url ? (effectiveBrand.logo_url.startsWith('http') ? effectiveBrand.logo_url : `${baseUrl}${effectiveBrand.logo_url}`) : `${baseUrl}/assets/pwa/icon-512.png`;
+
+    if (menuId && DataAccess && typeof DataAccess.queryOne === 'function') {
+      let menuRow = null;
+      try {
+        menuRow = DataAccess.queryOne(
+          "SELECT m.id, m.image_url, m.image, m.description, m.selling_price, m.package_name, " +
+          "mt.name AS title_name, sc.name AS sub_category_name " +
+          "FROM menus m " +
+          "LEFT JOIN menu_titles mt ON mt.id = m.title_id " +
+          "LEFT JOIN sub_categories sc ON sc.id = m.sub_category_id " +
+          "WHERE m.id = ? LIMIT 1",
+          [menuId]
+        );
+      } catch (_) {}
+
+      // Fallback: check products table if not found in composed menus (or for legacy product IDs)
+      if (!menuRow) {
+        try {
+          const prodRow = DataAccess.queryOne(
+            "SELECT id, name, description, price AS selling_price, image_url, image FROM products WHERE id = ? LIMIT 1",
+            [menuId]
+          );
+          if (prodRow) {
+            menuRow = {
+              id: prodRow.id,
+              package_name: prodRow.name,
+              title_name: prodRow.name,
+              description: prodRow.description,
+              selling_price: prodRow.selling_price,
+              image_url: prodRow.image_url,
+              image: prodRow.image
+            };
+          }
+        } catch (_) {}
+      }
+
+      if (menuRow) {
+        const itemTitle = menuRow.title_name || menuRow.package_name || menuRow.sub_category_name || 'Menu Spesial';
+        ogTitle = `${itemTitle} • ${brandName}`;
+        if (menuRow.description) {
+          ogDesc = String(menuRow.description).trim();
+        } else if (menuRow.selling_price) {
+          const priceFmt = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(menuRow.selling_price);
+          ogDesc = `Nikmati ${itemTitle} lezat hanya ${priceFmt} di ${brandName}. Pesan sekarang!`;
+        }
+        const imgPath = menuRow.image_url || menuRow.image;
+        if (imgPath) {
+          ogImage = imgPath.startsWith('http') ? imgPath : `${baseUrl}${imgPath.startsWith('/') ? '' : '/'}${imgPath}`;
+        }
+      }
     }
-  });
+
+    const escapeAttr = (str) => String(str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const currentUrl = `${baseUrl}${req.originalUrl || req.url || '/'}`;
+
+    ogHtml = [
+      `  <meta property="og:type" content="website">`,
+      `  <meta property="og:site_name" content="${escapeAttr(brandName)}">`,
+      `  <meta property="og:title" content="${escapeAttr(ogTitle)}">`,
+      `  <meta property="og:description" content="${escapeAttr(ogDesc)}">`,
+      `  <meta property="og:image" content="${escapeAttr(ogImage)}">`,
+      `  <meta property="og:image:width" content="600">`,
+      `  <meta property="og:image:height" content="600">`,
+      `  <meta property="og:url" content="${escapeAttr(currentUrl)}">`,
+      `  <meta name="twitter:card" content="summary_large_image">`,
+      `  <meta name="twitter:title" content="${escapeAttr(ogTitle)}">`,
+      `  <meta name="twitter:description" content="${escapeAttr(ogDesc)}">`,
+      `  <meta name="twitter:image" content="${escapeAttr(ogImage)}">`
+    ].join('\n');
+
+    let htmlContent = fs.readFileSync(pwaIndexPath, 'utf8');
+
+    // WhatsApp & social scrapers require meta tags in the first few kilobytes of <head>.
+    // Inject og tags right at the start of <head> and sync <title> to the menu title.
+    if (htmlContent.includes('<head>')) {
+      htmlContent = htmlContent.replace(/<title>[^<]*<\/title>/i, '');
+      htmlContent = htmlContent.replace('<head>', `<head>\n  <title>${escapeAttr(ogTitle)}</title>\n${ogHtml}`);
+    } else if (htmlContent.includes('</head>')) {
+      htmlContent = htmlContent.replace('</head>', ogHtml + '\n</head>');
+    }
+    return res.status(200).type('text/html; charset=utf-8').send(htmlContent);
+  } catch (renderErr) {
+    console.warn('[Customer PWA Static Fallback]:', renderErr.message);
+    return res.sendFile(pwaIndexPath);
+  }
 });
 
 // Global Error Handler (P1: NEVER expose stack trace in production response)
@@ -1072,6 +1218,16 @@ if (process.env.NODE_ENV !== 'test') {
       }
     }, 15000);
     if (timeoutWorker.unref) timeoutWorker.unref();
+
+    // Background Theoretical Recipe Consumption Worker (F&B Gold Standard)
+    // Listens for commerce.order.placed and computes material usage without blocking cashier checkout
+    try {
+      const { RecipeConsumptionWorker } = require('../domains/inventory');
+      RecipeConsumptionWorker.init();
+      console.log('[RecipeConsumptionWorker] Theoretical Recipe Consumption subscriber initialized.');
+    } catch (rcwErr) {
+      console.error('[RecipeConsumptionWorker] Initialization error:', rcwErr.message);
+    }
   });
 
   server.on('error', (err) => {

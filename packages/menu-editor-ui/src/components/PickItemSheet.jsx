@@ -1,6 +1,26 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Search } from 'lucide-react';
+
+function formatRupiah(amount) {
+  const num = Number(amount) || 0;
+  return 'Rp' + num.toLocaleString('id-ID');
+}
+
+// Color palette for fallback icon badges when product has no image
+const BADGE_COLORS = ['#EA4335', '#4285F4', '#34A853', '#FBBC05', '#8E44AD'];
+
+function getBadgeColor(id, index) {
+  if (typeof id === 'string') {
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) {
+      hash = (hash << 5) - hash + id.charCodeAt(i);
+      hash |= 0;
+    }
+    return BADGE_COLORS[Math.abs(hash) % BADGE_COLORS.length];
+  }
+  return BADGE_COLORS[(index || 0) % BADGE_COLORS.length];
+}
 
 export default function PickItemSheet({
   isOpen,
@@ -10,174 +30,385 @@ export default function PickItemSheet({
   onSelectProduct,
   initialSelectedId = null,
 }) {
-  const [selectedCatId, setSelectedCatId] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [tempSelectedId, setTempSelectedId] = useState(initialSelectedId);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
-  // Filter products by category and search
+  // Sync initialSelectedId when sheet opens
+  useEffect(() => {
+    if (isOpen) {
+      setTempSelectedId(initialSelectedId);
+      setSearchQuery('');
+    }
+  }, [isOpen, initialSelectedId]);
+
+  // Mobile Back Navigation & Escape handler
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleDismiss = () => {
+      if (typeof onCloseRef.current === 'function') {
+        onCloseRef.current();
+      }
+    };
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        handleDismiss();
+      }
+    };
+
+    window.addEventListener('popstate', handleDismiss);
+    window.addEventListener('hashchange', handleDismiss);
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('popstate', handleDismiss);
+      window.removeEventListener('hashchange', handleDismiss);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen]);
+
+  // Lock body scroll when picker sheet is open
+  useEffect(() => {
+    if (!isOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isOpen]);
+
+  // Filter products by search query (name, sku, or category)
   const filteredProducts = useMemo(() => {
+    if (!Array.isArray(products)) return [];
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return products;
+
     return products.filter((p) => {
-      // Category filter
-      if (selectedCatId !== 'all') {
-        if (String(p.category_id) !== String(selectedCatId)) {
-          return false;
-        }
-      }
-      // Search filter
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchName = (p.name || '').toLowerCase().includes(q);
-        const matchCat = (p.category_name || '').toLowerCase().includes(q);
-        if (!matchName && !matchCat) return false;
-      }
-      return true;
+      const matchName = String(p.name || '').toLowerCase().includes(q);
+      const matchSku = String(p.sku || p.barcode || '').toLowerCase().includes(q);
+      const matchCat = String(p.category_name || '').toLowerCase().includes(q);
+      return matchName || matchSku || matchCat;
     });
-  }, [products, selectedCatId, searchQuery]);
+  }, [products, searchQuery]);
 
   if (!isOpen) return null;
 
-  return createPortal(
+  const canSubmit = Boolean(tempSelectedId);
+
+  const handleItemClick = (p) => {
+    setTempSelectedId(p.id);
+  };
+
+  const handleConfirm = () => {
+    if (!canSubmit) return;
+    const found = products.find((p) => String(p.id) === String(tempSelectedId));
+    if (found && typeof onSelectProduct === 'function') {
+      onSelectProduct(found);
+    }
+    if (typeof onClose === 'function') {
+      onClose();
+    }
+  };
+
+  const sheetContent = (
     <div id="modern-menu-portal-root">
-      <div className="fixed inset-0 z-[99999] flex flex-col justify-end bg-black/60 backdrop-blur-xs animate-fade-in">
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 z-[99999] flex flex-col justify-end items-center bg-black/60 backdrop-blur-xs transition-opacity"
+        onClick={(e) => {
+          if (e.target === e.currentTarget && typeof onClose === 'function') {
+            onClose();
+          }
+        }}
+      >
+        {/* Modal Container */}
         <div
-          className="w-full bg-white rounded-t-3xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl transition-transform"
+          style={{
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
+          }}
+          className="w-full max-w-[447px] sm:max-w-md bg-white rounded-t-[20px] max-h-[85vh] flex flex-col overflow-hidden shadow-2xl transition-transform animate-sticky-swipe-up"
           onClick={(e) => e.stopPropagation()}
         >
-        {/* Handle bar */}
-        <div className="w-full flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 rounded-full bg-slate-300" />
-        </div>
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
-          <h3 className="text-base font-bold text-slate-900 m-0">Pilih Item</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 border-none bg-transparent cursor-pointer"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Search Input */}
-        <div className="px-5 pt-3 pb-2">
-          <div className="relative flex items-center">
-            <Search size={16} className="absolute left-3 text-slate-400 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Cari nama item..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-green-500 focus:bg-white transition-colors"
+          {/* Handle bar (40px x 5px #D9D9D9 centered) */}
+          <div className="w-full flex justify-center pt-6 pb-4 shrink-0">
+            <div
+              style={{
+                width: '40px',
+                height: '5px',
+                backgroundColor: '#D9D9D9',
+                borderRadius: '9999px',
+              }}
             />
           </div>
-        </div>
 
-        {/* Category Filter Pills */}
-        <div className="flex gap-2 px-5 py-2 overflow-x-auto no-scrollbar border-b border-slate-100">
-          <button
-            type="button"
-            onClick={() => setSelectedCatId('all')}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap cursor-pointer transition-colors border ${
-              selectedCatId === 'all'
-                ? 'bg-slate-900 text-white border-slate-900'
-                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-            }`}
-          >
-            Semua
-          </button>
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              type="button"
-              onClick={() => setSelectedCatId(cat.id)}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap cursor-pointer transition-colors border ${
-                String(selectedCatId) === String(cat.id)
-                  ? 'bg-slate-900 text-white border-slate-900'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-              }`}
+          {/* Header (Title: Pilih item + Close X button) */}
+          <div className="flex items-center justify-between px-4 pb-3 shrink-0">
+            <h3
+              style={{
+                color: '#0F172A',
+                fontSize: '18px',
+                fontWeight: 700,
+                lineHeight: '18px',
+              }}
+              className="m-0 text-left"
             >
-              {cat.name}
+              Pilih item
+            </h3>
+            <button
+              type="button"
+              aria-label="Tutup"
+              onClick={onClose}
+              className="p-1 rounded-full text-[#94A3B8] hover:text-[#0F172A] hover:bg-slate-100 border-none bg-transparent cursor-pointer transition-colors"
+            >
+              <X size={20} />
             </button>
-          ))}
-        </div>
+          </div>
 
-        {/* Products List */}
-        <div className="flex-1 overflow-y-auto px-5 py-3 divide-y divide-slate-100">
-          {filteredProducts.length === 0 ? (
-            <div className="py-12 text-center text-sm text-slate-400">
-              Tidak ada item yang sesuai
-            </div>
-          ) : (
-            filteredProducts.map((p) => {
-              const isSelected = String(tempSelectedId) === String(p.id);
-              const priceFormatted = new Intl.NumberFormat('id-ID', {
-                style: 'currency',
-                currency: 'IDR',
-                minimumFractionDigits: 0,
-              }).format(p.price || p.cogs || 0);
-
-              return (
-                <div
-                  key={p.id}
-                  data-product-pick-id={p.id}
-                  onClick={() => setTempSelectedId(p.id)}
-                  className="flex items-center justify-between py-3.5 cursor-pointer hover:bg-slate-50/80 -mx-2 px-2 rounded-xl transition-colors"
+          {/* Search Bar Input */}
+          <div className="px-4 pb-4 shrink-0">
+            <div
+              style={{
+                height: '48px',
+                borderRadius: '14px',
+                outline: '1px #CBD5E1 solid',
+                outlineOffset: '-1px',
+              }}
+              className="w-full relative overflow-hidden flex items-center px-4 gap-3 bg-white focus-within:outline-[#0F172A] focus-within:outline-2 transition-all"
+            >
+              <Search size={17} className="text-[#94A3B8] shrink-0 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Cari menu atau pengaturan bisnis"
+                style={{
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  fontFamily: "'Plus Jakarta Sans', sans-serif",
+                }}
+                className="w-full h-full bg-transparent border-none outline-none text-[#0F172A] placeholder-[#94A3B8]"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="p-1 text-[#94A3B8] hover:text-[#0F172A] border-none bg-transparent cursor-pointer"
                 >
-                  <div className="flex-1 pr-3">
-                    <div className="text-sm font-bold text-slate-900">{p.name}</div>
-                    <div className="text-xs text-slate-500 mt-0.5">
-                      {p.category_name || 'Item'} · {priceFormatted}
-                    </div>
-                  </div>
+                  <X size={15} />
+                </button>
+              )}
+            </div>
+          </div>
 
-                  <div className="flex-shrink-0">
+          {/* Scrollable Products List */}
+          <div className="flex-1 overflow-y-auto px-4 pb-4 flex flex-col gap-3 overscroll-contain">
+            {filteredProducts.length === 0 ? (
+              <div className="py-12 text-center text-[13px] font-medium text-[#94A3B8]">
+                Tidak ada item yang sesuai
+              </div>
+            ) : (
+              filteredProducts.map((p, idx) => {
+                const isSelected =
+                  String(tempSelectedId) === String(p.id) ||
+                  String(initialSelectedId) === String(p.id);
+                const availablePrice = [
+                  p.price,
+                  p.selling_price,
+                  p.regular_price,
+                  p.cogs,
+                  p.cost_price,
+                ].find((value) => value !== null && value !== undefined && value !== '' && Number(value) > 0);
+                const priceFormatted = formatRupiah(availablePrice ?? 0);
+                const skuDisplay = p.sku || p.barcode || 'KODE-SKU-0001';
+                const imageSrc = p.image_url || p.image || p.photo;
+                const badgeBg = getBadgeColor(p.id, idx);
+
+                return (
+                  <div
+                    key={p.id || idx}
+                    data-product-pick-id={p.id}
+                    onClick={() => handleItemClick(p)}
+                    style={{
+                      padding: '16px',
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: '10px',
+                      outline: '1px #D1D3D9 solid',
+                      outlineOffset: '-1px',
+                    }}
+                    className={`w-full flex items-center justify-between gap-4 cursor-pointer transition-all active:scale-[0.99] hover:bg-slate-50/80 select-none ${
+                      isSelected ? 'bg-[#F8FAF9]' : 'bg-white'
+                    }`}
+                  >
+                    {/* Left: Thumbnail (45x45, radius 10) */}
+                    {imageSrc ? (
+                      <img
+                        src={imageSrc}
+                        alt={p.name}
+                        style={{ width: '45px', height: '45px', borderRadius: '10px' }}
+                        className="object-cover shrink-0 select-none pointer-events-none"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: '45px',
+                          height: '45px',
+                          borderRadius: '10px',
+                          backgroundColor: badgeBg,
+                        }}
+                        className="flex items-center justify-center shrink-0 relative overflow-hidden"
+                      >
+                        {/* Cloche / Dish Icon */}
+                        <svg
+                          width="23"
+                          height="23"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="text-white"
+                        >
+                          <path
+                            d="M12 4C12.5523 4 13 4.44772 13 5V5.1C16.9247 5.56831 20 8.92211 20 13H4C4 8.92211 7.07529 5.56831 11 5.1V5C11 4.44772 11.4477 4 12 4Z"
+                            fill="white"
+                          />
+                          <rect x="3" y="15" width="18" height="2.5" rx="1" fill="white" />
+                        </svg>
+                      </div>
+                    )}
+
+                    {/* Middle: Title, SKU, Price */}
+                    <div className="flex-1 min-w-0 flex flex-col items-start gap-0.5 text-left">
+                      <div
+                        style={{
+                          color: '#0F172A',
+                          fontSize: '13px',
+                          fontWeight: 700,
+                          lineHeight: '1.25',
+                        }}
+                        className="truncate w-full"
+                      >
+                        {p.name}
+                      </div>
+                      <div
+                        style={{
+                          color: '#979797',
+                          fontSize: '10px',
+                          fontWeight: 500,
+                          lineHeight: '1.2',
+                        }}
+                        className="truncate w-full"
+                      >
+                        {skuDisplay}
+                      </div>
+                      <div
+                        style={{
+                          color: '#0F172A',
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          lineHeight: '1.2',
+                        }}
+                        className="truncate w-full"
+                      >
+                        {priceFormatted}
+                      </div>
+                    </div>
+
+                    {/* Right: Radio Selection Indicator (20x20) */}
                     <div
-                      className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${
-                        isSelected
-                          ? 'border-green-600 bg-green-600'
-                          : 'border-slate-300 bg-white'
-                      }`}
+                      style={{ width: '20px', height: '20px' }}
+                      className="relative shrink-0 flex items-center justify-center"
                     >
-                      {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
+                      {isSelected ? (
+                        <div
+                          style={{
+                            width: '16px',
+                            height: '16px',
+                            borderRadius: '9999px',
+                            border: '1.5px solid #00A637',
+                          }}
+                          className="flex items-center justify-center bg-white"
+                        >
+                          <div
+                            style={{
+                              width: '9px',
+                              height: '9px',
+                              backgroundColor: '#00A637',
+                              borderRadius: '9999px',
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            width: '16px',
+                            height: '16px',
+                            borderRadius: '9999px',
+                            border: '1.5px solid #CBD5E1',
+                          }}
+                          className="bg-white"
+                        />
+                      )}
                     </div>
                   </div>
-                </div>
-              );
-            })
-          )}
-        </div>
+                );
+              })
+            )}
+          </div>
 
-        {/* Footer Actions */}
-        <div className="p-4 border-t border-slate-100 bg-white flex gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 py-3 px-4 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold text-sm cursor-pointer hover:bg-slate-50 transition-colors"
-          >
-            Batal
-          </button>
-          <button
-            type="button"
-            disabled={!tempSelectedId}
-            onClick={() => {
-              const found = products.find((p) => String(p.id) === String(tempSelectedId));
-              if (found) onSelectProduct(found);
-              onClose();
+          {/* Bottom Bar Keputusan */}
+          <div
+            style={{
+              width: '100%',
+              backgroundColor: '#FFFFFF',
+              boxShadow: '0px 0px 15px rgba(0, 0, 0, 0.15)',
+              borderTopLeftRadius: '20px',
+              borderTopRightRadius: '20px',
+              paddingTop: '24px',
+              paddingBottom: 'calc(24px + env(safe-area-inset-bottom, 0px))',
+              paddingLeft: '16px',
+              paddingRight: '16px',
+              boxSizing: 'border-box',
             }}
-            className={`flex-1 py-3 px-4 rounded-xl text-white font-bold text-sm border-none cursor-pointer transition-colors ${
-              tempSelectedId
-                ? 'bg-green-600 hover:bg-green-700 shadow-sm'
-                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-            }`}
+            className="w-full shrink-0 z-10"
           >
-            Pilih Item
-          </button>
+            <button
+              type="button"
+              disabled={!canSubmit}
+              onClick={handleConfirm}
+              style={{
+                width: '100%',
+                height: '48px',
+                borderRadius: '9999px',
+                backgroundColor: canSubmit ? '#00A637' : '#F2F2F2',
+                color: canSubmit ? '#FFFFFF' : '#979797',
+                fontSize: '14px',
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                fontWeight: 700,
+                border: 'none',
+                outline: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: canSubmit ? 'pointer' : 'not-allowed',
+                transition: 'background-color 150ms ease, color 150ms ease, transform 100ms ease',
+              }}
+              className={canSubmit ? 'active:scale-[0.98] hover:bg-[#009230]' : ''}
+            >
+              Tambah
+            </button>
+          </div>
         </div>
       </div>
     </div>
-    </div>,
-    document.body
   );
+
+  return typeof document !== 'undefined'
+    ? createPortal(sheetContent, document.body)
+    : sheetContent;
 }

@@ -4,6 +4,11 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -65,12 +70,13 @@
             </intent-filter>
         </receiver>
 
-        <!-- Driver Foreground Location Service (Location ping & background tracking) -->
+        <!-- Driver Foreground Location & Task Monitor Service (Location ping & background order polling) -->
         <service
             android:name=".DriverGpsService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="location" />
+            android:stopWithTask="false"
+            android:foregroundServiceType="location|dataSync" />
 
         <!-- High Priority Order Siren & Alarm Service -->
         <service
@@ -83,7 +89,19 @@
         <service
             android:name=".OrderOverlayService"
             android:enabled="true"
-            android:exported="false" />
+            android:exported="false"
+            android:stopWithTask="false" />
+
+        <!-- FileProvider for native camera capture -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

@@ -53,12 +53,20 @@ class OrderRepository {
 
   findOverduePending({ timeoutSeconds }) {
     return this.db.queryMany(`
-      SELECT id, status, branch_id, created_at
-      FROM orders
-      WHERE status = 'pending'
-        AND created_at <= datetime('now', ?)
-      ORDER BY created_at ASC
-    `, [`-${timeoutSeconds} seconds`]);
+      SELECT o.id, o.status, o.branch_id, o.created_at, o.order_type
+      FROM orders o
+      LEFT JOIN order_payments op ON op.order_id = o.id
+      WHERE o.status = 'pending'
+        AND (
+          ((COALESCE(o.payment_method, 'cash') = 'cash' OR o.order_type = 'reservation')
+           AND datetime(o.created_at) <= datetime('now', ?))
+          OR
+          (COALESCE(o.payment_method, 'cash') != 'cash' AND o.order_type != 'reservation'
+           AND (o.payment_status = 'settlement' OR op.payment_status = 'settlement')
+           AND datetime(COALESCE(op.settled_at, o.updated_at, o.created_at)) <= datetime('now', ?))
+        )
+      ORDER BY o.created_at ASC
+    `, [`-${timeoutSeconds} seconds`, `-${timeoutSeconds} seconds`]);
   }
 
   findByBranchTransactionId(branchId, clientTransactionId) {
@@ -247,7 +255,7 @@ class OrderRepository {
 
   insertReservation({
     id, orderNumber, brandId, branchId, customerId = null, customerName, customerPhone,
-    orderChannel, selectionMode, reservationDate, reservationTime = null, orderNote, createdAt, updatedAt
+    orderChannel, selectionMode, tableNumber = null, reservationDate, reservationTime = null, orderNote, createdAt, updatedAt
   }) {
     const scheduledSlotStart = reservationDate && reservationTime
       ? String(reservationDate) + 'T' + String(reservationTime) + ':00'
@@ -257,10 +265,10 @@ class OrderRepository {
         id, order_number, brand_id, branch_id, customer_id, customer_name, customer_phone,
         order_type, order_channel, selection_mode, table_number, scheduled_slot_start,
         subtotal, delivery_fee, grand_total, payment_method, status, order_note, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'reservation', ?, ?, NULL, ?, 0, 0, 0, 'cash', 'confirmed', ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'reservation', ?, ?, ?, ?, 0, 0, 0, 'cash', 'confirmed', ?, ?, ?)
     `, [
       id, orderNumber, brandId, branchId, customerId || null, customerName, customerPhone,
-      orderChannel, selectionMode, scheduledSlotStart, orderNote, createdAt, updatedAt
+      orderChannel, selectionMode, tableNumber || null, scheduledSlotStart, orderNote, createdAt, updatedAt
     ]);
   }
 

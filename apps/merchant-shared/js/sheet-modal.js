@@ -135,10 +135,29 @@
     }
   });
 
+  function closeAllModals() {
+    var ids = activeModalStack.slice();
+    activeModalStack = [];
+    ids.forEach(function (id) {
+      var backdrop = document.getElementById(id);
+      if (backdrop) {
+        backdrop.classList.remove('open');
+        backdrop.style.display = 'none';
+      }
+    });
+  }
+
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('popstate', function () {
+      if (activeModalStack.length > 0) closeAllModals();
+    });
+  }
+
   window.XentraUI = window.XentraUI || {};
   window.XentraUI.Modal = {
     open: openModal,
     close: closeModal,
+    closeAll: closeAllModals,
     confirm: confirmDialog
   };
 

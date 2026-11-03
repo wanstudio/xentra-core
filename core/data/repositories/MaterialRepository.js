@@ -9,22 +9,22 @@ class MaterialRepository {
 
   findById(id) {
     return this.db.queryOne(
-      'SELECT id, organization_id, material_code, name, description, base_uom_id, status, created_at, updated_at FROM materials WHERE id = ?',
+      'SELECT id, organization_id, material_code, name, description, base_uom_id, status, created_at, updated_at, purchase_uom_name, purchase_uom_ratio, estimated_unit_cost, estimated_unit_cost AS unit_cost FROM materials WHERE id = ?',
       [id]
     );
   }
 
   findByCode(organizationId, materialCode) {
     return this.db.queryOne(
-      'SELECT id, organization_id, material_code, name, description, base_uom_id, status, created_at, updated_at FROM materials WHERE organization_id = ? AND lower(trim(material_code)) = lower(trim(?))',
+      'SELECT id, organization_id, material_code, name, description, base_uom_id, status, created_at, updated_at, purchase_uom_name, purchase_uom_ratio, estimated_unit_cost, estimated_unit_cost AS unit_cost FROM materials WHERE organization_id = ? AND lower(trim(material_code)) = lower(trim(?))',
       [organizationId, materialCode]
     );
   }
 
   listByOrganization(organizationId, { includeArchived = false } = {}) {
     const sql = includeArchived
-      ? 'SELECT id, organization_id, material_code, name, description, base_uom_id, status, created_at, updated_at FROM materials WHERE organization_id = ? ORDER BY material_code'
-      : "SELECT id, organization_id, material_code, name, description, base_uom_id, status, created_at, updated_at FROM materials WHERE organization_id = ? AND status <> 'ARCHIVED' ORDER BY material_code";
+      ? 'SELECT id, organization_id, material_code, name, description, base_uom_id, status, created_at, updated_at FROM materials WHERE organization_id = ? ORDER BY lower(trim(name)) ASC, id ASC'
+      : "SELECT id, organization_id, material_code, name, description, base_uom_id, status, created_at, updated_at FROM materials WHERE organization_id = ? AND status <> 'ARCHIVED' ORDER BY lower(trim(name)) ASC, id ASC";
     return this.db.queryMany(sql, [organizationId]);
   }
 
@@ -70,14 +70,17 @@ class MaterialRepository {
           m.base_uom_id,
           COALESCE(m.purchase_uom_name, '') AS purchase_uom_name,
           COALESCE(m.purchase_uom_ratio, 1) AS purchase_uom_ratio,
+          COALESCE(m.estimated_unit_cost, 0) AS estimated_unit_cost,
           m.status,
           m.created_at,
           m.updated_at,
           u.name AS base_uom_name,
           u.code AS base_uom_code,
+          u.conversion_factor AS base_uom_factor,
+          u.category_id AS base_uom_category_id,
           COALESCE(msb.quantity_base, 0) AS current_stock,
-          COALESCE(msb.moving_average_unit_cost, 0) AS moving_average_unit_cost,
-          COALESCE(msb.moving_average_unit_cost, 0) AS unit_cost,
+          COALESCE(NULLIF(msb.moving_average_unit_cost, 0), m.estimated_unit_cost, 0) AS moving_average_unit_cost,
+          COALESCE(NULLIF(msb.moving_average_unit_cost, 0), m.estimated_unit_cost, 0) AS unit_cost,
           COALESCE(msb.carrying_value, 0) AS carrying_value,
           COALESCE(rp.minimum_quantity, 0) AS minimum_quantity,
           COALESCE(rp.target_quantity, 0) AS target_quantity,
@@ -94,7 +97,7 @@ class MaterialRepository {
           ON rp.identity_id = m.id AND rp.identity_type = 'MATERIAL' AND rp.stock_location_id = ?
         ${recipeJoin}
         WHERE m.organization_id = ? ${statusClause}
-        ORDER BY m.material_code
+        ORDER BY lower(trim(m.name)) ASC, m.id ASC
       `;
       return this.db.queryMany(sql, [locationId, locationId, organizationId]);
     } else {
@@ -108,14 +111,17 @@ class MaterialRepository {
           m.base_uom_id,
           COALESCE(m.purchase_uom_name, '') AS purchase_uom_name,
           COALESCE(m.purchase_uom_ratio, 1) AS purchase_uom_ratio,
+          COALESCE(m.estimated_unit_cost, 0) AS estimated_unit_cost,
           m.status,
           m.created_at,
           m.updated_at,
           u.name AS base_uom_name,
           u.code AS base_uom_code,
+          u.conversion_factor AS base_uom_factor,
+          u.category_id AS base_uom_category_id,
           COALESCE(msb.quantity_base, 0) AS current_stock,
-          COALESCE(msb.moving_average_unit_cost, 0) AS moving_average_unit_cost,
-          COALESCE(msb.moving_average_unit_cost, 0) AS unit_cost,
+          COALESCE(NULLIF(msb.moving_average_unit_cost, 0), m.estimated_unit_cost, 0) AS moving_average_unit_cost,
+          COALESCE(NULLIF(msb.moving_average_unit_cost, 0), m.estimated_unit_cost, 0) AS unit_cost,
           COALESCE(msb.carrying_value, 0) AS carrying_value,
           COALESCE(rp.minimum_quantity, 0) AS minimum_quantity,
           COALESCE(rp.target_quantity, 0) AS target_quantity,
@@ -146,7 +152,7 @@ class MaterialRepository {
         ) rp ON rp.identity_id = m.id
         ${recipeJoin}
         WHERE m.organization_id = ? ${statusClause}
-        ORDER BY m.material_code
+        ORDER BY lower(trim(m.name)) ASC, m.id ASC
       `;
       return this.db.queryMany(sql, [organizationId]);
     }

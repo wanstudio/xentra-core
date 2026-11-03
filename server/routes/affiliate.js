@@ -1,19 +1,104 @@
 'use strict';
 
 const { defaultService } = require('../../domains/affiliate');
+const DataAccess = require('../../core/data/DataAccess');
 
 module.exports = function registerAffiliateRoutes(router, deps = {}) {
   const requireCustomerAuth = deps.requireCustomerAuth;
   const requireAuth = deps.requireAuth;
   const service = deps.affiliateService || defaultService;
+  const db = deps.db || DataAccess;
   const ownerRoles = ['owner', 'brand_manager'];
 
   // Initialize table schema
   service.ensureSchema();
 
+  function resolveBrandId(req) {
+    if (req.brand_id) return req.brand_id;
+    if (req.customer && (req.customer.brandId || req.customer.brand_id)) return req.customer.brandId || req.customer.brand_id;
+    if (req.query && req.query.brand_id) return req.query.brand_id;
+    if (req.body && req.body.brand_id) return req.body.brand_id;
+    const b = (typeof db.queryOne === 'function') ? db.queryOne('SELECT id FROM brands ORDER BY id ASC LIMIT 1') : null;
+    return (b && b.id) || 'brand_bangjo';
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  //  0. PUBLIC / UNGUARDED AFFILIATE INFO & SOCIAL PROOF
+  // ══════════════════════════════════════════════════════════════
+
+  // Public program overview for Value-First Landing / Teaser
+  const handlePublicProgram = async (req, res) => {
+    try {
+      const brandId = resolveBrandId(req);
+      const programInfo = await service.getPublicProgramInfo({ brandId });
+      res.json({ success: true, program: programInfo });
+    } catch (err) {
+      console.error('[Affiliate Public Program Error]:', err);
+      res.status(500).json({ success: false, error: err.message || 'FAILED_TO_LOAD_PROGRAM' });
+    }
+  };
+  router.get('/public/affiliate/program', handlePublicProgram);
+  router.get('/customer/affiliate/program', handlePublicProgram);
+
+  // Generate verified QR code payload (SVG & DataURL) for a referral code
+  const handleQrCode = (req, res) => {
+    try {
+      const code = req.query.code || req.query.ref || '';
+      if (!code) return res.status(400).json({ success: false, error: 'REFERRAL_CODE_REQUIRED' });
+      const host = req.headers.host || 'app.mybangjo.com';
+      const protocol = req.headers['x-forwarded-proto'] || 'https';
+      const shareUrl = `${protocol}://${host}/?ref=${encodeURIComponent(code)}`;
+
+      const qrcode = require('qrcode-generator');
+      const qr = qrcode(0, 'M');
+      qr.addData(shareUrl);
+      qr.make();
+      const svg = qr.createSvgTag({ cellSize: 6, margin: 4, scalable: true });
+      const dataUrl = qr.createDataURL(6, 4);
+
+      res.json({
+        success: true,
+        referral_code: code,
+        share_url: shareUrl,
+        svg,
+        data_url: dataUrl
+      });
+    } catch (err) {
+      console.error('[Affiliate QR Error]:', err);
+      res.status(500).json({ success: false, error: err.message || 'FAILED_TO_GENERATE_QR' });
+    }
+  };
+  router.get('/public/affiliate/qr-code', handleQrCode);
+  router.get('/customer/affiliate/qr-code', handleQrCode);
+
   // ══════════════════════════════════════════════════════════════
   //  1. CUSTOMER AFFILIATE ROUTES
   // ══════════════════════════════════════════════════════════════
+
+  // Instant 1-Tap Activation (Zero Application Form)
+  router.post('/customer/affiliate/activate', requireCustomerAuth(), async (req, res) => {
+    try {
+      const customerId = req.customer.customerId || req.customer.customer_id;
+      const brandId = resolveBrandId(req);
+      const { full_name, phone } = req.body || {};
+
+      const profile = await service.activateInstantPartner({
+        brandId,
+        customerId,
+        customerName: full_name || req.customer.name || null,
+        customerPhone: phone || req.customer.phone || null
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Selamat! Akun Foodie Partner Anda telah aktif.',
+        profile
+      });
+    } catch (err) {
+      console.error('[Affiliate Activate Error]:', err);
+      res.status(400).json({ success: false, error: err.message || 'FAILED_TO_ACTIVATE_PARTNER' });
+    }
+  });
 
   // Get current customer registration and approval status
   router.get('/customer/affiliate/status', requireCustomerAuth(), async (req, res) => {
@@ -100,7 +185,8 @@ module.exports = function registerAffiliateRoutes(router, deps = {}) {
           commission_rate: program.commission_rate,
           commission_per_item: program.commission_per_item || program.commission_rate || 1000,
           min_payout_amount: program.min_payout_amount,
-          cookie_days: program.cookie_days
+          cookie_days: program.cookie_days,
+          featured_product: program.featured_product || null
         }
       });
     } catch (err) {
@@ -187,6 +273,19 @@ module.exports = function registerAffiliateRoutes(router, deps = {}) {
     }
   });
 
+  // Get customer's payout history
+  router.get('/customer/affiliate/payouts', requireCustomerAuth(), async (req, res) => {
+    try {
+      const customerId = req.customer.customerId || req.customer.customer_id;
+      const brandId = req.brand_id || req.customer.brandId || req.customer.brand_id;
+
+      const payouts = await service.listPayoutsByCustomer({ brandId, customerId });
+      res.json({ success: true, payouts: payouts || [] });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message || 'FAILED_TO_LOAD_PAYOUTS' });
+    }
+  });
+
   // Generate share link and precomposed WhatsApp message
   router.get('/customer/affiliate/share-text', requireCustomerAuth(), async (req, res) => {
     try {
@@ -201,6 +300,16 @@ module.exports = function registerAffiliateRoutes(router, deps = {}) {
         customerName: req.customer.name || null
       });
 
+      let brand = null;
+      if (brandId) {
+        if (typeof db.queryOne === 'function') {
+          brand = db.queryOne('SELECT name, customer_pwa_name FROM brands WHERE id = ? LIMIT 1', [brandId]);
+        } else if (typeof db.prepare === 'function') {
+          brand = db.prepare('SELECT name, customer_pwa_name FROM brands WHERE id = ?').get(brandId);
+        }
+      }
+      const brandName = (brand && (brand.customer_pwa_name || brand.name)) || 'Bangjo';
+
       const host = req.headers.host || 'app.mybangjo.com';
       const protocol = req.headers['x-forwarded-proto'] || 'https';
       let shareUrl = `${protocol}://${host}/?ref=${encodeURIComponent(profile.referral_code)}`;
@@ -208,11 +317,20 @@ module.exports = function registerAffiliateRoutes(router, deps = {}) {
         shareUrl += `&menu=${encodeURIComponent(menuId)}`;
       }
 
-      const waText = `Wah cobain deh ${menuTitle} di Bangjo, beneran enak banget! 🤤 Pesan langsung lewat link ini ya: ${shareUrl}`;
+      // GoFood/GrabFood clean share style:
+      // share_title: short canonical title
+      // share_text: message body WITHOUT duplicated URL
+      // share_url: distinct canonical URL for Web Share API
+      // whatsapp_text: pre-formatted single payload for direct chat / fallback (Text + newline + URL)
+      const shareTitle = `${menuTitle} • ${brandName}`;
+      const shareText = `Cobain deh ${menuTitle} di ${brandName}, rasanya rekomen banget!`;
+      const waText = `${shareText}\n${shareUrl}`;
 
       res.json({
         success: true,
         referral_code: profile.referral_code,
+        share_title: shareTitle,
+        share_text: shareText,
         share_url: shareUrl,
         whatsapp_text: waText
       });
@@ -236,7 +354,7 @@ module.exports = function registerAffiliateRoutes(router, deps = {}) {
 
   router.put('/admin/affiliate/program', requireAuth(ownerRoles), async (req, res) => {
     try {
-      const { commission_type, commission_rate, commission_per_item, cookie_days, min_payout_amount, is_active } = req.body || {};
+      const { commission_type, commission_rate, commission_per_item, cookie_days, min_payout_amount, is_active, featured_product_id } = req.body || {};
       const program = await service.updateProgram({
         brandId: req.brand_id,
         commissionType: commission_type,
@@ -244,7 +362,8 @@ module.exports = function registerAffiliateRoutes(router, deps = {}) {
         commissionPerItem: commission_per_item,
         cookieDays: cookie_days,
         minPayoutAmount: min_payout_amount,
-        isActive: is_active
+        isActive: is_active,
+        featuredProductId: featured_product_id
       });
       res.json({ success: true, program });
     } catch (err) {

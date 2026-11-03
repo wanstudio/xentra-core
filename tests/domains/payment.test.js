@@ -3,6 +3,8 @@ const test = require('node:test');
 const assert = require('node:assert');
 const crypto = require('crypto');
 const db = require('../../server/database/db');
+const MidtransGateway = require('../../domains/payment/gateways/MidtransGateway');
+const PosOrderService = require('../../domains/pos/services/PosOrderService');
 const { domain, events } = require('../../core');
 const {
   PaymentModel,
@@ -913,4 +915,140 @@ test('R5 CHECK-2 — settlement keeps the order AWAITING; only Branch ACCEPT con
     'cancelled',
     'payment failure still cancels an unpaid pending order (PAYMENT_FAILURE class)'
   );
+});
+
+test('Shared dine-in payment — callback settles its original amount and POS can collect the remaining balance', () => {
+  const ts = Date.now();
+  const orderId = `ord_shared_pay_${ts}`;
+  const orderNumber = `XN-SHARED-PAY-${ts}`;
+  db.prepare(`
+    INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel,
+      subtotal, grand_total, payment_method, payment_status, status, dining_session_id)
+    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Customer Shared', '62812345678', 'dine_in', 'customer_app',
+      40000, 100000, 'midtrans', 'pending', 'pending', ?)
+  `).run(orderId, orderNumber, `sess_shared_payment_${ts}`);
+  db.prepare(`
+    INSERT INTO order_payments (id, order_id, provider, merchant_id, snap_token, payment_status, amount)
+    VALUES (?, ?, 'midtrans', 'M12345', 'snap_shared', 'pending', 40000)
+  `).run(`pay_shared_${ts}`, orderId);
+
+  const callback = {
+    order_id: orderId,
+    status_code: '200',
+    gross_amount: '40000.00',
+    transaction_status: 'settlement',
+    payment_type: 'qris'
+  };
+  const settled = PaymentGatewayService.handleWebhook(callback, { skipSignatureCheck: true, provider: 'midtrans' });
+  assert.equal(settled.success, true);
+  assert.equal(settled.payment_status, 'settlement');
+  assert.equal(PaymentGatewayService.handleWebhook(callback, { skipSignatureCheck: true, provider: 'midtrans' }).idempotent, true,
+    'duplicate provider callbacks remain idempotent');
+
+  const payment = db.prepare('SELECT amount, payment_status FROM order_payments WHERE order_id = ?').get(orderId);
+  assert.equal(payment.amount, 40000, 'payment ledger retains the amount charged when the gateway transaction was created');
+  assert.equal(payment.payment_status, 'settlement');
+
+  // Simulate Merchant acceptance; the customer paid Rp40k before later items
+  // raised this canonical table bill to Rp100k.
+  db.prepare("UPDATE orders SET status = 'confirmed' WHERE id = ?").run(orderId);
+  const cashRemainder = CashSettlementService.settleCashPayment({
+    order_id: orderId,
+    amount: 100000,
+    amount_tendered: 60000,
+    cashier_id: 'cashier_pay',
+    shift_id: 'shift_pay_open'
+  });
+  assert.equal(cashRemainder.success, true);
+  assert.equal(cashRemainder.amount, 60000);
+  const finalPayment = db.prepare('SELECT amount, provider, payment_method, payment_status FROM order_payments WHERE order_id = ?').get(orderId);
+  assert.equal(finalPayment.amount, 100000);
+  assert.equal(finalPayment.provider, 'multiple', 'aggregate payment records mixed online and cash tenders');
+  assert.equal(finalPayment.payment_method, 'multiple', 'aggregate payment method identifies mixed tenders');
+  assert.equal(finalPayment.payment_status, 'settlement');
+});
+
+test('POS check gateway intent settles one contribution and duplicate callback is idempotent', async () => {
+  const ts = Date.now();
+  const orderId = `ord_check_gateway_${ts}`;
+  const checkId = `check_gateway_${ts}`;
+  db.prepare(`INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, payment_status, status)
+    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Customer Check', '62812345678', 'dine_in', 'pos_cashier', 60000, 60000, 'cash', 'pending', 'confirmed')`).run(orderId, `XN-CHECK-${ts}`);
+  db.prepare(`INSERT INTO pos_order_checks (id, order_id, check_number, status, allocated_amount) VALUES (?, ?, 1, 'open', 60000)`).run(checkId, orderId);
+  const originalCreateTransaction = MidtransGateway.prototype.createTransaction;
+  MidtransGateway.prototype.createTransaction = async function (gatewayOrder) {
+    assert.equal(gatewayOrder.grand_total, 30000);
+    return { snap_token: 'snap_check_test', redirect_url: 'https://sandbox.example/pay', merchant_id: 'M12345' };
+  };
+  let started;
+  try {
+    started = await PosOrderService.createCheckPaymentIntent({ order_id: orderId, branch_id: 'branch_pay', check_id: checkId, amount: 30000, payer_name: 'Test Payer' });
+  } finally {
+    MidtransGateway.prototype.createTransaction = originalCreateTransaction;
+  }
+  const gatewayOrderId = started.payment.gateway_order_id;
+  const intentId = db.prepare('SELECT id FROM pos_check_payment_intents WHERE gateway_order_id = ?').get(gatewayOrderId).id;
+  assert.equal(started.payment.status, 'pending');
+
+  const callback = { order_id: gatewayOrderId, status_code: '200', gross_amount: '30000.00', transaction_status: 'settlement', payment_type: 'qris' };
+  const first = PaymentGatewayService.handleWebhook(callback, { skipSignatureCheck: true, provider: 'midtrans' });
+  assert.equal(first.success, true);
+  assert.equal(first.payment_status, 'settlement');
+  assert.equal(db.prepare("SELECT COALESCE(SUM(amount),0) AS amount FROM pos_check_payments WHERE check_id = ? AND payment_status = 'settlement'").get(checkId).amount, 30000);
+  assert.equal(db.prepare('SELECT payment_status FROM pos_check_payment_intents WHERE id = ?').get(intentId).payment_status, 'settlement');
+
+  const retry = PaymentGatewayService.handleWebhook(callback, { skipSignatureCheck: true, provider: 'midtrans' });
+  assert.equal(retry.idempotent, true);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM pos_check_payments WHERE check_id = ?').get(checkId).n, 1, 'retry must not duplicate the contribution');
+});
+
+test('POS check payment reconciliation settles an aged pending gateway intent', async () => {
+  const ts = Date.now();
+  const orderId = `ord_check_recon_${ts}`;
+  const checkId = `check_recon_${ts}`;
+  const gatewayOrderId = `pc_recon_${ts}`;
+  db.prepare(`INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, payment_status, status)
+    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Customer Check', '62812345678', 'dine_in', 'pos_cashier', 50000, 50000, 'cash', 'pending', 'confirmed')`).run(orderId, `XN-RECON-${ts}`);
+  db.prepare("INSERT INTO pos_order_checks (id, order_id, check_number, status, allocated_amount) VALUES (?, ?, 1, 'open', 50000)").run(checkId, orderId);
+  db.prepare(`INSERT INTO pos_check_payment_intents (id, gateway_order_id, order_id, check_id, provider, amount, payment_status, updated_at)
+    VALUES (?, ?, ?, ?, 'midtrans', 50000, 'pending', datetime('now', '-5 minutes'))`).run(`pci_recon_${ts}`, gatewayOrderId, orderId, checkId);
+
+  const originalStatusLookup = MidtransGateway.prototype.checkTransactionStatus;
+  MidtransGateway.prototype.checkTransactionStatus = async function (id) {
+    assert.equal(id, gatewayOrderId);
+    return { order_id: id, status_code: '200', gross_amount: '50000.00', transaction_status: 'settlement', payment_type: 'qris' };
+  };
+  try {
+    const results = await PaymentGatewayService.reconcilePendingPayments();
+    const result = results.find(row => row.gateway_order_id === gatewayOrderId);
+    assert.ok(result && result.success);
+    assert.equal(db.prepare('SELECT payment_status FROM pos_check_payment_intents WHERE gateway_order_id = ?').get(gatewayOrderId).payment_status, 'settlement');
+    assert.equal(db.prepare("SELECT COALESCE(SUM(amount),0) AS amount FROM pos_check_payments WHERE order_id = ? AND payment_status = 'settlement'").get(orderId).amount, 50000);
+  } finally {
+    MidtransGateway.prototype.checkTransactionStatus = originalStatusLookup;
+  }
+});
+
+test('POS check reconciliation cancels a gateway-missing intent and frees the reservation without cancelling the order', async () => {
+  const ts = Date.now();
+  const orderId = `ord_check_missing_${ts}`;
+  const checkId = `check_missing_${ts}`;
+  const gatewayOrderId = `pc_missing_${ts}`;
+  db.prepare(`INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, payment_status, status)
+    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Customer Check', '62812345678', 'dine_in', 'pos_cashier', 50000, 50000, 'cash', 'pending', 'confirmed')`).run(orderId, `XN-MISSING-${ts}`);
+  db.prepare("INSERT INTO pos_order_checks (id, order_id, check_number, status, allocated_amount) VALUES (?, ?, 1, 'open', 50000)").run(checkId, orderId);
+  db.prepare(`INSERT INTO pos_check_payment_intents (id, gateway_order_id, order_id, check_id, provider, amount, payment_status, updated_at)
+    VALUES (?, ?, ?, ?, 'midtrans', 30000, 'pending', datetime('now', '-5 minutes'))`).run(`pci_missing_${ts}`, gatewayOrderId, orderId, checkId);
+
+  const originalStatusLookup = MidtransGateway.prototype.checkTransactionStatus;
+  MidtransGateway.prototype.checkTransactionStatus = async function () { const err = new Error('not found'); err.response = { status: 404 }; throw err; };
+  try {
+    const results = await PaymentGatewayService.reconcilePendingPayments();
+    const result = results.find(row => row.gateway_order_id === gatewayOrderId);
+    assert.ok(result && result.success);
+    assert.equal(db.prepare('SELECT payment_status FROM pos_check_payment_intents WHERE gateway_order_id = ?').get(gatewayOrderId).payment_status, 'cancel');
+    assert.equal(db.prepare("SELECT status FROM orders WHERE id = ?").get(orderId).status, 'confirmed', 'missing gateway transaction must not cancel the accepted order');
+  } finally {
+    MidtransGateway.prototype.checkTransactionStatus = originalStatusLookup;
+  }
 });

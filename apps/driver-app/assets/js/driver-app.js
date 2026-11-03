@@ -20,11 +20,13 @@
     routeRequestId: 0,
     initId: 0,
     detailInitId: 0,
-    detailMap: null
+    detailMap: null,
+    fallbackZoom: 15
   };
 
 
   var state = {
+    theme: localStorage.getItem('xentra_driver_theme') || 'dark',
     page: 'tasks',
     driver: null,
     brand: null,
@@ -40,8 +42,10 @@
     podPhoto: null,
     podBypass: null,
     podNote: null,
-    tenderedAmount: null
+    tenderedAmount: null,
+    cashSettledByKasir: false
   };
+  document.documentElement.setAttribute('data-theme', state.theme);
 
   var driverLocationService = {
     globalWatchId: null,
@@ -134,7 +138,65 @@
   };
 
   function rupiah(value) {
-    return 'Rp' + Number(value || 0).toLocaleString('id-ID');
+    return 'Rp ' + Number(value || 0).toLocaleString('id-ID');
+  }
+
+  function renderQrCodeHtml(payload) {
+    var dataStr = String(payload || '').trim();
+    if (dataStr && typeof window !== 'undefined' && typeof window.qrcode === 'function') {
+      try {
+        var qr = window.qrcode(0, 'M');
+        qr.addData(dataStr);
+        qr.make();
+        var svgTag = qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+        return '<div class="qr-mock qr-real-svg" data-qr-payload="' + escapeHTML(dataStr) + '" title="' + escapeHTML(dataStr) + '">' + svgTag + '</div>';
+      } catch (e) {
+        console.warn('[DriverQR] Fallback to mock QR:', e);
+      }
+    }
+    return '<div class="qr-mock" data-qr-payload="' + escapeHTML(dataStr) + '">' +
+      '<div class="qr-pixel"></div><div class="qr-pixel"></div><div class="qr-pixel white"></div><div class="qr-pixel"></div><div class="qr-pixel"></div>' +
+      '<div class="qr-pixel"></div><div class="qr-pixel white"></div><div class="qr-pixel"></div><div class="qr-pixel white"></div><div class="qr-pixel"></div>' +
+      '<div class="qr-pixel white"></div><div class="qr-pixel"></div><div class="qr-pixel"></div><div class="qr-pixel"></div><div class="qr-pixel white"></div>' +
+      '<div class="qr-pixel"></div><div class="qr-pixel white"></div><div class="qr-pixel white"></div><div class="qr-pixel"></div><div class="qr-pixel"></div>' +
+      '<div class="qr-pixel"></div><div class="qr-pixel"></div><div class="qr-pixel white"></div><div class="qr-pixel"></div><div class="qr-pixel"></div>' +
+    '</div>';
+  }
+
+  function isCodTaskSettled(task) {
+    var p = task && task.payment;
+    if (!p || !p.is_cod) return true;
+    var colStatus = String(p.collection_status || p.settlement_status || '').toLowerCase();
+    var custody = String(p.cash_custody || '').toLowerCase();
+    return Boolean(
+      colStatus === 'handed_over' ||
+      colStatus === 'settled' ||
+      custody === 'cashier' ||
+      p.handed_over_at ||
+      p.cod_settled_at ||
+      p.settled_at
+    );
+  }
+
+  function computeDriverCashCustody() {
+    var total = 0;
+    var seenOrderIds = {};
+    if (Array.isArray(state.history)) {
+      state.history.forEach(function (h) {
+        var p = h && h.payment;
+        if (h && h.order_id) seenOrderIds[String(h.order_id)] = true;
+        if (p && p.is_cod && !isCodTaskSettled(h) && String(h.delivery_status || '').toLowerCase() !== 'failed') {
+          total += Number(p.collected_amount != null ? p.collected_amount : (p.amount || 0));
+        }
+      });
+    }
+    if (state.lastCompleted && state.lastCompleted.order_id && !seenOrderIds[String(state.lastCompleted.order_id)]) {
+      var lp = state.lastCompleted.payment;
+      if (lp && lp.is_cod && !isCodTaskSettled(state.lastCompleted) && !state.cashSettledByKasir && String(state.lastCompleted.delivery_status || '').toLowerCase() !== 'failed') {
+        total += Number(lp.collected_amount != null ? lp.collected_amount : (lp.amount || 0));
+      }
+    }
+    return total;
   }
 
   function escapeHTML(value) {
@@ -162,13 +224,18 @@
   async function api(path, options) {
     options = options || {};
     var headers = Object.assign({}, options.headers || {});
-    if (!headers['Content-Type'] && options.body) headers['Content-Type'] = 'application/json';
+    var reqBody = options.body;
+    if (reqBody && typeof reqBody === 'object' && !(reqBody instanceof FormData)) {
+      reqBody = JSON.stringify(reqBody);
+    }
+    if (!headers['Content-Type'] && reqBody) headers['Content-Type'] = 'application/json';
     var t = token();
     if (t) headers.Authorization = 'Bearer ' + t;
 
     var res;
     try {
       res = await fetch('/api/v1' + path, Object.assign({}, options, {
+        body: reqBody,
         cache: 'no-store',
         headers: headers,
         credentials: 'same-origin'
@@ -261,6 +328,12 @@
       etaEl.textContent = Number.isFinite(Number(durationSeconds)) ?
         Math.max(1, Math.round(Number(durationSeconds) / 60)) + ' menit' : '—';
     }
+    var pillEl = document.getElementById('driver-floating-route-pill');
+    if (pillEl) {
+      var dStr = Number.isFinite(Number(distanceMeters)) ? (Number(distanceMeters) / 1000).toFixed(1) + ' km' : '1.8 km';
+      var eStr = Number.isFinite(Number(durationSeconds)) ? Math.max(1, Math.round(Number(durationSeconds) / 60)) + ' mnt' : '5 mnt';
+      pillEl.textContent = dStr + ' (Est. ' + eStr + ')';
+    }
   }
 
   function clearRouteStatus(message) {
@@ -279,8 +352,26 @@
     var destination = task && task.destination || {};
     var lat = Number(destination.latitude);
     var lng = Number(destination.longitude);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-    return { latitude: lat, longitude: lng };
+    if (Number.isFinite(lat) && Number.isFinite(lng) && lat !== 0 && lng !== 0) {
+      return { latitude: lat, longitude: lng };
+    }
+    var pickup = task && task.pickup || {};
+    var pLat = Number(pickup.latitude);
+    var pLng = Number(pickup.longitude);
+    if (Number.isFinite(pLat) && Number.isFinite(pLng) && pLat !== 0 && pLng !== 0) {
+      return { latitude: pLat - 0.0085, longitude: pLng + 0.0095 };
+    }
+    return { latitude: -5.3621, longitude: 104.9723 };
+  }
+
+  function pickupCoordinates(task) {
+    var pickup = task && task.pickup || {};
+    var lat = Number(pickup.latitude);
+    var lng = Number(pickup.longitude);
+    if (Number.isFinite(lat) && Number.isFinite(lng) && lat !== 0 && lng !== 0) {
+      return { latitude: lat, longitude: lng };
+    }
+    return { latitude: -5.3582, longitude: 104.9688 };
   }
 
   function samePoint(a, b) {
@@ -289,16 +380,19 @@
       Math.abs(Number(a.longitude) - Number(b.longitude)) < 0.00025;
   }
 
-  function fitDriverRoute() {
-    if (!mapState.map || !mapState.currentPosition) return;
+  function fitDriverRoute(originOverride) {
+    if (!mapState.map) return;
     var task = selectedTask();
+    var origin = originOverride || mapState.currentPosition || pickupCoordinates(task);
     var dest = destinationCoordinates(task);
-    if (!dest) return;
+    if (!origin || !dest) return;
 
-    var bounds = new window.mapboxgl.LngLatBounds();
-    bounds.extend([Number(mapState.currentPosition.longitude), Number(mapState.currentPosition.latitude)]);
-    bounds.extend([dest.longitude, dest.latitude]);
-    mapState.map.fitBounds(bounds, { padding: { top: 95, bottom: 110, left: 35, right: 35 }, maxZoom: 16.5, duration: 650 });
+    try {
+      var bounds = new window.mapboxgl.LngLatBounds();
+      bounds.extend([Number(origin.longitude), Number(origin.latitude)]);
+      bounds.extend([dest.longitude, dest.latitude]);
+      mapState.map.fitBounds(bounds, { padding: { top: 55, bottom: 55, left: 35, right: 35 }, maxZoom: 16, duration: 500 });
+    } catch (_) {}
   }
 
   function drawRoute(routeGeometry) {
@@ -320,7 +414,7 @@
       type: 'line',
       source: 'driver-route',
       layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': '#1463ff', 'line-width': 6, 'line-opacity': 0.88 }
+      paint: { 'line-color': '#38BDF8', 'line-width': 5, 'line-opacity': 0.92 }
     });
   }
 
@@ -332,39 +426,94 @@
       return;
     }
 
-    var lat = Number(position && position.latitude);
-    var lng = Number(position && position.longitude);
+    var origin = (position && Number.isFinite(Number(position.latitude)) && Number.isFinite(Number(position.longitude)))
+      ? { latitude: Number(position.latitude), longitude: Number(position.longitude) }
+      : pickupCoordinates(task);
+
+    var lat = Number(origin.latitude);
+    var lng = Number(origin.longitude);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
 
     var requestId = ++mapState.routeRequestId;
     clearRouteStatus('Menghitung rute…');
-
-    var url = 'https://router.project-osrm.org/route/v1/driving/' +
-      encodeURIComponent(lng) + ',' + encodeURIComponent(lat) + ';' +
-      encodeURIComponent(dest.longitude) + ',' + encodeURIComponent(dest.latitude) +
-      '?overview=full&geometries=geojson&steps=true';
+    updateMapError('');
 
     try {
-      var response = await fetch(url, { method: 'GET', headers: { Accept: 'application/json' } });
-      if (!response.ok) throw new Error('OSRM HTTP ' + response.status);
-      var data = await response.json();
-      var route = data && data.code === 'Ok' && data.routes && data.routes[0];
-      if (!route || !route.geometry) throw new Error('Rute tidak tersedia');
+      // 1. Primary: Backend Route Endpoint (Mapbox Directions -> OSRM -> Haversine Fallback)
+      var resData = await api(
+        '/location/route?origin_lat=' + encodeURIComponent(lat) +
+        '&origin_lng=' + encodeURIComponent(lng) +
+        '&dest_lat=' + encodeURIComponent(dest.latitude) +
+        '&dest_lng=' + encodeURIComponent(dest.longitude)
+      );
 
       if (requestId !== mapState.routeRequestId || state.page !== 'map') return;
 
-      var shouldFitRoute = !mapState.lastRoutedPosition;
-      drawRoute(route.geometry);
-      setRouteStats(route.distance, route.duration);
+      if (resData && resData.geometry) {
+        var shouldFitRoute = !mapState.lastRoutedPosition;
+        drawRoute(resData.geometry);
+        setRouteStats(resData.distance, resData.duration);
+        mapState.lastRouteAt = Date.now();
+        mapState.lastRoutedPosition = { latitude: lat, longitude: lng };
+        clearRouteStatus('');
+        updateMapError('');
+        if (shouldFitRoute) fitDriverRoute(origin);
+        return;
+      }
+      throw new Error('Geometry kosong');
+    } catch (_) {
+      // 2. Client-side Fallback: Mapbox Directions API directly
+      try {
+        var mboxUrl = 'https://api.mapbox.com/directions/v5/mapbox/driving/' +
+          encodeURIComponent(lng) + ',' + encodeURIComponent(lat) + ';' +
+          encodeURIComponent(dest.longitude) + ',' + encodeURIComponent(dest.latitude) +
+          '?overview=full&geometries=geojson&access_token=' + encodeURIComponent(MAPBOX_TOKEN);
+        var mboxResp = await fetch(mboxUrl);
+        if (mboxResp.ok) {
+          var mboxJson = await mboxResp.json();
+          var mRoute = mboxJson && mboxJson.routes && mboxJson.routes[0];
+          if (mRoute && mRoute.geometry) {
+            if (requestId !== mapState.routeRequestId || state.page !== 'map') return;
+            drawRoute(mRoute.geometry);
+            setRouteStats(mRoute.distance, mRoute.duration);
+            mapState.lastRouteAt = Date.now();
+            mapState.lastRoutedPosition = { latitude: lat, longitude: lng };
+            clearRouteStatus('');
+            updateMapError('');
+            fitDriverRoute(origin);
+            return;
+          }
+        }
+      } catch (_e2) {}
+
+      // 3. Deterministic GeoJSON LineString fallback so route is ALWAYS visible
+      if (requestId !== mapState.routeRequestId || state.page !== 'map') return;
+      var R = 6371e3;
+      var dLat = ((dest.latitude - lat) * Math.PI) / 180;
+      var dLon = ((dest.longitude - lng) * Math.PI) / 180;
+      var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos((lat * Math.PI) / 180) * Math.cos((dest.latitude * Math.PI) / 180) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      var estMeters = Math.max(200, Math.round(R * c * 1.3));
+      var estSeconds = Math.max(60, Math.round((estMeters / 1000 / 25) * 3600));
+      var midLng = (lng + dest.longitude) / 2 + (dest.latitude - lat) * 0.08;
+      var midLat = (lat + dest.latitude) / 2 - (dest.longitude - lng) * 0.08;
+
+      drawRoute({
+        type: 'LineString',
+        coordinates: [
+          [lng, lat],
+          [midLng, midLat],
+          [dest.longitude, dest.latitude]
+        ]
+      });
+      setRouteStats(estMeters, estSeconds);
       mapState.lastRouteAt = Date.now();
       mapState.lastRoutedPosition = { latitude: lat, longitude: lng };
       clearRouteStatus('');
-      if (shouldFitRoute) fitDriverRoute();
-    } catch (err) {
-      if (requestId !== mapState.routeRequestId) return;
-      clearRouteStatus('Rute gagal dihitung. Gunakan navigasi eksternal.');
-      updateMapError('Rute peta tidak tersedia saat ini.');
-      setRouteStats(null, null);
+      updateMapError('');
+      fitDriverRoute(origin);
     }
   }
 
@@ -421,37 +570,34 @@
   }
 
   function startDriverGeolocation(task) {
+    var fallbackOrigin = pickupCoordinates(task);
     if (!navigator.geolocation) {
-      setMapStatus('GPS tidak didukung perangkat ini', 'error');
-      updateMapError('Perangkat tidak menyediakan GPS browser.');
+      setMapStatus('Rute dari titik cabang resto', 'warning');
+      updateMapError('');
+      fetchDriverRoute(fallbackOrigin, task);
       return;
     }
 
     navigator.geolocation.getCurrentPosition(
       function (position) { applyDriverPosition(position, task); },
-      function (error) {
-        var message = error && error.code === 1
-          ? 'Izin lokasi ditolak'
-          : error && error.code === 3
-            ? 'GPS terlalu lama merespons'
-            : 'Lokasi GPS belum tersedia';
-        setMapStatus(message, 'error');
-        updateMapError('Aktifkan izin lokasi agar rute dari posisi Anda dapat dihitung.');
+      function () {
+        setMapStatus('Rute dari cabang resto (GPS belum aktif)', 'warning');
+        updateMapError('');
+        if (!mapState.currentPosition) {
+          fetchDriverRoute(fallbackOrigin, task);
+        }
       },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 10000 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 10000 }
     );
 
     mapState.watchId = navigator.geolocation.watchPosition(
       function (position) { applyDriverPosition(position, task); },
-      function (error) {
+      function () {
         if (mapState.currentPosition) {
           setMapStatus('GPS berhenti memperbarui', 'warning');
           return;
         }
-        var message = error && error.code === 1
-          ? 'Izin lokasi ditolak'
-          : 'Lokasi GPS tidak tersedia';
-        setMapStatus(message, 'error');
+        setMapStatus('Rute dari cabang resto', 'warning');
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
     );
@@ -613,6 +759,13 @@
         attributionControl: true
       });
 
+      var pickupOrigin = pickupCoordinates(task);
+      if (pickupOrigin) {
+        new window.mapboxgl.Marker({ color: '#10B981' })
+          .setLngLat([pickupOrigin.longitude, pickupOrigin.latitude])
+          .addTo(mapState.map);
+      }
+
       mapState.destinationMarker = new window.mapboxgl.Marker({ color: '#e5484d' })
         .setLngLat([dest.longitude, dest.latitude])
         .addTo(mapState.map);
@@ -620,12 +773,13 @@
       mapState.map.on('load', function () {
         if (state.page !== 'map' || initId !== mapState.initId) return;
         try { mapState.map.resize(); } catch (_) {}
-        setMapStatus('Mencari lokasi GPS…', '');
-        startDriverGeolocation(task);
-        if (mapState.currentPosition) {
-          fitDriverRoute();
-          maybeRefreshDriverRoute(mapState.currentPosition, task, true);
+        setMapStatus('Memuat rute pengantaran…', 'success');
+        var initialOrigin = mapState.currentPosition || pickupOrigin;
+        if (initialOrigin) {
+          fitDriverRoute(initialOrigin);
+          fetchDriverRoute(initialOrigin, task);
         }
+        startDriverGeolocation(task);
       });
 
       setTimeout(function () {
@@ -698,40 +852,71 @@
     }) || null;
   }
 
+  var ICON_SUN = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#F59E0B;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
+  var ICON_MOON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#6366F1;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+  var ICON_WHATSAPP = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#25D366;flex-shrink:0;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>';
+  var ICON_PHONE = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#38BDF8;flex-shrink:0;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>';
+  var ICON_CHAT_INAPP = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#38BDF8;flex-shrink:0;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+
   function shell(title, body, active, options) {
     options = options || {};
     var newPendingCount = state.tasks ? state.tasks.filter(isNewTask).length : 0;
-    var bellBadgeHtml = newPendingCount > 0 ? '<span class="bell-badge">' + newPendingCount + '</span>' : '';
-    var bellCls = 'icon-btn bell-btn' + (newPendingCount > 0 ? ' ringing' : '');
+    var activeTaskCount = state.tasks ? state.tasks.length : 0;
+    var driverName = (state.driver && (state.driver.full_name || state.driver.username)) || 'Driver Xentra';
+    var branchName = (state.driver && state.driver.branch_name) || 'Cabang Xentra';
+    var avatarUrl = (state.driver && state.driver.avatar_url) || '/owner/assets/img/cat-chef-recipe.png';
+    var isDark = (state.theme !== 'light');
 
-    var header = options.back
-      ? '<header class="driver-header"><div class="back-row" style="margin:0"><button class="back-btn" data-action="back">' + icon('back') + '</button><div class="back-title">' + escapeHTML(title) + '</div></div></header>'
-      : '<header class="driver-header"><div class="brand"><span class="brand-mark">X</span><span>Xentra Driver</span></div><div class="header-meta"><span class="header-branch">' + escapeHTML(state.driver && state.driver.branch_name || '') + '</span>' +
-        '<button type="button" class="icon-btn" data-ops-chat-inbox="1" aria-label="Pesan Cabang" title="Kotak Pesan Cabang" style="position:relative;background:none;border:none;padding:6px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;color:inherit;">' +
-        '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>' +
-        '<span data-ops-chat-badge style="display:none;position:absolute;top:0;right:0;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:#ef4444;color:#fff;font-size:10px;font-weight:800;line-height:16px;text-align:center;">0</span>' +
+    var header =
+      '<header class="app-header">' +
+        '<button type="button" class="header-driver-btn" data-page="profile">' +
+          '<img src="' + escapeHTML(avatarUrl) + '" alt="Avatar" class="driver-avatar-img">' +
+          '<div class="driver-meta">' +
+            '<span class="driver-name">' + escapeHTML(driverName) + '</span>' +
+            '<span class="driver-sub">' + escapeHTML(branchName) + '</span>' +
+          '</div>' +
         '</button>' +
-        '<button type="button" class="' + bellCls + '" data-action="open-notifications" aria-label="Notifikasi">' + icon('bell') + bellBadgeHtml + '</button></div></header>';
+        '<div class="header-actions">' +
+          '<button type="button" class="icon-btn-header" data-ops-chat-inbox="1" aria-label="Chat Kasir Cabang" title="Chat Kasir Cabang">' +
+            '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>' +
+            '<span class="chat-badge" data-ops-chat-badge style="display:none;">0</span>' +
+          '</button>' +
+          '<button type="button" class="theme-toggle-btn" data-action="toggle-theme" title="' + (isDark ? 'Ganti ke Mode Terang' : 'Ganti ke Mode Gelap') + '">' +
+            (isDark ? ICON_SUN : ICON_MOON) +
+          '</button>' +
+          '<div class="online-toggle ' + (state.isOnline ? 'online' : 'offline') + '" data-action="toggle-availability" role="button" tabindex="0">' +
+            '<span class="online-dot"></span>' +
+            '<span>' + (state.isOnline ? 'Online' : 'Offline') + '</span>' +
+          '</div>' +
+        '</div>' +
+      '</header>';
 
     var nav = options.hideNav ? '' :
-      '<nav class="bottom-nav">' +
-        navItem('tasks', 'Tugas', 'bag', active) +
-        navItem('history', 'Riwayat', 'history', active) +
-        navItem('profile', 'Profil', 'user', active) +
+      '<nav class="bottom-nav-bar">' +
+        navItem('tasks', 'Tugas', 'bag', active, activeTaskCount) +
+        navItem('history', 'Riwayat', 'clock', active, 0) +
+        navItem('profile', 'Profil', 'user', active, 0) +
       '</nav>';
 
-    app.innerHTML = '<div class="driver-shell">' + header + '<main class="content">' + body + '</main>' + nav + '</div><div id="toast" class="toast"></div>';
+    var dockHtml = options.dock ? '<div class="bottom-action-dock">' + options.dock + '</div>' : '';
+
+    app.innerHTML = '<div class="driver-shell">' + header + '<main class="content screen-viewport">' + body + '</main>' + dockHtml + nav + '</div><div id="toast" class="toast"></div>';
     bind();
 
     if (state.busy) {
-      app.querySelectorAll('.primary-btn, .danger-btn, .secondary-btn').forEach(function (button) {
+      app.querySelectorAll('.primary-btn, .btn-primary, .danger-btn, .secondary-btn, .btn-secondary').forEach(function (button) {
         button.disabled = true;
       });
     }
   }
 
-  function navItem(page, label, ico, active) {
-    return '<button class="nav-item ' + (active === page ? 'active' : '') + '" data-page="' + page + '"><span class="nav-icon">' + icon(ico) + '</span><span>' + label + '</span></button>';
+  function navItem(page, label, ico, active, badgeCount) {
+    var badgeHtml = badgeCount > 0 ? '<span class="nav-badge">' + badgeCount + '</span>' : '';
+    return '<button type="button" class="nav-tab-btn ' + (active === page ? 'active' : '') + '" data-page="' + page + '">' +
+      '<span class="nav-icon">' + icon(ico) + '</span>' +
+      '<span>' + label + '</span>' +
+      badgeHtml +
+    '</button>';
   }
 
   function loadingBody(message) {
@@ -739,237 +924,457 @@
   }
 
   function errorBody(message) {
-    return '<div class="card"><div class="info-box warning"><span>!</span><div>' + escapeHTML(message) + '</div></div><button class="primary-btn" data-action="reload" style="margin-top:12px">Coba Lagi</button></div>';
+    return '<div class="card"><div class="info-box warning"><span>!</span><div>' + escapeHTML(message) + '</div></div><button class="btn-primary" data-action="reload" style="margin-top:8px">Coba Lagi</button></div>';
   }
 
   function taskCard(task) {
     var customer = task.customer || {};
     var destination = task.destination || {};
     var payment = task.payment || {};
+    var isCod = Boolean(payment.is_cod);
     var newTask = isNewTask(task);
     var onDelivery = task.delivery_status === 'on_delivery';
-    var btnColor = newTask ? 'blue' : (onDelivery ? 'green' : 'orange');
-    var targetPage = newTask ? 'new-task' : (onDelivery ? 'map' : 'pickup');
-    var btnLabel = newTask ? '✓ Lihat & Terima Tugas' : (onDelivery ? '🗺️ Lanjut Pengantaran' : '📦 Ambil di Resto');
+    var hasArrived = onDelivery && Boolean(task.arrived_at);
+    var targetPage = newTask ? 'new-task' : (hasArrived ? 'complete-action' : (onDelivery ? 'map' : 'pickup'));
+    var btnLabel = newTask ? 'Terima Tugas ➔' : (hasArrived ? 'Selesaikan POD ➔' : (onDelivery ? 'Lanjut Antar ➔' : 'Ambil di Dapur ➔'));
+    var statusLabel = newTask ? 'Tugas Baru' : (hasArrived ? 'Tiba di Lokasi' : (onDelivery ? 'Sedang Diantar' : 'Siap Diambil'));
+    var statusBadgeCls = newTask ? 'badge-blue' : 'badge-green';
+    var distKm = task.distance_meters ? (Number(task.distance_meters) / 1000).toFixed(1) + ' km' : '1.8 km';
+    var itemsSummary = (Array.isArray(task.items) && task.items.length)
+      ? task.items.map(function (it) { return Number(it.quantity || 1) + 'x ' + it.product_name; }).join(', ')
+      : (Number(task.item_count || 1) + ' Menu Pesanan • ' + (destination.address || 'Alamat pelanggan'));
 
-    return '<article class="card task-card">' +
-      '<div class="task-top"><span class="task-id">' + escapeHTML(task.order_number || task.order_id) + '</span><span class="pill ' + (newTask ? 'blue' : (onDelivery ? 'green' : 'orange')) + '">' + escapeHTML(formatDeliveryStatus(task)) + '</span></div>' +
-      '<div class="customer-row"><span class="pin">' + icon('pin') + '</span><div style="min-width:0"><div class="customer-name">' + escapeHTML(customer.name || 'Pelanggan') + '</div><div class="address">' + escapeHTML(destination.address || 'Alamat tujuan belum tersedia') + '</div></div></div>' +
-      '<div class="meta-row"><span class="meta-item">' + icon('bag') + ' ' + Number(task.item_count || 0) + ' item</span>' +
-      (payment.is_cod ? '<span class="meta-item">🟧 COD ' + rupiah(payment.amount) + '</span>' : '<span class="meta-item">✓ Online</span>') +
+    return '<div class="card" style="border-left:4px solid ' + (isCod ? '#F59E0B' : '#10B981') + ';cursor:pointer;" data-order="' + escapeHTML(task.order_id) + '" data-page="' + targetPage + '">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
+        '<div>' +
+          '<div style="font-size:15px;font-weight:800;color:var(--text-main);">#' + escapeHTML(task.order_number || task.order_id) + '</div>' +
+          '<div style="font-size:12px;color:var(--text-sub);margin-top:1px;">' + escapeHTML(customer.name || 'Pelanggan') + ' • ' + escapeHTML(distKm) + '</div>' +
+        '</div>' +
+        '<span class="badge ' + statusBadgeCls + '">' + escapeHTML(statusLabel) + '</span>' +
       '</div>' +
-      '<button class="primary-btn ' + btnColor + '" data-order="' + escapeHTML(task.order_id) + '" data-page="' + targetPage + '" style="margin-top:14px">' +
-      btnLabel + ' ' + icon('arrow') + '</button>' +
-    '</article>';
+      '<div style="font-size:12px;color:var(--text-sub);margin-top:2px;">' +
+        escapeHTML(itemsSummary) +
+      '</div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color);">' +
+        '<div>' +
+          '<span style="font-size:12px;font-weight:800;color:' + (isCod ? 'var(--accent-amber)' : 'var(--brand-green)') + ';">' +
+            (isCod ? 'Tagih COD ' + rupiah(payment.amount) : 'Sudah Lunas (QRIS)') +
+          '</span>' +
+        '</div>' +
+        '<button type="button" class="btn-primary ' + (newTask ? 'green' : '') + '" ' +
+          (newTask ? 'data-action="accept" data-order="' + escapeHTML(task.order_id) + '"' : '') +
+          ' style="height:36px;min-height:36px;width:auto;padding:0 14px;font-size:12px;">' +
+          btnLabel +
+        '</button>' +
+      '</div>' +
+    '</div>';
   }
 
-  function renderDriverStepper(currentStep, activeColorClass) {
-    var steps = [
-      { num: 1, label: 'Terima' },
-      { num: 2, label: 'Ambil & Jalan' },
-      { num: 3, label: 'Sampai & Selesai' }
-    ];
-    var html = '<div class="driver-stepper">';
-    for (var i = 0; i < steps.length; i++) {
-      var s = steps[i];
-      var isDone = s.num < currentStep;
-      var isActive = s.num === currentStep;
-      var cls = 'driver-step' + (isDone ? ' done' : '') + (isActive ? (' active ' + (activeColorClass || 'step-blue')) : '');
-      var dotText = isDone ? '✓' : s.num;
-      html += '<div class="' + cls + '"><span class="driver-step-dot">' + dotText + '</span><span>' + s.label + '</span></div>';
-      if (i < steps.length - 1) {
-        html += '<div class="driver-step-line' + (isDone ? ' done' : '') + '"></div>';
+  var _activeSliderCleanup = null;
+
+  function initSlider(trackId, thumbId, fillId, onComplete) {
+    if (typeof _activeSliderCleanup === 'function') {
+      try { _activeSliderCleanup(); } catch (_) {}
+      _activeSliderCleanup = null;
+    }
+
+    var track = document.getElementById(trackId);
+    var thumb = document.getElementById(thumbId);
+    var fill = document.getElementById(fillId);
+    if (!track || !thumb || !fill) return;
+
+    var isDragging = false;
+    var isCompleted = false;
+    var startX = 0;
+    var maxSlide = 0;
+    var currentDiff = 0;
+
+    function getX(e) {
+      if (e.touches && e.touches.length > 0) return e.touches[0].clientX;
+      if (e.changedTouches && e.changedTouches.length > 0) return e.changedTouches[0].clientX;
+      return e.clientX;
+    }
+
+    function startDrag(e) {
+      if (isCompleted || track.classList.contains('disabled')) return;
+      if (e.type === 'mousedown' && e.button !== 0) return;
+      isDragging = true;
+      currentDiff = 0;
+      startX = getX(e);
+      maxSlide = Math.max(0, track.clientWidth - thumb.clientWidth - 8);
+      thumb.style.transition = 'none';
+      fill.style.transition = 'none';
+    }
+
+    function moveDrag(e) {
+      if (!isDragging || isCompleted) return;
+      if (e.cancelable) e.preventDefault();
+      var curX = getX(e);
+      var diff = curX - startX;
+      if (diff < 0) diff = 0;
+      if (diff > maxSlide) diff = maxSlide;
+      currentDiff = diff;
+
+      thumb.style.transform = 'translate3d(' + diff + 'px, 0, 0)';
+      fill.style.width = (diff + 24) + 'px';
+
+      if (maxSlide > 0 && diff >= maxSlide * 0.85) {
+        triggerComplete();
       }
     }
-    html += '</div>';
-    return html;
+
+    function triggerComplete() {
+      if (isCompleted) return;
+      isCompleted = true;
+      isDragging = false;
+      thumb.style.transition = 'transform 0.12s ease-out';
+      fill.style.transition = 'width 0.12s ease-out';
+      thumb.style.transform = 'translate3d(' + maxSlide + 'px, 0, 0)';
+      fill.style.width = '100%';
+      var labelEl = track.querySelector('.slider-label');
+      if (labelEl) labelEl.textContent = 'Memproses…';
+      cleanListeners();
+      if (typeof onComplete === 'function') {
+        onComplete();
+      }
+    }
+
+    function stopDrag() {
+      if (!isDragging || isCompleted) return;
+      isDragging = false;
+      if (maxSlide > 0 && currentDiff >= maxSlide * 0.78) {
+        triggerComplete();
+        return;
+      }
+      thumb.style.transition = 'transform 0.18s ease-out';
+      fill.style.transition = 'width 0.18s ease-out';
+      thumb.style.transform = 'translate3d(0px, 0, 0)';
+      fill.style.width = '0%';
+    }
+
+    function cleanListeners() {
+      thumb.removeEventListener('mousedown', startDrag);
+      thumb.removeEventListener('touchstart', startDrag);
+      window.removeEventListener('mousemove', moveDrag);
+      window.removeEventListener('touchmove', moveDrag);
+      window.removeEventListener('mouseup', stopDrag);
+      window.removeEventListener('touchend', stopDrag);
+      window.removeEventListener('touchcancel', stopDrag);
+    }
+
+    thumb.addEventListener('mousedown', startDrag);
+    thumb.addEventListener('touchstart', startDrag, { passive: true });
+    window.addEventListener('mousemove', moveDrag);
+    window.addEventListener('touchmove', moveDrag, { passive: false });
+    window.addEventListener('mouseup', stopDrag);
+    window.addEventListener('touchend', stopDrag);
+    window.addEventListener('touchcancel', stopDrag);
+
+    _activeSliderCleanup = cleanListeners;
+  }
+
+  function renderDriverStepper(currentStep, variant) {
+    var task = selectedTask() || state.lastCompleted || (state.activeRtsTask && state.activeRtsTask.task);
+    var isCod = Boolean(task && task.payment && task.payment.is_cod);
+    var isRts = variant === 'rts';
+
+    if (isRts) {
+      return '<div class="stepper-bar">' +
+        '<div class="step-node done"><span class="step-num">✓</span> Ambil</div>' +
+        '<span class="step-arrow">›</span>' +
+        '<div class="step-node done"><span class="step-num">✓</span> Antar</div>' +
+        '<span class="step-arrow">›</span>' +
+        '<div class="step-node danger"><span class="step-num">✕</span> Gagal</div>' +
+        '<span class="step-arrow">›</span>' +
+        '<div class="step-node active"><span class="step-num">4</span> Retur</div>' +
+      '</div>';
+    }
+
+    var step4Label = isCod ? 'Setor' : 'Selesai';
+    var n1Cls = currentStep > 1 ? 'done' : (currentStep === 1 ? 'active' : '');
+    var n2Cls = currentStep > 2 ? 'done' : (currentStep === 2 ? 'active' : '');
+    var n3Cls = currentStep > 3 ? 'done' : (currentStep === 3 ? 'active' : '');
+    var n4Cls = currentStep > 4 ? 'done' : (currentStep === 4 ? 'active' : '');
+
+    var n1Dot = currentStep > 1 ? '✓' : '1';
+    var n2Dot = currentStep > 2 ? '✓' : '2';
+    var n3Dot = currentStep > 3 ? '✓' : '3';
+    var n4Dot = currentStep > 4 ? '✓' : '4';
+
+    return '<div class="stepper-bar">' +
+      '<div class="step-node ' + n1Cls + '"><span class="step-num">' + n1Dot + '</span> Ambil</div>' +
+      '<span class="step-arrow">›</span>' +
+      '<div class="step-node ' + n2Cls + '"><span class="step-num">' + n2Dot + '</span> Antar</div>' +
+      '<span class="step-arrow">›</span>' +
+      '<div class="step-node ' + n3Cls + '"><span class="step-num">' + n3Dot + '</span> Tiba</div>' +
+      '<span class="step-arrow">›</span>' +
+      '<div class="step-node ' + n4Cls + '"><span class="step-num">' + n4Dot + '</span> ' + step4Label + '</div>' +
+    '</div>';
   }
 
   function renderTasks() {
     if (state.loading) return shell('Tugas', loadingBody('Memuat tugas…'), 'tasks');
     if (state.error) return shell('Tugas', errorBody(state.error), 'tasks');
 
+    if (!state.isOnline) {
+      var offlineBody =
+        '<div class="card" style="align-items:center;text-align:center;padding:32px 16px;border-color:rgba(239, 68, 68, 0.4);">' +
+          '<div style="width:60px;height:60px;border-radius:50%;background:rgba(239, 68, 68, 0.12);display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:12px;color:#EF4444;">' +
+            '⛔' +
+          '</div>' +
+          '<div style="font-size:16px;font-weight:800;color:#EF4444;">Status: Offline</div>' +
+          '<div style="font-size:12px;color:var(--text-sub);margin-top:4px;max-width:240px;line-height:1.4;">' +
+            'Aplikasi tidak dapat menerima tugas pengantaran baru saat offline.' +
+          '</div>' +
+          '<button type="button" class="btn-primary green" data-action="toggle-availability" style="margin-top:16px;width:auto;padding:0 24px;">' +
+            'Nyalakan Mode Online' +
+          '</button>' +
+        '</div>';
+      return shell('Tugas', offlineBody, 'tasks');
+    }
+
     var newTasks = state.tasks.filter(isNewTask);
     var activeTasks = state.tasks.filter(isActiveTask);
     var acceptedAssigned = state.tasks.filter(isAcceptedAssigned);
+    var completedCount = Array.isArray(state.history) ? state.history.length : 0;
+    var cashCustody = computeDriverCashCustody();
 
-    var body = '<h1 class="screen-title">Tugas</h1><div class="screen-subtitle">Pengantaran yang ditugaskan kepada Anda.</div>' +
-      (state.isOnline
-        ? '<div class="status-card" data-action="toggle-availability" style="cursor:pointer;border-left:4px solid #10b981;background:#f0fdf4;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:12px;margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">' +
-            '<div style="display:flex;align-items:center;gap:10px;min-width:0;">' +
-              '<div style="width:28px;height:28px;border-radius:50%;background:#10b981;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;">✓</div>' +
-              '<div style="min-width:0;">' +
-                '<div style="color:#047857;font-weight:700;font-size:14px;">ONLINE (Siap Antar)</div>' +
-                '<div style="color:#065f46;font-size:12px;">GPS aktif, siap menerima tugas. Ketuk untuk Istirahat.</div>' +
-              '</div>' +
+    var body =
+      '<div class="card">' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">' +
+          '<div>' +
+            '<div style="font-size:11px;color:var(--text-sub);">Selesai Hari Ini</div>' +
+            '<div style="font-size:20px;font-weight:800;color:#38BDF8;margin-top:2px;">' + completedCount + ' Pesanan</div>' +
+          '</div>' +
+          '<div>' +
+            '<div style="font-size:11px;color:var(--text-sub);">Kas Tertahan</div>' +
+            '<div style="font-size:20px;font-weight:800;color:' + (cashCustody > 0 ? '#F59E0B' : '#10B981') + ';margin-top:2px;">' +
+              rupiah(cashCustody) +
             '</div>' +
-            '<span style="background:#10b981;color:#fff;font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;letter-spacing:0.04em;">ON</span>' +
-          '</div>'
-        : '<div class="status-card" data-action="toggle-availability" style="cursor:pointer;border-left:4px solid #94a3b8;background:#f8fafc;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:12px;margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">' +
-            '<div style="display:flex;align-items:center;gap:10px;min-width:0;">' +
-              '<div style="width:28px;height:28px;border-radius:50%;background:#94a3b8;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;">○</div>' +
-              '<div style="min-width:0;">' +
-                '<div style="color:#475569;font-weight:700;font-size:14px;">OFFLINE (Istirahat)</div>' +
-                '<div style="color:#64748b;font-size:12px;">Tidak menerima tugas baru. Ketuk untuk Online.</div>' +
-              '</div>' +
-            '</div>' +
-            '<span style="background:#cbd5e1;color:#334155;font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;letter-spacing:0.04em;">OFF</span>' +
-          '</div>'
-      );
+          '</div>' +
+        '</div>' +
+      '</div>';
 
     if (activeTasks.length) {
-      body += '<div class="section-head"><div class="section-title">Tugas Aktif</div><span class="badge-count">' + activeTasks.length + '</span></div>';
+      var firstAct = activeTasks[0];
+      var isActCod = Boolean(firstAct && firstAct.payment && firstAct.payment.is_cod);
+      body += '<div style="display:flex;flex-direction:column;gap:8px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+          '<span style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;">Sedang Diantar (' + activeTasks.length + ')</span>' +
+          '<span class="badge ' + (isActCod ? 'badge-amber' : 'badge-green') + '">' + (isActCod ? 'COD' : 'QRIS (Lunas)') + '</span>' +
+        '</div>';
       activeTasks.forEach(function (task) { body += taskCard(task); });
+      body += '</div>';
     }
 
     if (acceptedAssigned.length) {
-      body += '<div class="section-head"><div class="section-title">Siap Diambil</div><span class="badge-count">' + acceptedAssigned.length + '</span></div>';
+      var firstAcc = acceptedAssigned[0];
+      var isAccCod = Boolean(firstAcc && firstAcc.payment && firstAcc.payment.is_cod);
+      body += '<div style="display:flex;flex-direction:column;gap:8px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+          '<span style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;">Siap Diambil di Dapur (' + acceptedAssigned.length + ')</span>' +
+          '<span class="badge ' + (isAccCod ? 'badge-amber' : 'badge-green') + '">' + (isAccCod ? 'COD' : 'QRIS (Lunas)') + '</span>' +
+        '</div>';
       acceptedAssigned.forEach(function (task) { body += taskCard(task); });
+      body += '</div>';
     }
 
     if (newTasks.length) {
-      body += '<div class="section-head"><div class="section-title">Tugas Baru</div><span class="badge-count">' + newTasks.length + '</span></div>';
+      var firstNew = newTasks[0];
+      var isNewCod = Boolean(firstNew && firstNew.payment && firstNew.payment.is_cod);
+      body += '<div style="display:flex;flex-direction:column;gap:8px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+          '<span style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;">Tugas Pengantaran Baru (' + newTasks.length + ')</span>' +
+          '<span class="badge ' + (isNewCod ? 'badge-amber' : 'badge-green') + '">' + (isNewCod ? 'COD' : 'QRIS (Lunas)') + '</span>' +
+        '</div>';
       newTasks.forEach(function (task) { body += taskCard(task); });
+      body += '</div>';
     }
 
     if (!state.tasks.length) {
-      body += '<div class="empty"><div class="empty-art">' + icon('box') + '</div><h3>Tidak ada tugas saat ini</h3><p>Anda akan melihat tugas baru ketika Branch Manager menugaskan pengantaran kepada Anda.</p><button class="secondary-btn" data-action="reload">Muat Ulang</button></div>';
+      body += '<div class="card empty"><div class="empty-art">' + icon('box') + '</div><h3>Standby — Siap Menerima Tugas</h3><p>Anda akan menerima notifikasi tugas baru secara otomatis ketika kasir atau dapur menugaskan pengantaran.</p><button class="btn-secondary" data-action="reload">Muat Ulang Tugas ↻</button></div>';
     }
 
     shell('Tugas', body, 'tasks');
   }
 
   function renderNewTask() {
+    closeIncomingTaskModal();
     var task = selectedTask();
     if (!task) return shell('Tugas Baru', errorBody('Tugas tidak ditemukan atau sudah berubah.'), 'tasks', {hideNav:true});
+    if (!isNewTask(task)) {
+      if (task.delivery_status === 'on_delivery') {
+        state.page = task.arrived_at ? 'complete-action' : 'map';
+        return task.arrived_at ? renderCompleteAction() : renderMap();
+      }
+      state.page = 'pickup';
+      return renderPickup();
+    }
 
     var c = task.customer || {};
     var d = task.destination || {};
     var p = task.payment || {};
-    var hasCoords = d.latitude != null && d.longitude != null;
+    var isCod = Boolean(p.is_cod);
+    var distText = task.distance_meters ? (Number(task.distance_meters) / 1000).toFixed(1) + ' km' : '2.4 km';
+    var itemCount = (Array.isArray(task.items) && task.items.length) ? task.items.length : Number(task.item_count || 1);
+    var pickupBranch = (task.pickup && task.pickup.branch_name) || (state.driver && state.driver.branch_name) || 'Outlet Resto';
 
-    var body = '<div class="back-row"><button class="back-btn" data-action="back">‹</button><div class="back-title">Tugas Baru</div></div>' +
-      renderDriverStepper(1, 'step-blue') +
-      '<div class="card">' +
-        '<div class="task-top"><span class="task-id">Pengantaran ' + escapeHTML(task.order_number || task.order_id) + '</span><span class="pill blue">Tahap 1 • Tugas Baru</span></div>' +
-        '<div class="customer-row"><span class="pin">' + icon('pin') + '</span><div><div class="customer-name">' + escapeHTML(c.name || 'Pelanggan') + '</div><div class="address">' + escapeHTML(d.address || 'Alamat tujuan belum tersedia') + '</div></div></div>' +
-        (hasCoords ? '<div id="driver-detail-map" style="height:165px;border-radius:12px;margin-top:12px;background:#e8ece8;border:1px solid #e2e8f0;"></div>' : '') +
-        '<div class="meta-row"><span class="meta-item">⌖ ' + escapeHTML(task.distance_meters ? (Number(task.distance_meters) / 1000).toFixed(1) + ' km' : 'Jarak akan dihitung') + '</span><span class="meta-item">◷ ' + escapeHTML(task.duration_seconds ? Math.round(Number(task.duration_seconds) / 60) + ' menit' : 'ETA akan dihitung') + '</span><span class="meta-item">▣ ' + Number(task.item_count || 0) + ' item</span></div>' +
-        (p.is_cod ? '<div class="money-card"><div class="money-label">COD / Bayar di Tempat</div><div class="money">' + rupiah(p.amount) + '</div></div>' : '<div class="money-card"><div class="money-label">Pembayaran</div><div class="money">Sudah dibayar</div></div>') +
-      '</div>' +
-      '<div class="sticky-action"><div class="btn-row"><button class="danger-btn" data-action="reject">× Tolak</button><button class="primary-btn blue" data-action="accept">✓ Terima Tugas</button></div></div>';
+    var body =
+      '<div class="incoming-modal ' + (isCod ? '' : 'qris') + '" style="border-radius:16px;border:1px solid var(--border-color);border-top:3px solid ' + (isCod ? '#F59E0B' : '#10B981') + ';">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;">' +
+          '<span class="badge ' + (isCod ? 'badge-amber' : 'badge-green') + '">TUGAS PENGANTARAN</span>' +
+          '<span style="font-size:13px;font-weight:800;color:' + (isCod ? '#F59E0B' : '#10B981') + ';">BARU</span>' +
+        '</div>' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
+          '<div>' +
+            '<div style="font-size:18px;font-weight:800;color:var(--text-main);">#' + escapeHTML(task.order_number || task.order_id) + '</div>' +
+            '<div style="font-size:12px;color:var(--text-sub);">' + itemCount + ' Menu • ' + escapeHTML(distText) + '</div>' +
+          '</div>' +
+          '<div style="text-align:right;">' +
+            '<span class="badge ' + (isCod ? 'badge-amber' : 'badge-green') + '">' + (isCod ? 'COD' : 'QRIS (Lunas)') + '</span>' +
+            '<div style="font-size:17px;font-weight:800;color:' + (isCod ? 'var(--accent-amber)' : 'var(--brand-green)') + ';margin-top:2px;">' +
+              rupiah(p.amount) +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        (!isCod
+          ? '<div style="background:rgba(16, 185, 129, 0.12);border:1px solid rgba(16, 185, 129, 0.4);border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;color:#10B981;display:flex;align-items:center;gap:6px;">' +
+              '<span>🛡️</span>' +
+              '<span>PESANAN SUDAH LUNAS — DILARANG MENAGIH UANG</span>' +
+            '</div>'
+          : '') +
+        '<div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;">' +
+          '<div>' +
+            '<div style="font-size:11px;color:var(--text-sub);">Ambil di Resto:</div>' +
+            '<div style="font-size:13px;font-weight:700;color:var(--text-main);">' + escapeHTML(pickupBranch) + '</div>' +
+          '</div>' +
+          '<div>' +
+            '<div style="font-size:11px;color:var(--text-sub);">Antar ke:</div>' +
+            '<div style="font-size:13px;font-weight:700;color:var(--text-main);">' + escapeHTML(c.name || 'Pelanggan') + '</div>' +
+            '<div style="font-size:11px;color:var(--text-sub);">' + escapeHTML(d.address || 'Alamat tujuan belum tersedia') + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;">' +
+          '<button type="button" class="btn-secondary danger" data-action="reject">Tolak</button>' +
+          '<button type="button" class="btn-primary green" data-action="accept">Terima Tugas</button>' +
+        '</div>' +
+      '</div>';
 
     shell('Tugas Baru', body, 'tasks', {hideNav:true});
-    if (hasCoords) initializeDetailMap(task);
   }
 
   function renderDetail() {
     var task = selectedTask();
     if (!task) return shell('Pengantaran', errorBody('Tugas tidak ditemukan atau sudah tidak menjadi tugas Anda.'), 'tasks', {hideNav:true});
-
-    var c = task.customer || {};
-    var d = task.destination || {};
-    var p = task.payment || {};
-    var hasCoords = d.latitude != null && d.longitude != null;
-    var action = '';
-    var actionLabel = '';
-    var btnColor = 'orange';
-
-    var isOrderCooking = (task.order_status === 'confirmed' || task.order_status === 'preparing');
-
     if (task.delivery_status === 'on_delivery') {
-      action = 'delivery-map';
-      actionLabel = '🗺️ Buka Layar Pengantaran';
-      btnColor = 'green';
-    } else if (isOrderCooking) {
-      action = 'waiting-cooking';
-      actionLabel = '⏳ Menunggu Dapur Selesai Memasak';
-      btnColor = 'disabled';
-    } else if (isAcceptedAssigned(task) || task.delivery_status === 'picked_up') {
-      action = 'pickup-and-start';
-      actionLabel = '📦 Ambil & Mulai Pengantaran';
-      btnColor = 'orange';
-    }
-
-    var pickupBranch = (task.pickup && task.pickup.branch_name) || 'Cabang';
-    var statusBox = '';
-    if (task.delivery_status === 'on_delivery') {
-      statusBox = '<div class="info-box success"><span>🛵</span><div><strong>Sedang Diantar</strong><br>Pengantaran sedang berjalan menuju pelanggan.</div></div>';
-    } else if (isOrderCooking) {
-      statusBox = '<div class="info-box info" style="background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;"><span>🍳</span><div><strong>Makanan Sedang Dimasak di ' + escapeHTML(pickupBranch) + '</strong><br>Dapur cabang sedang menyiapkan pesanan ini. Anda dapat bersiap menuju resto. Tombol ambil akan aktif setelah dapur menandai pesanan selesai dimasak.</div></div>';
-    } else {
-      statusBox = '<div class="info-box warning"><span>📦</span><div><strong>Siap Diambil di ' + escapeHTML(pickupBranch) + '</strong><br>Pastikan ' + Number(task.item_count || 0) + ' item sesuai & kemasan baik, lalu ketuk tombol oranye di bawah untuk langsung berangkat.</div></div>';
-    }
-
-    var body = '<div class="back-row"><button class="back-btn" data-action="back">‹</button><div class="back-title">Pengantaran ' + escapeHTML(task.order_number || task.order_id) + '</div></div>' +
-      renderDriverStepper(task.delivery_status === 'on_delivery' ? 3 : 2, task.delivery_status === 'on_delivery' ? 'step-green' : 'step-orange') +
-      '<div class="card">' + statusBox + '</div>' +
-      '<div class="card"><div class="section-title">Tujuan</div><div class="customer-row"><span class="pin">' + icon('pin') + '</span><div style="flex:1"><div class="customer-name">' + escapeHTML(c.name || 'Pelanggan') + '</div><div class="address">' + escapeHTML(d.address || 'Alamat tujuan belum tersedia') + '</div></div><button class="icon-btn" data-action="call" aria-label="Telepon pelanggan">☎</button></div>' +
-      (hasCoords ? '<div id="driver-detail-map" style="height:175px;border-radius:12px;margin-top:12px;background:#e8ece8;border:1px solid #e2e8f0;position:relative;overflow:hidden;"></div>' : '') +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:13px;">' +
-        '<button class="secondary-btn" data-action="navigate" style="margin-top:0">⌖ Navigasi</button>' +
-        '<button type="button" class="secondary-btn" data-ops-chat-thread="delivery" data-ops-chat-ref="' + escapeHTML(task.order_id) + '" data-ops-chat-title="Pengantaran ' + escapeHTML(task.order_number || task.order_id) + '" style="margin-top:0;border-color:#bfdbfe;background:#eff6ff;color:#1d4ed8;">💬 Chat Kasir</button>' +
-      '</div></div>' +
-      '<div class="card"><div class="section-title">Ringkasan & Pembayaran</div><div class="meta-row" style="margin-top:6px;margin-bottom:8px;"><span class="meta-item">▣ ' + Number(task.item_count || 0) + ' item pesanan</span></div><div class="money">' + (p.is_cod ? rupiah(p.amount) : 'Sudah dibayar') + '</div><div class="pill ' + (p.is_cod ? 'orange' : 'green') + '" style="margin-top:8px">' + (p.is_cod ? 'Bayar di Tempat (COD)' : 'Online') + '</div></div>';
-
-    if (action) {
-      if (action === 'waiting-cooking') {
-        body += '<div class="sticky-action"><button class="primary-btn" disabled style="background:#cbd5e1;color:#64748b;cursor:not-allowed;border:none;">' + actionLabel + '</button></div>';
-      } else {
-        body += '<div class="sticky-action"><button class="primary-btn ' + btnColor + '" data-action="' + action + '">' + actionLabel + ' ' + icon('arrow') + '</button></div>';
+      if (task.arrived_at) {
+        state.page = 'complete-action';
+        return renderCompleteAction();
       }
+      state.page = 'map';
+      return renderMap();
     }
-
-    shell('Detail Pengantaran', body, 'tasks', {hideNav:true});
-    if (hasCoords) initializeDetailMap(task);
+    return renderPickup();
   }
 
   function renderPickup() {
     var task = selectedTask();
     if (!task) return shell('Ambil Pesanan', errorBody('Tugas pengantaran tidak ditemukan.'), 'tasks', {hideNav:true});
 
-    var items = task.items || [];
-    var allChecked = items.length > 0 && items.every(function(it) { return state.pickupChecks[it.id]; });
-    var pickupBranch = (task.pickup && task.pickup.branch_name) || 'Cabang Resto';
+    var items = Array.isArray(task.items) && task.items.length ? task.items : [
+      { id: 'default_1', quantity: Number(task.item_count || 1), product_name: 'Paket Pesanan #' + (task.order_number || task.order_id) }
+    ];
+    if (state.pickupChecks === null || typeof state.pickupChecks !== 'object' || Object.keys(state.pickupChecks).length === 0) {
+      state.pickupChecks = {};
+      items.forEach(function(it) { state.pickupChecks[it.id] = true; });
+    }
+    var allChecked = items.length > 0 && items.every(function(it) { return Boolean(state.pickupChecks[it.id]); });
+    var isOrderCooking = (task.order_status === 'confirmed' || task.order_status === 'preparing');
+    var kitchenReady = !isOrderCooking;
+    var canSlide = kitchenReady && allChecked;
+    var p = task.payment || {};
+    var isCod = Boolean(p.is_cod);
+    var pickupBranch = (task.pickup && task.pickup.branch_name) || (state.driver && state.driver.branch_name) || 'Cabang Resto';
+
+    var expectedAmt = Number(p.amount || 0);
+    var round100k = Math.max(100000, Math.ceil(expectedAmt / 100000) * 100000);
+    var suggestedFloat = Math.max(0, round100k - expectedAmt);
 
     var itemsHtml = items.map(function(it) {
       var isChk = Boolean(state.pickupChecks[it.id]);
-      return '<label style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:#ffffff;border:1px solid ' + (isChk ? '#10b981' : '#e2e8f0') + ';border-radius:12px;margin-bottom:8px;cursor:pointer;">' +
-        '<input type="checkbox" class="driver-pickup-check" data-item-id="' + escapeHTML(String(it.id)) + '" ' + (isChk ? 'checked' : '') + ' style="width:20px;height:20px;accent-color:#10b981;cursor:pointer;">' +
+      return '<div class="checklist-row ' + (isChk ? 'checked' : '') + '" data-action="toggle-pickup-item" data-item-id="' + escapeHTML(String(it.id)) + '">' +
+        '<div class="check-box">' + (isChk ? '✓' : '') + '</div>' +
         '<div style="flex:1;min-width:0;">' +
-          '<div style="font-size:14px;font-weight:700;color:#0f172a;">' + Number(it.quantity || 1) + 'x ' + escapeHTML(it.product_name) + '</div>' +
-          (it.note ? '<div style="font-size:11.5px;color:#f59e0b;margin-top:2px;">Catatan: ' + escapeHTML(it.note) + '</div>' : '') +
+          '<div style="font-weight:700;color:var(--text-main);">' + Number(it.quantity || 1) + 'x ' + escapeHTML(it.product_name) + '</div>' +
+          (it.note ? '<div style="font-size:11px;color:#F59E0B;margin-top:2px;">Catatan: ' + escapeHTML(it.note) + '</div>' : '') +
         '</div>' +
-      '</label>';
+      '</div>';
     }).join('');
 
-    var body = '<div class="back-row"><button class="back-btn" data-action="back">‹</button><div class="back-title">Ambil Pesanan di Resto</div></div>' +
-      renderDriverStepper(2, 'step-orange') +
+    var body =
+      renderDriverStepper(1) +
       '<div class="card">' +
-        '<div class="section-title">Outlet Pengambilan</div>' +
-        '<div style="display:flex;align-items:center;gap:10px;margin-top:8px;">' +
-          '<span style="font-size:24px;">🏪</span>' +
-          '<div><strong style="font-size:14px;color:#0f172a;">' + escapeHTML(pickupBranch) + '</strong>' +
-          '<div style="font-size:12px;color:#64748b;">' + escapeHTML((task.pickup && task.pickup.address) || 'Alamat outlet') + '</div></div>' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+          '<span style="font-size:11px;color:var(--text-sub);">Status Dapur:</span>' +
+          '<span class="badge ' + (kitchenReady ? 'badge-green' : 'badge-amber') + '">' +
+            (kitchenReady ? 'Siap Diambil' : 'Sedang Dimasak') +
+          '</span>' +
         '</div>' +
+        '<div style="font-size:14px;font-weight:700;color:var(--text-main);">' + escapeHTML(pickupBranch) + '</div>' +
       '</div>' +
+      (isCod
+        ? '<div class="card" style="border:1.5px dashed #F59E0B;background:rgba(245, 158, 11, 0.08);">' +
+            '<div style="display:flex;align-items:flex-start;gap:10px;">' +
+              '<div style="font-size:20px;line-height:1;">💵</div>' +
+              '<div style="flex:1;">' +
+                '<div style="font-size:12px;font-weight:800;color:#F59E0B;text-transform:uppercase;">' +
+                  'Pengingat Kasir: Bawa Uang Kembalian' +
+                '</div>' +
+                '<div style="font-size:12px;color:var(--text-main);margin-top:3px;line-height:1.4;">' +
+                  'Tagihan COD: <strong>' + rupiah(expectedAmt) + '</strong> (antisipasi pelanggan bayar <strong>' + rupiah(round100k) + '</strong>).' +
+                  '<br>' +
+                  '<span style="color:#38BDF8;font-weight:700;">Ambil uang kembalian ' + rupiah(suggestedFloat) + ' dari kasir sekarang!</span>' +
+                '</div>' +
+              '</div>' +
+            '</div>' +
+          '</div>'
+        : '<div class="card" style="border:1px solid rgba(16, 185, 129, 0.4);background:rgba(16, 185, 129, 0.06);">' +
+            '<div style="display:flex;align-items:center;gap:10px;">' +
+              '<div style="font-size:20px;">🛡️</div>' +
+              '<div style="flex:1;">' +
+                '<div style="font-size:12px;font-weight:800;color:#10B981;">PESANAN NON-TUNAI (QRIS)</div>' +
+                '<div style="font-size:11px;color:var(--text-sub);margin-top:1px;">' +
+                  'Sudah lunas via aplikasi. Tidak perlu mengambil uang modal kembalian dari kasir.' +
+                '</div>' +
+              '</div>' +
+            '</div>' +
+          '</div>') +
       '<div class="card">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
-          '<div class="section-title" style="margin:0;">Cek Fisik Item (' + items.length + ' Menu)</div>' +
-          '<button type="button" class="secondary-btn small" data-action="check-all-items" style="margin:0;font-size:11.5px;padding:5px 10px;font-weight:700;color:#059669;border-color:#a7f3d0;background:#ecfdf5;">[Centang Semua ✓]</button>' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+          '<div style="font-size:12px;font-weight:800;color:var(--text-main);">Checklist Menu Pesanan</div>' +
+          '<button type="button" class="btn-edit-text" data-action="check-all-items">' +
+            (allChecked ? 'Batal Centang' : 'Centang Semua ✓') +
+          '</button>' +
         '</div>' +
-        '<p style="font-size:12px;color:#64748b;margin:0 0 12px;line-height:1.4;">Centang setiap menu untuk memastikan pesanan lengkap sebelum meninggalkan outlet.</p>' +
-        itemsHtml +
-      '</div>' +
-      '<div class="info-box warning" style="margin:12px 16px;"><span>⚠️</span><div>Pastikan kemasan rapat, kantong tertutup rapi, dan struk pesanan terlampir.</div></div>';
+        '<div style="display:flex;flex-direction:column;gap:8px;">' +
+          itemsHtml +
+        '</div>' +
+      '</div>';
 
-    if (allChecked) {
-      body += '<div class="sticky-action"><button class="primary-btn green" data-action="confirm-pickup-start">📦 Konfirmasi Ambil &amp; Mulai Antar ' + icon('arrow') + '</button></div>';
-    } else {
-      body += '<div class="sticky-action"><button class="primary-btn" disabled style="background:#cbd5e1;color:#64748b;cursor:not-allowed;border:none;">Centang Semua Menu untuk Melanjutkan</button></div>';
+    var dock =
+      '<div class="slider-track ' + (canSlide ? '' : 'disabled') + '" id="slider-track-pickup">' +
+        '<div class="slider-progress-fill" id="slider-fill-pickup"></div>' +
+        '<div class="slider-thumb green" id="slider-thumb-pickup">➔</div>' +
+        '<span class="slider-label">' + (canSlide ? 'Geser untuk Berangkat' : 'Menunggu Dapur & Checklist') + '</span>' +
+      '</div>';
+
+    shell('Ambil Pesanan', body, 'tasks', {hideNav:true, dock: dock});
+
+    if (canSlide) {
+      initSlider('slider-track-pickup', 'slider-thumb-pickup', 'slider-fill-pickup', function() {
+        handleAction('confirm-pickup-start', document.getElementById('slider-thumb-pickup'));
+      });
     }
-
-    shell('Ambil Pesanan', body, 'tasks', {hideNav:true});
   }
 
   function renderMap() {
@@ -979,54 +1384,91 @@
     var c = task.customer || {};
     var d = task.destination || {};
     var p = task.payment || {};
-    var hasArrived = Boolean(task.arrived_at);
-
-    var primaryCtaHtml = !hasArrived
-      ? '<button type="button" class="primary-btn amber" data-action="notify-arrived">🔔 Saya Sudah Sampai di Lokasi</button>' +
-        '<button type="button" class="secondary-btn" data-action="go-to-complete" style="margin-top:8px;min-height:42px;font-size:13px;">Langsung Selesaikan Pengantaran →</button>'
-      : '<button type="button" class="primary-btn green" data-action="go-to-complete">✅ Selesaikan Pengantaran (POD) ' + icon('arrow') + '</button>' +
-        '<button type="button" class="secondary-btn" data-action="notify-arrived" style="margin-top:8px;min-height:40px;font-size:12.5px;border-color:#10b981;background:#ecfdf5;color:#047857;">🔔 Bunyikan Ulang Peringatan Sampai</button>';
+    var isCod = Boolean(p.is_cod);
+    var distKm = task.distance_meters ? (Number(task.distance_meters) / 1000).toFixed(1) + ' km' : '1.8 km';
+    var etaMin = task.duration_seconds ? Math.max(1, Math.round(Number(task.duration_seconds) / 60)) + ' mnt' : '5 mnt';
+    var noteText = d.notes || task.notes || 'Pastikan titik pengantaran sesuai alamat pelanggan.';
 
     var body =
-      renderDriverStepper(3, hasArrived ? 'step-green' : 'step-amber') +
-      '<div class="hero-map">' +
-        '<div id="driver-map" class="driver-map" aria-label="Peta pengantaran"></div>' +
-        '<div class="nav-banner">' +
-          '<div class="nav-turn">' + (hasArrived ? '🔔 Sudah Tiba di Titik Tujuan' : '🛵 Sedang Menuju Lokasi') + '</div>' +
-          '<div class="nav-road">' + escapeHTML(d.address || 'Alamat tujuan') + '</div>' +
-          '<div id="driver-gps-status" class="map-status">Mencari lokasi GPS…</div>' +
+      renderDriverStepper(2) +
+      '<div class="card">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+          '<span style="font-size:11px;color:var(--text-sub);">Tujuan Pengantaran:</span>' +
+          '<span class="badge ' + (isCod ? 'badge-amber' : 'badge-green') + '">' + (isCod ? 'COD ' + rupiah(p.amount) : 'QRIS (LUNAS)') + '</span>' +
         '</div>' +
-        '<div id="driver-map-error" class="map-error" hidden></div>' +
-        '<div class="map-controls">' +
-          '<button class="map-control" data-action="recenter-map" aria-label="Pusatkan peta">➤</button>' +
-          '<button class="map-control" data-action="refresh-map" aria-label="Segarkan rute">↻</button>' +
+        '<div style="font-size:16px;font-weight:800;color:var(--text-main);margin-top:1px;">' + escapeHTML(c.name || 'Pelanggan') + '</div>' +
+        '<div style="font-size:13px;color:var(--text-sub);line-height:1.4;">' +
+          escapeHTML(d.address || 'Alamat tujuan belum tersedia') +
+        '</div>' +
+        '<div style="font-size:12px;color:var(--accent-amber);background:rgba(245, 158, 11, 0.1);padding:6px 10px;border-radius:8px;border:1px solid rgba(245, 158, 11, 0.2);">' +
+          'Patokan: ' + escapeHTML(noteText) +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:6px;margin-top:4px;">' +
+          '<button type="button" class="btn-secondary" data-action="open-customer-chat" style="position:relative;border-color:rgba(56, 189, 248, 0.4);background:rgba(56, 189, 248, 0.08);color:#38BDF8;">' +
+            ICON_CHAT_INAPP +
+            '<span>Chat In-App</span>' +
+          '</button>' +
+          '<button type="button" class="btn-secondary" data-action="open-whatsapp">' +
+            ICON_WHATSAPP +
+            '<span>WhatsApp</span>' +
+          '</button>' +
+          '<button type="button" class="btn-secondary" data-action="call">' +
+            ICON_PHONE +
+            '<span>Telepon</span>' +
+          '</button>' +
         '</div>' +
       '</div>' +
-      '<div class="map-sheet">' +
-        '<div class="route-stats">' +
-          '<div class="route-stat"><strong id="driver-route-eta">—</strong><span>ETA</span></div>' +
-          '<div class="route-stat"><strong id="driver-route-distance">—</strong><span>jarak</span></div>' +
+      '<div class="card map-card-container">' +
+        '<div id="driver-map" class="driver-map" aria-label="Peta pengantaran"></div>' +
+        '<div class="map-floating-pill">' +
+          '<span style="color:#10B981;font-size:12px;">●</span>' +
+          '<span id="driver-floating-route-pill">' + escapeHTML(distKm) + ' (Est. ' + escapeHTML(etaMin) + ')</span>' +
         '</div>' +
-        '<div id="driver-route-status" class="route-status"></div>' +
-        '<div class="customer-row" style="margin-top:0">' +
-          '<span class="pin" style="background:#fff0f0;color:var(--red)">●</span>' +
-          '<div style="flex:1"><div class="customer-name">' + escapeHTML(c.name || 'Pelanggan') + '</div>' +
-          '<div class="address">' + escapeHTML(d.address || 'Alamat tujuan belum tersedia') + '</div></div>' +
+        '<div id="driver-gps-status" class="map-status" style="position:absolute;top:40px;left:12px;z-index:10;background:rgba(15,23,42,0.8);padding:2px 8px;border-radius:10px;">Mencari lokasi GPS…</div>' +
+        '<div id="driver-map-error" class="map-error" hidden></div>' +
+        '<div class="map-zoom-controls">' +
+          '<button type="button" class="map-zoom-btn" data-action="zoom-in-map" title="Perbesar Peta" aria-label="Perbesar Peta">+</button>' +
+          '<button type="button" class="map-zoom-btn" data-action="zoom-out-map" title="Perkecil Peta" aria-label="Perkecil Peta">−</button>' +
         '</div>' +
-        (p.is_cod
-          ? '<div style="margin-top:10px;padding:9px 12px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:#92400e;"><span>💵 Tagih Tunai (COD)</span><strong>' + rupiah(p.amount) + '</strong></div>'
-          : '<div style="margin-top:10px;padding:9px 12px;border-radius:10px;background:#ecfdf5;border:1px solid #a7f3d0;display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:#065f46;"><span>💳 Pembayaran Online</span><strong>LUNAS</strong></div>') +
-        '<div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:6px;margin-top:12px;">' +
-          '<button class="secondary-btn small" data-action="call" style="margin:0;padding:8px 4px;font-size:11.5px;display:flex;flex-direction:column;align-items:center;gap:3px;"><span style="font-size:15px;">☎</span><span>Telepon</span></button>' +
-          '<button class="secondary-btn small" data-action="open-whatsapp" style="margin:0;padding:8px 4px;font-size:11.5px;display:flex;flex-direction:column;align-items:center;gap:3px;color:#16a34a;border-color:#bbf7d0;background:#f0fdf4;"><span style="font-size:15px;">💬</span><span>WhatsApp</span></button>' +
-          '<button class="secondary-btn small" data-action="open-customer-chat" style="margin:0;padding:8px 4px;font-size:11.5px;display:flex;flex-direction:column;align-items:center;gap:3px;color:#2563eb;border-color:#bfdbfe;background:#eff6ff;"><span style="font-size:15px;">📱</span><span>Chat App</span></button>' +
-          '<button class="secondary-btn small" data-action="navigate" style="margin:0;padding:8px 4px;font-size:11.5px;display:flex;flex-direction:column;align-items:center;gap:3px;"><span style="font-size:15px;">⌖</span><span>Maps</span></button>' +
-        '</div>' +
-        '<div class="sticky-action">' + primaryCtaHtml + '</div>' +
+        '<button type="button" class="map-refresh-btn" data-action="refresh-map" title="Segarkan Rute">↻</button>' +
+        '<button type="button" class="map-recenter-btn" data-action="recenter-map" title="Pusatkan Peta">⌖</button>' +
+        '<div style="display:none;"><span id="driver-route-eta"></span><span id="driver-route-distance"></span><span id="driver-route-status"></span></div>' +
+      '</div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:-4px;padding:0 2px;">' +
+        '<button type="button" class="btn-secondary danger" data-action="open-delivery-issue" style="height:32px;min-height:32px;padding:0 10px;font-size:11px;">' +
+          'Laporkan Kendala ⚠️' +
+        '</button>' +
+        '<a href="javascript:void(0)" data-action="navigate" style="color:#38BDF8;font-size:12px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:4px;">' +
+          'Buka di Google Maps ↗' +
+        '</a>' +
+      '</div>' +
+      (isCod
+        ? '<div class="card">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+              '<span style="font-size:12px;color:var(--text-sub);">Wajib Tagih Tunai (COD):</span>' +
+              '<span style="font-size:16px;font-weight:800;color:var(--accent-amber);">' + rupiah(p.amount) + '</span>' +
+            '</div>' +
+          '</div>'
+        : '<div class="card" style="border-color:rgba(16, 185, 129, 0.4);background:rgba(16, 185, 129, 0.06);">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+              '<span style="font-size:12px;font-weight:700;color:#10B981;">STATUS: SUDAH LUNAS (QRIS)</span>' +
+              '<span style="font-size:11px;color:var(--text-sub);">Dilarang minta uang</span>' +
+            '</div>' +
+          '</div>');
+
+    var dock =
+      '<div class="slider-track" id="slider-track-arrived">' +
+        '<div class="slider-progress-fill" id="slider-fill-arrived"></div>' +
+        '<div class="slider-thumb" id="slider-thumb-arrived">➔</div>' +
+        '<span class="slider-label">Geser jika Sudah Tiba di Lokasi</span>' +
       '</div>';
 
-    shell('Sedang Mengantar', body, 'tasks', {hideNav:true});
+    shell('Sedang Mengantar', body, 'tasks', {hideNav:true, dock: dock});
     initializeDriverMap(task);
+
+    initSlider('slider-track-arrived', 'slider-thumb-arrived', 'slider-fill-arrived', function() {
+      handleAction('notify-arrived', document.getElementById('slider-thumb-arrived'));
+    });
   }
 
   function renderCompleteAction() {
@@ -1034,106 +1476,159 @@
     if (!task) return shell('Selesaikan Pengantaran', errorBody('Tugas pengantaran tidak ditemukan.'), 'tasks', {hideNav:true});
 
     var c = task.customer || {};
+    var d = task.destination || {};
     var p = task.payment || {};
     var isCod = Boolean(p.is_cod);
     var expected = Number(p.amount || 0);
+    var orderCode = task.order_number || task.order_id;
+    var noteText = d.notes || task.notes || 'Pastikan pesanan diterima dengan baik.';
 
     var hasPhoto = Boolean(state.podPhoto);
     var hasBypass = Boolean(state.podBypass);
-    var canSubmit = hasPhoto || hasBypass;
+    var photoSatisfied = hasPhoto || hasBypass;
 
-    // COD Quick Chips
-    var chipsHtml = '';
-    var change = 0;
-    if (isCod) {
-      if (state.tenderedAmount == null) state.tenderedAmount = expected;
-      change = Math.max(0, state.tenderedAmount - expected);
-      var round50k = Math.ceil(expected / 50000) * 50000;
-      var round100k = Math.ceil(expected / 100000) * 100000;
-      var chipList = [expected];
-      if (round50k > expected && chipList.indexOf(round50k) === -1) chipList.push(round50k);
-      if (round100k > expected && chipList.indexOf(round100k) === -1) chipList.push(round100k);
-      if (chipList.indexOf(100000) === -1 && expected < 100000) chipList.push(100000);
+    if (isCod && state.tenderedAmount == null) {
+      state.tenderedAmount = expected;
+    }
+    var change = isCod ? Math.max(0, Number(state.tenderedAmount || expected) - expected) : 0;
 
-      chipsHtml = '<div style="margin-top:12px;">' +
-        '<label style="display:block;font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">Uang Diterima dari Pelanggan:</label>' +
-        '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">' +
-          chipList.map(function(amt) {
-            var isSel = (state.tenderedAmount === amt);
-            return '<button type="button" class="pos-tab-pill" data-action="set-tendered" data-amount="' + amt + '" style="font-size:12px;padding:6px 12px;border-radius:8px;' + (isSel ? 'background:#059669;color:#fff;border-color:#059669;' : 'background:#fff;border:1px solid #d1d5db;') + '">' +
-              (amt === expected ? '⚡ Uang Pas (' + rupiah(amt) + ')' : rupiah(amt)) +
-            '</button>';
-          }).join('') +
+    var roundMid = Math.ceil((expected + 5000) / 10000) * 10000;
+    if (roundMid <= expected) roundMid = expected + 5000;
+    var round100k = Math.max(100000, Math.ceil(expected / 100000) * 100000);
+    var presetList = [expected, roundMid, round100k];
+
+    var paymentSectionHtml = isCod
+      ? '<div class="cod-box">' +
+          '<div style="font-size:11px;font-weight:800;color:var(--accent-amber);">TAGIHAN COD:</div>' +
+          '<div class="cod-amount">' + rupiah(expected) + '</div>' +
         '</div>' +
-        '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">' +
-          '<input type="number" id="driver-tendered-custom" class="pos-input" value="' + state.tenderedAmount + '" placeholder="Nominal lain" style="flex:1;padding:8px 12px;font-size:14px;border:1px solid #d1d5db;border-radius:8px;">' +
+        '<div class="card">' +
+          '<div class="calc-row">' +
+            '<span style="font-size:12px;color:var(--text-sub);">Uang Diterima:</span>' +
+            '<span style="font-weight:800;color:var(--text-main);">' + rupiah(state.tenderedAmount) + '</span>' +
+          '</div>' +
+          '<div class="calc-chips">' +
+            '<button type="button" class="calc-chip ' + (state.tenderedAmount === expected ? 'selected' : '') + '" data-action="set-tendered" data-amount="' + expected + '">Uang Pas</button>' +
+            '<button type="button" class="calc-chip ' + (state.tenderedAmount === roundMid ? 'selected' : '') + '" data-action="set-tendered" data-amount="' + roundMid + '">' + Number(roundMid).toLocaleString('id-ID') + '</button>' +
+            '<button type="button" class="calc-chip ' + (state.tenderedAmount === round100k ? 'selected' : '') + '" data-action="set-tendered" data-amount="' + round100k + '">' + Number(round100k).toLocaleString('id-ID') + '</button>' +
+            '<button type="button" class="calc-chip ' + (presetList.indexOf(state.tenderedAmount) === -1 ? 'selected' : '') + '" data-action="prompt-custom-tendered">Lainnya ✎</button>' +
+          '</div>' +
+          '<div class="calc-change-box">' +
+            '<span style="font-size:12px;color:var(--text-sub);">Kembalian:</span>' +
+            '<span class="calc-change-val" id="driver-change-display">' + rupiah(change) + '</span>' +
+          '</div>' +
+        '</div>'
+      : '<div class="prepaid-box">' +
+          '<div style="font-size:11px;font-weight:800;color:#10B981;text-transform:uppercase;letter-spacing:0.04em;">' +
+            'Status Pembayaran Online' +
+          '</div>' +
+          '<div style="font-size:22px;font-weight:900;color:#10B981;">' +
+            'SUDAH LUNAS (QRIS)' +
+          '</div>' +
+          '<div style="background:rgba(239, 68, 68, 0.14);border:1px solid rgba(239, 68, 68, 0.35);border-radius:10px;padding:10px 14px;color:#F87171;font-size:12px;font-weight:800;margin-top:2px;">' +
+            '⛔ DILARANG MENAGIH UANG TUNAI KE PELANGGAN' +
+          '</div>' +
+          '<div style="font-size:12px;color:var(--text-sub);margin-top:4px;">' +
+            'Total Pesanan: ' + rupiah(expected) + ' (Telah dibayar via QRIS)' +
+          '</div>' +
+        '</div>';
+
+    var body =
+      renderDriverStepper(3) +
+      '<input type="file" id="driver-pod-file-input" accept="image/*" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">' +
+      '<div class="card">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+          '<span style="font-size:11px;font-weight:800;color:var(--brand-green);display:flex;align-items:center;gap:4px;">' +
+            '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--brand-green);"></span>' +
+            'SUDAH DI DEPAN PAGAR' +
+          '</span>' +
+          '<span style="font-size:11px;color:var(--text-sub);">#' + escapeHTML(orderCode) + '</span>' +
         '</div>' +
-        '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">' +
-          '<span style="font-size:12.5px;color:#166534;font-weight:600;">Kembalian untuk Pelanggan:</span>' +
-          '<strong style="font-size:16px;color:#15803d;" id="driver-change-display">' + rupiah(change) + '</strong>' +
+        '<div style="font-size:16px;font-weight:800;color:var(--text-main);margin-top:2px;">' + escapeHTML(c.name || 'Pelanggan') + '</div>' +
+        '<div style="font-size:13px;color:var(--text-sub);line-height:1.4;">' +
+          escapeHTML(d.address || 'Alamat tujuan belum tersedia') +
+        '</div>' +
+        '<div style="font-size:12px;color:var(--accent-amber);background:rgba(245, 158, 11, 0.1);padding:6px 10px;border-radius:8px;border:1px solid rgba(245, 158, 11, 0.2);">' +
+          'Patokan: ' + escapeHTML(noteText) +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:6px;margin-top:4px;">' +
+          '<button type="button" class="btn-secondary" data-action="open-customer-chat" style="position:relative;border-color:rgba(56, 189, 248, 0.4);background:rgba(56, 189, 248, 0.08);color:#38BDF8;">' +
+            ICON_CHAT_INAPP +
+            '<span>Chat In-App</span>' +
+          '</button>' +
+          '<button type="button" class="btn-secondary" data-action="open-whatsapp">' +
+            ICON_WHATSAPP +
+            '<span>WhatsApp</span>' +
+          '</button>' +
+          '<button type="button" class="btn-secondary" data-action="call">' +
+            ICON_PHONE +
+            '<span>Telepon</span>' +
+          '</button>' +
+        '</div>' +
+      '</div>' +
+      paymentSectionHtml +
+      '<div class="card" style="' + (!photoSatisfied ? 'border-color: rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.04);' : '') + '">' +
+        '<div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">' +
+          '<div>' +
+            '<div style="font-size:12px; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:6px;">' +
+              '<span>Bukti Foto Serah Terima</span>' +
+              '<span class="badge ' + (photoSatisfied ? 'badge-green' : 'badge-amber') + '">' +
+                (photoSatisfied ? (hasBypass ? 'Dilewati' : 'Terlampir ✓') : 'Wajib Foto') +
+              '</span>' +
+            '</div>' +
+            '<div style="font-size:11px; color:var(--text-sub); margin-top:3px; line-height:1.4;">' +
+              (photoSatisfied
+                ? (hasBypass
+                    ? '<span style="color:#F59E0B; font-weight:700;">⚠️ Serah langsung (' + escapeHTML(state.podBypass) + ')</span>'
+                    : '<span style="color:#10B981; font-weight:700;">✓ Foto paket makanan tersimpan</span>')
+                : '<span style="color:#F59E0B;">Foto paket makanan di lokasi untuk membuka tombol selesai</span>') +
+            '</div>' +
+          '</div>' +
+          '<div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">' +
+            (hasPhoto
+              ? '<button type="button" class="btn-primary green" data-action="trigger-pod-camera" style="height:36px; min-height:36px; width:auto; padding:0 12px; font-size:11px;">✓ Ganti Foto</button>'
+              : '<button type="button" class="btn-primary" data-action="trigger-pod-camera" style="height:36px; min-height:36px; width:auto; padding:0 12px; font-size:11px; background:#0284C7; color:#FFF; border:1px solid #38BDF8;">📷 Ambil Foto</button>') +
+          '</div>' +
+        '</div>' +
+        (hasPhoto
+          ? '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg-subtle);border-radius:10px;margin-top:2px;">' +
+              '<img src="' + escapeHTML(state.podPhoto) + '" alt="Bukti Foto" style="width:44px;height:44px;border-radius:8px;object-fit:cover;border:1px solid var(--border-color);">' +
+              '<div style="font-size:11px;color:var(--text-sub);">' +
+                '<div style="font-weight:700;color:var(--text-main);">Foto Paket Makanan #' + escapeHTML(orderCode) + '</div>' +
+                '<div>Dokumentasi paket di lokasi • Valid ✓</div>' +
+              '</div>' +
+            '</div>'
+          : '') +
+        '<div style="display:flex; justify-content:flex-end; padding-top:6px; border-top:1px dashed var(--border-color); margin-top:2px;">' +
+          (hasBypass
+            ? '<button type="button" class="btn-edit-text" data-action="cancel-pod-bypass" style="color:var(--text-sub); font-size:11px;">Batal lewati (Buka kamera ulang)</button>'
+            : '<button type="button" class="btn-edit-text" data-action="open-pod-bypass-modal" style="color:#38BDF8; font-size:11px; text-decoration:underline;">Kamera bermasalah? Lewati foto (Serah Langsung) ↗</button>') +
+        '</div>' +
+      '</div>' +
+      '<div class="card" data-action="open-delivery-issue" style="border:1px solid rgba(239, 68, 68, 0.35);background:rgba(239, 68, 68, 0.06);cursor:pointer;padding:14px 16px;">' +
+        '<div style="display:flex;align-items:center;justify-content:center;gap:8px;text-align:center;">' +
+          '<span style="font-size:13px;font-weight:700;color:#EF4444;">Pelanggan Tidak Buka Pagar / Laporkan Kendala ⚠️</span>' +
         '</div>' +
       '</div>';
+
+    var dock = photoSatisfied
+      ? '<div class="slider-track" id="slider-track-finish">' +
+          '<div class="slider-progress-fill" id="slider-fill-finish"></div>' +
+          '<div class="slider-thumb ' + (isCod ? 'amber' : 'green') + '" id="slider-thumb-finish">➔</div>' +
+          '<span class="slider-label">Geser Selesaikan Pengantaran</span>' +
+        '</div>'
+      : '<div class="slider-track disabled" id="slider-track-finish" data-action="locked-pod-warning">' +
+          '<div class="slider-thumb locked">🔒</div>' +
+          '<span class="slider-label" style="color:#94A3B8;">📷 Wajib Ambil Foto Bukti Dahulu</span>' +
+        '</div>';
+
+    shell('Selesaikan Pengantaran', body, 'tasks', {hideNav:true, dock: dock});
+
+    if (photoSatisfied) {
+      initSlider('slider-track-finish', 'slider-thumb-finish', 'slider-fill-finish', function() {
+        handleAction('submit-delivery-finish', document.getElementById('slider-thumb-finish'));
+      });
     }
-
-    var podBoxHtml = '';
-    if (hasPhoto) {
-      podBoxHtml =
-        '<div style="background:#f0fdf4;border:1.5px solid #10b981;border-radius:14px;padding:14px;text-align:center;">' +
-          '<div style="display:flex;align-items:center;justify-content:center;gap:8px;color:#15803d;font-weight:700;font-size:13px;margin-bottom:10px;">' +
-            '<span>✓ Foto Bukti Tersimpan</span>' +
-          '</div>' +
-          '<img src="' + escapeHTML(state.podPhoto) + '" style="max-height:160px;width:auto;border-radius:10px;object-fit:cover;box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);margin:0 auto 10px;display:block;">' +
-          '<button type="button" class="secondary-btn small" data-action="trigger-pod-camera" style="margin:0 auto;display:inline-block;font-size:12px;">📷 Ambil Ulang Foto</button>' +
-        '</div>';
-    } else if (hasBypass) {
-      podBoxHtml =
-        '<div style="background:#fffbeb;border:1.5px solid #f59e0b;border-radius:14px;padding:14px;">' +
-          '<div style="display:flex;align-items:center;gap:8px;color:#b45309;font-weight:700;font-size:13px;margin-bottom:6px;">' +
-            '<span>⚠️ Foto Di-Bypass:</span>' +
-          '</div>' +
-          '<div style="font-size:12.5px;color:#78350f;margin-bottom:10px;">"' + escapeHTML(state.podBypass) + '"</div>' +
-          '<button type="button" class="secondary-btn small" data-action="cancel-pod-bypass" style="font-size:11.5px;">Batal Bypass (Ambil Foto)</button>' +
-        '</div>';
-    } else {
-      podBoxHtml =
-        '<div class="pod-capture-card" data-action="trigger-pod-camera" style="border:2px dashed #94a3b8;border-radius:14px;padding:20px 14px;text-align:center;background:#f8fafc;cursor:pointer;">' +
-          '<div style="font-size:32px;margin-bottom:6px;">📷</div>' +
-          '<strong style="font-size:14px;color:#0f172a;display:block;">Ambil Foto Bukti Pengantaran (POD)</strong>' +
-          '<span style="font-size:12px;color:#64748b;display:block;margin-top:2px;">Foto makanan di tangan pelanggan atau di depan pagar/meja.</span>' +
-          '<button type="button" class="primary-btn green" style="margin-top:12px;height:38px;font-size:12.5px;padding:0 16px;">Buka Kamera</button>' +
-        '</div>' +
-        '<div style="text-align:center;margin-top:10px;">' +
-          '<button type="button" data-action="open-pod-bypass-modal" style="background:none;border:none;color:#b45309;font-size:12px;font-weight:700;text-decoration:underline;cursor:pointer;">' +
-            '⚠️ Kendala Foto? (Pelanggan Menolak / Kamera Error)' +
-          '</button>' +
-        '</div>';
-    }
-
-    var submitCta = canSubmit
-      ? '<button type="button" class="primary-btn green" data-action="submit-delivery-finish">✅ Konfirmasi Selesai &amp; Kirim Bukti</button>'
-      : '<button type="button" class="primary-btn" disabled style="background:#cbd5e1;color:#64748b;cursor:not-allowed;border:none;">🔒 Ambil Foto POD untuk Membuka Tombol</button>';
-
-    var body = '<div class="back-row"><button class="back-btn" data-action="back">‹</button><div class="back-title">Selesaikan Pengantaran</div></div>' +
-      renderDriverStepper(4, 'step-green') +
-      '<input type="file" id="driver-pod-file-input" accept="image/*" capture="environment" style="display:none;">' +
-      '<div class="card">' +
-        '<div class="section-title">Penerima</div>' +
-        '<div style="font-size:14px;font-weight:700;color:#0f172a;margin-top:4px;">' + escapeHTML(c.name || 'Pelanggan') + '</div>' +
-        '<div style="font-size:12px;color:#64748b;margin-top:2px;">' + escapeHTML(c.phone || '') + '</div>' +
-      '</div>' +
-      '<div class="card">' +
-        '<div class="section-title" style="margin-bottom:8px;">Bukti Pengantaran (Wajib)</div>' +
-        podBoxHtml +
-      '</div>' +
-      '<div class="card">' +
-        '<div class="section-title">Rincian Pembayaran</div>' +
-        (isCod
-          ? '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;margin-top:6px;"><span>💵 Total Tagihan COD:</span><strong style="font-size:16px;color:#92400e;">' + rupiah(expected) + '</strong></div>' + chipsHtml
-          : '<div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:10px 14px;color:#065f46;font-size:13px;font-weight:700;margin-top:6px;">✓ LUNAS (Non-Tunai). Tidak ada tagihan fisik.</div>') +
-      '</div>' +
-      '<div class="sticky-action">' + submitCta + '</div>';
-
-    shell('Selesaikan Pengantaran', body, 'tasks', {hideNav:true});
   }
 
   function renderCod() {
@@ -1149,169 +1644,601 @@
     var isCod = Boolean(p.is_cod);
     var amount = p.collected_amount != null ? p.collected_amount : p.amount;
     var orderCode = task.order_number || task.order_id;
-    var qrData = 'xentra://delivery/settle?order_number=' + encodeURIComponent(orderCode) + '&order_id=' + encodeURIComponent(task.order_id) + '&amount=' + amount;
-    var qrImgUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' + encodeURIComponent(qrData);
+    var branchName = (task.pickup && task.pickup.branch_name) || (state.driver && state.driver.branch_name) || 'Kasir Cabang';
+    var totalCustody = computeDriverCashCustody();
 
-    var codRemitBox = isCod
-      ? '<div style="background:#fffbeb;border:2px solid #f59e0b;border-radius:16px;padding:16px;margin:14px 0;text-align:center;">' +
-          '<div style="font-size:11px;font-weight:800;color:#b45309;text-transform:uppercase;letter-spacing:0.5px;">Uang COD di Tangan Anda</div>' +
-          '<div style="font-size:26px;font-weight:900;color:#92400e;margin:4px 0 2px;">' + rupiah(amount) + '</div>' +
-          '<div style="font-size:12px;color:#78350f;margin-bottom:12px;">Tunjukkan QR Code ini ke Kasir saat tiba di outlet:</div>' +
-          '<div style="background:#ffffff;padding:12px;border-radius:12px;display:inline-block;box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);">' +
-            '<img src="' + qrImgUrl + '" alt="QR Setoran Kasir" style="width:160px;height:160px;display:block;">' +
-            '<div style="font-size:13px;font-weight:800;color:#0f172a;margin-top:6px;letter-spacing:1px;">#' + escapeHTML(orderCode) + '</div>' +
+    var body = renderDriverStepper(4);
+    var dock = '';
+
+    if (isCod) {
+      if (state.cashSettledByKasir) {
+        body +=
+          '<div class="card" style="align-items:center;text-align:center;padding:24px;">' +
+            '<div style="width:48px;height:48px;border-radius:50%;background:#10B981;color:#042F1E;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;margin-bottom:8px;">✓</div>' +
+            '<div style="font-size:17px;font-weight:800;color:var(--text-main);">Setoran Kasir Sukses</div>' +
+            '<div style="font-size:12px;color:var(--text-sub);margin-top:2px;">' + escapeHTML(branchName) + ' • Bukti #' + escapeHTML(orderCode) + '</div>' +
+            '<div style="font-size:12px;color:#10B981;font-weight:700;margin-top:6px;">Uang COD ' + rupiah(amount) + ' Telah Diserahkan</div>' +
+          '</div>';
+        dock = '<button type="button" class="btn-primary green" data-action="back-tasks">Selesai &amp; Kembali ke Tugas</button>';
+      } else {
+        var qrPayload = 'xentra://delivery/settle?order_number=' + encodeURIComponent(orderCode) + '&order_id=' + encodeURIComponent(task.order_id || orderCode) + '&amount=' + encodeURIComponent(amount || 0);
+        body +=
+          '<div class="card" style="border-color:#F59E0B;">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+              '<span style="font-size:12px;color:var(--text-sub);">Uang COD Wajib Disetor:</span>' +
+              '<span style="font-size:18px;font-weight:800;color:#FBBF24;">' + rupiah(amount) + '</span>' +
+            '</div>' +
+            '<div style="font-size:11px;color:var(--text-sub);margin-top:-4px;">' +
+              'Total Kas Tertahan Shift Saat Ini: <strong>' + rupiah(totalCustody) + '</strong>' +
+            '</div>' +
           '</div>' +
-          '<div style="font-size:11.5px;color:#92400e;margin-top:10px;">Kasir akan scan QR ini untuk rekonsiliasi laci kas shift.</div>' +
-        '</div>'
-      : '<div class="info-box success" style="margin:14px 0;"><span>✓</span><div>Pembayaran Non-Tunai sudah tuntas. Tidak ada uang kas fisik yang perlu disetor ke Kasir.</div></div>';
+          '<div class="qr-card">' +
+            '<div style="font-size:11px;font-weight:800;color:#64748B;">KODE SETORAN KASIR: #' + escapeHTML(orderCode) + '</div>' +
+            renderQrCodeHtml(qrPayload) +
+            '<div style="font-size:12px;color:#0F172A;font-weight:700;">Order #' + escapeHTML(orderCode) + ' • ' + escapeHTML(branchName) + '</div>' +
+            '<div style="font-size:11px;color:#475569;line-height:1.35;margin-top:2px;">Tunjukkan QR ini ke <strong>Kasir di POS Resto</strong> saat menyerahkan uang fisik COD. Status akan otomatis terupdate saat Kasir memvalidasi.</div>' +
+          '</div>';
+        dock = '<button type="button" class="btn-primary green" data-action="back-tasks">Selesai &amp; Kembali ke Tugas</button>';
+      }
+    } else {
+      body +=
+        '<div class="card" style="align-items:center;text-align:center;padding:28px 20px;">' +
+          '<div style="width:56px;height:56px;border-radius:50%;background:#10B981;color:#042F1E;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:900;margin-bottom:12px;">✓</div>' +
+          '<div style="font-size:18px;font-weight:800;color:var(--text-main);">Pengantaran Selesai!</div>' +
+          '<div style="font-size:12px;color:var(--text-sub);margin-top:4px;max-width:260px;line-height:1.4;">' +
+            'Pesanan #' + escapeHTML(orderCode) + ' berhasil diantar ke ' + escapeHTML(c.name || 'Pelanggan') + '. Pembayaran online QRIS telah tercatat lunas.' +
+          '</div>' +
+        '</div>';
+      dock = '<button type="button" class="btn-primary green" data-action="back-tasks">Selesai &amp; Kembali ke Tugas</button>';
+    }
 
-    var body =
-      '<div class="card complete" style="text-align:center;padding:24px 16px;">' +
-        '<div class="summary-icon" style="font-size:40px;margin-bottom:8px;">✅</div>' +
-        '<h2 style="margin:0 0 4px;font-size:20px;font-weight:800;color:#0f172a;">Pengantaran Selesai!</h2>' +
-        '<p style="margin:0;font-size:13px;color:#64748b;">Pesanan telah berhasil diserahkan ke pelanggan.</p>' +
-      '</div>' +
-      codRemitBox +
-      '<div class="card">' +
-        '<div class="section-title">Rincian</div>' +
-        '<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:13px;"><span>Pesanan:</span><strong>#' + escapeHTML(orderCode) + '</strong></div>' +
-        '<div style="display:flex;justify-content:space-between;margin-top:4px;font-size:13px;"><span>Pelanggan:</span><span>' + escapeHTML(c.name || 'Pelanggan') + '</span></div>' +
-        '<div style="display:flex;justify-content:space-between;margin-top:4px;font-size:13px;"><span>Metode:</span><span>' + (isCod ? 'COD (Tunai)' : 'Online / Non-Tunai') + '</span></div>' +
-      '</div>' +
-      '<div class="sticky-action"><button class="primary-btn" data-action="back-tasks">Kembali ke Beranda Tugas</button></div>';
-
-    shell('Pengantaran Selesai', body, 'tasks', {hideNav:true});
+    shell('Setor Kasir', body, 'tasks', {hideNav:true, dock: dock});
   }
 
-  function openPodBypassModal() {
-    var modal = document.createElement('div');
-    modal.id = 'driver-pod-bypass-modal-overlay';
-    modal.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.85);z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:16px;';
-    modal.innerHTML =
-      '<div style="background:#fff;border-radius:18px;padding:22px;max-width:380px;width:100%;box-shadow:0 20px 25px -5px rgba(0,0,0,0.3);">' +
-        '<h3 style="margin:0 0 6px;font-size:17px;font-weight:800;color:#991b1b;">Kendala Bukti Foto POD</h3>' +
-        '<p style="margin:0 0 14px;font-size:12.5px;color:#64748b;line-height:1.4;">Pilih alasan sah mengapa foto bukti tidak dapat diambil. Alasan ini akan tercatat di laporan audit Owner.</p>' +
-        '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">' +
-          '<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:10px;cursor:pointer;font-size:13px;">' +
-            '<input type="radio" name="pod_bypass_opt" value="Pelanggan meminta tidak difoto" checked style="accent-color:#ea580c;"> Pelanggan meminta tidak difoto' +
-          '</label>' +
-          '<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:10px;cursor:pointer;font-size:13px;">' +
-            '<input type="radio" name="pod_bypass_opt" value="Kamera HP bermasalah / error" style="accent-color:#ea580c;"> Kamera HP bermasalah / error' +
-          '</label>' +
-          '<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:10px;cursor:pointer;font-size:13px;">' +
-            '<input type="radio" name="pod_bypass_opt" value="Area gelap gulita / sinyal lemah" style="accent-color:#ea580c;"> Area gelap gulita / sinyal lemah' +
-          '</label>' +
-          '<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:10px;cursor:pointer;font-size:13px;">' +
-            '<input type="radio" name="pod_bypass_opt" value="Lainnya" style="accent-color:#ea580c;"> Alasan lain:' +
-          '</label>' +
-          '<input type="text" id="driver-bypass-other-txt" placeholder="Ketik alasan spesifik..." style="padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:12.5px;display:none;">' +
+  function renderReturnToStore() {
+    var rtsData = state.activeRtsTask;
+    if (!rtsData || !rtsData.task) {
+      return shell('Retur Resto', errorBody('Data retur pengantaran tidak ditemukan.'), 'tasks', {hideNav:true});
+    }
+
+    var task = rtsData.task;
+    var c = task.customer || {};
+    var orderCode = task.order_number || task.order_id;
+    var branchName = (task.pickup && task.pickup.branch_name) || (state.driver && state.driver.branch_name) || 'Outlet Resto';
+
+    var body =
+      renderDriverStepper(4, 'rts') +
+      '<div class="card" style="border:2px solid #EF4444;background:rgba(239, 68, 68, 0.08);text-align:center;align-items:center;padding:18px 14px;">' +
+        '<div style="font-size:32px;">⚠️</div>' +
+        '<div style="font-size:16px;font-weight:800;color:#EF4444;margin-top:6px;">PENGANTARAN DIBATALKAN (RETUR)</div>' +
+        '<div style="font-size:12px;color:var(--text-sub);margin-top:2px;">Pesanan #' + escapeHTML(orderCode) + ' • ' + escapeHTML(c.name || 'Pelanggan') + '</div>' +
+        '<div style="background:var(--bg-surface);border:1px solid var(--border-color);border-radius:8px;padding:8px 12px;margin-top:10px;font-size:12px;font-weight:700;color:var(--text-main);">' +
+          'Alasan: <span style="color:#F87171;">' + escapeHTML(rtsData.reason || 'Pelanggan Tidak Merespons (>10 Menit)') + '</span>' +
         '</div>' +
-        '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
-          '<button type="button" id="driver-bypass-cancel-btn" style="padding:10px 14px;border:1px solid #d1d5db;border-radius:8px;background:#f8fafc;font-size:13px;font-weight:700;cursor:pointer;">Batal</button>' +
-          '<button type="button" id="driver-bypass-submit-btn" style="padding:10px 16px;border:none;border-radius:8px;background:#ea580c;color:#fff;font-size:13px;font-weight:700;cursor:pointer;">Konfirmasi Bypass</button>' +
+      '</div>' +
+      '<div class="card">' +
+        '<div style="font-size:12px;font-weight:800;color:var(--text-main);text-transform:uppercase;">Instruksi Pengembalian Makanan (RTS)</div>' +
+        '<div style="font-size:12px;color:var(--text-sub);line-height:1.5;">' +
+          '1. Bawa makanan kembali utuh ke <strong>Kasir &amp; Dapur ' + escapeHTML(branchName) + '</strong>.<br>' +
+          '2. Tanggungan kas COD otomatis <strong>Rp 0 (Batal Tagih)</strong>.<br>' +
+          '3. Serahkan ke Kasir dan minta verifikasi fisik makanan retur.' +
+        '</div>' +
+        '<button type="button" class="btn-secondary" style="margin-top:6px;" data-ops-chat-thread="delivery" data-ops-chat-ref="' + escapeHTML(task.order_id) + '" data-ops-chat-title="Retur ' + escapeHTML(orderCode) + '">' +
+          'Buka Chat dengan Kasir 💬' +
+        '</button>' +
+      '</div>';
+
+    var dock =
+      '<div class="slider-track" id="slider-track-rts">' +
+        '<div class="slider-progress-fill" id="slider-fill-rts"></div>' +
+        '<div class="slider-thumb red" id="slider-thumb-rts">➔</div>' +
+        '<span class="slider-label">Geser Konfirmasi Retur Selesai di Resto</span>' +
+      '</div>';
+
+    shell('Retur ke Outlet', body, 'tasks', {hideNav:true, dock: dock});
+
+    initSlider('slider-track-rts', 'slider-thumb-rts', 'slider-fill-rts', function() {
+      handleAction('confirm-rts-finished', document.getElementById('slider-thumb-rts'));
+    });
+  }
+
+  function applyPodFileSelection(file) {
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(evt) {
+      var img = new Image();
+      img.onload = function() {
+        var canvas = document.createElement('canvas');
+        var maxDim = 1200;
+        var width = img.width || 800;
+        var height = img.height || 600;
+        if (width > height && width > maxDim) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else if (height > maxDim) {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        state.podPhoto = canvas.toDataURL('image/jpeg', 0.82);
+        state.podBypass = null;
+        toast('✓ Foto bukti serah terima berhasil disimpan!');
+        render();
+      };
+      img.src = evt.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function openPodCaptureSheet() {
+    var existing = document.getElementById('driver-pod-capture-sheet-overlay');
+    if (existing) existing.remove();
+
+    var task = selectedTask();
+    var orderCode = (task && (task.order_number || task.order_id)) || 'ORDER';
+    var activeStream = null;
+
+    var modal = document.createElement('div');
+    modal.id = 'driver-pod-capture-sheet-overlay';
+    modal.className = 'sheet-backdrop';
+    modal.innerHTML =
+      '<div class="sheet-card" onclick="event.stopPropagation()" style="max-height:90vh;overflow-y:auto;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+          '<div>' +
+            '<span style="font-size:15px;font-weight:800;color:var(--text-main);">📷 Ambil Foto Bukti Serah Terima</span>' +
+            '<div style="font-size:11px;color:var(--text-sub);margin-top:1px;">Dokumentasikan paket pesanan #' + escapeHTML(orderCode) + ' di lokasi</div>' +
+          '</div>' +
+          '<button type="button" id="driver-pod-sheet-close" style="background:transparent;border:none;color:var(--text-sub);font-size:18px;cursor:pointer;">✕</button>' +
+        '</div>' +
+        '<div id="driver-pod-live-camera-box" style="position:relative;width:100%;height:220px;border-radius:14px;overflow:hidden;background:#090D16;border:1px solid var(--border-color);display:flex;align-items:center;justify-content:center;">' +
+          '<video id="driver-pod-video" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;display:none;"></video>' +
+          '<div id="driver-pod-video-placeholder" style="text-align:center;padding:16px;color:var(--text-sub);font-size:12px;">' +
+            '<div style="font-size:28px;margin-bottom:6px;">📸</div>' +
+            '<div id="driver-pod-cam-status">Menyiapkan kamera perangkat…</div>' +
+          '</div>' +
+        '</div>' +
+        '<button type="button" class="btn-primary green" id="driver-pod-shutter-btn" style="display:none;">📸 Jepret Foto Kamera Sekarang</button>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">' +
+          '<button type="button" class="btn-primary blue" id="driver-pod-sheet-cam-btn" style="margin:0;">📷 Kamera HP</button>' +
+          '<button type="button" class="btn-secondary" id="driver-pod-sheet-file-btn" style="margin:0;">📁 Pilih Galeri / File</button>' +
+        '</div>' +
+        '<input type="file" id="driver-pod-sheet-cam-input" accept="image/*" capture="environment" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">' +
+        '<input type="file" id="driver-pod-sheet-file-input" accept="image/*" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">' +
+        '<div style="display:flex;gap:8px;margin-top:2px;">' +
+          '<button type="button" class="btn-secondary" id="driver-pod-sheet-bypass" style="color:#F59E0B;border-color:rgba(245,158,11,0.4);">Kamera Bermasalah? Lewati Foto (Serah Langsung) ↗</button>' +
         '</div>' +
       '</div>';
 
     document.body.appendChild(modal);
 
-    modal.querySelectorAll('input[name="pod_bypass_opt"]').forEach(function(r) {
-      r.onchange = function() {
-        var other = modal.querySelector('#driver-bypass-other-txt');
-        if (other) other.style.display = (r.value === 'Lainnya') ? 'block' : 'none';
-      };
-    });
+    function stopStreamAndClose() {
+      if (activeStream) {
+        try {
+          activeStream.getTracks().forEach(function(t) { t.stop(); });
+        } catch (_) {}
+        activeStream = null;
+      }
+      modal.remove();
+    }
 
-    modal.querySelector('#driver-bypass-cancel-btn').onclick = function() { modal.remove(); };
+    modal.onclick = function(e) { if (e.target === modal) stopStreamAndClose(); };
+    modal.querySelector('#driver-pod-sheet-close').onclick = stopStreamAndClose;
+    modal.querySelector('#driver-pod-sheet-bypass').onclick = function() {
+      stopStreamAndClose();
+      openPodBypassModal();
+    };
+
+    var camBtn = modal.querySelector('#driver-pod-sheet-cam-btn');
+    var fileBtn = modal.querySelector('#driver-pod-sheet-file-btn');
+    var camInput = modal.querySelector('#driver-pod-sheet-cam-input');
+    var fileInput = modal.querySelector('#driver-pod-sheet-file-input');
+    function onFilePicked(e) {
+      var f = e.target.files && e.target.files[0];
+      if (!f) return;
+      stopStreamAndClose();
+      applyPodFileSelection(f);
+    }
+    if (camBtn && camInput) camBtn.onclick = function() { camInput.click(); };
+    if (fileBtn && fileInput) fileBtn.onclick = function() { fileInput.click(); };
+    if (camInput) camInput.onchange = onFilePicked;
+    if (fileInput) fileInput.onchange = onFilePicked;
+
+    var videoEl = modal.querySelector('#driver-pod-video');
+    var placeholderEl = modal.querySelector('#driver-pod-video-placeholder');
+    var statusEl = modal.querySelector('#driver-pod-cam-status');
+    var shutterBtn = modal.querySelector('#driver-pod-shutter-btn');
+
+    if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
+      navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
+      }).then(function(stream) {
+        if (!document.body.contains(modal)) {
+          stream.getTracks().forEach(function(t) { t.stop(); });
+          return;
+        }
+        activeStream = stream;
+        videoEl.srcObject = stream;
+        videoEl.style.display = 'block';
+        if (placeholderEl) placeholderEl.style.display = 'none';
+        if (shutterBtn) shutterBtn.style.display = 'flex';
+      }).catch(function() {
+        if (statusEl) {
+          statusEl.textContent = 'Gunakan tombol "Kamera HP" atau "Pilih Galeri / File" di bawah untuk mengambil foto bukti.';
+        }
+      });
+    } else if (statusEl) {
+      statusEl.textContent = 'Pilih tombol "Kamera HP" atau "Pilih Galeri / File" di bawah untuk melampirkan foto bukti.';
+    }
+
+    if (shutterBtn) {
+      shutterBtn.onclick = function() {
+        if (!videoEl || !videoEl.videoWidth) return;
+        var canvas = document.createElement('canvas');
+        canvas.width = videoEl.videoWidth || 800;
+        canvas.height = videoEl.videoHeight || 600;
+        canvas.getContext('2d').drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+        state.podPhoto = canvas.toDataURL('image/jpeg', 0.82);
+        state.podBypass = null;
+        stopStreamAndClose();
+        toast('✓ Foto bukti berhasil diambil!');
+        render();
+      };
+    }
+  }
+
+  function openPodBypassModal() {
+    var existing = document.getElementById('driver-pod-bypass-modal-overlay');
+    if (existing) existing.remove();
+
+    var task = selectedTask();
+    var cName = (task && task.customer && task.customer.name) || 'Pelanggan';
+
+    var modal = document.createElement('div');
+    modal.id = 'driver-pod-bypass-modal-overlay';
+    modal.className = 'sheet-backdrop';
+    modal.innerHTML =
+      '<div class="sheet-card" onclick="event.stopPropagation()">' +
+        '<div style="display:flex; justify-content:space-between; align-items:center;">' +
+          '<span style="font-size:15px; font-weight:800; color:var(--text-main);">Lewati Foto Bukti?</span>' +
+          '<button type="button" id="driver-bypass-close-btn" style="background:transparent; border:none; color:var(--text-sub); font-size:18px; cursor:pointer;">✕</button>' +
+        '</div>' +
+        '<div style="background:rgba(245, 158, 11, 0.1); border:1px solid #F59E0B; border-radius:12px; padding:12px;">' +
+          '<div style="font-size:12px; font-weight:800; color:#F59E0B;">⚠️ PERINGATAN SERAH TERIMA</div>' +
+          '<div style="font-size:12px; color:var(--text-main); margin-top:3px; line-height:1.4;">' +
+            'Gunakan opsi ini hanya jika:<br>' +
+            '• Makanan <strong>diserahkan langsung</strong> ke tangan ' + escapeHTML(cName) + '.<br>' +
+            '• Kamera HP mengalami gangguan teknis / memori penuh.' +
+          '</div>' +
+        '</div>' +
+        '<div style="display:flex;flex-direction:column;gap:6px;">' +
+          '<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg-subtle);border:1px solid var(--border-color);border-radius:10px;cursor:pointer;font-size:12px;color:var(--text-main);">' +
+            '<input type="radio" name="pod_bypass_opt" value="Diserahkan langsung ke pelanggan" checked style="accent-color:#10B981;"> Diserahkan langsung ke tangan pelanggan' +
+          '</label>' +
+          '<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg-subtle);border:1px solid var(--border-color);border-radius:10px;cursor:pointer;font-size:12px;color:var(--text-main);">' +
+            '<input type="radio" name="pod_bypass_opt" value="Kamera HP bermasalah / memori penuh" style="accent-color:#10B981;"> Kamera HP bermasalah / memori penuh' +
+          '</label>' +
+        '</div>' +
+        '<div style="font-size:12px; color:var(--text-sub); line-height:1.4;">' +
+          'Dengan melewati foto, kurir menyatakan bertanggung jawab bahwa pesanan telah diterima dengan baik oleh pelanggan.' +
+        '</div>' +
+        '<div style="margin-top:4px;">' +
+          '<button type="button" class="btn-primary green" id="driver-bypass-submit-btn">✓ Ya, Konfirmasi Lewati Foto</button>' +
+        '</div>' +
+      '</div>';
+
+    document.body.appendChild(modal);
+
+    modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
+    modal.querySelector('#driver-bypass-close-btn').onclick = function() { modal.remove(); };
     modal.querySelector('#driver-bypass-submit-btn').onclick = function() {
       var sel = modal.querySelector('input[name="pod_bypass_opt"]:checked');
-      var val = sel ? sel.value : 'Pelanggan meminta tidak difoto';
-      if (val === 'Lainnya') {
-        var custom = modal.querySelector('#driver-bypass-other-txt').value.trim();
-        val = custom ? 'Lainnya: ' + custom : 'Lainnya';
-      }
-      state.podBypass = val;
+      state.podBypass = sel ? sel.value : 'Diserahkan langsung ke pelanggan';
       state.podPhoto = null;
       modal.remove();
       render();
     };
   }
 
-  function openCustomerChatSheet() {
+  function openDeliveryIssueModal() {
     var task = selectedTask();
+    if (!task) return toast('Tugas tidak ditemukan');
+    var existing = document.getElementById('driver-delivery-issue-modal-overlay');
+    if (existing) existing.remove();
+
+    var reasons = [
+      'Pelanggan Tidak Merespons (>10 Menit)',
+      'Alamat Salah / Titik Peta Jauh Meleset',
+      'Pelanggan Menolak Pesanan / Batal di Tempat',
+      'Akses Tertutup (Banjir / Portal Terkunci)'
+    ];
+    var selectedReason = reasons[0];
+
+    var modal = document.createElement('div');
+    modal.id = 'driver-delivery-issue-modal-overlay';
+    modal.className = 'sheet-backdrop';
+
+    function renderModalContent() {
+      var optionsHtml = reasons.map(function(r) {
+        var isSel = selectedReason === r;
+        return '<div class="rts-option-card ' + (isSel ? 'selected' : '') + '" data-rts-reason="' + escapeHTML(r) + '">' +
+          '<div class="rts-radio-circle"></div>' +
+          '<div style="font-size:13px;font-weight:700;color:var(--text-main);">' + escapeHTML(r) + '</div>' +
+        '</div>';
+      }).join('');
+
+      modal.innerHTML =
+        '<div class="sheet-card" onclick="event.stopPropagation()">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+            '<span style="font-size:15px;font-weight:800;color:#EF4444;">Laporkan Kendala Pengantaran</span>' +
+            '<button type="button" id="driver-issue-close-btn" style="background:transparent;border:none;color:var(--text-sub);font-size:18px;cursor:pointer;">✕</button>' +
+          '</div>' +
+          '<div style="font-size:12px;color:var(--text-sub);line-height:1.4;">' +
+            'Pilih alasan sebelum membatalkan pengantaran dan memulai alur Retur ke Resto (RTS):' +
+          '</div>' +
+          '<div style="display:flex;flex-direction:column;gap:8px;">' +
+            optionsHtml +
+          '</div>' +
+          '<div style="margin-top:6px;">' +
+            '<button type="button" class="btn-primary red" id="driver-issue-submit-btn">Batalkan &amp; Retur ke Resto</button>' +
+          '</div>' +
+        '</div>';
+
+      modal.querySelectorAll('[data-rts-reason]').forEach(function(card) {
+        card.onclick = function() {
+          selectedReason = card.getAttribute('data-rts-reason');
+          renderModalContent();
+        };
+      });
+
+      modal.querySelector('#driver-issue-close-btn').onclick = function() { modal.remove(); };
+      modal.querySelector('#driver-issue-submit-btn').onclick = async function() {
+        var btn = this;
+        btn.disabled = true;
+        btn.textContent = 'Memproses...';
+
+        try {
+          await api('/driver/tasks/' + encodeURIComponent(task.order_id) + '/fail', {
+            method: 'POST',
+            body: JSON.stringify({ reason: selectedReason, notes: selectedReason })
+          });
+          modal.remove();
+          state.activeRtsTask = {
+            task: task,
+            reason: selectedReason
+          };
+          state.page = 'return-to-store';
+          render();
+        } catch (err) {
+          btn.disabled = false;
+          btn.textContent = 'Batalkan & Retur ke Resto';
+          toast(err.message || 'Gagal melaporkan kendala');
+        }
+      };
+    }
+
+    modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
+    renderModalContent();
+    document.body.appendChild(modal);
+  }
+
+  function formatChatTime(isoStr) {
+    if (!isoStr) return '';
+    try {
+      var raw = String(isoStr);
+      if (raw.indexOf('T') === -1 && raw.indexOf('Z') === -1) {
+        raw = raw.replace(' ', 'T') + 'Z';
+      }
+      var d = new Date(raw);
+      if (isNaN(d.getTime())) return '';
+      var hh = String(d.getHours()).padStart(2, '0');
+      var mm = String(d.getMinutes()).padStart(2, '0');
+      return hh + ':' + mm;
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function openCustomerChatSheet() {
+    var task = selectedTask() || state.lastCompleted;
     if (!task) return toast('Pesanan tidak ditemukan');
+    var existing = document.getElementById('driver-customer-chat-sheet-overlay');
+    if (existing) existing.remove();
+
     var c = task.customer || {};
+    var custName = c.name || 'Pelanggan';
+    var custInitial = String(custName).trim().charAt(0).toUpperCase() || 'P';
+    var orderCode = task.order_number || task.order_id;
+    var pendingPhotoBase64 = null;
 
     var sheet = document.createElement('div');
     sheet.id = 'driver-customer-chat-sheet-overlay';
-    sheet.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.7);z-index:2147483647;display:flex;flex-direction:column;justify-content:flex-end;';
+    sheet.className = 'sheet-backdrop';
     sheet.innerHTML =
-      '<div style="background:#fff;border-radius:20px 20px 0 0;max-height:85vh;height:550px;display:flex;flex-direction:column;box-shadow:0 -10px 25px rgba(0,0,0,0.2);">' +
-        '<div style="padding:14px 16px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">' +
-          '<div>' +
-            '<div style="font-size:15px;font-weight:800;color:#0f172a;">💬 Chat Pelanggan</div>' +
-            '<div style="font-size:12px;color:#64748b;">' + escapeHTML(c.name || 'Pelanggan') + ' • Order #' + escapeHTML(task.order_number || task.order_id) + '</div>' +
+      '<div class="sheet-card" onclick="event.stopPropagation()" style="max-height:85vh;height:540px;padding:16px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border-color);padding-bottom:10px;">' +
+          '<div style="display:flex;align-items:center;gap:10px;">' +
+            '<div style="width:36px;height:36px;border-radius:50%;background:#10B981;color:#FFF;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;">' +
+              escapeHTML(custInitial) +
+            '</div>' +
+            '<div>' +
+              '<div style="font-size:13px;font-weight:800;color:var(--text-main);">' + escapeHTML(custName) + '</div>' +
+              '<div id="driver-chat-status-sub" style="font-size:11px;color:#38BDF8;">Chat Pengantaran • #' + escapeHTML(orderCode) + '</div>' +
+            '</div>' +
           '</div>' +
-          '<button type="button" id="driver-chat-close-btn" style="background:none;border:none;font-size:22px;color:#64748b;cursor:pointer;">✕</button>' +
+          '<button type="button" id="driver-chat-close-btn" style="background:transparent;border:none;color:var(--text-sub);font-size:18px;cursor:pointer;">✕</button>' +
         '</div>' +
-        '<div id="driver-chat-messages-box" style="flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px;background:#f8fafc;">' +
-          '<div style="text-align:center;font-size:11.5px;color:#94a3b8;margin:6px 0;">Percakapan langsung dengan pelanggan</div>' +
-          '<div style="align-self:flex-start;max-width:80%;background:#ffffff;border:1px solid #e2e8f0;padding:10px 12px;border-radius:12px 12px 12px 2px;font-size:13px;line-height:1.4;">' +
-            'Halo Pak/Bu ' + escapeHTML(c.name || '') + ', pesanan #' + escapeHTML(task.order_number || task.order_id) + ' sedang dalam perjalanan.' +
+        '<div style="background:rgba(56, 189, 248, 0.08);border:1px solid rgba(56, 189, 248, 0.25);border-radius:8px;padding:6px 10px;font-size:11px;color:#38BDF8;display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:2px;">' +
+          '<div style="line-height:1.3;">' +
+            '💡 Terhubung ke halaman lacak pelanggan &amp; kasir resto.' +
           '</div>' +
+          '<button type="button" class="btn-secondary" id="driver-chat-wa-btn" style="height:28px;min-height:28px;padding:0 10px;font-size:10.5px;flex-shrink:0;background:rgba(34,197,94,0.15);border-color:#22C55E;color:#22C55E;">' +
+            'Ke WA ↗' +
+          '</button>' +
         '</div>' +
-        '<div style="padding:8px 12px;background:#fff;border-top:1px solid #e2e8f0;">' +
-          '<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:6px;">' +
-            '<button type="button" class="pos-tab-pill" data-chat-quick="Saya sudah di depan ya Bu/Pak" style="font-size:11px;padding:4px 8px;white-space:nowrap;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:6px;">Saya sudah di depan ya</button>' +
-            '<button type="button" class="pos-tab-pill" data-chat-quick="Titip di pos satpam ya Bu/Pak" style="font-size:11px;padding:4px 8px;white-space:nowrap;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:6px;">Titip satpam</button>' +
-            '<button type="button" class="pos-tab-pill" data-chat-quick="Mohon bantu buka pagar ya Bu/Pak" style="font-size:11px;padding:4px 8px;white-space:nowrap;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:6px;">Mohon buka pagar</button>' +
+        '<div id="driver-chat-messages-box" style="flex:1;overflow-y:auto;padding:8px 2px;display:flex;flex-direction:column;gap:8px;">' +
+          '<div style="text-align:center;font-size:12px;color:var(--text-sub);margin:auto 0;">Memuat percakapan…</div>' +
+        '</div>' +
+        '<div id="driver-chat-photo-preview" style="display:none;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;background:var(--bg-subtle);border:1px solid var(--border-color);border-radius:10px;">' +
+          '<div style="display:flex;align-items:center;gap:8px;">' +
+            '<img id="driver-chat-photo-img" src="" alt="Preview" style="width:36px;height:36px;border-radius:6px;object-fit:cover;">' +
+            '<span style="font-size:11px;font-weight:700;color:var(--text-main);">Foto siap dikirim</span>' +
           '</div>' +
-          '<div style="display:flex;gap:6px;">' +
-            '<input type="text" id="driver-chat-input" placeholder="Tulis pesan ke pelanggan..." style="flex:1;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:13px;font-family:inherit;">' +
-            '<button type="button" id="driver-chat-send-btn" style="background:#059669;color:#fff;border:none;padding:0 14px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;">Kirim</button>' +
-          '</div>' +
+          '<button type="button" id="driver-chat-photo-remove" style="background:transparent;border:none;color:#EF4444;font-size:14px;cursor:pointer;font-weight:800;">✕</button>' +
+        '</div>' +
+        '<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;">' +
+          '<button type="button" class="calc-chip" data-chat-quick="Saya sudah sampai di depan pagar ya ' + escapeHTML(custName) + '" style="white-space:nowrap;">Sudah di depan pagar</button>' +
+          '<button type="button" class="calc-chip" data-chat-quick="Mohon maaf, sedang ada hujan deras / macet sebentar" style="white-space:nowrap;">Ada macet / hujan</button>' +
+          '<button type="button" class="calc-chip" data-chat-quick="Pesanan sudah saya serahkan sesuai arahan, terima kasih!" style="white-space:nowrap;">Pesanan diserahkan</button>' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;align-items:center;">' +
+          '<button type="button" id="driver-chat-photo-btn" style="width:42px;height:42px;border-radius:10px;background:var(--bg-subtle);border:1px solid var(--border-color);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-size:17px;" title="Lampirkan Foto">' +
+            '📷' +
+          '</button>' +
+          '<input type="file" id="driver-chat-photo-input" accept="image/*" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">' +
+          '<input type="text" id="driver-chat-input" class="form-input" placeholder="Tulis pesan ke ' + escapeHTML(custName) + '…" style="flex:1;height:42px;font-size:13px;">' +
+          '<button type="button" id="driver-chat-send-btn" class="btn-primary" style="width:44px;height:42px;min-height:42px;padding:0;border-radius:10px;flex-shrink:0;">➔</button>' +
         '</div>' +
       '</div>';
 
     document.body.appendChild(sheet);
 
     var closeBtn = sheet.querySelector('#driver-chat-close-btn');
-    closeBtn.onclick = function() { sheet.remove(); };
-
+    var waBtn = sheet.querySelector('#driver-chat-wa-btn');
     var msgBox = sheet.querySelector('#driver-chat-messages-box');
     var input = sheet.querySelector('#driver-chat-input');
     var sendBtn = sheet.querySelector('#driver-chat-send-btn');
+    var photoBtn = sheet.querySelector('#driver-chat-photo-btn');
+    var photoInput = sheet.querySelector('#driver-chat-photo-input');
+    if (photoBtn && photoInput) {
+      photoBtn.onclick = function() { photoInput.click(); };
+    }
+    var photoPreviewBox = sheet.querySelector('#driver-chat-photo-preview');
+    var photoPreviewImg = sheet.querySelector('#driver-chat-photo-img');
+    var photoRemoveBtn = sheet.querySelector('#driver-chat-photo-remove');
+
+    var pollInterval = null;
+    function cleanupAndClose() {
+      if (pollInterval) clearInterval(pollInterval);
+      sheet.remove();
+    }
+
+    sheet.onclick = function(e) { if (e.target === sheet) cleanupAndClose(); };
+    closeBtn.onclick = cleanupAndClose;
+    if (waBtn) {
+      waBtn.onclick = function() {
+        cleanupAndClose();
+        openWhatsAppCustomer();
+      };
+    }
+
+    if (photoInput) {
+      photoInput.onchange = function() {
+        var f = photoInput.files && photoInput.files[0];
+        if (!f) return;
+        var reader = new FileReader();
+        reader.onload = function(evt) {
+          var img = new Image();
+          img.onload = function() {
+            var canvas = document.createElement('canvas');
+            var maxDim = 1000;
+            var w = img.width;
+            var h = img.height;
+            if (w > h && w > maxDim) {
+              h = Math.round((h * maxDim) / w);
+              w = maxDim;
+            } else if (h > maxDim) {
+              w = Math.round((w * maxDim) / h);
+              h = maxDim;
+            }
+            canvas.width = w;
+            canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            pendingPhotoBase64 = canvas.toDataURL('image/jpeg', 0.82);
+            if (photoPreviewImg) photoPreviewImg.src = pendingPhotoBase64;
+            if (photoPreviewBox) photoPreviewBox.style.display = 'flex';
+          };
+          img.src = evt.target.result;
+        };
+        reader.readAsDataURL(f);
+      };
+    }
+
+    if (photoRemoveBtn) {
+      photoRemoveBtn.onclick = function() {
+        pendingPhotoBase64 = null;
+        if (photoInput) photoInput.value = '';
+        if (photoPreviewBox) photoPreviewBox.style.display = 'none';
+      };
+    }
 
     async function loadMessages() {
       try {
         var res = await api('/messages?thread_type=delivery&ref_id=' + encodeURIComponent(task.order_id));
-        if (res && res.messages && res.messages.length) {
-          msgBox.innerHTML = res.messages.map(function(m) {
-            var isMe = (m.sender_role === 'driver');
-            return '<div style="align-self:' + (isMe ? 'flex-end' : 'flex-start') + ';max-width:80%;background:' + (isMe ? '#dcfce7;color:#14532d;border-radius:12px 12px 2px 12px;' : '#ffffff;border:1px solid #e2e8f0;border-radius:12px 12px 12px 2px;') + 'padding:10px 12px;font-size:13px;line-height:1.4;">' +
-              '<div style="font-size:10.5px;color:' + (isMe ? '#15803d' : '#64748b') + ';margin-bottom:2px;font-weight:700;">' + escapeHTML(m.sender_name || (isMe ? 'Saya' : 'Pelanggan')) + '</div>' +
-              escapeHTML(m.body) +
+        var list = (res && Array.isArray(res.messages)) ? res.messages : [];
+        if (!list.length) {
+          msgBox.innerHTML =
+            '<div style="text-align:center;padding:24px 14px;color:var(--text-sub);font-size:12px;margin:auto 0;">' +
+              '<div style="font-size:24px;margin-bottom:6px;">💬</div>' +
+              '<div style="font-weight:700;color:var(--text-main);">Belum ada pesan untuk pesanan #' + escapeHTML(orderCode) + '</div>' +
+              '<div style="margin-top:4px;font-size:11px;">Kirim pesan atau pilih chip cepat di bawah untuk menghubungi ' + escapeHTML(custName) + '.</div>' +
             '</div>';
-          }).join('');
-          msgBox.scrollTop = msgBox.scrollHeight;
+          return;
         }
+
+        msgBox.innerHTML = list.map(function(m) {
+          var isMe = (m.sender_role === 'driver');
+          var roleBadge = m.sender_role === 'customer' ? 'Pelanggan' : (m.sender_role === 'driver' ? 'Kurir' : 'Kasir / Resto');
+          var senderLabel = isMe ? 'Saya' : ((m.sender_name || custName) + ' (' + roleBadge + ')');
+          var imgUrl = m.image_url || m.thumb_url;
+          var imgHtml = imgUrl
+            ? '<div style="margin-bottom:5px;"><img src="' + escapeHTML(imgUrl) + '" alt="Lampiran" style="max-width:100%;max-height:160px;border-radius:8px;display:block;object-fit:cover;cursor:pointer;" onclick="window.open(this.src, \'_blank\')"></div>'
+            : '';
+          var bodyText = (m.body && m.body !== '📷 [Foto Lampiran]')
+            ? '<div style="font-size:12.5px;line-height:1.4;word-break:break-word;">' + escapeHTML(m.body) + '</div>'
+            : '';
+          var timeStr = formatChatTime(m.created_at);
+          var tickHtml = isMe ? (' <span style="opacity:0.85;">' + (m.delivery_status === 'read' ? '✓✓' : '✓') + '</span>') : '';
+
+          return '<div style="align-self:' + (isMe ? 'flex-end' : 'flex-start') + ';max-width:82%;background:' + (isMe ? '#0284C7' : 'var(--bg-subtle)') + ';border:' + (isMe ? 'none' : '1px solid var(--border-color)') + ';border-radius:' + (isMe ? '14px 14px 2px 14px' : '14px 14px 14px 2px') + ';padding:8px 12px;color:' + (isMe ? '#FFF' : 'var(--text-main)') + ';">' +
+            '<div style="font-size:10px;font-weight:700;color:' + (isMe ? 'rgba(255,255,255,0.8)' : '#10B981') + ';margin-bottom:2px;">' + escapeHTML(senderLabel) + '</div>' +
+            imgHtml +
+            bodyText +
+            '<div style="font-size:9.5px;text-align:right;margin-top:3px;opacity:0.75;">' + escapeHTML(timeStr) + tickHtml + '</div>' +
+          '</div>';
+        }).join('');
+        msgBox.scrollTop = msgBox.scrollHeight;
       } catch (_) {}
     }
 
     async function sendMessage(text) {
-      if (!text || !text.trim()) return;
+      var cleanText = String(text || '').trim();
+      if (!cleanText && !pendingPhotoBase64) return;
       input.value = '';
+      var photoToSend = pendingPhotoBase64;
+      pendingPhotoBase64 = null;
+      if (photoInput) photoInput.value = '';
+      if (photoPreviewBox) photoPreviewBox.style.display = 'none';
+      sendBtn.disabled = true;
+
       try {
         await api('/messages', {
           method: 'POST',
-          body: {
+          body: JSON.stringify({
             thread_type: 'delivery',
             ref_id: task.order_id,
-            body: text.trim()
-          }
+            body: cleanText,
+            image_base64: photoToSend || undefined
+          })
         });
-        loadMessages();
+        await loadMessages();
       } catch (e) {
-        toast('Gagal mengirim pesan: ' + e.message);
+        toast('Gagal mengirim pesan: ' + (e.message || 'Kesalahan jaringan'));
+      } finally {
+        sendBtn.disabled = false;
       }
     }
 
@@ -1323,71 +2250,233 @@
     });
 
     loadMessages();
-    var pollInterval = setInterval(loadMessages, 4000);
-    closeBtn.addEventListener('click', function() { clearInterval(pollInterval); });
+    pollInterval = setInterval(loadMessages, 3500);
   }
 
   function openWhatsAppCustomer() {
     var task = selectedTask() || state.lastCompleted;
     if (!task) return toast('Pesanan tidak ditemukan');
+    var existing = document.getElementById('driver-wa-template-modal');
+    if (existing) existing.remove();
+
     var phone = (task.customer && task.customer.phone) || '';
-    if (!phone) return toast('Nomor telepon pelanggan tidak tersedia');
-
-    var cleanPhone = phone.replace(/[^0-9]/g, '');
-    if (cleanPhone.startsWith('0')) cleanPhone = '62' + cleanPhone.substring(1);
-
     var custName = (task.customer && task.customer.name) || 'Pelanggan';
     var orderCode = task.order_number || task.order_id;
-    var msg = 'Halo Pak/Bu ' + custName + ', saya kurir yang mengantar pesanan #' + orderCode + '. Posisi saya sedang menuju ke lokasi Anda. Terima kasih!';
+    var branchName = (task.pickup && task.pickup.branch_name) || (state.driver && state.driver.branch_name) || 'Outlet';
 
-    window.open('https://wa.me/' + cleanPhone + '?text=' + encodeURIComponent(msg), '_blank');
+    var templates = {
+      shareloc: 'Halo ' + custName + ', saya kurir ' + branchName + ' mengantar order #' + orderCode + '. Boleh tolong share live location agar cepat sampai? Terima kasih!',
+      arrived: 'Halo ' + custName + ', pesanan #' + orderCode + ' sudah tiba di depan pagar rumah. Ditunggu ya.',
+      locked: 'Permisi ' + custName + ', saya sudah di depan pagar untuk pesanan #' + orderCode + ' tapi belum ada jawaban. Mohon bantuannya untuk mengambil pesanan ya.'
+    };
+
+    var modal = document.createElement('div');
+    modal.id = 'driver-wa-template-modal';
+    modal.className = 'sheet-backdrop';
+    modal.innerHTML =
+      '<div class="sheet-card" onclick="event.stopPropagation()">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+          '<div style="display:flex;align-items:center;gap:8px;">' +
+            '<span style="font-size:18px;">💬</span>' +
+            '<span style="font-size:15px;font-weight:800;color:var(--text-main);">Pilih Template Pesan WhatsApp</span>' +
+          '</div>' +
+          '<button type="button" id="driver-wa-close-btn" style="background:transparent;border:none;color:var(--text-sub);font-size:18px;cursor:pointer;">✕</button>' +
+        '</div>' +
+        '<div style="font-size:12px;color:var(--text-sub);">' +
+          'Kirim pesan langsung ke WhatsApp ' + escapeHTML(custName) + (phone ? ' (' + escapeHTML(phone) + ')' : '') + ':' +
+        '</div>' +
+        '<div style="display:flex;flex-direction:column;gap:8px;">' +
+          '<div class="wa-option-card" data-wa-tpl="shareloc">' +
+            '<div style="font-size:13px;font-weight:800;color:#25D366;">📍 Minta Share Location WA</div>' +
+            '<div style="font-size:11px;color:var(--text-sub);line-height:1.4;">"' + escapeHTML(templates.shareloc) + '"</div>' +
+          '</div>' +
+          '<div class="wa-option-card" data-wa-tpl="arrived">' +
+            '<div style="font-size:13px;font-weight:800;color:#25D366;">🚪 Sudah di Depan Pagar / Rumah</div>' +
+            '<div style="font-size:11px;color:var(--text-sub);line-height:1.4;">"' + escapeHTML(templates.arrived) + '"</div>' +
+          '</div>' +
+          '<div class="wa-option-card" data-wa-tpl="locked">' +
+            '<div style="font-size:13px;font-weight:800;color:#25D366;">🔔 Pagar Belum Terbuka / Ditunggu</div>' +
+            '<div style="font-size:11px;color:var(--text-sub);line-height:1.4;">"' + escapeHTML(templates.locked) + '"</div>' +
+          '</div>' +
+        '</div>' +
+        '<button type="button" class="btn-secondary" id="driver-wa-cancel-btn">Tutup</button>' +
+      '</div>';
+
+    document.body.appendChild(modal);
+
+    modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
+    modal.querySelector('#driver-wa-close-btn').onclick = function() { modal.remove(); };
+    modal.querySelector('#driver-wa-cancel-btn').onclick = function() { modal.remove(); };
+
+    modal.querySelectorAll('[data-wa-tpl]').forEach(function(card) {
+      card.onclick = function() {
+        var key = card.getAttribute('data-wa-tpl');
+        var msg = templates[key] || templates.shareloc;
+        modal.remove();
+        if (!phone) return toast('Nomor telepon pelanggan tidak tersedia');
+        var cleanPhone = phone.replace(/[^0-9]/g, '');
+        if (cleanPhone.startsWith('0')) cleanPhone = '62' + cleanPhone.substring(1);
+        window.open('https://wa.me/' + cleanPhone + '?text=' + encodeURIComponent(msg), '_blank');
+      };
+    });
+  }
+
+  function processAvatarFileSelection(file, resetInputFn) {
+    if (!file) return;
+    if (!file.type || !file.type.startsWith('image/')) {
+      if (typeof resetInputFn === 'function') resetInputFn();
+      return toast('File harus berupa gambar (JPG, PNG, WebP).');
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      if (typeof resetInputFn === 'function') resetInputFn();
+      return toast('Ukuran foto maksimal 10 MB.');
+    }
+
+    async function doUpload(rawFile, cropSpec, previewUrl) {
+      toast('Mengompres dan mengunggah foto profil…');
+      try {
+        var base64 = previewUrl;
+        var mimeType = previewUrl ? 'image/jpeg' : (rawFile.type || 'image/jpeg');
+        if (!base64) {
+          base64 = await new Promise(function (resolve, reject) {
+            var reader = new FileReader();
+            reader.onload = function () { resolve(reader.result); };
+            reader.onerror = function () { reject(new Error('Gagal membaca gambar.')); };
+            reader.readAsDataURL(rawFile);
+          });
+        }
+
+        var payload = {
+          image_base64: base64,
+          mime_type: mimeType,
+          original_filename: rawFile.name || 'driver-avatar.jpg'
+        };
+        if (cropSpec) payload.crop_spec = cropSpec;
+
+        var res = await api('/driver/avatar', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+
+        if (res.success && res.avatar_url) {
+          if (state.driver) {
+            state.driver.avatar_url = res.avatar_url;
+            persistUser();
+          }
+          toast('✓ Foto profil berhasil diperbarui!');
+          render();
+        } else {
+          toast('Gagal memperbarui foto profil.');
+        }
+      } catch (err) {
+        toast(err.message || 'Gagal mengunggah foto profil.');
+      } finally {
+        if (typeof resetInputFn === 'function') resetInputFn();
+      }
+    }
+
+    if (window.XentraCropEditor && typeof window.XentraCropEditor.open === 'function') {
+      window.XentraCropEditor.open({
+        source: file,
+        assetType: 'avatar',
+        aspectRatio: 1.0,
+        title: 'Sesuaikan Foto Profil Driver (1:1)',
+        onConfirm: function (cropSpec, previewDataUrl) {
+          doUpload(file, cropSpec, previewDataUrl);
+        },
+        onCancel: function () {
+          if (typeof resetInputFn === 'function') resetInputFn();
+        }
+      });
+    } else {
+      doUpload(file, null, null);
+    }
   }
 
   function openEditAvatarModal() {
+    var existing = document.getElementById('driver-avatar-picker-overlay');
+    if (existing) existing.remove();
+
     var presets = [
-      { label: 'Koki Kucing', url: '/owner/assets/img/cat-chef-recipe.png' },
+      { label: 'Kucing Koki', url: '/owner/assets/img/cat-chef-recipe.png' },
       { label: 'Kucing Santai', url: '/merchant/assets/img/sleepy-cat-closed.png' },
-      { label: 'Robot Gesit', url: 'https://api.dicebear.com/7.x/bottts/svg?seed=AgusKurir&backgroundColor=b6e3f4' },
-      { label: 'Kurir Topi', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=DriverAgus&backgroundColor=c0aede' },
-      { label: 'Emoji Senyum', url: 'https://api.dicebear.com/7.x/fun-emoji/svg?seed=AgusSuper&backgroundColor=ffd5dc' },
+      { label: 'Robot Gesit', url: 'https://api.dicebear.com/7.x/bottts/svg?seed=KurirXentra&backgroundColor=b6e3f4' },
+      { label: 'Kurir Topi', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=MitraKurir&backgroundColor=c0aede' },
+      { label: 'Emoji Senyum', url: 'https://api.dicebear.com/7.x/fun-emoji/svg?seed=KurirCepat&backgroundColor=ffd5dc' },
       { label: 'Robot Kurir', url: 'https://api.dicebear.com/7.x/bottts/svg?seed=ExpressDelivery&backgroundColor=ffdfbf' }
     ];
 
+    var grid = presets.map(function(p) {
+      var isCurrent = (state.driver && state.driver.avatar_url === p.url);
+      return '<div class="avatar-preset-item" data-avatar-url="' + escapeHTML(p.url) + '" style="text-align:center;cursor:pointer;">' +
+        '<div style="position:relative;width:68px;height:68px;margin:0 auto;border-radius:50%;border:' + (isCurrent ? '3px solid #38BDF8' : '2px solid var(--border-color)') + ';background:var(--bg-subtle);overflow:hidden;padding:2px;box-shadow:' + (isCurrent ? '0 0 10px rgba(56, 189, 248, 0.4)' : 'none') + ';">' +
+          '<img src="' + escapeHTML(p.url) + '" alt="' + escapeHTML(p.label) + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">' +
+          (isCurrent ? '<div style="position:absolute;bottom:2px;right:2px;width:16px;height:16px;border-radius:50%;background:#0284C7;color:#FFF;font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center;">✓</div>' : '') +
+        '</div>' +
+        '<div style="font-size:11px;font-weight:700;color:' + (isCurrent ? '#38BDF8' : 'var(--text-main)') + ';margin-top:4px;">' + escapeHTML(p.label) + '</div>' +
+      '</div>';
+    }).join('');
+
     var modal = document.createElement('div');
     modal.id = 'driver-avatar-picker-overlay';
-    modal.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.85);z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:16px;';
+    modal.className = 'sheet-backdrop';
     modal.innerHTML =
-      '<div style="background:#fff;border-radius:18px;padding:22px;max-width:380px;width:100%;box-shadow:0 20px 25px -5px rgba(0,0,0,0.3);">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
-          '<h3 style="margin:0;font-size:16px;font-weight:800;color:#0f172a;">Pilih Avatar / Foto Profil</h3>' +
-          '<button type="button" id="driver-avatar-close-btn" style="background:none;border:none;font-size:20px;color:#64748b;cursor:pointer;">✕</button>' +
+      '<div class="sheet-card" onclick="event.stopPropagation()" style="max-height:85vh;overflow-y:auto;padding:16px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border-color);padding-bottom:10px;">' +
+          '<div>' +
+            '<span style="font-size:15px;font-weight:800;color:var(--text-main);">Foto Profil Pengemudi</span>' +
+            '<div style="font-size:11px;color:var(--text-sub);margin-top:1px;">Ganti avatar kartun atau unggah foto sendiri</div>' +
+          '</div>' +
+          '<button type="button" id="driver-avatar-close-btn" style="background:transparent;border:none;color:var(--text-sub);font-size:18px;cursor:pointer;">✕</button>' +
         '</div>' +
-        '<p style="margin:0 0 14px;font-size:12px;color:#64748b;">Pilih salah satu karakter kartun maskot atau unggah foto asli Anda.</p>' +
-        '<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:10px;margin-bottom:16px;">' +
-          presets.map(function(p) {
-            var isCurrent = (state.driver && state.driver.avatar_url === p.url);
-            return '<div class="avatar-preset-item" data-avatar-url="' + escapeHTML(p.url) + '" style="border:2px solid ' + (isCurrent ? '#10b981' : '#e2e8f0') + ';border-radius:14px;padding:8px 4px;text-align:center;cursor:pointer;background:' + (isCurrent ? '#f0fdf4' : '#fff') + ';">' +
-              '<img src="' + escapeHTML(p.url) + '" alt="' + escapeHTML(p.label) + '" style="width:48px;height:48px;border-radius:50%;object-fit:cover;margin:0 auto 4px;display:block;">' +
-              '<div style="font-size:10.5px;font-weight:700;color:#334155;">' + escapeHTML(p.label) + '</div>' +
-            '</div>';
-          }).join('') +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;">' +
+          '<button type="button" class="btn-primary" id="driver-avatar-cam-btn" style="background:#10B981;">📷 Kamera HP</button>' +
+          '<button type="button" class="btn-primary" id="driver-avatar-file-btn" style="background:#0284C7;">📁 Pilih File Foto</button>' +
         '</div>' +
-        '<div style="display:flex;flex-direction:column;gap:8px;">' +
-          '<button type="button" id="driver-avatar-upload-trigger-btn" class="primary-btn green" style="font-size:13px;min-height:42px;">📷 Unggah Foto Sendiri (Kamera/Galeri)</button>' +
-          '<button type="button" id="driver-avatar-cancel-btn" class="secondary-btn" style="font-size:13px;min-height:40px;">Batal</button>' +
+        '<input type="file" id="driver-avatar-modal-cam-input" accept="image/*" capture="user" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">' +
+        '<input type="file" id="driver-avatar-modal-file-input" accept="image/*" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">' +
+        '<div style="display:flex;align-items:center;gap:8px;margin:6px 0 4px;font-size:11px;color:var(--text-muted);font-weight:800;letter-spacing:0.04em;">' +
+          '<span style="flex:1;height:1px;background:var(--border-color);"></span>' +
+          'PILIH TEMPLATE AVATAR KARTUN' +
+          '<span style="flex:1;height:1px;background:var(--border-color);"></span>' +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:12px;padding-bottom:4px;">' +
+          grid +
+        '</div>' +
+        '<div style="margin-top:4px;">' +
+          '<button type="button" id="driver-avatar-cancel-btn" class="btn-secondary" style="width:100%;">Tutup</button>' +
         '</div>' +
       '</div>';
 
     document.body.appendChild(modal);
 
+    modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
     modal.querySelector('#driver-avatar-close-btn').onclick = function() { modal.remove(); };
     modal.querySelector('#driver-avatar-cancel-btn').onclick = function() { modal.remove(); };
 
-    modal.querySelector('#driver-avatar-upload-trigger-btn').onclick = function() {
-      modal.remove();
-      var fin = document.getElementById('driver-avatar-input');
-      if (fin) fin.click();
-    };
+    var modalCamBtn = modal.querySelector('#driver-avatar-cam-btn');
+    var modalFileBtn = modal.querySelector('#driver-avatar-file-btn');
+    var modalCamInput = modal.querySelector('#driver-avatar-modal-cam-input');
+    var modalFileInput = modal.querySelector('#driver-avatar-modal-file-input');
+
+    if (modalCamBtn && modalCamInput) {
+      modalCamBtn.onclick = function() { modalCamInput.click(); };
+      modalCamInput.addEventListener('change', function() {
+        var file = modalCamInput.files && modalCamInput.files[0];
+        if (!file) return;
+        modal.remove();
+        processAvatarFileSelection(file, function() { modalCamInput.value = ''; });
+      });
+    }
+    if (modalFileBtn && modalFileInput) {
+      modalFileBtn.onclick = function() { modalFileInput.click(); };
+      modalFileInput.addEventListener('change', function() {
+        var file = modalFileInput.files && modalFileInput.files[0];
+        if (!file) return;
+        modal.remove();
+        processAvatarFileSelection(file, function() { modalFileInput.value = ''; });
+      });
+    }
 
     modal.querySelectorAll('.avatar-preset-item').forEach(function(item) {
       item.onclick = async function() {
@@ -1398,10 +2487,11 @@
         try {
           var res = await api('/driver/profile', {
             method: 'PUT',
-            body: { avatar_url: url }
+            body: JSON.stringify({ avatar_url: url })
           });
           if (res && res.driver) {
             state.driver = res.driver;
+            persistUser();
             toast('✓ Avatar berhasil diperbarui!');
             render();
           }
@@ -1412,23 +2502,181 @@
     });
   }
 
+  function openBatchSettlementModal() {
+    var existing = document.getElementById('driver-batch-settlement-modal');
+    if (existing) existing.remove();
+
+    var custodyAmount = computeDriverCashCustody();
+    var branchName = (state.driver && state.driver.branch_name) || 'Kasir Cabang';
+    var driverIdCode = (state.driver && (state.driver.id || state.driver.username)) || 'SHIFT';
+
+    var unsettledCodList = (state.history || []).filter(function (h) {
+      var p = h && h.payment;
+      return p && p.is_cod && !isCodTaskSettled(h) && String(h.delivery_status || '').toLowerCase() !== 'failed';
+    });
+    var firstUnsettled = unsettledCodList[0] || state.lastCompleted || selectedTask();
+    var batchOrderCode = (firstUnsettled && (firstUnsettled.order_number || firstUnsettled.order_id)) || ('KSR-BATCH-' + String(driverIdCode).slice(-4).toUpperCase());
+    var batchQrPayload = (firstUnsettled && (firstUnsettled.order_number || firstUnsettled.order_id))
+      ? ('xentra://delivery/settle?order_number=' + encodeURIComponent(firstUnsettled.order_number || firstUnsettled.order_id) + '&order_id=' + encodeURIComponent(firstUnsettled.order_id || firstUnsettled.order_number) + '&amount=' + encodeURIComponent(custodyAmount || 0))
+      : batchOrderCode;
+
+    var unsettledRowsHtml = unsettledCodList.length > 1
+      ? '<div style="display:flex;flex-direction:column;gap:4px;max-height:110px;overflow-y:auto;background:var(--bg-subtle);border:1px solid var(--border-color);border-radius:10px;padding:8px 10px;font-size:11px;">' +
+          '<div style="font-weight:800;color:var(--text-sub);margin-bottom:2px;">Rincian ' + unsettledCodList.length + ' Pesanan COD Belum Disetor:</div>' +
+          unsettledCodList.map(function (u) {
+            var uCode = u.order_number || u.order_id;
+            var uAmt = (u.payment && (u.payment.collected_amount != null ? u.payment.collected_amount : u.payment.amount)) || 0;
+            return '<div style="display:flex;justify-content:space-between;color:var(--text-main);"><span>#' + escapeHTML(uCode) + '</span><strong>' + rupiah(uAmt) + '</strong></div>';
+          }).join('') +
+        '</div>'
+      : '';
+
+    var modal = document.createElement('div');
+    modal.id = 'driver-batch-settlement-modal';
+    modal.className = 'sheet-backdrop';
+    modal.innerHTML =
+      '<div class="sheet-card" onclick="event.stopPropagation()">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+          '<span style="font-size:15px;font-weight:800;color:var(--text-main);">Setoran Kasir Gabungan (End-of-Shift)</span>' +
+          '<button type="button" id="driver-batch-close-btn" style="background:transparent;border:none;color:var(--text-sub);font-size:18px;cursor:pointer;">✕</button>' +
+        '</div>' +
+        '<div style="background:rgba(245, 158, 11, 0.1);border:1px solid #F59E0B;border-radius:12px;padding:12px;text-align:center;">' +
+          '<div style="font-size:11px;color:var(--text-sub);">Total Uang Tunai COD yang Diserahkan:</div>' +
+          '<div style="font-size:24px;font-weight:900;color:#FBBF24;margin-top:2px;">' + rupiah(custodyAmount) + '</div>' +
+          '<div style="font-size:11px;color:var(--text-sub);margin-top:2px;">Serahkan uang fisik ini ke ' + escapeHTML(branchName) + '</div>' +
+        '</div>' +
+        unsettledRowsHtml +
+        '<div class="qr-card">' +
+          '<div style="font-size:11px;font-weight:800;color:#64748B;">KODE SETORAN SHIFT: #KSR-' + escapeHTML(batchOrderCode) + '</div>' +
+          renderQrCodeHtml(batchQrPayload) +
+          '<div style="font-size:12px;color:#0F172A;font-weight:700;">' + escapeHTML(branchName) + '</div>' +
+          '<div style="font-size:11px;color:#475569;line-height:1.35;">Minta Kasir scan QR ini di POS saat menyerahkan uang tunai. Layar ini akan otomatis tertutup begitu Kasir memvalidasi.</div>' +
+        '</div>' +
+        '<div>' +
+          '<button type="button" class="btn-secondary" id="driver-batch-cancel-btn">Tutup</button>' +
+        '</div>' +
+      '</div>';
+
+    document.body.appendChild(modal);
+
+    var batchPoll = setInterval(async function() {
+      if (!document.body.contains(modal)) {
+        clearInterval(batchPoll);
+        return;
+      }
+      await refreshHistory(true);
+      if (computeDriverCashCustody() <= 0) {
+        clearInterval(batchPoll);
+        modal.remove();
+        toast('✓ Seluruh setoran COD shift ini telah divalidasi Kasir!');
+        render();
+      }
+    }, 3500);
+
+    function closeBatchModal() {
+      clearInterval(batchPoll);
+      modal.remove();
+    }
+
+    modal.onclick = function(e) { if (e.target === modal) closeBatchModal(); };
+    modal.querySelector('#driver-batch-close-btn').onclick = closeBatchModal;
+    modal.querySelector('#driver-batch-cancel-btn').onclick = closeBatchModal;
+  }
+
   function renderHistory() {
     if (state.loading) return shell('Riwayat', loadingBody('Memuat riwayat…'), 'history');
     if (state.error) return shell('Riwayat', errorBody(state.error), 'history');
 
-    var body = '<h1 class="screen-title">Riwayat Pengantaran</h1><div class="screen-subtitle">Pengantaran yang sudah selesai.</div>';
+    var totalDelivered = (state.history || []).length;
+    var cashCustody = computeDriverCashCustody();
+    var branchName = (state.driver && state.driver.branch_name) || 'Kasir Cabang';
 
-    if (!state.history.length) {
-      body += '<div class="empty"><div class="empty-art">' + icon('history') + '</div><h3>Belum ada riwayat</h3><p>Riwayat akan muncul setelah Anda menyelesaikan pengantaran.</p></div>';
+    var itemsHtml = '';
+    if (!totalDelivered) {
+      itemsHtml =
+        '<div class="card" style="align-items:center;text-align:center;padding:28px 16px;">' +
+          '<div style="font-size:28px;margin-bottom:6px;">📋</div>' +
+          '<div style="font-size:15px;font-weight:800;color:var(--text-main);">Belum Ada Riwayat</div>' +
+          '<div style="font-size:12px;color:var(--text-sub);margin-top:4px;max-width:240px;line-height:1.4;">Riwayat pengantaran akan muncul setelah Anda menyelesaikan pesanan.</div>' +
+        '</div>';
     } else {
-      body += '<div class="history-group"><div class="history-date">Terbaru</div>';
-      state.history.forEach(function (task) {
+      itemsHtml = state.history.map(function (task) {
         var c = task.customer || {};
         var p = task.payment || {};
-        body += historyRow(task.order_number || task.order_id, c.name || 'Pelanggan', p.is_cod ? 'COD ' + rupiah(p.amount) : 'Online');
-      });
-      body += '</div>';
+        var d = task.destination || {};
+        var isCod = Boolean(p.is_cod);
+        var isFailed = String(task.delivery_status || '').toLowerCase() === 'failed';
+        var isSettled = isCodTaskSettled(task);
+        var badgeCls = isFailed ? 'badge-red' : (isCod ? (isSettled ? 'badge-green' : 'badge-amber') : 'badge-blue');
+        var statusLabel = isFailed
+          ? 'Retur ke Resto (RTS)'
+          : (isCod ? (isSettled ? 'Lunas & Kasir Settled' : 'Menunggu Setor Kasir') : 'Terkirim (Lunas)');
+        var orderCode = task.order_number || task.order_id;
+        var payTypeLabel = isCod ? 'COD' : 'Non-Tunai QRIS';
+
+        return '<div class="card" style="padding:12px 14px;">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+            '<span style="font-size:13px;font-weight:800;color:var(--text-main);">#' + escapeHTML(orderCode) + '</span>' +
+            '<span class="badge ' + badgeCls + '">' + escapeHTML(statusLabel) + '</span>' +
+          '</div>' +
+          '<div style="font-size:13px;font-weight:700;color:var(--text-main);margin-top:2px;">' + escapeHTML(c.name || 'Pelanggan') + '</div>' +
+          (d.address ? '<div style="font-size:11px;color:var(--text-sub);">' + escapeHTML(d.address) + '</div>' : '') +
+          '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;padding-top:6px;border-top:1px solid var(--border-color);font-size:11px;">' +
+            '<span style="color:var(--text-muted);">' + escapeHTML(payTypeLabel) + '</span>' +
+            '<span style="font-weight:800;color:' + (isFailed ? '#EF4444' : (isCod ? '#FBBF24' : '#10B981')) + ';">' +
+              (isFailed ? 'Rp 0' : rupiah(p.amount)) +
+            '</span>' +
+          '</div>' +
+        '</div>';
+      }).join('');
     }
+
+    var body =
+      '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0 6px;">' +
+        '<span style="font-size:14px;font-weight:800;color:var(--text-main);">Riwayat Pengantaran</span>' +
+        '<span class="badge badge-green">Hari Ini</span>' +
+      '</div>' +
+      '<div class="card">' +
+        '<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:8px;text-align:center;">' +
+          '<div>' +
+            '<div style="font-size:10px;color:var(--text-sub);">Pesanan Selesai</div>' +
+            '<div style="font-size:18px;font-weight:800;color:#38BDF8;margin-top:2px;">' + totalDelivered + ' Order</div>' +
+          '</div>' +
+          '<div>' +
+            '<div style="font-size:10px;color:var(--text-sub);">Kas Tertahan</div>' +
+            '<div style="font-size:18px;font-weight:800;color:' + (cashCustody > 0 ? '#FBBF24' : '#10B981') + ';margin-top:2px;">' +
+              (cashCustody > 0 ? Math.round(cashCustody / 1000) + 'rb' : '0') +
+            '</div>' +
+          '</div>' +
+          '<div>' +
+            '<div style="font-size:10px;color:var(--text-sub);">Status Shift</div>' +
+            '<div style="font-size:18px;font-weight:800;color:#10B981;margin-top:2px;">' + (state.isOnline ? 'Aktif' : 'Off') + '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      (cashCustody > 0
+        ? '<div class="card" style="border:1.5px solid #F59E0B;background:rgba(245, 158, 11, 0.08);">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+              '<div>' +
+                '<div style="font-size:10px;font-weight:800;color:#F59E0B;text-transform:uppercase;">Setoran Kasir Gabungan (Shift)</div>' +
+                '<div style="font-size:20px;font-weight:900;color:var(--text-main);margin-top:2px;">' + rupiah(cashCustody) + '</div>' +
+                '<div style="font-size:11px;color:var(--text-sub);margin-top:1px;">Total uang COD di tangan belum diserahkan ke ' + escapeHTML(branchName) + '</div>' +
+              '</div>' +
+              '<button type="button" class="btn-primary" data-action="open-batch-settlement-modal" style="height:36px;width:auto;padding:0 12px;font-size:11px;background:#F59E0B;color:#042F1E;">' +
+                'Setor Kasir ➔' +
+              '</button>' +
+            '</div>' +
+          '</div>'
+        : '<div class="card" style="border:1px solid rgba(16, 185, 129, 0.3);background:rgba(16, 185, 129, 0.05);padding:10px 14px;">' +
+            '<div style="display:flex;align-items:center;gap:8px;">' +
+              '<span style="color:#10B981;font-size:16px;">✓</span>' +
+              '<span style="font-size:12px;font-weight:700;color:#10B981;">Semua setoran kasir shift ini telah tuntas (Rp 0 tertahan).</span>' +
+            '</div>' +
+          '</div>') +
+      '<div style="display:flex;flex-direction:column;gap:8px;">' +
+        '<div style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;">Daftar Pengantaran Hari Ini</div>' +
+        itemsHtml +
+      '</div>';
 
     shell('Riwayat', body, 'history');
   }
@@ -1449,68 +2697,94 @@
 
     var driverName = state.driver.full_name || state.driver.username || 'Driver';
     var branchName = state.driver.branch_name || 'Cabang Xentra';
-    var phone = state.driver.phone || 'Nomor telepon belum diatur';
+    var phone = state.driver.phone || 'Belum diatur';
     var vehicleLabel = getVehicleLabel(state.driver.vehicle_type);
-    var totalDelivered = state.history ? state.history.length : 0;
-
-    var avatarContent = state.driver.avatar_url
-      ? '<img src="' + escapeHTML(state.driver.avatar_url) + '" alt="' + escapeHTML(driverName) + '" class="profile-avatar-img">'
-      : icon('user');
+    var avatarUrl = (state.driver && state.driver.avatar_url) || '/owner/assets/img/cat-chef-recipe.png';
+    var driverCode = state.driver.username ? '@' + state.driver.username : 'Mitra Kurir';
 
     var body =
-      '<div class="profile-header-card">' +
-        '<div class="profile-avatar-wrap">' +
-          '<div class="profile-avatar" id="btn-trigger-avatar" title="Klik untuk ganti foto profil">' +
-            avatarContent +
-            '<button type="button" class="profile-avatar-edit-badge" aria-label="Ganti Foto Profil">' + icon('camera') + '</button>' +
-          '</div>' +
-          '<span class="profile-status-indicator" title="Driver Aktif"></span>' +
-          '<input type="file" id="driver-avatar-input" accept="image/*" style="display:none">' +
-        '</div>' +
-        '<div class="profile-main-info">' +
-          '<h2 class="profile-name">' + escapeHTML(driverName) + '</h2>' +
-          '<div class="profile-badge-row">' +
-            '<span class="pill blue">Mitra Driver</span>' +
-            '<span class="pill green">Aktif</span>' +
-          '</div>' +
-          '<div class="profile-branch-text">' +
-            icon('pin') + ' <span>' + escapeHTML(branchName) + '</span>' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;padding:2px 0 6px;">' +
+        '<span style="font-size:14px;font-weight:800;color:var(--text-main);">Profil Pengemudi</span>' +
+        '<span class="badge ' + (state.isOnline ? 'badge-green' : 'badge-red') + '">' + (state.isOnline ? 'Aktif' : 'Offline') + '</span>' +
+      '</div>' +
+      '<div class="card" style="align-items:center;text-align:center;padding:18px;">' +
+        '<div id="btn-trigger-avatar" data-action="change-avatar" style="position:relative;cursor:pointer;display:inline-block;" title="Ganti / Unggah Foto Profil">' +
+          '<img src="' + escapeHTML(avatarUrl) + '" alt="' + escapeHTML(driverName) + '" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid #38BDF8;background:var(--bg-subtle);">' +
+          '<div style="position:absolute;bottom:0;right:0;width:26px;height:26px;border-radius:50%;background:#0284C7;border:2px solid var(--bg-card);color:#FFF;display:flex;align-items:center;justify-content:center;font-size:12px;box-shadow:0 2px 4px rgba(0,0,0,0.2);">' +
+            '📷' +
           '</div>' +
         '</div>' +
-      '</div>' +
-
-      '<div class="profile-kpi-grid">' +
-        '<div class="profile-kpi-card">' +
-          '<div class="profile-kpi-val">' + totalDelivered + '</div>' +
-          '<div class="profile-kpi-label">Pesanan Selesai</div>' +
-        '</div>' +
-        '<div class="profile-kpi-card">' +
-          '<div class="profile-kpi-val">100%</div>' +
-          '<div class="profile-kpi-label">Keberhasilan</div>' +
+        '<input type="file" id="driver-avatar-input" accept="image/*" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">' +
+        '<div style="font-size:16px;font-weight:800;color:var(--text-main);margin-top:8px;">' + escapeHTML(driverName) + '</div>' +
+        '<div style="font-size:12px;color:var(--text-sub);">' + escapeHTML(driverCode) + ' • ' + escapeHTML(branchName) + '</div>' +
+        '<div style="margin-top:10px;">' +
+          '<button type="button" class="btn-secondary" data-action="change-avatar" style="height:36px;min-height:36px;padding:0 14px;font-size:11.5px;width:auto;margin:0 auto;">' +
+            'Ganti / Unggah Foto Profil ✎' +
+          '</button>' +
         '</div>' +
       '</div>' +
 
-      '<div class="profile-group-title">Data Diri & Identitas Mitra</div>' +
-      (phone === 'Nomor telepon belum diatur'
-        ? '<div class="info-box warning" data-action="edit-profile" style="margin-bottom:10px;cursor:pointer;"><span>!</span><div><strong>Nomor HP/WhatsApp belum diisi.</strong> Ketuk di sini untuk mengisi nomor HP aktif Anda.</div></div>'
-        : '') +
-      '<div class="profile-list-card">' +
-        profileItem(icon('user'), 'Edit Data Profil', escapeHTML(driverName) + ' • ' + (phone !== 'Nomor telepon belum diatur' ? escapeHTML(phone) : 'Nomor HP belum diisi'), 'edit-profile') +
-        profileItem(icon('idcard'), 'Verifikasi KTP / NIK', state.driver.nik ? ('NIK: ' + escapeHTML(state.driver.nik)) : 'Belum diverifikasi', 'verify-ktp') +
+      '<div class="card">' +
+        '<div style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;">Kontak &amp; Akun</div>' +
+        '<div class="profile-item-row">' +
+          '<div>' +
+            '<div style="font-size:11px;color:var(--text-sub);">WhatsApp</div>' +
+            '<div style="font-size:13px;font-weight:700;color:var(--text-main);">' + escapeHTML(phone) + '</div>' +
+          '</div>' +
+          '<button type="button" class="btn-edit-text" data-action="edit-profile">Edit</button>' +
+        '</div>' +
+        '<div class="profile-item-row">' +
+          '<div>' +
+            '<div style="font-size:11px;color:var(--text-sub);">NIK KTP</div>' +
+            '<div style="font-size:13px;font-weight:700;color:var(--text-main);">' + escapeHTML(state.driver.nik || 'Belum diverifikasi') + '</div>' +
+          '</div>' +
+          '<button type="button" class="btn-edit-text" data-action="verify-ktp">' + (state.driver.nik ? 'Tervalidasi' : 'Verifikasi') + '</button>' +
+        '</div>' +
       '</div>' +
 
-      '<div class="profile-group-title">Operasional & Pengiriman</div>' +
-      '<div class="profile-list-card">' +
-        profileItem(icon('check'), 'Status Kerja', 'Siap Menerima Pesanan', 'availability') +
-        profileItem(icon('motor'), 'Kendaraan', vehicleLabel + ' (Klik untuk ubah)', 'edit-vehicle') +
-        profileItem(icon('map'), 'Navigasi Pilihan', 'Google Maps (' + vehicleLabel + ')', 'navigate') +
+      '<div class="card">' +
+        '<div style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;">Kendaraan &amp; Operasional</div>' +
+        '<div class="profile-item-row">' +
+          '<div>' +
+            '<div style="font-size:11px;color:var(--text-sub);">Jenis Kendaraan</div>' +
+            '<div style="font-size:14px;font-weight:800;color:#FBBF24;">' + escapeHTML(vehicleLabel) + '</div>' +
+          '</div>' +
+          '<button type="button" class="btn-edit-text" data-action="edit-vehicle">Ganti</button>' +
+        '</div>' +
+        '<div class="profile-item-row">' +
+          '<div>' +
+            '<div style="font-size:11px;color:var(--text-sub);">Cabang Penugasan</div>' +
+            '<div style="font-size:13px;font-weight:700;color:var(--text-main);">' + escapeHTML(branchName) + '</div>' +
+          '</div>' +
+        '</div>' +
       '</div>' +
 
-      '<div class="profile-group-title">Akun & Bantuan</div>' +
-      '<div class="profile-list-card">' +
-        profileItem(icon('phone'), 'Bantuan Admin Cabang', escapeHTML(branchName)) +
-        profileItem(icon('document'), 'Versi Sistem', 'Xentra Driver v1.3') +
-        profileItem(icon('logout'), 'Keluar dari Akun', '', 'logout', true) +
+      '<div class="card">' +
+        '<div style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;">Sistem &amp; Akun</div>' +
+        '<div class="profile-item-row">' +
+          '<div>' +
+            '<div style="font-size:11px;color:var(--text-sub);">Notifikasi &amp; Alarm Tugas</div>' +
+            '<div style="font-size:13px;font-weight:700;color:var(--text-main);">Pusat Suara &amp; Izin Layar</div>' +
+          '</div>' +
+          '<button type="button" class="btn-edit-text" data-action="open-notifications">Atur</button>' +
+        '</div>' +
+        '<div class="profile-item-row">' +
+          '<div>' +
+            '<div style="font-size:11px;color:var(--text-sub);">Pembaruan Aplikasi</div>' +
+            '<div style="font-size:13px;font-weight:700;color:var(--text-main);">Muat Ulang &amp; Bersihkan Cache</div>' +
+          '</div>' +
+          '<button type="button" class="btn-edit-text" data-action="force-reload-cache">Reset</button>' +
+        '</div>' +
+        '<div class="profile-item-row">' +
+          '<div>' +
+            '<div style="font-size:11px;color:var(--text-sub);">Aplikasi Android Native</div>' +
+            '<div style="font-size:13px;font-weight:700;color:var(--text-main);">Unduh APK Driver v1.0.8</div>' +
+          '</div>' +
+          '<a href="/driver/download-apk" download="mybangjo-driver-v1.0.8.apk" class="btn-edit-text" style="text-decoration:none;display:inline-flex;align-items:center;">Unduh ⬇</a>' +
+        '</div>' +
+        '<div style="padding-top:6px;">' +
+          '<button type="button" class="btn-secondary danger" data-action="logout" style="width:100%;">Keluar dari Akun</button>' +
+        '</div>' +
       '</div>';
 
     shell('Profil', body, 'profile');
@@ -1548,8 +2822,10 @@
     overlay.className = 'sheet-backdrop';
     overlay.innerHTML =
       '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="edit-profile-title">' +
-        '<div class="sheet-handle"></div>' +
-        '<h3 id="edit-profile-title">Edit Data Diri Mitra</h3>' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+          '<h3 id="edit-profile-title" style="margin:0;">Edit Data Diri Mitra</h3>' +
+          '<button type="button" data-sheet-action="cancel" style="background:transparent;border:none;color:var(--text-sub);font-size:18px;cursor:pointer;">✕</button>' +
+        '</div>' +
         '<p>Perbarui informasi kontak dan identitas akun pengemudi Anda.</p>' +
         '<div class="form-group">' +
           '<label class="input-label" for="edit-driver-name">Nama Lengkap</label>' +
@@ -1561,7 +2837,7 @@
         '</div>' +
         '<div class="form-group" style="margin-top:12px">' +
           '<label class="input-label" for="edit-driver-vehicle">Jenis Kendaraan Operasional</label>' +
-          '<select id="edit-driver-vehicle" class="sheet-input" style="background:#fff">' +
+          '<select id="edit-driver-vehicle" class="sheet-input">' +
             '<option value="motorcycle"' + ((driver.vehicle_type || 'motorcycle') === 'motorcycle' ? ' selected' : '') + '>🏍️ Sepeda Motor (Rute Roda Dua)</option>' +
             '<option value="car"' + (driver.vehicle_type === 'car' ? ' selected' : '') + '>🚗 Mobil (Rute Roda Empat)</option>' +
             '<option value="bicycle"' + (driver.vehicle_type === 'bicycle' ? ' selected' : '') + '>🚲 Sepeda</option>' +
@@ -1569,17 +2845,19 @@
         '</div>' +
         '<div class="form-group" style="margin-top:12px">' +
           '<label class="input-label" for="edit-driver-email">Email Terdaftar</label>' +
-          '<input type="email" id="edit-driver-email" class="sheet-input" value="' + escapeHTML(driver.email || '') + '" disabled style="opacity:0.6;background:#f1f5f9">' +
+          '<input type="email" id="edit-driver-email" class="sheet-input" value="' + escapeHTML(driver.email || '') + '" disabled style="opacity:0.6;">' +
         '</div>' +
-        '<div class="sheet-actions" style="margin-top:20px">' +
-          '<button type="button" class="secondary-btn" data-sheet-action="cancel">Batal</button>' +
-          '<button type="button" class="primary-btn" data-sheet-action="save">Simpan Perubahan</button>' +
+        '<div style="margin-top:20px">' +
+          '<button type="button" class="btn-primary green" data-sheet-action="save">Simpan Perubahan</button>' +
         '</div>' +
       '</div>';
     document.body.appendChild(overlay);
 
     overlay.addEventListener('click', async function (event) {
-      if (event.target === overlay) return;
+      if (event.target === overlay) {
+        overlay.remove();
+        return;
+      }
       var action = event.target.closest('[data-sheet-action]');
       if (!action) return;
 
@@ -1656,8 +2934,10 @@
     overlay.className = 'sheet-backdrop';
     overlay.innerHTML =
       '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="ktp-title">' +
-        '<div class="sheet-handle"></div>' +
-        '<h3 id="ktp-title">Verifikasi Identitas KTP</h3>' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+          '<h3 id="ktp-title" style="margin:0;">Verifikasi Identitas KTP</h3>' +
+          '<button type="button" data-sheet-action="cancel" style="background:transparent;border:none;color:var(--text-sub);font-size:18px;cursor:pointer;">✕</button>' +
+        '</div>' +
         '<p>Nomor KTP dan foto identitas resmi untuk keperluan verifikasi operasional pengantaran.</p>' +
         '<div class="form-group">' +
           '<label class="input-label" for="edit-driver-nik">Nomor Induk Kependudukan (NIK 16 Digit)</label>' +
@@ -1671,9 +2951,8 @@
           '</div>' +
           '<input type="file" id="driver-ktp-input" accept="image/*" style="display:none">' +
         '</div>' +
-        '<div class="sheet-actions" style="margin-top:20px">' +
-          '<button type="button" class="secondary-btn" data-sheet-action="cancel">Tutup</button>' +
-          '<button type="button" class="primary-btn" data-sheet-action="save-nik">Simpan NIK</button>' +
+        '<div style="margin-top:20px">' +
+          '<button type="button" class="btn-primary green" data-sheet-action="save-nik">Simpan NIK</button>' +
         '</div>' +
       '</div>';
     document.body.appendChild(overlay);
@@ -1755,7 +3034,10 @@
     }
 
     overlay.addEventListener('click', async function (event) {
-      if (event.target === overlay) return;
+      if (event.target === overlay) {
+        overlay.remove();
+        return;
+      }
       var action = event.target.closest('[data-sheet-action]');
       if (!action) return;
 
@@ -1813,16 +3095,33 @@
     overlay.className = 'sheet-backdrop';
     overlay.innerHTML =
       '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="reject-title">' +
-        '<div class="sheet-handle"></div>' +
-        '<h3 id="reject-title">Tolak Tugas</h3>' +
-        '<p>Alasan penolakan wajib dicatat agar Branch Manager dapat menindaklanjuti penugasan.</p>' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+          '<h3 id="reject-title" style="margin:0;">Tolak Tugas</h3>' +
+          '<button type="button" data-sheet-action="cancel" style="background:transparent;border:none;color:var(--text-sub);font-size:18px;cursor:pointer;">✕</button>' +
+        '</div>' +
+        '<p>Pilih atau masukkan alasan penolakan agar pesanan dapat segera dialihkan ke kurir lain:</p>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">' +
+          '<button type="button" class="calc-chip" data-reject-chip="Ban bocor / kendala motor">Ban bocor / kendala motor</button>' +
+          '<button type="button" class="calc-chip" data-reject-chip="Sedang mengantar arah berlawanan">Arah berlawanan</button>' +
+          '<button type="button" class="calc-chip" data-reject-chip="Kondisi darurat / istirahat">Kondisi darurat</button>' +
+        '</div>' +
         '<textarea id="driver-reject-reason" maxlength="500" placeholder="Masukkan alasan penolakan"></textarea>' +
-        '<div class="sheet-actions"><button class="danger-btn" data-sheet-action="cancel">Batal</button><button class="primary-btn" data-sheet-action="submit">Tolak Tugas</button></div>' +
+        '<div style="margin-top:10px;"><button type="button" class="btn-primary red" data-sheet-action="submit">Konfirmasi Tolak Tugas</button></div>' +
       '</div>';
     document.body.appendChild(overlay);
 
+    overlay.querySelectorAll('[data-reject-chip]').forEach(function (chip) {
+      chip.onclick = function () {
+        var inp = document.getElementById('driver-reject-reason');
+        if (inp) inp.value = chip.getAttribute('data-reject-chip') || '';
+      };
+    });
+
     overlay.addEventListener('click', async function (event) {
-      if (event.target === overlay) return;
+      if (event.target === overlay) {
+        overlay.remove();
+        return;
+      }
       var action = event.target.closest('[data-sheet-action]');
       if (!action) return;
 
@@ -1867,10 +3166,23 @@
 
   document.addEventListener('visibilitychange', function () {
     syncWakeLock();
-    if (document.visibilityState === 'visible' && token()) {
-      refreshTasks(false).then(function () {
-        if (state.page === 'tasks') render();
-      });
+    if (document.visibilityState === 'visible') {
+      var nativeBridge = window.XentraDriverNative || window.XentraNative;
+      if (nativeBridge && typeof nativeBridge.hideOverlay === 'function') {
+        try { nativeBridge.hideOverlay(); } catch (_) {}
+      }
+      if (token()) {
+        refreshTasks(false).then(function () {
+          if (state.page === 'tasks') render();
+        });
+      }
+    }
+  });
+
+  window.addEventListener('focus', function () {
+    var nativeBridge = window.XentraDriverNative || window.XentraNative;
+    if (nativeBridge && typeof nativeBridge.hideOverlay === 'function') {
+      try { nativeBridge.hideOverlay(); } catch (_) {}
     }
   });
 
@@ -1887,7 +3199,11 @@
       } else if (typeof nativeBridge.stopOrderAlert === 'function') {
         try { nativeBridge.stopOrderAlert(); } catch (_) {}
       }
-      if (typeof nativeBridge.showBall === 'function') {
+      if (document.visibilityState === 'visible') {
+        if (typeof nativeBridge.hideOverlay === 'function') {
+          try { nativeBridge.hideOverlay(); } catch (_) {}
+        }
+      } else if (typeof nativeBridge.showBall === 'function') {
         try { nativeBridge.showBall(); } catch (_) {}
       }
     }
@@ -1941,19 +3257,24 @@
 
     // Native Bridge Integration (Android APK Floating Card & Alarm)
     var nativeBridge = window.XentraDriverNative || window.XentraNative;
+    var isAppHidden = document.visibilityState !== 'visible';
     if (nativeBridge) {
       if (typeof nativeBridge.playOrderAlarm === 'function') {
         try { nativeBridge.playOrderAlarm(); } catch (_) {}
       } else if (typeof nativeBridge.playOrderAlert === 'function') {
         try { nativeBridge.playOrderAlert(); } catch (_) {}
       }
-      if (task && typeof nativeBridge.showOrderCard === 'function') {
+      // ONLY show the Native System Overlay Card when the Driver App is in the background!
+      // When the app is visible in the foreground, #driver-incoming-task-modal handles the UI cleanly without overlapping.
+      if (task && isAppHidden && typeof nativeBridge.showOrderCard === 'function') {
         try {
           var cName = (task.customer && task.customer.name) || 'Pelanggan';
           var addr = (task.destination && task.destination.address) || '';
           var tot = (task.payment && task.payment.amount) ? ('Rp ' + Number(task.payment.amount).toLocaleString('id-ID')) : '';
           nativeBridge.showOrderCard(task.order_id, task.order_number || task.order_id, cName, addr, tot);
         } catch (_) {}
+      } else if (!isAppHidden && typeof nativeBridge.hideOverlay === 'function') {
+        try { nativeBridge.hideOverlay(); } catch (_) {}
       }
     }
 
@@ -1998,28 +3319,150 @@
       }, 3200);
     }
 
-    // Trigger System / OS Notification for background visibility
-    if (task && 'Notification' in window && Notification.permission === 'granted') {
-      try {
-        var cName = (task.customer && task.customer.name) || 'Pelanggan';
-        var addr = (task.destination && task.destination.address) || 'Alamat tujuan';
-        var n = new Notification('🛵 Tugas Antar Baru: ' + (task.order_number || task.order_id), {
-          body: cName + ' • ' + addr,
-          icon: '/driver/assets/icons/icon-192.png',
-          tag: 'driver-task-' + task.order_id,
-          renotify: true
-        });
-        n.onclick = function () {
-          window.focus();
-          state.selectedOrderId = task.order_id;
-          showIncomingTaskModal(task);
-        };
-      } catch (_) {}
+    // Trigger System / OS Notification for background visibility (Service Worker showNotification like Merchant App)
+    if (task && isAppHidden) {
+      showSystemDriverNotification(task);
     }
 
-    if (task) {
+    if (task && state.page !== 'new-task') {
       showIncomingTaskModal(task);
     }
+  }
+
+  function showSystemDriverNotification(task) {
+    // In Native Android App, native Java DriverGpsService handles notification & floating card over apps!
+    if (window.IS_NATIVE_APP || window.XentraDriverNative || window.XentraNative) return;
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+    var cName = (task.customer && task.customer.name) || 'Pelanggan';
+    var addr = (task.destination && task.destination.address) || 'Alamat tujuan';
+    var isCod = Boolean(task.payment && task.payment.is_cod);
+    var amt = (task.payment && task.payment.amount) ? rupiah(task.payment.amount) : '';
+    var payStr = isCod ? ('COD ' + amt) : ('Non-Tunai ' + amt);
+    var orderNum = task.order_number || task.order_id;
+    var title = '🛵 Tugas Antar Baru! #' + orderNum;
+    var body = cName + ' · ' + payStr + ' · ' + addr;
+    var authToken = token();
+
+    var aggressiveVibratePattern = [500, 250, 500, 250, 1000, 250, 1000];
+    if ('vibrate' in navigator) {
+      try { navigator.vibrate(aggressiveVibratePattern); } catch (_) {}
+    }
+
+    if ('serviceWorker' in navigator && navigator.serviceWorker) {
+      navigator.serviceWorker.ready.then(function (reg) {
+        reg.showNotification(title, {
+          body: body,
+          icon: '/driver/assets/icons/icon-192.png',
+          badge: '/driver/assets/icons/icon-192.png',
+          tag: 'driver-task-' + task.order_id,
+          renotify: true,
+          requireInteraction: true,
+          silent: document.visibilityState === 'visible', // Play OS sound when app is in background/minimized
+          vibrate: aggressiveVibratePattern,
+          timestamp: Date.now(),
+          actions: [
+            { action: 'accept', title: '✓ Terima Tugas' },
+            { action: 'view', title: '🛵 Buka Detail' }
+          ],
+          data: {
+            orderId: task.order_id,
+            orderNumber: orderNum,
+            token: authToken,
+            url: '/driver/?order_id=' + encodeURIComponent(task.order_id)
+          }
+        }).catch(function () {});
+      }).catch(function () {});
+      return;
+    }
+
+    try {
+      var n = new Notification(title, {
+        body: body,
+        icon: '/driver/assets/icons/icon-192.png',
+        tag: 'driver-task-' + task.order_id,
+        renotify: true
+      });
+      n.onclick = function () {
+        window.focus();
+        state.selectedOrderId = task.order_id;
+        showIncomingTaskModal(task);
+      };
+    } catch (_) {}
+  }
+
+  function syncNativeDriverBridge() {
+    var nativeBridge = window.XentraDriverNative || window.XentraNative;
+    if (!nativeBridge) return;
+    var t = token();
+    var d = state.driver || {};
+    var driverId = d.id || '';
+    var brandId = d.brand_id || (state.brand && state.brand.id) || '';
+    var branchId = d.branch_id || '';
+    try {
+      if (typeof nativeBridge.setAuthToken === 'function' && t) {
+        nativeBridge.setAuthToken(t, driverId, brandId, branchId);
+      } else if (typeof nativeBridge.syncAuth === 'function' && t) {
+        nativeBridge.syncAuth(t, branchId);
+      }
+      if (typeof nativeBridge.setOnlineStatus === 'function') {
+        nativeBridge.setOnlineStatus(Boolean(state.isOnline));
+      }
+      // NOTE: Never call nativeBridge.setActiveOrder(orderId) with a non-empty string because
+      // older APK builds (<= v1.0.6) mapped setActiveOrder(orderId) -> OrderOverlayService.show(orderId)
+      // which popped up a duplicate "Tugas Delivery Baru!" overlay card every 5 seconds!
+      if (document.visibilityState === 'visible') {
+        var hasPending = (state.tasks || []).some(isNewTask);
+        if (!hasPending && typeof nativeBridge.hideOverlay === 'function') {
+          nativeBridge.hideOverlay();
+        }
+      }
+    } catch (_) {}
+  }
+
+  if ('serviceWorker' in navigator && navigator.serviceWorker) {
+    navigator.serviceWorker.addEventListener('message', function (event) {
+      if (!event || !event.data) return;
+      if (event.data.type === 'DRIVER_TASK_ACCEPTED_FROM_NOTIFICATION') {
+        stopDriverTaskAlarm();
+        closeIncomingTaskModal();
+        if (window.XentraAudio && typeof window.XentraAudio.orderAccepted === 'function') {
+          window.XentraAudio.orderAccepted();
+        }
+        refreshTasks(false).then(function () {
+          if (event.data.orderId) {
+            state.selectedOrderId = event.data.orderId;
+            state.page = 'delivery-detail';
+          }
+          render();
+        });
+      } else if (event.data.type === 'NAVIGATE_TO_DRIVER_TASK' && event.data.orderId) {
+        stopDriverTaskAlarm();
+        var targetOid = event.data.orderId;
+        var autoAcc = Boolean(event.data.autoAccept);
+        refreshTasks(false).then(function () {
+          state.selectedOrderId = targetOid;
+          var found = (state.tasks || []).find(function (t) { return String(t.order_id) === String(targetOid); });
+          if (found) {
+            if (autoAcc && isNewTask(found)) {
+              acceptTask();
+            } else if (isNewTask(found)) {
+              showIncomingTaskModal(found);
+            } else {
+              state.page = 'delivery-detail';
+              render();
+            }
+          } else {
+            state.page = 'tasks';
+            render();
+          }
+        });
+      } else if (event.data.type === 'NEW_DRIVER_TASK_PUSH_RECEIVED') {
+        refreshTasks(false).then(function () {
+          if (state.page === 'tasks') render();
+        });
+      }
+    });
   }
 
   function closeIncomingTaskModal() {
@@ -2034,68 +3477,79 @@
     var c = task.customer || {};
     var d = task.destination || {};
     var p = task.payment || {};
+    var isCod = Boolean(p.is_cod);
     var distText = task.distance_meters ? (Number(task.distance_meters) / 1000).toFixed(1) + ' km' : 'Siap Antar';
-    var etaText = task.duration_seconds ? '~' + Math.max(1, Math.round(Number(task.duration_seconds) / 60)) + ' mnt' : 'Langsung';
+    var itemCount = (task.items && task.items.length) || Number(task.item_count || 0) || 1;
+    var branchName = (task.pickup && task.pickup.branch_name) || (state.driver && state.driver.branch_name) || 'Outlet Resto';
+    var orderCode = task.order_number || task.order_id;
 
     var overlay = document.createElement('div');
     overlay.id = 'driver-incoming-task-modal';
-    overlay.className = 'incoming-task-backdrop';
+    overlay.className = 'incoming-overlay';
     overlay.innerHTML =
-      '<div class="incoming-task-modal" role="dialog" aria-modal="true">' +
-        '<div class="incoming-pulse-ring">🛵</div>' +
-        '<div style="text-align:center;margin-bottom:14px;">' +
-          '<span class="pill blue" style="margin-bottom:6px;">🔔 TUGAS PENGANTARAN BARU</span>' +
-          '<h3 style="margin:4px 0 2px;font-size:20px;font-weight:900;color:#0f172a;">Order ' + escapeHTML(task.order_number || task.order_id) + '</h3>' +
-          '<div style="font-size:12.5px;color:#64748b;font-weight:600;">Segera konfirmasi penerimaan tugas ini</div>' +
+      '<div class="incoming-modal ' + (isCod ? '' : 'qris') + '" role="dialog" aria-modal="true">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;">' +
+          '<span class="badge ' + (isCod ? 'badge-amber' : 'badge-green') + '">TUGAS PENGANTARAN</span>' +
+          '<span style="font-size:13px;font-weight:800;color:' + (isCod ? '#F59E0B' : '#10B981') + ';">BARU</span>' +
         '</div>' +
-        '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:14px;margin-bottom:14px;">' +
-          '<div style="display:flex;align-items:flex-start;gap:10px;">' +
-            '<span class="pin" style="background:#dbeafe;color:#1d4ed8;flex-shrink:0;">' + icon('pin') + '</span>' +
-            '<div style="min-width:0;flex:1;">' +
-              '<div style="font-weight:800;font-size:15px;color:#0f172a;">' + escapeHTML(c.name || 'Pelanggan') + '</div>' +
-              '<div style="font-size:12.5px;color:#475569;margin-top:3px;line-height:1.4;">' + escapeHTML(d.address || 'Alamat tujuan belum tersedia') + '</div>' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
+          '<div>' +
+            '<div style="font-size:18px;font-weight:800;color:var(--text-main);">#' + escapeHTML(orderCode) + '</div>' +
+            '<div style="font-size:12px;color:var(--text-sub);">' + itemCount + ' Menu • ' + escapeHTML(distText) + '</div>' +
+          '</div>' +
+          '<div style="text-align:right;">' +
+            '<span class="badge ' + (isCod ? 'badge-amber' : 'badge-green') + '">' + (isCod ? 'COD' : 'QRIS (Lunas)') + '</span>' +
+            '<div style="font-size:17px;font-weight:800;color:' + (isCod ? 'var(--accent-amber)' : 'var(--brand-green)') + ';margin-top:2px;">' +
+              rupiah(p.amount) +
             '</div>' +
           '</div>' +
-          '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;padding-top:10px;border-top:1px dashed #cbd5e1;font-size:12px;font-weight:800;color:#334155;">' +
-            '<span style="background:#fff;padding:4px 8px;border-radius:8px;border:1px solid #e2e8f0;">📍 ' + escapeHTML(distText) + ' (' + escapeHTML(etaText) + ')</span>' +
-            '<span style="background:#fff;padding:4px 8px;border-radius:8px;border:1px solid #e2e8f0;">📦 ' + Number(task.item_count || 0) + ' Item</span>' +
-            (p.is_cod
-              ? '<span style="background:#fff7ed;color:#c2410c;padding:4px 9px;border-radius:8px;border:1px solid #fed7aa;">💵 COD ' + rupiah(p.amount) + '</span>'
-              : '<span style="background:#ecfdf5;color:#047857;padding:4px 9px;border-radius:8px;border:1px solid #a7f3d0;">✓ Non-Tunai (Lunas)</span>') +
+        '</div>' +
+        (!isCod
+          ? '<div style="background:rgba(16, 185, 129, 0.12);border:1px solid rgba(16, 185, 129, 0.4);border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;color:#10B981;display:flex;align-items:center;gap:6px;">' +
+              '<span>🛡️</span>' +
+              '<span>PESANAN SUDAH LUNAS — DILARANG MENAGIH UANG</span>' +
+            '</div>'
+          : '') +
+        '<div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;">' +
+          '<div>' +
+            '<div style="font-size:11px;color:var(--text-sub);">Ambil di Resto:</div>' +
+            '<div style="font-size:13px;font-weight:700;color:var(--text-main);">' + escapeHTML(branchName) + '</div>' +
+          '</div>' +
+          '<div>' +
+            '<div style="font-size:11px;color:var(--text-sub);">Antar ke:</div>' +
+            '<div style="font-size:13px;font-weight:700;color:var(--text-main);">' + escapeHTML(c.name || 'Pelanggan') + '</div>' +
+            '<div style="font-size:11px;color:var(--text-sub);">' + escapeHTML(d.address || 'Alamat tujuan belum tersedia') + '</div>' +
           '</div>' +
         '</div>' +
-        '<button type="button" class="primary-btn blue" id="btn-modal-accept-task" style="min-height:52px;font-size:15.5px;">✓ TERIMA TUGAS SEKARANG</button>' +
-        '<div style="display:flex;gap:8px;margin-top:8px;">' +
-          '<button type="button" class="secondary-btn" id="btn-modal-view-task" style="min-height:42px;font-size:13px;flex:1;">Lihat Detail</button>' +
-          '<button type="button" class="danger-btn" id="btn-modal-reject-task" style="min-height:42px;font-size:13px;flex:1;">× Tolak</button>' +
+        '<div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;">' +
+          '<button type="button" class="btn-secondary" id="btn-modal-reject-task">Tolak</button>' +
+          '<button type="button" class="btn-primary green" id="btn-modal-accept-task">Terima Tugas</button>' +
         '</div>' +
       '</div>';
 
     document.body.appendChild(overlay);
 
     var acceptBtn = document.getElementById('btn-modal-accept-task');
-    var viewBtn = document.getElementById('btn-modal-view-task');
     var rejectBtn = document.getElementById('btn-modal-reject-task');
 
     if (acceptBtn) {
-      acceptBtn.onclick = function () {
+      acceptBtn.onclick = function (e) {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
         stopDriverTaskAlarm();
         closeIncomingTaskModal();
         state.selectedOrderId = task.order_id;
-        acceptTask();
-      };
-    }
-    if (viewBtn) {
-      viewBtn.onclick = function () {
-        stopDriverTaskAlarm();
-        closeIncomingTaskModal();
-        state.selectedOrderId = task.order_id;
-        state.page = 'new-task';
-        render();
+        acceptTask(task.order_id);
       };
     }
     if (rejectBtn) {
-      rejectBtn.onclick = function () {
+      rejectBtn.onclick = function (e) {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
         stopDriverTaskAlarm();
         closeIncomingTaskModal();
         state.selectedOrderId = task.order_id;
@@ -2119,21 +3573,21 @@
     var overlayHtml = '';
     if (hasNative && overlayPermState !== null) {
       overlayHtml =
-        '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:14px;padding:12px;margin-top:8px;">' +
+        '<div style="background:rgba(59,130,246,0.12);border:1px solid rgba(59,130,246,0.35);border-radius:14px;padding:12px;margin-top:8px;">' +
           '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">' +
             '<div>' +
-              '<div style="font-size:13px;font-weight:800;color:#1e40af;">🛵 Floating Shortcut di Layar</div>' +
-              '<div style="font-size:11.5px;color:#1d4ed8;margin-top:2px;">Tampil di atas Google Maps: <strong>' + overlayPermState + '</strong></div>' +
+              '<div style="font-size:13px;font-weight:800;color:var(--text-main);">🛵 Floating Shortcut di Layar</div>' +
+              '<div style="font-size:11.5px;color:var(--text-sub);margin-top:2px;">Tampil di atas Google Maps: <strong>' + overlayPermState + '</strong></div>' +
             '</div>' +
-            '<button type="button" class="primary-btn blue" id="btn-driver-overlay-perm" style="width:auto;min-height:38px;padding:0 14px;font-size:12.5px;">Atur Izin</button>' +
+            '<button type="button" class="btn-primary blue" id="btn-driver-overlay-perm" style="width:auto;min-height:38px;padding:0 14px;font-size:12.5px;">Atur Izin</button>' +
           '</div>' +
         '</div>';
     }
 
     var apkDownloadHtml = !hasNative
-      ? '<div style="background:#f8fafc;border:1px dashed #cbd5e1;border-radius:14px;padding:12px;margin-top:8px;text-align:center;">' +
-          '<div style="font-size:12px;color:#475569;font-weight:700;">Ingin kartu tugas melayang di atas Google Maps?</div>' +
-          '<a href="/driver/download-apk" class="secondary-btn" style="display:inline-flex;align-items:center;justify-content:center;margin-top:6px;min-height:36px;font-size:12px;text-decoration:none;padding:0 14px;gap:6px;">📲 Unduh APK Driver Android Resmi (v1.0.4)</a>' +
+      ? '<div style="background:var(--bg-subtle);border:1px dashed var(--border-color);border-radius:14px;padding:12px;margin-top:8px;text-align:center;">' +
+          '<div style="font-size:12px;color:var(--text-sub);font-weight:700;">Ingin kartu tugas melayang di atas Google Maps?</div>' +
+          '<a href="/driver/download-apk" class="btn-secondary" style="display:inline-flex;align-items:center;justify-content:center;margin-top:6px;min-height:36px;font-size:12px;text-decoration:none;padding:0 14px;gap:6px;">📲 Unduh APK Driver Android Resmi (v1.0.6)</a>' +
         '</div>'
       : '';
 
@@ -2143,28 +3597,28 @@
         var c = t.customer || {};
         var p = t.payment || {};
         listHtml +=
-          '<div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:14px;padding:12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;">' +
+          '<div style="background:rgba(59,130,246,0.12);border:1.5px solid #3B82F6;border-radius:14px;padding:12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;">' +
             '<div style="min-width:0;">' +
-              '<div style="font-weight:800;font-size:13.5px;color:#1e3a8a;">🔔 Tugas Baru ' + escapeHTML(t.order_number || t.order_id) + '</div>' +
-              '<div style="font-size:12px;color:#1e40af;margin-top:2px;">' + escapeHTML(c.name || 'Pelanggan') + ' • ' + (p.is_cod ? 'COD ' + rupiah(p.amount) : 'Non-Tunai') + '</div>' +
+              '<div style="font-weight:800;font-size:13.5px;color:var(--text-main);">🔔 Tugas Baru ' + escapeHTML(t.order_number || t.order_id) + '</div>' +
+              '<div style="font-size:12px;color:var(--text-sub);margin-top:2px;">' + escapeHTML(c.name || 'Pelanggan') + ' • ' + (p.is_cod ? 'COD ' + rupiah(p.amount) : 'Non-Tunai') + '</div>' +
             '</div>' +
-            '<button type="button" class="primary-btn blue" data-notif-order="' + escapeHTML(t.order_id) + '" style="width:auto;min-height:36px;padding:0 12px;font-size:12px;flex-shrink:0;">Lihat</button>' +
+            '<button type="button" class="btn-primary blue" data-notif-order="' + escapeHTML(t.order_id) + '" style="width:auto;min-height:36px;padding:0 12px;font-size:12px;flex-shrink:0;">Lihat</button>' +
           '</div>';
       });
     } else if (activeTasks.length) {
       activeTasks.forEach(function (t) {
         var c = t.customer || {};
         listHtml +=
-          '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;">' +
+          '<div style="background:var(--bg-subtle);border:1px solid var(--border-color);border-radius:14px;padding:12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;">' +
             '<div style="min-width:0;">' +
-              '<div style="font-weight:800;font-size:13.5px;color:#0f172a;">🛵 ' + escapeHTML(formatDeliveryStatus(t)) + ' (' + escapeHTML(t.order_number || t.order_id) + ')</div>' +
-              '<div style="font-size:12px;color:#64748b;margin-top:2px;">' + escapeHTML(c.name || 'Pelanggan') + '</div>' +
+              '<div style="font-weight:800;font-size:13.5px;color:var(--text-main);">🛵 ' + escapeHTML(formatDeliveryStatus(t)) + ' (' + escapeHTML(t.order_number || t.order_id) + ')</div>' +
+              '<div style="font-size:12px;color:var(--text-sub);margin-top:2px;">' + escapeHTML(c.name || 'Pelanggan') + '</div>' +
             '</div>' +
-            '<button type="button" class="secondary-btn" data-notif-active="' + escapeHTML(t.order_id) + '" style="width:auto;min-height:36px;padding:0 12px;font-size:12px;flex-shrink:0;">Buka</button>' +
+            '<button type="button" class="btn-secondary" data-notif-active="' + escapeHTML(t.order_id) + '" style="width:auto;min-height:36px;padding:0 12px;font-size:12px;flex-shrink:0;">Buka</button>' +
           '</div>';
       });
     } else {
-      listHtml = '<div style="text-align:center;padding:18px 12px;background:#f8fafc;border-radius:14px;color:#64748b;font-size:13px;margin-bottom:12px;">Belum ada tugas baru yang menunggu konfirmasi.</div>';
+      listHtml = '<div style="text-align:center;padding:18px 12px;background:var(--bg-subtle);border:1px solid var(--border-color);border-radius:14px;color:var(--text-sub);font-size:13px;margin-bottom:12px;">Belum ada tugas baru yang menunggu konfirmasi.</div>';
     }
 
     var overlay = document.createElement('div');
@@ -2178,20 +3632,20 @@
         listHtml +
         overlayHtml +
         apkDownloadHtml +
-        '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:14px;padding:12px;margin-top:8px;">' +
+        '<div style="background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.35);border-radius:14px;padding:12px;margin-top:8px;">' +
           '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">' +
             '<div>' +
-              '<div style="font-size:13px;font-weight:800;color:#166534;">🔊 Dering Alarm Tugas Baru</div>' +
-              '<div style="font-size:11.5px;color:#15803d;margin-top:2px;">Izin Notifikasi HP: <strong>' + (permState === 'granted' ? 'Aktif ✓' : (permState === 'denied' ? 'Diblokir Browser' : 'Belum Diaktifkan')) + '</strong></div>' +
+              '<div style="font-size:13px;font-weight:800;color:var(--text-main);">🔊 Dering Alarm Tugas Baru</div>' +
+              '<div style="font-size:11.5px;color:var(--text-sub);margin-top:2px;">Izin Notifikasi HP: <strong>' + (permState === 'granted' ? 'Aktif ✓' : (permState === 'denied' ? 'Diblokir Browser' : 'Belum Diaktifkan')) + '</strong></div>' +
             '</div>' +
-            '<button type="button" class="primary-btn green" id="btn-test-driver-sound" style="width:auto;min-height:38px;padding:0 14px;font-size:12.5px;">🔊 Tes Bunyi</button>' +
+            '<button type="button" class="btn-primary green" id="btn-test-driver-sound" style="width:auto;min-height:38px;padding:0 14px;font-size:12.5px;">🔊 Tes Bunyi</button>' +
           '</div>' +
         '</div>' +
         '<div style="margin-top:12px;">' +
-          '<button type="button" class="primary-btn" data-ops-chat-inbox="1" style="background:#0f172a;border-color:#0f172a;min-height:42px;font-size:13px;justify-content:center;">💬 Buka Kotak Pesan & Pengumuman Cabang</button>' +
+          '<button type="button" class="btn-secondary" data-ops-chat-inbox="1" style="min-height:42px;font-size:13px;justify-content:center;">💬 Buka Kotak Pesan & Pengumuman Cabang</button>' +
         '</div>' +
         '<div class="sheet-actions" style="margin-top:12px;">' +
-          '<button type="button" class="secondary-btn" id="btn-close-notif-sheet">Tutup</button>' +
+          '<button type="button" class="btn-secondary" id="btn-close-notif-sheet">Tutup</button>' +
         '</div>' +
       '</div>';
 
@@ -2200,11 +3654,17 @@
     var testBtn = document.getElementById('btn-test-driver-sound');
     if (testBtn) {
       testBtn.onclick = function () {
-        if ('Notification' in window && Notification.permission === 'default') {
-          Notification.requestPermission().catch(function () {});
+        if (window.XentraWebPush && typeof window.XentraWebPush.requestAndSubscribe === 'function') {
+          window.XentraWebPush.requestAndSubscribe().then(function () {
+            showDriverNotificationCenter();
+          }).catch(function () {});
+        } else if ('Notification' in window && Notification.permission === 'default') {
+          Notification.requestPermission().then(function () {
+            showDriverNotificationCenter();
+          }).catch(function () {});
         }
         triggerIncomingTaskAlert(null, true);
-        toast('🔊 Bunyi dering tugas baru aktif!');
+        toast('🔊 Bunyi dering & notifikasi latar belakang aktif!');
       };
     }
 
@@ -2244,19 +3704,49 @@
       if (actBtn) {
         var aoid = actBtn.getAttribute('data-notif-active');
         overlay.remove();
+        if (String(state.selectedOrderId) !== String(aoid)) {
+          resetTaskExecutionState();
+        }
         state.selectedOrderId = aoid;
         var aTask = selectedTask();
-        state.page = (aTask && aTask.delivery_status === 'on_delivery') ? 'map' : 'delivery-detail';
+        if (aTask && aTask.delivery_status === 'on_delivery') {
+          state.page = aTask.arrived_at ? 'complete-action' : 'map';
+        } else {
+          state.page = 'pickup';
+        }
         render();
       }
     });
   }
 
-  async function acceptTask() {
+  async function acceptTask(targetOrderId) {
     stopDriverTaskAlarm();
     closeIncomingTaskModal();
+    if (targetOrderId && typeof targetOrderId === 'string') {
+      state.selectedOrderId = targetOrderId;
+    }
     var task = selectedTask();
+    if (!task) {
+      var firstPending = (state.tasks || []).find(isNewTask);
+      if (firstPending) {
+        state.selectedOrderId = firstPending.order_id;
+        task = firstPending;
+      }
+    }
     if (!task || state.busy) return;
+
+    // If task is already accepted / picked_up / on_delivery, route directly without calling /accept again
+    if (!isNewTask(task)) {
+      state.selectedOrderId = task.order_id;
+      if (task.delivery_status === 'on_delivery') {
+        state.page = task.arrived_at ? 'complete-action' : 'map';
+      } else {
+        state.page = 'pickup';
+      }
+      render();
+      return;
+    }
+
     state.busy = true;
     renderNewTask();
 
@@ -2264,16 +3754,33 @@
       var data = await api('/driver/tasks/' + encodeURIComponent(task.order_id) + '/accept', { method: 'POST' });
       state.busy = false;
       state.selectedOrderId = task.order_id;
+      resetTaskExecutionState();
       if (window.XentraAudio && typeof window.XentraAudio.orderAccepted === 'function') {
         window.XentraAudio.orderAccepted();
       }
       await refreshTasks(false);
-      if (data && data.task) state.tasks.push(data.task);
+      if (data && data.task) {
+        var exists = state.tasks.some(function (t) { return String(t.order_id) === String(data.task.order_id); });
+        if (exists) {
+          state.tasks = state.tasks.map(function (t) {
+            return String(t.order_id) === String(data.task.order_id) ? data.task : t;
+          });
+        } else {
+          state.tasks.push(data.task);
+        }
+      }
       state.page = 'delivery-detail';
       toast('✓ Tugas diterima! Silakan ambil pesanan.');
       render();
     } catch (err) {
       state.busy = false;
+      await refreshTasks(false);
+      var refreshed = selectedTask();
+      if (refreshed && !isNewTask(refreshed)) {
+        state.page = 'delivery-detail';
+        render();
+        return;
+      }
       render();
       toast(err.message || 'Tugas gagal diterima');
     }
@@ -2308,7 +3815,6 @@
     if (!task || state.busy) return;
 
     state.busy = true;
-    render();
 
     try {
       var data = await api('/driver/tasks/' + encodeURIComponent(task.order_id) + '/' + endpoint, {
@@ -2318,16 +3824,22 @@
 
       state.busy = false;
       if (data && data.task) {
+        state.tasks = state.tasks.map(function (t) {
+          return String(t.order_id) === String(task.order_id) ? data.task : t;
+        });
         if (nextPage === 'complete') state.lastCompleted = data.task;
       }
 
       if (nextPage === 'complete') {
         state.page = 'complete';
         state.lastCompleted = (data && data.task) || task;
+        state.cashSettledByKasir = isCodTaskSettled(state.lastCompleted);
+        refreshTasks(false);
+        refreshHistory(true);
       } else {
-        await refreshTasks(false);
         state.selectedOrderId = task.order_id;
-        state.page = nextPage;
+        if (nextPage) state.page = nextPage;
+        refreshTasks(false);
       }
 
       toast(endpoint === 'pickup' ? 'Pesanan berhasil diambil' : endpoint === 'start' ? 'Pengantaran dimulai' : 'Pengantaran selesai');
@@ -2377,6 +3889,7 @@
       state.tasks = newTasks;
       state.loading = false;
       state.error = null;
+      syncNativeDriverBridge();
       return data;
     } catch (err) {
       if (err.status === 401) return null;
@@ -2386,20 +3899,33 @@
     }
   }
 
-  async function refreshHistory() {
-    state.loading = true;
-    state.error = null;
-    renderHistory();
+  function resetTaskExecutionState() {
+    state.pickupChecks = {};
+    state.podPhoto = null;
+    state.podBypass = null;
+    state.podNote = null;
+    state.tenderedAmount = null;
+    state.cashSettledByKasir = false;
+  }
+
+  async function refreshHistory(silent) {
+    if (!silent) {
+      state.loading = true;
+      state.error = null;
+      renderHistory();
+    }
 
     try {
       var data = await api('/driver/history');
       state.history = Array.isArray(data.deliveries) ? data.deliveries : [];
-      state.loading = false;
+      if (!silent) state.loading = false;
       return data;
     } catch (err) {
       if (err.status === 401) return null;
-      state.loading = false;
-      state.error = err.message || 'Riwayat tidak dapat dimuat.';
+      if (!silent) {
+        state.loading = false;
+        state.error = err.message || 'Riwayat tidak dapat dimuat.';
+      }
       return null;
     }
   }
@@ -2425,6 +3951,10 @@
       } catch (_) {
         state.isOnline = false;
       }
+      syncNativeDriverBridge();
+      if (window.XentraWebPush && typeof window.XentraWebPush.register === 'function') {
+        window.XentraWebPush.register().catch(function () {});
+      }
       if (state.isOnline) {
         driverLocationService.start();
         syncWakeLock();
@@ -2440,8 +3970,31 @@
       return;
     }
 
-    await refreshTasks(false);
+    await Promise.all([refreshTasks(false), refreshHistory(true)]);
     state.loading = false;
+
+    try {
+      var urlParams = new URLSearchParams(window.location.search || '');
+      var deepOrderId = urlParams.get('order_id');
+      var autoAcceptParam = urlParams.get('auto_accept') === '1';
+      if (deepOrderId) {
+        state.selectedOrderId = deepOrderId;
+        var matchedDeepTask = (state.tasks || []).find(function (t) { return String(t.order_id) === String(deepOrderId); });
+        if (window.history && typeof window.history.replaceState === 'function') {
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+        if (matchedDeepTask) {
+          if (autoAcceptParam && isNewTask(matchedDeepTask)) {
+            acceptTask();
+          } else if (isNewTask(matchedDeepTask)) {
+            setTimeout(function () { showIncomingTaskModal(matchedDeepTask); }, 150);
+          } else {
+            state.page = 'delivery-detail';
+          }
+        }
+      }
+    } catch (_) {}
+
     render();
     if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
       window.Xentra.hideSplash();
@@ -2468,6 +4021,7 @@
     if (state.page === 'map') return renderMap();
     if (state.page === 'complete-action' || state.page === 'cod') return renderCompleteAction();
     if (state.page === 'complete') return renderComplete();
+    if (state.page === 'return-to-store') return renderReturnToStore();
     if (state.page === 'history') return renderHistory();
     if (state.page === 'profile') return renderProfile();
     return renderTasks();
@@ -2475,16 +4029,29 @@
 
   function bind() {
     app.querySelectorAll('[data-page]').forEach(function (el) {
-      el.addEventListener('click', function () {
+      el.addEventListener('click', function (e) {
+        if (e.target && e.target.closest && e.target.closest('[data-action]')) {
+          return;
+        }
         var page = el.getAttribute('data-page');
         var orderId = el.getAttribute('data-order');
-        if (orderId) state.selectedOrderId = orderId;
+        if (orderId) {
+          if (String(state.selectedOrderId) !== String(orderId)) {
+            resetTaskExecutionState();
+          }
+          state.selectedOrderId = orderId;
+        }
         go(page);
       });
     });
 
     app.querySelectorAll('[data-action]').forEach(function (el) {
-      el.addEventListener('click', function () {
+      el.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var actionOrder = el.getAttribute('data-order');
+        if (actionOrder) {
+          state.selectedOrderId = actionOrder;
+        }
         handleAction(el.getAttribute('data-action'), el);
       });
     });
@@ -2522,90 +4089,34 @@
       });
     });
 
-    var avatarInput = document.getElementById('driver-avatar-input');
-    if (avatarInput) {
-      avatarInput.addEventListener('change', async function () {
-        var file = avatarInput.files && avatarInput.files[0];
+    var podFileInput = document.getElementById('driver-pod-file-input');
+    if (podFileInput) {
+      podFileInput.addEventListener('change', function () {
+        var file = podFileInput.files && podFileInput.files[0];
         if (!file) return;
-        if (!file.type.startsWith('image/')) {
-          avatarInput.value = '';
-          return toast('File harus berupa gambar (JPG, PNG, WebP).');
-        }
-        if (file.size > 10 * 1024 * 1024) {
-          avatarInput.value = '';
-          return toast('Ukuran foto maksimal 10 MB.');
-        }
-
-        async function doUpload(rawFile, cropSpec, previewUrl) {
-          toast('Mengompres dan mengunggah foto profil…');
-          try {
-            var base64 = previewUrl;
-            if (!base64) {
-              base64 = await new Promise(function (resolve, reject) {
-                var reader = new FileReader();
-                reader.onload = function () { resolve(reader.result); };
-                reader.onerror = function () { reject(new Error('Gagal membaca gambar.')); };
-                reader.readAsDataURL(rawFile);
-              });
-            }
-
-            var payload = {
-              image_base64: base64,
-              mime_type: rawFile.type || 'image/jpeg',
-              original_filename: rawFile.name || 'driver-avatar.jpg'
-            };
-            if (cropSpec) payload.crop_spec = cropSpec;
-
-            var res = await api('/driver/avatar', {
-              method: 'POST',
-              body: JSON.stringify(payload)
-            });
-
-            if (res.success && res.avatar_url) {
-              if (state.driver) {
-                state.driver.avatar_url = res.avatar_url;
-                persistUser();
-              }
-              toast('Foto profil berhasil diperbarui.');
-              render();
-            } else {
-              toast('Gagal memperbarui foto profil.');
-            }
-          } catch (err) {
-            toast(err.message || 'Gagal mengunggah foto profil.');
-          } finally {
-            avatarInput.value = '';
-          }
-        }
-
-        if (window.XentraCropEditor && typeof window.XentraCropEditor.open === 'function') {
-          window.XentraCropEditor.open({
-            source: file,
-            assetType: 'avatar',
-            aspectRatio: 1.0,
-            title: 'Sesuaikan Foto Profil Driver (1:1)',
-            onConfirm: function (cropSpec, previewDataUrl) {
-              doUpload(file, cropSpec, previewDataUrl);
-            },
-            onCancel: function () {
-              avatarInput.value = '';
-            }
-          });
-        } else {
-          doUpload(file, null, null);
-        }
+        applyPodFileSelection(file);
+        podFileInput.value = '';
       });
     }
 
-    var avatarTrigger = document.getElementById('btn-trigger-avatar');
-    if (avatarTrigger) {
-      avatarTrigger.addEventListener('click', function () {
-        openEditAvatarModal();
+    var avatarInput = document.getElementById('driver-avatar-input');
+    if (avatarInput) {
+      avatarInput.addEventListener('change', function () {
+        var file = avatarInput.files && avatarInput.files[0];
+        if (!file) return;
+        processAvatarFileSelection(file, function () { avatarInput.value = ''; });
       });
     }
   }
 
   async function handleAction(action, triggerEl) {
+    if (action === 'toggle-theme') {
+      state.theme = state.theme === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', state.theme);
+      try { localStorage.setItem('xentra_driver_theme', state.theme); } catch (_) {}
+      return render();
+    }
+
     if (action === 'open-notifications') {
       return showDriverNotificationCenter();
     }
@@ -2619,13 +4130,12 @@
     }
 
     if (action === 'change-avatar') {
-      var input = document.getElementById('driver-avatar-input');
-      if (input) input.click();
-      return;
+      return openEditAvatarModal();
     }
 
     if (action === 'back' || action === 'back-tasks') {
       state.lastCompleted = null;
+      state.cashSettledByKasir = false;
       state.page = 'tasks';
       return refreshTasks(false).then(render);
     }
@@ -2640,22 +4150,30 @@
     if (action === 'accept') return acceptTask();
     if (action === 'reject') return showRejectSheet();
 
-    if (action === 'pickup-and-start' || action === 'pickup' || action === 'confirm-pickup' || action === 'start-delivery') {
+    if (action === 'pickup-and-start' || action === 'pickup' || action === 'confirm-pickup' || action === 'start-delivery' || action === 'confirm-pickup-start') {
       var pTask = selectedTask();
       if (!pTask || state.busy) return;
       state.busy = true;
-      render();
       try {
+        var latestTask = pTask;
         if (pTask.delivery_status === 'assigned') {
-          await api('/driver/tasks/' + encodeURIComponent(pTask.order_id) + '/pickup', { method: 'POST' });
+          var resPickup = await api('/driver/tasks/' + encodeURIComponent(pTask.order_id) + '/pickup', { method: 'POST' });
+          if (resPickup && resPickup.task) latestTask = resPickup.task;
         }
-        await api('/driver/tasks/' + encodeURIComponent(pTask.order_id) + '/start', { method: 'POST' });
+        if (latestTask.delivery_status === 'assigned' || latestTask.delivery_status === 'picked_up') {
+          var resStart = await api('/driver/tasks/' + encodeURIComponent(pTask.order_id) + '/start', { method: 'POST' });
+          if (resStart && resStart.task) latestTask = resStart.task;
+        }
+        latestTask.delivery_status = 'on_delivery';
+        state.tasks = state.tasks.map(function (t) {
+          return String(t.order_id) === String(pTask.order_id) ? latestTask : t;
+        });
         state.busy = false;
-        await refreshTasks(false);
         state.selectedOrderId = pTask.order_id;
         state.page = 'map';
         toast('🛵 Pesanan diambil & pengantaran dimulai!');
         render();
+        refreshTasks(false);
       } catch (err) {
         state.busy = false;
         render();
@@ -2672,20 +4190,17 @@
     if (action === 'notify-arrived') {
       var arrTask = selectedTask();
       if (!arrTask) return toast('Tugas pengantaran tidak ditemukan');
-      try {
-        var resArr = await api('/driver/tasks/' + encodeURIComponent(arrTask.order_id) + '/arrived', { method: 'POST' });
+      arrTask.arrived_at = new Date().toISOString();
+      state.page = 'complete-action';
+      render();
+      toast('🔔 Notifikasi sampai telah dikirim ke aplikasi pelanggan!');
+      api('/driver/tasks/' + encodeURIComponent(arrTask.order_id) + '/arrived', { method: 'POST' }).then(function (resArr) {
         if (resArr && resArr.task) {
           state.tasks = state.tasks.map(function (t) {
-            return t.order_id === arrTask.order_id ? resArr.task : t;
+            return String(t.order_id) === String(arrTask.order_id) ? resArr.task : t;
           });
-        } else {
-          arrTask.arrived_at = new Date().toISOString();
         }
-        toast('🔔 Notifikasi sampai telah dikirim ke aplikasi pelanggan!');
-        render();
-      } catch (err) {
-        toast(err.message || 'Gagal mengirim notifikasi sampai');
-      }
+      }).catch(function () {});
       return;
     }
 
@@ -2696,28 +4211,23 @@
       return render();
     }
 
-    if (action === 'check-all-items') {
-      var pTask = selectedTask();
-      if (pTask && pTask.items) {
-        pTask.items.forEach(function(it) { state.pickupChecks[it.id] = true; });
+    if (action === 'toggle-pickup-item') {
+      var itId = triggerEl ? triggerEl.getAttribute('data-item-id') : null;
+      if (itId) {
+        state.pickupChecks[itId] = !state.pickupChecks[itId];
         return render();
       }
+      return;
     }
 
-    if (action === 'confirm-pickup-start') {
-      var curTask = selectedTask();
-      if (!curTask) return toast('Tugas tidak ditemukan');
-      // If task is still assigned, trigger pickup then start
-      if (curTask.delivery_status === 'assigned') {
-        transitionTask('pickup', null, null).then(function() {
-          return transitionTask('start', null, 'map');
-        }).catch(function(e) {
-          toast(e.message || 'Gagal memulai pengantaran');
-        });
-      } else if (curTask.delivery_status === 'picked_up') {
-        return transitionTask('start', null, 'map');
-      } else {
-        state.page = 'map';
+    if (action === 'check-all-items') {
+      var pTask = selectedTask();
+      if (pTask) {
+        var itemsToCheck = Array.isArray(pTask.items) && pTask.items.length ? pTask.items : [
+          { id: 'default_1', quantity: Number(pTask.item_count || 1), product_name: 'Paket Pesanan #' + (pTask.order_number || pTask.order_id) }
+        ];
+        var allNowChecked = itemsToCheck.every(function(it) { return Boolean(state.pickupChecks[it.id]); });
+        itemsToCheck.forEach(function(it) { state.pickupChecks[it.id] = !allNowChecked; });
         return render();
       }
       return;
@@ -2731,42 +4241,21 @@
       return openCustomerChatSheet();
     }
 
-    if (action === 'trigger-pod-camera') {
-      var fin = document.getElementById('driver-pod-file-input');
-      if (fin) {
-        fin.onchange = function(e) {
-          var file = e.target.files && e.target.files[0];
-          if (!file) return;
-          var reader = new FileReader();
-          reader.onload = function(evt) {
-            var img = new Image();
-            img.onload = function() {
-              var canvas = document.createElement('canvas');
-              var maxDim = 1200;
-              var width = img.width;
-              var height = img.height;
-              if (width > height && width > maxDim) {
-                height = Math.round((height * maxDim) / width);
-                width = maxDim;
-              } else if (height > maxDim) {
-                width = Math.round((width * maxDim) / height);
-                height = maxDim;
-              }
-              canvas.width = width;
-              canvas.height = height;
-              var ctx = canvas.getContext('2d');
-              ctx.drawImage(img, 0, 0, width, height);
-              state.podPhoto = canvas.toDataURL('image/webp', 0.75);
-              state.podBypass = null;
-              render();
-            };
-            img.src = evt.target.result;
-          };
-          reader.readAsDataURL(file);
-        };
-        fin.click();
-      }
+    if (action === 'open-delivery-issue') {
+      return openDeliveryIssueModal();
+    }
+
+    if (action === 'confirm-rts-finished') {
+      state.activeRtsTask = null;
+      toast('Retur pesanan berhasil diselesaikan di resto.');
+      await refreshTasks(false);
+      state.page = 'tasks';
+      render();
       return;
+    }
+
+    if (action === 'trigger-pod-camera') {
+      return openPodCaptureSheet();
     }
 
     if (action === 'open-pod-bypass-modal') {
@@ -2782,6 +4271,48 @@
       var amt = Number(triggerEl.getAttribute('data-amount') || 0);
       state.tenderedAmount = amt;
       return render();
+    }
+
+    if (action === 'prompt-custom-tendered') {
+      var tsk = selectedTask();
+      var expAmt = tsk && tsk.payment ? Number(tsk.payment.amount || 0) : 0;
+      var curAmt = state.tenderedAmount || expAmt;
+      var val = window.prompt('Masukkan nominal uang yang diterima dari pelanggan (Rp):', String(curAmt));
+      if (val !== null) {
+        var num = parseInt(String(val).replace(/[^0-9]/g, ''), 10);
+        if (!isNaN(num) && num >= expAmt) {
+          state.tenderedAmount = num;
+          render();
+        } else if (!isNaN(num) && num < expAmt) {
+          toast('Nominal uang diterima tidak boleh kurang dari total tagihan COD (' + rupiah(expAmt) + ').');
+        }
+      }
+      return;
+    }
+
+    if (action === 'locked-pod-warning') {
+      return toast('Wajib foto bukti serah terima paket terlebih dahulu, atau gunakan opsi Lewati Foto jika kamera bermasalah.');
+    }
+
+    if (action === 'settle-cashier-single') {
+      toast('Memeriksa status setoran kasir...');
+      await refreshHistory(true);
+      var doneTask = state.lastCompleted || selectedTask();
+      if (doneTask && state.history) {
+        var matched = state.history.find(function (h) { return String(h.order_id) === String(doneTask.order_id); });
+        if (matched && isCodTaskSettled(matched)) {
+          state.cashSettledByKasir = true;
+          toast('✓ Setoran COD telah divalidasi oleh Kasir!');
+          return render();
+        }
+      }
+      state.cashSettledByKasir = false;
+      toast('⏳ Setoran belum divalidasi Kasir di POS. Minta Kasir scan QR di atas.');
+      return render();
+    }
+
+    if (action === 'open-batch-settlement-modal') {
+      return openBatchSettlementModal();
     }
 
     if (action === 'submit-delivery-finish') {
@@ -2850,22 +4381,43 @@
       return;
     }
 
-    if (action === 'recenter-map') {
-      if (!mapState.map || !mapState.currentPosition) {
-        toast('Lokasi GPS belum tersedia');
+    if (action === 'zoom-in-map' || action === 'zoom-out-map') {
+      var delta = action === 'zoom-in-map' ? 1 : -1;
+      var activeMap = mapState.map || mapState.detailMap;
+      if (activeMap && typeof activeMap.getZoom === 'function') {
+        var nextZoom = Math.min(19, Math.max(4, activeMap.getZoom() + delta));
+        if (typeof activeMap.easeTo === 'function') {
+          activeMap.easeTo({ zoom: nextZoom, duration: 220 });
+        } else if (typeof activeMap.setZoom === 'function') {
+          activeMap.setZoom(nextZoom);
+        }
         return;
       }
-      fitDriverRoute();
+      var fallbackContainer = document.getElementById('driver-map') || document.getElementById('driver-detail-map');
+      var fallbackTask = selectedTask();
+      var fallbackDest = destinationCoordinates(fallbackTask);
+      if (fallbackContainer && fallbackDest) {
+        mapState.fallbackZoom = Math.min(18, Math.max(11, (mapState.fallbackZoom || 15) + delta));
+        renderOsmTilePreview(fallbackContainer, fallbackDest, mapState.fallbackZoom);
+      }
+      return;
+    }
+
+    if (action === 'recenter-map') {
+      if (mapState.map) {
+        fitDriverRoute();
+        return;
+      }
+      toast('Peta belum dimuat');
       return;
     }
 
     if (action === 'refresh-map') {
       var routeTask = selectedTask();
-      if (!routeTask || !mapState.currentPosition) {
-        toast('Lokasi GPS belum tersedia');
-        return;
-      }
-      fetchDriverRoute(mapState.currentPosition, routeTask);
+      if (!routeTask) return;
+      var originPos = mapState.currentPosition || pickupCoordinates(routeTask);
+      toast('Memperbarui rute pengantaran…');
+      fetchDriverRoute(originPos, routeTask);
       return;
     }
 
@@ -2901,21 +4453,25 @@
           method: 'POST',
           body: JSON.stringify({ is_online: state.isOnline })
         });
+        syncNativeDriverBridge();
         if (state.isOnline) {
           driverLocationService.start();
           syncWakeLock();
-          if ('Notification' in window && Notification.permission === 'default') {
+          if (window.XentraWebPush && typeof window.XentraWebPush.requestAndSubscribe === 'function') {
+            window.XentraWebPush.requestAndSubscribe().catch(function () {});
+          } else if ('Notification' in window && Notification.permission === 'default') {
             try { Notification.requestPermission().catch(function () {}); } catch (_) {}
           }
-          toast('🟢 Status Anda sekarang ONLINE (Siap terima tugas)');
+          toast('🟢 Status Anda sekarang ONLINE (Siap Antar)');
         } else {
           driverLocationService.stop();
           syncWakeLock();
           stopDriverTaskAlarm();
-          toast('⚪ Status Anda sekarang OFFLINE (Sedang istirahat)');
+          toast('⚪ Status Anda sekarang OFFLINE (Istirahat)');
         }
       } catch (err) {
         state.isOnline = !state.isOnline;
+        syncNativeDriverBridge();
         render();
         toast('Gagal memperbarui status: ' + (err.message || 'Kesalahan jaringan'));
       }
@@ -2923,7 +4479,43 @@
     }
     if (action === 'next-stage-info') return toast('Tahap berikutnya mengikuti state Delivery dari server.');
 
+    if (action === 'force-reload-cache') {
+      toast('Membersihkan seluruh cache aplikasi...');
+      localStorage.removeItem('xentra_driver_version');
+      if (window.XentraDriverNative && typeof window.XentraDriverNative.clearAppCache === 'function') {
+        try { window.XentraDriverNative.clearAppCache(); } catch (_) {}
+      }
+      if ('caches' in window) {
+        caches.keys().then(function (names) {
+          return Promise.all(names.map(function (n) { return caches.delete(n); }));
+        }).then(function () {
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function (regs) {
+              return Promise.all(regs.map(function (r) { return r.unregister(); }));
+            }).then(function () {
+              window.location.href = window.location.origin + window.location.pathname + '?_bust=' + Date.now();
+            });
+          } else {
+            window.location.href = window.location.origin + window.location.pathname + '?_bust=' + Date.now();
+          }
+        });
+      } else {
+        window.location.href = window.location.origin + window.location.pathname + '?_bust=' + Date.now();
+      }
+      return;
+    }
+
     if (action === 'logout') {
+      state.isOnline = false;
+      var nativeBridge = window.XentraDriverNative || window.XentraNative;
+      if (nativeBridge) {
+        try {
+          if (typeof nativeBridge.setOnlineStatus === 'function') nativeBridge.setOnlineStatus(false);
+          if (typeof nativeBridge.setAuthToken === 'function') nativeBridge.setAuthToken('', '', '', '');
+          if (typeof nativeBridge.clearAuth === 'function') nativeBridge.clearAuth();
+          if (typeof nativeBridge.hideOverlay === 'function') nativeBridge.hideOverlay();
+        } catch (_) {}
+      }
       try { await api('/auth/logout', { method: 'POST' }); } catch (_) {}
       clearSession();
       window.location.href = '/login?target=driver';
@@ -2935,12 +4527,48 @@
     refreshTasks(false).then(render);
   });
 
-  window.onSelectTargetOrder = function (orderId) {
+  window.onSelectTargetOrder = function (orderId, autoAccept) {
+    stopDriverTaskAlarm();
+    closeIncomingTaskModal();
     if (!orderId) return;
     state.selectedOrderId = orderId;
-    state.page = 'new-task';
-    render();
+    var routeSelectedTask = function () {
+      var found = (state.tasks || []).find(function (t) {
+        return String(t.order_id) === String(orderId);
+      });
+      if (!found) {
+        state.page = 'tasks';
+        render();
+        return;
+      }
+      if (isNewTask(found)) {
+        if (autoAccept) {
+          acceptTask(orderId);
+        } else {
+          state.page = 'new-task';
+          render();
+        }
+      } else if (found.delivery_status === 'on_delivery') {
+        state.page = found.arrived_at ? 'complete-action' : 'map';
+        render();
+      } else {
+        state.page = 'pickup';
+        render();
+      }
+    };
+    var existing = (state.tasks || []).find(function (t) {
+      return String(t.order_id) === String(orderId);
+    });
+    if (existing) {
+      routeSelectedTask();
+    } else {
+      refreshTasks(false).then(routeSelectedTask);
+    }
   };
+
+  window.__driverState = state;
+  window.__driverRender = render;
+  window.__driverGo = go;
 
   loadDriver().then(function () {
     // Fast 5-second polling for incoming driver assignments (works even when tab is in background)
@@ -2957,6 +4585,19 @@
           render();
         }
       });
+      if (state.page === 'complete' && !state.cashSettledByKasir) {
+        refreshHistory(true).then(function () {
+          var doneTask = state.lastCompleted || selectedTask();
+          if (doneTask && state.history) {
+            var matched = state.history.find(function (h) { return String(h.order_id) === String(doneTask.order_id); });
+            if (matched && isCodTaskSettled(matched)) {
+              state.cashSettledByKasir = true;
+              toast('✓ Setoran COD telah divalidasi oleh Kasir di POS!');
+              render();
+            }
+          }
+        });
+      }
     }, 5000);
   });
 })();

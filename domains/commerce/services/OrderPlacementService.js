@@ -161,7 +161,7 @@ function deductComposedStock({
         sourceReference: referenceId,
         orderId: order.id || null,
         totalCost: canonicalPosting.total_cost,
-        currencyCode: canonicalPosting.currency_code,
+        currencyCode: canonicalPosting.currency_code || 'IDR',
         costLines: canonicalPosting.cost_lines
       });
       if (!canonicalPosting.idempotent) {
@@ -287,6 +287,19 @@ class OrderPlacementService {
     if (client_transaction_id && branch_id) {
       const existing = orderRepository.findByBranchTransactionId(branch_id, client_transaction_id);
       if (existing) {
+        const incomingCustomerId = customer?.id || customer?.customer_id || '';
+        const existingCustomerId = existing.customer_id || '';
+        const sameIdentity = incomingCustomerId && existingCustomerId
+          ? String(incomingCustomerId) === String(existingCustomerId)
+          : (!incomingCustomerId && !existingCustomerId && existing.order_channel === order_channel &&
+            String(existing.customer_phone || '') === String(customer?.phone || ''));
+        if (!sameIdentity) {
+          return {
+            success: false,
+            status: 'CLIENT_TRANSACTION_CONFLICT',
+            errors: ['ID transaksi ini sudah digunakan oleh akun lain. Buat ulang pesanan dari akun Anda.']
+          };
+        }
         return {
           success: true,
           idempotent: true,
@@ -307,7 +320,19 @@ class OrderPlacementService {
     if (effectiveOrderType === 'reservation') {
       let reservationResult;
       try {
-        reservationResult = DiningTableService.createReservation({ brand_id, branch_id, customer, order_channel, selection_mode, reservation_date, reservation_time, guest_count, notes });
+        reservationResult = DiningTableService.createReservation({
+          brand_id,
+          branch_id,
+          customer,
+          order_channel,
+          selection_mode,
+          reservation_date,
+          reservation_time,
+          guest_count,
+          notes,
+          table_number,
+          table_id: table_id || (Array.isArray(table_ids) && table_ids[0]) || null
+        });
       } catch (err) {
         console.error('[OrderPlacementService] Reservation insert error:', err.message);
         return { success: false, status: 'ORDER_CREATION_FAILED', errors: [err.message] };
@@ -330,7 +355,7 @@ class OrderPlacementService {
       const diningContext = DiningTableService.prepareDineInOrderContext({
         branch_id,
         order_channel,
-        customer_phone: customer?.phone || null,
+        customer_id: customer?.id || customer?.customer_id || null,
         dining_session_id: effectiveDiningSessionId,
         table_number: resolvedTableNumber,
         table_id,
@@ -450,6 +475,39 @@ class OrderPlacementService {
     let confirmedComposedDeductions = [];
     try {
       orderRepository.beginTransaction();
+      if (effectiveOrderType === 'dine_in' && effectiveDiningSessionId) {
+        const lockedDiningContext = DiningTableService.prepareDineInOrderContext({
+          branch_id,
+          order_channel,
+          customer_id: customer?.id || customer?.customer_id || null,
+          dining_session_id: effectiveDiningSessionId,
+          table_number: resolvedTableNumber,
+          table_ids: resolvedTableIds
+        });
+        if (!lockedDiningContext.valid) {
+          orderRepository.rollbackTransaction();
+          return {
+            success: false,
+            status: lockedDiningContext.status,
+            errors: lockedDiningContext.errors
+          };
+        }
+      }
+      // A cashier-opened table cycle may receive simultaneous first orders.
+      // Serialize the canonical parent binding inside the write transaction;
+      // the checkout route converts the losing submission into an attributed
+      // order batch after this transaction is released.
+      if (effectiveOrderType === 'dine_in' && effectiveDiningSessionId) {
+        const existingSessionOrder = orderRepository.findCanonicalDineInOrderBySession(effectiveDiningSessionId);
+        if (existingSessionOrder) {
+          orderRepository.rollbackTransaction();
+          return {
+            success: false,
+            status: 'DINING_SESSION_ORDER_EXISTS',
+            existing_order: existingSessionOrder
+          };
+        }
+      }
       orderRepository.insertOrder({
         id: orderId,
         orderNumber,
@@ -601,7 +659,7 @@ class OrderPlacementService {
 
       if (insertedStatus === 'confirmed' && verification.applied_promos && verification.applied_promos.length > 0) {
         const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
-        PromotionEngineService.recordRedemptions({ order_id: orderId, brand_id, branch_id, customer_phone: customer.phone, promotions: verification.applied_promos });
+        PromotionEngineService.recordRedemptions({ order_id: orderId, brand_id, branch_id, customer_phone: customer.phone, customer_id: customer.id || null, promotions: verification.applied_promos });
       }
 
       if (shift_id && effectivePaymentMethod === 'cash') {
@@ -802,7 +860,8 @@ class OrderPlacementService {
     const order = orderRepository.findById(orderId);
     if (!order) throw new Error(`[OrderPlacementService] Order "${orderId}" tidak ditemukan.`);
 
-    const items = orderRepository.findItems(orderId);
+    const allItems = orderRepository.findItems(orderId);
+    const items = (allItems || []).filter(it => !it.addition_batch_id);
     if (!items || items.length === 0) return { success: true, deducted_items: [] };
 
     const existingMovement = inventoryRepository.findSaleDeductionByReference(order.order_number);

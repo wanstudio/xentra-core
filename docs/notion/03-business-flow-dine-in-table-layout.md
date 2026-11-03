@@ -2,6 +2,8 @@
 
 # 🔒 LOCKED — Dine-in Table Layout, Multi-Table Dining & Payment Hold
 
+> **Superseded for cashier-opened QR table cycles (2026-10-30):** the customer-selected table and single-customer session rules below remain a historical snapshot. For the QR flow, follow the approved addendum in [XENTRA_DINE_IN_TABLE_LAYOUT_CONTRACT.md](../XENTRA_DINE_IN_TABLE_LAYOUT_CONTRACT.md#18-approved-addendum--cashier-opened-qr-table-cycle-2026-10-30). This snapshot remains applicable only to the legacy customer-started floor-plan flow until that path is retired.
+
 Dine-in Xentra is **table-aware**. A Dine-in purchase may use one or more physical tables at the selected fulfillment Branch. The customer selects from a visual representation of the Branch dining layout.
 
 ## Customer Flow

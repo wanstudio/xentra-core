@@ -19,9 +19,10 @@
   }
 
   async function registerWebPushSubscription() {
-    // In Native Android App, native Java OrderMonitorService handles notifications!
+    var hasNativeMonitor = Boolean(window.IS_NATIVE_APP || window.XentraNative || window.XentraDriverNative);
+    // In Native Android App, native Java OrderMonitorService / DriverGpsService handles notifications!
     // Unsubscribe from browser web push so Google Chrome never intercepts notifications
-    if (window.IS_NATIVE_APP) {
+    if (hasNativeMonitor) {
       if ('serviceWorker' in navigator && 'PushManager' in window) {
         try {
           var r = await navigator.serviceWorker.ready;
@@ -33,6 +34,13 @@
         var S_native = window.XentraShared;
         var apiBase_native = S_native ? S_native.API_BASE : '/api/v1';
         var hdrs_native = S_native ? S_native.getAuthHeaders() : {};
+        if (!hdrs_native.Authorization) {
+          var tokNative = localStorage.getItem('xentra_driver_token') ||
+            localStorage.getItem('xentra_merchant_token') ||
+            localStorage.getItem('xentra_pos_token') ||
+            localStorage.getItem('xentra_owner_token') || '';
+          if (tokNative) hdrs_native = { Authorization: 'Bearer ' + tokNative };
+        }
         fetch(apiBase_native + '/notifications/unsubscribe-all', {
           method: 'POST',
           headers: hdrs_native
@@ -52,6 +60,16 @@
       var S = window.XentraShared;
       var API_BASE = S ? S.API_BASE : '/api/v1';
       var headers = S ? S.getAuthHeaders() : {};
+      if (!headers.Authorization) {
+        var tok = localStorage.getItem('xentra_driver_token') ||
+          localStorage.getItem('xentra_merchant_token') ||
+          localStorage.getItem('xentra_pos_token') ||
+          localStorage.getItem('xentra_owner_token') || '';
+        if (tok) headers = { Authorization: 'Bearer ' + tok };
+      }
+      if (!headers.Authorization) {
+        return false;
+      }
 
       // 1. Fetch server's VAPID public key
       var keyRes = await fetch(API_BASE + '/notifications/vapid-public-key');

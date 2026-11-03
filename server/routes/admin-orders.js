@@ -50,16 +50,28 @@ router.get('/admin/branches/:id/orders', requireAuth(['owner', 'brand_manager', 
 
     const statusFilter = req.query.status;
     let query = `
-      SELECT o.*, b.name as branch_name, COALESCE((SELECT SUM(cp.amount) FROM pos_check_payments cp WHERE cp.order_id = o.id AND cp.payment_status = 'settlement'), 0) AS paid_amount 
+      SELECT o.*, b.name as branch_name,
+        MAX(
+          COALESCE((SELECT MAX(p.amount) FROM order_payments p WHERE p.order_id = o.id AND p.payment_status = 'settlement'), 0),
+          COALESCE((SELECT SUM(cp.amount) FROM pos_check_payments cp WHERE cp.order_id = o.id AND cp.payment_status = 'settlement'), 0)
+        ) AS paid_amount 
       FROM orders o
       LEFT JOIN branches b ON b.id = o.branch_id
       WHERE o.brand_id = ? AND o.branch_id = ?
+        AND (
+          COALESCE(o.payment_method, 'cash') = 'cash'
+          OR o.order_type = 'reservation'
+          OR o.status != 'pending'
+          OR o.payment_status = 'settlement'
+          OR (SELECT payment_status FROM order_payments WHERE order_id = o.id) = 'settlement'
+          OR ? = '1'
+        )
     `;
     // Keep the same operational precedence as the Merchant App:
     // pending → upcoming confirmed reservation → everything else.
     // This is a visibility safeguard at the API boundary; the client may still
     // apply its own presentation sort without changing server business state.
-    const params = [req.brand_id, req.params.id];
+    const params = [req.brand_id, req.params.id, req.query.include_unpaid_online || '0'];
 
     if (statusFilter && statusFilter !== 'all') {
       query += ' AND o.status = ?';
@@ -134,7 +146,11 @@ router.get('/admin/orders', requireAuth(['owner', 'brand_manager', 'branch_manag
     } = req.query;
 
     let query = `
-      SELECT o.*, b.name as branch_name 
+      SELECT o.*, b.name as branch_name,
+        MAX(
+          COALESCE((SELECT MAX(p.amount) FROM order_payments p WHERE p.order_id = o.id AND p.payment_status = 'settlement'), 0),
+          COALESCE((SELECT SUM(cp.amount) FROM pos_check_payments cp WHERE cp.order_id = o.id AND cp.payment_status = 'settlement'), 0)
+        ) AS paid_amount 
       FROM orders o
       LEFT JOIN branches b ON b.id = o.branch_id
       WHERE o.brand_id = ?
@@ -214,7 +230,11 @@ router.get('/admin/orders', requireAuth(['owner', 'brand_manager', 'branch_manag
 router.get('/admin/orders/:id', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
     const order = db.prepare(`
-      SELECT o.*, b.name as branch_name
+      SELECT o.*, b.name as branch_name,
+        MAX(
+          COALESCE((SELECT MAX(p.amount) FROM order_payments p WHERE p.order_id = o.id AND p.payment_status = 'settlement'), 0),
+          COALESCE((SELECT SUM(cp.amount) FROM pos_check_payments cp WHERE cp.order_id = o.id AND cp.payment_status = 'settlement'), 0)
+        ) AS paid_amount
       FROM orders o
       LEFT JOIN branches b ON b.id = o.branch_id
       WHERE o.id = ? AND o.brand_id = ?
@@ -241,10 +261,24 @@ router.get('/admin/orders/:id', requireAuth(['owner', 'brand_manager', 'branch_m
     }
 
     const items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(order.id);
-    const delivery = db.prepare('SELECT * FROM order_deliveries WHERE order_id = ?').get(order.id);
+    const delivery = db.prepare(`
+      SELECT od.*, u.vehicle_type AS driver_vehicle_type
+      FROM order_deliveries od
+      LEFT JOIN users u ON u.id = od.driver_id
+      WHERE od.order_id = ?
+    `).get(order.id);
     const payment = db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(order.id);
     const logs = db.prepare('SELECT previous_status, new_status, note, created_at FROM order_status_logs WHERE order_id = ? ORDER BY created_at ASC').all(order.id);
-    const additions = db.prepare('SELECT * FROM order_addition_batches WHERE order_id = ? ORDER BY sequence_no ASC, created_at ASC').all(order.id).map((addition) => ({
+    const additions = db.prepare(`
+      SELECT ab.id, ab.order_id, ab.branch_id, ab.dining_session_id, ab.sequence_no,
+             ab.source_channel, ab.created_by, ab.client_transaction_id, ab.items_payload,
+             ab.subtotal, ab.status, ab.accepted_at, ab.rejected_at, ab.rejection_reason,
+             ab.created_at, ab.updated_at, c.display_name AS created_by_name
+      FROM order_addition_batches ab
+      LEFT JOIN customers c ON c.id = ab.created_by
+      WHERE ab.order_id = ?
+      ORDER BY ab.sequence_no ASC, ab.created_at ASC
+    `).all(order.id).map((addition) => ({
       ...addition,
       items: JSON.parse(addition.items_payload || '[]')
     }));
@@ -271,6 +305,7 @@ router.get('/admin/orders/:id', requireAuth(['owner', 'brand_manager', 'branch_m
         status_logs: logs || [],
         additions: additions || [],
         pending_additions_count: additions.filter((a) => a.status === 'pending_acceptance').length,
+        outstanding_amount: Math.max(0, Number(order.grand_total || 0) - Number(order.paid_amount || 0)),
         session_orders: sessionOrders
       }
     });

@@ -318,7 +318,7 @@ class CostResolutionService {
 
     const currency = currencyCode
       ? assertCurrencyCode(currencyCode)
-      : assertCurrencyCode(latest && latest.currency_code);
+      : assertCurrencyCode((latest && latest.currency_code) || 'IDR');
 
     assertCurrencyContinuity(currency, latest);
 
@@ -336,28 +336,50 @@ class CostResolutionService {
     }
 
     if (balance.quantity > 0 && !latest) {
-      if (balance.costAvailabilityStatus === 'AVAILABLE' && balance.movingAverageUnitCost >= 0 && identityType === 'MATERIAL') {
-        const autoMoveId = 'msm_auto_' + stockIdentityId + '_' + Date.now();
+      if (balance.costAvailabilityStatus === 'AVAILABLE' && balance.movingAverageUnitCost >= 0) {
+        const autoMoveId = (identityType === 'PRODUCT' ? 'psm_auto_' : 'msm_auto_') + stockIdentityId + '_' + Date.now();
         const autoMutationId = 'mut_auto_' + stockIdentityId + '_' + Date.now();
-        repository.insertMaterialValuationMovement({
-          id: autoMoveId,
-          stockLocationId,
-          materialId: stockIdentityId,
-          movementType: 'OPENING_STOCK',
-          quantityBase: balance.quantity,
-          previousQuantity: 0,
-          currentQuantity: balance.quantity,
-          unitCost: balance.movingAverageUnitCost,
-          totalCost: balance.carryingValue,
-          currencyCode: currency || 'IDR',
-          costBasisType: 'OPENING_ACTUAL',
-          sourceType: 'OPENING_BALANCE',
-          sourceReference: 'AUTO_INITIALIZED',
-          postingMutationId: autoMutationId,
-          valuationVersion: balance.valuationVersion || 1,
-          postingTimestamp: timestamp,
-          resolverVersion: 'v1'
-        });
+        if (identityType === 'PRODUCT') {
+          repository.insertProductValuationMovement({
+            id: autoMoveId,
+            stockLocationId,
+            productId: stockIdentityId,
+            movementType: 'OPENING_STOCK',
+            quantity: balance.quantity,
+            previousQuantity: 0,
+            currentQuantity: balance.quantity,
+            unitCost: balance.movingAverageUnitCost,
+            totalCost: balance.carryingValue,
+            currencyCode: currency || 'IDR',
+            costBasisType: 'OPENING_ACTUAL',
+            sourceType: 'OPENING_BALANCE',
+            sourceReference: 'AUTO_INITIALIZED',
+            postingMutationId: autoMutationId,
+            valuationVersion: balance.valuationVersion || 1,
+            postingTimestamp: timestamp,
+            resolverVersion: 'v1'
+          });
+        } else {
+          repository.insertMaterialValuationMovement({
+            id: autoMoveId,
+            stockLocationId,
+            materialId: stockIdentityId,
+            movementType: 'OPENING_STOCK',
+            quantityBase: balance.quantity,
+            previousQuantity: 0,
+            currentQuantity: balance.quantity,
+            unitCost: balance.movingAverageUnitCost,
+            totalCost: balance.carryingValue,
+            currencyCode: currency || 'IDR',
+            costBasisType: 'OPENING_ACTUAL',
+            sourceType: 'OPENING_BALANCE',
+            sourceReference: 'AUTO_INITIALIZED',
+            postingMutationId: autoMutationId,
+            valuationVersion: balance.valuationVersion || 1,
+            postingTimestamp: timestamp,
+            resolverVersion: 'v1'
+          });
+        }
       } else {
         throw fail('VALUATION_STATE_INVALID', 'VALUATION_STATE_INVALID');
       }

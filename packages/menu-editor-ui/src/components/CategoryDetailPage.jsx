@@ -24,10 +24,31 @@ export default function CategoryDetailPage({
   onEditMenu,
   onSortMenus,
 }) {
-  const [category, setCategory] = useState(null);
-  const [menus, setMenus] = useState([]);
+  const [category, setCategory] = useState(() => {
+    if (typeof window !== 'undefined' && window.state && Array.isArray(window.state.categories)) {
+      return window.state.categories.find((c) => c && String(c.id) === String(categoryId)) || null;
+    }
+    return null;
+  });
+  const [menus, setMenus] = useState(() => {
+    if (typeof window !== 'undefined' && window._ownerMasterMenuState && Array.isArray(window._ownerMasterMenuState.menus)) {
+      return window._ownerMasterMenuState.menus
+        .filter((m) => {
+          if (!m) return false;
+          const mCatId = m.category_id || (m.category && m.category.id);
+          return String(mCatId || '') === String(categoryId || '');
+        })
+        .sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0));
+    }
+    return [];
+  });
   const [filter, setFilter] = useState('ACTIVE');
-  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(() => {
+    const hasCat = typeof window !== 'undefined' && window.state && Array.isArray(window.state.categories) && window.state.categories.some((c) => c && String(c.id) === String(categoryId));
+    const hasMenus = typeof window !== 'undefined' && window._ownerMasterMenuState && Array.isArray(window._ownerMasterMenuState.menus) && window._ownerMasterMenuState.menus.length > 0;
+    return !(hasCat || hasMenus);
+  });
   const [togglingId, setTogglingId] = useState(null);
   const [leavingId, setLeavingId] = useState(null);
 
@@ -56,17 +77,25 @@ export default function CategoryDetailPage({
       const headers = { Accept: 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const [catRes, menuRes] = await Promise.all([
-        fetch('/api/v1/admin/categories', { headers }).catch(() => null),
-        fetch('/api/v1/admin/menus', { headers }).catch(() => null),
+      const [catRes, menuRes, singleCatRes] = await Promise.all([
+        fetch(`/api/v1/admin/categories?_t=${Date.now()}`, { headers, cache: 'no-store' }).catch(() => null),
+        fetch(`/api/v1/admin/menus?_t=${Date.now()}`, { headers, cache: 'no-store' }).catch(() => null),
+        categoryId ? fetch(`/api/v1/admin/categories/${encodeURIComponent(categoryId)}?_t=${Date.now()}`, { headers, cache: 'no-store' }).catch(() => null) : Promise.resolve(null),
       ]);
+
+      if (singleCatRes && singleCatRes.ok) {
+        const singleData = await singleCatRes.json().catch(() => null);
+        if (singleData && singleData.success && singleData.category) {
+          setCategory(singleData.category);
+        }
+      }
 
       if (catRes && catRes.ok) {
         const catData = await catRes.json().catch(() => null);
         if (catData && catData.success && Array.isArray(catData.categories)) {
           if (window.state) window.state.categories = catData.categories;
           const found = catData.categories.find((c) => c && String(c.id) === String(categoryId));
-          if (found) setCategory(found);
+          if (found && (!singleCatRes || !singleCatRes.ok)) setCategory(found);
         }
       }
 
@@ -92,8 +121,38 @@ export default function CategoryDetailPage({
   };
 
   useEffect(() => {
-    setLoading(true);
+    const hasCached = (typeof window !== 'undefined' && window.state && Array.isArray(window.state.categories) && window.state.categories.some((c) => c && String(c.id) === String(categoryId))) ||
+      (typeof window !== 'undefined' && window._ownerMasterMenuState && Array.isArray(window._ownerMasterMenuState.menus) && window._ownerMasterMenuState.menus.length > 0);
+    if (!hasCached) {
+      setLoading(true);
+    }
     loadData();
+    if (categoryId) {
+      try {
+        sessionStorage.setItem('xentra_owner_last_category_id', categoryId);
+      } catch (_) {}
+    }
+
+    const handleCategoriesUpdated = (event) => {
+      if (event && event.detail && typeof event.detail === 'object') {
+        const updated = event.detail;
+        if (String(updated.id) === String(categoryId)) {
+          if (updated._deleted) {
+            handleBack();
+            return;
+          }
+          setCategory((prev) => ({ ...prev, ...updated }));
+        }
+      }
+      loadData();
+    };
+
+    window.addEventListener('categories-updated', handleCategoriesUpdated);
+    window.addEventListener('category-updated', handleCategoriesUpdated);
+    return () => {
+      window.removeEventListener('categories-updated', handleCategoriesUpdated);
+      window.removeEventListener('category-updated', handleCategoriesUpdated);
+    };
   }, [categoryId]);
 
   const handleBack = () => {
@@ -103,9 +162,7 @@ export default function CategoryDetailPage({
     }
     if (typeof window.navigateTo === 'function') {
       window.navigateTo('catalog/categories');
-      return;
     }
-    window.location.hash = '#catalog/categories';
   };
 
   const handleEditCategoryClick = () => {
@@ -115,9 +172,7 @@ export default function CategoryDetailPage({
     }
     if (typeof window.navigateTo === 'function') {
       window.navigateTo(`catalog/categories/${encodeURIComponent(categoryId)}/edit`);
-      return;
     }
-    window.location.hash = `#catalog/categories/${encodeURIComponent(categoryId)}/edit`;
   };
 
   const handleAddMenuClick = () => {
@@ -127,15 +182,16 @@ export default function CategoryDetailPage({
         window._ownerMasterMenuState.preselectedCategoryName = category.name;
       }
     }
+    try {
+      sessionStorage.setItem('xentra_owner_last_category_id', categoryId);
+    } catch (_) {}
     if (typeof onAddMenu === 'function') {
       onAddMenu(categoryId);
       return;
     }
     if (typeof window.navigateTo === 'function') {
-      window.navigateTo('catalog/master-menus/new');
-      return;
+      window.navigateTo('catalog/master-menus/new', { history: 'push' });
     }
-    window.location.hash = '#catalog/master-menus/new';
   };
 
   const handleMenuCardClick = (menu) => {
@@ -146,15 +202,16 @@ export default function CategoryDetailPage({
         window._ownerMasterMenuState.preselectedCategoryName = category.name;
       }
     }
+    try {
+      sessionStorage.setItem('xentra_owner_last_category_id', categoryId);
+    } catch (_) {}
     if (typeof onEditMenu === 'function') {
       onEditMenu(menu.id);
       return;
     }
     if (typeof window.navigateTo === 'function') {
-      window.navigateTo(`catalog/master-menus/${encodeURIComponent(menu.id)}/edit`);
-      return;
+      window.navigateTo(`catalog/master-menus/${encodeURIComponent(menu.id)}/edit`, { history: 'push' });
     }
-    window.location.hash = `#catalog/master-menus/${encodeURIComponent(menu.id)}/edit`;
   };
 
   const handleSortClick = () => {
@@ -165,9 +222,7 @@ export default function CategoryDetailPage({
     const targetRoute = `catalog/categories/${encodeURIComponent(categoryId)}/sort-menus`;
     if (typeof window.navigateTo === 'function') {
       window.navigateTo(targetRoute);
-      return;
     }
-    window.location.hash = `#${targetRoute}`;
   };
 
   const isMenuActive = (m) => {
@@ -296,10 +351,17 @@ export default function CategoryDetailPage({
 
   const filteredMenus = menus.filter((m) => {
     const active = isMenuActive(m);
-    if (filter === 'ACTIVE') {
-      return active || leavingId === m.id;
-    }
-    return !active || leavingId === m.id;
+    const matchesFilter = filter === 'ACTIVE'
+      ? (active || leavingId === m.id)
+      : (!active || leavingId === m.id);
+    if (!matchesFilter) return false;
+
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    const title = getMenuTitle(m).toLowerCase();
+    const subtitle = getMenuCompositionSubtitle(m).toLowerCase();
+    const sku = String(m.sku || m.code || '').toLowerCase();
+    return title.includes(q) || subtitle.includes(q) || sku.includes(q);
   });
 
   const headerTitle = category && category.name ? category.name : 'Detail kategori';
@@ -309,7 +371,7 @@ export default function CategoryDetailPage({
       id="modern-category-detail-page-root"
       style={{
         boxSizing: 'border-box',
-        paddingBottom: '150px',
+        paddingBottom: '96px',
       }}
       className="w-full flex flex-col gap-4 max-w-lg md:mx-auto font-sans select-none"
     >
@@ -334,6 +396,79 @@ export default function CategoryDetailPage({
 
       {/* 2. Main Card Container (358px wide, rounded 14px, inset stroke) */}
       <div className="w-full rounded-[14px] p-4 bg-white hub-inset-stroke flex flex-col gap-4">
+        {/* Search Input Bar */}
+        <div
+          style={{
+            height: '48px',
+            borderRadius: '14px',
+            outline: '1px solid #CBD5E1',
+            outlineOffset: '-1px',
+            position: 'relative',
+            overflow: 'hidden',
+            display: 'flex',
+            alignItems: 'center',
+            paddingLeft: '16px',
+            paddingRight: '16px',
+            backgroundColor: '#FFFFFF',
+            boxSizing: 'border-box',
+            width: '100%',
+          }}
+          className="w-full relative overflow-hidden flex items-center bg-white focus-within:[outline-color:#0F172A] transition-all"
+        >
+          <div style={{ width: '17px', height: '17px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginRight: '15px' }}>
+            <svg
+              width="17"
+              height="17"
+              viewBox="0 0 18 18"
+              fill="none"
+              stroke="#94A3B8"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="8" cy="8" r="5.5" />
+              <line x1="12" y1="12" x2="16" y2="16" />
+            </svg>
+          </div>
+          <input
+            id="cat-detail-search-input"
+            type="search"
+            aria-label="Cari nama menu"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onSearch={(e) => setSearchQuery(e.target.value)}
+            placeholder="Cari nama menu..."
+            style={{
+              fontSize: '13px',
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
+              fontWeight: 500,
+              color: '#0F172A',
+              border: 'none',
+              outline: 'none',
+              background: 'transparent',
+              width: '100%',
+              height: '100%',
+              padding: 0,
+              boxSizing: 'border-box',
+            }}
+            className="w-full bg-transparent border-none outline-none placeholder-[#94A3B8]"
+          />
+          {searchQuery.length > 0 && (
+            <button
+              type="button"
+              aria-label="Bersihkan pencarian"
+              onClick={() => setSearchQuery('')}
+              className="w-6 h-6 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 flex items-center justify-center text-slate-500 border-none cursor-pointer shrink-0 p-0 transition-all ml-2"
+            >
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="10.5" y1="3.5" x2="3.5" y2="10.5" />
+                <line x1="3.5" y1="3.5" x2="10.5" y2="10.5" />
+              </svg>
+            </button>
+          )}
+        </div>
+
         {/* Top Control Row: Filter Pills (Aktif / Nonaktif) + "Ubah" Category Button */}
         <div className="w-full flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
@@ -394,7 +529,9 @@ export default function CategoryDetailPage({
           </div>
         ) : filteredMenus.length === 0 ? (
           <div className="py-12 text-center text-sm text-[#94A3B8] font-medium">
-            {filter === 'ACTIVE'
+            {searchQuery.trim()
+              ? `Tidak ada menu yang cocok dengan "${searchQuery}"`
+              : filter === 'ACTIVE'
               ? 'Belum ada menu aktif dalam kategori ini'
               : 'Belum ada menu nonaktif dalam kategori ini'}
           </div>

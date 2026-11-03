@@ -95,12 +95,38 @@
   }
 
   function close(record) {
-    record.host.classList.remove('open');
+    record.host.classList.remove('open', 'is-dropup');
     record.trigger.setAttribute('aria-expanded', 'false');
+    if (record.menu && record.menu.style) {
+      record.menu.style.removeProperty('top');
+      record.menu.style.removeProperty('bottom');
+      record.menu.style.removeProperty('max-height');
+    }
   }
 
   function closeAll() {
     enhanced.forEach(close);
+  }
+
+  function positionMenu(record) {
+    if (!record || !record.trigger || !record.menu) return;
+    var rect = record.trigger.getBoundingClientRect();
+    var vh = window.innerHeight || document.documentElement.clientHeight || 640;
+    var spaceBelow = vh - rect.bottom - 12;
+    var spaceAbove = rect.top - 12;
+    var estimatedMenuHeight = Math.min(280, Math.max(140, (record.select.options ? record.select.options.length : 4) * 42 + 16));
+
+    if (spaceBelow < estimatedMenuHeight && spaceAbove > spaceBelow) {
+      record.host.classList.add('is-dropup');
+      record.menu.style.top = 'auto';
+      record.menu.style.bottom = 'calc(100% + 6px)';
+      record.menu.style.maxHeight = Math.max(120, Math.min(320, Math.floor(spaceAbove - 8))) + 'px';
+    } else {
+      record.host.classList.remove('is-dropup');
+      record.menu.style.bottom = 'auto';
+      record.menu.style.top = 'calc(100% + 6px)';
+      record.menu.style.maxHeight = Math.max(120, Math.min(320, Math.floor(spaceBelow - 8))) + 'px';
+    }
   }
 
   function toggle(record) {
@@ -108,6 +134,7 @@
     closeAll();
     if (!willOpen) return;
     if (typeof record.sync === 'function') record.sync();
+    positionMenu(record);
     record.host.classList.add('open');
     record.trigger.setAttribute('aria-expanded', 'true');
   }

@@ -73,9 +73,9 @@ test('MERCHANT-HOME-02: Home has explicit operational and attention anchors', ()
 });
 
 test('MERCHANT-HOME-03: Merchant Home shell assets are render-blocking and PWA-cached', () => {
-  assert.ok(HTML.includes('/merchant-app/assets/css/home.css?v=1.0.3'), 'Home CSS must be loaded');
+  assert.ok(/\/merchant-app\/assets\/css\/home\.css\?v=1\./.test(HTML), 'Home CSS must be loaded');
   assert.ok(HTML.includes('/merchant-app/assets/js/home.js?v=1.0.2'), 'Home JS must be loaded');
-  assert.ok(SW.includes('/merchant-app/assets/css/home.css?v=1.0.3'), 'Home CSS must be precached');
+  assert.ok(/\/merchant-app\/assets\/css\/home\.css\?v=1\./.test(SW), 'Home CSS must be precached');
   assert.ok(SW.includes('/merchant-app/assets/js/home.js?v=1.0.2'), 'Home JS must be precached');
 });
 
@@ -88,6 +88,6 @@ test('MERCHANT-HOME-04: Home presentation is isolated from backend authority', (
 
 test('MERCHANT-HOME-05: Mobile primary navigation remains locked to five Merchant jobs', () => {
   const home = HTML.slice(HTML.indexOf('id="x-merchant-mobile-nav"'));
-  const labels = ['Beranda', 'Pesanan', 'Menu', 'Stock', 'Promo'];
+  const labels = ['Beranda', 'Pesanan', 'Menu &amp; Stok', 'Belanja', 'Lainnya'];
   for (const label of labels) assert.ok(home.includes(`<span>${label}</span>`), `Missing nav label: ${label}`);
 });

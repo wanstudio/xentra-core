@@ -15,13 +15,22 @@ import android.os.PowerManager;
 import androidx.core.app.NotificationCompat;
 
 public class OrderAlarmService extends Service {
-    private static final String CHANNEL_ID = "channel_pos_order_alarm";
+    private static final String CHANNEL_ID = "channel_owner_order_alarm";
     private static final int NOTIF_ID = 9120;
     public static final String ACTION_START_ALARM = "com.mybangjo.owner.ACTION_START_ALARM";
     public static final String ACTION_STOP_ALARM = "com.mybangjo.owner.ACTION_STOP_ALARM";
 
     private MediaPlayer mediaPlayer;
     private PowerManager.WakeLock wakeLock;
+    private final android.os.Handler autoStopHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable autoStopRunnable = new Runnable() {
+        @Override
+        public void run() {
+            stopAudioAndRelease();
+            stopForeground(true);
+            stopSelf();
+        }
+    };
 
     public static void startAlarm(Context context) {
         Intent intent = new Intent(context, OrderAlarmService.class);
@@ -69,9 +78,9 @@ public class OrderAlarmService extends Service {
                     PowerManager.SCREEN_BRIGHT_WAKE_LOCK |
                     PowerManager.ACQUIRE_CAUSES_WAKEUP |
                     PowerManager.ON_AFTER_RELEASE,
-                    "MybangjoPOS:OrderAlarmWakeLock"
+                    "MybangjoOwner:OrderAlarmWakeLock"
                 );
-                wakeLock.acquire(120 * 1000L); // Max 2 minutes lock
+                wakeLock.acquire(8 * 1000L); // Max 8 seconds lock
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -92,7 +101,7 @@ public class OrderAlarmService extends Service {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 AudioAttributes audioAttributes = new AudioAttributes.Builder()
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                     .build();
                 try {
                     mediaPlayer = MediaPlayer.create(this, R.raw.ada_pesanan_baru, audioAttributes, 0);
@@ -106,9 +115,9 @@ public class OrderAlarmService extends Service {
             }
 
             if (mediaPlayer == null) {
-                android.net.Uri alarmUri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM);
+                android.net.Uri alarmUri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION);
                 if (alarmUri == null) {
-                    alarmUri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION);
+                    alarmUri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM);
                 }
                 if (alarmUri != null) {
                     mediaPlayer = MediaPlayer.create(this, alarmUri);
@@ -117,8 +126,14 @@ public class OrderAlarmService extends Service {
 
             if (mediaPlayer != null) {
                 mediaPlayer.setWakeMode(this, PowerManager.PARTIAL_WAKE_LOCK);
-                mediaPlayer.setLooping(true);
+                mediaPlayer.setLooping(false); // Strictly NO LOOPING for Owner (Single Sound Alert Only)
                 mediaPlayer.setVolume(1.0f, 1.0f);
+                mediaPlayer.setOnCompletionListener(mp -> {
+                    autoStopHandler.removeCallbacks(autoStopRunnable);
+                    stopAudioAndRelease();
+                    stopForeground(true);
+                    stopSelf();
+                });
                 mediaPlayer.start();
             }
         } catch (Exception e) {
@@ -128,19 +143,24 @@ public class OrderAlarmService extends Service {
         try {
             android.os.Vibrator v = (android.os.Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
             if (v != null && v.hasVibrator()) {
-                long[] pattern = new long[]{0, 800, 400, 800, 400, 1200};
+                long[] pattern = new long[]{0, 400, 200, 400};
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    v.vibrate(android.os.VibrationEffect.createWaveform(pattern, 0));
+                    v.vibrate(android.os.VibrationEffect.createWaveform(pattern, -1)); // -1 = play once, DO NOT REPEAT
                 } else {
-                    v.vibrate(pattern, 0);
+                    v.vibrate(pattern, -1); // -1 = play once, DO NOT REPEAT
                 }
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
+
+        // Safety watchdog: automatically stop service after 6 seconds to prevent any orphan process
+        autoStopHandler.removeCallbacks(autoStopRunnable);
+        autoStopHandler.postDelayed(autoStopRunnable, 6000L);
     }
 
     private void stopAudioAndRelease() {
+        autoStopHandler.removeCallbacks(autoStopRunnable);
         try {
             if (mediaPlayer != null) {
                 if (mediaPlayer.isPlaying()) {
@@ -183,14 +203,14 @@ public class OrderAlarmService extends Service {
 
         return new NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("🔔 Ada Pesanan Kasir Baru!")
-            .setContentText("Ketuk untuk membuka kasir dan melihat pesanan.")
+            .setContentTitle("🔔 Ada Pesanan Baru!")
+            .setContentText("Pesanan baru masuk ke toko. Ketuk untuk membuka.")
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setContentIntent(pi)
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Matikan Sirene", stopPi)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Tutup", stopPi)
             .setAutoCancel(true)
-            .setOngoing(true)
+            .setOngoing(false)
             .build();
     }
 
@@ -198,10 +218,10 @@ public class OrderAlarmService extends Service {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID,
-                "Sirine Pesanan Kasir POS",
+                "Notifikasi Pesanan Owner",
                 NotificationManager.IMPORTANCE_HIGH
             );
-            channel.setDescription("Notifikasi saat pesanan kasir baru masuk");
+            channel.setDescription("Notifikasi saat pesanan baru masuk untuk Pemilik Toko");
             channel.setSound(null, null); // Sound handled by MediaPlayer
             channel.enableVibration(true);
 

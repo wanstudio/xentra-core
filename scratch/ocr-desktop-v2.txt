@@ -1,0 +1,41 @@
++ Xentra Governance SIMULASI INTERAKTIF
+
+. + 2.MenuHabis(86) | @ 3. SaklarDarurat Cabang
+
+W Layar HP Owner fix Layar Kasir Cabang @ Keduanya
+
+' ONLINE
+
+Edit Menu: Ayam Bakar Madu MasterHQ: Katalog Menu Kasir ‘Cabang Tebet
+
+ie STATUS KATALOG CABANG MALL
+
+HARGA MASTER PUSAT (HOLDING)
+Kasirsiap ima pesanan denganharg
+
+Rp 30.000
+
+Ayam Bakar Madu
+
+me 35.000
+
+Atur Harga Khusus Cabang [ @) Harga Khusus Cabang Mall
+
+Cabang Mall Kelapa Gading
+
+Harga di Cabang Mall (Rp):
+Es Teh Manis
+Rp 6.000
+
++ Kemball ke Kontrol HP Owner
+
+35000
++159 (Mall) +25% (Bandara) Samadgn Pusat
+
+9 Dampak: Cabang Mall menjual Rp 35.000, sedanah
+Cabang Tebet tetap Rp 30.000.
+
+Lihat Tampilan di Layar Kasir Cabang >
+
+Menu master tetap I data disistem pusat. Owner bisa menentukan harga berbeda untuk cabang mall/ruko tanpa periumenduplikasi
+menu. Laporan omzet holding tetap rapi terkonsolidasi

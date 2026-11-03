@@ -1266,6 +1266,10 @@
       .then(function (data) {
         _ownerMaterials = data.materials || [];
         applyOwnerMaterialsFilter();
+        if (typeof window !== 'undefined') {
+          window._ownerMaterials = _ownerMaterials;
+          window.dispatchEvent(new CustomEvent('materials-updated', { detail: _ownerMaterials }));
+        }
       })
       .catch(function (err) {
         if (container) {
@@ -1352,6 +1356,10 @@
   }
 
   window.openEditMaterialModal = function(matId) {
+    if (typeof window.navigateTo === 'function') {
+      window.navigateTo('business/materials/' + encodeURIComponent(matId) + '/edit');
+      return;
+    }
     var material = (_ownerMaterials || []).find(function(m) {
       return String(m.id) === String(matId);
     });
@@ -1586,7 +1594,8 @@
       material_code: code,
       name: name,
       base_uom_id: uomId,
-      description: desc || null
+      description: desc || null,
+      status: 'ACTIVE'
     };
 
     adminFetch(API_BASE + '/admin/materials', {

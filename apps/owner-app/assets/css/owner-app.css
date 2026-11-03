@@ -24,8 +24,22 @@ body.x-owner-mobile-app {
   -webkit-tap-highlight-color: transparent;
   user-select: none;
   overflow-x: hidden;
-  padding-bottom: max(116px, calc(96px + env(safe-area-inset-bottom, 24px))) !important; /* Space for fixed bottom nav */
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  padding-bottom: 0 !important; /* Bottom clearance handled by .x-dash-main to prevent double padding */
   scroll-padding-top: max(var(--topbar-height-mobile, 68px), calc(var(--topbar-height-mobile, 68px) + env(safe-area-inset-top, 0px)));
+}
+
+body.x-owner-mobile-app::-webkit-scrollbar,
+body.x-owner-mobile-app *::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+body.x-owner-mobile-app * {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
 }
 
 /* 1. Never show desktop sidebar in mobile app */
@@ -40,35 +54,60 @@ body.x-owner-mobile-app .x-desktop-table-view {
   display: none !important;
 }
 
-/* 3. Always display mobile bottom navigation bar */
-body.x-owner-mobile-app .x-owner-bottom-nav {
-  position: fixed !important;
-  display: grid !important;
-  grid-template-columns: repeat(5, 1fr) !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  min-width: 100% !important;
-  margin: 0 !important;
-  z-index: 200 !important;
-  min-height: 72px !important;
-  padding-top: 8px !important;
-  padding-bottom: max(24px, env(safe-area-inset-bottom, 24px)) !important;
-  box-sizing: border-box !important;
-  background: #ffffff !important;
-  border-top: 1px solid #e2e8f0 !important;
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.04) !important;
+/* 3. Hide legacy bottom nav — modern navigation is handled by OwnerAppShell */
+body.x-owner-mobile-app .x-owner-bottom-nav,
+body.x-owner-mobile-app #x-owner-bottom-nav {
+  display: none !important;
 }
 
 body.x-owner-mobile-app .x-owner-nav-item {
+  position: relative !important;
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
   justify-content: flex-start !important;
   padding-top: 4px !important;
-  gap: 3px !important;
+  gap: 6px !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+body.x-owner-mobile-app .x-owner-nav-item img,
+body.x-owner-mobile-app .x-owner-nav-item svg {
+  width: 20px !important;
+  height: 20px !important;
+  opacity: 0.85 !important;
+  transition: filter 0.15s ease, opacity 0.15s ease !important;
+}
+
+body.x-owner-mobile-app .x-owner-nav-item span {
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  line-height: 14px !important;
+  color: #0F172A !important;
+}
+
+body.x-owner-mobile-app .x-owner-nav-item.active img,
+body.x-owner-mobile-app .x-owner-nav-item.active svg {
+  opacity: 1 !important;
+  filter: brightness(0) saturate(100%) invert(48%) sepia(97%) saturate(1451%) hue-rotate(116deg) brightness(92%) contrast(101%) !important;
+}
+
+body.x-owner-mobile-app .x-owner-nav-item.active::before {
+  content: '' !important;
+  position: absolute !important;
+  top: -10px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: 40px !important;
+  height: 3.5px !important;
+  border-radius: 0 0 4px 4px !important;
+  background: #16A34A !important;
+}
+
+body.x-owner-mobile-app .x-owner-nav-item * {
+  pointer-events: none !important;
 }
 
 body.x-owner-mobile-app.x-hide-bottom-nav .x-owner-bottom-nav,
@@ -114,7 +153,7 @@ body.x-owner-mobile-app .bm-orders-mobile-cards {
 body.x-owner-mobile-app .x-dash-main {
   margin: 0 !important;
   padding-top: max(var(--topbar-height-mobile, 68px), calc(var(--topbar-height-mobile, 68px) + env(safe-area-inset-top, 0px))) !important;
-  padding-bottom: max(116px, calc(96px + env(safe-area-inset-bottom, 24px))) !important;
+  padding-bottom: max(105px, calc(81px + 24px + env(safe-area-inset-bottom, 0px))) !important;
   padding-left: 16px !important;
   padding-right: 16px !important;
   width: 100% !important;
@@ -750,11 +789,16 @@ body.x-owner-mobile-app #btn-save-master-menu-active,
   #owner-business-main-view,
   #modern-business-hub-mount,
   #subpage-catalog-menu-hub,
+  #tab-materials,
+  #modern-materials-page-mount,
+  #modern-material-editor-page-mount,
   #tab-catalog-categories,
   #modern-categories-page-mount,
   #master-categories-page,
   #tab-catalog-products,
   #modern-item-master-page-mount,
+  #modern-item-editor-page-mount,
+  #product-editor-view,
   #category-editor-view {
     padding-left: 0 !important;
     padding-right: 0 !important;
@@ -765,5 +809,106 @@ body.x-owner-mobile-app #btn-save-master-menu-active,
     box-sizing: border-box !important;
   }
 }
+
+/* 9. Anti-Flicker & Smooth Page Transition Rules for Owner Mobile */
+body.x-owner-mobile-app .x-tab-content {
+  animation: none !important;
+  transform: none !important;
+}
+
+/* Business Hub: 70% reduced clearance between last card and bottom navigation bar */
+body.x-owner-mobile-app #tab-business.x-tab-content {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+body.x-owner-mobile-app #tab-business #modern-business-hub-root {
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+body.x-owner-mobile-app #legacy-business-main-content,
+body.x-owner-mobile-app #master-categories-page,
+body.x-owner-mobile-app #product-list-view,
+body.x-owner-mobile-app #legacy-materials-content {
+  display: none !important;
+}
+
+/* ==========================================================================
+   DESKTOP RESPONSIVE PHONE FRAME (Centered 430px iPhone Simulator on PC/Mac)
+   ========================================================================== */
+@media (min-width: 640px) {
+  body.x-owner-mobile-app {
+    background: #0f172a !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: flex-start !important;
+    min-height: 100vh !important;
+    padding: 20px 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .x-owner-viewport-container {
+    max-width: 430px !important;
+    width: 100% !important;
+    min-height: calc(100vh - 40px) !important;
+    background: #f8fafc !important;
+    border-radius: 36px !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 0 10px #1e293b, 0 0 0 12px #334155 !important;
+    overflow-x: hidden !important;
+    position: relative !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  #xentra-owner-app-mount,
+  #xentra-owner-app-root {
+    width: 100% !important;
+    min-height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    border-radius: 36px !important;
+  }
+
+  #clean-owner-bottom-nav {
+    position: sticky !important;
+    bottom: 0 !important;
+    left: auto !important;
+    right: auto !important;
+    width: 100% !important;
+    max-width: 430px !important;
+    margin-top: auto !important;
+    border-bottom-left-radius: 36px !important;
+    border-bottom-right-radius: 36px !important;
+  }
+}
+
+#clean-owner-bottom-nav button {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  padding: 12px 0 6px 0 !important;
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+}
+
+@media (max-width: 639px) {
+  body.x-owner-mobile-app {
+    background: #f8fafc !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .x-owner-viewport-container {
+    width: 100% !important;
+    min-height: 100vh !important;
+    background: #f8fafc !important;
+  }
+}
+
 
 

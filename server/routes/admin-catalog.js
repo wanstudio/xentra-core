@@ -4,13 +4,40 @@
  * Owner/Brand Manager category and master-product CRUD. Branch adoption and
  * branch catalog operations remain in the branch-scoped route area.
  */
+function setNoCacheHeaders(res) {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
+}
+
 module.exports = function registerAdminCatalogRoutes(router, deps) {
   const { db, requireAuth } = deps;
 
 router.get('/admin/categories', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
+    setNoCacheHeaders(res);
     const categories = db.prepare('SELECT * FROM categories WHERE brand_id = ? ORDER BY sort_order ASC').all(req.brand_id);
     res.json({ success: true, categories: categories || [] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/admin/categories/:id', requireAuth(['owner', 'brand_manager']), (req, res) => {
+  try {
+    setNoCacheHeaders(res);
+    const category = db.prepare('SELECT * FROM categories WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
+    if (!category) {
+      return res.status(404).json({ success: false, error: 'CATEGORY_NOT_FOUND', message: 'Kategori tidak ditemukan.' });
+    }
+    try {
+      const productCountRow = db.prepare('SELECT COUNT(*) as count FROM products WHERE category_id = ? AND brand_id = ?').get(category.id, req.brand_id);
+      category.product_count = productCountRow ? productCountRow.count : 0;
+    } catch (_) {
+      category.product_count = 0;
+    }
+    res.json({ success: true, category });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -141,28 +168,40 @@ router.put('/admin/categories/:id', requireAuth(['owner', 'brand_manager']), (re
   }
 });
 
-router.patch('/admin/categories/:id/toggle', requireAuth(['owner', 'brand_manager']), (req, res) => {
-  try {
-    const stmt = db.prepare(`
-      UPDATE categories 
-      SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END
-      WHERE id = ? AND brand_id = ?
-    `).run(req.params.id, req.brand_id);
+['/admin/categories/:id/toggle', '/admin/categories/:id/status'].forEach((routePath) => {
+  router.patch(routePath, requireAuth(['owner', 'brand_manager']), (req, res) => {
+    try {
+      const existing = db.prepare('SELECT * FROM categories WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
+      if (!existing) {
+        return res.status(404).json({ success: false, error: 'Kategori tidak ditemukan.' });
+      }
 
-    if (!stmt || stmt.changes === 0) {
-      return res.status(404).json({ success: false, error: 'Kategori tidak ditemukan atau tidak berubah.' });
+      let nextActive;
+      if (req.body && req.body.is_active !== undefined) {
+        nextActive = (req.body.is_active === 1 || req.body.is_active === true || req.body.is_active === '1') ? 1 : 0;
+      } else if (req.body && req.body.status !== undefined) {
+        nextActive = String(req.body.status).toUpperCase() === 'ACTIVE' ? 1 : 0;
+      } else {
+        nextActive = existing.is_active === 1 ? 0 : 1;
+      }
+
+      db.prepare(`
+        UPDATE categories 
+        SET is_active = ?
+        WHERE id = ? AND brand_id = ?
+      `).run(nextActive, req.params.id, req.brand_id);
+
+      const category = db.prepare('SELECT * FROM categories WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
+      const activeText = category && category.is_active === 1 ? 'diaktifkan' : 'dinonaktifkan';
+      res.json({
+        success: true,
+        message: `Kategori "${category ? category.name : ''}" berhasil ${activeText}.`,
+        category
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
     }
-
-    const category = db.prepare('SELECT * FROM categories WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
-    const activeText = category && category.is_active === 1 ? 'diaktifkan' : 'dinonaktifkan';
-    res.json({
-      success: true,
-      message: `Kategori "${category ? category.name : ''}" berhasil ${activeText}.`,
-      category
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
+  });
 });
 
 router.patch('/admin/categories/:id/archive', requireAuth(['owner', 'brand_manager']), (req, res) => {
@@ -354,6 +393,7 @@ router.delete('/admin/categories/:id', requireAuth(['owner', 'brand_manager']), 
 // 13. Admin Products CRUD
 router.get('/admin/products', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
+    setNoCacheHeaders(res);
     const products = db.prepare(`
       SELECT p.*,
              ml.id AS level_id,
@@ -373,6 +413,7 @@ router.get('/admin/products', requireAuth(['owner', 'brand_manager']), (req, res
 
 router.get('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
+    setNoCacheHeaders(res);
     const product = db.prepare(`
       SELECT p.*,
              ml.id AS level_id,
@@ -408,6 +449,7 @@ router.get('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req,
       ORDER BY b.name ASC
     `).all(req.params.id, req.brand_id);
 
+    product.branch_adoptions = branchAdoptions;
     res.json({ success: true, product, branch_adoptions: branchAdoptions });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -551,6 +593,29 @@ router.put('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req,
       req.brand_id
     );
 
+    // Location-Specific Pricing (LSP) per branch override support
+    if (Array.isArray(req.body.branch_prices)) {
+      for (const bp of req.body.branch_prices) {
+        if (!bp || !bp.branch_id) continue;
+        const validBranch = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(bp.branch_id, req.brand_id);
+        if (!validBranch) continue;
+
+        const rawBranchPrice = bp.price !== undefined && bp.price !== null && bp.price !== '' ? Number(bp.price) : null;
+        const branchPrice = (rawBranchPrice !== null && Number.isFinite(rawBranchPrice) && rawBranchPrice >= 0) ? rawBranchPrice : null;
+
+        const existingBp = db.prepare('SELECT branch_id, price FROM branch_products WHERE branch_id = ? AND product_id = ?').get(bp.branch_id, req.params.id);
+        if (existingBp) {
+          db.prepare('UPDATE branch_products SET price = ?, updated_at = datetime(\'now\') WHERE branch_id = ? AND product_id = ?')
+            .run(branchPrice, bp.branch_id, req.params.id);
+        } else {
+          db.prepare(`
+            INSERT INTO branch_products (branch_id, product_id, price, stock, is_available)
+            VALUES (?, ?, ?, 100, 1)
+          `).run(bp.branch_id, req.params.id, branchPrice);
+        }
+      }
+    }
+
     const product = db.prepare(
       'SELECT * FROM products WHERE id = ? AND brand_id = ?'
     ).get(req.params.id, req.brand_id);
@@ -566,6 +631,7 @@ router.put('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req,
 
 router.get('/admin/products/:id/options', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
+    setNoCacheHeaders(res);
     const product = db.prepare('SELECT id, name, options_config FROM products WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
     if (!product) return res.status(404).json({ success: false, error: 'Product tidak ditemukan.' });
     const ProductOptionsModel = require('../../domains/catalog/models/ProductOptionsModel');

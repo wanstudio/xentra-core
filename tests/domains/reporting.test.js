@@ -153,6 +153,27 @@ test('Reporting 3 — Payment Report: aggregates settled funds per provider', ()
   assert.strictEqual(payment.summary.total_settled, 135000);
 });
 
+test('Reporting — shared bill payment breakdown uses check contributions without duplicating order summary', () => {
+  const orderId = 'ord_rep_shared_checks';
+  const checkId = 'check_rep_shared_checks';
+  db.prepare(`INSERT OR REPLACE INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, delivery_fee, grand_total, payment_method, payment_status, status, created_at)
+    VALUES (?, 'ORD-REP-SHARED-CHECKS', 'brand_rep', 'branch_rep_1', 'Group', '6281234', 'dine_in', 'customer_app', 110000, 0, 110000, 'multiple', 'settlement', 'pending', datetime('now'))`).run(orderId);
+  db.prepare("INSERT OR REPLACE INTO pos_order_checks (id, order_id, check_number, status, allocated_amount) VALUES (?, ?, 1, 'open', 110000)").run(checkId, orderId);
+  db.prepare("INSERT OR REPLACE INTO order_payments (id, order_id, provider, payment_method, payment_status, amount) VALUES ('pay_rep_shared_checks', ?, 'multiple', 'multiple', 'settlement', 110000)").run(orderId);
+  db.prepare(`INSERT OR REPLACE INTO pos_check_payments (id, check_id, order_id, payment_method, provider, amount, payment_status, raw_payment)
+    VALUES ('cp_rep_shared_online', ?, ?, 'midtrans', 'midtrans', 40000, 'settlement', '{"source":"existing_order_payment","payment_id":"pay_rep_shared_checks"}'),
+           ('cp_rep_shared_cash', ?, ?, 'cash', 'cash', 60000, 'settlement', '{"cashier_id":"cashier_1"}')`).run(checkId, orderId, checkId, orderId);
+  db.prepare(`INSERT OR REPLACE INTO pos_check_payment_intents (id, gateway_order_id, order_id, check_id, provider, amount, payment_status)
+    VALUES ('pci_rep_shared_pending', 'pc_rep_shared_pending', ?, ?, 'midtrans', 10000, 'pending')`).run(orderId, checkId);
+
+  const report = PaymentReportService.getPaymentReport({ brand_id: 'brand_rep' });
+  assert.equal(report.summary.cash_settled, 120000);
+  assert.equal(report.summary.midtrans_settled, 115000);
+  assert.equal(report.summary.total_settled, 235000);
+  assert.equal(report.summary.total_pending, 10000);
+  assert.ok(!report.breakdown.some(row => row.provider === 'multiple'), 'cumulative mixed summary is represented by detailed check contributions');
+});
+
 // ==============================================================================
 // Reporting 4 — Inventory Report Service (Low-Stock Alerting & Multi-Tenant Scoping - NEW-01)
 // ==============================================================================

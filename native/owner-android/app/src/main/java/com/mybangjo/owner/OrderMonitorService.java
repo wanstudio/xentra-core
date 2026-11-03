@@ -43,6 +43,7 @@ public class OrderMonitorService extends Service {
 
     private ScheduledExecutorService scheduler;
     private final Set<String> seenPendingOrderIds = new HashSet<>();
+    private boolean isFirstPoll = true;
     private boolean isAlarmActive = false;
 
     public static void saveAuthContext(Context context, String token, String branchId) {
@@ -67,6 +68,15 @@ public class OrderMonitorService extends Service {
             prefs.edit().remove(KEY_TOKEN).remove(KEY_BRANCH_ID).apply();
             stopMonitoring(context);
         } catch (Exception ignored) {}
+    }
+
+    public static String getSavedToken(Context context) {
+        try {
+            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            return prefs.getString(KEY_TOKEN, null);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public static void startMonitoring(Context context) {
@@ -249,6 +259,13 @@ public class OrderMonitorService extends Service {
             OrderOverlayService.updateBadge(this, pendingCount);
 
             if (pendingCount > 0) {
+                // First poll after monitor startup: seed existing pending orders without blasting alarm
+                if (isFirstPoll) {
+                    isFirstPoll = false;
+                    seenPendingOrderIds.addAll(currentPendingIds);
+                    return;
+                }
+
                 boolean hasNewOrder = false;
                 for (String id : currentPendingIds) {
                     if (!seenPendingOrderIds.contains(id)) {
@@ -257,9 +274,13 @@ public class OrderMonitorService extends Service {
                     }
                 }
 
-                if (hasNewOrder || !isAlarmActive) {
+                if (hasNewOrder) {
                     isAlarmActive = true;
                     seenPendingOrderIds.addAll(currentPendingIds);
+                    if (seenPendingOrderIds.size() > 300) {
+                        seenPendingOrderIds.clear();
+                        seenPendingOrderIds.addAll(currentPendingIds);
+                    }
 
                     wakeUpScreen();
                     OrderAlarmService.startAlarm(this);
@@ -276,9 +297,9 @@ public class OrderMonitorService extends Service {
                     }
                 }
             } else {
-                if (isAlarmActive || !seenPendingOrderIds.isEmpty()) {
+                isFirstPoll = false;
+                if (isAlarmActive) {
                     isAlarmActive = false;
-                    seenPendingOrderIds.clear();
                     OrderAlarmService.stopAlarm(this);
                     dismissOrderNotification();
                     if (OrderOverlayService.isAssistiveBallEnabled(this)) {
@@ -299,9 +320,9 @@ public class OrderMonitorService extends Service {
                     PowerManager.SCREEN_BRIGHT_WAKE_LOCK |
                     PowerManager.ACQUIRE_CAUSES_WAKEUP |
                     PowerManager.ON_AFTER_RELEASE,
-                    "MybangjoPOS:OrderWakeUp"
+                    "MybangjoOwner:OrderWakeUp"
                 );
-                wl.acquire(60 * 1000L);
+                wl.acquire(8 * 1000L);
             }
         } catch (Exception ignored) {}
     }

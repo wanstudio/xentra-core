@@ -83,9 +83,26 @@
 
   function showCategoryEditorSection() {
     var modernMount = $('modern-categories-page-mount');
-    if (modernMount) modernMount.style.display = 'none';
+    if (modernMount) {
+      modernMount.style.display = 'none';
+      if (typeof window.unmountCategoriesPage === 'function') {
+        window.unmountCategoriesPage(modernMount);
+      }
+    }
     var modernItemMount = $('modern-item-master-page-mount');
-    if (modernItemMount) modernItemMount.style.display = 'none';
+    if (modernItemMount) {
+      modernItemMount.style.display = 'none';
+      if (typeof window.unmountItemMasterPage === 'function') {
+        window.unmountItemMasterPage(modernItemMount);
+      }
+    }
+    var modernMenuMount = $('modern-menu-editor-mount');
+    if (modernMenuMount) {
+      modernMenuMount.style.display = 'none';
+      if (typeof window.unmountMenuEditor === 'function') {
+        window.unmountMenuEditor(modernMenuMount);
+      }
+    }
     var page = $('master-categories-page');
     var catEditor = $('category-editor-view');
     var productList = $('product-list-view');
@@ -102,10 +119,23 @@
     var modernMount = $('modern-categories-page-mount');
     var modernItemMount = $('modern-item-master-page-mount');
     var modernCatEditorMount = $('modern-category-editor-page-mount');
+    var modernMenuMount = $('modern-menu-editor-mount');
     if (modernCatEditorMount) {
       modernCatEditorMount.style.display = 'none';
       if (typeof window.unmountCategoryEditorPage === 'function') {
         window.unmountCategoryEditorPage(modernCatEditorMount);
+      }
+    }
+    if (modernItemMount) {
+      modernItemMount.style.display = 'none';
+      if (typeof window.unmountItemMasterPage === 'function') {
+        window.unmountItemMasterPage(modernItemMount);
+      }
+    }
+    if (modernMenuMount) {
+      modernMenuMount.style.display = 'none';
+      if (typeof window.unmountMenuEditor === 'function') {
+        window.unmountMenuEditor(modernMenuMount);
       }
     }
     var page = $('master-categories-page');
@@ -114,7 +144,12 @@
     var productDetail = $('product-detail-view');
     var productEditor = $('product-editor-view');
 
-    var currentHash = (window.location.hash || '').replace(/^#\/?/, '');
+    var snap = window.XentraNavigationController && typeof window.XentraNavigationController.getSnapshot === 'function'
+      ? window.XentraNavigationController.getSnapshot()
+      : null;
+    var currentHash = (snap && snap.route)
+      ? snap.route
+      : (window.location.hash || '').replace(/^#\/?/, '');
     if (currentHash === 'catalog/categories/sort' || currentHash === 'catalog/categories/reorder') {
       if (modernMount && typeof window.mountCategorySortPage === 'function') {
         modernMount.style.display = 'block';
@@ -181,10 +216,10 @@
             navigateTo('catalog/categories/' + encodeURIComponent(id || detailCatId) + '/edit');
           },
           onAddMenu: function() {
-            navigateTo('catalog/master-menus/new');
+            navigateTo('catalog/master-menus/new', { history: 'push' });
           },
           onEditMenu: function(menuId) {
-            navigateTo('catalog/master-menus/' + encodeURIComponent(menuId) + '/edit');
+            navigateTo('catalog/master-menus/' + encodeURIComponent(menuId) + '/edit', { history: 'push' });
           },
           onSortMenus: function(id) {
             navigateTo('catalog/categories/' + encodeURIComponent(id || detailCatId) + '/sort-menus');
@@ -207,7 +242,7 @@
           if (typeof window.goBackFromCategory === 'function') {
             window.goBackFromCategory();
           } else {
-            navigateTo('business/catalog');
+            navigateTo('business');
           }
         },
         onNavigate: function(route) {
@@ -259,6 +294,13 @@
   }
 
   async function loadMasterCategoriesPage() {
+    var modernMount = $('modern-categories-page-mount');
+    if (modernMount && typeof window.mountCategoriesPage === 'function') {
+      // Modern React CategoriesPage / CategoryDetailPage / CategorySortPage
+      // handles its own focused fetches; avoid firing 7 redundant legacy requests
+      // that trigger the native WebView loading progress bar.
+      return;
+    }
     var listEls = {
       category: $('master-categories-page-list'),
       flavor: $('master-flavors-page-list'),

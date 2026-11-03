@@ -1,7 +1,7 @@
 /**
  * XENTRA CORE — MERCHANT APP STOCK & AVAILABILITY
  *
- * Fast Operational Availability & Daily Portion Counter for Branch Operations.
+ * Branch sellable Product Stock, ingredient stock, and production operations.
  * Simple 1-tap availability toggle & direct portion step adjustments (GoBiz / Moka style).
  */
 (function () {
@@ -25,7 +25,8 @@
     statusFilter: 'all',
     fetchSeq: 0,
     activeAdjustItem: null,
-    activePrepareItem: null
+    activePrepareItem: null,
+    activePreparePostingId: null
   };
 
   function getStockBranchId() {
@@ -105,8 +106,8 @@
   window.loadBMStock = loadBMStock;
 
   function getStockStatus(it) {
-    if (it.is_available === 0 || it.is_available === false) return 'out';
-    if (it.fulfillment_type === 'BY_ORDER' || it.stock === null || it.stock === undefined || it.stock === '') return 'untracked';
+    if (it.fulfillment_type === 'BY_ORDER') return 'by_order';
+    if (it.has_stock_record === false || it.has_stock_record === 0 || it.stock === null || it.stock === undefined || it.stock === '') return 'untracked';
     var s = Number(it.stock);
     var th = Number(it.low_stock_threshold || 5);
     if (s <= 0) return 'out';
@@ -122,14 +123,18 @@
     var lowStock = (items || []).filter(function (it) { return getStockStatus(it) === 'low'; }).length;
     var safeStock = (items || []).filter(function (it) { return getStockStatus(it) === 'safe'; }).length;
 
-    var trackedAvailable = safeStock + lowStock;
-
     if ($('bm-stock-stat-total')) $('bm-stock-stat-total').textContent = total;
-    if ($('bm-stock-stat-tracked')) $('bm-stock-stat-tracked').textContent = trackedAvailable;
     if ($('bm-stock-stat-safe')) $('bm-stock-stat-safe').textContent = safeStock;
     if ($('bm-stock-stat-low')) $('bm-stock-stat-low').textContent = lowStock;
     if ($('bm-stock-stat-out')) $('bm-stock-stat-out').textContent = outOfStock;
-    if ($('bm-stock-stat-untracked')) $('bm-stock-stat-untracked').textContent = byOrder > 0 ? (byOrder + ' By Order') : untracked;
+    if ($('bm-stock-stat-by-order')) $('bm-stock-stat-by-order').textContent = byOrder;
+    var untrackedNote = $('bm-stock-untracked-note');
+    if (untrackedNote) {
+      untrackedNote.hidden = untracked === 0;
+      untrackedNote.textContent = untracked
+        ? untracked + ' menu belum memiliki saldo stok tercatat. Catat jumlah fisiknya sebelum menu dijual.'
+        : '';
+    }
 
     var hubPortionBadge = $('bm-stock-hub-portion-badge');
     if (hubPortionBadge) {
@@ -146,18 +151,6 @@
       }
     }
 
-    var hubRecipeBadge = $('bm-stock-hub-recipe-badge');
-    if (hubRecipeBadge) {
-      var rCount = (_bmStockState.recipes || []).length;
-      hubRecipeBadge.textContent = rCount + ' Resep';
-      if (rCount > 0) {
-        hubRecipeBadge.style.background = '#fef3c7';
-        hubRecipeBadge.style.color = '#92400e';
-      } else {
-        hubRecipeBadge.style.background = '#f1f5f9';
-        hubRecipeBadge.style.color = '#64748b';
-      }
-    }
   }
 
   function onBMStockFilterChange() {
@@ -200,7 +193,7 @@
       var status = getStockStatus(it);
       var isUntracked = status === 'untracked';
       var isOut = status === 'out';
-      var isAvail = !isOut;
+      var isMenuUnavailable = it.is_available === 0 || it.is_available === false;
       var s = isUntracked ? null : Number(it.stock);
       var th = Number(it.low_stock_threshold || 5);
 
@@ -212,16 +205,17 @@
 
       var statusText = isOut ? 'HABIS'
         : isByOrder ? 'BY ORDER'
-        : status === 'untracked' ? 'TIDAK DIBATASI'
+        : status === 'untracked' ? 'BELUM DILACAK'
         : status === 'low' ? 'SISA ' + s + ' PORSI (MENIPIS)'
         : 'SISA ' + s + ' PORSI';
+      if (isMenuUnavailable && !isOut && !isByOrder) statusText += ' · MENU NONAKTIF';
 
       var portionDisplayHtml = isByOrder
         ? '<span class="x-stock-portion-display" style="font-size:16px; color:#0284c7;">∞</span>' +
           '<span class="x-stock-portion-unit" style="font-size:10px; color:#0284c7;">By Order</span>'
         : isUntracked
-        ? '<span class="x-stock-portion-display">∞</span>' +
-          '<span class="x-stock-portion-unit">Porsi</span>'
+        ? '<span class="x-stock-portion-display">—</span>' +
+          '<span class="x-stock-portion-unit">Belum dilacak</span>'
         : '<span class="x-stock-portion-display">' + s + '</span>' +
           '<span class="x-stock-portion-unit">Porsi</span>';
 
@@ -243,6 +237,26 @@
       var metaRow2 = recipe
         ? '<div class="x-stock-item-meta-recipe"><span>📋</span><span>Resep: ' + esc(recipe.recipe_name) + '</span></div>'
         : '';
+      var recipeCapacityHtml = '';
+      if (recipe && !isByOrder && Array.isArray(recipe.components) && recipe.components.length) {
+        var maxBatches = Infinity;
+        var capacityKnown = false;
+        recipe.components.forEach(function (comp) {
+          var planned = Number(comp.planned_quantity);
+          var available = Number(comp.branch_material_stock);
+          if (!Number.isFinite(planned) || planned <= 0) return;
+          if (!Number.isFinite(available) || available < 0) available = 0;
+          capacityKnown = true;
+          maxBatches = Math.min(maxBatches, Math.floor((available + 1e-9) / planned));
+        });
+        if (capacityKnown) {
+          var batchYield = Number(recipe.planned_yield_quantity) || 0;
+          var capacityText = maxBatches > 0
+            ? 'Estimasi bahan cukup ' + maxBatches + ' batch' + (batchYield > 0 ? ' (+' + (maxBatches * batchYield) + ' porsi menurut resep)' : '')
+            : 'Stok bahan belum cukup untuk 1 batch resep';
+          recipeCapacityHtml = '<div style="font-size:10.5px; color:' + (maxBatches > 0 ? '#15803d' : '#b91c1c') + '; margin-top:4px;">' + capacityText + '</div>';
+        }
+      }
 
       return '<div class="x-stock-item-card" data-product-id="' + esc(it.product_id) + '" style="cursor:pointer;" onclick="openBMStockDetailModal(\'' + esc(it.product_id) + '\')">' +
         '<div class="x-stock-item-main">' +
@@ -253,6 +267,7 @@
           '<div class="x-stock-item-meta">' +
             '<div class="x-stock-item-meta-row">' + metaRow1Items.join(' <span style="color:#cbd5e1;">•</span> ') + '</div>' +
             metaRow2 +
+            recipeCapacityHtml +
           '</div>' +
         '</div>' +
         '<div class="x-stock-item-controls">' +
@@ -283,7 +298,7 @@
       var status = getStockStatus(it);
       var isUntracked = status === 'untracked';
       var isOut = status === 'out';
-      var isAvail = !isOut;
+      var isMenuUnavailable = it.is_available === 0 || it.is_available === false;
       var s = isUntracked ? null : Number(it.stock);
       var th = Number(it.low_stock_threshold || 5);
       var statusLabel = isOut ? 'HABIS'
@@ -291,6 +306,7 @@
         : status === 'untracked' ? 'BELUM DILACAK'
         : status === 'low' ? 'MENIPIS'
         : 'AMAN';
+      if (isMenuUnavailable && !isOut && !isByOrder) statusLabel += ' · MENU NONAKTIF';
       var badgeClass = isOut ? 'x-badge-danger'
         : isByOrder ? 'x-badge-info'
         : status === 'untracked' ? 'x-badge-muted'
@@ -398,7 +414,7 @@
 
     if ($('bm-adjust-product-id')) $('bm-adjust-product-id').value = item.product_id;
     if ($('bm-adjust-product-name')) $('bm-adjust-product-name').textContent = item.product_name;
-    if ($('bm-adjust-current-stock')) $('bm-adjust-current-stock').textContent = (item.stock == null ? 'Belum dilacak (0)' : item.stock + ' porsi');
+    if ($('bm-adjust-current-stock')) $('bm-adjust-current-stock').textContent = (item.stock == null ? 'Belum dilacak — masukkan jumlah fisik untuk mulai melacak' : item.stock + ' porsi');
     if ($('bm-adjust-target-qty')) $('bm-adjust-target-qty').value = curStock;
     if ($('bm-adjust-low-threshold')) $('bm-adjust-low-threshold').value = (item.low_stock_threshold != null ? item.low_stock_threshold : 5);
 
@@ -510,6 +526,25 @@
   window.submitBMStockAdjustment = submitBMStockAdjustment;
 
   /* Cooking / Preparation Batch Modal Handlers */
+  function getPreparePostingStorageKey(branchId, productId) {
+    return 'xentra_production_posting:' + String(branchId || '') + ':' + String(productId || '');
+  }
+
+  function makePreparePostingId() {
+    var random = window.crypto && typeof window.crypto.randomUUID === 'function'
+      ? window.crypto.randomUUID().replace(/-/g, '')
+      : (Date.now().toString(36) + Math.random().toString(36).slice(2));
+    return 'prep_ui_' + random;
+  }
+
+  function findPrepareConsumptionInput(materialId) {
+    var inputs = document.querySelectorAll('[data-actual-material-id]');
+    for (var i = 0; i < inputs.length; i += 1) {
+      if (String(inputs[i].getAttribute('data-actual-material-id')) === String(materialId)) return inputs[i];
+    }
+    return null;
+  }
+
   function openBMStockPrepareModal(productId) {
     var recipe = (_bmStockState.recipes || []).find(function (r) { return r.output_product_id === productId; });
     if (!recipe) {
@@ -527,6 +562,12 @@
     }
 
     _bmStockState.activePrepareItem = item;
+    var postingStorageKey = getPreparePostingStorageKey(getStockBranchId(), productId);
+    try {
+      _bmStockState.activePreparePostingId = localStorage.getItem(postingStorageKey) || null;
+    } catch (_) {
+      _bmStockState.activePreparePostingId = null;
+    }
     var modal = $('modal-bm-stock-prepare');
     if (!modal) return false;
 
@@ -539,7 +580,12 @@
       $('bm-prepare-portions').value = yieldQty;
       $('bm-prepare-portions').min = 1;
     }
+    if ($('bm-prepare-actual-portions')) {
+      $('bm-prepare-actual-portions').value = '';
+      $('bm-prepare-actual-portions').min = 1;
+    }
     if ($('bm-prepare-notes')) $('bm-prepare-notes').value = '';
+    if ($('bm-prepare-components-list')) $('bm-prepare-components-list').innerHTML = '';
 
     renderBMPrepareBatchButtons(yieldQty);
     updateBMPrepareMaterialsPreview();
@@ -575,10 +621,19 @@
     var input = $('bm-prepare-portions');
     if (input) {
       input.value = val;
-      updateBMPrepareMaterialsPreview();
+      onBMPrepareTargetChange();
     }
   }
   window.setBMPreparePortions = setBMPreparePortions;
+
+  function onBMPrepareTargetChange() {
+    var actualOutput = $('bm-prepare-actual-portions');
+    if (actualOutput) actualOutput.value = '';
+    var container = $('bm-prepare-components-list');
+    if (container) container.innerHTML = '';
+    updateBMPrepareMaterialsPreview();
+  }
+  window.onBMPrepareTargetChange = onBMPrepareTargetChange;
 
   function updateBMPrepareMaterialsPreview() {
     var item = _bmStockState.activePrepareItem;
@@ -613,43 +668,73 @@
     var container = $('bm-prepare-components-list');
     var warningEl = $('bm-prepare-warning');
     var submitBtn = $('btn-bm-submit-prepare');
-    var hasShortage = false;
-
     if (!container) return;
-
     container.innerHTML = recipe.components.map(function (comp) {
       var needed = Number(comp.planned_quantity) * factor;
       var avail = Number(comp.branch_material_stock || 0);
-      var isShort = avail < needed;
-      if (isShort) hasShortage = true;
-
       var neededFormatted = needed % 1 === 0 ? needed : needed.toFixed(2);
       var availFormatted = avail % 1 === 0 ? avail : avail.toFixed(2);
 
-      return '<div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px dashed #e2e8f0;">' +
+      return '<div data-actual-consumption-row="1" data-material-id="' + esc(comp.material_id) + '" data-available="' + esc(avail) + '" style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:7px 0; border-bottom:1px dashed #e2e8f0;">' +
         '<div>' +
           '<strong>' + esc(comp.material_name) + '</strong>' +
-          '<div style="font-size:11px; color:' + (isShort ? '#b91c1c' : 'var(--text-muted)') + ';">' +
-            'Dibutuhkan: ' + neededFormatted + ' ' + esc(comp.planned_uom_name || '') +
-            ' • Ada: ' + availFormatted + ' ' + esc(comp.planned_uom_name || '') +
+          '<div style="font-size:11px; color:var(--text-muted);">' +
+            'Resep: ' + neededFormatted + ' ' + esc(comp.planned_uom_name || '') +
+            ' • Stok: ' + availFormatted + ' ' + esc(comp.planned_uom_name || '') +
           '</div>' +
         '</div>' +
-        '<div>' +
-          (isShort
-            ? '<span class="x-badge x-badge-danger" style="font-size:10px;">KURANG</span>'
-            : '<span class="x-badge x-badge-success" style="font-size:10px;">CUKUP</span>') +
-        '</div>' +
+        '<label style="font-size:10px; color:var(--text-muted); white-space:nowrap;">Aktual' +
+          '<input type="number" min="0" step="any" inputmode="decimal" data-actual-material-id="' + esc(comp.material_id) + '" value="" aria-label="Pemakaian aktual ' + esc(comp.material_name) + '" oninput="validateBMPrepareBatch()" style="display:block; width:96px; margin-top:3px; padding:6px 7px; border:1px solid #cbd5e1; border-radius:7px; font-size:12px; font-weight:700; color:#0f172a;">' +
+          '<span>' + esc(comp.planned_uom_name || '') + '</span>' +
+        '</label>' +
+        '<div data-consumption-status="1" style="min-width:48px; text-align:right;"><span style="font-size:10px; color:#64748b;">Isi aktual</span></div>' +
       '</div>';
     }).join('');
-
-    if (warningEl) warningEl.style.display = hasShortage ? 'block' : 'none';
-    if (submitBtn) {
-      submitBtn.disabled = hasShortage;
-      submitBtn.style.opacity = hasShortage ? '0.5' : '1';
-      submitBtn.style.cursor = hasShortage ? 'not-allowed' : 'pointer';
-    }
+    validateBMPrepareBatch();
   }
   window.updateBMPrepareMaterialsPreview = updateBMPrepareMaterialsPreview;
+
+  function validateBMPrepareBatch() {
+    var container = $('bm-prepare-components-list');
+    var warningEl = $('bm-prepare-warning');
+    var submitBtn = $('btn-bm-submit-prepare');
+    if (!container) return;
+    var hasShortage = false;
+    var hasInvalid = false;
+    var hasUse = false;
+    container.querySelectorAll('[data-actual-consumption-row]').forEach(function (row) {
+      var input = row.querySelector('[data-actual-material-id]');
+      var status = row.querySelector('[data-consumption-status]');
+      var raw = input ? input.value.trim() : '';
+      var qty = raw === '' ? NaN : Number(raw);
+      var available = Number(row.getAttribute('data-available') || 0);
+      var valid = Number.isFinite(qty) && qty >= 0;
+      var used = valid && qty > 0;
+      var short = used && qty > available + 1e-9;
+      if (!valid) hasInvalid = true;
+      if (used) hasUse = true;
+      if (short) hasShortage = true;
+      if (input) input.style.borderColor = short ? '#ef4444' : (valid ? '#16a34a' : '#cbd5e1');
+      if (status) status.innerHTML = short
+        ? '<span class="x-badge x-badge-danger" style="font-size:10px;">KURANG</span>'
+        : used ? '<span class="x-badge x-badge-success" style="font-size:10px;">CUKUP</span>'
+          : valid ? '<span style="font-size:10px; color:#64748b;">Tidak dipakai</span>'
+            : '<span style="font-size:10px; color:#64748b;">Isi aktual</span>';
+    });
+    var output = $('bm-prepare-actual-portions');
+    var outputValue = output ? Number(output.value) : NaN;
+    var validOutput = !!output && output.value.trim() !== '' && Number.isInteger(outputValue) && outputValue > 0;
+    var inputWarning = $('bm-prepare-input-warning');
+    if (inputWarning) inputWarning.style.display = !validOutput || hasInvalid || !hasUse ? 'block' : 'none';
+    if (warningEl) warningEl.style.display = hasShortage ? 'block' : 'none';
+    var disabled = hasShortage || hasInvalid || !hasUse || !validOutput;
+    if (submitBtn) {
+      submitBtn.disabled = disabled;
+      submitBtn.style.opacity = disabled ? '0.5' : '1';
+      submitBtn.style.cursor = disabled ? 'not-allowed' : 'pointer';
+    }
+  }
+  window.validateBMPrepareBatch = validateBMPrepareBatch;
 
   async function submitBMStockPrepare(e) {
     if (e && typeof e.preventDefault === 'function') e.preventDefault();
@@ -661,13 +746,46 @@
     if (!productId && item) productId = item.product_id;
 
     var portionsInput = $('bm-prepare-portions');
-    var portions = portionsInput ? Number(portionsInput.value) : NaN;
+    var plannedPortions = portionsInput ? Number(portionsInput.value) : NaN;
+    var actualPortionsInput = $('bm-prepare-actual-portions');
+    var actualPortions = actualPortionsInput ? Number(actualPortionsInput.value) : NaN;
     var notes = $('bm-prepare-notes') ? $('bm-prepare-notes').value.trim() : '';
 
-    if (!productId || isNaN(portions) || portions <= 0) {
-      showToast('Masukkan jumlah porsi masak yang valid (> 0).');
+    if (!productId || !Number.isInteger(plannedPortions) || plannedPortions <= 0 || !Number.isInteger(actualPortions) || actualPortions <= 0) {
+      showToast('Isi target produksi dan hasil aktual batch dengan bilangan porsi lebih dari 0.');
       return;
     }
+
+    var recipe = (_bmStockState.recipes || []).find(function (r) { return r.output_product_id === productId; });
+    var actualConsumptions = [];
+    var invalidMaterial = false;
+    (recipe && Array.isArray(recipe.components) ? recipe.components : []).forEach(function (comp) {
+      var input = findPrepareConsumptionInput(comp.material_id);
+      var quantity = input && input.value.trim() !== '' ? Number(input.value) : NaN;
+      if (!Number.isFinite(quantity) || quantity < 0) {
+        invalidMaterial = true;
+        return;
+      }
+      if (quantity > 0) {
+        actualConsumptions.push({
+          material_id: comp.material_id,
+          source_uom_id: comp.planned_uom_id,
+          actual_quantity: quantity
+        });
+      }
+    });
+    if (invalidMaterial || actualConsumptions.length === 0) {
+      showToast('Isi pemakaian aktual bahan dengan benar. Minimal satu bahan harus lebih dari 0.');
+      return;
+    }
+
+    var postingStorageKey = getPreparePostingStorageKey(branchId, productId);
+    if (!_bmStockState.activePreparePostingId) {
+      _bmStockState.activePreparePostingId = makePreparePostingId();
+    }
+    try {
+      localStorage.setItem(postingStorageKey, _bmStockState.activePreparePostingId);
+    } catch (_) {}
 
     var submitBtn = $('btn-bm-submit-prepare');
     if (submitBtn) submitBtn.disabled = true;
@@ -678,15 +796,20 @@
         headers: getAuthHeaders(),
         body: JSON.stringify({
           product_id: productId,
-          portions: portions,
+          planned_portions: plannedPortions,
+          portions: actualPortions,
+          actual_consumptions: actualConsumptions,
+          production_posting_id: _bmStockState.activePreparePostingId,
           notes: notes
         })
       });
       var data = await res.json();
 
       if (res.ok && data.success) {
-        showToast('🍳 Berhasil! ' + portions + ' porsi siap jual ditambahkan dan bahan baku telah dipotong.');
+        showToast('🍳 Batch selesai: ' + Number(data.portions_prepared || actualPortions) + ' porsi siap jual ditambahkan dan pemakaian aktual bahan dicatat.');
         closeBMStockPrepareModal();
+        _bmStockState.activePreparePostingId = null;
+        try { localStorage.removeItem(postingStorageKey); } catch (_) {}
         loadBMStock();
         window.dispatchEvent(new CustomEvent('xentra:inventory:updated', { detail: { productId: productId } }));
       } else {
@@ -716,6 +839,8 @@
 
     var shortMaterials = [];
     recipe.components.forEach(function (comp) {
+      // Shortage notification is based on the recipe target; actual use is only
+      // entered after cooking and must not hide a shortage in the plan.
       var needed = Number(comp.planned_quantity) * factor;
       var avail = Number(comp.branch_material_stock || 0);
       if (avail < needed) {
@@ -795,8 +920,8 @@
 
     if (titleEl) titleEl.textContent = item.product_name || 'Detail Stok Menu';
     var isByOrder = item.fulfillment_type === 'BY_ORDER';
-    var isUntracked = !isByOrder && (item.stock === null || item.stock === undefined || item.stock === '');
-    var currentPortions = isByOrder ? 'By Order' : (isUntracked ? 'Tanpa Batas Porsi' : (Number(item.stock) + ' Porsi'));
+    var isUntracked = !isByOrder && (item.has_stock_record === false || item.has_stock_record === 0 || item.stock === null || item.stock === undefined || item.stock === '');
+    var currentPortions = isByOrder ? 'By Order' : (isUntracked ? 'Belum dilacak' : (Number(item.stock) + ' Porsi'));
 
     if (subtitleEl) {
       subtitleEl.textContent = isByOrder
@@ -869,14 +994,16 @@
 
     // Render footer buttons
     var cookBtn = (recipe && !isByOrder)
-      ? '<button type="button" class="x-btn-primary" style="font-size:13px; padding:9px 18px; font-weight:700; background:#16a34a; border-color:#16a34a;" onclick="closeBMStockDetailModal(); openBMStockPrepareModal(\'' + esc(productId) + '\');">🍳 Masak Porsi Baru</button>'
+      ? '<button type="button" class="x-btn-primary" style="flex:1; height:42px; justify-content:center; font-size:13.5px; padding:0 16px; font-weight:700; background:#16a34a; border-color:#16a34a;" onclick="closeBMStockDetailModal(); openBMStockPrepareModal(\'' + esc(productId) + '\');">🍳 Masak Porsi Baru</button>'
       : '';
     var adjustBtn = (!isByOrder)
-      ? '<button type="button" class="x-btn-secondary" style="font-size:13px; padding:9px 15px; font-weight:600;" onclick="closeBMStockDetailModal(); openBMStockAdjustmentModal(\'' + esc(productId) + '\');">Koreksi Stok</button>'
+      ? '<button type="button" class="x-btn-secondary" style="flex:1; height:42px; justify-content:center; font-size:13.5px; padding:0 16px; font-weight:700;" onclick="closeBMStockDetailModal(); openBMStockAdjustmentModal(\'' + esc(productId) + '\');">Koreksi Stok</button>'
       : '';
 
     if (footerEl) {
-      footerEl.innerHTML = adjustBtn + cookBtn + '<button type="button" class="x-btn-secondary" onclick="closeBMStockDetailModal()" style="font-size:13px; padding:9px 18px; font-weight:600;">Tutup</button>';
+      footerEl.innerHTML = (adjustBtn || cookBtn)
+        ? (adjustBtn + cookBtn)
+        : '<button type="button" class="x-btn-primary" onclick="closeBMStockDetailModal()" style="width:100%; height:42px; justify-content:center; font-size:13.5px; font-weight:700;">Tutup</button>';
     }
 
     modal.style.display = 'flex';
@@ -902,7 +1029,8 @@
     statusFilter: 'all',
     fetchSeq: 0,
     activeAdjustItem: null,
-    activeReorderItem: null
+    activeReorderItem: null,
+    activeWasteItem: null
   };
 
   function switchBMStockSubView(viewName, options) {
@@ -1106,11 +1234,14 @@
     var outOfStock = 0;
     var lowStock = 0;
     var safeStock = 0;
+    var untracked = 0;
 
     (items || []).forEach(function (m) {
-      if (m.current_stock <= 0) {
+      if (m.has_stock_record === false || m.has_stock_record === 0 || m.status === 'UNTRACKED') {
+        untracked++;
+      } else if (Number(m.current_stock) <= 0) {
         outOfStock++;
-      } else if (m.current_stock <= m.minimum_quantity) {
+      } else if (Number(m.current_stock) <= Number(m.effective_threshold != null ? m.effective_threshold : m.minimum_quantity)) {
         lowStock++;
       } else {
         safeStock++;
@@ -1121,6 +1252,9 @@
     if ($('bm-mat-stat-safe')) $('bm-mat-stat-safe').textContent = safeStock;
     if ($('bm-mat-stat-low')) $('bm-mat-stat-low').textContent = lowStock;
     if ($('bm-mat-stat-out')) $('bm-mat-stat-out').textContent = outOfStock;
+    if ($('bm-mat-stat-untracked-hint')) {
+      $('bm-mat-stat-untracked-hint').textContent = untracked ? (untracked + ' belum dicatat') : '';
+    }
 
     var hubMatBadge = $('bm-stock-hub-material-badge');
     if (hubMatBadge) {
@@ -1159,13 +1293,17 @@
       var matchesSearch = !q || name.indexOf(q) !== -1 || code.indexOf(q) !== -1;
       if (!matchesSearch) return false;
 
-      var isOut = m.current_stock <= 0;
-      var isLow = !isOut && m.current_stock <= m.minimum_quantity;
-      var isSafe = !isOut && !isLow;
+      var isUntracked = m.has_stock_record === false || m.has_stock_record === 0 || m.status === 'UNTRACKED';
+      var currentStock = Number(m.current_stock || 0);
+      var threshold = Number(m.effective_threshold != null ? m.effective_threshold : m.minimum_quantity);
+      var isOut = !isUntracked && currentStock <= 0;
+      var isLow = !isUntracked && !isOut && currentStock <= threshold;
+      var isSafe = !isUntracked && !isOut && !isLow;
 
       if (f === 'low') return isLow || isOut;
       if (f === 'out') return isOut;
       if (f === 'safe') return isSafe;
+      if (f === 'untracked') return isUntracked;
       return true;
     });
 
@@ -1175,16 +1313,20 @@
     }
 
     container.innerHTML = filtered.map(function (m) {
-      var isOut = m.current_stock <= 0;
-      var isLow = !isOut && m.current_stock <= m.minimum_quantity;
+      var isUntracked = m.has_stock_record === false || m.has_stock_record === 0 || m.status === 'UNTRACKED';
+      var currentStock = Number(m.current_stock || 0);
+      var threshold = Number(m.effective_threshold != null ? m.effective_threshold : m.minimum_quantity);
+      var isOut = !isUntracked && currentStock <= 0;
+      var isLow = !isUntracked && !isOut && currentStock <= threshold;
 
-      var badgeClass = isOut ? 'x-badge-danger' : isLow ? 'x-badge-warning' : 'x-badge-success';
-      var statusText = isOut ? 'HABIS' : isLow ? 'STOK MENIPIS' : 'STOK AMAN';
+      var badgeClass = isUntracked ? 'x-badge-muted' : isOut ? 'x-badge-danger' : isLow ? 'x-badge-warning' : 'x-badge-success';
+      var statusText = isUntracked ? 'BELUM DICATAT' : isOut ? 'HABIS' : isLow ? 'STOK MENIPIS' : 'STOK AMAN';
 
       var uom = esc(m.base_uom_name || m.base_uom_code || 'Satuan');
-      var stockVal = Number(m.current_stock.toFixed(2));
-      var minVal = Number(m.minimum_quantity.toFixed(2));
-      var targetVal = Number(m.target_quantity.toFixed(2));
+      var stockVal = isUntracked ? '—' : String(Number(currentStock.toFixed(2)));
+      var minVal = Number(threshold.toFixed(2));
+      var targetVal = Number(Number(m.target_quantity || 0).toFixed(2));
+      var stockColor = isUntracked ? '#64748b' : isOut ? '#dc2626' : isLow ? '#d97706' : '#15803d';
 
       return '<div class="x-stock-item-card" data-material-id="' + esc(m.id) + '">' +
         '<div class="x-stock-item-main">' +
@@ -1196,7 +1338,7 @@
             '<div class="x-stock-item-meta-row">' +
               '<span>Kode: <b>' + esc(m.material_code) + '</b></span>' +
               '<span style="color:#cbd5e1;">•</span>' +
-              '<span>Batas Minimum (Par): <b>' + minVal + ' ' + uom + '</b></span>' +
+              '<span>Batas Menipis: <b>' + minVal + ' ' + uom + '</b></span>' +
               '<span style="color:#cbd5e1;">•</span>' +
               '<span>Target Belanja: <b>' + targetVal + ' ' + uom + '</b></span>' +
             '</div>' +
@@ -1204,13 +1346,16 @@
         '</div>' +
         '<div class="x-stock-item-controls">' +
           '<div style="text-align:center; padding:5px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; min-width:70px;">' +
-            '<div style="font-size:18px; font-weight:800; line-height:1.2; color:' + (isOut ? '#dc2626' : isLow ? '#d97706' : '#15803d') + ';">' + stockVal + '</div>' +
+            '<div style="font-size:18px; font-weight:800; line-height:1.2; color:' + stockColor + ';">' + stockVal + '</div>' +
             '<div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">' + uom + '</div>' +
           '</div>' +
           '<div style="display:flex; gap:6px;">' +
             '<button type="button" class="x-btn-secondary" style="font-size:12px; font-weight:700; padding:6px 10px; display:inline-flex; align-items:center; gap:4px;" onclick="openBMMaterialAdjustModal(\'' + esc(m.id) + '\')">' +
-              '<span>⚖️</span><span>Opname</span>' +
+              '<span>⚖️</span><span>' + (isUntracked ? 'Mulai Catat' : 'Opname') + '</span>' +
             '</button>' +
+            (currentStock > 0 && !isUntracked
+              ? '<button type="button" class="x-btn-secondary" style="font-size:12px; font-weight:700; padding:6px 10px; display:inline-flex; align-items:center; gap:4px; color:#b91c1c; border-color:#fecaca;" onclick="openBMMaterialWasteModal(\'' + esc(m.id) + '\')">Rusak</button>'
+              : '') +
             '<button type="button" class="x-btn-secondary" style="font-size:12px; font-weight:700; padding:6px 10px; display:inline-flex; align-items:center; gap:4px;" onclick="openBMMaterialReorderModal(\'' + esc(m.id) + '\')">' +
               '<span>⚙️</span><span>Batas</span>' +
             '</button>' +
@@ -1299,7 +1444,6 @@
       if (res.ok && data.success) {
         showToast('✅ ' + (data.message || 'Koreksi fisik bahan berhasil disimpan.'));
         closeBMMaterialAdjustModal();
-        await loadBMMaterials();
         window.dispatchEvent(new CustomEvent('xentra:inventory:updated', { detail: { branch_id: branchId } }));
       } else {
         showToast('❌ Gagal koreksi fisik: ' + (data.error || data.message || 'Terjadi kesalahan'));
@@ -1315,6 +1459,84 @@
     }
   }
   window.submitBMMaterialAdjustment = submitBMMaterialAdjustment;
+
+  function openBMMaterialWasteModal(materialId) {
+    var item = (_bmMaterialsState.materials || []).find(function (m) { return m.id === materialId; });
+    if (!item || !item.has_stock_record || Number(item.current_stock) <= 0) {
+      showToast('Tidak ada saldo bahan tercatat yang bisa dikurangi. Catat stok fisik terlebih dahulu.');
+      return;
+    }
+    _bmMaterialsState.activeWasteItem = item;
+    if ($('bm-mat-waste-material-id')) $('bm-mat-waste-material-id').value = item.id;
+    if ($('bm-mat-waste-name')) $('bm-mat-waste-name').textContent = item.name;
+    if ($('bm-mat-waste-current')) $('bm-mat-waste-current').textContent = Number(Number(item.current_stock).toFixed(2));
+    var uom = item.base_uom_name || item.base_uom_code || '';
+    if ($('bm-mat-waste-uom')) $('bm-mat-waste-uom').textContent = uom;
+    if ($('bm-mat-waste-input-uom')) $('bm-mat-waste-input-uom').textContent = uom;
+    if ($('bm-mat-waste-qty')) {
+      $('bm-mat-waste-qty').value = '';
+      $('bm-mat-waste-qty').max = Number(item.current_stock);
+    }
+    if ($('bm-mat-waste-reason')) $('bm-mat-waste-reason').value = 'SPOILED_EXPIRED';
+    if ($('bm-mat-waste-notes')) $('bm-mat-waste-notes').value = '';
+    var modal = $('modal-bm-material-waste');
+    if (modal) modal.style.display = 'flex';
+  }
+  window.openBMMaterialWasteModal = openBMMaterialWasteModal;
+
+  function closeBMMaterialWasteModal() {
+    var modal = $('modal-bm-material-waste');
+    if (modal) modal.style.display = 'none';
+    _bmMaterialsState.activeWasteItem = null;
+  }
+  window.closeBMMaterialWasteModal = closeBMMaterialWasteModal;
+
+  async function submitBMMaterialWaste(e) {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    var item = _bmMaterialsState.activeWasteItem;
+    if (!item) return;
+    var branchId = getStockBranchId();
+    if (!branchId) return;
+
+    var quantity = $('bm-mat-waste-qty') ? Number($('bm-mat-waste-qty').value) : NaN;
+    var reasonCode = $('bm-mat-waste-reason') ? $('bm-mat-waste-reason').value : '';
+    var notes = $('bm-mat-waste-notes') ? $('bm-mat-waste-notes').value.trim() : '';
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      showToast('Masukkan jumlah bahan rusak lebih dari 0.');
+      return;
+    }
+    if (quantity > Number(item.current_stock) + 1e-9) {
+      showToast('Jumlah rusak melebihi saldo bahan saat ini. Muat ulang stok lalu koreksi jumlahnya.');
+      return;
+    }
+
+    var button = $('btn-bm-submit-mat-waste');
+    if (button) { button.disabled = true; button.textContent = 'Menyimpan...'; }
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/inventory/waste', {
+        method: 'POST',
+        headers: Object.assign({}, getAuthHeaders(), { 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          item_type: 'MATERIAL',
+          item_id: item.id,
+          quantity: quantity,
+          reason_code: reasonCode,
+          notes: notes
+        })
+      });
+      var data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || data.message || 'Gagal mencatat waste.');
+      closeBMMaterialWasteModal();
+      showToast('Waste ' + quantity + ' ' + (item.base_uom_name || item.base_uom_code || '') + ' ' + item.name + ' berhasil dicatat.');
+      window.dispatchEvent(new CustomEvent('xentra:inventory:updated', { detail: { branch_id: branchId } }));
+    } catch (err) {
+      console.error('[Submit Material Waste Error]:', err);
+      showToast('Gagal mencatat waste: ' + (err.message || 'kesalahan jaringan'));
+    } finally {
+      if (button) { button.disabled = false; button.textContent = 'Simpan Waste'; }
+    }
+  }
+  window.submitBMMaterialWaste = submitBMMaterialWaste;
 
   function openBMMaterialReorderModal(materialId) {
     var m = (_bmMaterialsState.materials || []).find(function (it) { return it.id === materialId; });
@@ -1402,5 +1624,3 @@
   });
 
 })();
-
-

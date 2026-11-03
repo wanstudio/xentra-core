@@ -26,6 +26,7 @@ class BranchRepository {
       WHERE b.brand_id = ?
         AND b.is_active = 1
         AND b.is_open_override = 1
+        AND (b.is_online_paused IS NULL OR b.is_online_paused = 0)
         AND s.is_delivery_active = 1
     `, [brandId]);
   }
@@ -34,6 +35,7 @@ class BranchRepository {
     return this.db.queryOne(`
       SELECT
         b.id as branch_id,
+        b.brand_id,
         b.reservation_max_guests
       FROM branches b
       WHERE b.id = ?

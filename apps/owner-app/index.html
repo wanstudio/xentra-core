@@ -6,15 +6,15 @@
   <title>Mybangjo Owner — Aplikasi Bisnis & Operasional</title>
   <!-- Shared merchant infrastructure — design tokens, toast, action-menu, crop editor -->
   <link rel="stylesheet" href="/merchant-shared/fonts/plus-jakarta-sans.css?v=1.0.0">
-  <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.5">
-  <link rel="stylesheet" href="/merchant-shared/css/presentation-shells.css?v=1.0.4">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.65">
+  <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.7">
+  <link rel="stylesheet" href="/merchant-shared/css/presentation-shells.css?v=1.0.5">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.73">
   <link rel="stylesheet" href="/merchant-shared/css/modules/marketing.css?v=1.0.0">
   <link rel="stylesheet" href="/merchant-shared/css/modules/stock.css?v=1.0.3">
   <link rel="stylesheet" href="/merchant-shared/css/modules/catalog.css?v=1.0.4">
   <link rel="stylesheet" href="/merchant-shared/css/ui-primitives.css?v=1.0.1">
-  <link rel="stylesheet" href="/owner/assets/css/owner-app.css?v=1.0.24">
-  <link rel="stylesheet" href="/owner/assets/bundles/menu-editor.css?v=1.0.56">
+  <link rel="stylesheet" href="/owner/assets/css/owner-app.css?v=1.0.34">
+  <link rel="stylesheet" href="/owner/assets/bundles/menu-editor.css?v=1.1.65">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#ffffff">
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
@@ -30,19 +30,16 @@
   <script>
     (function () {
       'use strict';
-      if (typeof caches !== 'undefined') {
-        caches.keys().then(function (names) {
-          names.forEach(function (name) {
-            if (name !== 'mybangjo-owner-v1.8.27') {
-              caches.delete(name);
-            }
-          });
-        });
-      }
-
       if ('serviceWorker' in navigator) {
         var refreshing = false;
+        var hadController = Boolean(navigator.serviceWorker.controller);
         navigator.serviceWorker.addEventListener('controllerchange', function () {
+          // If this is the initial install/claim, do not force-reload the page.
+          // Only reload if an already-active controller is being replaced by an update.
+          if (!hadController) {
+            hadController = true;
+            return;
+          }
           if (refreshing) return;
           refreshing = true;
           try {
@@ -55,8 +52,16 @@
         });
 
         window.addEventListener('load', function () {
-          navigator.serviceWorker.register('/owner/sw.js', { scope: '/owner/' }).then(function (reg) {
+          navigator.serviceWorker.register('/owner/sw.js', { scope: '/owner/', updateViaCache: 'none' }).then(function (reg) {
             if (reg && typeof reg.update === 'function') reg.update();
+            document.addEventListener('visibilitychange', function () {
+              if (document.visibilityState === 'visible' && reg && typeof reg.update === 'function') {
+                reg.update();
+              }
+            });
+            window.addEventListener('hashchange', function () {
+              if (reg && typeof reg.update === 'function') reg.update();
+            });
           }).catch(function () {});
         });
       }
@@ -66,11 +71,41 @@
 <body class="x-owner-mobile-app">
   <script>
     (function () {
+      window.showToast = function (msg) {
+        var t = document.getElementById('xentra-owner-toast');
+        if (!t) {
+          t = document.createElement('div');
+          t.id = 'xentra-owner-toast';
+          t.style.cssText = 'position:fixed;top:24px;left:50%;transform:translateX(-50%);z-index:99999999;background:#0F172A;color:#FFFFFF;padding:12px 22px;border-radius:9999px;font-size:13px;font-weight:700;font-family:\'Plus Jakarta Sans\',sans-serif;box-shadow:0 8px 24px rgba(0,0,0,0.3);pointer-events:none;transition:opacity 0.2s ease, transform 0.2s ease;opacity:0;display:none;white-space:nowrap;';
+          document.body.appendChild(t);
+        }
+        t.innerText = msg;
+        t.style.display = 'block';
+        setTimeout(function () {
+          t.style.opacity = '1';
+          t.style.transform = 'translateX(-50%) translateY(0)';
+        }, 10);
+        clearTimeout(t._timer);
+        t._timer = setTimeout(function () {
+          t.style.opacity = '0';
+          t.style.transform = 'translateX(-50%) translateY(-10px)';
+          setTimeout(function () { t.style.display = 'none'; }, 200);
+        }, 2500);
+      };
+    })();
+  </script>
+  <script>
+    (function () {
       window.Xentra = window.Xentra || {};
       window.Xentra.showSplash = function (message) {
         var el = document.getElementById('x-splash');
         if (el) {
+          el.classList.remove('x-splash-fade-out');
           el.style.display = 'flex';
+          el.style.pointerEvents = 'auto';
+          void el.offsetHeight;
+          el.style.opacity = '1';
+          el.style.visibility = 'visible';
           var txt = document.getElementById('x-splash-text');
           if (txt && typeof message === 'string') {
             txt.textContent = message;
@@ -78,8 +113,16 @@
         }
       };
       window.Xentra.hideSplash = function () {
+        if (window.XentraOwnerBridge && typeof window.XentraOwnerBridge.hideNativeSplash === 'function') {
+          window.XentraOwnerBridge.hideNativeSplash();
+        }
         var el = document.getElementById('x-splash');
-        if (el) el.style.display = 'none';
+        if (el && !el.classList.contains('x-splash-fade-out')) {
+          el.classList.add('x-splash-fade-out');
+          setTimeout(function () {
+            el.style.display = 'none';
+          }, 420);
+        }
       };
       window.__xentraHideSplash = window.Xentra.hideSplash;
 
@@ -89,12 +132,14 @@
         }
       });
 
-      setTimeout(window.__xentraHideSplash, 3000);
+      // Failsafe timer so user is never stuck if offline/network error occurs
+      setTimeout(window.__xentraHideSplash, 3500);
     })();
   </script>
 
-  <div id="x-splash" style="position:fixed;inset:0;z-index:99999;background:#ffffff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;font-family:'Plus Jakarta Sans',system-ui,sans-serif;">
+  <div id="x-splash" style="position:fixed;inset:0;z-index:99999;background:#ffffff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;font-family:'Plus Jakarta Sans',system-ui,sans-serif;opacity:1;visibility:visible;transition:opacity 0.38s cubic-bezier(0.16, 1, 0.3, 1),visibility 0.38s ease;will-change:opacity;">
     <style>
+      #x-splash.x-splash-fade-out { opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
       #x-splash .bot-arm-l, #x-splash .bot-arm-r { transform-box: fill-box; transform-origin: 50% 0%; }
       #x-splash .bot-float { animation: bot-float 2.6s ease-in-out infinite alternate; }
       #x-splash .bot-shadow { animation: bot-shadow 2.6s ease-in-out infinite alternate; }
@@ -145,7 +190,12 @@
     <div id="x-splash-text" style="color:#64748b;font-size:13px;font-weight:600;letter-spacing:-0.01em;margin-top:2px;">Memuat…</div>
   </div>
 
-  <div class="x-dash-layout">
+  <!-- Modern Standalone Mobile Owner App Container (Centered phone on desktop, edge-to-edge on mobile) -->
+  <div id="desktop-phone-frame-wrapper" class="x-owner-viewport-container">
+    <div id="xentra-owner-app-mount"></div>
+  </div>
+
+  <div class="x-dash-layout" style="display:none;" aria-hidden="true">
     
     <!-- Sidebar Navigation -->
     <aside class="x-dash-sidebar" id="x-dash-sidebar">
@@ -308,8 +358,9 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
           </button>
           <!-- Messages entry point (Direct Message / Chat) -->
-          <button type="button" class="x-topbar-icon-btn x-topbar-icon-btn-round" id="btn-messages" aria-label="Pesan" title="Pesan" onclick="if (typeof showToast === 'function') showToast('Fitur pesan segera hadir')">
+          <button type="button" class="x-topbar-icon-btn x-topbar-icon-btn-round" id="btn-messages" aria-label="Pesan & Broadcast" title="Kotak Pesan & Pengumuman" data-ops-chat-inbox="1" style="position:relative;">
             <svg class="x-topbar-plane-icon" width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><image href="/owner/assets/icons/reicon_plane-filled.svg" x="0" y="0" width="20" height="20"></image></svg>
+            <span data-ops-chat-badge style="display:none;position:absolute;top:-3px;right:-3px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:#ef4444;color:#fff;font-size:10px;font-weight:800;line-height:16px;text-align:center;">0</span>
           </button>
           <!-- Notifications entry point -->
           <button type="button" class="x-topbar-icon-btn x-topbar-icon-btn-round" id="btn-notifications" aria-label="Notifikasi" title="Notifikasi">
@@ -475,7 +526,7 @@
               </button>
             </div>
             <div class="x-occ-quick-grid" aria-label="Akses cepat Owner">
-              <button type="button" class="x-occ-quick-chip" onclick="navigateTo('catalog/menus')" aria-label="Buka Menu">
+              <button type="button" class="x-occ-quick-chip" onclick="navigateTo('catalog/categories')" aria-label="Buka Kategori &amp; Menu">
                 <span class="x-occ-chip-icon" aria-hidden="true"><img src="/owner/assets/icons/quick-access/menu.png" alt="" width="44" height="44" loading="eager" decoding="async"></span>
                 <span class="x-occ-chip-label">Menu</span>
               </button>
@@ -1933,6 +1984,7 @@
 
       <section id="tab-catalog-products" class="x-tab-content" data-tab="catalog-products">
         <div id="modern-item-master-page-mount"></div>
+        <div id="modern-item-editor-page-mount" style="display:none;width:100%;"></div>
         <!-- 1. Product List View -->
         <div id="product-list-view" class="x-card-panel x-owner-child-page-shell">
           <!-- Kartu ini hanya memuat judul, deskripsi, dan CTA. Pencarian, kategori,
@@ -3008,7 +3060,9 @@
 
       <!-- TAB: BAHAN BAKU (Master Raw Materials - bahan baku.png) -->
       <section id="tab-materials" class="x-tab-content" data-tab="materials">
-        <div class="x-card-panel x-owner-child-page-shell">
+        <div id="modern-materials-page-mount" style="width:100%;"></div>
+        <div id="modern-material-editor-page-mount" style="display:none;width:100%;"></div>
+        <div id="legacy-materials-content" class="x-card-panel x-owner-child-page-shell" style="display:none;">
           <div class="x-card">
             <div class="x-panel-header-flex">
               <div class="x-owner-child-mobile-header">
@@ -3563,6 +3617,7 @@
           <button type="button" class="x-subnav-tab" data-subtab="payouts" onclick="navigateTo('finance/payouts')">Payouts</button>
           <button type="button" class="x-subnav-tab" data-subtab="reconciliation" onclick="navigateTo('finance/reconciliation')">Reconciliation</button>
           <button type="button" class="x-subnav-tab" data-subtab="payment-methods" onclick="navigateTo('finance/payment-methods')">Payment Methods</button>
+          <button type="button" class="x-subnav-tab" data-subtab="cod-custody" onclick="navigateTo('finance/cod-custody')">COD Custody &amp; Kurir</button>
         </div>
 
 
@@ -3796,6 +3851,77 @@
               <div id="fin-payment-methods-list" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:16px;">
                 <div class="x-empty-state">Memuat konfigurasi payment methods...</div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 6. Finance: COD Custody & Courier Liability Subtab -->
+        <div id="finance-view-cod-custody" class="x-finance-subview" style="display:none;">
+          <div class="x-metrics-grid" style="margin-bottom:20px;">
+            <div class="x-metric-card">
+              <div class="x-metric-icon bg-amber" style="background:#fef3c7;color:#b45309;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+              </div>
+              <div class="x-metric-info">
+                <span class="x-metric-label">Uang COD di Tangan Kurir</span>
+                <h3 id="fin-cod-in-custody-val" class="x-metric-value" style="color:#b45309;">Rp 0</h3>
+                <div class="x-stat-sub" style="font-size:11px;color:var(--text-muted);margin-top:2px;">Fisik kas belum disetor ke Kasir</div>
+              </div>
+            </div>
+            <div class="x-metric-card">
+              <div class="x-metric-icon bg-green">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              </div>
+              <div class="x-metric-info">
+                <span class="x-metric-label">Total COD Disetor ke Kasir</span>
+                <h3 id="fin-cod-handed-over-val" class="x-metric-value" style="color:#059669;">Rp 0</h3>
+                <div class="x-stat-sub" style="font-size:11px;color:var(--text-muted);margin-top:2px;">Sudah masuk laci kas shift POS</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="x-card" style="margin-bottom:20px;">
+            <div class="x-card-header" style="padding:14px 20px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center;">
+              <h3 style="font-size:15px;font-weight:700;margin:0;">Kurir yang Memegang Kas COD</h3>
+              <button type="button" class="x-btn-secondary" onclick="loadFinCodCustody()" style="padding:6px 12px;font-size:12px;border-radius:8px;">↻ Segarkan</button>
+            </div>
+            <div class="x-card-body" style="padding:0;overflow-x:auto;">
+              <table class="x-table" style="width:100%;margin:0;">
+                <thead>
+                  <tr>
+                    <th>Nama Kurir</th>
+                    <th>Cabang</th>
+                    <th>No. Telepon</th>
+                    <th>Jumlah Order COD</th>
+                    <th style="text-align:right;">Total Kas Dipegang</th>
+                  </tr>
+                </thead>
+                <tbody id="fin-cod-drivers-tbody">
+                  <tr><td colspan="5" style="text-align:center;padding:24px;color:#64748b;">Memuat data kas kurir...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="x-card">
+            <div class="x-card-header" style="padding:14px 20px;border-bottom:1px solid var(--border-color);">
+              <h3 style="font-size:15px;font-weight:700;margin:0;">Log Audit Bypass Foto Bukti Pengantaran (POD)</h3>
+            </div>
+            <div class="x-card-body" style="padding:0;overflow-x:auto;">
+              <table class="x-table" style="width:100%;margin:0;">
+                <thead>
+                  <tr>
+                    <th>Waktu</th>
+                    <th>No. Order</th>
+                    <th>Kurir</th>
+                    <th>Alasan Bypass</th>
+                    <th>Catatan</th>
+                  </tr>
+                </thead>
+                <tbody id="fin-cod-bypass-tbody">
+                  <tr><td colspan="5" style="text-align:center;padding:24px;color:#64748b;">Memuat audit bypass...</td></tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -6436,7 +6562,7 @@
 
 
   <!-- Persistent mobile application-shell navigation. Must stay outside route/page sections. -->
-<nav class="x-owner-bottom-nav" id="x-owner-bottom-nav" aria-label="Navigasi Utama Mobile Owner">
+<nav class="x-owner-bottom-nav" id="x-owner-bottom-nav" aria-label="Navigasi Utama Mobile Owner" style="display:none;" aria-hidden="true">
         <button type="button" class="x-owner-nav-item active" data-tab-module="beranda" data-route="overview" aria-current="page">
           <img src="/owner/assets/icons/fa7-solid_home.svg" alt="" width="24" height="24" aria-hidden="true">
           <span>Beranda</span>
@@ -6526,7 +6652,8 @@
           <h3 id="sheet-notif-title" style="margin:0; font-size:16px; font-weight:800; color:var(--text-main, #0f172a);">Pusat Notifikasi</h3>
           <span class="x-badge" id="notif-unread-pill" style="display:none; font-size:11px; padding:2px 8px; border-radius:10px; background:#ef4444; color:#fff; font-weight:700;">0 Baru</span>
         </div>
-        <div style="display:flex; align-items:center; gap:12px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button type="button" data-ops-chat-inbox="1" style="font-size:12px; color:#1d4ed8; background:#eff6ff; border:1px solid #bfdbfe; border-radius:999px; padding:4px 10px; cursor:pointer; font-weight:700;">💬 Pesan &amp; Broadcast</button>
           <button type="button" class="x-btn-text" id="btn-mark-all-read" onclick="markAllOwnerNotificationsAsRead()" style="font-size:12px; color:#2563eb; background:transparent; border:none; cursor:pointer; font-weight:600;">Tandai Dibaca</button>
           <button type="button" class="x-btn-close" onclick="closeOwnerNotificationsSheet()" aria-label="Tutup" style="background:transparent; border:none; font-size:20px; cursor:pointer; color:var(--text-muted, #64748b);">&times;</button>
         </div>
@@ -6541,38 +6668,21 @@
 
   <!-- Dashboard JavaScript -->
   <!-- Shared merchant infrastructure (auth, toast, action-menu, crop editor) — must load first -->
-  <script src="/merchant-shared/js/shared.js?v=1.0.2"></script>
-  <script src="/merchant-shared/js/action-menu.js?v=1.0.1"></script>
-  <script src="/merchant-shared/js/crop-editor.js?v=1.0.2"></script>
-  <script src="/merchant-shared/js/catalog-client.js?v=1.0.1"></script>
-  <script src="/merchant-shared/js/currency-input.js?v=1.0.1"></script>
-  <script src="/merchant-shared/js/live-search.js?v=1.0.0"></script>
-  <script src="/merchant-shared/js/dropdown.js?v=1.0.1"></script>
-  <script src="/merchant-shared/js/sheet-modal.js?v=1.0.0"></script>
-  <script src="/merchant-dashboard/assets/js/branch-catalog-ui.js?v=1.0.3"></script>
-  <script src="/merchant-dashboard/assets/js/owner-bottom-nav.js?v=1.0.0"></script>
-  <script src="/merchant-shared/js/presentation-shells.js?v=1.0.2"></script>
-  <script src="/merchant-dashboard/assets/js/owner-navigation.js?v=1.0.0"></script>
-  <script src="/merchant-dashboard/assets/js/modules/auth.js?v=1.0.0"></script>
-  <script src="/merchant-dashboard/assets/js/modules/overview.js?v=1.0.0"></script>
-  <script src="/merchant-dashboard/assets/js/modules/orders.js?v=1.0.0"></script>
-  <script src="/merchant-dashboard/assets/js/modules/stock.js?v=2.5.2"></script>
-  <script src="/merchant-dashboard/assets/js/modules/branches.js?v=1.0.1"></script>
-  <script src="/merchant-dashboard/assets/js/modules/reports.js?v=1.0.0"></script>
-  <script src="/merchant-dashboard/assets/js/modules/team.js?v=1.0.0"></script>
-  <script src="/merchant-dashboard/assets/js/modules/customers.js?v=1.0.0"></script>
-  <script src="/merchant-dashboard/assets/js/modules/finance.js?v=1.0.0"></script>
-  <script src="/merchant-dashboard/assets/js/modules/marketing-banners.js?v=1.0.0"></script>
-  <script src="/merchant-dashboard/assets/js/modules/marketing.js?v=1.0.1"></script>
-  <script src="/owner/assets/bundles/menu-editor.js?v=1.0.56"></script>
-  <script src="/merchant-dashboard/assets/js/modules/master-menu.js?v=1.0.14"></script>
-  <script src="/merchant-dashboard/assets/js/modules/settings.js?v=1.0.0"></script>
-  <script src="/merchant-dashboard/assets/js/modules/brand.js?v=1.0.0"></script>
-  <script src="/merchant-dashboard/assets/js/modules/catalog-reference.js?v=1.0.7"></script>
-  <script src="/merchant-dashboard/assets/js/modules/catalog.js?v=1.0.2"></script>
-  <script src="/dashboard/assets/js/dashboard.js?v=3.2.6"></script>
-  <script src="/merchant-dashboard/assets/js/owner-master-menu-inline.js?v=1.0.2"></script>
-  <script src="/merchant-dashboard/assets/js/owner-bottom-nav.js?v=1.0.2"></script>
-  <script src="/owner/assets/js/owner-app.js?v=1.0.9"></script>
+  <script defer src="/merchant-shared/js/shared.js?v=1.0.2"></script>
+  <script defer src="/merchant-shared/js/audio-alerts.js?v=1.0.6"></script>
+  <script defer src="/merchant-shared/js/owner-order-alerts.js?v=1.0.0"></script>
+  <script defer src="/merchant-shared/js/ops-chat.js?v=2.0.0"></script>
+  <script defer src="/merchant-shared/js/action-menu.js?v=1.0.1"></script>
+  <script defer src="/merchant-shared/js/crop-editor.js?v=1.0.2"></script>
+  <script defer src="/merchant-shared/js/catalog-client.js?v=1.0.1"></script>
+  <script defer src="/merchant-shared/js/currency-input.js?v=1.0.1"></script>
+  <script defer src="/merchant-shared/js/live-search.js?v=1.0.0"></script>
+  <script defer src="/merchant-shared/js/dropdown.js?v=1.0.2"></script>
+  <script defer src="/merchant-shared/js/sheet-modal.js?v=1.0.0"></script>
+  <script defer src="/merchant-shared/js/presentation-shells.js?v=1.0.3"></script>
+  <!-- Modern React Single App Shell (Menu, Catalog, Overview, Orders, Finance, Materials) -->
+  <script src="/owner/assets/bundles/menu-editor.js?v=1.1.65"></script>
+  <!-- Mobile Owner App Runtime (Native Bridge, Routing & Bootstrap) -->
+  <script defer src="/owner/assets/js/owner-app.js?v=1.0.15"></script>
 </body>
 </html>  

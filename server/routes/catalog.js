@@ -45,7 +45,7 @@ router.get('/catalog/composed-menu', (req, res) => {
         ).all(branchId, brandId);
       } else {
         activeCategories = db.prepare(
-          'SELECT id, brand_id, name, slug, image_url, media_id, sort_order ' +
+          'SELECT id, brand_id, name, slug, image_url, image, media_id, sort_order ' +
           'FROM categories ' +
           'WHERE brand_id = ? AND COALESCE(is_active, 1) = 1 ' +
           'ORDER BY sort_order ASC, name ASC'

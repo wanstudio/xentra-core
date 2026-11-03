@@ -8,6 +8,7 @@
 
   var API_BASE = '';
   var _currentPurchasingView = 'tasks';
+  var _purchasingCalcReturnView = 'tasks';
 
   function $(id) {
     return document.getElementById(id);
@@ -318,6 +319,19 @@
     var titleEl = $('purchasing-list-title');
     if (titleEl) titleEl.textContent = isMandate ? 'Tugas Mandat Belanja' : 'Daftar Belanja Pasar';
 
+    var chatBtn = $('btn-purchasing-ops-chat');
+    if (chatBtn) {
+      if (isMandate) {
+        chatBtn.setAttribute('data-ops-chat-thread', 'purchasing');
+        chatBtn.setAttribute('data-ops-chat-ref', _purchasingState.activeMandateId);
+        chatBtn.setAttribute('data-ops-chat-title', 'Mandat Belanja #' + String(_purchasingState.activeMandateId).slice(-6));
+      } else {
+        chatBtn.setAttribute('data-ops-chat-thread', 'channel');
+        chatBtn.setAttribute('data-ops-chat-ref', 'purchasing');
+        chatBtn.setAttribute('data-ops-chat-title', '🛒 Tim Belanja Pasar');
+      }
+    }
+
     if (!items.length) {
       hidePurchasingBottomBar();
       container.innerHTML =
@@ -341,7 +355,7 @@
     var html = '';
     items.forEach(function (item) {
       var isChecked = item.checked;
-      var subtotal = Math.round(item.buyQty * item.actualUnitPrice);
+      var subtotal = item.receiptTotal || Math.round(item.buyQty * item.actualUnitPrice);
       var uomCode = item.base_uom_code || item.base_uom_name || 'Unit';
 
       var priceHtml = '';
@@ -418,7 +432,7 @@
     var totalReal = 0;
     _purchasingState.items.forEach(function (itm) {
       if (itm.checked) {
-        totalReal += Math.round(itm.buyQty * itm.actualUnitPrice);
+        totalReal += (itm.receiptTotal || Math.round(itm.buyQty * itm.actualUnitPrice));
       }
     });
 
@@ -474,13 +488,40 @@
     if (uomSuffix) uomSuffix.textContent = uomText;
     if (qtyIn) qtyIn.value = itm.buyQty;
     if (priceIn) {
-      var initialNum = itm.actualUnitPrice || 0;
-      priceIn.value = initialNum > 0 ? formatNumberWithDots(initialNum) : '';
+      var initialTotal = itm.receiptTotal || Math.round(itm.buyQty * (itm.actualUnitPrice || 0));
+      priceIn.value = initialTotal > 0 ? formatNumberWithDots(initialTotal) : '';
       setTimeout(function () { priceIn.focus(); priceIn.select(); }, 60);
     }
+    onPurchasingModalInputChanged();
     if (modal) modal.style.display = 'flex';
   }
   window.openPurchasingUpdatePriceModal = openPurchasingUpdatePriceModal;
+
+  function onPurchasingModalInputChanged() {
+    var itm = _purchasingState.activeEditItem;
+    if (!itm) return;
+    var qtyIn = $('input-purchasing-modal-qty');
+    var priceIn = $('input-purchasing-modal-price');
+    var previewBox = $('purchasing-modal-calc-preview');
+    var previewPrice = $('purchasing-modal-calc-unit-price');
+    var previewUom = $('purchasing-modal-calc-uom');
+
+    var qty = qtyIn ? parseFloat(qtyIn.value) : 0;
+    var rawDigits = priceIn ? String(priceIn.value || '').replace(/\D/g, '') : '';
+    var total = parseFloat(rawDigits || 0);
+
+    var uomText = itm.base_uom_code || itm.base_uom_name || 'unit';
+    if (previewUom) previewUom.textContent = '/ ' + uomText;
+
+    if (qty > 0 && total > 0 && previewBox && previewPrice) {
+      var unitPrice = Math.round(total / qty);
+      previewPrice.textContent = formatMoney(unitPrice);
+      previewBox.style.display = 'block';
+    } else if (previewBox) {
+      previewBox.style.display = 'none';
+    }
+  }
+  window.onPurchasingModalInputChanged = onPurchasingModalInputChanged;
 
   function closePurchasingUpdatePriceModal() {
     var modal = $('modal-purchasing-update-price');
@@ -502,20 +543,22 @@
     }
 
     var rawDigits = priceIn ? String(priceIn.value || '').replace(/\D/g, '') : '';
-    var newPrice = parseFloat(rawDigits || 0);
+    var totalReceipt = parseFloat(rawDigits || 0);
 
-    if (isNaN(newPrice) || newPrice <= 0) {
-      showToast('⚠️ Masukkan nominal harga pasar yang valid (harus lebih dari Rp 0).');
+    if (isNaN(totalReceipt) || totalReceipt <= 0) {
+      showToast('⚠️ Masukkan total bayar di nota pasar yang valid (harus lebih dari Rp 0).');
       return;
     }
 
+    var unitPrice = Math.round(totalReceipt / newQty);
     itm.buyQty = newQty;
-    itm.actualUnitPrice = newPrice;
+    itm.receiptTotal = totalReceipt;
+    itm.actualUnitPrice = unitPrice;
     itm.has_price_update = true;
     closePurchasingUpdatePriceModal();
     renderPurchasingList();
     recalculatePurchasingSummary();
-    showToast('✓ Data barang belanja diperbarui.');
+    showToast('✓ Total nota ' + formatMoney(totalReceipt) + ' (@ ' + formatMoney(unitPrice) + '/' + (itm.base_uom_code || itm.base_uom_name || 'unit') + ') disimpan.');
   }
   window.confirmPurchasingPriceUpdate = confirmPurchasingPriceUpdate;
 
@@ -723,7 +766,7 @@
 
     if (listEl) {
       listEl.innerHTML = checkedItems.map(function (itm) {
-        var subTot = Math.round(itm.buyQty * itm.actualUnitPrice);
+        var subTot = itm.receiptTotal || Math.round(itm.buyQty * itm.actualUnitPrice);
         var itmName = itm.material_name || itm.name || 'Bahan Baku';
         var itmUom = itm.base_uom_name || itm.base_uom_code || itm.uom || 'Unit';
         return (
@@ -1634,6 +1677,9 @@
      7. VIEW SWITCHER (TASKS, PO, HISTORY, CALC)
      ========================================================================= */
   function switchPurchasingView(viewId) {
+    if (viewId === 'calc' && _currentPurchasingView !== 'calc') {
+      _purchasingCalcReturnView = _currentPurchasingView || 'tasks';
+    }
     _currentPurchasingView = viewId;
     var vTasks = $('purchasing-view-tasks');
     var vPo = $('purchasing-view-po');
@@ -1684,6 +1730,11 @@
     }
   }
   window.switchPurchasingView = switchPurchasingView;
+
+  function closePurchasingCalc() {
+    switchPurchasingView(_purchasingCalcReturnView || 'tasks');
+  }
+  window.closePurchasingCalc = closePurchasingCalc;
 
   function refreshPurchasingActiveView() {
     if (_currentPurchasingView === 'po') {

@@ -10,9 +10,9 @@ const orderRepository = new OrderRepository();
 
 const DELIVERY_TRANSITIONS = Object.freeze({
   unassigned: Object.freeze(['assigned']),
-  assigned: Object.freeze(['picked_up']),
-  picked_up: Object.freeze(['on_delivery']),
-  on_delivery: Object.freeze(['delivered']),
+  assigned: Object.freeze(['picked_up', 'failed', 'cancelled']),
+  picked_up: Object.freeze(['on_delivery', 'failed', 'cancelled']),
+  on_delivery: Object.freeze(['delivered', 'failed', 'cancelled']),
   delivered: Object.freeze([]),
   failed: Object.freeze([]),
   cancelled: Object.freeze([])
@@ -70,19 +70,31 @@ class DeliveryDispatchService {
   static acceptAssignment({ order_id, actor_id }) {
     const order = orderRepository.findById(order_id);
     if (!order) throw new Error('[DeliveryDispatchService] Order "' + order_id + '" tidak ditemukan.');
-    if (!['confirmed', 'preparing', 'ready'].includes(order.status)) {
-      throw new Error('[DeliveryDispatchService] Driver assignment hanya dapat diterima/ditolak saat pesanan masih dalam proses aktif.');
-    }
     const delivery = orderRepository.findDeliveryByOrderId(order_id);
-    if (!delivery || delivery.status !== DeliveryModel.STATUS.ASSIGNED) {
-      throw new Error('[DeliveryDispatchService] Delivery job tidak sedang menunggu penerimaan Driver.');
+    if (!delivery) {
+      throw new Error('[DeliveryDispatchService] Delivery job tidak ditemukan.');
     }
     this._assertAssignedDriver(delivery, actor_id);
-    if (delivery.driver_assignment_status === DeliveryModel.ASSIGNMENT_RESPONSES.ACCEPTED) {
-      return { success: true, order_id, status: 'assigned', assignment_status: 'accepted', idempotent: true };
+    if (
+      delivery.driver_assignment_status === DeliveryModel.ASSIGNMENT_RESPONSES.ACCEPTED ||
+      [DeliveryModel.STATUS.PICKED_UP, DeliveryModel.STATUS.ON_DELIVERY, DeliveryModel.STATUS.DELIVERED].includes(delivery.status)
+    ) {
+      return {
+        success: true,
+        order_id,
+        status: delivery.status || 'assigned',
+        assignment_status: 'accepted',
+        idempotent: true
+      };
     }
     if (delivery.driver_assignment_status === DeliveryModel.ASSIGNMENT_RESPONSES.REJECTED) {
       throw new Error('[DeliveryDispatchService] Delivery job sudah ditolak dan harus di-assign ulang oleh Manager.');
+    }
+    if (delivery.status !== DeliveryModel.STATUS.ASSIGNED) {
+      throw new Error('[DeliveryDispatchService] Delivery job tidak sedang menunggu penerimaan Driver.');
+    }
+    if (!['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status)) {
+      throw new Error('[DeliveryDispatchService] Driver assignment hanya dapat diterima/ditolak saat pesanan masih dalam proses aktif.');
     }
     const now = new Date().toISOString();
     const result = orderRepository.respondToDriverAssignment({
@@ -103,16 +115,19 @@ class DeliveryDispatchService {
   static rejectAssignment({ order_id, actor_id, reason = '' }) {
     const order = orderRepository.findById(order_id);
     if (!order) throw new Error('[DeliveryDispatchService] Order "' + order_id + '" tidak ditemukan.');
-    if (!['confirmed', 'preparing', 'ready'].includes(order.status)) {
-      throw new Error('[DeliveryDispatchService] Driver assignment hanya dapat diterima/ditolak saat pesanan masih dalam proses aktif.');
-    }
     const delivery = orderRepository.findDeliveryByOrderId(order_id);
-    if (!delivery || delivery.status !== DeliveryModel.STATUS.ASSIGNED) {
-      throw new Error('[DeliveryDispatchService] Delivery job tidak sedang menunggu penerimaan Driver.');
+    if (!delivery) {
+      throw new Error('[DeliveryDispatchService] Delivery job tidak ditemukan.');
     }
-    this._assertAssignedDriver(delivery, actor_id);
     if (delivery.driver_assignment_status === DeliveryModel.ASSIGNMENT_RESPONSES.REJECTED && delivery.status === DeliveryModel.STATUS.UNASSIGNED) {
       return { success: true, order_id, status: 'unassigned', assignment_status: 'rejected', idempotent: true };
+    }
+    this._assertAssignedDriver(delivery, actor_id);
+    if (delivery.status !== DeliveryModel.STATUS.ASSIGNED) {
+      throw new Error('[DeliveryDispatchService] Delivery job tidak sedang menunggu penerimaan Driver.');
+    }
+    if (!['pending', 'confirmed', 'preparing', 'ready'].includes(order.status)) {
+      throw new Error('[DeliveryDispatchService] Driver assignment hanya dapat diterima/ditolak saat pesanan masih dalam proses aktif.');
     }
     const rejectionReason = String(reason || '').trim();
     if (!rejectionReason) throw new Error('[DeliveryDispatchService] Alasan penolakan Driver wajib diisi.');
@@ -176,16 +191,13 @@ class DeliveryDispatchService {
     if (!DeliveryModel.isValidStatus(status)) {
       throw new Error('[DeliveryDispatchService] Delivery status "' + status + '" tidak valid.');
     }
-    if ([DeliveryModel.STATUS.FAILED, DeliveryModel.STATUS.CANCELLED].includes(status)) {
-      throw new Error('[DELIVERY_EXCEPTION_FLOW_NOT_LOCKED]: Failed/cancelled delivery belum boleh ditulis melalui lifecycle normal. Gunakan alur exception/reassignment resmi setelah kontrak exception dikunci.');
-    }
     const order = orderRepository.findById(order_id);
     if (!order) throw new Error('[DeliveryDispatchService] Order "' + order_id + '" tidak ditemukan.');
     if (order.order_type !== 'delivery') throw new Error('[DeliveryDispatchService] Order "' + order_id + '" bukan Fulfillment Environment delivery.');
     const currentDelivery = orderRepository.findDeliveryByOrderId(order_id);
     const currentDeliveryStatus = currentDelivery ? String(currentDelivery.status || 'unassigned') : 'unassigned';
 
-    if ([DeliveryModel.STATUS.PICKED_UP, DeliveryModel.STATUS.ON_DELIVERY, DeliveryModel.STATUS.DELIVERED].includes(status)) {
+    if ([DeliveryModel.STATUS.PICKED_UP, DeliveryModel.STATUS.ON_DELIVERY, DeliveryModel.STATUS.DELIVERED, DeliveryModel.STATUS.FAILED, DeliveryModel.STATUS.CANCELLED].includes(status)) {
       this._assertDriverActor(currentDelivery, actor_id);
     }
 
@@ -261,6 +273,38 @@ class DeliveryDispatchService {
           order_id, target_status: 'completed', actor_type: 'driver', actor_id,
           note: notes || 'Driver menyelesaikan pengantaran'
         }, { dbTransactionProvided: true });
+      } else if (status === DeliveryModel.STATUS.FAILED || status === DeliveryModel.STATUS.CANCELLED) {
+        const settledPayment = orderRepository.findPaymentSettlement(order_id);
+        if (!settledPayment) {
+          OrderStateMachine.transition({
+            order_id,
+            target_status: 'cancelled',
+            actor_type: 'driver',
+            actor_id,
+            note: notes || 'Pengantaran gagal / Return to Store'
+          }, { dbTransactionProvided: true });
+        } else {
+          const crypto = require('crypto');
+          const logId = 'log_' + crypto.randomBytes(8).toString('hex');
+          orderRepository.insertStatusLog({
+            logId,
+            orderId: order_id,
+            previousStatus: latestOrder.status,
+            newStatus: latestOrder.status,
+            actorType: 'driver',
+            actorId: actor_id,
+            note: '[DELIVERY_FAILED]: ' + (notes || 'Pengantaran gagal / Return to Store')
+          });
+        }
+        orderRepository.updateDeliveryStatus({
+          orderId: order_id,
+          status,
+          updatedAt: now,
+          codCollectionStatus: 'cancelled',
+          codCashCustody: 'none',
+          codCollectedAmount: 0,
+          podNote: notes || 'Gagal antar / Return to store'
+        });
       } else {
         orderRepository.updateDeliveryStatus({ orderId: order_id, status, updatedAt: now });
       }
@@ -275,6 +319,11 @@ class DeliveryDispatchService {
       events.EventBus.publish({
         type: 'delivery.completed', producer: 'delivery',
         payload: { order_id, order_number: order.order_number, branch_id: order.branch_id, completed_at: now, actor_id }
+      }).catch(() => {});
+    } else if (status === DeliveryModel.STATUS.FAILED || status === DeliveryModel.STATUS.CANCELLED) {
+      events.EventBus.publish({
+        type: 'delivery.failed', producer: 'delivery',
+        payload: { order_id, order_number: order.order_number, branch_id: order.branch_id, failed_at: now, actor_id, reason: notes }
       }).catch(() => {});
     }
     return { success: true, order_id, status, updated_at: now };

@@ -1,12 +1,196 @@
 @tailwind components;
 @tailwind utilities;
 
+*, ::before, ::after {
+  --tw-gradient-from-position: 0%;
+  --tw-gradient-to-position: 100%;
+  --tw-gradient-via-position: 50%;
+}
+
+#xentra-owner-app-root,
 #modern-menu-editor-root {
   font-family: inherit;
   box-sizing: border-box;
   width: 100%;
 }
 
+#clean-owner-bottom-nav button {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  padding: 12px 0 6px 0 !important;
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+}
+
+/* ==========================================================================
+   SHARED OCC DROPDOWN STYLES (from apps/merchant-shared/css/dashboard.css)
+   ========================================================================== */
+.x-occ-dropdown {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.x-occ-dropdown-trigger {
+  width: 100%;
+  height: 42px;
+  min-height: 42px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f172a;
+  text-align: left;
+  outline: none;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+}
+
+.x-occ-dropdown-trigger:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.x-occ-dropdown-trigger:focus-visible,
+.x-occ-dropdown-trigger[aria-expanded="true"] {
+  background: #ffffff;
+  border-color: #334155;
+  box-shadow: 0 0 0 2px rgba(51, 65, 85, 0.12);
+}
+
+.x-occ-dropdown-trigger .x-occ-chevron-icon {
+  flex-shrink: 0;
+  color: #64748b;
+  transition: transform 0.2s ease;
+}
+
+.x-occ-dropdown-trigger[aria-expanded="true"] .x-occ-chevron-icon {
+  transform: rotate(180deg);
+}
+
+.x-occ-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  min-width: 160px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+  padding: 6px;
+  z-index: 220;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  max-height: min(320px, 50dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
+}
+
+.x-occ-dropdown.open .x-occ-dropdown-menu {
+  display: flex !important;
+  animation: xOwnerDropdownIn 0.15s ease-out;
+}
+
+@keyframes xOwnerDropdownIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.x-occ-dropdown-item {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  padding: 9px 12px !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 10px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #334155 !important;
+  cursor: pointer !important;
+  text-align: left !important;
+  transition: background 0.12s ease, color 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box !important;
+}
+
+.x-occ-dropdown-item:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+.x-occ-dropdown-item.active {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  font-weight: 700 !important;
+}
+
+.x-occ-dropdown-item .x-occ-check-icon {
+  opacity: 0;
+  color: #0f172a;
+  flex-shrink: 0;
+  transition: opacity 0.12s ease;
+}
+
+.x-occ-dropdown-item.active .x-occ-check-icon {
+  opacity: 1 !important;
+}
+
+.x-occ-custom-toggle {
+  flex: 0 0 auto;
+  min-height: 42px;
+  height: 42px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0 14px;
+  cursor: pointer;
+  outline: none;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.x-occ-custom-toggle:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.x-occ-custom-toggle[aria-expanded="true"] {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #ffffff;
+}
+
+#xentra-owner-app-root *,
 #modern-menu-editor-root *,
 #modern-business-hub-root *,
 #modern-catalog-subhub-root *,
@@ -15,7 +199,13 @@
 #modern-category-editor-page-root *,
 #modern-category-sort-page-root *,
 #modern-category-detail-page-root *,
-#modern-category-menu-sort-page-root * {
+#modern-category-menu-sort-page-root *,
+#modern-item-editor-page-root *,
+#modern-item-editor-bottom-bar *,
+#modern-materials-page-root *,
+#modern-materials-bottom-bar *,
+#modern-material-editor-page-root *,
+#modern-material-editor-bottom-bar * {
   box-sizing: border-box;
 }
 
@@ -27,7 +217,13 @@
 #modern-category-editor-page-root button,
 #modern-category-sort-page-root button,
 #modern-category-detail-page-root button,
-#modern-category-menu-sort-page-root button {
+#modern-category-menu-sort-page-root button,
+#modern-item-editor-page-root button,
+#modern-item-editor-bottom-bar button,
+#modern-materials-page-root button,
+#modern-materials-bottom-bar button,
+#modern-material-editor-page-root button,
+#modern-material-editor-bottom-bar button {
   border-style: solid;
   outline: none;
 }
@@ -36,7 +232,9 @@
 #modern-business-hub-root input[type="search"]::-webkit-search-cancel-button,
 #modern-business-hub-root input[type="search"]::-webkit-search-decoration,
 #modern-item-master-page-root input[type="search"]::-webkit-search-cancel-button,
-#modern-item-master-page-root input[type="search"]::-webkit-search-decoration {
+#modern-item-master-page-root input[type="search"]::-webkit-search-decoration,
+#modern-materials-page-root input[type="search"]::-webkit-search-cancel-button,
+#modern-materials-page-root input[type="search"]::-webkit-search-decoration {
   -webkit-appearance: none;
   appearance: none;
   display: none;
@@ -50,7 +248,8 @@
 #modern-category-editor-page-root .hub-inset-stroke,
 #modern-category-sort-page-root .hub-inset-stroke,
 #modern-category-detail-page-root .hub-inset-stroke,
-#modern-category-menu-sort-page-root .hub-inset-stroke {
+#modern-category-menu-sort-page-root .hub-inset-stroke,
+#modern-item-editor-page-root .hub-inset-stroke {
   box-shadow: inset 0 0 0 1px #CBD5E1 !important;
   border: none !important;
 }
@@ -63,7 +262,8 @@
 #modern-category-editor-page-root .hub-card:hover,
 #modern-category-sort-page-root .hub-card:hover,
 #modern-category-detail-page-root .hub-card:hover,
-#modern-category-menu-sort-page-root .hub-card:hover {
+#modern-category-menu-sort-page-root .hub-card:hover,
+#modern-item-editor-page-root .hub-card:hover {
   box-shadow: inset 0 0 0 1px #94A3B8 !important;
 }
 
@@ -98,8 +298,8 @@
 /* Smooth GoBiz-style Horizontal Slide Page Transitions for Modern React Views */
 @keyframes xentraSlidePushIn {
   0% {
-    opacity: 0;
-    transform: translate3d(28px, 0, 0);
+    opacity: 0.96;
+    transform: translate3d(14px, 0, 0);
   }
   100% {
     opacity: 1;
@@ -109,8 +309,8 @@
 
 @keyframes xentraSlidePopIn {
   0% {
-    opacity: 0;
-    transform: translate3d(-24px, 0, 0);
+    opacity: 0.96;
+    transform: translate3d(-12px, 0, 0);
   }
   100% {
     opacity: 1;
@@ -120,8 +320,8 @@
 
 @keyframes xentraTabFadeIn {
   0% {
-    opacity: 0;
-    transform: translate3d(0, 4px, 0);
+    opacity: 0.96;
+    transform: none;
   }
   100% {
     opacity: 1;
@@ -129,7 +329,7 @@
   }
 }
 
-/* Fast ease-up animation for fixed bottom action bars and sheets (< 1s, specifically ~220ms with 60ms delay) */
+/* Fast ease-up animation for fixed bottom action bars and sheets (< 1s, specifically ~200ms) */
 @keyframes xentraBottomBarEaseUp {
   0% {
     opacity: 0;
@@ -148,10 +348,11 @@
 #modern-categories-sort-bottom-bar,
 #modern-menu-editor-bottom-bar,
 .x-owner-bottom-bar-ease-up {
-  animation: xentraBottomBarEaseUp 0.22s cubic-bezier(0.16, 1, 0.3, 1) 0.06s both !important;
+  animation: xentraBottomBarEaseUp 0.2s cubic-bezier(0.16, 1, 0.3, 1) both !important;
 }
 
-/* Ensure modern tabs have no transform on the outer section that would trap fixed positioning */
+/* Ensure outer tab sections and legacy wrappers never apply transform or animation that would trap fixed positioning or conflict with inner page transitions */
+.x-tab-content,
 #tab-catalog-categories,
 #tab-catalog-products,
 #tab-catalog-master-menus,
@@ -159,6 +360,14 @@
 #tab-business {
   transform: none !important;
   animation: none !important;
+}
+
+/* Hide legacy fallback containers when modern React bundle is loaded so they never flash for 1 frame before JS hides them */
+body.x-owner-mobile-app #legacy-business-main-content,
+body.x-owner-mobile-app #master-categories-page,
+body.x-owner-mobile-app #product-list-view,
+body.x-owner-mobile-app #legacy-materials-content {
+  display: none !important;
 }
 
 /* Animate inner modern roots & child page shells smoothly on mount/route transition */
@@ -170,9 +379,14 @@
 #modern-category-sort-page-root,
 #modern-category-menu-sort-page-root,
 #modern-item-master-page-root,
+#modern-item-editor-page-root,
 #modern-menu-editor-root,
+#modern-materials-page-root,
+#modern-material-editor-page-root,
 .x-owner-page-anim-push {
-  animation: xentraSlidePushIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both !important;
+  animation: xentraSlidePushIn 0.18s cubic-bezier(0.22, 1, 0.36, 1) both !important;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 body[data-nav-dir="pop"] #modern-business-hub-root,
@@ -183,15 +397,22 @@ body[data-nav-dir="pop"] #modern-category-editor-page-root,
 body[data-nav-dir="pop"] #modern-category-sort-page-root,
 body[data-nav-dir="pop"] #modern-category-menu-sort-page-root,
 body[data-nav-dir="pop"] #modern-item-master-page-root,
+body[data-nav-dir="pop"] #modern-item-editor-page-root,
 body[data-nav-dir="pop"] #modern-menu-editor-root,
+body[data-nav-dir="pop"] #modern-materials-page-root,
+body[data-nav-dir="pop"] #modern-material-editor-page-root,
 .x-owner-page-anim-pop {
-  animation: xentraSlidePopIn 0.26s cubic-bezier(0.22, 1, 0.36, 1) both !important;
+  animation: xentraSlidePopIn 0.16s cubic-bezier(0.22, 1, 0.36, 1) both !important;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 body[data-nav-dir="tab"] #modern-business-hub-root,
 body[data-nav-dir="tab"] #x-owner-command-center,
 .x-owner-page-anim-tab {
-  animation: xentraTabFadeIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both !important;
+  animation: xentraTabFadeIn 0.14s cubic-bezier(0.22, 1, 0.36, 1) both !important;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 @media (max-width: 768px) {
@@ -238,7 +459,15 @@ body.x-owner-mobile-app #category-editor-view,
 #subpage-catalog-menu-hub,
 #modern-categories-page-mount,
 #modern-item-master-page-mount,
-#modern-category-editor-page-mount {
+#modern-category-editor-page-mount,
+#product-editor-view,
+#product-editor-view.x-card-panel,
+#product-editor-view.x-owner-child-page-shell,
+body.x-owner-mobile-app #product-editor-view,
+body.x-owner-mobile-app #product-editor-view.x-card-panel,
+#modern-item-editor-page-mount,
+#modern-materials-page-mount,
+#modern-material-editor-page-mount {
   padding-top: 0 !important;
   padding-bottom: 0 !important;
   padding-left: 0 !important;
@@ -264,7 +493,10 @@ body.x-owner-mobile-app #category-editor-view,
   #modern-category-sort-page-root,
   #modern-category-menu-sort-page-root,
   #modern-item-master-page-root,
-  #modern-menu-editor-root {
+  #modern-item-editor-page-root,
+  #modern-menu-editor-root,
+  #modern-materials-page-root,
+  #modern-material-editor-page-root {
     padding-top: 8px !important;
   }
 }

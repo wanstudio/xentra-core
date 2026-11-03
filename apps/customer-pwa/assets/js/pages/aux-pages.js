@@ -98,537 +98,243 @@
     renderAffiliateDashboard(container);
   }
 
-  function renderAffiliateApplyForm(container, program, session, prefill) {
-    program = program || {};
-    prefill = prefill || {};
-    var isFixedPerItem = (program.commission_type === 'FIXED_PER_ITEM');
-    var rateDisplay = isFixedPerItem
-      ? (UI.money(program.commission_per_item || program.commission_rate || 1000) + ' per menu')
-      : ((program.commission_rate != null ? program.commission_rate : 5) + '% per pesanan');
-    var custName = prefill.full_name || (session && (session.name || session.displayName)) || '';
-    if (custName.indexOf('@') !== -1) {
-      custName = custName.split('@')[0];
-    }
-    var custPhone = sanitizePhone(prefill.phone || (session && session.phone) || '');
-
-    var formData = {
-      full_name: custName,
-      phone: custPhone,
-      social_channel: 'Instagram',
-      social_media: prefill.social_media || '',
-      bank_name: prefill.bank_name || 'BCA',
-      bank_account_number: prefill.bank_account_number || '',
-      bank_account_holder: prefill.bank_account_holder || custName,
-      notes: prefill.notes || ''
-    };
-
-    var currentStep = 1;
-
-    function renderShell() {
-      container.innerHTML =
-        '<div class="x-aux-page">' +
-        '  <div class="x-aux-header">' +
-        '    <button type="button" class="x-aux-back-btn" id="x-affiliate-back" aria-label="Kembali">' +
-        '      <img src="/assets/icons/arrowback.svg" alt="Kembali">' +
-        '    </button>' +
-        '    <h1 class="x-aux-title">Daftar Affiliate</h1>' +
-        '  </div>' +
-        '  <div class="x-aux-body">' +
-        '    <div class="x-aff-wizard">' +
-        '      <!-- Stepper Progress Bar -->' +
-        '      <div class="x-aff-progress-bar" id="x-aff-progress-bar">' +
-        '        <div class="x-aff-progress-seg active" id="pseg-1"></div>' +
-        '        <div class="x-aff-progress-seg" id="pseg-2"></div>' +
-        '        <div class="x-aff-progress-seg" id="pseg-3"></div>' +
-        '        <div class="x-aff-progress-seg" id="pseg-4"></div>' +
-        '      </div>' +
-        '      <div id="x-aff-step-host"></div>' +
-        '    </div>' +
-        '  </div>' +
-        '</div>';
-
-      var backBtn = container.querySelector('#x-affiliate-back');
-      if (backBtn) {
-        backBtn.onclick = function () {
-          if (currentStep > 1) {
-            goToStep(currentStep - 1);
-          } else {
-            Router.navigate('home');
-          }
-        };
-      }
-
-      renderCurrentStep();
-    }
-
-    function updateProgressBar() {
-      for (var i = 1; i <= 4; i++) {
-        var seg = container.querySelector('#pseg-' + i);
-        if (seg) {
-          if (i <= currentStep) seg.classList.add('active');
-          else seg.classList.remove('active');
-        }
-      }
-    }
-
-    function goToStep(step) {
-      currentStep = step;
-      updateProgressBar();
-      renderCurrentStep();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-
-    function renderCurrentStep() {
-      var host = container.querySelector('#x-aff-step-host');
-      if (!host) return;
-
-      if (currentStep === 1) renderStep1(host);
-      else if (currentStep === 2) renderStep2(host);
-      else if (currentStep === 3) renderStep3(host);
-      else if (currentStep === 4) renderStep4(host);
-    }
-
-    // ── STEP 1: Data Diri ───────────────────────────────────────────
-    function renderStep1(host) {
-      host.innerHTML =
-        '<div class="x-aff-step-container">' +
-        '  <div class="x-aff-card">' +
-        '    <div class="x-aff-step-badge">1 dari 4 • Data Diri</div>' +
-        '    <h2 class="x-aff-step-title">Data Diri</h2>' +
-        '    <p class="x-aff-step-desc">Isi nama dan nomor WhatsApp aktifmu.</p>' +
-        '    <div class="x-aff-field-group">' +
-        '      <label class="x-aff-label"><span>Nama Lengkap</span><span style="color:#ef4444;">*</span></label>' +
-        '      <input type="text" id="x-step-name" class="x-aff-input" placeholder="Nama lengkapmu" value="' + UI.escape(formData.full_name) + '">' +
-        '    </div>' +
-        '    <div class="x-aff-field-group">' +
-        '      <label class="x-aff-label"><span>Nomor WhatsApp</span><span style="color:#ef4444;">*</span></label>' +
-        '      <input type="tel" id="x-step-phone" class="x-aff-input" placeholder="08xxxxxxxxxx" value="' + UI.escape(formData.phone) + '">' +
-        '    </div>' +
-        '    <button type="button" class="x-aff-btn-primary" id="x-step1-next" style="margin-top:20px;">Lanjut &rarr;</button>' +
-        '  </div>' +
-        '</div>';
-
-      var nextBtn = host.querySelector('#x-step1-next');
-      nextBtn.onclick = function () {
-        var nameInput = host.querySelector('#x-step-name').value.trim();
-        var phoneInput = host.querySelector('#x-step-phone').value.trim();
-
-        if (!nameInput) {
-          if (UI && UI.toast) UI.toast('Nama lengkap belum diisi');
-          host.querySelector('#x-step-name').focus();
-          return;
-        }
-        if (!phoneInput || phoneInput.indexOf('@') !== -1 || phoneInput.length < 8) {
-          if (UI && UI.toast) UI.toast('Nomor WhatsApp belum valid (gunakan nomor HP aktif)');
-          host.querySelector('#x-step-phone').focus();
-          return;
-        }
-
-        formData.full_name = nameInput;
-        formData.phone = phoneInput;
-        if (!formData.bank_account_holder) formData.bank_account_holder = nameInput;
-        goToStep(2);
-      };
-    }
-
-    // ── STEP 2: Media Promosi ────────────────────────────────────────
-    function renderStep2(host) {
-      var channels = [
-        { id: 'Instagram', name: 'Instagram', icon: '📸', ph: '@username' },
-        { id: 'TikTok', name: 'TikTok', icon: '🎵', ph: '@username' },
-        { id: 'WhatsApp', name: 'WhatsApp', icon: '💬', ph: 'No. WA / Grup' },
-        { id: 'X (Twitter)', name: 'X / Twitter', icon: '🐦', ph: '@username' },
-        { id: 'Teman & Kantor', name: 'Teman / Kantor', icon: '👥', ph: 'Nama kantor atau divisi' },
-        { id: 'Lainnya', name: 'Lainnya', icon: '🌐', ph: 'Media / link promosi' }
-      ];
-
-      var chipsHtml = channels.map(function (c) {
-        var isSel = formData.social_channel === c.id;
-        return '<div class="x-aff-chip ' + (isSel ? 'selected' : '') + '" data-channel="' + c.id + '" data-ph="' + c.ph + '">' +
-               '  <span class="x-aff-chip-icon">' + c.icon + '</span>' +
-               '  <span>' + c.name + '</span>' +
-               '</div>';
-      }).join('');
-
-      var currentChannelObj = channels.find(function (c) { return c.id === formData.social_channel; }) || channels[0];
-
-      host.innerHTML =
-        '<div class="x-aff-step-container">' +
-        '  <div class="x-aff-card">' +
-        '    <div class="x-aff-step-badge">2 dari 4 • Media Promosi</div>' +
-        '    <h2 class="x-aff-step-title">Biasa Share di Mana?</h2>' +
-        '    <p class="x-aff-step-desc">Pilih media yang paling sering kamu pakai:</p>' +
-        '    <div class="x-aff-chips-grid" id="x-social-chips">' + chipsHtml + '</div>' +
-        '    <div class="x-aff-field-group">' +
-        '      <label class="x-aff-label"><span id="x-social-label">Akun / Link (' + UI.escape(formData.social_channel) + ')</span><span style="color:#ef4444;">*</span></label>' +
-        '      <input type="text" id="x-step-social" class="x-aff-input" placeholder="' + UI.escape(currentChannelObj.ph) + '" value="' + UI.escape(formData.social_media) + '">' +
-        '    </div>' +
-        '    <button type="button" class="x-aff-btn-primary" id="x-step2-next" style="margin-top:20px;">Lanjut &rarr;</button>' +
-        '    <button type="button" class="x-aff-btn-secondary" id="x-step2-back">&larr; Kembali</button>' +
-        '  </div>' +
-        '</div>';
-
-      var chipEls = host.querySelectorAll('.x-aff-chip');
-      var socialInput = host.querySelector('#x-step-social');
-      var socialLabel = host.querySelector('#x-social-label');
-
-      chipEls.forEach(function (chip) {
-        chip.onclick = function () {
-          chipEls.forEach(function (c) { c.classList.remove('selected'); });
-          chip.classList.add('selected');
-          var chId = chip.getAttribute('data-channel');
-          var ph = chip.getAttribute('data-ph');
-          formData.social_channel = chId;
-          socialInput.placeholder = ph;
-          socialLabel.textContent = 'Akun / Link (' + chId + ')';
-        };
-      });
-
-      host.querySelector('#x-step2-back').onclick = function () { goToStep(1); };
-
-      host.querySelector('#x-step2-next').onclick = function () {
-        var socialVal = socialInput.value.trim();
-        if (!socialVal) {
-          if (UI && UI.toast) UI.toast('Isi nama akun atau link kamu');
-          socialInput.focus();
-          return;
-        }
-        formData.social_media = socialVal;
-        goToStep(3);
-      };
-    }
-
-    // ── STEP 3: Rekening Pencairan ──────────────────────────────────
-    function renderStep3(host) {
-      var popularBanks = ['BCA', 'Mandiri', 'BRI', 'BNI', 'GoPay', 'OVO', 'DANA', 'Lainnya'];
-      var bankChipsHtml = popularBanks.map(function (b) {
-        var isSel = formData.bank_name === b;
-        return '<div class="x-aff-bank-chip ' + (isSel ? 'selected' : '') + '" data-bank="' + b + '">' + b + '</div>';
-      }).join('');
-
-      host.innerHTML =
-        '<div class="x-aff-step-container">' +
-        '  <div class="x-aff-card">' +
-        '    <div class="x-aff-step-badge">3 dari 4 • Rekening</div>' +
-        '    <h2 class="x-aff-step-title">Rekening Pencairan</h2>' +
-        '    <p class="x-aff-step-desc">Tujuan transfer saat komisi ditarik:</p>' +
-        '    <div class="x-aff-bank-chips" id="x-bank-chips">' + bankChipsHtml + '</div>' +
-        '    <div class="x-aff-field-group">' +
-        '      <label class="x-aff-label"><span>Bank / E-Wallet</span><span style="color:#ef4444;">*</span></label>' +
-        '      <input type="text" id="x-step-bank-name" class="x-aff-input" placeholder="Contoh: BCA / GoPay" value="' + UI.escape(formData.bank_name) + '">' +
-        '    </div>' +
-        '    <div class="x-aff-field-group">' +
-        '      <label class="x-aff-label"><span>Nomor Rekening / No. HP</span><span style="color:#ef4444;">*</span></label>' +
-        '      <input type="tel" id="x-step-bank-acc" class="x-aff-input" placeholder="Nomor rekening atau HP e-wallet" value="' + UI.escape(formData.bank_account_number) + '">' +
-        '    </div>' +
-        '    <div class="x-aff-field-group">' +
-        '      <label class="x-aff-label"><span>Nama Pemilik Rekening</span><span style="color:#ef4444;">*</span></label>' +
-        '      <input type="text" id="x-step-bank-holder" class="x-aff-input" placeholder="Nama pemilik rekening" value="' + UI.escape(formData.bank_account_holder) + '">' +
-        '    </div>' +
-        '    <button type="button" class="x-aff-btn-primary" id="x-step3-next" style="margin-top:20px;">Lanjut &rarr;</button>' +
-        '    <button type="button" class="x-aff-btn-secondary" id="x-step3-back">&larr; Kembali</button>' +
-        '  </div>' +
-        '</div>';
-
-      var bankNameInput = host.querySelector('#x-step-bank-name');
-      var bankChips = host.querySelectorAll('.x-aff-bank-chip');
-
-      bankChips.forEach(function (chip) {
-        chip.onclick = function () {
-          bankChips.forEach(function (c) { c.classList.remove('selected'); });
-          chip.classList.add('selected');
-          var bName = chip.getAttribute('data-bank');
-          if (bName === 'Lainnya') {
-            bankNameInput.value = '';
-            bankNameInput.placeholder = 'Ketik nama bank (contoh: CIMB, Jago, SeaBank)';
-            bankNameInput.focus();
-          } else {
-            bankNameInput.value = bName;
-            formData.bank_name = bName;
-          }
-        };
-      });
-
-      host.querySelector('#x-step3-back').onclick = function () { goToStep(2); };
-
-      host.querySelector('#x-step3-next').onclick = function () {
-        var bName = bankNameInput.value.trim();
-        var bAcc = host.querySelector('#x-step-bank-acc').value.trim();
-        var bHolder = host.querySelector('#x-step-bank-holder').value.trim();
-
-        if (!bName) {
-          if (UI && UI.toast) UI.toast('Pilih atau ketik bank / e-wallet');
-          bankNameInput.focus();
-          return;
-        }
-        if (!bAcc || bAcc.length < 5) {
-          if (UI && UI.toast) UI.toast('Nomor rekening belum valid');
-          host.querySelector('#x-step-bank-acc').focus();
-          return;
-        }
-        if (!bHolder) {
-          if (UI && UI.toast) UI.toast('Nama pemilik rekening belum diisi');
-          host.querySelector('#x-step-bank-holder').focus();
-          return;
-        }
-
-        formData.bank_name = bName;
-        formData.bank_account_number = bAcc;
-        formData.bank_account_holder = bHolder;
-        goToStep(4);
-      };
-    }
-
-    // ── STEP 4: Review & Submit ─────────────────────────────────────
-    function renderStep4(host) {
-      host.innerHTML =
-        '<div class="x-aff-step-container">' +
-        '  <div class="x-aff-card">' +
-        '    <div class="x-aff-step-badge">4 dari 4 • Cek Data</div>' +
-        '    <h2 class="x-aff-step-title">Cek Sekali Lagi</h2>' +
-        '    <p class="x-aff-step-desc">Pastikan nomor rekening dan data sudah sesuai:</p>' +
-        '    <div class="x-aff-summary-card">' +
-        '      <div class="x-aff-summary-row">' +
-        '        <span class="x-aff-summary-label">Nama</span>' +
-        '        <span class="x-aff-summary-val">' + UI.escape(formData.full_name) + '</span>' +
-        '      </div>' +
-        '      <div class="x-aff-summary-row">' +
-        '        <span class="x-aff-summary-label">WhatsApp</span>' +
-        '        <span class="x-aff-summary-val">' + UI.escape(formData.phone) + '</span>' +
-        '      </div>' +
-        '      <div class="x-aff-summary-row">' +
-        '        <span class="x-aff-summary-label">Media</span>' +
-        '        <span class="x-aff-summary-val">' + UI.escape(formData.social_channel) + ' (' + UI.escape(formData.social_media) + ')</span>' +
-        '      </div>' +
-        '      <div class="x-aff-summary-row">' +
-        '        <span class="x-aff-summary-label">Rekening</span>' +
-        '        <span class="x-aff-summary-val">' + UI.escape(formData.bank_name) + ' - ' + UI.escape(formData.bank_account_number) + '<br><small style="color:#64748b;font-weight:400;">a.n. ' + UI.escape(formData.bank_account_holder) + '</small></span>' +
-        '      </div>' +
-        '      <div class="x-aff-summary-row">' +
-        '        <span class="x-aff-summary-label">Komisi</span>' +
-        '        <span class="x-aff-summary-val" style="color:#10b981;">' + rateDisplay + '</span>' +
-        '      </div>' +
-        '    </div>' +
-        '    <div class="x-aff-field-group">' +
-        '      <label class="x-aff-label"><span>Pesan Tambahan (Opsional)</span></label>' +
-        '      <textarea id="x-step-notes" class="x-aff-input" placeholder="Tulis catatan jika ada..." style="resize:vertical;min-height:56px;">' + UI.escape(formData.notes) + '</textarea>' +
-        '    </div>' +
-        '    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px 14px;font-size:12px;color:#475569;line-height:1.45;margin-bottom:18px;">' +
-        '      ⏱️ Pendaftaran dicek tim kami dalam 1×24 jam. Link referral langsung aktif begitu disetujui.' +
-        '    </div>' +
-        '    <button type="button" class="x-aff-btn-primary" id="x-step4-submit">Kirim Pendaftaran 🚀</button>' +
-        '    <button type="button" class="x-aff-btn-secondary" id="x-step4-back">&larr; Ubah Data</button>' +
-        '  </div>' +
-        '</div>';
-
-      host.querySelector('#x-step4-back').onclick = function () { goToStep(1); };
-
-      var submitBtn = host.querySelector('#x-step4-submit');
-      submitBtn.onclick = function () {
-        var notesVal = (host.querySelector('#x-step-notes') ? host.querySelector('#x-step-notes').value : '').trim();
-        formData.notes = notesVal;
-
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<span class="x-loc-spinner" style="margin-right:8px;"></span> Mengirim…';
-
-        API.post('/customer/affiliate/apply', {
-          full_name: formData.full_name,
-          phone: formData.phone,
-          social_media: formData.social_channel + ': ' + formData.social_media,
-          bank_name: formData.bank_name,
-          bank_account_number: formData.bank_account_number,
-          bank_account_holder: formData.bank_account_holder,
-          notes: formData.notes
-        })
-        .then(function (res) {
-          if (UI && UI.toast) UI.toast('Pendaftaran terkirim! 🎉');
-          var custId = (session && (session.customer_id || session.id || session.email)) || 'me';
-          try {
-            sessionStorage.setItem('xnt_aff_status_' + custId, 'PENDING');
-            localStorage.setItem('xnt_aff_status_' + custId, 'PENDING');
-          } catch (_) {}
-          container.setAttribute('data-mounted-session', session ? session.token : '');
-          container.setAttribute('data-mounted-view', 'affiliate-pending');
-          renderAffiliatePendingView(container, (res && res.profile) || {}, program, session);
-        })
-        .catch(function (err) {
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Kirim Pendaftaran 🚀';
-          var errMsg = (err && err.data && (err.data.error || err.data.message)) ||
-                       (err && err.message) ||
-                       'Gagal mengirim pendaftaran.';
-          if (UI && UI.toast) UI.toast(errMsg);
-        });
-      };
-    }
-
-    renderShell();
-    if (typeof window.__xentraHideSplash === 'function') window.__xentraHideSplash();
-  }
-
-  function renderAffiliatePendingView(container, profile, program, session) {
-    profile = profile || {};
-    var dateStr = profile.created_at ? new Date(profile.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
-
-    container.innerHTML =
-      '<div class="x-aux-page">' +
-      '  <div class="x-aux-header">' +
-      '    <button type="button" class="x-aux-back-btn" id="x-affiliate-back" aria-label="Kembali">' +
-      '      <img src="/assets/icons/arrowback.svg" alt="Kembali">' +
-      '    </button>' +
-      '    <h1 class="x-aux-title">Status Pendaftaran</h1>' +
-      '  </div>' +
-      '  <div class="x-aux-body">' +
-      '    <div class="x-aff-wizard">' +
-      '      <div class="x-aff-card" style="text-align:center;padding:32px 20px;">' +
-      '        <div style="font-size:44px;line-height:1;margin-bottom:12px;">⏳</div>' +
-      '        <div style="display:inline-block;background:#fef3c7;color:#b45309;padding:4px 14px;border-radius:20px;font-size:12px;font-weight:700;margin-bottom:12px;">Sedang Ditinjau</div>' +
-      '        <h2 style="font-size:19px;font-weight:800;color:#0f172a;margin:0 0 6px;">Pendaftaran Sedang Dicek</h2>' +
-      '        <p style="font-size:13px;color:#64748b;line-height:1.55;margin:0 auto 18px;max-width:320px;">' +
-      '          Tim kami akan memeriksa data pendaftaranmu dalam 1×24 jam. Link referral akan otomatis aktif begitu disetujui.' +
-      '        </p>' +
-      '        <div class="x-aff-summary-card" style="text-align:left;">' +
-      '          <div class="x-aff-summary-row"><span class="x-aff-summary-label">Media</span><span class="x-aff-summary-val">' + UI.escape(profile.social_media || '-') + '</span></div>' +
-      '          <div class="x-aff-summary-row"><span class="x-aff-summary-label">Rekening</span><span class="x-aff-summary-val">' + UI.escape(profile.bank_name || '-') + ' - ' + UI.escape(profile.bank_account_number || '-') + '<br><small style="color:#64748b;font-weight:400;">a.n. ' + UI.escape(profile.bank_account_holder || '-') + '</small></span></div>' +
-      '          <div class="x-aff-summary-row"><span class="x-aff-summary-label">Diajukan</span><span class="x-aff-summary-val">' + UI.escape(dateStr) + '</span></div>' +
-      '        </div>' +
-      '        <button type="button" class="x-aff-btn-secondary" id="x-aff-edit-apply-btn" style="color:#0284c7;font-weight:700;font-size:13px;">✏️ Ubah Data Pendaftaran</button>' +
-      '      </div>' +
-      '    </div>' +
-      '  </div>' +
-      '</div>';
-
-    var backBtn = container.querySelector('#x-affiliate-back');
-    if (backBtn) backBtn.onclick = function () { Router.navigate('home'); };
-
-    var editBtn = container.querySelector('#x-aff-edit-apply-btn');
-    if (editBtn) {
-      editBtn.onclick = function () {
-        container.setAttribute('data-mounted-view', 'affiliate-form');
-        renderAffiliateApplyForm(container, program, session, profile);
-      };
-    }
-    if (typeof window.__xentraHideSplash === 'function') window.__xentraHideSplash();
-  }
-
-  function renderAffiliateRejectedView(container, profile, program, session) {
-    profile = profile || {};
-    var reason = profile.rejection_reason || 'Data pendaftaran belum sesuai kriteria.';
-
-    container.innerHTML =
-      '<div class="x-aux-page">' +
-      '  <div class="x-aux-header">' +
-      '    <button type="button" class="x-aux-back-btn" id="x-affiliate-back" aria-label="Kembali">' +
-      '      <img src="/assets/icons/arrowback.svg" alt="Kembali">' +
-      '    </button>' +
-      '    <h1 class="x-aux-title">Status Pendaftaran</h1>' +
-      '  </div>' +
-      '  <div class="x-aux-body">' +
-      '    <div class="x-aff-wizard">' +
-      '      <div class="x-aff-card" style="text-align:center;padding:32px 20px;">' +
-      '        <div style="font-size:44px;line-height:1;margin-bottom:12px;">❌</div>' +
-      '        <div style="display:inline-block;background:#fee2e2;color:#b91c1c;padding:4px 14px;border-radius:20px;font-size:12px;font-weight:700;margin-bottom:12px;">Belum Disetujui</div>' +
-      '        <h2 style="font-size:19px;font-weight:800;color:#0f172a;margin:0 0 6px;">Pendaftaran Belum Diterima</h2>' +
-      '        <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:10px 14px;color:#991b1b;font-size:12.5px;line-height:1.45;margin:12px auto 16px;max-width:320px;text-align:left;">' +
-      '          <b>Alasan:</b> ' + UI.escape(reason) +
-      '        </div>' +
-      '        <button type="button" class="x-aff-btn-primary" id="x-aff-reapply-btn" style="max-width:240px;margin:0 auto;">Ajukan Ulang Data 📝</button>' +
-      '      </div>' +
-      '    </div>' +
-      '  </div>' +
-      '</div>';
-
-    var backBtn = container.querySelector('#x-affiliate-back');
-    if (backBtn) backBtn.onclick = function () { Router.navigate('home'); };
-
-    var reapplyBtn = container.querySelector('#x-aff-reapply-btn');
-    if (reapplyBtn) {
-      reapplyBtn.onclick = function () {
-        container.setAttribute('data-mounted-view', 'affiliate-form');
-        renderAffiliateApplyForm(container, program, session, profile);
-      };
-    }
-    if (typeof window.__xentraHideSplash === 'function') window.__xentraHideSplash();
-  }
+  // Legacy stubs (deprecated in 2026 redesign — direct 1-tap activation replaces multi-step forms)
+  function renderAffiliateApplyForm(container) { mountAffiliate(container, true); }
+  function renderAffiliatePendingView(container) { mountAffiliate(container, true); }
+  function renderAffiliateRejectedView(container) { mountAffiliate(container, true); }
 
   function renderAffiliateGuestView(container) {
     container.innerHTML =
       '<div class="x-aux-page">' +
-      '  <div class="x-aux-header">' +
-      '    <button type="button" class="x-aux-back-btn" id="x-affiliate-back" aria-label="Kembali">' +
+      '  <div class="x-aux-header" style="background:var(--x-lime, #b6ff00);border-bottom:1px solid rgba(0,0,0,0.06);">' +
+      '    <button type="button" class="x-aux-back-btn" id="x-affiliate-back" aria-label="Kembali" style="background:#fff;">' +
       '      <img src="/assets/icons/arrowback.svg" alt="Kembali">' +
       '    </button>' +
-      '    <h1 class="x-aux-title">Daftar Affiliate</h1>' +
+      '    <h1 class="x-aux-title" style="color:#111111;">Bagi Info, Dapat Cuan</h1>' +
+      '    <div style="width:36px;"></div>' +
       '  </div>' +
-      '  <div class="x-aux-body">' +
-      '    <div class="x-aff-wizard">' +
-      '      <!-- Hero Card -->' +
-      '      <div class="x-aux-hero-card" style="background: linear-gradient(135deg, #064e3b 0%, #065f46 100%); margin-bottom:18px;">' +
-      '        <div class="x-aux-badge" style="background:#10b981;color:#fff;">🍗 Bagi Info, Dapat Cuan</div>' +
-      '        <h2 style="font-size:21px;font-weight:900;color:#fff;margin:10px 0 6px;letter-spacing:-0.02em;">Ajak Teman Makan, Dapat Komisi</h2>' +
-      '        <p style="font-size:13px;color:#a7f3d0;line-height:1.55;margin:0 0 16px;">Suka menu Bangjo? Cukup bagikan link rekomendasi ke teman atau grup WA. Dapatkan komisi Rp1.000 tunai untuk tiap menu yang terjual dari link kamu.</p>' +
-      '        <div class="x-aux-stats-grid">' +
-      '          <div class="x-aux-stat-box"><span class="num" style="color:#fde047;">Rp1.000</span><span class="lbl">Tiap Menu Terjual</span></div>' +
-      '          <div class="x-aux-stat-box"><span class="num" style="color:#a7f3d0;">Tanpa Modal</span><span class="lbl">Tinggal Share</span></div>' +
-      '          <div class="x-aux-stat-box"><span class="num" style="color:#fff;">BCA / E-Wallet</span><span class="lbl">Tarik Kapan Saja</span></div>' +
-      '        </div>' +
-      '      </div>' +
-      '      <!-- 3 Langkah Sederhana -->' +
-      '      <div class="x-aff-card" style="margin-bottom:18px;">' +
-      '        <h3 style="font-size:14.5px;font-weight:800;color:#0f172a;margin:0 0 14px;">Cara Kerjanya:</h3>' +
-      '        <div style="display:flex;flex-direction:column;gap:12px;">' +
-      '          <div style="display:flex;gap:12px;align-items:flex-start;">' +
-      '            <div style="width:32px;height:32px;border-radius:10px;background:#ecfdf5;color:#059669;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0;">1</div>' +
-      '            <div><div style="font-size:13.5px;font-weight:700;color:#0f172a;">Masuk dengan Google</div><div style="font-size:12px;color:#64748b;margin-top:2px;">Langsung aktif instan tanpa perlu isi formulir pendaftaran.</div></div>' +
-      '          </div>' +
-      '          <div style="display:flex;gap:12px;align-items:flex-start;">' +
-      '            <div style="width:32px;height:32px;border-radius:10px;background:#eff6ff;color:#2563eb;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0;">2</div>' +
-      '            <div><div style="font-size:13.5px;font-weight:700;color:#0f172a;">Bagikan Link ke WhatsApp</div><div style="font-size:12px;color:#64748b;margin-top:2px;">Dapatkan link rekomendasi instan dan kirim ke teman kantor, grup WA, atau keluarga.</div></div>' +
-      '          </div>' +
-      '          <div style="display:flex;gap:12px;align-items:flex-start;">' +
-      '            <div style="width:32px;height:32px;border-radius:10px;background:#fef3c7;color:#d97706;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0;">3</div>' +
-      '            <div><div style="font-size:13.5px;font-weight:700;color:#0f172a;">Terima Komisi Tunai</div><div style="font-size:12px;color:#64748b;margin-top:2px;">Dapatkan Rp1.000 per menu yang dipesan teman, langsung masuk saldo dan bisa ditarik.</div></div>' +
-      '          </div>' +
-      '        </div>' +
-      '      </div>' +
-      '      <button type="button" class="x-aff-btn-primary" id="x-affiliate-login-cta" style="padding:15px;">Masuk dengan Google ✨</button>' +
-      '    </div>' +
+      '  <div class="x-aux-body" style="padding:0;background:#ffffff;" id="x-aff-guest-body">' +
+      '    <div style="padding:48px 20px;text-align:center;color:#64748b;font-size:13.5px;"><span class="x-loc-spinner"></span> Memuat program affiliate…</div>' +
       '  </div>' +
       '</div>';
 
     var backBtn = container.querySelector('#x-affiliate-back');
     if (backBtn) backBtn.onclick = function () { Router.navigate('home'); };
 
-    var loginCta = container.querySelector('#x-affiliate-login-cta');
-    if (loginCta) {
-      loginCta.onclick = function () {
-        loginCta.disabled = true;
-        var prevText = loginCta.textContent;
-        loginCta.textContent = 'Membuka Google Sign-In…';
-        startCustomerAuth('#affiliate', function () {
-          mountAffiliate(container, true);
-        }, loginCta, prevText);
-      };
-    }
-    if (typeof window.__xentraHideSplash === 'function') window.__xentraHideSplash();
+    var guestBody = container.querySelector('#x-aff-guest-body');
+
+    API.get('/customer/affiliate/program')
+      .then(function (res) {
+        if (!guestBody) return;
+        var prog = (res && res.program) || {};
+        var commissionPerItem = Number(prog.commission_per_item || 1000);
+        var rateText = UI.money(commissionPerItem);
+        var recentPayouts = (prog.recent_payouts && prog.recent_payouts.length > 0)
+          ? prog.recent_payouts
+          : [
+              { name: 'Dimas S.', amount: 45000, method: 'GoPay' },
+              { name: 'Rina P.', amount: 62000, method: 'BCA' },
+              { name: 'Fajar K.', amount: 38000, method: 'DANA' }
+            ];
+
+        var defaultPorsi = 10;
+        var defaultDaily = defaultPorsi * commissionPerItem;
+        var defaultMonthly = defaultDaily * 30;
+
+        guestBody.innerHTML =
+          // Hero
+          '<div class="x-aff-teaser-hero">' +
+          '  <div class="x-aff-teaser-badge">🍗 Foodie Partner Bangjo</div>' +
+          '  <h2 class="x-aff-teaser-title">Suka Makan di Sini?<br>Ajak Teman, Panen Cuan!</h2>' +
+          '  <p class="x-aff-teaser-desc">Cukup bagikan rekomendasi menu favoritmu ke WhatsApp. Dapatkan komisi tunai instan tiap kali teman memesan.</p>' +
+          '  <div class="x-aff-value-grid">' +
+          '    <div class="x-aff-value-pill">' +
+          '      <div class="x-aff-value-num" style="color:#059669;" id="x-aff-rate-pill">' + rateText + '</div>' +
+          '      <div class="x-aff-value-lbl">Tiap Porsi Menu</div>' +
+          '    </div>' +
+          '    <div class="x-aff-value-pill">' +
+          '      <div class="x-aff-value-num">⚡ Instan</div>' +
+          '      <div class="x-aff-value-lbl">0 Formulir Ribet</div>' +
+          '    </div>' +
+          '    <div class="x-aff-value-pill">' +
+          '      <div class="x-aff-value-num">BCA / E-Wallet</div>' +
+          '      <div class="x-aff-value-lbl">Tarik Kapan Saja</div>' +
+          '    </div>' +
+          '  </div>' +
+          '</div>' +
+
+          // Main Wrap
+          '<div style="padding:20px 18px 100px;">' +
+          // Live Ticker
+          '  <div class="x-aff-ticker">' +
+          '    <div class="x-aff-ticker-dot"></div>' +
+          '    <div class="x-aff-ticker-text" id="x-aff-ticker-txt">🔥 <b>' + UI.escape(recentPayouts[0].name) + '</b> baru saja mencairkan komisi <b>' + UI.money(recentPayouts[0].amount) + '</b> via ' + UI.escape(recentPayouts[0].method || 'E-Wallet') + '</div>' +
+          '  </div>' +
+
+          // Interactive Calculator
+          '  <div class="x-aff-calc-card">' +
+          '    <div class="x-aff-calc-header">' +
+          '      <div class="x-aff-calc-title">🧮 Hitung Potensi Cuanmu</div>' +
+          '      <span class="x-aff-calc-badge">Simulasi</span>' +
+          '    </div>' +
+          '    <div class="x-aff-slider-wrap">' +
+          '      <div class="x-aff-slider-labels">' +
+          '        <span>Porsi dipesan temanmu/hari:</span>' +
+          '        <span class="x-aff-slider-val" id="x-aff-slider-val">' + defaultPorsi + ' Porsi</span>' +
+          '      </div>' +
+          '      <input type="range" class="x-aff-slider" id="x-aff-calc-range" min="2" max="50" step="2" value="' + defaultPorsi + '">' +
+          '    </div>' +
+          '    <div class="x-aff-calc-result">' +
+          '      <div>' +
+          '        <div class="x-aff-calc-res-lbl">POTENSI KOMISI BULANAN</div>' +
+          '        <div class="x-aff-calc-res-num" id="x-aff-monthly-val">' + UI.money(defaultMonthly) + '</div>' +
+          '        <div class="x-aff-calc-res-hint" id="x-aff-daily-val">≈ ' + UI.money(defaultDaily) + ' setiap hari</div>' +
+          '      </div>' +
+          '      <div style="font-size:32px;">💰</div>' +
+          '    </div>' +
+          '  </div>' +
+
+          // 3 Simple Steps
+          '  <div style="margin-bottom:24px;">' +
+          '    <h3 style="font-size:15px;font-weight:800;color:#0f172a;margin-bottom:14px;">Cara Mulai dalam 30 Detik:</h3>' +
+          '    <div class="x-aff-step-item">' +
+          '      <div class="x-aff-step-icon" style="background:#eff6ff;color:#2563eb;">1️⃣</div>' +
+          '      <div>' +
+          '        <div class="x-aff-step-name">Sekali Tap Langsung Aktif</div>' +
+          '        <div class="x-aff-step-text">Langsung aktif tanpa formulir bertele-tele dan tanpa tunggu review 1x24 jam.</div>' +
+          '      </div>' +
+          '    </div>' +
+          '    <div class="x-aff-step-item">' +
+          '      <div class="x-aff-step-icon" style="background:#fef3c7;color:#d97706;">2️⃣</div>' +
+          '      <div>' +
+          '        <div class="x-aff-step-name">Bagikan ke Teman / Grup WA</div>' +
+          '        <div class="x-aff-step-text">Kirim saat jam lapar kantor, teman kos, atau keluarga via 1-klik share.</div>' +
+          '      </div>' +
+          '    </div>' +
+          '    <div class="x-aff-step-item">' +
+          '      <div class="x-aff-step-icon" style="background:#ecfdf5;color:#059669;">3️⃣</div>' +
+          '      <div>' +
+          '        <div class="x-aff-step-name">Komisi Tunai Masuk Saldo</div>' +
+          '        <div class="x-aff-step-text">Tarik uang komisi langsung ke rekening BCA, Mandiri, BRI, atau E-Wallet pilihanmu.</div>' +
+          '      </div>' +
+          '    </div>' +
+          '  </div>' +
+          '</div>' +
+
+          // Sticky Bottom CTA Dock
+          '<div class="x-aff-bottom-dock">' +
+          '  <button type="button" class="x-aff-super-btn" id="x-aff-join-cta">' +
+          '    <span>Mulai Jadi Partner</span>' +
+          '    <span class="accent-pill">1-Tap Aktif ⚡</span>' +
+          '  </button>' +
+          '</div>';
+
+        // Calculator slider event
+        var slider = guestBody.querySelector('#x-aff-calc-range');
+        var sliderVal = guestBody.querySelector('#x-aff-slider-val');
+        var monthlyVal = guestBody.querySelector('#x-aff-monthly-val');
+        var dailyVal = guestBody.querySelector('#x-aff-daily-val');
+
+        if (slider) {
+          slider.oninput = function () {
+            var porsi = Number(slider.value) || 2;
+            sliderVal.textContent = porsi + ' Porsi';
+            var d = porsi * commissionPerItem;
+            var m = d * 30;
+            monthlyVal.textContent = UI.money(m);
+            dailyVal.textContent = '≈ ' + UI.money(d) + ' setiap hari';
+          };
+        }
+
+        // Live Ticker rotation
+        var tickerTxt = guestBody.querySelector('#x-aff-ticker-txt');
+        if (tickerTxt && recentPayouts.length > 1) {
+          var tIdx = 0;
+          var tInterval = setInterval(function () {
+            if (!document.body.contains(tickerTxt)) {
+              clearInterval(tInterval);
+              return;
+            }
+            tIdx = (tIdx + 1) % recentPayouts.length;
+            var item = recentPayouts[tIdx];
+            tickerTxt.innerHTML = '🔥 <b>' + UI.escape(item.name) + '</b> baru saja mencairkan komisi <b>' + UI.money(item.amount) + '</b> via ' + UI.escape(item.method || 'E-Wallet');
+          }, 3500);
+        }
+
+        // Join CTA Click
+        var joinCta = guestBody.querySelector('#x-aff-join-cta');
+        if (joinCta) {
+          joinCta.onclick = function () {
+            var session = Store ? Store.getState().customerSession : null;
+            if (session && session.token) {
+              joinCta.disabled = true;
+              joinCta.innerHTML = '<span>Mengaktifkan Partner…</span>';
+              API.post('/customer/affiliate/activate', {})
+                .then(function () {
+                  if (UI && UI.toast) UI.toast('Selamat! Kamu resmi jadi Foodie Partner Bangjo');
+                  mountAffiliate(container, true);
+                })
+                .catch(function () {
+                  mountAffiliate(container, true);
+                });
+            } else {
+              joinCta.disabled = true;
+              var prevHtml = joinCta.innerHTML;
+              joinCta.innerHTML = '<span>Membuka Google Sign-In…</span>';
+              startCustomerAuth('#affiliate', function () {
+                mountAffiliate(container, true);
+              }, joinCta, prevHtml);
+            }
+          };
+        }
+
+        if (typeof window.__xentraHideSplash === 'function') window.__xentraHideSplash();
+      })
+      .catch(function (err) {
+        if (!guestBody) return;
+        guestBody.innerHTML =
+          '<div style="padding:48px 20px;text-align:center;">' +
+          '  <div style="font-size:32px;margin-bottom:8px;">⚠️</div>' +
+          '  <div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:6px;">Gagal Memuat Program</div>' +
+          '  <div style="font-size:12px;color:#64748b;margin-bottom:14px;">' + UI.escape((err && (err.message || err.error)) || 'Koneksi terputus') + '</div>' +
+          '  <button type="button" class="x-aux-action-btn" id="x-aff-retry-guest" style="max-width:180px;margin:0 auto;background:#111;color:#fff;">Coba Lagi</button>' +
+          '</div>';
+        var retry = guestBody.querySelector('#x-aff-retry-guest');
+        if (retry) retry.onclick = function () { renderAffiliateGuestView(container); };
+        if (typeof window.__xentraHideSplash === 'function') window.__xentraHideSplash();
+      });
   }
 
   function renderAffiliateDashboard(container) {
     container.innerHTML =
       '<div class="x-aux-page">' +
-      '  <div class="x-aux-header">' +
-      '    <button type="button" class="x-aux-back-btn" id="x-affiliate-back" aria-label="Kembali">' +
-      '      <img src="/assets/icons/arrowback.svg" alt="Kembali">' +
+      '  <div class="x-aux-header" style="background:#0f172a;color:#ffffff;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:space-between;">' +
+      '    <button type="button" class="x-aux-back-btn" id="x-affiliate-back" aria-label="Kembali" style="background:rgba(255,255,255,0.12);color:#fff;flex-shrink:0;">' +
+      '      <img src="/assets/icons/arrowback.svg" alt="Kembali" style="filter:brightness(0) invert(1);">' +
       '    </button>' +
-      '    <h1 class="x-aux-title">Daftar Affiliate</h1>' +
+      '    <h1 class="x-aux-title" style="color:#ffffff;flex:1;text-align:left;margin-left:4px;">Partner Dashboard</h1>' +
+      '    <button type="button" id="x-aff-help-top" aria-label="Bantuan Customer Service" style="background:rgba(255,255,255,0.12);border:none;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;color:#ffffff;cursor:pointer;flex-shrink:0;margin-left:auto;">' +
+      '      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '        <path d="M3 11h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5Zm0 0a9 9 0 1 1 18 0m0 0v5a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3Z"></path>' +
+      '        <path d="M21 16v2a4 4 0 0 1-4 4h-5"></path>' +
+      '      </svg>' +
+      '    </button>' +
       '  </div>' +
-      '  <div class="x-aux-body" id="x-aff-dash-wrap">' +
-      '    <div style="padding:48px 20px;text-align:center;color:#64748b;font-size:13.5px;"><span class="x-loc-spinner"></span> Memuat data affiliate…</div>' +
+      '  <div class="x-aux-body" style="padding:0;background:#f8fafc;" id="x-aff-dash-wrap">' +
+      '    <div style="padding:48px 20px;text-align:center;color:#64748b;font-size:13.5px;"><span class="x-loc-spinner"></span> Memuat dashboard affiliate…</div>' +
       '  </div>' +
       '</div>';
 
     var backBtn = container.querySelector('#x-affiliate-back');
     if (backBtn) backBtn.onclick = function () { Router.navigate('home'); };
+
+    var helpTop = container.querySelector('#x-aff-help-top');
+    if (helpTop) {
+      helpTop.onclick = function () {
+        var waHelp = 'https://api.whatsapp.com/send?phone=628112345678&text=' + encodeURIComponent('Halo Tim Bangjo, saya butuh bantuan terkait Program Foodie Partner Affiliate.');
+        window.open(waHelp, '_blank');
+      };
+    }
 
     var dashWrap = container.querySelector('#x-aff-dash-wrap');
 
@@ -638,43 +344,37 @@
         var data = (res && res.stats) || {};
         var profile = data.profile || {};
         var program = data.program || {};
-        var conversions = data.conversions || [];
+        var tier = data.tier || { name: 'Foodie Pemula', level: 1, badge: '🥉 Foodie Pemula • Level 1' };
         var payouts = data.payouts || [];
 
-        var code = profile.referral_code || '';
+        // Auto-activate profile if not already active
+        if (profile.status !== 'ACTIVE') {
+          API.post('/customer/affiliate/activate', {}).then(function (actRes) {
+            if (actRes && actRes.profile) profile = actRes.profile;
+          }).catch(function () {});
+        }
+
+        var session = Store ? Store.getState().customerSession : null;
+        var rawName = (session && (session.name || session.displayName)) || 'Foodie Partner';
+        if (rawName.indexOf('@') !== -1) rawName = rawName.split('@')[0];
+        var initial = rawName.charAt(0).toUpperCase() || 'F';
+
+        var code = profile.referral_code || 'BANGJO';
         var shareUrl = window.location.origin + '/?ref=' + encodeURIComponent(code);
-        var waShareText = 'Yuk cobain pesan menu favorit di Bangjo lewat link rekomendasi aku ini: ' + shareUrl;
 
         var payable = Number(profile.balance_payable || 0);
         var pending = Number(profile.balance_pending || 0);
-        var totalEarned = Number(profile.total_earnings || 0);
         var minPayout = Number(program.min_payout_amount || 50000);
-        var canWithdraw = payable >= minPayout && profile.bank_account_number;
+        var canWithdraw = payable >= minPayout;
+        var hasBank = Boolean(profile.bank_account_number && profile.bank_name);
+        var progressPct = Math.min(100, Math.round((payable / minPayout) * 100));
 
-        var bankHtml = '';
-        if (profile.bank_name && profile.bank_account_number) {
-          bankHtml =
-            '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px 14px;margin-top:10px;">' +
-            '  <div style="display:flex;justify-content:space-between;align-items:center;">' +
-            '    <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">Rekening Pencairan</div>' +
-            '    <button type="button" id="x-aff-edit-bank-btn" style="background:none;border:none;color:#0284c7;font-size:12px;font-weight:700;cursor:pointer;">Ubah Rekening</button>' +
-            '  </div>' +
-            '  <div style="font-size:14px;font-weight:800;color:#0f172a;margin-top:4px;">' + UI.escape(profile.bank_name) + ' - ' + UI.escape(profile.bank_account_number) + '</div>' +
-            '  <div style="font-size:12px;color:#475569;">a.n. ' + UI.escape(profile.bank_account_holder) + '</div>' +
-            '</div>';
-        } else {
-          bankHtml =
-            '<div style="background:#fffbeb;border:1px dashed #f59e0b;border-radius:12px;padding:12px 14px;margin-top:10px;text-align:center;">' +
-            '  <div style="font-size:12.5px;font-weight:700;color:#b45309;margin-bottom:4px;">Belum Mengatur Rekening Pencairan</div>' +
-            '  <div style="font-size:11.5px;color:#78350f;margin-bottom:8px;">Tambahkan nomor rekening Bank atau E-Wallet untuk mencairkan komisi tunai Anda.</div>' +
-            '  <button type="button" id="x-aff-setup-bank-btn" style="background:#f59e0b;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;">+ Atur Rekening Sekarang</button>' +
-            '</div>';
-        }
+        var waDefaultText = 'Yuk pesan menu spesial di Bangjo lewat link rekomendasi aku ini, dijamin nagih: ' + shareUrl;
 
-        // Payout history list
+        // Payout rows
         var payoutRowsHtml = '';
         if (payouts.length === 0) {
-          payoutRowsHtml = '<div style="padding:14px;text-align:center;font-size:12px;color:#94a3b8;">Belum ada riwayat penarikan dana.</div>';
+          payoutRowsHtml = '<div style="padding:16px;text-align:center;font-size:12px;color:#94a3b8;">Belum ada riwayat penarikan dana.</div>';
         } else {
           payouts.forEach(function (p) {
             var stBadge = p.status === 'PAID'
@@ -682,140 +382,269 @@
               : (p.status === 'REJECTED'
                 ? '<span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;">Ditolak</span>'
                 : '<span style="background:#fef3c7;color:#b45309;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;">Menunggu Transfer</span>');
-
-            var dateStr = p.created_at ? new Date(p.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+            var dateStr = p.requested_at ? new Date(p.requested_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
 
             payoutRowsHtml +=
-              '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f1f5f9;">' +
+              '<div class="x-aff-payout-row-item" data-payout-id="' + UI.escape(p.id) + '" style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;">' +
               '  <div>' +
-              '    <div style="font-size:13px;font-weight:700;color:#0f172a;">' + UI.money(p.amount) + '</div>' +
-              '    <div style="font-size:11px;color:#64748b;">' + dateStr + (p.bank_name ? ' · ' + p.bank_name : '') + '</div>' +
+              '    <div style="font-size:13px;font-weight:800;color:#0f172a;">' + UI.money(p.amount) + '</div>' +
+              '    <div style="font-size:11px;color:#64748b;">' + dateStr + (p.bank_name ? ' · ' + UI.escape(p.bank_name) : '') + '</div>' +
               '  </div>' +
-              '  <div style="text-align:right;">' + stBadge + '</div>' +
+              '  <div style="display:flex;align-items:center;gap:6px;">' +
+              '    ' + stBadge +
+              '    <span style="font-size:13px;color:#94a3b8;font-weight:700;">›</span>' +
+              '  </div>' +
               '</div>';
           });
         }
 
-        var isFixedPerItem = (program.commission_type === 'FIXED_PER_ITEM');
-        var rateValueText = isFixedPerItem
-          ? UI.money(program.commission_per_item || program.commission_rate || 1000)
-          : ((program.commission_rate || 5) + '%');
-        var rateLabelText = isFixedPerItem ? 'Per Menu Terjual' : 'Rate Komisi';
-        var commissionExplain = isFixedPerItem
-          ? 'komisi <strong>' + rateValueText + '</strong> tiap menu yang terjual'
-          : '<strong>komisi ' + (program.commission_rate || 5) + '%</strong>';
-
         dashWrap.innerHTML =
-          // Hero & Balance Grid
-          '<div class="x-aux-hero-card" style="background:linear-gradient(135deg, #064e3b 0%, #065f46 100%);">' +
-          '  <div class="x-aux-badge" style="background:#10b981;color:#fff;">Mitra Affiliate Aktif</div>' +
-          '  <div style="margin:12px 0 4px;font-size:12px;color:#a7f3d0;text-transform:uppercase;letter-spacing:0.5px;">Saldo Komisi Siap Cair</div>' +
-          '  <div style="font-size:28px;font-weight:900;color:#fff;letter-spacing:-0.5px;">' + UI.money(payable) + '</div>' +
-          '  <div class="x-aux-stats-grid" style="margin-top:14px;">' +
-          '    <div class="x-aux-stat-box"><span class="num" style="color:#fde047;">' + UI.money(pending) + '</span><span class="lbl">Saldo Tertunda</span></div>' +
-          '    <div class="x-aux-stat-box"><span class="num" style="color:#a7f3d0;">' + UI.money(totalEarned) + '</span><span class="lbl">Total Komisi</span></div>' +
-          '    <div class="x-aux-stat-box"><span class="num" style="color:#fff;">' + rateValueText + '</span><span class="lbl">' + rateLabelText + '</span></div>' +
+          // Dark Executive Hero
+          '<div class="x-aff-dash-hero">' +
+          '  <div class="x-aff-user-row">' +
+          '    <div class="x-aff-avatar-meta">' +
+          '      <div class="x-aff-avatar">' + initial + '</div>' +
+          '      <div>' +
+          '        <div class="x-aff-username">Halo, ' + UI.escape(rawName) + ' 👋</div>' +
+          '        <div class="x-aff-tier-badge">' + (tier.badge || '⭐ Foodie Star') + '</div>' +
+          '      </div>' +
+          '    </div>' +
           '  </div>' +
-          '</div>' +
 
-          // Link & Kode Referral Card
-          '<div class="x-aux-card" style="margin-top:16px;">' +
-          '  <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Link Rekomendasi Anda</div>' +
-          '  <div style="display:flex;gap:8px;align-items:center;">' +
-          '    <input type="text" readonly value="' + UI.escape(shareUrl) + '" style="flex:1;background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;padding:10px 12px;font-size:12px;font-weight:600;color:#334155;outline:none;" id="x-aff-share-url-input">' +
-          '    <button type="button" id="x-aff-copy-link-btn" style="background:#0f172a;color:#fff;border:none;border-radius:10px;padding:10px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">Salin</button>' +
-          '  </div>' +
-          '  <div style="display:flex;gap:8px;margin-top:10px;">' +
-          '    <button type="button" id="x-aff-wa-share-btn" style="flex:1;background:#22c55e;color:#fff;border:none;border-radius:10px;padding:11px;font-size:12.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">' +
-          '      <span>💬</span> Bagikan ke WhatsApp' +
+          // Wallet Card
+          '  <div class="x-aff-wallet-box">' +
+          '    <div class="x-aff-wallet-lbl">TOTAL KOMISI TERSEDIA</div>' +
+          '    <div class="x-aff-balance-row">' +
+          '      <div class="x-aff-wallet-val">' + UI.money(payable) + '</div>' +
+          '      <div class="x-aff-wallet-tag">⏳ ' + UI.money(pending) + ' menunggu selesai</div>' +
+          '    </div>' +
+          (!canWithdraw ?
+            '<div style="margin:10px 0 12px;">' +
+            '  <div style="display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,0.7);margin-bottom:4px;">' +
+            '    <span>Target Minimal Tarik: ' + UI.money(minPayout) + '</span>' +
+            '    <span><b>' + progressPct + '%</b></span>' +
+            '  </div>' +
+            '  <div style="background:rgba(255,255,255,0.15);border-radius:999px;height:6px;overflow:hidden;">' +
+            '    <div style="background:#b6ff00;height:100%;width:' + progressPct + '%;border-radius:999px;"></div>' +
+            '  </div>' +
+            '</div>' : '') +
+          '    <button type="button" class="x-aff-withdraw-btn" id="x-aff-withdraw-btn" style="' + (canWithdraw ? 'background:#b6ff00;color:#0f172a;' : 'background:rgba(255,255,255,0.14);color:rgba(255,255,255,0.9);') + '">' +
+          '      <span>💸 ' + (canWithdraw ? 'Tarik Saldo ke Rekening / E-Wallet' : 'Minimal Penarikan ' + UI.money(minPayout)) + '</span>' +
           '    </button>' +
           '  </div>' +
-          '  <div style="margin-top:10px;font-size:11.5px;color:#64748b;display:flex;justify-content:space-between;align-items:center;">' +
-          '    <span>Kode Referral: <strong style="color:#0f172a;">' + UI.escape(code) + '</strong></span>' +
-          '    <button type="button" id="x-aff-copy-code-btn" style="background:none;border:none;color:#0284c7;font-size:11.5px;font-weight:700;cursor:pointer;padding:0;">Salin Kode</button>' +
-          '  </div>' +
           '</div>' +
 
-          // Cara Dapat Komisi
-          '<div class="x-aux-card" style="margin-top:16px;">' +
-          '  <h3 style="font-size:13.5px;font-weight:700;color:#0f172a;margin:0 0 10px;">💡 Cara Dapat Komisi:</h3>' +
-          '  <div style="font-size:12px;color:#475569;line-height:1.6;display:flex;flex-direction:column;gap:6px;">' +
-          '    <div>1. Klik <strong>Bagikan ke WhatsApp</strong> atau salin link rekomendasi di atas.</div>' +
-          '    <div>2. Kirim ke teman, keluarga, atau grup WA saat jam makan siang/malam.</div>' +
-          '    <div>3. Tiap teman klik dan pesan menu, kamu langsung dapat ' + commissionExplain + ' tunai!</div>' +
-          '  </div>' +
-          '</div>' +
+          // Content Container
+          '<div style="padding:18px 18px 40px;">' +
 
-          // Bank Account Section
-          '<div class="x-aux-card" style="margin-top:16px;">' +
-          '  <h3 style="font-size:14px;font-weight:700;color:#0f172a;margin:0 0 4px;">Pencairan Komisi</h3>' +
-          '  <div style="font-size:12px;color:#64748b;">Komisi dapat ditarik langsung ke rekening bank atau e-wallet Anda. Minimal penarikan: ' + UI.money(minPayout) + '</div>' +
-          bankHtml +
-          '  <button type="button" id="x-aff-withdraw-btn" class="x-aux-action-btn" style="margin-top:14px;background:' + (canWithdraw ? '#16a34a' : '#cbd5e1') + ';color:' + (canWithdraw ? '#fff' : '#64748b') + ';cursor:' + (canWithdraw ? 'pointer' : 'not-allowed') + ';" ' + (canWithdraw ? '' : 'disabled') + '>' +
-          (payable < minPayout
-            ? 'Saldo Belum Mencukupi Min. ' + UI.money(minPayout)
-            : (!profile.bank_account_number ? 'Atur Rekening Dahulu' : 'Tarik Saldo ' + UI.money(payable))) +
-          '  </button>' +
-          '</div>' +
+          // Bank & E-Wallet Target Card
+          '  <div class="x-aff-bank-target-card" id="x-aff-bank-target-card" style="background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:14px 16px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,0.03);">' +
+          '    <div style="display:flex;align-items:center;gap:12px;min-width:0;">' +
+          '      <div style="width:40px;height:40px;border-radius:12px;background:' + (hasBank ? '#ecfdf5' : '#fffbeb') + ';color:' + (hasBank ? '#059669' : '#d97706') + ';display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">' +
+          '        ' + (hasBank ? '💳' : '⚠️') +
+          '      </div>' +
+          '      <div style="min-width:0;">' +
+          '        <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Tujuan Pencairan Saldo</div>' +
+          '        <div style="font-size:13px;font-weight:800;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
+          '          ' + (hasBank ? (UI.escape(profile.bank_name) + ' · ' + UI.escape(profile.bank_account_number)) : 'Belum diatur (DANA / BCA)') +
+          '        </div>' +
+          '        <div style="font-size:11px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
+          '          ' + (hasBank ? ('a.n. ' + UI.escape(profile.bank_account_holder)) : 'Atur rekening / no. HP DANA untuk transfer komisi') +
+          '        </div>' +
+          '      </div>' +
+          '    </div>' +
+          '    <button type="button" id="x-aff-btn-edit-bank" style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;color:#0f172a;cursor:pointer;flex-shrink:0;">' +
+          '      ' + (hasBank ? '✏️ Ubah' : '➕ Atur') +
+          '    </button>' +
+          '  </div>' +
+
+          // Instant Link Sharing Hub
+          '  <div class="x-aff-share-hub">' +
+          '    <div class="x-aff-share-hub-title">🔗 Link Rekomendasi Kamu</div>' +
+          '    <div class="x-aff-share-hub-desc">Bagikan link ini agar pesanan temanmu otomatis tercatat & komisimu langsung masuk:</div>' +
+          '    <div class="x-aff-reflink-box">' +
+          '      <span class="x-aff-reflink-text">' + UI.escape(shareUrl) + '</span>' +
+          '      <button type="button" class="x-aff-copy-btn" id="x-aff-copy-ref-btn">' +
+          '        <span>📋 Salin</span>' +
+          '      </button>' +
+          '    </div>' +
+          '    <div class="x-aff-quick-grid">' +
+          '      <div class="x-aff-quick-tile" id="x-aff-share-wa">' +
+          '        <div class="x-aff-tile-icon" style="background:#25D366;color:#fff;">' +
+          '          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0012.04 2zM17.5 16.5c-.24.67-1.19 1.29-1.95 1.45-.52.11-1.2.2-3.48-.75-2.92-1.22-4.8-4.2-4.95-4.4-.14-.2-1.19-1.58-1.19-3.02s.75-2.14 1.02-2.43c.27-.29.59-.36.79-.36.2 0 .4 0 .57.01.19.01.44-.07.69.52.25.6.86 2.1.94 2.25.08.16.14.34.03.55-.11.21-.16.34-.32.53-.16.19-.34.42-.48.56-.16.16-.33.33-.14.66.19.33.84 1.38 1.8 2.24 1.24 1.11 2.29 1.45 2.62 1.61.33.16.52.14.71-.08.2-.22.84-.98 1.06-1.32.22-.34.45-.29.75-.17.3.11 1.92.9 2.25 1.07.33.16.55.25.63.39.08.13.08.77-.16 1.44z"/></svg>' +
+          '        </div>' +
+          '        <span class="x-aff-tile-lbl">WhatsApp</span>' +
+          '      </div>' +
+          '      <div class="x-aff-quick-tile" id="x-aff-share-ig">' +
+          '        <div class="x-aff-tile-icon" style="background:linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);color:#fff;">' +
+          '          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><circle cx="17.5" cy="6.5" r="1.5" fill="currentColor" stroke="none"></circle></svg>' +
+          '        </div>' +
+          '        <span class="x-aff-tile-lbl">IG Story</span>' +
+          '      </div>' +
+          '      <div class="x-aff-quick-tile" id="x-aff-share-qr">' +
+          '        <div class="x-aff-tile-icon" style="background:#0f172a;color:#fff;">' +
+          '          <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm13-2h3v2h-3v-2zm-5 0h2v3h-2v-3zm2 3h3v3h-3v-3zm3 3h3v2h-3v-2zm-5 0h2v2h-2v-2zm3-3h2v3h-2v-3z"/></svg>' +
+          '        </div>' +
+          '        <span class="x-aff-tile-lbl">Kartu QR</span>' +
+          '      </div>' +
+          '    </div>' +
+          '  </div>' +
+
+          // Metric Funnel
+          '  <div class="x-aff-metric-grid">' +
+          '    <div class="x-aff-metric-cell">' +
+          '      <div class="x-aff-metric-num">' + (data.total_clicks || 0) + '</div>' +
+          '      <div class="x-aff-metric-lbl">Total Klik</div>' +
+          '    </div>' +
+          '    <div class="x-aff-metric-cell">' +
+          '      <div class="x-aff-metric-num" style="color:#059669;">' + (data.total_orders || 0) + '</div>' +
+          '      <div class="x-aff-metric-lbl">Menu Terjual</div>' +
+          '    </div>' +
+          '    <div class="x-aff-metric-cell">' +
+          '      <div class="x-aff-metric-num" style="color:#2563eb;">' + UI.money(profile.total_withdrawn || 0) + '</div>' +
+          '      <div class="x-aff-metric-lbl">Total Ditarik</div>' +
+          '    </div>' +
+          '  </div>' +
+
+          // WhatsApp Templates
+          '  <div style="background:#ffffff;border-radius:20px;border:1px solid #e2e8f0;padding:16px 18px;margin-bottom:18px;">' +
+          '    <div style="font-size:13.5px;font-weight:800;color:#0f172a;margin-bottom:10px;">✍️ Template Pesan WhatsApp Siap Pakai</div>' +
+          '    <div class="x-aff-tpl-card">' +
+          '      <div>' +
+          '        <b>💼 Mode Makan Siang Kantor:</b><br>' +
+          '        "Gais makan siang apa hari ini? Cobain Ayam Tulang Lunak Bangjo yuk, pesan lewat link rekomendasi ini:"' +
+          '      </div>' +
+          '      <button type="button" class="x-aff-copy-btn" id="x-aff-tpl-btn-1" style="padding:6px 10px;font-size:11px;">Kirim WA</button>' +
+          '    </div>' +
+          '    <div class="x-aff-tpl-card">' +
+          '      <div>' +
+          '        <b>🍗 Mode Rekomen Geprek Nagih:</b><br>' +
+          '        "Sumpah sambel geprek lombok ijo Bangjo nagih bgt! Pesan langsung lewat link ini praktis & hemat:"' +
+          '      </div>' +
+          '      <button type="button" class="x-aff-copy-btn" id="x-aff-tpl-btn-2" style="padding:6px 10px;font-size:11px;">Kirim WA</button>' +
+          '    </div>' +
+          '  </div>' +
+
+          // QR Story Card Promo Box
+          '  <div class="x-aff-story-box">' +
+          '    <div style="width:48px;height:48px;background:#fff;border-radius:12px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.06);flex-shrink:0;">' +
+          '      <svg viewBox="0 0 24 24" fill="#0f172a" width="28" height="28"><path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm13-2h3v2h-3v-2zm-5 0h2v3h-2v-3zm2 3h3v3h-3v-3zm3 3h3v2h-3v-2zm-5 0h2v2h-2v-2zm3-3h2v3h-2v-3z"/></svg>' +
+          '    </div>' +
+          '    <div style="flex:1;">' +
+          '      <div style="font-size:13px;font-weight:800;color:#1e3a1e;">Download Kartu Story QR</div>' +
+          '      <div style="font-size:11px;color:#3f6212;margin-top:2px;line-height:1.4;">Pasang di status WhatsApp atau IG Story dengan 1 klik.</div>' +
+          '    </div>' +
+          '    <button type="button" id="x-aff-view-qr-card-btn" style="background:#111;color:#fff;border:none;border-radius:12px;padding:8px 12px;font-size:11.5px;font-weight:700;cursor:pointer;">Lihat</button>' +
+          '  </div>' +
 
           // Payout History
-          '<div class="x-aux-card" style="margin-top:16px;margin-bottom:32px;">' +
-          '  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
-          '    <h3 style="font-size:14px;font-weight:700;color:#0f172a;margin:0;">Riwayat Penarikan Dana</h3>' +
-          '    <span style="font-size:11px;color:#94a3b8;">' + payouts.length + ' transaksi</span>' +
-          '  </div>' +
+          '  <div style="background:#ffffff;border-radius:20px;border:1px solid #e2e8f0;padding:16px 18px;">' +
+          '    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
+          '      <h3 style="font-size:14px;font-weight:800;color:#0f172a;margin:0;">Riwayat Penarikan Dana</h3>' +
+          '      <span style="font-size:11px;color:#94a3b8;">' + payouts.length + ' transaksi</span>' +
+          '    </div>' +
           payoutRowsHtml +
+          '  </div>' +
+
           '</div>';
 
-        // Attach Event Listeners
-        var copyLinkBtn = dashWrap.querySelector('#x-aff-copy-link-btn');
-        if (copyLinkBtn) {
-          copyLinkBtn.onclick = function () {
+        // Attach Event Handlers
+        var copyRefBtn = dashWrap.querySelector('#x-aff-copy-ref-btn');
+        if (copyRefBtn) {
+          copyRefBtn.onclick = function () {
             if (navigator.clipboard) {
               navigator.clipboard.writeText(shareUrl).then(function () {
-                if (UI && UI.toast) UI.toast('Link affiliate berhasil disalin!');
+                if (UI && UI.toast) UI.toast('Link rekomendasi berhasil disalin!');
               });
+            } else {
+              if (UI && UI.toast) UI.toast('Link: ' + shareUrl);
             }
           };
         }
 
-        var copyCodeBtn = dashWrap.querySelector('#x-aff-copy-code-btn');
-        if (copyCodeBtn) {
-          copyCodeBtn.onclick = function () {
-            if (navigator.clipboard) {
-              navigator.clipboard.writeText(code).then(function () {
-                if (UI && UI.toast) UI.toast('Kode referral disalin: ' + code);
-              });
-            }
-          };
-        }
-
-        var waBtn = dashWrap.querySelector('#x-aff-wa-share-btn');
-        if (waBtn) {
-          waBtn.onclick = function () {
-            var url = 'https://api.whatsapp.com/send?text=' + encodeURIComponent(waShareText);
+        var shareWaTile = dashWrap.querySelector('#x-aff-share-wa');
+        if (shareWaTile) {
+          shareWaTile.onclick = function () {
+            var url = 'https://api.whatsapp.com/send?text=' + encodeURIComponent(waDefaultText);
             window.open(url, '_blank');
           };
         }
 
-        var setupBankBtn = dashWrap.querySelector('#x-aff-setup-bank-btn');
-        var editBankBtn = dashWrap.querySelector('#x-aff-edit-bank-btn');
-        var onBankClick = function () {
-          openBankModal(profile, function () {
-            mountAffiliate(container, true);
+        var shareIgTile = dashWrap.querySelector('#x-aff-share-ig');
+        var shareQrTile = dashWrap.querySelector('#x-aff-share-qr');
+        var viewQrCardBtn = dashWrap.querySelector('#x-aff-view-qr-card-btn');
+        var onStoryClick = function () {
+          profile.program = program;
+          var featProd = (program && program.featured_product) || null;
+          openStoryModal(profile, shareUrl, {
+            customerName: rawName,
+            tierBadge: tier.badge,
+            foodUrl: (featProd && featProd.image_url) || null,
+            foodTitle: (featProd && featProd.name) || null
           });
         };
-        if (setupBankBtn) setupBankBtn.onclick = onBankClick;
-        if (editBankBtn) editBankBtn.onclick = onBankClick;
+        if (shareIgTile) {
+          shareIgTile.onclick = function () {
+            var featProd = (program && program.featured_product) || null;
+            shareToInstagramStory(rawName, profile.referral_code || '', shareUrl, {
+              foodUrl: (featProd && featProd.image_url) || null,
+              foodTitle: (featProd && featProd.name) || null
+            });
+          };
+        }
+        if (shareQrTile) shareQrTile.onclick = onStoryClick;
+        if (viewQrCardBtn) viewQrCardBtn.onclick = onStoryClick;
 
-        var withdrawBtn = dashWrap.querySelector('#x-aff-withdraw-btn');
-        if (withdrawBtn && canWithdraw) {
-          withdrawBtn.onclick = function () {
-            openPayoutModal(profile, payable, minPayout, function () {
+        var tplBtn1 = dashWrap.querySelector('#x-aff-tpl-btn-1');
+        if (tplBtn1) {
+          tplBtn1.onclick = function () {
+            var msg = 'Gais makan siang apa hari ini? Cobain Ayam Tulang Lunak Bangjo yuk, pesan lewat link rekomendasi ini:\n' + shareUrl;
+            window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(msg), '_blank');
+          };
+        }
+
+        var tplBtn2 = dashWrap.querySelector('#x-aff-tpl-btn-2');
+        if (tplBtn2) {
+          tplBtn2.onclick = function () {
+            var msg = 'Sumpah sambel geprek lombok ijo Bangjo nagih bgt! Pesan langsung lewat link ini praktis & hemat:\n' + shareUrl;
+            window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(msg), '_blank');
+          };
+        }
+
+        var editBankBtn = dashWrap.querySelector('#x-aff-btn-edit-bank');
+        if (editBankBtn) {
+          editBankBtn.onclick = function () {
+            openBankModal(profile, function () {
               mountAffiliate(container, true);
             });
           };
         }
+
+        var withdrawBtn = dashWrap.querySelector('#x-aff-withdraw-btn');
+        if (withdrawBtn) {
+          withdrawBtn.onclick = function () {
+            if (canWithdraw) {
+              openPayoutModal(profile, payable, minPayout, function () {
+                mountAffiliate(container, true);
+              });
+            } else {
+              openWithdrawGuidanceModal(profile, payable, minPayout, function () {
+                openBankModal(profile, function () {
+                  mountAffiliate(container, true);
+                });
+              });
+            }
+          };
+        }
+
+        dashWrap.querySelectorAll('.x-aff-payout-row-item').forEach(function (row) {
+          row.onclick = function () {
+            var pid = row.getAttribute('data-payout-id');
+            var found = payouts.find(function (it) { return String(it.id) === String(pid); });
+            if (found) openPayoutDetailModal(found);
+          };
+        });
+
         if (typeof window.__xentraHideSplash === 'function') window.__xentraHideSplash();
       })
       .catch(function (err) {
@@ -870,36 +699,55 @@
     var defaultHolder = profile.bank_account_holder || (session && (session.name || session.displayName)) || '';
     if (defaultHolder.indexOf('@') !== -1) defaultHolder = defaultHolder.split('@')[0];
 
-    var popularBanks = ['BCA', 'Mandiri', 'BRI', 'BNI', 'GoPay', 'OVO', 'DANA', 'ShopeePay'];
-    var chipsHtml = popularBanks.map(function (b) {
-      return '<button type="button" class="x-aff-bank-chip-modal" data-bank="' + b + '" style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;padding:6px 10px;font-size:11.5px;font-weight:700;color:#334155;cursor:pointer;">' + b + '</button>';
+    var popularDestinations = [
+      { name: 'DANA', icon: '📱', type: 'ewallet' },
+      { name: 'GoPay', icon: '📱', type: 'ewallet' },
+      { name: 'OVO', icon: '📱', type: 'ewallet' },
+      { name: 'ShopeePay', icon: '📱', type: 'ewallet' },
+      { name: 'BCA', icon: '🏦', type: 'bank' },
+      { name: 'Mandiri', icon: '🏦', type: 'bank' },
+      { name: 'BRI', icon: '🏦', type: 'bank' },
+      { name: 'BNI', icon: '🏦', type: 'bank' }
+    ];
+
+    var curBank = profile.bank_name || '';
+    var chipsHtml = popularDestinations.map(function (d) {
+      var isSel = curBank.toUpperCase() === d.name.toUpperCase();
+      return '<button type="button" class="x-aff-bank-chip-modal" data-bank="' + d.name + '" data-type="' + d.type + '" style="background:' + (isSel ? '#0f172a' : '#f1f5f9') + ';color:' + (isSel ? '#ffffff' : '#334155') + ';border:1px solid ' + (isSel ? '#0f172a' : '#cbd5e1') + ';border-radius:10px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">' +
+        '<span>' + d.icon + '</span><span>' + d.name + '</span>' +
+      '</button>';
     }).join('');
 
     var overlay = document.createElement('div');
     overlay.className = 'x-overlay open';
     overlay.style.zIndex = '99999';
     overlay.innerHTML =
-      '<div class="x-sheet" style="max-width:440px;margin:auto;border-radius:20px;padding:24px 20px;background:#fff;">' +
-      '  <h3 style="font-size:16px;font-weight:800;color:#0f172a;margin:0 0 6px;">Rekening Bank / E-Wallet</h3>' +
-      '  <p style="font-size:12.5px;color:#64748b;margin:0 0 16px;">Tujuan transfer saat komisi ditarik:</p>' +
-      '  <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;" id="x-modal-bank-chips">' + chipsHtml + '</div>' +
+      '<div class="x-sheet" style="max-width:440px;margin:auto;border-radius:24px;padding:24px 20px;background:#fff;">' +
+      '  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
+      '    <h3 style="font-size:17px;font-weight:800;color:#0f172a;margin:0;">Rekening Bank / E-Wallet</h3>' +
+      '    <button type="button" id="x-modal-bank-x" style="background:#f1f5f9;border:none;border-radius:999px;width:30px;height:30px;font-size:15px;color:#64748b;cursor:pointer;">✕</button>' +
+      '  </div>' +
+      '  <p style="font-size:12.5px;color:#64748b;margin:0 0 16px;">Pilih tujuan pencairan komisi (DANA, GoPay, atau Rekening Bank):</p>' +
+      '  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;" id="x-modal-bank-chips">' + chipsHtml + '</div>' +
       '  <div style="display:flex;flex-direction:column;gap:12px;">' +
       '    <div>' +
-      '      <label style="display:block;font-size:11.5px;font-weight:700;color:#334155;margin-bottom:4px;">Nama Bank / E-Wallet</label>' +
-      '      <input type="text" id="x-input-bank-name" placeholder="Pilih chip di atas atau ketik di sini" value="' + UI.escape(profile.bank_name || '') + '" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:13px;">' +
+      '      <label style="display:block;font-size:11.5px;font-weight:700;color:#334155;margin-bottom:5px;">Nama Bank / E-Wallet</label>' +
+      '      <input type="text" id="x-input-bank-name" placeholder="Pilih chip di atas atau ketik di sini" value="' + UI.escape(profile.bank_name || '') + '" style="width:100%;box-sizing:border-box;padding:11px 13px;border:1.5px solid #cbd5e1;border-radius:12px;font-size:13px;font-weight:600;">' +
       '    </div>' +
       '    <div>' +
-      '      <label style="display:block;font-size:11.5px;font-weight:700;color:#334155;margin-bottom:4px;">Nomor Rekening / No. HP E-Wallet</label>' +
-      '      <input type="text" id="x-input-bank-acc" placeholder="Contoh: 8830123456" value="' + UI.escape(profile.bank_account_number || '') + '" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:13px;">' +
+      '      <label style="display:block;font-size:11.5px;font-weight:700;color:#334155;margin-bottom:5px;" id="x-lbl-bank-acc">Nomor Rekening / No. HP E-Wallet</label>' +
+      '      <input type="tel" id="x-input-bank-acc" placeholder="Contoh: 081234567890 atau 8830123456" value="' + UI.escape(profile.bank_account_number || '') + '" style="width:100%;box-sizing:border-box;padding:11px 13px;border:1.5px solid #cbd5e1;border-radius:12px;font-size:14px;font-weight:700;">' +
+      '      <small style="font-size:11px;color:#64748b;display:block;margin-top:4px;">Pastikan nomor terdaftar aktif di aplikasi DANA / m-Banking Anda.</small>' +
       '    </div>' +
       '    <div>' +
-      '      <label style="display:block;font-size:11.5px;font-weight:700;color:#334155;margin-bottom:4px;">Nama Pemilik Rekening</label>' +
-      '      <input type="text" id="x-input-bank-holder" placeholder="Contoh: Budi Santoso" value="' + UI.escape(defaultHolder) + '" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:13px;">' +
+      '      <label style="display:block;font-size:11.5px;font-weight:700;color:#334155;margin-bottom:5px;">Nama Pemilik Akun / Rekening</label>' +
+      '      <input type="text" id="x-input-bank-holder" placeholder="Masukkan nama sesuai rekening / KTP" value="' + UI.escape(defaultHolder) + '" style="width:100%;box-sizing:border-box;padding:11px 13px;border:1.5px solid #cbd5e1;border-radius:12px;font-size:13px;font-weight:600;">' +
+      '      <small style="font-size:11px;color:#64748b;display:block;margin-top:4px;">Sesuai nama KTP / nama yang terdaftar di akun tujuan.</small>' +
       '    </div>' +
       '  </div>' +
       '  <div style="display:flex;gap:10px;margin-top:20px;">' +
       '    <button type="button" id="x-modal-bank-cancel" style="flex:1;background:#f1f5f9;color:#475569;border:none;border-radius:12px;padding:12px;font-weight:700;font-size:13px;cursor:pointer;">Batal</button>' +
-      '    <button type="button" id="x-modal-bank-save" style="flex:2;background:#16a34a;color:#fff;border:none;border-radius:12px;padding:12px;font-weight:700;font-size:13px;cursor:pointer;">Simpan Rekening</button>' +
+      '    <button type="button" id="x-modal-bank-save" style="flex:2;background:#0f172a;color:#fff;border:none;border-radius:12px;padding:12px;font-weight:700;font-size:13px;cursor:pointer;">Simpan Rekening</button>' +
       '  </div>' +
       '</div>';
 
@@ -907,9 +755,28 @@
 
     var bankInput = overlay.querySelector('#x-input-bank-name');
     var accInput = overlay.querySelector('#x-input-bank-acc');
+    var accLbl = overlay.querySelector('#x-lbl-bank-acc');
+
     overlay.querySelectorAll('.x-aff-bank-chip-modal').forEach(function (btn) {
       btn.onclick = function () {
-        bankInput.value = btn.getAttribute('data-bank');
+        var selectedBank = btn.getAttribute('data-bank');
+        var selectedType = btn.getAttribute('data-type');
+        bankInput.value = selectedBank;
+        if (selectedType === 'ewallet') {
+          accLbl.textContent = 'Nomor HP Akun ' + selectedBank;
+          accInput.placeholder = 'Contoh: 081234567890';
+        } else {
+          accLbl.textContent = 'Nomor Rekening ' + selectedBank;
+          accInput.placeholder = 'Contoh: 8830123456';
+        }
+        overlay.querySelectorAll('.x-aff-bank-chip-modal').forEach(function (b) {
+          b.style.background = '#f1f5f9';
+          b.style.color = '#334155';
+          b.style.borderColor = '#cbd5e1';
+        });
+        btn.style.background = '#0f172a';
+        btn.style.color = '#ffffff';
+        btn.style.borderColor = '#0f172a';
         accInput.focus();
       };
     });
@@ -918,17 +785,30 @@
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
     }
 
+    overlay.querySelector('#x-modal-bank-x').onclick = close;
     overlay.querySelector('#x-modal-bank-cancel').onclick = close;
 
     overlay.querySelector('#x-modal-bank-save').onclick = function () {
-      var bName = overlay.querySelector('#x-input-bank-name').value.trim();
-      var bAcc = overlay.querySelector('#x-input-bank-acc').value.trim();
+      var bName = bankInput.value.trim();
+      var bAcc = accInput.value.replace(/[^0-9]/g, '').trim();
       var bHolder = overlay.querySelector('#x-input-bank-holder').value.trim();
 
-      if (!bName || !bAcc || !bHolder) {
-        if (UI && UI.toast) UI.toast('Harap lengkapi semua kolom rekening.');
+      if (!bName) {
+        if (UI && UI.toast) UI.toast('Harap pilih atau isi nama Bank / E-Wallet.');
         return;
       }
+      if (!bAcc || bAcc.length < 5) {
+        if (UI && UI.toast) UI.toast('Nomor rekening atau nomor HP tidak valid.');
+        return;
+      }
+      if (!bHolder) {
+        if (UI && UI.toast) UI.toast('Harap isi nama pemilik rekening/akun.');
+        return;
+      }
+
+      var saveBtn = overlay.querySelector('#x-modal-bank-save');
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Menyimpan...';
 
       API.put('/customer/affiliate/bank-details', {
         bank_name: bName,
@@ -938,37 +818,69 @@
         if (res && res.success) {
           if (UI && UI.toast) UI.toast('Rekening pencairan berhasil disimpan.');
           close();
-          if (typeof onSaved === 'function') onSaved();
+          if (typeof onSaved === 'function') onSaved(res.profile);
         } else {
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Simpan Rekening';
           if (UI && UI.toast) UI.toast('Gagal menyimpan: ' + (res.error || 'Error'));
         }
       }).catch(function (err) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Simpan Rekening';
         if (UI && UI.toast) UI.toast('Gagal: ' + (err.message || 'Error'));
       });
     };
   }
 
-  function openPayoutModal(profile, payable, minPayout, onDone) {
+  function openWithdrawGuidanceModal(profile, payable, minPayout, onOpenBank) {
+    var needed = Math.max(0, minPayout - payable);
+    var pct = Math.min(100, Math.round((payable / minPayout) * 100));
+    var estimatedItems = Math.ceil(needed / 1000);
+
     var overlay = document.createElement('div');
     overlay.className = 'x-overlay open';
     overlay.style.zIndex = '99999';
     overlay.innerHTML =
-      '<div class="x-sheet" style="max-width:440px;margin:auto;border-radius:20px;padding:24px 20px;background:#fff;">' +
-      '  <h3 style="font-size:16px;font-weight:800;color:#0f172a;margin:0 0 6px;">Tarik Saldo Komisi</h3>' +
-      '  <p style="font-size:12.5px;color:#64748b;margin:0 0 16px;">Dana akan ditransfer oleh pengelola resto ke rekening terdaftar Anda.</p>' +
-      '  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:14px;">' +
-      '    <div style="font-size:11px;color:#64748b;">Tujuan Transfer:</div>' +
-      '    <div style="font-size:13px;font-weight:700;color:#0f172a;">' + UI.escape(profile.bank_name) + ' - ' + UI.escape(profile.bank_account_number) + '</div>' +
-      '    <div style="font-size:11.5px;color:#475569;">a.n. ' + UI.escape(profile.bank_account_holder) + '</div>' +
+      '<div class="x-sheet" style="max-width:440px;margin:auto;border-radius:24px;padding:24px 20px;background:#fff;">' +
+      '  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">' +
+      '    <div>' +
+      '      <span style="display:inline-block;background:#fef3c7;color:#b45309;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:800;margin-bottom:6px;">Minimal Tarik ' + UI.money(minPayout) + '</span>' +
+      '      <h3 style="font-size:17px;font-weight:800;color:#0f172a;margin:0;">Saldo Belum Mencukupi</h3>' +
+      '    </div>' +
+      '    <button type="button" id="x-modal-guidance-x" style="background:#f1f5f9;border:none;border-radius:999px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:15px;color:#64748b;cursor:pointer;">✕</button>' +
       '  </div>' +
-      '  <div style="margin-bottom:14px;">' +
-      '    <label style="display:block;font-size:11.5px;font-weight:700;color:#334155;margin-bottom:4px;">Nominal Penarikan (Rp)</label>' +
-      '    <input type="number" id="x-input-payout-amt" value="' + payable + '" min="' + minPayout + '" max="' + payable + '" style="width:100%;box-sizing:border-box;padding:12px;border:1px solid #cbd5e1;border-radius:10px;font-size:16px;font-weight:800;color:#0f172a;">' +
-      '    <div style="font-size:11px;color:#64748b;margin-top:4px;">Maksimal penarikan: ' + UI.money(payable) + '</div>' +
+      '  <p style="font-size:12.5px;color:#64748b;margin:0 0 16px;line-height:1.5;">Komisi dapat dicairkan langsung ke rekening atau e-wallet setelah saldo mencapai batas minimal <b>' + UI.money(minPayout) + '</b>.</p>' +
+      '  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:16px;margin-bottom:16px;">' +
+      '    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px;">' +
+      '      <span style="color:#64748b;">Saldo Komisi Anda:</span>' +
+      '      <span style="font-weight:800;color:#0f172a;">' + UI.money(payable) + '</span>' +
+      '    </div>' +
+      '    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:8px;">' +
+      '      <span style="color:#64748b;">Target Penarikan:</span>' +
+      '      <span style="font-weight:800;color:#16a34a;">' + UI.money(minPayout) + '</span>' +
+      '    </div>' +
+      '    <div style="background:#e2e8f0;border-radius:999px;height:8px;overflow:hidden;margin-bottom:10px;">' +
+      '      <div style="background:#16a34a;height:100%;width:' + pct + '%;border-radius:999px;transition:width 0.3s ease;"></div>' +
+      '    </div>' +
+      '    <div style="font-size:11.5px;color:#0369a1;background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:8px 10px;line-height:1.4;">' +
+      '      💡 Butuh <b>' + UI.money(needed) + '</b> lagi (sekitar <b>' + estimatedItems + ' menu</b> terjual) untuk bisa melakukan pencairan.' +
+      '    </div>' +
       '  </div>' +
-      '  <div style="display:flex;gap:10px;margin-top:20px;">' +
-      '    <button type="button" id="x-modal-payout-cancel" style="flex:1;background:#f1f5f9;color:#475569;border:none;border-radius:12px;padding:12px;font-weight:700;font-size:13px;cursor:pointer;">Batal</button>' +
-      '    <button type="button" id="x-modal-payout-confirm" style="flex:2;background:#16a34a;color:#fff;border:none;border-radius:12px;padding:12px;font-weight:700;font-size:13px;cursor:pointer;">Ajukan Pencairan</button>' +
+      '  <div style="margin-bottom:20px;">' +
+      '    <div style="font-size:12px;font-weight:700;color:#334155;margin-bottom:8px;">Tips Cepat Kumpulkan Saldo:</div>' +
+      '    <ul style="margin:0;padding-left:18px;font-size:12px;color:#64748b;line-height:1.6;">' +
+      '      <li>Bagikan <b>Kartu Story Instagram</b> ke teman dan follower.</li>' +
+      '      <li>Kirim rekomendasi menu via <b>WhatsApp</b> saat jam makan siang.</li>' +
+      '      <li>Setiap menu yang dipesan via linkmu langsung menambah saldo Rp 1.000.</li>' +
+      '    </ul>' +
+      '  </div>' +
+      '  <div style="display:flex;flex-direction:column;gap:10px;">' +
+      '    <button type="button" id="x-modal-guidance-setup-bank" style="width:100%;background:#0f172a;color:#fff;border:none;border-radius:12px;padding:12px;font-weight:700;font-size:13px;cursor:pointer;">' +
+      '      💳 Atur Rekening / DANA Sekarang' +
+      '    </button>' +
+      '    <button type="button" id="x-modal-guidance-close" style="width:100%;background:#f1f5f9;color:#475569;border:none;border-radius:12px;padding:11px;font-weight:700;font-size:13px;cursor:pointer;">' +
+      '      Kembali ke Dashboard' +
+      '    </button>' +
       '  </div>' +
       '</div>';
 
@@ -978,10 +890,87 @@
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
     }
 
+    overlay.querySelector('#x-modal-guidance-x').onclick = close;
+    overlay.querySelector('#x-modal-guidance-close').onclick = close;
+    overlay.querySelector('#x-modal-guidance-setup-bank').onclick = function () {
+      close();
+      if (typeof onOpenBank === 'function') onOpenBank();
+    };
+  }
+
+  function openPayoutModal(profile, payable, minPayout, onDone) {
+    if (!profile.bank_account_number) {
+      openBankModal(profile, function (updatedProfile) {
+        openPayoutModal(updatedProfile || profile, payable, minPayout, onDone);
+      });
+      return;
+    }
+
+    var defaultAmts = [50000, 100000];
+    var chipsAmts = defaultAmts.filter(function (a) { return a >= minPayout && a <= payable; });
+
+    var chipsHtml = chipsAmts.map(function (a) {
+      return '<button type="button" class="x-aff-amt-chip" data-amt="' + a + '" style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;color:#0f172a;cursor:pointer;">' + UI.money(a) + '</button>';
+    }).join('');
+    chipsHtml += '<button type="button" class="x-aff-amt-chip" data-amt="' + payable + '" style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;color:#047857;cursor:pointer;">Tarik Semua (' + UI.money(payable) + ')</button>';
+
+    var overlay = document.createElement('div');
+    overlay.className = 'x-overlay open';
+    overlay.style.zIndex = '99999';
+    overlay.innerHTML =
+      '<div class="x-sheet" style="max-width:440px;margin:auto;border-radius:24px;padding:24px 20px;background:#fff;">' +
+      '  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
+      '    <h3 style="font-size:17px;font-weight:800;color:#0f172a;margin:0;">Tarik Saldo Komisi</h3>' +
+      '    <button type="button" id="x-modal-payout-x" style="background:#f1f5f9;border:none;border-radius:999px;width:30px;height:30px;font-size:15px;color:#64748b;cursor:pointer;">✕</button>' +
+      '  </div>' +
+      '  <p style="font-size:12.5px;color:#64748b;margin:0 0 16px;">Dana akan ditransfer oleh resto ke rekening / e-wallet terdaftar Anda.</p>' +
+      '  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:12px 14px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">' +
+      '    <div>' +
+      '      <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">Tujuan Transfer:</div>' +
+      '      <div style="font-size:13px;font-weight:800;color:#0f172a;margin-top:2px;">' + UI.escape(profile.bank_name) + ' - ' + UI.escape(profile.bank_account_number) + '</div>' +
+      '      <div style="font-size:11.5px;color:#475569;">a.n. ' + UI.escape(profile.bank_account_holder) + '</div>' +
+      '    </div>' +
+      '    <button type="button" id="x-modal-payout-change-bank" style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700;color:#0f172a;cursor:pointer;">Ubah</button>' +
+      '  </div>' +
+      '  <div style="margin-bottom:14px;">' +
+      '    <label style="display:block;font-size:11.5px;font-weight:700;color:#334155;margin-bottom:6px;">Nominal Penarikan (Rp)</label>' +
+      '    <input type="number" id="x-input-payout-amt" value="' + payable + '" min="' + minPayout + '" max="' + payable + '" style="width:100%;box-sizing:border-box;padding:12px;border:1.5px solid #cbd5e1;border-radius:12px;font-size:17px;font-weight:800;color:#0f172a;">' +
+      '    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;">' + chipsHtml + '</div>' +
+      '    <div style="font-size:11px;color:#64748b;margin-top:8px;">Saldo komisi dapat dicairkan: <b>' + UI.money(payable) + '</b> (Min. ' + UI.money(minPayout) + ')</div>' +
+      '  </div>' +
+      '  <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:10px 12px;font-size:11.5px;color:#166534;line-height:1.4;margin-bottom:16px;">' +
+      '    ⚡ <b>Bebas Biaya Admin</b>: Penarikan diproses oleh kasir/admin resto langsung ke rekening/e-wallet Anda.' +
+      '  </div>' +
+      '  <div style="display:flex;gap:10px;">' +
+      '    <button type="button" id="x-modal-payout-cancel" style="flex:1;background:#f1f5f9;color:#475569;border:none;border-radius:12px;padding:12px;font-weight:700;font-size:13px;cursor:pointer;">Batal</button>' +
+      '    <button type="button" id="x-modal-payout-confirm" style="flex:2;background:#0f172a;color:#fff;border:none;border-radius:12px;padding:12px;font-weight:700;font-size:13px;cursor:pointer;">Ajukan Pencairan</button>' +
+      '  </div>' +
+      '</div>';
+
+    document.body.appendChild(overlay);
+
+    function close() {
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    }
+
+    var amtInput = overlay.querySelector('#x-input-payout-amt');
+    overlay.querySelectorAll('.x-aff-amt-chip').forEach(function (btn) {
+      btn.onclick = function () {
+        amtInput.value = btn.getAttribute('data-amt');
+      };
+    });
+
+    overlay.querySelector('#x-modal-payout-x').onclick = close;
     overlay.querySelector('#x-modal-payout-cancel').onclick = close;
 
+    overlay.querySelector('#x-modal-payout-change-bank').onclick = function () {
+      close();
+      openBankModal(profile, function (upd) {
+        openPayoutModal(upd || profile, payable, minPayout, onDone);
+      });
+    };
+
     overlay.querySelector('#x-modal-payout-confirm').onclick = function () {
-      var amtInput = overlay.querySelector('#x-input-payout-amt');
       var amt = Number(amtInput.value);
 
       if (isNaN(amt) || amt < minPayout) {
@@ -993,6 +982,10 @@
         return;
       }
 
+      var confirmBtn = overlay.querySelector('#x-modal-payout-confirm');
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = 'Memproses...';
+
       API.post('/customer/affiliate/payout', { amount: amt })
         .then(function (res) {
           if (res && res.success) {
@@ -1000,12 +993,640 @@
             close();
             if (typeof onDone === 'function') onDone();
           } else {
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = 'Ajukan Pencairan';
             if (UI && UI.toast) UI.toast('Gagal mengajukan: ' + (res.error || 'Error'));
           }
         })
         .catch(function (err) {
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = 'Ajukan Pencairan';
           if (UI && UI.toast) UI.toast('Gagal: ' + (err.message || 'Error'));
         });
+    };
+  }
+
+  function openPayoutDetailModal(payout) {
+    if (!payout) return;
+    var statusTitle = payout.status === 'PAID'
+      ? 'Dana Berhasil Ditransfer'
+      : (payout.status === 'REJECTED' ? 'Penarikan Ditolak' : 'Menunggu Transfer Resto');
+    var statusColor = payout.status === 'PAID'
+      ? '#16a34a'
+      : (payout.status === 'REJECTED' ? '#dc2626' : '#d97706');
+    var statusIcon = payout.status === 'PAID'
+      ? '✅'
+      : (payout.status === 'REJECTED' ? '❌' : '⏳');
+    var dateReq = payout.requested_at ? new Date(payout.requested_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : '-';
+    var dateProc = payout.processed_at ? new Date(payout.processed_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : null;
+
+    var overlay = document.createElement('div');
+    overlay.className = 'x-overlay open';
+    overlay.style.zIndex = '99999';
+    overlay.innerHTML =
+      '<div class="x-sheet" style="max-width:440px;margin:auto;border-radius:24px;padding:24px 20px;background:#fff;">' +
+      '  <div style="text-align:center;padding:12px 0 16px;">' +
+      '    <div style="font-size:38px;margin-bottom:8px;">' + statusIcon + '</div>' +
+      '    <div style="font-size:12px;font-weight:800;color:' + statusColor + ';text-transform:uppercase;letter-spacing:0.5px;">' + statusTitle + '</div>' +
+      '    <div style="font-size:26px;font-weight:900;color:#0f172a;margin-top:4px;">' + UI.money(payout.amount) + '</div>' +
+      '  </div>' +
+      '  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;font-size:12px;margin-bottom:18px;">' +
+      '    <div style="display:flex;justify-content:space-between;">' +
+      '      <span style="color:#64748b;">No. Referensi</span>' +
+      '      <span style="font-weight:700;color:#0f172a;font-family:monospace;">' + UI.escape(payout.id) + '</span>' +
+      '    </div>' +
+      '    <div style="display:flex;justify-content:space-between;">' +
+      '      <span style="color:#64748b;">Tujuan Transfer</span>' +
+      '      <span style="font-weight:700;color:#0f172a;">' + UI.escape(payout.bank_name) + ' (' + UI.escape(payout.bank_account_number) + ')</span>' +
+      '    </div>' +
+      '    <div style="display:flex;justify-content:space-between;">' +
+      '      <span style="color:#64748b;">Nama Pemilik</span>' +
+      '      <span style="font-weight:700;color:#0f172a;">' + UI.escape(payout.bank_account_holder) + '</span>' +
+      '    </div>' +
+      '    <div style="display:flex;justify-content:space-between;">' +
+      '      <span style="color:#64748b;">Waktu Pengajuan</span>' +
+      '      <span style="color:#334155;">' + dateReq + '</span>' +
+      '    </div>' +
+      (dateProc ?
+        '<div style="display:flex;justify-content:space-between;">' +
+        '  <span style="color:#64748b;">Waktu Diproses</span>' +
+        '  <span style="color:#334155;">' + dateProc + '</span>' +
+        '</div>' : '') +
+      (payout.transfer_receipt_url ?
+        '<div style="display:flex;justify-content:space-between;border-top:1px dashed #e2e8f0;padding-top:8px;">' +
+        '  <span style="color:#64748b;">Bukti / Ref Transfer</span>' +
+        '  <span style="font-weight:700;color:#16a34a;">' + UI.escape(payout.transfer_receipt_url) + '</span>' +
+        '</div>' : '') +
+      (payout.rejection_reason ?
+        '<div style="background:#fef2f2;border:1px solid #fecaca;padding:8px 10px;border-radius:8px;color:#991b1b;margin-top:4px;">' +
+        '  <b>Alasan Penolakan:</b> ' + UI.escape(payout.rejection_reason) +
+        '</div>' : '') +
+      '  </div>' +
+      '  <button type="button" id="x-modal-detail-close" style="width:100%;background:#0f172a;color:#fff;border:none;border-radius:12px;padding:12px;font-weight:700;font-size:13px;cursor:pointer;">Tutup</button>' +
+      '</div>';
+
+    document.body.appendChild(overlay);
+
+    function close() {
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    }
+    overlay.querySelector('#x-modal-detail-close').onclick = close;
+  }
+
+  function roundRect(ctx, x, y, width, height, radius) {
+    if (typeof ctx.roundRect === 'function') {
+      ctx.beginPath();
+      ctx.roundRect(x, y, width, height, radius);
+      return;
+    }
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+  }
+
+  function preloadStoryAssets(referralCode, qrObj, callback, opts) {
+    opts = opts || {};
+    var brandState = (Store && Store.getState && Store.getState().brand) || {};
+    var brandName = brandState.name || 'MyBangjo';
+    var brandTagline = brandState.tagline || 'Spesial Ayam Tulang Lunak';
+    var logoUrl = brandState.logo_url || '/assets/uploads/logos/logo-e77d9c69a2f29ba0-1790611597659.png';
+    var foodUrl = opts.foodUrl || '/assets/uploads/originals/brand_bangjo/med_b2d4b51563eb2d22_1791149148155.png';
+    var foodTitle = opts.foodTitle || 'Ayam Tulang Lunak Bangjo';
+
+    var toLoad = [
+      { key: 'logoImg', src: logoUrl },
+      { key: 'foodImg', src: foodUrl }
+    ];
+
+    if (!qrObj) {
+      toLoad.push({
+        key: 'qrImg',
+        src: '/api/customer/affiliate/qr-code?code=' + encodeURIComponent(referralCode || '')
+      });
+    }
+
+    var assets = {
+      brandName: brandName,
+      brandTagline: brandTagline,
+      logoUrl: logoUrl,
+      foodUrl: foodUrl,
+      foodTitle: foodTitle,
+      logoImg: null,
+      foodImg: null,
+      qrImg: null
+    };
+
+    var remaining = toLoad.length;
+    var finished = false;
+
+    function finish() {
+      if (!finished) {
+        finished = true;
+        clearTimeout(timer);
+        callback(assets);
+      }
+    }
+
+    var timer = setTimeout(function () {
+      finish();
+    }, 3500);
+
+    toLoad.forEach(function (item) {
+      var img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = function () {
+        assets[item.key] = img;
+        remaining--;
+        if (remaining <= 0) finish();
+      };
+      img.onerror = function () {
+        assets[item.key] = null;
+        remaining--;
+        if (remaining <= 0) finish();
+      };
+      img.src = item.src;
+    });
+  }
+
+  function buildStoryCanvas(rawName, referralCode, qrObj, assets) {
+    assets = assets || {};
+    var canvas = document.createElement('canvas');
+    canvas.width = 1080;
+    canvas.height = 1920;
+    var ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    var brandName = assets.brandName || 'MyBangjo';
+    var brandTagline = assets.brandTagline || 'Spesial Ayam Tulang Lunak';
+    var foodTitle = assets.foodTitle || 'Ayam Tulang Lunak Bangjo';
+    var logoImg = assets.logoImg || null;
+    var foodImg = assets.foodImg || null;
+    var qrImg = assets.qrImg || null;
+
+    // 1. Rich dark gradient background
+    var bgGrad = ctx.createLinearGradient(0, 0, 0, 1920);
+    bgGrad.addColorStop(0, '#080c15');
+    bgGrad.addColorStop(0.4, '#0f172a');
+    bgGrad.addColorStop(1, '#172033');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, 1080, 1920);
+
+    // Lime radial glow at top
+    var limeGlow = ctx.createRadialGradient(540, 240, 20, 540, 240, 550);
+    limeGlow.addColorStop(0, 'rgba(182, 255, 0, 0.18)');
+    limeGlow.addColorStop(1, 'rgba(8, 12, 21, 0)');
+    ctx.fillStyle = limeGlow;
+    ctx.fillRect(0, 0, 1080, 650);
+
+    // Warm food glow
+    var warmGlow = ctx.createRadialGradient(540, 750, 40, 540, 750, 480);
+    warmGlow.addColorStop(0, 'rgba(245, 158, 11, 0.12)');
+    warmGlow.addColorStop(1, 'rgba(8, 12, 21, 0)');
+    ctx.fillStyle = warmGlow;
+    ctx.fillRect(0, 400, 1080, 800);
+
+    // 2. Client Branding Header
+    if (logoImg && logoImg.width && logoImg.height) {
+      ctx.save();
+      roundRect(ctx, 290, 136, 84, 84, 20);
+      ctx.clip();
+      ctx.drawImage(logoImg, 290, 136, 84, 84);
+      ctx.restore();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.lineWidth = 2;
+      roundRect(ctx, 290, 136, 84, 84, 20);
+      ctx.stroke();
+
+      ctx.font = '900 42px -apple-system, BlinkMacSystemFont, "Plus Jakarta Sans", sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'left';
+      ctx.fillText(brandName, 395, 178);
+
+      ctx.font = '800 20px -apple-system, BlinkMacSystemFont, "Plus Jakarta Sans", sans-serif';
+      ctx.fillStyle = '#b6ff00';
+      ctx.fillText(brandTagline.toUpperCase(), 395, 210);
+    } else {
+      ctx.font = '900 40px -apple-system, BlinkMacSystemFont, "Plus Jakarta Sans", sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.fillText(brandName + ' • ' + brandTagline.toUpperCase(), 540, 180);
+    }
+
+    // 3. Partner Status Badge
+    ctx.fillStyle = '#b6ff00';
+    roundRect(ctx, 310, 250, 460, 56, 28);
+    ctx.fill();
+
+    ctx.font = '900 22px -apple-system, BlinkMacSystemFont, "Plus Jakarta Sans", sans-serif';
+    ctx.fillStyle = '#111111';
+    ctx.textAlign = 'center';
+    ctx.fillText('🍗 OFFICIAL FOODIE PARTNER', 540, 286);
+
+    // 4. Recommendation Endorsement
+    ctx.font = '700 28px -apple-system, BlinkMacSystemFont, "Plus Jakarta Sans", sans-serif';
+    ctx.fillStyle = '#cbd5e1';
+    ctx.textAlign = 'center';
+    ctx.fillText('Rekomendasi Spesial dari ' + (rawName || 'Mitra'), 540, 350);
+
+    // 5. Hero Food Card
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.45)';
+    ctx.shadowBlur = 40;
+    ctx.shadowOffsetY = 20;
+    ctx.fillStyle = '#0f172a';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+    ctx.lineWidth = 3;
+    roundRect(ctx, 110, 390, 860, 790, 36);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    // Food Photo
+    if (foodImg && foodImg.width && foodImg.height) {
+      var iw = foodImg.width;
+      var ih = foodImg.height;
+      var tw = 808;
+      var th = 540;
+      var scale = Math.max(tw / iw, th / ih);
+      var sw = tw / scale;
+      var sh = th / scale;
+      var sx = (iw - sw) / 2;
+      var sy = (ih - sh) / 2;
+
+      ctx.save();
+      roundRect(ctx, 136, 416, 808, 540, 28);
+      ctx.clip();
+      ctx.drawImage(foodImg, sx, sy, sw, sh, 136, 416, 808, 540);
+
+      // Dark gradient overlay on photo
+      var fGrad = ctx.createLinearGradient(0, 720, 0, 956);
+      fGrad.addColorStop(0, 'rgba(15, 23, 42, 0)');
+      fGrad.addColorStop(1, 'rgba(15, 23, 42, 0.85)');
+      ctx.fillStyle = fGrad;
+      ctx.fillRect(136, 700, 808, 256);
+      ctx.restore();
+    }
+
+    // Floating badges on food
+    roundRect(ctx, 160, 440, 230, 48, 24);
+    ctx.fillStyle = '#ea580c';
+    ctx.fill();
+    ctx.font = '800 20px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.fillText('🔥 MENU ANDALAN', 275, 471);
+
+    roundRect(ctx, 740, 440, 180, 48, 24);
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+    ctx.fill();
+    ctx.font = '800 20px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillStyle = '#facc15';
+    ctx.fillText('⭐ 4.9 / 5.0', 830, 471);
+
+    // Food Meta inside card
+    ctx.font = '900 40px -apple-system, BlinkMacSystemFont, "Plus Jakarta Sans", sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'left';
+    ctx.fillText(foodTitle, 160, 1015);
+
+    ctx.font = '600 24px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText('Gurih renyah sampai ke tulang • Sambal khas juara', 160, 1060);
+
+    roundRect(ctx, 160, 1090, 460, 44, 22);
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.15)';
+    ctx.fill();
+    ctx.font = '700 20px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillText('🏷️ DISKON EKSTRA PEMESANAN ONLINE', 178, 1120);
+
+    // 6. Link CTA Pill
+    var ctaGrad = ctx.createLinearGradient(130, 0, 950, 0);
+    ctaGrad.addColorStop(0, '#b6ff00');
+    ctaGrad.addColorStop(1, '#a3e635');
+    ctx.fillStyle = ctaGrad;
+    roundRect(ctx, 130, 1215, 820, 78, 39);
+    ctx.fill();
+
+    ctx.font = '900 26px -apple-system, BlinkMacSystemFont, "Plus Jakarta Sans", sans-serif';
+    ctx.fillStyle = '#0f172a';
+    ctx.textAlign = 'center';
+    ctx.fillText('👉 TAP STIKER LINK UNTUK PESAN LANGSUNG', 540, 1264);
+
+    // 7. Bottom Card: QR + Referral Code
+    ctx.save();
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+    ctx.shadowBlur = 30;
+    ctx.shadowOffsetY = 15;
+    ctx.fillStyle = '#ffffff';
+    roundRect(ctx, 110, 1325, 860, 310, 32);
+    ctx.fill();
+    ctx.restore();
+
+    // QR Code on Left
+    var qrLeft = 145;
+    var qrTop = 1355;
+    var qrSize = 250;
+    if (qrObj && typeof qrObj.getModuleCount === 'function') {
+      var modCount = qrObj.getModuleCount();
+      var cellSize = qrSize / modCount;
+      ctx.fillStyle = '#0f172a';
+      for (var r = 0; r < modCount; r++) {
+        for (var c = 0; c < modCount; c++) {
+          if (qrObj.isDark(r, c)) {
+            ctx.fillRect(qrLeft + c * cellSize, qrTop + r * cellSize, cellSize + 0.35, cellSize + 0.35);
+          }
+        }
+      }
+    } else if (qrImg) {
+      ctx.drawImage(qrImg, qrLeft, qrTop, qrSize, qrSize);
+    }
+
+    // Divider
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(435, 1355);
+    ctx.lineTo(435, 1605);
+    ctx.stroke();
+
+    // Right Column
+    ctx.font = '800 20px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillStyle = '#64748b';
+    ctx.textAlign = 'left';
+    ctx.fillText('KODE PROMO / REFERRAL', 465, 1395);
+
+    roundRect(ctx, 465, 1415, 465, 76, 18);
+    ctx.fillStyle = '#f8fafc';
+    ctx.strokeStyle = '#cbd5e1';
+    ctx.lineWidth = 2;
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.font = '900 44px monospace';
+    ctx.fillStyle = '#0f172a';
+    ctx.fillText(referralCode || '', 490, 1469);
+
+    ctx.font = '600 22px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillStyle = '#475569';
+    ctx.fillText('Gunakan saat pesan online di:', 465, 1530);
+
+    ctx.font = '900 26px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillStyle = '#16a34a';
+    ctx.fillText('🌐 app.mybangjo.com', 465, 1572);
+
+    // 8. Footer
+    ctx.font = '700 23px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillStyle = '#94a3b8';
+    ctx.textAlign = 'center';
+    ctx.fillText('100% Halal • Dapur Higienis • Pengantaran Cepat', 540, 1715);
+
+    ctx.font = '500 18px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillStyle = '#64748b';
+    ctx.fillText('MyBangjo Customer Partner App', 540, 1755);
+
+    return canvas;
+  }
+
+  function renderAndDownloadStory(rawName, referralCode, shareUrl, qrObj, qrSrc, opts) {
+    opts = opts || {};
+    if (UI && UI.toast) UI.toast('Menyiapkan gambar HD 1080×1920…');
+
+    preloadStoryAssets(referralCode, qrObj, function (assets) {
+      try {
+        var canvas = buildStoryCanvas(rawName, referralCode, qrObj, assets);
+        if (!canvas) return;
+
+        var dataUrl = canvas.toDataURL('image/png');
+        var a = document.createElement('a');
+        a.download = 'bangjo-story-' + (referralCode || 'referral') + '.png';
+        a.href = dataUrl;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        if (UI && UI.toast) UI.toast('Gambar HD Story berhasil diunduh!');
+      } catch (err) {
+        console.error('Download error:', err);
+        if (UI && UI.toast) UI.toast('Gagal mengunduh gambar: ' + (err.message || 'Error'));
+      }
+    }, opts);
+  }
+
+  function shareToInstagramStory(rawName, referralCode, shareUrl, opts) {
+    opts = opts || {};
+    if (UI && UI.toast) UI.toast('Menyiapkan Story untuk Instagram…');
+
+    // 1. Copy link automatically so customer can paste in Instagram link sticker
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(shareUrl).catch(function () {});
+    }
+
+    var qrObj = null;
+    try {
+      if (typeof window !== 'undefined' && window.qrcode) {
+        qrObj = window.qrcode(0, 'M');
+        qrObj.addData(shareUrl);
+        qrObj.make();
+      }
+    } catch (e) {
+      console.warn('QR error:', e);
+    }
+
+    preloadStoryAssets(referralCode, qrObj, function (assets) {
+      try {
+        var canvas = buildStoryCanvas(rawName, referralCode, qrObj, assets);
+        if (!canvas) return;
+
+        var fileName = 'bangjo-story-' + (referralCode || 'promo') + '.png';
+
+        if (canvas.toBlob) {
+          canvas.toBlob(function (blob) {
+            if (!blob) return;
+
+            var file = null;
+            try {
+              file = new File([blob], fileName, { type: 'image/png' });
+            } catch (_) {}
+
+            var canShare = Boolean(file && navigator.canShare && navigator.canShare({ files: [file] }));
+
+            if (canShare) {
+              // Direct OS native share sheet: Instagram Stories receives the image and opens Story editor directly!
+              navigator.share({
+                files: [file],
+                title: 'Bangjo Foodie Partner',
+                text: 'Pesan menu favorit Bangjo: ' + shareUrl
+              }).then(function () {
+                if (UI && UI.toast) UI.toast('Berhasil membuka Instagram Story!');
+              }).catch(function (err) {
+                if (err && err.name !== 'AbortError') {
+                  console.warn('Share error:', err);
+                }
+              });
+            } else {
+              // Fallback for browsers/webviews where file sharing is not supported:
+              // Download image to device gallery and trigger Instagram story intent
+              var a = document.createElement('a');
+              a.download = fileName;
+              a.href = canvas.toDataURL('image/png');
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+
+              if (UI && UI.toast) {
+                UI.toast('Gambar kartu tersimpan di Galeri & link disalin! Membuka Instagram…');
+              }
+
+              var isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+              if (isMobile) {
+                window.location.href = 'intent://#Intent;action=com.instagram.share.ADD_TO_STORY;package=com.instagram.android;end;';
+                setTimeout(function () {
+                  window.location.href = 'instagram-stories://share';
+                  setTimeout(function () {
+                    window.open('https://www.instagram.com/', '_blank');
+                  }, 1200);
+                }, 600);
+              } else {
+                window.open('https://www.instagram.com/', '_blank');
+              }
+            }
+          }, 'image/png');
+        }
+      } catch (err) {
+        console.error('IG Story error:', err);
+      }
+    }, opts);
+  }
+
+  function openStoryModal(profile, shareUrl, opts) {
+    opts = opts || {};
+    var rawName = opts.customerName || (profile && profile.customer_name) || 'Mitra Bangjo';
+    var referralCode = (profile && profile.referral_code) || '';
+    var qrSrc = '';
+    var qrObj = null;
+
+    try {
+      if (typeof window !== 'undefined' && window.qrcode) {
+        qrObj = window.qrcode(0, 'M');
+        qrObj.addData(shareUrl);
+        qrObj.make();
+        qrSrc = qrObj.createDataURL(6, 2);
+      }
+    } catch (e) {
+      console.warn('QR error:', e);
+    }
+    if (!qrSrc) {
+      qrSrc = '/api/customer/affiliate/qr-code?code=' + encodeURIComponent(referralCode);
+    }
+
+    var brandState = (Store && Store.getState && Store.getState().brand) || {};
+    var brandName = brandState.name || 'MyBangjo';
+    var brandTagline = brandState.tagline || 'Spesial Ayam Tulang Lunak';
+    var logoUrl = brandState.logo_url || '/assets/uploads/logos/logo-e77d9c69a2f29ba0-1790611597659.png';
+
+    var featured = (profile && profile.program && profile.program.featured_product) || null;
+    var foodUrl = opts.foodUrl || (featured && featured.image_url) || '/assets/uploads/originals/brand_bangjo/med_b2d4b51563eb2d22_1791149148155.png';
+    var foodTitle = opts.foodTitle || (featured && featured.name) || 'Ayam Tulang Lunak Bangjo';
+
+    var overlay = document.createElement('div');
+    overlay.className = 'x-overlay open';
+    overlay.style.zIndex = '99999';
+
+    overlay.innerHTML =
+      '<div class="x-story-sheet">' +
+      '  <div class="x-story-drag-bar"></div>' +
+      '  <div class="x-story-modal-header">' +
+      '    <div class="x-story-modal-title">Kartu Story & QR Promo</div>' +
+      '    <button type="button" class="x-story-close-btn" id="x-story-modal-close" aria-label="Tutup">✕</button>' +
+      '  </div>' +
+      '  <div class="x-story-poster-frame">' +
+      '    <div class="x-story-poster-brand">' +
+      '      <img src="' + UI.escape(logoUrl) + '" class="x-story-poster-brand-logo" alt="Logo">' +
+      '      <div class="x-story-poster-brand-info">' +
+      '        <div class="x-story-poster-brand-name">' + UI.escape(brandName) + '</div>' +
+      '        <div class="x-story-poster-brand-tagline">' + UI.escape(brandTagline) + '</div>' +
+      '      </div>' +
+      '    </div>' +
+      '    <div class="x-story-poster-badge">🍗 OFFICIAL FOODIE PARTNER</div>' +
+      '    <div class="x-story-poster-user">Rekomendasi dari <b>' + UI.escape(rawName) + '</b></div>' +
+      '    <div class="x-story-poster-food-card">' +
+      '      <div class="x-story-poster-food-img-wrap">' +
+      '        <img src="' + UI.escape(foodUrl) + '" class="x-story-poster-food-img" alt="' + UI.escape(foodTitle) + '">' +
+      '        <span class="x-story-poster-food-tag">🔥 Menu Andalan</span>' +
+      '        <span class="x-story-poster-food-rate">⭐ 4.9</span>' +
+      '      </div>' +
+      '      <div class="x-story-poster-food-meta">' +
+      '        <div class="x-story-poster-food-title">' + UI.escape(foodTitle) + '</div>' +
+      '        <div class="x-story-poster-food-desc">Gurih renyah sampai ke tulang • Sambal khas juara</div>' +
+      '      </div>' +
+      '    </div>' +
+      '    <div class="x-story-poster-cta-pill">👉 Tap Stiker Link untuk Pesan</div>' +
+      '    <div class="x-story-poster-bottom-card">' +
+      '      <div class="x-story-poster-bottom-qr">' +
+      '        <img class="x-story-poster-qr-img" id="x-story-modal-img" src="' + qrSrc + '" alt="QR Code">' +
+      '      </div>' +
+      '      <div class="x-story-poster-bottom-divider"></div>' +
+      '      <div class="x-story-poster-bottom-info">' +
+      '        <div class="x-story-poster-bottom-lbl">KODE REFERRAL</div>' +
+      '        <div class="x-story-poster-bottom-code">' + UI.escape(referralCode) + '</div>' +
+      '        <div class="x-story-poster-bottom-url">🌐 app.mybangjo.com</div>' +
+      '      </div>' +
+      '    </div>' +
+      '    <div class="x-story-poster-sub">100% Halal • Fresh Dapur • Siap Antar Cepat</div>' +
+      '  </div>' +
+      '  <div class="x-story-actions-wrap">' +
+      '    <button type="button" class="x-story-btn-download" id="x-story-download-btn">' +
+      '      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>' +
+      '      <span>Unduh Gambar Story (HD 1080×1920)</span>' +
+      '    </button>' +
+      '    <button type="button" class="x-story-btn-wa" id="x-story-wa-btn">' +
+      '      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0012.04 2z"/></svg>' +
+      '      <span>Bagikan ke WhatsApp</span>' +
+      '    </button>' +
+      '    <button type="button" class="x-story-btn-copy" id="x-story-copy-btn">' +
+      '      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>' +
+      '      <span>Salin Link Story</span>' +
+      '    </button>' +
+      '  </div>' +
+      '</div>';
+
+    document.body.appendChild(overlay);
+
+    function close() {
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    }
+
+    overlay.querySelector('#x-story-modal-close').onclick = close;
+    overlay.onclick = function (e) {
+      if (e.target === overlay) close();
+    };
+
+    overlay.querySelector('#x-story-copy-btn').onclick = function () {
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(shareUrl).then(function () {
+          if (UI && UI.toast) UI.toast('Link story berhasil disalin!');
+        });
+      } else {
+        if (UI && UI.toast) UI.toast('Link: ' + shareUrl);
+      }
+    };
+
+    overlay.querySelector('#x-story-wa-btn').onclick = function () {
+      var waMsg = 'Pesan menu favorit Bangjo lewat link rekomendasi ini:\n' + shareUrl;
+      window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(waMsg), '_blank');
+    };
+
+    overlay.querySelector('#x-story-download-btn').onclick = function () {
+      renderAndDownloadStory(rawName, referralCode, shareUrl, qrObj, qrSrc, { foodUrl: foodUrl, foodTitle: foodTitle });
     };
   }
 
@@ -1522,7 +2143,6 @@
           var matched = collections.find(function (c) { return String(c.id) === String(pid); });
           if (matched && Store && typeof Store.addItem === 'function') {
             Store.addItem(matched, 1);
-            if (UI && UI.toast) UI.toast('Ditambahkan ke keranjang');
           }
         };
       });

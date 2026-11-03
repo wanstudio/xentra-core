@@ -11,10 +11,12 @@ router.get('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, res
   try {
     const branches = db.prepare(`
       SELECT 
-        b.id, b.name, b.slug, b.address_text, b.latitude, b.longitude, b.phone, b.whatsapp_number, b.is_active, b.is_open_override, b.is_archived, b.timezone, b.daily_petty_cash_limit,
+        b.id, b.name, b.slug, b.address_text, b.latitude, b.longitude, b.phone, b.whatsapp_number, b.is_active, b.is_open_override, b.is_online_paused, b.is_archived, b.timezone, b.daily_petty_cash_limit,
         s.is_delivery_active, s.is_pickup_active, s.free_delivery_km, s.price_per_km, s.max_radius_km, s.promo_delivery_discount, s.promo_min_order,
+        COALESCE(s.dispatch_mode, 'hybrid') AS dispatch_mode, COALESCE(s.auto_dispatch_timeout_seconds, 120) AS auto_dispatch_timeout_seconds,
         (SELECT COUNT(*) FROM orders o WHERE o.branch_id = b.id) AS total_orders,
-        (SELECT COUNT(*) FROM orders o WHERE o.branch_id = b.id AND o.status IN ('pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery')) AS active_orders
+        (SELECT COUNT(*) FROM orders o WHERE o.branch_id = b.id AND o.status IN ('pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery')) AS active_orders,
+        (SELECT COUNT(*) FROM branch_products bp WHERE bp.branch_id = b.id AND (bp.is_available = 0 OR bp.stock <= 0)) AS items_86_count
       FROM branches b
       LEFT JOIN branch_delivery_settings s ON s.branch_id = b.id
       WHERE b.brand_id = ? AND (b.is_archived = 0 OR b.is_archived IS NULL)
@@ -78,6 +80,7 @@ router.post('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, re
     const branchWa = rawWa;
 
     const isOpenOverride = req.body.is_open_override !== undefined ? (req.body.is_open_override ? 1 : 0) : 1;
+    const isOnlinePaused = req.body.is_online_paused !== undefined ? (req.body.is_online_paused ? 1 : 0) : 0;
     const branchTimezone = String(timezone || 'Asia/Jakarta').trim();
     const branchPettyCashLimit = (daily_petty_cash_limit !== undefined && daily_petty_cash_limit !== null && String(daily_petty_cash_limit).trim() !== '')
       ? Math.max(0, Number(daily_petty_cash_limit))
@@ -90,8 +93,8 @@ router.post('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, re
     }
 
     db.prepare(`
-      INSERT INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, whatsapp_number, is_active, is_open_override, timezone, daily_petty_cash_limit)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+      INSERT INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, whatsapp_number, is_active, is_open_override, is_online_paused, timezone, daily_petty_cash_limit)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
     `).run(
       branchId,
       req.brand_id,
@@ -103,6 +106,7 @@ router.post('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, re
       branchPhone,
       branchWa,
       isOpenOverride,
+      isOnlinePaused,
       branchTimezone,
       branchPettyCashLimit
     );
@@ -159,9 +163,10 @@ router.get('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
 
     const branch = db.prepare(`
       SELECT 
-        b.id, b.brand_id, b.name, b.slug, b.address_text, b.latitude, b.longitude, b.phone, b.whatsapp_number, b.is_active, b.is_open_override, b.is_archived, b.timezone, b.daily_petty_cash_limit,
+        b.id, b.brand_id, b.name, b.slug, b.address_text, b.latitude, b.longitude, b.phone, b.whatsapp_number, b.is_active, b.is_open_override, b.is_online_paused, b.is_archived, b.timezone, b.daily_petty_cash_limit, b.operating_hours,
         b.created_at, b.updated_at,
         s.is_delivery_active, s.is_pickup_active, s.free_delivery_km, s.price_per_km, s.max_radius_km, s.promo_delivery_discount, s.promo_min_order,
+        COALESCE(s.dispatch_mode, 'hybrid') AS dispatch_mode, COALESCE(s.auto_dispatch_timeout_seconds, 120) AS auto_dispatch_timeout_seconds,
         (SELECT COUNT(*) FROM branch_menus bm WHERE bm.branch_id = b.id) AS adopted_menus_count,
         (SELECT COUNT(*) FROM branch_menus bm WHERE bm.branch_id = b.id) AS adopted_products_count,
         (SELECT COUNT(*) FROM branch_categories bc WHERE bc.branch_id = b.id) AS branch_categories_count,
@@ -187,17 +192,37 @@ router.get('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
   }
 });
 
-router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+const handleUpdateBranch = (req, res) => {
   try {
-    const { name, address_text, latitude, longitude, phone, whatsapp_number, is_active, is_open_override, is_delivery_active, is_pickup_active, free_delivery_km, price_per_km, max_radius_km, promo_min_order, promo_delivery_discount, timezone, reservation_max_guests, daily_petty_cash_limit } = req.body;
+    const { name, address_text, latitude, longitude, phone, whatsapp_number, is_active, is_open_override, is_online_paused, is_delivery_active, is_pickup_active, free_delivery_km, price_per_km, max_radius_km, promo_min_order, promo_delivery_discount, timezone, reservation_max_guests, daily_petty_cash_limit, dispatch_mode, auto_dispatch_timeout_seconds, operating_hours } = req.body;
     const targetPhone = phone !== undefined ? phone : null;
     const targetWa = whatsapp_number !== undefined ? whatsapp_number : null;
     const targetPettyCashLimit = (daily_petty_cash_limit !== undefined && daily_petty_cash_limit !== null && String(daily_petty_cash_limit).trim() !== '')
       ? Math.max(0, Number(daily_petty_cash_limit))
       : (daily_petty_cash_limit !== undefined ? 500000 : null);
 
+    let normalizedOperatingHours = null;
+    let hasOperatingHours = operating_hours !== undefined ? 1 : 0;
+    if (operating_hours !== undefined) {
+      if (operating_hours === null || operating_hours === '') {
+        normalizedOperatingHours = null;
+      } else if (typeof operating_hours === 'object') {
+        normalizedOperatingHours = JSON.stringify(operating_hours);
+      } else if (typeof operating_hours === 'string') {
+        try {
+          JSON.parse(operating_hours);
+          normalizedOperatingHours = operating_hours;
+        } catch (_) {
+          return res.status(400).json({
+            success: false,
+            error: 'Format operating_hours tidak valid (harus JSON string atau object).'
+          });
+        }
+      }
+    }
+
     // B1 OPERATIONAL STATE VALIDATION (B1.3): authoritative branch operational booleans
-    // (is_active lifecycle, is_open_override open/close switch) accept ONLY 0 or 1.
+    // (is_active lifecycle, is_open_override open/close switch, is_online_paused emergency switch) accept ONLY 0 or 1.
     // Rejects invalid transitions instead of silently persisting arbitrary client values.
     const normBoolField = (value) => {
       if (value === undefined || value === null) return null;
@@ -209,17 +234,21 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
     };
     const providedIsActive = normBoolField(is_active);
     const providedIsOpenOverride = normBoolField(is_open_override);
+    const providedIsOnlinePaused = normBoolField(is_online_paused);
     if (is_active !== undefined && providedIsActive === undefined) {
       return res.status(400).json({ success: false, error: 'Nilai is_active tidak valid. Gunakan 0 atau 1.' });
     }
     if (is_open_override !== undefined && providedIsOpenOverride === undefined) {
       return res.status(400).json({ success: false, error: 'Nilai is_open_override tidak valid. Gunakan 0 atau 1.' });
     }
+    if (is_online_paused !== undefined && providedIsOnlinePaused === undefined) {
+      return res.status(400).json({ success: false, error: 'Nilai is_online_paused tidak valid. Gunakan 0 atau 1.' });
+    }
 
     // P1 TENANT WRITE BOUNDARY GUARD (FINDING 01): Verify branch ownership before ANY mutation
     // B1: full pre-mutation snapshot is captured so every authorized change is auditable (B1.10).
     const existingBranch = db.prepare(`
-      SELECT id, name, address_text, latitude, longitude, phone, whatsapp_number, is_active, is_open_override, timezone
+      SELECT id, name, address_text, latitude, longitude, phone, whatsapp_number, is_active, is_open_override, is_online_paused, timezone, operating_hours
       FROM branches WHERE id = ? AND brand_id = ?
     `).get(req.params.id, req.brand_id);
     if (!existingBranch) {
@@ -337,9 +366,11 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
             whatsapp_number = COALESCE(?, whatsapp_number),
             is_active = COALESCE(?, is_active),
             is_open_override = COALESCE(?, is_open_override),
+            is_online_paused = COALESCE(?, is_online_paused),
             timezone = COALESCE(?, timezone),
             reservation_max_guests = COALESCE(?, reservation_max_guests),
             daily_petty_cash_limit = COALESCE(?, daily_petty_cash_limit),
+            operating_hours = CASE WHEN ? = 1 THEN ? ELSE operating_hours END,
             updated_at = datetime('now')
         WHERE id = ? AND brand_id = ?
       `).run(
@@ -351,9 +382,12 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
         targetWa !== undefined ? targetWa : null,
         providedIsActive,
         providedIsOpenOverride,
+        providedIsOnlinePaused,
         timezone !== undefined ? normalizedTimezone : null,
         normalizedMaxGuests,
         targetPettyCashLimit,
+        hasOperatingHours,
+        normalizedOperatingHours,
         req.params.id,
         req.brand_id
       );
@@ -368,9 +402,12 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
       const providedIsDelivery = normToggle(is_delivery_active);
       const providedIsPickup = normToggle(is_pickup_active);
 
+      const validDispatchMode = ['manual', 'automatic', 'hybrid'].includes(dispatch_mode) ? dispatch_mode : null;
+      const validTimeoutSec = Number.isInteger(Number(auto_dispatch_timeout_seconds)) && Number(auto_dispatch_timeout_seconds) >= 30 ? Number(auto_dispatch_timeout_seconds) : null;
+
       db.prepare(`
-        INSERT INTO branch_delivery_settings (id, branch_id, is_delivery_active, is_pickup_active, free_delivery_km, price_per_km, max_radius_km, promo_min_order, promo_delivery_discount)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO branch_delivery_settings (id, branch_id, is_delivery_active, is_pickup_active, free_delivery_km, price_per_km, max_radius_km, promo_min_order, promo_delivery_discount, dispatch_mode, auto_dispatch_timeout_seconds)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(branch_id) DO UPDATE SET
           is_delivery_active = COALESCE(excluded.is_delivery_active, branch_delivery_settings.is_delivery_active),
           is_pickup_active = COALESCE(excluded.is_pickup_active, branch_delivery_settings.is_pickup_active),
@@ -379,6 +416,8 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
           max_radius_km = COALESCE(excluded.max_radius_km, branch_delivery_settings.max_radius_km),
           promo_min_order = COALESCE(excluded.promo_min_order, branch_delivery_settings.promo_min_order),
           promo_delivery_discount = COALESCE(excluded.promo_delivery_discount, branch_delivery_settings.promo_delivery_discount),
+          dispatch_mode = COALESCE(excluded.dispatch_mode, branch_delivery_settings.dispatch_mode),
+          auto_dispatch_timeout_seconds = COALESCE(excluded.auto_dispatch_timeout_seconds, branch_delivery_settings.auto_dispatch_timeout_seconds),
           updated_at = datetime('now')
       `).run(
         'bds_' + req.params.id,
@@ -389,7 +428,9 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
         price_per_km !== undefined ? price_per_km : null,
         max_radius_km !== undefined ? max_radius_km : null,
         promo_min_order !== undefined ? promo_min_order : null,
-        promo_delivery_discount !== undefined ? promo_delivery_discount : null
+        promo_delivery_discount !== undefined ? promo_delivery_discount : null,
+        validDispatchMode,
+        validTimeoutSec
       );
 
       // B1 OPERATIONAL AUDIT TRAIL (B1.10): append-only branch_operation_logs rows for every
@@ -407,6 +448,7 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
       };
 
       const prevOpen = (existingBranch.is_open_override === null || existingBranch.is_open_override === undefined) ? 1 : existingBranch.is_open_override;
+      const prevOnlinePaused = (existingBranch.is_online_paused === null || existingBranch.is_online_paused === undefined) ? 0 : existingBranch.is_online_paused;
       const tracked = [
         { field: 'name', prev: existingBranch.name, next: name !== undefined ? String(name) : existingBranch.name, isNum: false },
         { field: 'address_text', prev: existingBranch.address_text, next: address_text !== undefined ? String(address_text) : existingBranch.address_text, isNum: false },
@@ -416,8 +458,13 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
         { field: 'whatsapp_number', prev: existingBranch.whatsapp_number || null, next: targetWa !== undefined ? String(targetWa) : (existingBranch.whatsapp_number || null), isNum: false },
         { field: 'is_active', prev: existingBranch.is_active, next: providedIsActive !== null ? providedIsActive : existingBranch.is_active, isNum: true },
         { field: 'is_open_override', prev: prevOpen, next: providedIsOpenOverride !== null ? providedIsOpenOverride : prevOpen, isNum: true },
+        { field: 'is_online_paused', prev: prevOnlinePaused, next: providedIsOnlinePaused !== null ? providedIsOnlinePaused : prevOnlinePaused, isNum: true },
         { field: 'timezone', prev: existingBranch.timezone || 'Asia/Jakarta', next: timezone !== undefined ? normalizedTimezone : (existingBranch.timezone || 'Asia/Jakarta'), isNum: false }
       ];
+
+      if (hasOperatingHours) {
+        tracked.push({ field: 'operating_hours', prev: existingBranch.operating_hours || null, next: normalizedOperatingHours, isNum: false });
+      }
 
       const hadSettingsRow = Boolean(db.prepare('SELECT 1 FROM branch_delivery_settings WHERE branch_id = ?').get(req.params.id));
       if (hadSettingsRow) {
@@ -464,13 +511,18 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
         id: existingBranch.id,
         is_active: providedIsActive !== null ? providedIsActive : existingBranch.is_active,
         is_open_override: providedIsOpenOverride !== null ? providedIsOpenOverride : (existingBranch.is_open_override == null ? 1 : existingBranch.is_open_override),
-        timezone: timezone !== undefined ? normalizedTimezone : (existingBranch.timezone || 'Asia/Jakarta')
+        is_online_paused: providedIsOnlinePaused !== null ? providedIsOnlinePaused : (existingBranch.is_online_paused == null ? 0 : existingBranch.is_online_paused),
+        timezone: timezone !== undefined ? normalizedTimezone : (existingBranch.timezone || 'Asia/Jakarta'),
+        operating_hours: hasOperatingHours ? normalizedOperatingHours : (existingBranch.operating_hours || null)
       }
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
-});
+};
+
+router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch_manager']), handleUpdateBranch);
+router.patch('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch_manager']), handleUpdateBranch);
 
 router.delete('/admin/branches/:id', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
@@ -605,6 +657,44 @@ router.get('/admin/branches/:id/operation-logs', requireAuth(['owner', 'brand_ma
     res.json({
       success: true,
       logs: logs || []
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 14.1.4 Get Out-Of-Stock / 86 Items for a Branch (Protokol 86 Observability)
+router.get(['/admin/branches/:id/items-86', '/api/v1/admin/branches/:id/items-86'], requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
+  try {
+    const branch = db.prepare('SELECT id, name FROM branches WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
+    if (!branch) {
+      return res.status(404).json({
+        success: false,
+        error: 'BRANCH_NOT_FOUND',
+        message: 'Cabang tidak ditemukan pada brand ini.'
+      });
+    }
+
+    const items = db.prepare(`
+      SELECT 
+        bp.product_id,
+        p.name AS product_name,
+        p.image_url AS product_image,
+        COALESCE(bp.price, p.price) AS price,
+        bp.stock,
+        bp.is_available,
+        bp.updated_at
+      FROM branch_products bp
+      JOIN products p ON p.id = bp.product_id AND p.brand_id = ?
+      WHERE bp.branch_id = ? AND (bp.is_available = 0 OR bp.stock <= 0)
+      ORDER BY bp.updated_at DESC
+    `).all(req.brand_id, req.params.id);
+
+    res.json({
+      success: true,
+      branch_id: branch.id,
+      branch_name: branch.name,
+      items: items || []
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

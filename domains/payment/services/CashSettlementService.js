@@ -69,11 +69,18 @@ class CashSettlementService {
       );
     }
 
-    if (order.payment_method && order.payment_method !== 'cash') {
+    const expectedAmount = Number(order.grand_total);
+    const existingPayment = paymentRepository.findPaymentByOrderId(order_id);
+    const existingPaidAmount = Number(existingPayment && existingPayment.amount) || 0;
+    const canSettleSharedDineInRemainder = Boolean(
+      order.order_type === 'dine_in' &&
+      existingPayment &&
+      existingPayment.payment_status === PaymentModel.STATUSES.SETTLEMENT &&
+      existingPaidAmount < expectedAmount
+    );
+    if (order.payment_method && order.payment_method !== 'cash' && !canSettleSharedDineInRemainder) {
       throw new Error(`[CashSettlementService Payment Method Conflict]: Pesanan "${order_id}" menggunakan metode pembayaran online "${order.payment_method}". Tidak dapat diselesaikan melalui pelunasan tunai (Cash).`);
     }
-
-    const expectedAmount = Number(order.grand_total);
     if (Number(amount) !== expectedAmount) {
       throw new Error(
         `[SETTLEMENT_AMOUNT_MISMATCH]: Jumlah pembayaran (Rp ${Number(amount).toLocaleString('id-ID')}) tidak sesuai dengan total tagihan order (Rp ${expectedAmount.toLocaleString('id-ID')}).`
@@ -86,9 +93,8 @@ class CashSettlementService {
 
     const tendered = Number(amount_tendered);
 
-    const existingPayment = paymentRepository.findPaymentByOrderId(order_id);
     if (existingPayment) {
-      if (existingPayment.provider && existingPayment.provider !== 'cash') {
+      if (existingPayment.provider && existingPayment.provider !== 'cash' && !canSettleSharedDineInRemainder) {
         throw new Error(`[CashSettlementService Provider Conflict]: Pembayaran untuk pesanan "${order_id}" sudah terdaftar dengan provider online "${existingPayment.provider}".`);
       }
       const existingAmount = Number(existingPayment.amount || 0);
@@ -203,28 +209,31 @@ class CashSettlementService {
         }
       } catch (_) {}
 
-      if (payment_group_id) {
-        const checks = posBillRepository.findChecks(order_id);
-        if (checks.length === 1) {
-          const check = checks[0];
-          const checkPaid = posBillRepository.findCheckPaidAmount(check.id);
-          if (Number(checkPaid) < Number(order.grand_total)) {
-            posBillRepository.createCheckPayment({
-              id: `gcp_${crypto.randomBytes(6).toString('hex')}`,
-              checkId: check.id,
-              orderId: order_id,
-              paymentMethod: 'cash',
-              provider: 'cash',
-              amount: Number(order.grand_total) - Number(checkPaid),
-              paymentStatus: 'settlement',
-              payerName: null,
-              actorId: cashier_id,
-              rawPayment: JSON.stringify({ payment_group_id }),
-              settledAt: now,
-              now
-            });
+      const checks = posBillRepository.findChecks(order_id);
+      if (checks && checks.length > 0) {
+        for (const check of checks) {
+          if (check.status === 'open') {
+            const checkPaid = posBillRepository.findCheckPaidAmount(check.id);
+            const checkAllocated = Number(check.allocated_amount || 0);
+            const checkUnpaid = Math.max(0, checkAllocated - checkPaid);
+            if (checkUnpaid > 0) {
+              posBillRepository.createCheckPayment({
+                id: `cp_${crypto.randomBytes(6).toString('hex')}`,
+                checkId: check.id,
+                orderId: order_id,
+                paymentMethod: 'cash',
+                provider: 'cash',
+                amount: checkUnpaid,
+                paymentStatus: 'settlement',
+                payerName: null,
+                actorId: cashier_id,
+                rawPayment: JSON.stringify({ amount_tendered: tendered, change, cashier_id, shift_id, payment_group_id }),
+                settledAt: now,
+                now
+              });
+            }
+            posBillRepository.setCheckStatus(check.id, 'paid', now);
           }
-          posBillRepository.setCheckStatus(check.id, 'paid', now);
         }
       }
 
@@ -261,6 +270,20 @@ class CashSettlementService {
     } catch (err) {
       if (manage_transaction) { try { paymentRepository.rollbackTransaction(); } catch (_) {} }
       throw err;
+    }
+
+    // Dine-in served-but-unpaid: once POS settles, the order completes.
+    if (order.order_type === 'dine_in' && order.status === 'ready') {
+      try {
+        const served = paymentRepository.db.queryOne(
+          "SELECT 1 AS ok FROM order_status_logs WHERE order_id = ? AND note LIKE '[SERVED_TO_TABLE]%' LIMIT 1",
+          [order_id]
+        );
+        if (served) {
+          const OrderStateMachine = require('../../../server/services/OrderStateMachine');
+          OrderStateMachine.transition({ order_id, target_status: 'completed', actor_type: 'cashier', actor_id: cashier_id, note: '[AUTO_COMPLETE] Sudah disajikan & lunas di Kasir POS.' });
+        }
+      } catch (_) {}
     }
 
     events.EventBus.publish({

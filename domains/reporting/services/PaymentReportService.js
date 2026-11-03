@@ -20,6 +20,7 @@ class PaymentReportService {
     let totalMidtransSettled = 0;
     let totalDokuSettled = 0;
     let totalQrisStaticSettled = 0;
+    let totalMultipleSettled = 0;
     let totalPending = 0;
 
     for (const row of breakdown) {
@@ -28,7 +29,8 @@ class PaymentReportService {
         if (row.provider === 'midtrans') totalMidtransSettled += row.total_amount;
         if (row.provider === 'doku') totalDokuSettled += row.total_amount;
         if (row.provider === 'qris_static') totalQrisStaticSettled += row.total_amount;
-      } else if (row.payment_status === 'pending') {
+        if (row.provider === 'multiple') totalMultipleSettled += row.total_amount;
+      } else if (['pending', 'challenge', 'reconciliation_pending'].includes(row.payment_status)) {
         totalPending += row.total_amount;
       }
     }
@@ -37,11 +39,12 @@ class PaymentReportService {
       report_type: 'payment',
       filter,
       summary: {
-        total_settled: totalCashSettled + totalMidtransSettled + totalDokuSettled + totalQrisStaticSettled,
+        total_settled: totalCashSettled + totalMidtransSettled + totalDokuSettled + totalQrisStaticSettled + totalMultipleSettled,
         cash_settled: totalCashSettled,
         midtrans_settled: totalMidtransSettled,
         doku_settled: totalDokuSettled,
         qris_static_settled: totalQrisStaticSettled,
+        multiple_settled: totalMultipleSettled,
         total_pending: totalPending
       },
       breakdown

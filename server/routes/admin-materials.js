@@ -10,9 +10,16 @@ function registerAdminMaterialRoutes(router, deps = {}) {
   const requireAuth = typeof deps.requireAuth === 'function' ? deps.requireAuth : () => (req, res, next) => next();
   const authGate = requireAuth(['owner', 'brand_manager']);
 
+  const setNoCacheHeaders = (res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  };
+
   // GET /admin/uoms — List all active UOMs for recipe/material configuration
   router.get('/admin/uoms', authGate, (req, res) => {
     try {
+      setNoCacheHeaders(res);
       const uoms = uomRepository.listActive();
       return res.json({ success: true, uoms });
     } catch (err) {
@@ -23,6 +30,7 @@ function registerAdminMaterialRoutes(router, deps = {}) {
   // GET /admin/materials — List materials for current organization with stock balances and reorder policies
   router.get('/admin/materials', authGate, (req, res) => {
     try {
+      setNoCacheHeaders(res);
       const orgId = req.user?.organization_id || req.brand?.organization_id || 'org_xentra_holding';
       let locationId = req.query.stock_location_id || null;
       if (!locationId && req.query.branch_id) {
@@ -43,11 +51,51 @@ function registerAdminMaterialRoutes(router, deps = {}) {
     }
   });
 
+  // GET /admin/materials/:id — Get details of a single material with UOM, stock, cost, and usage count
+  router.get('/admin/materials/:id', authGate, (req, res) => {
+    try {
+      setNoCacheHeaders(res);
+      const orgId = req.user?.organization_id || req.brand?.organization_id || 'org_xentra_holding';
+      let locationId = req.query.stock_location_id || null;
+      if (!locationId && req.query.branch_id) {
+        const loc = materialRepository.db?.queryOne
+          ? materialRepository.db.queryOne("SELECT id FROM stock_locations WHERE branch_id = ? AND is_active = 1 LIMIT 1", [req.query.branch_id])
+          : null;
+        if (loc) locationId = loc.id;
+      }
+      if (!locationId) {
+        const loc = materialRepository.db?.queryOne
+          ? materialRepository.db.queryOne("SELECT id FROM stock_locations WHERE organization_id = ? AND is_active = 1 LIMIT 1", [orgId])
+          : null;
+        if (loc) locationId = loc.id;
+      }
+
+      const list = materialRepository.listWithDetails(orgId, {
+        includeArchived: true,
+        locationId
+      });
+      const targetId = String(req.params.id);
+      const found = list.find((m) => String(m.id) === targetId || String(m.material_code) === targetId);
+
+      if (!found) {
+        const direct = materialRepository.findById(targetId);
+        if (!direct || String(direct.organization_id) !== orgId) {
+          return res.status(404).json({ success: false, error: 'MATERIAL_NOT_FOUND', message: 'Bahan baku tidak ditemukan' });
+        }
+        return res.json({ success: true, material: direct });
+      }
+
+      return res.json({ success: true, material: found });
+    } catch (err) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // POST /admin/materials — Create a new canonical Material
   router.post('/admin/materials', authGate, (req, res) => {
     try {
       const orgId = req.user?.organization_id || req.brand?.organization_id || 'org_xentra_holding';
-      const { material_code, name, description, base_uom_id, status } = req.body || {};
+      const { material_code, name, description, base_uom_id, purchase_uom_name, purchase_uom_ratio, unit_cost, status } = req.body || {};
 
       const created = MaterialService.createMaterial({
         organizationId: orgId,
@@ -59,6 +107,21 @@ function registerAdminMaterialRoutes(router, deps = {}) {
         repository: materialRepository,
         uomRepo: uomRepository
       });
+
+      const parsedUnitCost = unitCost !== undefined ? Math.max(0, Number(unitCost) || 0) : 0;
+      if (created && created.id) {
+        const uomName = purchase_uom_name ? String(purchase_uom_name).trim() : null;
+        const uomRatio = purchase_uom_ratio ? Math.max(0.0001, Number(purchase_uom_ratio)) : 1;
+        materialRepository.db.execute(
+          "UPDATE materials SET purchase_uom_name = ?, purchase_uom_ratio = ?, estimated_unit_cost = ?, updated_at = datetime('now') WHERE id = ?",
+          [uomName, uomRatio, parsedUnitCost, created.id]
+        );
+        created.purchase_uom_name = uomName;
+        created.purchase_uom_ratio = uomRatio;
+        created.estimated_unit_cost = parsedUnitCost;
+        created.unit_cost = parsedUnitCost;
+        created.moving_average_unit_cost = parsedUnitCost;
+      }
 
       let locationId = req.body.stock_location_id || null;
       if (!locationId) {
@@ -185,6 +248,22 @@ function registerAdminMaterialRoutes(router, deps = {}) {
         `, [name, description, purchaseUomName, purchaseUomRatio, now, req.params.id]);
       }
 
+      if (req.body.unit_cost !== undefined || req.body.moving_average_unit_cost !== undefined) {
+        const costVal = Math.max(0, Number(req.body.unit_cost !== undefined ? req.body.unit_cost : req.body.moving_average_unit_cost) || 0);
+        materialRepository.db.execute(
+          "UPDATE materials SET estimated_unit_cost = ?, updated_at = ? WHERE id = ?",
+          [costVal, now, req.params.id]
+        );
+        materialRepository.db.execute(`
+          UPDATE material_stock_balances
+          SET moving_average_unit_cost = ?,
+              carrying_value = ROUND(quantity_base * ?, 2),
+              cost_availability_status = 'AVAILABLE',
+              updated_at = ?
+          WHERE material_id = ? AND quantity_base > 0
+        `, [costVal, costVal, now, req.params.id]);
+      }
+
       let locationId = req.body.stock_location_id || null;
       if (!locationId) {
         const loc = materialRepository.db?.queryOne ? materialRepository.db.queryOne("SELECT id FROM stock_locations WHERE organization_id = ? AND is_active = 1 LIMIT 1", [orgId]) : null;
@@ -279,8 +358,56 @@ function registerAdminMaterialRoutes(router, deps = {}) {
         }
       }
 
-      const updated = materialRepository.findById(req.params.id);
-      return res.json({ success: true, material: updated });
+      const updated = materialRepository.findById(req.params.id) || {};
+      if (req.body.unit_cost !== undefined || req.body.moving_average_unit_cost !== undefined) {
+        const costVal = Number(req.body.unit_cost !== undefined ? req.body.unit_cost : req.body.moving_average_unit_cost) || 0;
+        updated.unit_cost = costVal;
+        updated.moving_average_unit_cost = costVal;
+      }
+
+      // Return full detailed representation matching listWithDetails
+      const list = materialRepository.listWithDetails(orgId, { includeArchived: true, locationId });
+      const fullUpdated = list.find((m) => String(m.id) === String(req.params.id));
+      return res.json({ success: true, material: fullUpdated || updated });
+    } catch (err) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // DELETE /admin/materials/:id — Delete or archive a material safely
+  router.delete('/admin/materials/:id', authGate, (req, res) => {
+    try {
+      const orgId = req.user?.organization_id || req.brand?.organization_id || 'org_xentra_holding';
+      const existing = materialRepository.findById(req.params.id);
+      if (!existing || String(existing.organization_id) !== orgId) {
+        return res.status(404).json({ success: false, error: 'MATERIAL_NOT_FOUND' });
+      }
+
+      // Check if referenced in recipe components or movements
+      const recipeRef = materialRepository.db?.queryOne ? materialRepository.db.queryOne(
+        "SELECT COUNT(*) as count FROM recipe_components WHERE material_id = ?",
+        [req.params.id]
+      ) : null;
+      const movementRef = materialRepository.db?.queryOne ? materialRepository.db.queryOne(
+        "SELECT COUNT(*) as count FROM material_stock_movements WHERE material_id = ?",
+        [req.params.id]
+      ) : null;
+
+      const hasRecipe = (recipeRef?.count || 0) > 0;
+      const hasMovements = (movementRef?.count || 0) > 0;
+
+      const now = new Date().toISOString();
+      if (!hasRecipe && !hasMovements) {
+        // Safe to hard-delete unused master material
+        materialRepository.db.execute("DELETE FROM material_stock_balances WHERE material_id = ?", [req.params.id]);
+        materialRepository.db.execute("DELETE FROM inventory_reorder_policies WHERE identity_type = 'MATERIAL' AND identity_id = ?", [req.params.id]);
+        materialRepository.db.execute("DELETE FROM materials WHERE id = ?", [req.params.id]);
+        return res.json({ success: true, deleted: true, message: 'Bahan baku berhasil dihapus permanen' });
+      } else {
+        // Soft delete / archive to protect financial audit trail and recipe integrity
+        materialRepository.updateStatus({ id: req.params.id, status: 'ARCHIVED', updatedAt: now });
+        return res.json({ success: true, archived: true, message: 'Bahan baku berhasil diarsipkan' });
+      }
     } catch (err) {
       return res.status(500).json({ success: false, error: err.message });
     }
@@ -310,8 +437,17 @@ function registerAdminMaterialRoutes(router, deps = {}) {
       }
       const now = new Date().toISOString();
       materialRepository.updateStatus({ id: req.params.id, status: targetStatus, updatedAt: now });
-      const updated = materialRepository.findById(req.params.id);
-      return res.json({ success: true, material: updated });
+      const updated = materialRepository.findById(req.params.id) || {};
+      if (req.body.unit_cost !== undefined || req.body.moving_average_unit_cost !== undefined) {
+        const costVal = Number(req.body.unit_cost !== undefined ? req.body.unit_cost : req.body.moving_average_unit_cost) || 0;
+        updated.unit_cost = costVal;
+        updated.moving_average_unit_cost = costVal;
+      }
+
+      // Return full detailed representation matching listWithDetails
+      const list = materialRepository.listWithDetails(orgId, { includeArchived: true, locationId });
+      const fullUpdated = list.find((m) => String(m.id) === String(req.params.id));
+      return res.json({ success: true, material: fullUpdated || updated });
     } catch (err) {
       return res.status(500).json({ success: false, error: err.message });
     }

@@ -76,11 +76,14 @@
               var typeBadge = (o.order_type === 'delivery')
                 ? '<span class="x-badge x-badge-info">DELIVERY</span>'
                 : (o.order_type === 'dine_in' ? '<span class="x-badge" style="background:#ede9fe;color:#6d28d9;">DINE IN</span>' : '<span class="x-badge x-badge-warning">PICKUP</span>');
+              var orderCode = (typeof window.formatBMOrderCode === 'function')
+                ? window.formatBMOrderCode(o)
+                : (o.order_number || o.id || '—');
               return '<tr>' +
-                '<td><strong>' + esc(o.order_number || o.id) + '</strong></td>' +
-                '<td>' + esc(o.customer_name || 'Pelanggan') + '</td>' +
-                '<td>' + typeBadge + '</td>' +
-                '<td><strong style="color:var(--accent-teal);">' + formatMoney(o.grand_total) + '</strong></td>' +
+                '<td data-label="No. Pesanan"><strong>' + esc(orderCode) + '</strong></td>' +
+                '<td data-label="Pelanggan">' + esc(o.customer_name || 'Pelanggan') + '</td>' +
+                '<td data-label="Tipe">' + typeBadge + '</td>' +
+                '<td data-label="Total"><strong style="color:var(--accent-teal);">' + formatMoney(o.grand_total) + '</strong></td>' +
               '</tr>';
             }).join('');
           }

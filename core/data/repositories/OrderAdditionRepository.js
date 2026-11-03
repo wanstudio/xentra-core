@@ -21,6 +21,14 @@ class OrderAdditionRepository {
     return Number(row?.count || 0);
   }
 
+  cancelPendingForOrder({ orderId, reason, cancelledAt, updatedAt }) {
+    return this.db.execute(`
+      UPDATE order_addition_batches
+      SET status = 'cancelled', rejection_reason = ?, rejected_at = ?, updated_at = ?
+      WHERE order_id = ? AND status = 'pending_acceptance'
+    `, [reason || 'Order utama ditutup sebelum kiriman diproses.', cancelledAt, updatedAt, orderId]);
+  }
+
   nextSequence(orderId) {
     const row = this.db.queryOne(
       'SELECT COALESCE(MAX(sequence_no), 0) + 1 AS next_sequence FROM order_addition_batches WHERE order_id = ?',
@@ -37,10 +45,10 @@ class OrderAdditionRepository {
     );
   }
 
-  insertBatch({ id, orderId, branchId, diningSessionId, sequenceNo, sourceChannel, createdBy, clientTransactionId = null, itemsPayload, subtotal, createdAt, updatedAt }) {
+  insertBatch({ id, orderId, branchId, diningSessionId, sequenceNo, sourceChannel, createdBy, createdByPhone = null, clientTransactionId = null, itemsPayload, subtotal, createdAt, updatedAt }) {
     return this.db.execute(
-      "INSERT INTO order_addition_batches (id, order_id, branch_id, dining_session_id, sequence_no, source_channel, created_by, client_transaction_id, items_payload, subtotal, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_acceptance', ?, ?)",
-      [id, orderId, branchId, diningSessionId, sequenceNo, sourceChannel, createdBy || null, clientTransactionId || null, itemsPayload, Number(subtotal || 0), createdAt, updatedAt]
+      "INSERT INTO order_addition_batches (id, order_id, branch_id, dining_session_id, sequence_no, source_channel, created_by, created_by_phone, client_transaction_id, items_payload, subtotal, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_acceptance', ?, ?)",
+      [id, orderId, branchId, diningSessionId, sequenceNo, sourceChannel, createdBy || null, createdByPhone || null, clientTransactionId || null, itemsPayload, Number(subtotal || 0), createdAt, updatedAt]
     );
   }
 

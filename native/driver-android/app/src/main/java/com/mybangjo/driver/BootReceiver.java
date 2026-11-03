@@ -11,8 +11,9 @@ public class BootReceiver extends BroadcastReceiver {
         String action = intent != null ? intent.getAction() : null;
         if (Intent.ACTION_BOOT_COMPLETED.equals(action) || Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
             SharedPreferences prefs = context.getSharedPreferences("xentra_driver_prefs", Context.MODE_PRIVATE);
+            String token = prefs.getString("auth_token", null);
             boolean isOnline = prefs.getBoolean("is_online", false);
-            if (isOnline) {
+            if (isOnline || (token != null && !token.trim().isEmpty())) {
                 DriverGpsService.startService(context);
             }
         }

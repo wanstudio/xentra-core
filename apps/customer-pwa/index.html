@@ -87,7 +87,7 @@
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/layout.css">
   <link rel="stylesheet" href="/assets/css/components.css">
-  <link rel="stylesheet" href="/assets/css/home.css?v=20261021_rev7">
+  <link rel="stylesheet" href="/assets/css/home.css?v=20261029_search_elevated">
   <!-- checkout.css, order-received.css & location-picker.css are NOT render-blocking:
        they are lazy-loaded via loadStylesheetOnce() when their view/feature is used.
        Checkout's CSS is additionally gated in updateViews() so it is ready BEFORE
@@ -132,8 +132,8 @@
         }
       });
 
-      // Ceiling timeout: if API stalls or network fails, gracefully dismiss after 3s
-      setTimeout(window.__xentraHideSplash, 3000);
+      // Keep the robot visible until home.js confirms the catalog has painted.
+      // A fixed timeout could expose an empty home while the catalog is pending.
     })();
   </script>
 
@@ -247,6 +247,37 @@
       <div class="x-hero-clock-wrap">
         <div class="x-hero-time" id="x-hero-time"></div>
         <div class="x-hero-date" id="x-hero-date"></div>
+      </div>
+
+      <!-- SEARCH BAR (UNDER CLOCK / DATE) -->
+      <div class="x-menu-search-wrap" id="x-menu-search-wrap">
+        <form class="x-menu-search-box" id="x-menu-search-form" action="javascript:void(0);" role="search" method="get">
+          <button type="submit" class="x-menu-search-icon" id="x-menu-search-icon-btn" aria-label="Cari menu">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </button>
+          <input 
+            type="search" 
+            name="q"
+            id="x-menu-search-input" 
+            class="x-menu-search-input" 
+            placeholder="Cari menu favorit kamu..." 
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="none"
+            spellcheck="false"
+            enterkeyhint="search"
+            aria-label="Cari menu favorit kamu"
+          >
+          <button type="button" class="x-menu-search-clear" id="x-menu-search-clear" aria-label="Hapus pencarian" style="display:none;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </form>
       </div>
     </header>
 
@@ -409,7 +440,7 @@
        checkout, order-received, aux-pages, location-picker, table-qr,
        payment-gateway, fulfillment-environments, and delivery-schedule
        are ROUTE/ACTION_ONLY and are lazy-loaded on demand below. -->
-  <script src="/assets/js/pages/home.js"></script>
+  <script src="/assets/js/pages/home.js?v=20261030_category_image_priority"></script>
 
   <!-- ═══════════════════════════════════════════════════
        SPA ROUTER & VIEW COORDINATOR
@@ -604,11 +635,19 @@
             (window.Xentra && window.Xentra.OrderReceived) ? Promise.resolve() : loadScriptOnce(src)
           ]);
         }
-        if ((view === 'affiliate' || view === 'history' || view === 'profile' || view === 'account-settings' || view === 'collections') && window.XentraAuxPages) return Promise.resolve();
+        if (view === 'affiliate') {
+          return Promise.all([
+            loadScriptOnce('/assets/js/core/qrcode.js'),
+            window.XentraAuxPages ? Promise.resolve() : loadScriptOnce(src)
+          ]);
+        }
+        if ((view === 'history' || view === 'profile' || view === 'account-settings' || view === 'collections') && window.XentraAuxPages) return Promise.resolve();
         return loadScriptOnce(src);
       }
 
+      var viewTransitionId = 0;
       function updateViews(view, params) {
+        var transitionId = ++viewTransitionId;
         var homeEl = document.getElementById('xentra-home-view');
         var checkoutEl = document.getElementById('xentra-checkout-view');
         var orderEl = document.getElementById('xentra-order-view');
@@ -618,32 +657,47 @@
         var accountSettingsEl = document.getElementById('xentra-account-settings-view');
         var collectionsEl = document.getElementById('xentra-collections-view');
 
-        // Hide only views that are not the target view to avoid flicker
-        if (view !== 'home' && homeEl) homeEl.style.display = 'none';
-        if (view !== 'checkout' && checkoutEl) checkoutEl.style.display = 'none';
-        if (view !== 'order-received' && orderEl) orderEl.style.display = 'none';
-        if (view !== 'affiliate' && affiliateEl) affiliateEl.style.display = 'none';
-        if (view !== 'history' && historyEl) historyEl.style.display = 'none';
-        if (view !== 'profile' && profileEl) profileEl.style.display = 'none';
-        if (view !== 'account-settings' && accountSettingsEl) accountSettingsEl.style.display = 'none';
-        if (view !== 'collections' && collectionsEl) collectionsEl.style.display = 'none';
+        // Keep the current page visible while Checkout's first-use assets load.
+        // Other routes can switch immediately because their containers are shown below.
+        if (view !== 'checkout') {
+          if (view !== 'home' && homeEl) homeEl.style.display = 'none';
+          if (view !== 'checkout' && checkoutEl) checkoutEl.style.display = 'none';
+          if (view !== 'order-received' && orderEl) orderEl.style.display = 'none';
+          if (view !== 'affiliate' && affiliateEl) affiliateEl.style.display = 'none';
+          if (view !== 'history' && historyEl) historyEl.style.display = 'none';
+          if (view !== 'profile' && profileEl) profileEl.style.display = 'none';
+          if (view !== 'account-settings' && accountSettingsEl) accountSettingsEl.style.display = 'none';
+          if (view !== 'collections' && collectionsEl) collectionsEl.style.display = 'none';
+        }
 
         if (view === 'checkout') {
           if (checkoutEl) {
-            // CSS must be ready BEFORE the view is revealed and mounted (no FOUC).
-            // The final catch still reveals the view if CSS/controller load fails,
-            // so a network hiccup can never strand the customer on a blank screen.
-            window.Xentra.ensureCheckoutCss()
+            // Fetch CSS and controller together while keeping the previous page visible.
+            // Reveal and mount only after both are ready, avoiding a white transition.
+            Promise.all([window.Xentra.ensureCheckoutCss(), ensureController('checkout')])
               .then(function () {
+                if (transitionId !== viewTransitionId) return;
+                if (homeEl) homeEl.style.display = 'none';
+                if (orderEl) orderEl.style.display = 'none';
+                if (affiliateEl) affiliateEl.style.display = 'none';
+                if (historyEl) historyEl.style.display = 'none';
+                if (profileEl) profileEl.style.display = 'none';
+                if (accountSettingsEl) accountSettingsEl.style.display = 'none';
+                if (collectionsEl) collectionsEl.style.display = 'none';
                 checkoutEl.style.display = 'block';
-                return ensureController('checkout');
-              })
-              .then(function () {
                 var C = window.Xentra && window.Xentra.Checkout;
                 if (C) C.mount(checkoutEl, params);
                 if (typeof window.__xentraHideSplash === 'function') window.__xentraHideSplash();
               })
               .catch(function () {
+                if (transitionId !== viewTransitionId) return;
+                if (homeEl) homeEl.style.display = 'none';
+                if (orderEl) orderEl.style.display = 'none';
+                if (affiliateEl) affiliateEl.style.display = 'none';
+                if (historyEl) historyEl.style.display = 'none';
+                if (profileEl) profileEl.style.display = 'none';
+                if (accountSettingsEl) accountSettingsEl.style.display = 'none';
+                if (collectionsEl) collectionsEl.style.display = 'none';
                 checkoutEl.style.display = 'block';
                 if (typeof window.__xentraHideSplash === 'function') window.__xentraHideSplash();
               });
@@ -720,7 +774,8 @@
             window.scrollTo(0, 0);
           }
         } else {
-          // Home: splash is hidden by home.js checkHomeReady() once banners & catalog are both painted
+          // Home: splash is hidden by home.js once the usable catalog is painted;
+          // banners load independently and do not hold the first usable screen.
           if (homeEl) {
             homeEl.style.display = 'block';
             if (window.XentraHome && typeof window.XentraHome.refresh === 'function') {

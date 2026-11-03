@@ -20,8 +20,8 @@ class RouteService {
   }
 
   /**
-   * Calculates actual road distance and estimated driving duration using OSRM.
-   * Falls back gracefully to Haversine * 1.3 (estimated road factor) if OSRM is unreachable.
+   * Calculates actual road distance and estimated driving duration using Mapbox Directions + OSRM fallback.
+   * Falls back gracefully to Haversine * 1.3 (estimated road factor) if both are unreachable.
    * 
    * @param {number} originLat - Branch Latitude
    * @param {number} originLng - Branch Longitude
@@ -30,8 +30,52 @@ class RouteService {
    * @returns {Promise<{ distance_meters: number, duration_seconds: number, provider: string }>}
    */
   static async getRoadDistance(originLat, originLng, destLat, destLng) {
-    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${originLng},${originLat};${destLng},${destLat}?overview=false`;
+    const routeData = await this.getDrivingRouteGeometry(originLat, originLng, destLat, destLng);
+    return {
+      distance_meters: routeData.distance_meters,
+      duration_seconds: routeData.duration_seconds,
+      provider: routeData.provider
+    };
+  }
 
+  /**
+   * Returns full GeoJSON LineString route geometry, distance_meters, and duration_seconds.
+   * 1. Primary: Mapbox Directions API
+   * 2. Secondary: OSRM Public Routing API
+   * 3. Tertiary: Interpolated GeoJSON LineString + Haversine * 1.3 road estimate (never fails)
+   */
+  static async getDrivingRouteGeometry(originLat, originLng, destLat, destLng) {
+    const oLat = Number(originLat);
+    const oLng = Number(originLng);
+    const dLat = Number(destLat);
+    const dLng = Number(destLng);
+
+    const mapboxToken = process.env.MAPBOX_TOKEN ||
+      'pk.eyJ1IjoiaWtod2FucyIsImEiOiJjbXQ5c2cwMzYwOW15MnpxdXdpeWU3am45In0.YcX49DH0uXP70aBxVDC-TA';
+
+    // 1. Primary: Mapbox Directions API
+    if (mapboxToken && Number.isFinite(oLat) && Number.isFinite(oLng) && Number.isFinite(dLat) && Number.isFinite(dLng)) {
+      try {
+        const mboxUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${oLng},${oLat};${dLng},${dLat}?overview=full&geometries=geojson&steps=false&access_token=${mapboxToken}`;
+        const mboxRes = await axios.get(mboxUrl, { timeout: 4000 });
+        if (mboxRes.data && mboxRes.data.routes && mboxRes.data.routes.length > 0) {
+          const r = mboxRes.data.routes[0];
+          if (r && r.geometry) {
+            return {
+              distance_meters: Math.round(r.distance || 0),
+              duration_seconds: Math.round(r.duration || 0),
+              geometry: r.geometry,
+              provider: 'mapbox_directions'
+            };
+          }
+        }
+      } catch (err) {
+        // Fallback to OSRM
+      }
+    }
+
+    // 2. Secondary: OSRM
+    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${oLng},${oLat};${dLng},${dLat}?overview=full&geometries=geojson`;
     try {
       const response = await axios.get(osrmUrl, { timeout: 4000 });
       if (
@@ -41,25 +85,38 @@ class RouteService {
         response.data.routes.length > 0
       ) {
         const route = response.data.routes[0];
-        return {
-          distance_meters: Math.round(route.distance),
-          duration_seconds: Math.round(route.duration),
-          provider: 'osrm'
-        };
+        if (route && route.geometry) {
+          return {
+            distance_meters: Math.round(route.distance),
+            duration_seconds: Math.round(route.duration),
+            geometry: route.geometry,
+            provider: 'osrm'
+          };
+        }
       }
     } catch (err) {
-      // Log OSRM fallback
-      console.warn('[RouteService] OSRM query failed, falling back to Haversine calculation:', err.message);
+      console.warn('[RouteService] OSRM query failed, falling back to Haversine geometry:', err.message);
     }
 
-    // Fallback: Haversine with 1.3x road circuitous factor
-    const haversineMeters = this.calculateHaversineMeters(originLat, originLng, destLat, destLng);
-    const estimatedRoadMeters = Math.round(haversineMeters * 1.3);
-    const estimatedDurationSeconds = Math.round((estimatedRoadMeters / 1000 / 25) * 3600); // 25 km/h avg speed
+    // 3. Tertiary Fallback: Haversine + interpolated GeoJSON LineString so map always renders a route
+    const haversineMeters = this.calculateHaversineMeters(oLat, oLng, dLat, dLng);
+    const estimatedRoadMeters = Math.max(100, Math.round(haversineMeters * 1.3));
+    const estimatedDurationSeconds = Math.max(60, Math.round((estimatedRoadMeters / 1000 / 25) * 3600));
+
+    const midLng = (oLng + dLng) / 2 + (dLat - oLat) * 0.08;
+    const midLat = (oLat + dLat) / 2 - (dLng - oLng) * 0.08;
 
     return {
       distance_meters: estimatedRoadMeters,
       duration_seconds: estimatedDurationSeconds,
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [oLng, oLat],
+          [midLng, midLat],
+          [dLng, dLat]
+        ]
+      },
       provider: 'haversine_fallback'
     };
   }

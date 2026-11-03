@@ -1,28 +1,72 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Plus, Trash2 } from 'lucide-react';
 
-export default function AturItemModal({ isOpen, onClose, item, onSaveConfig }) {
-  if (!isOpen || !item) return null;
-
-  // Extract config
-  let initialConfig = {
+function readItemConfig(item) {
+  const defaultConfig = {
     mode: 'MERCHANT',
-    variants: [{ name: 'Pedas', type: 'level', level: 4, active: true }],
+    // Item Choice groups are item-specific. Never invent a Pedas group for an
+    // item such as Sambal; only render choices explicitly saved on that item.
+    variants: [],
   };
+  if (!item || !item.options_config) return defaultConfig;
 
-  if (item.options_config) {
-    if (typeof item.options_config === 'object') {
-      initialConfig = JSON.parse(JSON.stringify(item.options_config));
-    } else {
-      try {
-        initialConfig = JSON.parse(item.options_config);
-      } catch (_) {}
+  let config = item.options_config;
+  if (typeof config === 'string') {
+    try {
+      config = JSON.parse(config);
+    } catch (_) {
+      return defaultConfig;
     }
   }
+  if (!config || typeof config !== 'object' || Array.isArray(config)) return defaultConfig;
 
-  const [mode, setMode] = useState(initialConfig.mode || 'MERCHANT');
-  const [variants, setVariants] = useState(initialConfig.variants || []);
+  return {
+    // Customer-selected options are not wired through the catalog/Customer PWA yet.
+    mode: 'MERCHANT',
+    variants: Array.isArray(config.variants) ? config.variants : [],
+  };
+}
+
+export default function AturItemModal({ isOpen, onClose, item, onSaveConfig }) {
+  const [mode, setMode] = useState(() => readItemConfig(item).mode);
+  const [variants, setVariants] = useState(() => readItemConfig(item).variants);
+
+  // Lock body scroll and close on Escape key / popstate when modal is open
+  useEffect(() => {
+    if (!isOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && typeof onClose === 'function') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    const handlePop = () => {
+      if (typeof onClose === 'function') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('popstate', handlePop);
+    window.addEventListener('hashchange', handlePop);
+
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('popstate', handlePop);
+      window.removeEventListener('hashchange', handlePop);
+    };
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen || !item) return;
+    const config = readItemConfig(item);
+    setMode(config.mode);
+    setVariants(config.variants);
+  }, [isOpen, item]);
+
+  if (!isOpen || !item) return null;
 
   const handleLevelChange = (vIdx, lvl) => {
     const updated = [...variants];
@@ -49,7 +93,7 @@ export default function AturItemModal({ isOpen, onClose, item, onSaveConfig }) {
 
   const handleSave = () => {
     onSaveConfig({
-      mode,
+      mode: 'MERCHANT',
       variants,
     });
     onClose();
@@ -57,7 +101,31 @@ export default function AturItemModal({ isOpen, onClose, item, onSaveConfig }) {
 
   return createPortal(
     <div id="modern-menu-portal-root">
-      <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-atur-item-title"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: '100vw',
+          height: '100vh',
+          backgroundColor: 'rgba(15, 23, 42, 0.6)',
+          backdropFilter: 'blur(4px)',
+          WebkitBackdropFilter: 'blur(4px)',
+          zIndex: 999999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '16px',
+          boxSizing: 'border-box',
+        }}
+        className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in"
+        onClick={onClose}
+      >
         <div
           className="w-full max-w-sm bg-white rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
           onClick={(e) => e.stopPropagation()}
@@ -65,7 +133,7 @@ export default function AturItemModal({ isOpen, onClose, item, onSaveConfig }) {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
           <div>
-            <h3 className="text-base font-bold text-slate-900 m-0">Atur Varian Item</h3>
+            <h3 id="modal-atur-item-title" className="text-base font-bold text-slate-900 m-0">Atur Varian Item</h3>
             <div className="text-xs text-slate-500 mt-0.5">{item.name}</div>
           </div>
           <button
@@ -98,20 +166,18 @@ export default function AturItemModal({ isOpen, onClose, item, onSaveConfig }) {
               </button>
               <button
                 type="button"
-                onClick={() => setMode('CUSTOMER')}
-                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all border-none cursor-pointer ${
-                  mode === 'CUSTOMER'
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'bg-transparent text-slate-500 hover:text-slate-700'
-                }`}
+                disabled
+                aria-disabled="true"
+                title="Pelanggan memilih belum tersedia"
+                className="py-2 px-3 rounded-lg text-xs font-bold border-none bg-transparent text-slate-400 cursor-not-allowed opacity-60"
               >
                 Pelanggan Memilih
               </button>
             </div>
             <p className="text-[11px] text-slate-400 mt-1.5 leading-normal">
               {mode === 'MERCHANT'
-                ? 'Pilihan varian ditetapkan langsung dari dapur/owner (default fix).'
-                : 'Pilihan varian akan dimunculkan kepada pelanggan saat checkout.'}
+                ? 'Owner menentukan varian dan levelnya. Pengaturan ini belum ditampilkan sebagai pilihan pelanggan di Customer PWA.'
+                : 'Pelanggan memilih belum tersedia.'}
             </p>
           </div>
 
@@ -162,7 +228,7 @@ export default function AturItemModal({ isOpen, onClose, item, onSaveConfig }) {
               }
 
               // Radio / Choices
-              const choices = v.choices || ['Manis', 'Tawar'];
+              const choices = Array.isArray(v.choices) ? v.choices : [];
               return (
                 <div key={vIdx} className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
                   <div className="flex items-center justify-between mb-3">

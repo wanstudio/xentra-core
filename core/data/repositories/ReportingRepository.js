@@ -141,39 +141,42 @@ class ReportingRepository {
   }
 
   getPaymentBreakdown(filter = {}) {
-    const whereClauses = [];
-    const params = [];
-
-    if (filter.branch_id) {
-      whereClauses.push('o.branch_id = ?');
-      params.push(filter.branch_id);
-    }
-    if (filter.brand_id) {
-      whereClauses.push('o.brand_id = ?');
-      params.push(filter.brand_id);
-    }
-    if (filter.start_date) {
-      whereClauses.push('p.created_at >= ?');
-      params.push(filter.start_date);
-    }
-    if (filter.end_date) {
-      whereClauses.push('p.created_at <= ?');
-      params.push(filter.end_date);
-    }
-
-    const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
-
-    return this.db.queryMany(`
-      SELECT
-        p.provider,
-        p.payment_status,
-        COUNT(*) as transaction_count,
-        COALESCE(SUM(p.amount), 0) as total_amount
-      FROM order_payments p
-      JOIN orders o ON p.order_id = o.id
-      ${whereSql}
-      GROUP BY p.provider, p.payment_status
-    `, params);
+    const buildWhere = (orderAlias, paymentAlias) => {
+      const clauses = [];
+      const params = [];
+      if (filter.branch_id) { clauses.push(`${orderAlias}.branch_id = ?`); params.push(filter.branch_id); }
+      if (filter.brand_id) { clauses.push(`${orderAlias}.brand_id = ?`); params.push(filter.brand_id); }
+      if (filter.start_date) { clauses.push(`datetime(${paymentAlias}.created_at) >= datetime(?)`); params.push(filter.start_date); }
+      if (filter.end_date) { clauses.push(`datetime(${paymentAlias}.created_at) <= datetime(?)`); params.push(filter.end_date); }
+      return { sql: clauses.length ? `AND ${clauses.join(' AND ')}` : '', params };
+    };
+    const orderPaymentFilter = buildWhere('o', 'p');
+    const checkPaymentFilter = buildWhere('o', 'cp');
+    const intentFilter = buildWhere('o', 'i');
+    const rows = this.db.queryMany(`
+      SELECT provider, payment_status, COUNT(*) AS transaction_count, COALESCE(SUM(amount), 0) AS total_amount
+      FROM (
+        SELECT p.provider, p.payment_status, p.amount
+        FROM order_payments p JOIN orders o ON p.order_id = o.id
+        WHERE p.provider <> 'multiple'
+          AND NOT EXISTS (
+            SELECT 1 FROM pos_check_payments seeded
+            WHERE seeded.order_id = p.order_id AND seeded.payment_status = 'settlement'
+              AND seeded.raw_payment LIKE '%existing_order_payment%'
+          )
+          ${orderPaymentFilter.sql}
+        UNION ALL
+        SELECT cp.provider, cp.payment_status, cp.amount
+        FROM pos_check_payments cp JOIN orders o ON cp.order_id = o.id
+        WHERE 1 = 1 ${checkPaymentFilter.sql}
+        UNION ALL
+        SELECT i.provider, i.payment_status, i.amount
+        FROM pos_check_payment_intents i JOIN orders o ON i.order_id = o.id
+        WHERE i.payment_status IN ('pending', 'challenge', 'reconciliation_pending') ${intentFilter.sql}
+      ) payment_rows
+      GROUP BY provider, payment_status
+    `, [...orderPaymentFilter.params, ...checkPaymentFilter.params, ...intentFilter.params]);
+    return rows;
   }
 
   getInventoryMovementBreakdown(filter = {}) {
@@ -734,4 +737,3 @@ class ReportingRepository {
 }
 
 module.exports = ReportingRepository;
-

@@ -219,14 +219,11 @@
       }
     }
 
-    var cleanText = text.replace(/^[✅✓❌⚡⚠️\s]+/, '');
-    var icon = resolvedType === 'error' ? '❌'
-      : (resolvedType === 'success' ? '✅'
-      : (resolvedType === 'warning' ? '⚠️' : '⚡'));
+    var cleanText = text.replace(/^[✅✓❌✕xX⚡⚠️\s]+/, '');
 
     var toast = document.createElement('div');
     toast.className = 'x-toast' + (resolvedType ? ' x-toast-' + resolvedType : '');
-    toast.innerHTML = '<span>' + icon + '</span> <span>' + esc(cleanText || text) + '</span>';
+    toast.innerHTML = '<span class="x-toast-msg">' + esc(cleanText || text) + '</span>';
     container.appendChild(toast);
 
     setTimeout(function () {
@@ -307,6 +304,7 @@
     'marketing/promotions':        { title: 'Promotions',       sub: 'Daftar program promosi dan aturan insentif brand', tab: 'marketing' },
     'marketing/discounts':         { title: 'Discounts',        sub: 'Aturan diskon harga dan kupon potongan pesanan', tab: 'marketing' },
     'marketing/banners':          { title: 'Banners',          sub: 'Kelola banner storefront, penempatan, jadwal, dan visibilitas pelanggan', tab: 'marketing' },
+    'marketing/affiliate':        { title: 'Program Affiliate', sub: 'Kelola program kemitraan B2C, komisi, dan menu unggulan story', tab: 'marketing' },
     'marketing/campaigns':         { title: 'Campaigns',        sub: 'Kampanye broadcast dan pesan pemasaran multi-channel', tab: 'marketing' },
     'marketing/loyalty':           { title: 'Loyalty',          sub: 'Program poin pelanggan setia dan reward belanja', tab: 'marketing' },
     'settings':                    { title: 'Settings',          sub: 'Konfigurasi brand, cabang, pemenuhan, dan integrasi sistem', tab: 'settings' },
@@ -335,6 +333,8 @@
     'business/materials-production': { title: 'Bahan & Produksi', sub: 'Standar baku, resep, hasil produksi, dan hubungan bahan dengan hasil produksi', tab: 'business' },
     'business/materials':          { title: 'Bahan Baku',        sub: 'Identitas bahan mentah untuk resep dapur dan pengadaan belanja', tab: 'materials' },
     'materials':                   { title: 'Bahan Baku',        sub: 'Identitas bahan mentah untuk resep dapur dan pengadaan belanja', tab: 'materials' },
+    'business/materials/new':      { title: 'Tambah bahan',      sub: 'Tambah identitas bahan baku baru', tab: 'materials' },
+    'materials/new':               { title: 'Tambah bahan',      sub: 'Tambah identitas bahan baku baru', tab: 'materials' },
     'business/recipes':            { title: 'Resep Produksi',    sub: 'Kelola resep acuan perhitungan HPP dan pemotongan stok bahan', tab: 'recipes' },
     'recipes':                     { title: 'Resep Produksi',    sub: 'Kelola resep acuan perhitungan HPP dan pemotongan stok bahan', tab: 'recipes' },
     'more':                        { title: 'Lainnya',           sub: 'Pengaturan sistem, integrasi, keamanan, notifikasi, dan akun', tab: 'more' },
@@ -406,7 +406,11 @@
       if (hash.indexOf('catalog/master-menus/') === 0) {
         return hash;
       }
-      if (hash === 'business/catalog' || hash === 'business/materials-production' || hash === 'business/materials' || hash === 'business/recipes' || hash === 'materials' || hash === 'recipes') {
+      if (hash === 'business/catalog' || hash === 'business/materials-production' ||
+          hash === 'business/materials' || hash.indexOf('business/materials/') === 0 ||
+          hash === 'materials' || hash.indexOf('materials/') === 0 ||
+          hash === 'business/recipes' || hash.indexOf('business/recipes/') === 0 ||
+          hash === 'recipes' || hash.indexOf('recipes/') === 0) {
         return hash;
       }
       // Handle dynamic route: branches/:id and branches/:id/:subtab
@@ -518,6 +522,11 @@
   function canonicalizeOwnerRoute(route) {
     var value = String(route || '');
     if (isPlatformContext()) return value;
+    if (value === 'materials' || value === 'business/materials') return 'business/materials';
+    if (value === 'materials/new' || value === 'business/materials/new') return 'business/materials/new';
+    if (value.indexOf('materials/') === 0 && value.indexOf('business/materials/') !== 0) {
+      return 'business/' + value;
+    }
     return OWNER_ROUTE_ALIASES[value] || value;
   }
 
@@ -531,13 +540,20 @@
 
     var current = canonicalizeOwnerRoute(route || '');
 
-    if (current === 'business/catalog' || current === 'business/materials-production') {
+    if (current === 'business/catalog' || current === 'business/materials-production' ||
+        current === 'business/materials' || current === 'materials') {
       return 'business';
     }
 
-    if (current === 'business/materials' || current === 'materials' ||
-        current === 'business/recipes' || current === 'recipes') {
-      return 'business/materials-production';
+    if (current === 'business/materials/new' ||
+        current === 'materials/new' ||
+        current.indexOf('business/materials/') === 0 ||
+        current.indexOf('materials/') === 0) {
+      return 'business/materials';
+    }
+
+    if (current === 'business/recipes' || current === 'recipes') {
+      return 'business';
     }
 
     if (current === 'catalog/products/new' ||
@@ -548,7 +564,39 @@
 
     if (current === 'catalog/master-menus/new' ||
         /^catalog\/master-menus\/[^/]+\/edit$/.test(current)) {
-      return 'catalog/master-menus';
+      var catId = null;
+      if (typeof window !== 'undefined') {
+        var navSnapshot = window.XentraNavigationController && typeof window.XentraNavigationController.getSnapshot === 'function' ? window.XentraNavigationController.getSnapshot() : null;
+        var activeRoute = navSnapshot ? navSnapshot.route : null;
+        if (activeRoute === 'catalog/master-menus') {
+          return 'catalog/master-menus';
+        }
+
+        if (window._ownerMasterMenuState && window._ownerMasterMenuState.preselectedCategoryId) {
+          catId = window._ownerMasterMenuState.preselectedCategoryId;
+        } else {
+          try {
+            catId = sessionStorage.getItem('xentra_owner_last_category_id');
+          } catch (_) {}
+        }
+
+        if (!catId && /^catalog\/master-menus\/[^/]+\/edit$/.test(current)) {
+          var menuId = decodeURIComponent(current.split('catalog/master-menus/')[1].split('/edit')[0]);
+          if (window._ownerMasterMenuState && Array.isArray(window._ownerMasterMenuState.menus)) {
+            var foundMenu = window._ownerMasterMenuState.menus.find(function(m) {
+              return m && String(m.id) === String(menuId);
+            });
+            if (foundMenu && (foundMenu.category_id || foundMenu.categoryId)) {
+              catId = foundMenu.category_id || foundMenu.categoryId;
+            }
+          }
+        }
+      }
+
+      if (catId) {
+        return 'catalog/categories/' + encodeURIComponent(catId);
+      }
+      return 'catalog/categories';
     }
 
     if (/^catalog\/categories\/[^/]+\/(?:edit|sort-menus|sort)$/.test(current)) {
@@ -566,7 +614,7 @@
         current === 'catalog/categories' ||
         current === 'catalog/master-menus' ||
         current === 'catalog/menus') {
-      return 'business/catalog';
+      return 'business';
     }
 
     if (current === 'branches') return 'business';
@@ -745,20 +793,12 @@
       if (mainView) mainView.style.display = 'none';
       if (catHub) catHub.style.display = (type === 'catalog') ? 'block' : 'none';
       if (matHub) matHub.style.display = (type === 'materials-production') ? 'block' : 'none';
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: 'auto' });
     }
   }
   window.openBusinessSubHub = openBusinessSubHub;
 
-  function closeBusinessSubHub() {
-    if (window.XentraNavigationController) {
-      var snapshot = window.XentraNavigationController.getSnapshot && window.XentraNavigationController.getSnapshot();
-      var stack = snapshot ? snapshot.stack : [];
-      if (stack.length > 1 && snapshot.route && snapshot.route.indexOf('business/') === 0) {
-        window.XentraNavigationController.back();
-        return;
-      }
-    }
+  function renderBusinessMainHubView() {
     var mainView = $('owner-business-main-view');
     var catHub = $('subpage-catalog-menu-hub');
     var matHub = $('subpage-materials-production-hub');
@@ -773,6 +813,7 @@
       modernMount.style.display = 'block';
       if (legacyContent) legacyContent.style.display = 'none';
       window.mountBusinessHub(modernMount, {
+        initialSubHub: null,
         onNavigate: function(targetRoute, id) {
           if (id === 'catalog') {
             openBusinessSubHub('catalog');
@@ -785,7 +826,19 @@
       });
     }
 
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }
+
+  function closeBusinessSubHub() {
+    if (window.XentraNavigationController) {
+      var snapshot = window.XentraNavigationController.getSnapshot && window.XentraNavigationController.getSnapshot();
+      var stack = snapshot ? snapshot.stack : [];
+      if (stack.length > 1 && snapshot.route && snapshot.route.indexOf('business/') === 0) {
+        window.XentraNavigationController.back();
+        return;
+      }
+    }
+    renderBusinessMainHubView();
   }
   window.closeBusinessSubHub = closeBusinessSubHub;
 
@@ -891,15 +944,16 @@
   function getOwnerRouteDepth(r) {
     if (!r || isOwnerRootRoute(r)) return 1;
     if (r === 'business/catalog' || r === 'business/materials-production') return 2;
-    if (r === 'catalog/categories' || r === 'catalog/products' || r === 'catalog/master-menus' || r === 'catalog/menus') return 3;
-    if (/^catalog\/categories\/[^/]+$/.test(r) && r !== 'catalog/categories/new' && r !== 'catalog/categories/sort' && r !== 'catalog/categories/reorder') return 4;
-    if (/^catalog\/categories\/[^/]+\/(?:edit|sort-menus|sort)$/.test(r) || r === 'catalog/categories/new' || r === 'catalog/categories/sort' || r === 'catalog/categories/reorder' || r === 'catalog/master-menus/new' || /^catalog\/master-menus\/[^/]+\/edit$/.test(r) || r === 'catalog/products/new' || /^catalog\/products\/[^/]+\/edit$/.test(r)) return 5;
+    if (r === 'business/materials' || r === 'business/recipes') return 2;
+    if (r === 'business/materials/new' || r === 'materials/new' || r.indexOf('business/materials/') === 0 || r.indexOf('materials/') === 0) return 3;
+    if (r === 'catalog/categories' || r === 'catalog/products' || r === 'catalog/master-menus' || r === 'catalog/menus') return 2;
+    if (/^catalog\/categories\/[^/]+$/.test(r) && r !== 'catalog/categories/new' && r !== 'catalog/categories/sort' && r !== 'catalog/categories/reorder') return 3;
+    if (/^catalog\/categories\/[^/]+\/(?:edit|sort-menus|sort)$/.test(r) || r === 'catalog/categories/new' || r === 'catalog/categories/sort' || r === 'catalog/categories/reorder' || r === 'catalog/master-menus/new' || /^catalog\/master-menus\/[^/]+\/edit$/.test(r) || r === 'catalog/products/new' || /^catalog\/products\/[^/]+\/edit$/.test(r)) return 4;
     var parent = ownerParentRoute(r);
     return parent ? 2 + (r.split('/').length - 1) : 1;
   }
 
-  function triggerOwnerPageSlideTransition(nextRoute) {
-    if (typeof document === 'undefined' || !document.body) return;
+  function computeOwnerRouteDirection(nextRoute) {
     var nextDepth = getOwnerRouteDepth(nextRoute);
     var dir = 'push';
     if (_lastRenderedOwnerRoute === null) {
@@ -913,21 +967,33 @@
     }
     _lastRenderedOwnerRoute = nextRoute;
     _lastRenderedStackDepth = nextDepth;
-    document.body.setAttribute('data-nav-dir', dir);
+    return dir;
+  }
 
-    if (typeof window.requestAnimationFrame === 'function') {
-      window.requestAnimationFrame(function () {
-        var targets = document.querySelectorAll(
-          '#modern-business-hub-root, #modern-catalog-subhub-root, #modern-categories-page-root, #modern-category-detail-page-root, #modern-category-editor-page-root, #modern-category-sort-page-root, #modern-category-menu-sort-page-root, #modern-item-master-page-root, #modern-menu-editor-root, .x-tab-content.active > .x-owner-child-page-shell, .x-tab-content.active > #x-owner-command-center'
-        );
-        var animClass = dir === 'pop' ? 'x-owner-page-anim-pop' : (dir === 'tab' ? 'x-owner-page-anim-tab' : 'x-owner-page-anim-push');
-        targets.forEach(function (el) {
-          el.classList.remove('x-owner-page-anim-push', 'x-owner-page-anim-pop', 'x-owner-page-anim-tab');
-          void el.offsetWidth;
-          el.classList.add(animClass);
-        });
-      });
+  function prepareOwnerRouteDirection(nextRoute) {
+    var dir = computeOwnerRouteDirection(nextRoute);
+    if (typeof document !== 'undefined' && document.body) {
+      document.body.setAttribute('data-nav-dir', dir);
     }
+    return dir;
+  }
+
+  function triggerOwnerPageSlideTransition(nextRoute, precomputedDir) {
+    if (typeof document === 'undefined' || !document.body) return;
+    var dir = precomputedDir || prepareOwnerRouteDirection(nextRoute);
+    var animClass = dir === 'pop' ? 'x-owner-page-anim-pop' : (dir === 'tab' ? 'x-owner-page-anim-tab' : 'x-owner-page-anim-push');
+    var applyAnim = function () {
+      var targets = document.querySelectorAll(
+        '.x-tab-content.active > .x-owner-child-page-shell, .x-tab-content.active > #x-owner-command-center'
+      );
+      targets.forEach(function (el) {
+        if (el.style && el.style.display === 'none') return;
+        el.classList.remove('x-owner-page-anim-push', 'x-owner-page-anim-pop', 'x-owner-page-anim-tab');
+        void el.offsetWidth;
+        el.classList.add(animClass);
+      });
+    };
+    applyAnim();
   }
 
   // Apply the route: update nav active state, show correct section, load data
@@ -951,7 +1017,27 @@
     }
 
     saveOwnerRoute(route);
-    triggerOwnerPageSlideTransition(route);
+    if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+      try {
+        window.scrollTo({ top: 0, behavior: 'auto' });
+      } catch (_) {
+        window.scrollTo(0, 0);
+      }
+    }
+
+    // Close any open presentation bottom sheets or dialogs when transitioning routes
+    if (typeof window !== 'undefined' && window.XentraPresentation) {
+      if (typeof window.XentraPresentation.closeAll === 'function') {
+        window.XentraPresentation.closeAll();
+      } else if (typeof window.XentraPresentation.stackSize === 'function' && typeof window.XentraPresentation.closeTop === 'function') {
+        while (window.XentraPresentation.stackSize() > 0) {
+          if (!window.XentraPresentation.closeTop()) break;
+        }
+      }
+    }
+    if (typeof window !== 'undefined' && window.XentraUI && window.XentraUI.Modal && typeof window.XentraUI.Modal.closeAll === 'function') {
+      window.XentraUI.Modal.closeAll();
+    }
 
     var isCategoryEditor = !isPlatform && (
       route === 'catalog/categories/new' ||
@@ -982,6 +1068,41 @@
       route === 'catalog/master-menus/new' ||
       /^catalog\/master-menus\/[^/]+\/edit$/.test(route)
     );
+
+    var isMaterialEditor = !isPlatform && (
+      route === 'business/materials/new' ||
+      route === 'materials/new' ||
+      /^business\/materials\/[^/]+(?:\/edit)?$/.test(route) ||
+      /^materials\/[^/]+(?:\/edit)?$/.test(route)
+    );
+    var materialEditorId = isMaterialEditor && route !== 'business/materials/new' && route !== 'materials/new'
+      ? decodeURIComponent(
+          (route.indexOf('business/materials/') === 0
+            ? route.split('business/materials/')[1]
+            : route.split('materials/')[1]
+          ).replace(/\/edit$/, '')
+        )
+      : null;
+
+    if (typeof window !== 'undefined' && typeof window.unmountAllModernPages === 'function') {
+      var isModernReactRoute = !isPlatform && (
+        route === 'business' ||
+        route === 'business/catalog' ||
+        route === 'business/materials' ||
+        route === 'materials' ||
+        isMaterialEditor ||
+        route === 'catalog/categories' ||
+        route === 'catalog/products' ||
+        isCategoryDetail ||
+        isCategorySort ||
+        isCategoryEditor ||
+        isProductEditor ||
+        isMasterMenuEditor
+      );
+      if (!isModernReactRoute) {
+        window.unmountAllModernPages();
+      }
+    }
     var masterMenuEditorId = isMasterMenuEditor && route !== 'catalog/master-menus/new'
       ? route.split('catalog/master-menus/')[1].split('/edit')[0]
       : null;
@@ -1022,7 +1143,9 @@
     var isSettingsRoute = !isPlatform && (route === 'settings' || route.indexOf('settings/') === 0);
     var settingsSubtab = isSettingsRoute ? (route.indexOf('settings/') === 0 ? route.split('settings/')[1] : 'business/profile') : 'business/profile';
 
-    var metaKey = (isCategoryEditor || isCategorySort || isCategoryDetail)
+    var metaKey = (isMaterialEditor || route === 'business/materials' || route === 'materials')
+      ? 'business/materials'
+      : (isCategoryEditor || isCategorySort || isCategoryDetail)
       ? 'catalog/categories'
       : ((isMasterMenuEditor || route === 'catalog/master-menus')
         ? 'catalog/master-menus'
@@ -1079,7 +1202,8 @@
       }
     }
 
-    // 4. Show correct content section
+    // 4. Show correct content section and update navigation direction attribute right before mounting/showing target view
+    var navDir = prepareOwnerRouteDirection(route);
     document.querySelectorAll('.x-tab-content').forEach(function (section) {
       section.classList.toggle('active', section.id === 'tab-' + tabId);
     });
@@ -1175,21 +1299,63 @@
           if (catHub) catHub.style.display = 'block';
           if (matHub) matHub.style.display = 'none';
         }
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        window.scrollTo({ top: 0, behavior: 'auto' });
       } else if (route === 'business/materials-production') {
         if (mainView) mainView.style.display = 'none';
         if (catHub) catHub.style.display = 'none';
         if (matHub) matHub.style.display = 'block';
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        window.scrollTo({ top: 0, behavior: 'auto' });
       } else {
-        closeBusinessSubHub();
+        renderBusinessMainHubView();
       }
     }
     if (tabId === 'overview') loadOverview();
     if (tabId === 'reports') loadReports(reportSubtype);
     if (tabId === 'stock') loadOwnerStockOverview();
     if (tabId === 'materials') {
-      if (typeof loadOwnerMaterials === 'function') loadOwnerMaterials();
+      var modernMatMount = $('modern-materials-page-mount');
+      var modernMatEditorMount = $('modern-material-editor-page-mount');
+      var legacyMatContent = $('legacy-materials-content');
+      if (isMaterialEditor) {
+        if (modernMatMount) {
+          modernMatMount.style.display = 'none';
+          if (typeof window.unmountMaterialsPage === 'function') window.unmountMaterialsPage(modernMatMount);
+        }
+        var mountTarget = modernMatEditorMount || modernMatMount;
+        if (mountTarget && typeof window.mountMaterialEditorPage === 'function') {
+          mountTarget.style.display = 'block';
+          if (legacyMatContent) legacyMatContent.style.display = 'none';
+          window.mountMaterialEditorPage(mountTarget, {
+            materialId: materialEditorId,
+            onBack: function() {
+              goBackFromChildPage();
+            },
+            onSaved: function() {
+              navigateTo('business/materials');
+            }
+          });
+        }
+      } else {
+        if (modernMatEditorMount) {
+          modernMatEditorMount.style.display = 'none';
+          if (typeof window.unmountMaterialEditorPage === 'function') window.unmountMaterialEditorPage(modernMatEditorMount);
+        }
+        if (modernMatMount && typeof window.mountMaterialsPage === 'function') {
+          modernMatMount.style.display = 'block';
+          if (legacyMatContent) legacyMatContent.style.display = 'none';
+          window.mountMaterialsPage(modernMatMount, {
+            onBack: function() {
+              goBackFromChildPage();
+            },
+            onNavigate: function(r) {
+              navigateTo(String(r || '').replace(/^#\/?/, ''));
+            }
+          });
+        } else {
+          if (legacyMatContent) legacyMatContent.style.display = 'block';
+          if (typeof loadOwnerMaterials === 'function') loadOwnerMaterials();
+        }
+      }
     }
     if (tabId === 'recipes') {
       var rEditor = $('recipe-editor-view');
@@ -1275,6 +1441,8 @@
         loadMenusView();
       }
     }
+
+    triggerOwnerPageSlideTransition(route, navDir);
   }
 
   // switchTab kept for backward compat (called from quick-action buttons in HTML)
@@ -2041,6 +2209,7 @@
     'overview': 'marketing-view-overview',
     'promotions': 'marketing-view-promotions',
     'banners': 'marketing-view-banners',
+    'affiliate': 'marketing-view-affiliate',
     'broadcasts': 'marketing-view-broadcasts'
   };
 
@@ -2373,8 +2542,13 @@
     // Owner Mobile Pull-To-Refresh wiring
     initOwnerPullToRefresh();
 
-    if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
-      window.Xentra.hideSplash();
+    // If starting on a route other than overview, dismiss splash when shell is ready
+    // (Homepage overview handles its own smooth fade-out once initial data is rendered)
+    var curRoute = (typeof getCurrentRoute === 'function') ? getCurrentRoute() : '';
+    if (curRoute && curRoute !== 'overview' && curRoute !== 'beranda' && curRoute !== '') {
+      if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
+        window.Xentra.hideSplash();
+      }
     }
   }
 
@@ -2479,7 +2653,7 @@
 
     if (actionUrl) {
       if (actionUrl.startsWith('#')) {
-        window.location.hash = actionUrl;
+        navigateTo(actionUrl.replace(/^#\/?/, ''));
       } else {
         window.location.href = actionUrl;
       }
@@ -2695,7 +2869,12 @@
   }
 
   async function triggerOwnerRefresh() {
-    var route = (window.location.hash || '').replace(/^#\/?/, '') || 'overview';
+    var snap = window.XentraNavigationController && typeof window.XentraNavigationController.getSnapshot === 'function'
+      ? window.XentraNavigationController.getSnapshot()
+      : null;
+    var route = (snap && snap.route)
+      ? snap.route
+      : ((window.location.hash || '').replace(/^#\/?/, '') || 'overview');
     try {
       if (typeof loadBranchSelectorContext === 'function') {
         loadBranchSelectorContext();

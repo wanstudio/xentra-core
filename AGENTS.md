@@ -39,6 +39,10 @@ Tests use Node's built-in test runner (`node --test`) with `--test-concurrency=1
 4. Inspect current Git status, recent commits, and affected files.
 5. Identify the domain owner, locked invariants, and existing implementation boundary.
 6. Do not write or modify code until the required context is understood.
+7. For mobile UI/CSS tasks, strictly adhere to `docs/decisions/MOBILE_LAYOUT_SYSTEM_CONTRACT.md`:
+   - **Screen Archetype A (With Primary Bottom Nav)**: Only `.x-tab-content.active::after` provides bottom clearance (`var(--m-bottom-spacer)`). Inner screens (`.x-home-screen`, `.bm-orders-mobile-cards`) must have `padding-bottom: 0 !important;` and `:last-child { margin-bottom: 0 !important; }`.
+   - **Screen Archetype B (With Floating Action Dock/CTA)**: Suppress `active::after` (`display: none !important; height: 0 !important;`). The card list container MUST have explicit `padding-bottom: calc(88px + env(...)) !important;` so cards are never covered by the bottom action dock. Cards must have `margin-bottom: 0 !important;`.
+   - Guarded by `node --test tests/merchantLayoutContract.test.js`.
 
 ## Authority
 
@@ -70,7 +74,7 @@ Key domain boundaries: Organization → Brand → Branch. Payment credentials re
 - `.agent/skills/xentra-ponytail-audit/SKILL.md` — repository-level audit for accumulated over-engineering and architecture drift.
 - `.agent/skills/xentra-ponytail-debt/SKILL.md` — deliberate technical-debt tracking and cleanup discipline.
 - `.agent/skills/xentra-backend-engineering/SKILL.md` — Node/Express backend boundaries, API contracts, authority, transactions, and idempotency.
-- `.agent/skills/xentra-frontend-engineering/SKILL.md` — PWA/dashboard/workspace UI, reusable components, state, runtime wiring, and navigation.
+- `.agent/skills/xentra-frontend-engineering/SKILL.md` — PWA/dashboard/workspace UI, reusable components, state, runtime wiring, and navigation. Follows `docs/decisions/FIGMA_TO_PRODUCTION_UI_TRANSLATION_RULES.md` for translating raw Figma/Tailwind UI snippets into production code.
 - `.agent/skills/xentra-integration-engineering/SKILL.md` — gateways, webhooks, POS sync, delivery, hardware, and event integrations.
 - `.agent/skills/xentra-database/SKILL.md` — database integrity, concurrency, transactions, inventory, and financial persistence.
 - `.agent/skills/xentra-debugging/SKILL.md` — root-cause debugging and runtime investigation.
@@ -131,6 +135,17 @@ Never take lazy shortcuts or leave half-baked wiring. When adding or updating us
 3. **Never Confuse YAGNI With Incomplete Work**:
    - YAGNI means avoiding speculative architecture and unneeded dependencies; it does **not** mean taking shortcuts that deliver broken UX, bypassing existing platform engines, or leaving unmounted routes.
 
+## UI-to-Backend Full-Stack Standpoint (Absolute Invariant)
+
+Whenever a user provides a UI design snippet (Tailwind, HTML, Figma mockup, or React view), **DO NOT TREAT IT AS JUST ISOLATED UI/STYLING**. A UI snippet is an architectural contract of intent. The agent **MUST** automatically deduce, implement, and verify the full underlying system architecture as defined in [docs/XENTRA_UI_TO_BACKEND_EXECUTION_STANDPOINT.md](docs/XENTRA_UI_TO_BACKEND_EXECUTION_STANDPOINT.md):
+
+1. **System Flow & Deep Link Navigation**: Define canonical route patterns (`:id/edit`), parameter extraction, and parent stack restoration.
+2. **Database Invariants & Atomic Projections**: Update all related entities (master records AND valuation/stock balance records) atomically in a single transaction.
+3. **Mandatory 5-Endpoint CRUD Suite**: List (`GET`), Detail (`GET /:id`), Create (`POST`), Update (`PUT /:id`), and Status Toggle (`PUT/PATCH /:id/status` or `DELETE`).
+4. **Service Worker & Cache Proxy Boundary**: Explicitly bypass mutations in `apps/owner-app/sw.js` under `network-only` and set `Cache-Control: no-store` on dynamic admin endpoints.
+5. **Client-Side State Synchronization (0ms UX)**: Pair optimistic UI state updates with authoritative background re-fetch and screen resume event listeners.
+6. **Automated Verification**: Never consider a UI change done without passing end-to-end targeted unit and integration tests.
+
 ## Currency & Number Formatting Rule (Absolute Invariant)
 
 - **Indonesian Rupiah Display Standard**: Semua representasi mata uang Rupiah dan angka kuantitas/harga di seluruh surface (Customer PWA, Merchant App, Merchant Dashboard, POS, Driver App) **WAJIB** menggunakan tanda titik (`.`) sebagai pemisah ribuan, jutaan, dan seterusnya (`Rp 1.000`, `Rp 25.000`, `Rp 1.500.000`).
@@ -144,6 +159,49 @@ Never take lazy shortcuts or leave half-baked wiring. When adding or updating us
   - Gunakan canonical helper platform:
     - Display: `formatMoney(val)` / `window.XentraShared.formatMoney` / `window.Xentra.UI.money`
     - Input Binding: `window.XentraShared.setupCurrencyInputAutoDot(inputEl, onChange)` / `formatNumber(val)`.
+
+## Mobile Page Bottom Action Bar & Bottom Sheet Lifecycle Standard (Absolute Invariant)
+
+Every mobile/web page in Xentra (especially Owner Mobile `apps/owner-app`, `apps/merchant-dashboard`, and React bundles in `packages/menu-editor-ui`) may own its own fixed bottom action bar or modal bottom sheets for executing page-specific endpoints. To prevent overlapping bottom bars (`createPortal` stacking) and orphaned bottom sheets on route transitions or Back navigation, all AI agents MUST obey these 4 invariants:
+
+1. **Single-Active-Page Root Guarantee (`packages/menu-editor-ui/src/main.jsx`)**:
+   - All React page mounts MUST be tracked in an iterable `Map` (`roots`) rather than an un-iterable `WeakMap`.
+   - Mounting any page (`mount*Page`, `mountMenuEditor`, `mountBusinessHub`, `mountCatalogSubHub`) MUST call `unmountOtherPageRoots(activeContainer)` first, and global route transitions MUST call `window.unmountAllModernPages()`.
+   - **FORBIDDEN**: Hiding a React mount container using only `element.style.display = 'none'` without calling `root.unmount()`. Because fixed bottom bars and modals use `createPortal(..., document.body)`, hiding the mount div leaves portaled bottom bars alive and stacked on `document.body`.
+2. **Route-Level Cleanup (`dashboard.js` & feature modules)**:
+   - Every route change in `applyRoute(route)` MUST close all active presentation overlays (`window.XentraPresentation.closeAll()`, `window.XentraUI.Modal.closeAll()`) and unmount inactive modern React page roots (`window.unmountAllModernPages()`) before mounting the target route.
+   - Whenever a module switches sub-views (e.g., `showCategoryEditorSection`, `showMasterCategoriesPage`, `showOwnerMasterMenuEditor`, `showProductListSection`, `showProductDetailSection`, `showProductEditorSection`), it MUST explicitly unmount sibling React containers.
+3. **Hardware / Browser Back (`popstate` & `hashchange`) Must Destroy/Close Active Sheets & Modals**:
+   - `window.XentraPresentation` (`apps/merchant-shared/js/presentation-shells.js`) and `window.XentraUI.Modal` (`apps/merchant-shared/js/sheet-modal.js`) MUST listen to `popstate` and expose `closeAll()` so pressing Back immediately destroys open bottom sheets/dialogs from `#x-presentation-root` / `document.body`.
+   - Any React page component that renders portaled modals or bottom sheets (`PickItemSheet`, `AturItemModal`, `showDeleteModal`, `showAddSheet`, etc.) MUST register `popstate` and `hashchange` cleanup listeners to close its open state on Back navigation, and `OwnerAppShell` MUST sync routes on both `hashchange` and `popstate`.
+4. **Bundle Rebuild & Regression Verification**:
+   - Any change to `packages/menu-editor-ui/src/**` MUST be followed by `cd packages/menu-editor-ui && npm run build` so `apps/owner-app/assets/bundles/menu-editor.js` is updated.
+   - Verify compliance with `node --test tests/ownerBottomBarLifecycle.test.js`.
+
+## Smooth Page Transition & Anti-Flicker Standard (Absolute Invariant)
+
+All Xentra surfaces (Owner Mobile `apps/owner-app`, Merchant App `apps/merchant-app`, Merchant Dashboard `apps/merchant-dashboard`, POS `apps/pos-web`, Customer PWA `apps/customer-pwa`, and future refactored apps) MUST provide native-grade, flicker-free page transitions and obey these 8 invariants:
+
+1. **No Native WebView Top Progress Bar Flicker (`native/*-android`)**:
+   - In Android WebView shells (`native/owner-android`, `native/merchant-android`, `native/pos-android`), `ProgressBar` (`@+id/progressBar` above the topbar) MUST remain permanently hidden (`View.GONE`, `0dp`, `alpha="0"`) AND have all tints set to `@android:color/transparent` (`Color.TRANSPARENT`).
+   - **FORBIDDEN**: Calling `progressBar.setVisibility(View.VISIBLE)` inside `WebViewClient.onPageStarted` or `WebChromeClient.onProgressChanged`.
+2. **Static Icon & Image HTTP Caching (`_smartStaticHeaders` in `server/app.js`)**:
+   - Static asset mounts (`/owner/assets`, `/dashboard/assets`, `/merchant-shared`, `/merchant/assets`, `/pos/assets`, `/driver/assets`, `/belanja/assets`) MUST use `_smartStaticHeaders` so `.svg`, `.png`, `.webp`, `.ico`, and `.woff2` files are cached (`Cache-Control: public, max-age=86400, stale-while-revalidate=604800`) while `.js` and `.css` remain `no-cache, no-store, must-revalidate`.
+   - **FORBIDDEN**: Serving `/owner/assets/icons/*.svg` with `Cache-Control: no-store`. Forcing the browser/WebView to re-download SVG icons on every React page mount causes both icon pop-in flicker and Chromium `WebChromeClient.onProgressChanged` (the green progress bar flicker) on every route transition!
+3. **Synchronous React 18 Commit on Route Mount/Unmount (`flushSync` in `packages/menu-editor-ui/src/main.jsx`)**:
+   - Because the host router (`applyRoute` in `dashboard.js`) switches `.x-tab-content.active` synchronously, all React 18 `root.render(...)` and `root.unmount()` calls in `main.jsx` MUST be wrapped in `flushSync` from `'react-dom'`.
+   - **FORBIDDEN**: Calling `root.render(...)` asynchronously during synchronous tab switching, which leaves the active container blank for 1–2 frames before React commits.
+4. **Synchronous Prop-to-State Derivation & Cache Hydration in React Pages**:
+   - When a component syncs state from a prop (such as `initialSubHub` in `BusinessHub.jsx`), it MUST update state synchronously during render (`if (initialSubHub !== prevInitialSubHub) { ... }`), NEVER inside `useEffect` (which paints the stale view for 1 frame and then re-renders).
+   - Page components (`CategoriesPage`, `CategoryDetailPage`, `CategorySortPage`, `CategoryMenuSortPage`, `CategoryEditorPage`, `ItemMasterPage`) MUST hydrate their initial `useState(() => ...)` synchronously from `window.state` / `window._ownerMasterMenuState` so cached pages render immediately on Frame 0 without flashing `animate-pulse` skeletons.
+5. **History-State Navigation Over Raw `window.location.hash` / `history.back()`**:
+   - Internal route transitions and programmatic Back (`XentraNavigationController.back()`) MUST use `history.pushState` / `history.replaceState` + synchronous `renderRoute()` rather than `window.location.hash = ...` or `window.history.back()`, which trigger asynchronous browser traversal and WebView load-progress bars.
+6. **Zero Transform & Zero Competing Animation on Outer `.x-tab-content` Sections**:
+   - Outer `<section class="x-tab-content">` containers MUST have `animation: none !important; transform: none !important;`.
+7. **Canonical Non-Blanking Directional Page Transitions (`data-nav-dir` + Shared Keyframes)**:
+   - Update `document.body.setAttribute('data-nav-dir', dir)` via `prepareOwnerRouteDirection(route)` right when activating the target tab (after cleaning up the outgoing view), and start keyframes (`xentraSlidePushIn`, `xentraSlidePopIn`, `xentraTabFadeIn`) at `opacity: 0.96` (never `opacity: 0` full-viewport blanking) over `140ms–180ms cubic-bezier(0.22, 1, 0.36, 1)`.
+8. **Hide Legacy Fallback Views by Default in CSS**:
+   - When a route is served by a modern React mount, legacy sibling containers (`#legacy-business-main-content`, `#master-categories-page`, `#product-list-view`) MUST be hidden by CSS (`display: none !important`) so they never flash for 1 frame before JS hides them.
 
 ## Completion
 

@@ -12,24 +12,30 @@ const db = require('../server/database/db');
 const { ComposedProductService } = require('../domains/catalog');
 const adminComposedMenuRoutes = require('../server/routes/admin-composed-menu');
 
-test('ITEM EDITOR VARIANTS SUITE', async (t) => {
+test('ITEM EDITOR & MENU EDITOR ARCHITECTURAL SEPARATION SUITE', async (t) => {
   const orgId = 'org_item_var_' + Date.now();
   const brandId = 'brand_test_item_var_' + Date.now();
   db.prepare("INSERT OR IGNORE INTO organizations (id, name, slug) VALUES (?, 'Org Item Var', ?)").run(orgId, 'slug-' + orgId);
   db.prepare("INSERT INTO brands (id, organization_id, name, slug) VALUES (?, ?, 'Brand Item Var Test', ?)").run(brandId, orgId, 'slug-' + brandId);
 
-  await t.test('1. HTML markup contains Card Varian with mutual toggle switches in both apps', () => {
+  await t.test('1. HTML markup isolates Item Master from customer variants (no card-prod-variants in either app)', () => {
     const ownerHtml = fs.readFileSync(path.join(__dirname, '../apps/owner-app/index.html'), 'utf8');
     const dashboardHtml = fs.readFileSync(path.join(__dirname, '../apps/merchant-dashboard/index.html'), 'utf8');
 
     for (const [name, html] of [['owner-app', ownerHtml], ['merchant-dashboard', dashboardHtml]]) {
-      assert.ok(html.includes('id="card-prod-variants"'), `${name} must contain card-prod-variants`);
-      assert.ok(html.includes('id="toggle-prod-variant-merchant"'), `${name} must contain toggle-prod-variant-merchant`);
-      assert.ok(html.includes('id="toggle-prod-variant-customer"'), `${name} must contain toggle-prod-variant-customer`);
-      assert.ok(html.includes('id="container-prod-variant-options"'), `${name} must contain container-prod-variant-options`);
-      assert.ok(html.includes('id="prod-variant-checklist-items"'), `${name} must contain prod-variant-checklist-items`);
-      assert.equal(html.includes('id="input-new-prod-variant"'), false, `${name} should not have extra variant input`);
-      assert.equal(html.includes('id="btn-add-prod-variant"'), false, `${name} should not have extra variant add button`);
+      // Industry Standard: Commercial variants (Hot/Cold, Spice levels, Modifiers) belong in Menu Editor, NOT Item Master
+      assert.equal(html.includes('id="card-prod-variants"'), false, `${name} must NOT contain card-prod-variants in Item Editor`);
+      assert.equal(html.includes('id="toggle-prod-variant-merchant"'), false, `${name} must NOT contain toggle-prod-variant-merchant`);
+      assert.equal(html.includes('id="toggle-prod-variant-customer"'), false, `${name} must NOT contain toggle-prod-variant-customer`);
+
+      // Item Editor must contain essential operational inventory cards
+      assert.ok(html.includes('id="prod-name"'), `${name} must contain prod-name`);
+      assert.ok(html.includes('id="row-prod-type-cooked"'), `${name} must contain row-prod-type-cooked`);
+      assert.ok(html.includes('id="row-prod-type-direct"'), `${name} must contain row-prod-type-direct`);
+      assert.ok(html.includes('id="card-prod-recipe-cost-info"'), `${name} must contain card-prod-recipe-cost-info`);
+      assert.ok(html.includes('id="card-prod-cost-price"'), `${name} must contain card-prod-cost-price`);
+      assert.ok(html.includes('id="prod-manage-stock-toggle"'), `${name} must contain prod-manage-stock-toggle`);
+      assert.ok(html.includes('id="prod-desc"'), `${name} must contain prod-desc`);
     }
   });
 
@@ -145,12 +151,11 @@ test('ITEM EDITOR VARIANTS SUITE', async (t) => {
     }
   });
 
-  await t.test('4. Frontend DOM interaction: toggle radio mutual exclusivity and variant checklist', () => {
+  await t.test('4. Frontend DOM interaction: Item Editor toggles operational inventory types (Cooked vs Direct)', () => {
     const html = fs.readFileSync(path.join(__dirname, '../apps/owner-app/index.html'), 'utf8');
     const dom = new JSDOM(html, { runScripts: 'dangerously', url: 'http://localhost' });
     const { window } = dom;
 
-    // Load catalog.js
     const catalogJs = fs.readFileSync(path.join(__dirname, '../apps/merchant-dashboard/assets/js/modules/catalog.js'), 'utf8');
     window.API_BASE = '/api';
     window.showToast = () => {};
@@ -163,151 +168,39 @@ test('ITEM EDITOR VARIANTS SUITE', async (t) => {
       window.initCatalogListeners();
     }
 
-    const toggleMerchant = window.document.getElementById('toggle-prod-variant-merchant');
-    const toggleCustomer = window.document.getElementById('toggle-prod-variant-customer');
-    const container = window.document.getElementById('container-prod-variant-options');
-    const checklist = window.document.getElementById('prod-variant-checklist-items');
-    const inputNew = window.document.getElementById('input-new-prod-variant');
-    const btnAdd = window.document.getElementById('btn-add-prod-variant');
+    const toggleCooked = window.document.getElementById('toggle-prod-type-cooked');
+    const toggleDirect = window.document.getElementById('toggle-prod-type-direct');
+    const rowDirect = window.document.getElementById('row-prod-type-direct');
+    const rowCooked = window.document.getElementById('row-prod-type-cooked');
+    const cardCostPrice = window.document.getElementById('card-prod-cost-price');
+    const cardRecipeCost = window.document.getElementById('card-prod-recipe-cost-info');
 
-    assert.ok(toggleMerchant, 'Merchant toggle exists');
-    assert.ok(toggleCustomer, 'Customer toggle exists');
-    assert.ok(container, 'Container options exists');
-    assert.equal(inputNew, null, 'Extra variant input must not exist');
-    assert.equal(btnAdd, null, 'Extra variant add button must not exist');
+    assert.ok(toggleCooked, 'Cooked toggle exists');
+    assert.ok(toggleDirect, 'Direct toggle exists');
+    assert.ok(cardCostPrice, 'Cost price card exists');
+    assert.ok(cardRecipeCost, 'Recipe cost info card exists');
 
-    // Initially container should be hidden
-    assert.equal(container.style.display, 'none');
-    assert.equal(toggleMerchant.checked, false);
-    assert.equal(toggleCustomer.checked, false);
+    // Default state: Pakai Resep (COOKED)
+    assert.equal(toggleCooked.checked, true, 'Default must be Cooked (Pakai Resep)');
+    assert.equal(toggleDirect.checked, false, 'Default Direct must be unchecked');
+    assert.equal(cardCostPrice.style.display, 'none', 'Cost price is hidden for Cooked items');
 
-    // 1. Click toggle Customer ON
-    toggleCustomer.click();
-    assert.equal(toggleCustomer.checked, true, 'Customer toggle should be ON');
-    assert.equal(toggleMerchant.checked, false, 'Merchant toggle should be OFF');
-    assert.equal(container.style.display, 'block', 'Container should be visible');
+    // Switch to DIRECT (Siap Jual Non-Resep)
+    rowDirect.click();
+    assert.equal(toggleDirect.checked, true, 'Direct toggle should be checked after click');
+    assert.equal(toggleCooked.checked, false, 'Cooked toggle should be unchecked');
+    assert.equal(cardCostPrice.style.display, 'block', 'Cost price should be visible for Direct items');
+    assert.equal(cardRecipeCost.style.display, 'none', 'Recipe cost info should be hidden for Direct items');
 
-    // Checklist should contain EXACTLY 3 default variants (Pedas, Suhu, Opsi lain)
-    const items = checklist.querySelectorAll('.x-variant-item-row');
-    assert.equal(items.length, 3, 'Must render exactly 3 variants: Pedas, Suhu, Opsi lain');
-
-    // 2. Click toggle Merchant ON -> Customer must turn OFF (mutual exclusivity)
-    toggleMerchant.click();
-    assert.equal(toggleMerchant.checked, true, 'Merchant toggle should be ON');
-    assert.equal(toggleCustomer.checked, false, 'Customer toggle should turn OFF');
-    assert.equal(container.style.display, 'block', 'Container should still be visible');
-
-    // In MERCHANT mode ("Kamu mengatur"), Suhu is excluded!
-    const merchantItems = checklist.querySelectorAll('.x-variant-item-row');
-    assert.equal(merchantItems.length, 2, 'Must render exactly 2 variants in Kamu mengatur (Pedas and Opsi lain, Suhu excluded)');
-    assert.equal(checklist.querySelector('[data-variant-name="Suhu (Panas/Dingin)"]'), null, 'Suhu must not be in Kamu mengatur');
-
-    // 3. Click toggle Merchant again -> should turn OFF (both OFF)
-    toggleMerchant.click();
-    assert.equal(toggleMerchant.checked, false, 'Merchant toggle should turn OFF');
-    assert.equal(toggleCustomer.checked, false, 'Customer toggle should stay OFF');
-    assert.equal(container.style.display, 'none', 'Container should be hidden when both are off');
-
-    // 4. Click Customer ON again, then toggle Pedas radio button
-    toggleCustomer.click();
-    assert.equal(toggleCustomer.checked, true);
-    const pedasRow = checklist.querySelector('.x-variant-item-row');
-    assert.ok(pedasRow);
-    const indicatorBefore = pedasRow.querySelector('.x-variant-check-indicator');
-    assert.equal(indicatorBefore.classList.contains('active'), false);
-
-    pedasRow.click();
-    const indicatorAfter = checklist.querySelector('.x-variant-item-row .x-variant-check-indicator');
-    assert.equal(indicatorAfter.classList.contains('active'), true, 'Clicked variant should become active');
-
-    // 4b. 5 Level boxes should be rendered under Pedas in Item Editor
-    const levelBoxes = checklist.querySelectorAll('.x-pedas-level-box');
-    assert.equal(levelBoxes.length, 5, 'Pedas should render 5 square level boxes');
-    // Click level 3
-    levelBoxes[2].click();
-    const activeLevelBox = checklist.querySelector('.x-pedas-level-box[data-level="3"]');
-    assert.ok(activeLevelBox);
-    assert.equal(activeLevelBox.style.background, 'rgb(15, 23, 42)', 'Level 3 box should be highlighted');
-
-    // 5. Check editable 'Opsi lain' text input
-    const opsiLainInput = checklist.querySelector('.x-variant-name-edit');
-    assert.ok(opsiLainInput, 'Opsi lain should have editable input');
-    assert.equal(opsiLainInput.value, 'Opsi lain');
-
-    // Owner types 'Topping' into Opsi lain
-    opsiLainInput.value = 'Topping';
-    opsiLainInput.dispatchEvent(new window.Event('input'));
-    opsiLainInput.dispatchEvent(new window.Event('change'));
-
-    // Check indicator on Topping row (clicking Topping turns it ON and turns Pedas OFF)
-    const toppingRow = opsiLainInput.closest('.x-variant-item-row');
-    const toppingCheck = toppingRow.querySelector('.x-variant-check-indicator');
-    toppingCheck.click();
-    const activeIndicator = checklist.querySelector('[data-variant-name="Topping"] .x-variant-check-indicator');
-    assert.ok(activeIndicator);
-    assert.equal(activeIndicator.classList.contains('active'), true, 'Topping should become active');
-
-    // VERIFY RADIO BUTTON MUTUAL EXCLUSIVITY: Pedas MUST BE DEACTIVATED!
-    const pedasIndicatorAfterTopping = checklist.querySelector('[data-variant-name="Pedas"] .x-variant-check-indicator');
-    assert.equal(pedasIndicatorAfterTopping.classList.contains('active'), false, 'Pedas MUST become inactive when Topping is selected (radio button mutual exclusivity)');
-
-    // 6. Checkbox Builder should be displayed underneath active custom variant
-    const activeToppingRow = checklist.querySelector('[data-variant-name="Topping"]');
-    assert.equal(activeToppingRow.querySelector('.x-btn-delete-variant'), null, 'Opsi lain container must NOT have a trash delete icon');
-    const builder = activeToppingRow.querySelector('.x-variant-checkbox-builder');
-    assert.ok(builder, 'Checkbox builder must be rendered when custom variant is active');
-
-    // Add another choice so we have 2 choices
-    const btnAddChoiceInitial = builder.querySelector('.x-btn-add-choice');
-    btnAddChoiceInitial.click();
-
-    // Query refreshed DOM
-    let choiceInputs = checklist.querySelectorAll('[data-variant-name="Topping"] .x-variant-choice-input');
-    let deleteButtons = checklist.querySelectorAll('[data-variant-name="Topping"] .x-btn-delete-choice');
-
-    assert.ok(choiceInputs.length >= 2, 'Should have at least 2 choices');
-    assert.equal(deleteButtons.length, choiceInputs.length, 'Every choice must have a trash delete button');
-
-    // Simulate scenario: user types custom labels, then deletes 1 choice with trash icon
-    choiceInputs[0].value = 'Keju';
-    choiceInputs[0].dispatchEvent(new window.Event('input'));
-    choiceInputs[1].value = 'Cokelat';
-    choiceInputs[1].dispatchEvent(new window.Event('input'));
-
-    const initialCount = choiceInputs.length;
-    // Click delete trash icon on the last choice
-    deleteButtons[deleteButtons.length - 1].click();
-
-    // After deletion, choice count should decrease by 1
-    const updatedBuilder = checklist.querySelector('[data-variant-name="Topping"] .x-variant-checkbox-builder');
-    const updatedChoices = updatedBuilder.querySelectorAll('.x-variant-choice-input');
-    assert.equal(updatedChoices.length, initialCount - 1, 'Choice count must decrease after clicking trash delete button');
-    assert.equal(updatedChoices[0].value, 'Keju');
-
-    // Click + Tambah pilihan
-    const updatedAddBtn = updatedBuilder.querySelector('.x-btn-add-choice');
-    updatedAddBtn.click();
-    const reloadedChoices = checklist.querySelectorAll('[data-variant-name="Topping"] .x-variant-choice-input');
-    assert.equal(reloadedChoices.length, initialCount, 'Choice count must increase after clicking + Tambah pilihan');
-
-    // 7. Click Suhu radio button -> Topping must turn OFF and checkbox builder must disappear
-    const suhuRow = checklist.querySelector('[data-variant-name="Suhu (Panas/Dingin)"]');
-    assert.ok(suhuRow, 'Suhu row must exist');
-    suhuRow.click();
-
-    const suhuIndicator = checklist.querySelector('[data-variant-name="Suhu (Panas/Dingin)"] .x-variant-check-indicator');
-    assert.equal(suhuIndicator.classList.contains('active'), true, 'Suhu should become active');
-    const toppingIndicatorAfterSuhu = checklist.querySelector('[data-variant-name="Topping"] .x-variant-check-indicator');
-    assert.equal(toppingIndicatorAfterSuhu.classList.contains('active'), false, 'Topping must become inactive when Suhu is clicked');
-    const toppingBuilderAfterSuhu = checklist.querySelector('[data-variant-name="Topping"] .x-variant-checkbox-builder');
-    assert.equal(toppingBuilderAfterSuhu, null, 'Topping checkbox builder must disappear when Topping is inactive');
-
-    // Verify there are strictly 3 variant rows in total
-    const finalRows = checklist.querySelectorAll('.x-variant-item-row');
-    assert.equal(finalRows.length, 3, 'Variant list must contain strictly 3 variants: Pedas, Suhu, Opsi lain');
+    // Switch back to COOKED
+    rowCooked.click();
+    assert.equal(toggleCooked.checked, true, 'Cooked toggle should be checked after click');
+    assert.equal(toggleDirect.checked, false, 'Direct toggle should be unchecked');
+    assert.equal(cardCostPrice.style.display, 'none', 'Cost price should be hidden for Cooked items');
+    assert.equal(cardRecipeCost.style.display, 'block', 'Recipe cost info should be visible for Cooked items');
   });
 
-  await t.test('5. Menu Editor renders Pedas (5 boxes), Suhu (radios), Checkboxes (Topping), and [Atur item] button', () => {
+  await t.test('5. Menu Editor renders Pedas (chips), Suhu (radios), Checkboxes (Topping), and [Atur item] button', () => {
     const html = fs.readFileSync(path.join(__dirname, '../apps/owner-app/index.html'), 'utf8');
     const dom = new JSDOM(html, { runScripts: 'dangerously', url: 'http://localhost' });
     const { window } = dom;
@@ -349,36 +242,34 @@ test('ITEM EDITOR VARIANTS SUITE', async (t) => {
     const container = window.document.getElementById('cm-items-container');
     assert.ok(container, 'Items container should exist');
 
-    const variantContainer = container.querySelector('.x-cm-item-variants-container');
-    assert.ok(variantContainer, 'Variant container should be rendered in Menu Editor for product with variants');
+    const variantBlocks = container.querySelectorAll('.x-cm-item-variant-block');
+    assert.ok(variantBlocks.length > 0, 'Variant blocks should be rendered in Menu Editor for product with variants');
 
-    // 1. Pedas: 5 level boxes
-    assert.ok(variantContainer.textContent.includes('Pedas'));
-    assert.ok(variantContainer.textContent.includes('Level 1 - 5'));
-    assert.ok(variantContainer.textContent.includes('1'));
-    assert.ok(variantContainer.textContent.includes('5'));
+    // 1. Pedas: 5 level chips
+    assert.ok(container.textContent.includes('Pedas'));
+    assert.ok(container.textContent.includes('Pelanggan memilih: Pedas'));
 
     // 2. Suhu: Panas / Dingin
-    assert.ok(variantContainer.textContent.includes('Suhu'));
-    assert.ok(variantContainer.textContent.includes('Panas'));
-    assert.ok(variantContainer.textContent.includes('Dingin'));
+    assert.ok(container.textContent.includes('Suhu (Panas/Dingin)'));
+    assert.ok(container.textContent.includes('Panas'));
+    assert.ok(container.textContent.includes('Dingin'));
 
     // 3. Checkbox Group: Topping
-    assert.ok(variantContainer.textContent.includes('Topping'));
-    assert.ok(variantContainer.textContent.includes('Keju Mozzarella'));
-    assert.ok(variantContainer.textContent.includes('Kulit Crispy'));
-    assert.ok(variantContainer.textContent.includes('Telur Ceplok'));
+    assert.ok(container.textContent.includes('Topping'));
+    assert.ok(container.textContent.includes('Keju Mozzarella'));
+    assert.ok(container.textContent.includes('Kulit Crispy'));
+    assert.ok(container.textContent.includes('Telur Ceplok'));
 
     // 4. [Atur item] button
-    const btnAturItem = variantContainer.querySelector('.x-btn-edit-item-variant');
-    assert.ok(btnAturItem, '[Atur item] button must be present');
+    const btnAturItem = container.querySelector('.x-btn-edit-item-variant');
+    assert.ok(btnAturItem, '[Atur item] button must be present in Menu Editor');
     assert.ok(btnAturItem.textContent.includes('Atur item'));
 
     btnAturItem.click();
-    assert.equal(editedProductId, testProd.id, 'Clicking [Atur item] must open the Item Editor for this item');
+    assert.equal(editedProductId, testProd.id, 'Clicking [Atur item] must open item editor for this product');
   });
 
-  await t.test('6. Full round-trip: item editor saves edited variant, rehydrates template slots on re-open, and updates master menu state', async () => {
+  await t.test('6. Full round-trip: Item Editor saves operational product cleanly without injecting variant clutter', async () => {
     const html = fs.readFileSync(path.join(__dirname, '../apps/owner-app/index.html'), 'utf8');
     const dom = new JSDOM(html, { runScripts: 'dangerously', url: 'http://localhost' });
     const { window } = dom;
@@ -389,6 +280,7 @@ test('ITEM EDITOR VARIANTS SUITE', async (t) => {
         id: 'prod_sambal_99',
         name: 'Sambal Korek Bawang',
         sku: 'SBL-099',
+        inventory_type: 'COOKED',
         is_active: 1,
         options_config: null
       }
@@ -429,22 +321,20 @@ test('ITEM EDITOR VARIANTS SUITE', async (t) => {
     // 1. Load item into product editor
     await window.loadProductEditorPage('prod_sambal_99');
 
-    const toggleMerchant = window.document.getElementById('toggle-prod-variant-merchant');
-    const checklist = window.document.getElementById('prod-variant-checklist-items');
+    const nameInput = window.document.getElementById('prod-name');
+    assert.equal(nameInput.value, 'Sambal Korek Bawang');
 
-    // Turn ON Kamu mengatur
-    toggleMerchant.click();
-    assert.equal(toggleMerchant.checked, true);
+    // Switch to DIRECT item
+    const rowDirect = window.document.getElementById('row-prod-type-direct');
+    rowDirect.click();
 
-    // Click Pedas row to activate Pedas
-    const pedasRow = checklist.querySelector('[data-variant-name="Pedas"]');
-    assert.ok(pedasRow, 'Pedas row must exist');
-    pedasRow.click();
+    // Enable SKU stock management and set SKU
+    const manageStockToggle = window.document.getElementById('prod-manage-stock-toggle');
+    manageStockToggle.checked = true;
+    manageStockToggle.dispatchEvent(new window.Event('change'));
 
-    // Click Pedas level 4
-    const levelBox4 = checklist.querySelector('.x-pedas-level-box[data-level="4"]');
-    assert.ok(levelBox4, 'Level box 4 must exist');
-    levelBox4.click();
+    const skuInput = window.document.getElementById('prod-sku');
+    skuInput.value = 'SBL-099-DIR';
 
     // Submit form
     const form = window.document.getElementById('form-product');
@@ -452,29 +342,10 @@ test('ITEM EDITOR VARIANTS SUITE', async (t) => {
 
     // Verify saved payload
     assert.ok(savedPayload, 'Payload must be sent to PUT endpoint');
-    assert.ok(savedPayload.options_config, 'options_config must be in payload');
-    assert.equal(savedPayload.options_config.mode, 'MERCHANT');
-    const pedasVar = savedPayload.options_config.variants.find((v) => v.name === 'Pedas');
-    assert.ok(pedasVar);
-    assert.equal(pedasVar.active, true);
-    assert.equal(pedasVar.level, 4);
-
-    // 2. Re-open the item in item editor — ensure all 3 base slots are preserved and rehydrated
-    await window.loadProductEditorPage('prod_sambal_99');
-
-    assert.equal(toggleMerchant.checked, true, 'Merchant toggle should stay ON on reload');
-    const reloadedPedas4 = checklist.querySelector('.x-pedas-level-box[data-level="4"]');
-    assert.ok(reloadedPedas4);
-    assert.equal(reloadedPedas4.style.background, 'rgb(15, 23, 42)', 'Level 4 should stay selected');
-
-    // Switch to Customer mode to verify Suhu and Opsi lain were NOT lost
-    const toggleCustomer = window.document.getElementById('toggle-prod-variant-customer');
-    toggleCustomer.click();
-    assert.equal(toggleCustomer.checked, true);
-
-    const reloadedRows = checklist.querySelectorAll('.x-variant-item-row');
-    assert.equal(reloadedRows.length, 3, 'All 3 variant options (Pedas, Suhu, Opsi lain) must be available in Customer mode');
-    assert.ok(checklist.querySelector('[data-variant-name="Suhu (Panas/Dingin)"]'), 'Suhu must still be available');
-    assert.ok(checklist.querySelector('[data-variant-name="Opsi lain"]'), 'Opsi lain must still be available');
+    assert.equal(savedPayload.name, 'Sambal Korek Bawang');
+    assert.equal(savedPayload.inventory_type, 'DIRECT');
+    assert.equal(savedPayload.sku, 'SBL-099-DIR');
+    // Critical architecture proof: Item Master does NOT inject options_config when variants are not enabled
+    assert.equal(savedPayload.options_config, null, 'Operational Item Master should not inject customer options_config');
   });
 });

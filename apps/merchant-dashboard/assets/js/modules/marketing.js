@@ -1095,6 +1095,26 @@
      ========================================================================= */
   async function loadMarketingAffiliate() {
     try {
+      // 1. Load active products for featured product dropdown
+      var selProduct = $('mkt-aff-featured-product');
+      if (selProduct) {
+        try {
+          var pRes = await adminFetch(API_BASE + '/admin/products', { headers: getAuthHeaders() });
+          var pJson = await pRes.json();
+          var prodList = (pJson && pJson.products) || [];
+          var optsHtml = '<option value="">🍗 Otomatis / Default Resto (Ayam Tulang Lunak)</option>';
+          prodList.forEach(function (prod) {
+            if (prod && prod.id && prod.name) {
+              var hasImg = Boolean(prod.image_url);
+              optsHtml += '<option value="' + esc(prod.id) + '">' + esc(prod.name) + (hasImg ? ' 📷' : '') + '</option>';
+            }
+          });
+          selProduct.innerHTML = optsHtml;
+        } catch (e) {
+          console.warn('Could not load products for affiliate dropdown:', e);
+        }
+      }
+
       var res = await adminFetch(API_BASE + '/admin/affiliate/program', {
         headers: getAuthHeaders()
       });
@@ -1102,9 +1122,18 @@
       if (res.ok && json.success && json.program) {
         var p = json.program;
         if ($('mkt-aff-status')) $('mkt-aff-status').value = p.is_active ? '1' : '0';
-        if ($('mkt-aff-rate')) $('mkt-aff-rate').value = p.commission_rate != null ? p.commission_rate : 5;
+        var cType = p.commission_type || 'FIXED_PER_ITEM';
+        if ($('mkt-aff-comm-type')) $('mkt-aff-comm-type').value = cType;
+        onAffiliateCommTypeChange(cType);
+
+        if ($('mkt-aff-rate')) {
+          $('mkt-aff-rate').value = cType === 'PERCENTAGE'
+            ? (p.commission_rate != null ? p.commission_rate : 5)
+            : (p.commission_per_item || p.commission_rate || 1000);
+        }
         if ($('mkt-aff-min-payout')) $('mkt-aff-min-payout').value = p.min_payout_amount != null ? p.min_payout_amount : 50000;
         if ($('mkt-aff-cookie-days')) $('mkt-aff-cookie-days').value = p.cookie_days != null ? p.cookie_days : 14;
+        if ($('mkt-aff-featured-product')) $('mkt-aff-featured-product').value = p.featured_product_id || '';
       }
     } catch (err) {
       console.error('[Load Affiliate Program Error]:', err);
@@ -1114,24 +1143,51 @@
   }
   window.loadMarketingAffiliate = loadMarketingAffiliate;
 
+  function onAffiliateCommTypeChange(cType) {
+    var lbl = $('mkt-aff-rate-lbl');
+    var desc = $('mkt-aff-rate-desc');
+    var input = $('mkt-aff-rate');
+    if (!lbl || !input) return;
+
+    if (cType === 'PERCENTAGE') {
+      lbl.textContent = 'Persentase Komisi (%)';
+      input.min = '1';
+      input.max = '50';
+      input.step = '0.5';
+      if (desc) desc.textContent = 'Dihitung dari subtotal makanan/minuman yang dipesan teman.';
+    } else {
+      lbl.textContent = 'Besaran Komisi per Menu (Rp)';
+      input.min = '500';
+      input.removeAttribute('max');
+      input.step = '500';
+      if (desc) desc.textContent = 'Komisi tetap per porsi menu yang dipesan (standar: Rp 1.000).';
+    }
+  }
+  window.onAffiliateCommTypeChange = onAffiliateCommTypeChange;
+
   async function saveMarketingAffiliateProgram() {
     var btn = $('btn-save-affiliate-program');
     if (btn) btn.disabled = true;
 
     try {
       var statusVal = $('mkt-aff-status') ? $('mkt-aff-status').value === '1' : true;
-      var rateVal = $('mkt-aff-rate') ? Number($('mkt-aff-rate').value) : 5;
+      var commTypeVal = $('mkt-aff-comm-type') ? $('mkt-aff-comm-type').value : 'FIXED_PER_ITEM';
+      var rateVal = $('mkt-aff-rate') ? Number($('mkt-aff-rate').value) : 1000;
       var minPayoutVal = $('mkt-aff-min-payout') ? Number($('mkt-aff-min-payout').value) : 50000;
       var cookieDaysVal = $('mkt-aff-cookie-days') ? Number($('mkt-aff-cookie-days').value) : 14;
+      var featuredProductVal = $('mkt-aff-featured-product') ? $('mkt-aff-featured-product').value : null;
 
       var res = await adminFetch(API_BASE + '/admin/affiliate/program', {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify({
           is_active: statusVal,
+          commission_type: commTypeVal,
           commission_rate: rateVal,
+          commission_per_item: commTypeVal === 'FIXED_PER_ITEM' ? rateVal : 1000,
           min_payout_amount: minPayoutVal,
-          cookie_days: cookieDaysVal
+          cookie_days: cookieDaysVal,
+          featured_product_id: featuredProductVal || null
         })
       });
       var json = await res.json();
@@ -1176,12 +1232,18 @@
         }
 
         var customerInfo = '<strong>' + esc(p.customer_name || 'Pelanggan') + '</strong><br><small class="text-muted">' + esc(p.customer_phone || '-') + '</small>';
-        var bankInfo = '<strong>' + esc(p.bank_name || '-') + '</strong> · ' + esc(p.bank_account_number || '-') + '<br><small class="text-muted">a.n. ' + esc(p.bank_account_holder || '-') + '</small>';
+        var rawAcc = String(p.bank_account_number || '').trim();
+        var bankInfo =
+          '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">' +
+          '  <strong>' + esc(p.bank_name || '-') + '</strong> · <span style="font-family:monospace;font-weight:700;">' + esc(rawAcc || '-') + '</span>' +
+          (rawAcc ? ' <button type="button" class="x-btn-xs" style="background:#f1f5f9;border:1px solid #cbd5e1;padding:2px 6px;border-radius:4px;font-size:10.5px;cursor:pointer;color:#334155;" onclick="navigator.clipboard.writeText(\'' + esc(rawAcc) + '\');showToast(\'Nomor rekening / HP disalin!\');">📋 Salin</button>' : '') +
+          '</div>' +
+          '<small class="text-muted">a.n. ' + esc(p.bank_account_holder || '-') + '</small>';
         var dateFormatted = p.created_at ? new Date(p.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
 
         var infoNotes = '';
         if (p.status === 'PAID') {
-          infoNotes = '<span style="font-size:11.5px;color:#15803d;">Ref: ' + esc(p.transfer_reference || '-') + '</span>';
+          infoNotes = '<span style="font-size:11.5px;color:#15803d;font-weight:600;">Ref: ' + esc(p.transfer_reference || '-') + '</span>';
         } else if (p.status === 'REJECTED') {
           infoNotes = '<span style="font-size:11.5px;color:#b91c1c;">Alasan: ' + esc(p.rejection_reason || '-') + '</span>';
         } else {
@@ -1194,6 +1256,14 @@
             '<div style="display:flex;gap:6px;justify-content:flex-end;">' +
             '  <button type="button" class="x-btn-xs" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11.5px;font-weight:700;cursor:pointer;" onclick="approveMarketingAffiliatePayout(\'' + esc(p.id) + '\')">Tandai Transfer</button>' +
             '  <button type="button" class="x-btn-xs" style="background:#ef4444;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11.5px;font-weight:700;cursor:pointer;" onclick="rejectMarketingAffiliatePayout(\'' + esc(p.id) + '\')">Tolak</button>' +
+            '</div>';
+        } else if (p.status === 'PAID') {
+          var destPhone = String(p.customer_phone || (p.bank_name && /dana|gopay|ovo|shopee/i.test(p.bank_name) ? p.bank_account_number : '') || '').replace(/[^0-9]/g, '');
+          if (destPhone.startsWith('0')) destPhone = '62' + destPhone.slice(1);
+          var waMsg = encodeURIComponent('Halo Kak ' + (p.customer_name || 'Mitra') + ', komisi affiliate Anda sebesar ' + formatMoney(p.amount) + ' telah berhasil ditransfer ke ' + (p.bank_name || 'rekening Anda') + ' (' + (p.bank_account_number || '-') + '). Ref: ' + (p.transfer_reference || '-') + '. Terima kasih atas kerja samanya!');
+          actions =
+            '<div style="display:flex;gap:6px;justify-content:flex-end;">' +
+            (destPhone ? '<a href="https://api.whatsapp.com/send?phone=' + destPhone + '&text=' + waMsg + '" target="_blank" class="x-btn-xs" style="background:#25D366;color:#fff;border:none;border-radius:6px;padding:5px 9px;font-size:11px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:4px;">💬 Konfirmasi WA</a>' : '<span style="color:#16a34a;font-size:11.5px;font-weight:700;">✓ Selesai</span>') +
             '</div>';
         }
 

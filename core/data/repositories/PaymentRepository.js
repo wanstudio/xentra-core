@@ -136,7 +136,8 @@ class PaymentRepository {
       ) VALUES (?, ?, 'cash', 'cash', ?, 'settlement', ?, ?, ?, ?)
       ON CONFLICT(order_id) DO UPDATE SET
         payment_status = 'settlement',
-        payment_method = 'cash',
+        provider = CASE WHEN order_payments.provider = 'cash' THEN 'cash' ELSE 'multiple' END,
+        payment_method = CASE WHEN order_payments.payment_method = 'cash' THEN 'cash' ELSE 'multiple' END,
         amount = excluded.amount,
         settled_at = excluded.settled_at,
         raw_webhook_response = excluded.raw_webhook_response,
@@ -147,9 +148,24 @@ class PaymentRepository {
   markOrderPaidByCash({ orderId, updatedAt }) {
     return this.db.execute(`
       UPDATE orders
-      SET payment_method = 'cash', updated_at = ?
+      SET payment_method = CASE WHEN payment_method = 'cash' THEN 'cash' ELSE 'multiple' END,
+          payment_status = 'settlement',
+          updated_at = ?
       WHERE id = ?
     `, [updatedAt, orderId]);
+  }
+
+  settleOrderFromCheckPayments({ orderId, amount, settledAt, rawPayment, updatedAt }) {
+    const result = this.db.execute(`
+      INSERT INTO order_payments (id, order_id, provider, payment_method, amount, payment_status, settled_at, raw_webhook_response, created_at, updated_at)
+      VALUES (?, ?, 'multiple', 'multiple', ?, 'settlement', ?, ?, ?, ?)
+      ON CONFLICT(order_id) DO UPDATE SET
+        provider = 'multiple', payment_method = 'multiple', amount = excluded.amount,
+        payment_status = 'settlement', settled_at = excluded.settled_at,
+        raw_webhook_response = excluded.raw_webhook_response, updated_at = excluded.updated_at
+    `, [`pay_checks_${orderId}`, orderId, amount, settledAt, rawPayment, updatedAt, updatedAt]);
+    this.db.execute("UPDATE orders SET payment_method = 'multiple', payment_status = 'settlement', updated_at = ? WHERE id = ?", [updatedAt, orderId]);
+    return result;
   }
 
   findOrderStatus(orderId) {
@@ -186,10 +202,21 @@ class PaymentRepository {
 
   findOrderItemsWithPromoMarker(orderId) {
     return this.db.queryMany(`
-      SELECT *
-      FROM order_items
-      WHERE order_id = ?
-        AND (note LIKE '%[PROMO:%' OR product_id LIKE 'prm_%')
+      SELECT oi.*,
+             ab.id AS addition_batch_id,
+             ab.created_by AS addition_created_by,
+             COALESCE(
+               ab.created_by_phone,
+               c.phone,
+               CASE WHEN ab.id IS NULL OR ab.source_channel != 'customer_app' THEN o.customer_phone END
+             ) AS promo_customer_phone,
+             c.id AS promo_customer_id
+      FROM order_items oi
+      JOIN orders o ON o.id = oi.order_id
+      LEFT JOIN order_addition_batches ab ON ab.id = oi.addition_batch_id
+      LEFT JOIN customers c ON c.id = ab.created_by
+      WHERE oi.order_id = ?
+        AND (oi.note LIKE '%[PROMO:%' OR oi.product_id LIKE 'prm_%')
     `, [orderId]);
   }
 

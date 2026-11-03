@@ -489,19 +489,20 @@ class WorkforceService {
   // ==================== AUTHENTICATION ====================
 
   authenticate(username, password, brandId) {
+    const cleanIdentifier = String(username || '').trim();
     let user = null;
     if (brandId) {
-      user = this.repository.prepare('SELECT * FROM users WHERE (username = ? OR email = ?) AND brand_id = ?')
-        .get(username, username, brandId);
+      user = this.repository.prepare('SELECT * FROM users WHERE (username = ? COLLATE NOCASE OR email = ? COLLATE NOCASE) AND brand_id = ?')
+        .get(cleanIdentifier, cleanIdentifier, brandId);
     } else {
-      user = this.repository.prepare('SELECT * FROM users WHERE (username = ? OR email = ?)')
-        .get(username, username);
+      user = this.repository.prepare('SELECT * FROM users WHERE (username = ? COLLATE NOCASE OR email = ? COLLATE NOCASE)')
+        .get(cleanIdentifier, cleanIdentifier);
     }
 
     // Fallback: identity-only users (pre-invitation) have brand_id = NULL
     if (!user && brandId) {
-      user = this.repository.prepare('SELECT * FROM users WHERE (username = ? OR email = ?) AND brand_id IS NULL')
-        .get(username, username);
+      user = this.repository.prepare('SELECT * FROM users WHERE (username = ? COLLATE NOCASE OR email = ? COLLATE NOCASE) AND brand_id IS NULL')
+        .get(cleanIdentifier, cleanIdentifier);
     }
 
     if (!user) {

@@ -94,5 +94,33 @@ router.get(['/delivery/reverse-geocode', '/address/reverse'], async (req, res) =
   }
 });
 
+// 4.2 Driving Route Geometry (Mapbox Directions -> OSRM -> Haversine Fallback)
+router.get(['/location/route', '/delivery/route'], async (req, res) => {
+  try {
+    const originLat = Number(req.query.origin_lat ?? req.query.from_lat);
+    const originLng = Number(req.query.origin_lng ?? req.query.from_lng);
+    const destLat = Number(req.query.dest_lat ?? req.query.to_lat);
+    const destLng = Number(req.query.dest_lng ?? req.query.to_lng);
+
+    if (!Number.isFinite(originLat) || !Number.isFinite(originLng) || !Number.isFinite(destLat) || !Number.isFinite(destLng)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Koordinat asal (origin_lat, origin_lng) dan tujuan (dest_lat, dest_lng) wajib dikirim.'
+      });
+    }
+
+    const route = await RouteService.getDrivingRouteGeometry(originLat, originLng, destLat, destLng);
+    res.json({
+      success: true,
+      distance: route.distance_meters,
+      duration: route.duration_seconds,
+      geometry: route.geometry,
+      provider: route.provider
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 
 };

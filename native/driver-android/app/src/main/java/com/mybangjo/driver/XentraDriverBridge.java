@@ -5,6 +5,8 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.BatteryManager;
+import android.os.Build;
+import android.provider.Settings;
 import android.webkit.JavascriptInterface;
 import android.widget.Toast;
 
@@ -20,6 +22,11 @@ public class XentraDriverBridge {
     @JavascriptInterface
     public boolean isNativeApp() {
         return true;
+    }
+
+    @JavascriptInterface
+    public void clearAppCache() {
+        activity.runOnUiThread(activity::clearWebViewCache);
     }
 
     // ── Native Google Sign-In (System Account Picker) ──
@@ -41,13 +48,8 @@ public class XentraDriverBridge {
             .putString("brand_id", brandId)
             .putString("branch_id", branchId)
             .apply();
-    }
-
-    @JavascriptInterface
-    public void setOnlineStatus(boolean isOnline) {
-        prefs.edit().putBoolean("is_online", isOnline).apply();
         activity.runOnUiThread(() -> {
-            if (isOnline) {
+            if (token != null && !token.trim().isEmpty()) {
                 DriverGpsService.startService(activity);
             } else {
                 DriverGpsService.stopService(activity);
@@ -56,13 +58,91 @@ public class XentraDriverBridge {
     }
 
     @JavascriptInterface
-    public void setActiveOrder(String orderId) {
-        prefs.edit().putString("active_order_id", orderId).apply();
-        if (orderId != null && !orderId.isEmpty()) {
-            activity.runOnUiThread(() -> OrderOverlayService.show(activity, orderId));
-        } else {
-            activity.runOnUiThread(() -> OrderOverlayService.hide(activity));
+    public void syncAuth(String token, String branchId) {
+        prefs.edit()
+            .putString("auth_token", token)
+            .putString("branch_id", branchId)
+            .apply();
+        activity.runOnUiThread(() -> {
+            if (token != null && !token.trim().isEmpty()) {
+                DriverGpsService.startService(activity);
+            } else {
+                DriverGpsService.stopService(activity);
+            }
+        });
+    }
+
+    @JavascriptInterface
+    public void clearAuth() {
+        prefs.edit()
+            .remove("auth_token")
+            .remove("driver_id")
+            .remove("brand_id")
+            .remove("branch_id")
+            .remove("active_order_id")
+            .remove("last_alerted_order_id")
+            .putBoolean("is_online", false)
+            .apply();
+        activity.runOnUiThread(() -> {
+            OrderAlarmService.stop(activity);
+            OrderOverlayService.hideOverlay(activity);
+            DriverGpsService.stopService(activity);
+        });
+    }
+
+    @JavascriptInterface
+    public void setOnlineStatus(boolean isOnline) {
+        prefs.edit().putBoolean("is_online", isOnline).apply();
+        String token = prefs.getString("auth_token", null);
+        activity.runOnUiThread(() -> {
+            if (isOnline || (token != null && !token.isEmpty())) {
+                DriverGpsService.startService(activity);
+            } else {
+                DriverGpsService.stopService(activity);
+            }
+        });
+    }
+
+    // ── Floating Order Overlay & Assistive Ball Controls ──
+    @JavascriptInterface
+    public boolean hasOverlayPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            return Settings.canDrawOverlays(activity);
         }
+        return true;
+    }
+
+    @JavascriptInterface
+    public void requestOverlayPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(activity)) {
+            activity.runOnUiThread(() -> {
+                Intent intent = new Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:" + activity.getPackageName())
+                );
+                activity.startActivity(intent);
+            });
+        }
+    }
+
+    @JavascriptInterface
+    public void showOrderCard(String orderId, String orderNumber, String customer, String address, String total) {
+        activity.runOnUiThread(() -> OrderOverlayService.showOrderCard(activity, orderId, orderNumber, customer, address, total));
+    }
+
+    @JavascriptInterface
+    public void showBall() {
+        activity.runOnUiThread(() -> OrderOverlayService.showBall(activity));
+    }
+
+    @JavascriptInterface
+    public void hideOverlay() {
+        activity.runOnUiThread(() -> OrderOverlayService.hideOverlay(activity));
+    }
+
+    @JavascriptInterface
+    public void setActiveOrder(String orderId) {
+        prefs.edit().putString("active_order_id", orderId != null ? orderId : "").apply();
     }
 
     @JavascriptInterface
@@ -73,6 +153,17 @@ public class XentraDriverBridge {
     @JavascriptInterface
     public void stopOrderAlert() {
         activity.runOnUiThread(() -> OrderAlarmService.stop(activity));
+    }
+
+    // Alias for parity with XentraAudio (audio-alerts.js) and standard XentraNative bridge
+    @JavascriptInterface
+    public void playOrderAlarm() {
+        playOrderAlert();
+    }
+
+    @JavascriptInterface
+    public void stopOrderAlarm() {
+        stopOrderAlert();
     }
 
     @JavascriptInterface

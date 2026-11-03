@@ -3,6 +3,7 @@
 const crypto = require('crypto');
 const MaterialRepository = require('../../../core/data/repositories/MaterialRepository');
 const UomRepository = require('../../../core/data/repositories/UomRepository');
+const { generateMaterialCode } = require('../utils/materialCodeGenerator');
 
 const materialRepository = new MaterialRepository();
 const uomRepository = new UomRepository();
@@ -31,14 +32,28 @@ class MaterialService {
     uomRepo = uomRepository
   }) {
     const orgId = text(organizationId, 'ORGANIZATION_REQUIRED');
-    const code = text(materialCode, 'MATERIAL_CODE_REQUIRED');
     const materialName = text(name, 'MATERIAL_NAME_REQUIRED');
     const uomId = text(baseUomId, 'MATERIAL_BASE_UOM_REQUIRED');
 
     const uom = uomRepo.findById(uomId);
     if (!uom || Number(uom.is_active) !== 1) throw fail('MATERIAL_BASE_UOM_INVALID');
 
-    if (repository.findByCode(orgId, code)) throw fail('MATERIAL_CODE_ALREADY_EXISTS');
+    let code = typeof materialCode === 'string' ? materialCode.trim() : '';
+    if (!code) {
+      const existing = typeof repository.listByOrganization === 'function'
+        ? repository.listByOrganization(orgId, { includeArchived: true })
+        : [];
+      const existingCodes = (existing || []).map((m) => m.material_code);
+      code = generateMaterialCode(materialName, existingCodes);
+      while (repository.findByCode(orgId, code)) {
+        const parts = code.split('-');
+        const prefix = parts[0] || 'MAT';
+        const num = (parseInt(parts[1] || '0', 10) || 0) + 1;
+        code = `${prefix}-${num < 100 ? String(num).padStart(2, '0') : num}`;
+      }
+    } else if (repository.findByCode(orgId, code)) {
+      throw fail('MATERIAL_CODE_ALREADY_EXISTS');
+    }
 
     const lifecycle = String(status || 'DRAFT').toUpperCase();
     if (!['DRAFT', 'ACTIVE', 'ARCHIVED'].includes(lifecycle)) {

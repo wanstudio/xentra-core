@@ -240,14 +240,20 @@ router.get('/orders/:id/messages', (req, res) => {
     }
 
     const messages = db.prepare(`
-      SELECT id, brand_id, branch_id, thread_type, thread_ref_id,
-             sender_user_id, sender_role, sender_name, target_role,
-             body, quick_code, created_at
-      FROM ops_messages
-      WHERE brand_id = ? AND thread_type = 'delivery'
-        AND (thread_ref_id = ? OR thread_ref_id = ?)
-      ORDER BY datetime(created_at) ASC
+      SELECT m.id, m.brand_id, m.branch_id, m.thread_type, m.thread_ref_id,
+             m.sender_user_id, m.sender_role, m.sender_name, m.target_role,
+             m.body, m.quick_code, m.image_full_key, m.image_thumb_key, m.retracted_at, m.created_at
+      FROM ops_messages m
+      WHERE m.brand_id = ? AND m.thread_type = 'delivery'
+        AND (m.thread_ref_id = ? OR m.thread_ref_id = ?)
+        AND m.retracted_at IS NULL
+      ORDER BY datetime(m.created_at) ASC, m.rowid ASC
     `).all(order.brand_id, order.id, order.order_number);
+
+    function resolveChatImgUrl(key) {
+      if (!key) return null;
+      return '/assets/uploads/' + String(key).replace(/^\/+/, '');
+    }
 
     res.json({
       success: true,
@@ -259,6 +265,8 @@ router.get('/orders/:id/messages', (req, res) => {
         sender_name: m.sender_name || (m.sender_role === 'driver' ? 'Kurir' : 'Pelanggan'),
         body: m.body,
         quick_code: m.quick_code || null,
+        image_url: resolveChatImgUrl(m.image_full_key),
+        thumb_url: resolveChatImgUrl(m.image_thumb_key || m.image_full_key),
         created_at: m.created_at
       }))
     });

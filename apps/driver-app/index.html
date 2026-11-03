@@ -1,19 +1,39 @@
 <!doctype html>
-<html lang="id">
+<html lang="id" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#ffffff">
-  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#090D16">
+  <meta name="color-scheme" content="dark">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Xentra Driver">
   <meta name="mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="/driver/assets/icons/icon-192.png">
   <link rel="manifest" href="/driver/manifest.json">
   <link rel="stylesheet" href="/merchant-shared/fonts/plus-jakarta-sans.css">
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.3">
-  <link rel="stylesheet" href="/driver/assets/css/driver.css?v=7">
+  <link rel="stylesheet" href="/driver/assets/css/driver.css?v=20261031_v31">
+  <script>
+    // Version Sentinel: Auto-purge stale service worker caches on new deployment
+    (function () {
+      var CURRENT_VERSION = '20261031_v31';
+      var lastVer = localStorage.getItem('xentra_driver_version');
+      if (lastVer !== CURRENT_VERSION) {
+        localStorage.setItem('xentra_driver_version', CURRENT_VERSION);
+        if ('caches' in window) {
+          caches.keys().then(function (keys) {
+            return Promise.all(keys.map(function (k) {
+              if (k.indexOf('driver') !== -1 || k.indexOf('xentra') !== -1) {
+                console.log('[CacheBust] Purging cache:', k);
+                return caches.delete(k);
+              }
+            }));
+          }).catch(function () {});
+        }
+      }
+    })();
+  </script>
   <title>Xentra Driver</title>
 </head>
 <body>
@@ -161,16 +181,25 @@
     </div>
   </div>
 
+  <script src="/merchant-shared/js/qrcode.js?v=1.0.0"></script>
   <script src="/merchant-shared/js/crop-editor.js?v=1.0.2"></script>
   <script src="/merchant-shared/js/audio-alerts.js?v=1.0.6"></script>
+  <script src="/merchant-shared/js/web-push-client.js?v=1.0.1"></script>
   <script src="/merchant-shared/js/ops-chat.js?v=2.0.0"></script>
-  <script src="/driver/assets/js/driver-app.js?v=13"></script>
+  <script src="/driver/assets/js/driver-app.js?v=20261031_v31"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", function () {
         var isSubdomain = window.location.hostname.startsWith('driver.') || window.location.hostname.startsWith('kurir.');
         var swScope = isSubdomain ? '/' : (window.location.pathname.startsWith('/driver') ? '/driver/' : '/');
-        navigator.serviceWorker.register("/driver/sw.js", { scope: swScope }).catch(function () {});
+        navigator.serviceWorker.register("/driver/sw.js?v=20261031_v31", { scope: swScope, updateViaCache: 'none' }).then(function (reg) {
+          reg.update();
+        }).catch(function () {});
+
+        navigator.serviceWorker.addEventListener("controllerchange", function () {
+          console.log("[SW] Controller changed, auto-reloading...");
+          window.location.reload();
+        });
       });
     }
   </script>

@@ -42,16 +42,139 @@ function sendError(res, err, fallback) {
   });
 }
 
+function setNoCacheHeaders(res) {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
+}
+
 function registerAdminComposedMenuRoutes(router, deps = {}) {
   const requireAuth = deps.requireAuth;
   const productService = deps.productService || ComposedProductService;
   const service = deps.service || ComposedMenuService;
   const resolver = deps.resolver || ComposedMenuResolver;
+  const rawDb = deps.db || require('../database/db');
   const ownerRoles = ['owner', 'brand_manager'];
   const menuAdoptionRoles = ['owner', 'brand_manager', 'branch_manager'];
 
+  function attachRecipeToProduct(db, orgId, product, recipeData) {
+    if (!product || !recipeData || !Array.isArray(recipeData.components) || recipeData.components.length === 0) return null;
+
+    try {
+      const recipeName = String(recipeData.name || recipeData.recipe_name || ('Resep ' + product.name)).trim();
+      const yieldQty = Math.max(1, Number(recipeData.planned_yield_quantity || recipeData.yield_quantity) || 1);
+      const yieldUomId = recipeData.yield_uom_id || 'uom_pcs';
+
+      // 1. Ensure production_item exists
+      let pi = db.prepare
+        ? db.prepare("SELECT id FROM production_items WHERE output_product_id = ? AND status = 'ACTIVE' LIMIT 1").get(product.id)
+        : (db.queryOne ? db.queryOne("SELECT id FROM production_items WHERE output_product_id = ? AND status = 'ACTIVE' LIMIT 1", [product.id]) : null);
+
+      let piId = pi ? pi.id : null;
+      if (!piId) {
+        piId = 'pi_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+        const code = ('PRD-' + String(product.sku || product.id).replace(/[^A-Z0-9_-]/gi, '').toUpperCase() + '-' + Date.now().toString(36)).slice(0, 80);
+        const stmt = "INSERT INTO production_items (id, organization_id, output_product_id, production_item_code, name, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'ACTIVE', datetime('now'), datetime('now'))";
+        if (db.prepare) db.prepare(stmt).run(piId, orgId, product.id, code, recipeName);
+        else if (db.execute) db.execute(stmt, [piId, orgId, product.id, code, recipeName]);
+      }
+
+      // 2. Ensure recipe exists
+      let r = db.prepare
+        ? db.prepare("SELECT id FROM recipes WHERE production_item_id = ? AND status = 'ACTIVE' LIMIT 1").get(piId)
+        : (db.queryOne ? db.queryOne("SELECT id FROM recipes WHERE production_item_id = ? AND status = 'ACTIVE' LIMIT 1", [piId]) : null);
+
+      let rId = r ? r.id : null;
+      if (!rId) {
+        rId = 'rec_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+        const stmt = "INSERT INTO recipes (id, production_item_id, name, status, created_at, updated_at) VALUES (?, ?, ?, 'ACTIVE', datetime('now'), datetime('now'))";
+        if (db.prepare) db.prepare(stmt).run(rId, piId, recipeName);
+        else if (db.execute) db.execute(stmt, [rId, piId, recipeName]);
+      } else {
+        const stmt = "UPDATE recipes SET name = ?, updated_at = datetime('now') WHERE id = ?";
+        if (db.prepare) db.prepare(stmt).run(recipeName, rId);
+        else if (db.execute) db.execute(stmt, [recipeName, rId]);
+      }
+
+      // 3. Create published recipe_version
+      const rvId = 'rv_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+      const vNumRow = db.prepare
+        ? db.prepare("SELECT MAX(version_number) AS max_v FROM recipe_versions WHERE recipe_id = ?").get(rId)
+        : (db.queryOne ? db.queryOne("SELECT MAX(version_number) AS max_v FROM recipe_versions WHERE recipe_id = ?", [rId]) : null);
+      const vNum = ((vNumRow && vNumRow.max_v) || 0) + 1;
+
+      // Mark older versions archived
+      if (db.prepare) db.prepare("UPDATE recipe_versions SET status = 'ARCHIVED' WHERE recipe_id = ? AND status = 'PUBLISHED'").run(rId);
+      else if (db.execute) db.execute("UPDATE recipe_versions SET status = 'ARCHIVED' WHERE recipe_id = ? AND status = 'PUBLISHED'", [rId]);
+
+      const rvStmt = "INSERT INTO recipe_versions (id, recipe_id, version_number, status, planned_yield_quantity, yield_uom_id, published_at, created_at, updated_at) VALUES (?, ?, ?, 'PUBLISHED', ?, ?, datetime('now'), datetime('now'), datetime('now'))";
+      if (db.prepare) db.prepare(rvStmt).run(rvId, rId, vNum, yieldQty, yieldUomId);
+      else if (db.execute) db.execute(rvStmt, [rvId, rId, vNum, yieldQty, yieldUomId]);
+
+      // 4. Insert components and calculate total cost
+      let totalCost = 0;
+      const comps = [];
+      recipeData.components.forEach((comp, idx) => {
+        const rcId = 'rc_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8) + idx;
+        const matId = comp.material_id || comp.materialId;
+        const qty = Math.max(0, Number(comp.planned_quantity || comp.quantity) || 0);
+        const uomId = comp.planned_uom_id || comp.plannedUomId || comp.uom_id || 'uom_g';
+
+        const rcStmt = "INSERT INTO recipe_components (id, recipe_version_id, material_id, planned_quantity, planned_uom_id, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))";
+        if (db.prepare) db.prepare(rcStmt).run(rcId, rvId, matId, qty, uomId, idx);
+        else if (db.execute) db.execute(rcStmt, [rcId, rvId, matId, qty, uomId, idx]);
+
+        // Calculate line cost
+        const matRow = db.prepare
+          ? db.prepare("SELECT m.name AS material_name, m.base_uom_id, u.name AS uom_name, u.conversion_factor AS uom_factor, bu.conversion_factor AS base_factor, COALESCE(NULLIF(msb.moving_average_unit_cost, 0), m.estimated_unit_cost, 0) AS unit_cost FROM materials m LEFT JOIN uoms u ON u.id = ? LEFT JOIN uoms bu ON bu.id = m.base_uom_id LEFT JOIN (SELECT material_id, AVG(moving_average_unit_cost) AS moving_average_unit_cost FROM material_stock_balances WHERE moving_average_unit_cost > 0 GROUP BY material_id) msb ON msb.material_id = m.id WHERE m.id = ?").get(uomId, matId)
+          : (db.queryOne ? db.queryOne("SELECT m.name AS material_name, m.base_uom_id, u.name AS uom_name, u.conversion_factor AS uom_factor, bu.conversion_factor AS base_factor, COALESCE(NULLIF(msb.moving_average_unit_cost, 0), m.estimated_unit_cost, 0) AS unit_cost FROM materials m LEFT JOIN uoms u ON u.id = ? LEFT JOIN uoms bu ON bu.id = m.base_uom_id LEFT JOIN (SELECT material_id, AVG(moving_average_unit_cost) AS moving_average_unit_cost FROM material_stock_balances WHERE moving_average_unit_cost > 0 GROUP BY material_id) msb ON msb.material_id = m.id WHERE m.id = ?", [uomId, matId]) : null);
+
+        if (matRow) {
+          const factor = (Number(matRow.uom_factor) || 1) / (Number(matRow.base_factor) || 1);
+          const qtyInBase = qty * factor;
+          const lineCost = qtyInBase * (Number(matRow.unit_cost) || 0);
+          totalCost += lineCost;
+          comps.push({
+            material_id: matId,
+            material_name: matRow.material_name || comp.material_name || 'Bahan',
+            planned_quantity: qty,
+            planned_uom_id: uomId,
+            uom_name: matRow.uom_name || comp.uom_name || 'Gr',
+            planned_uom_factor: matRow.uom_factor,
+            base_uom_factor: matRow.base_factor,
+            base_uom_id: matRow.base_uom_id,
+            unit_cost: matRow.unit_cost
+          });
+        }
+      });
+
+      const costPerUnit = yieldQty > 0 ? Math.round(totalCost / yieldQty) : Math.round(totalCost);
+      if (costPerUnit > 0) {
+        if (db.prepare) db.prepare("UPDATE products SET cost_price = ? WHERE id = ?").run(costPerUnit, product.id);
+        else if (db.execute) db.execute("UPDATE products SET cost_price = ? WHERE id = ?", [costPerUnit, product.id]);
+        product.cost_price = costPerUnit;
+      }
+
+      return {
+        id: rId,
+        name: recipeName,
+        recipe_version_id: rvId,
+        yield_quantity: yieldQty,
+        yield_uom_name: 'Porsi',
+        total_batch_cost: Math.round(totalCost),
+        cost_per_unit: costPerUnit,
+        components: comps.length > 0 ? comps : recipeData.components
+      };
+    } catch (err) {
+      console.error('[attachRecipeToProduct] Error saving recipe:', err);
+      return null;
+    }
+  }
+
   const handleProductList = (req, res) => {
     try {
+      setNoCacheHeaders(res);
       const activeOnly = !(req.query && (req.query.active_only === '0' || req.query.active_only === 'false'));
       const query = req.query && req.query.q != null ? req.query.q : null;
       res.json({
@@ -69,12 +192,35 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
 
   const handleProductRead = (req, res) => {
     try {
+      setNoCacheHeaders(res);
       const product = productService.findProduct
         ? productService.findProduct({ brandId: req.brand_id, productId: req.params.id })
         : null;
 
       if (!product) {
         return res.status(404).json({ success: false, error: 'MASTER_PRODUCT_NOT_FOUND' });
+      }
+
+      if (rawDb && rawDb.prepare) {
+        try {
+          const branchAdoptions = rawDb.prepare(`
+            SELECT 
+              b.id AS branch_id,
+              b.name AS branch_name,
+              b.address_text AS branch_address,
+              b.is_active AS is_branch_active,
+              bp.product_id,
+              bp.price AS branch_price,
+              bp.stock AS branch_stock,
+              bp.is_available AS branch_is_available,
+              CASE WHEN bp.product_id IS NOT NULL THEN 1 ELSE 0 END AS is_adopted
+            FROM branches b
+            LEFT JOIN branch_products bp ON bp.branch_id = b.id AND bp.product_id = ?
+            WHERE b.brand_id = ? AND (b.is_archived = 0 OR b.is_archived IS NULL)
+            ORDER BY b.name ASC
+          `).all(req.params.id, req.brand_id);
+          product.branch_adoptions = branchAdoptions;
+        } catch (_) {}
       }
 
       res.json({ success: true, product });
@@ -100,6 +246,13 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
         actorId: req.user && (req.user.id || req.user.userId) || null,
         actorRole: req.user && req.user.role || null
       });
+
+      if (body.recipe && Array.isArray(body.recipe.components) && body.recipe.components.length > 0) {
+        const orgId = req.organization_id || (req.user && req.user.organization_id) || 'org_xentra_holding';
+        const attached = attachRecipeToProduct(rawDb, orgId, product, body.recipe);
+        if (attached) product.recipe = attached;
+      }
+
       res.status(201).json({ success: true, product });
     } catch (err) {
       sendError(res, err, 'COMPOSED_PRODUCT_CREATE_FAILED');
@@ -124,6 +277,31 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
         actorId: req.user && (req.user.id || req.user.userId) || null,
         actorRole: req.user && req.user.role || null
       });
+
+      if (body.recipe && Array.isArray(body.recipe.components) && body.recipe.components.length > 0) {
+        const orgId = req.organization_id || (req.user && req.user.organization_id) || 'org_xentra_holding';
+        const attached = attachRecipeToProduct(rawDb, orgId, product, body.recipe);
+        if (attached) product.recipe = attached;
+      }
+
+      if (Array.isArray(body.branch_prices) && rawDb && rawDb.prepare) {
+        for (const bp of body.branch_prices) {
+          if (!bp || !bp.branch_id) continue;
+          const rawPrice = bp.price !== undefined && bp.price !== null && bp.price !== '' ? Number(bp.price) : null;
+          const branchPrice = (rawPrice !== null && Number.isFinite(rawPrice) && rawPrice >= 0) ? rawPrice : null;
+          const existing = rawDb.prepare('SELECT branch_id FROM branch_products WHERE branch_id = ? AND product_id = ?').get(bp.branch_id, req.params.id);
+          if (existing) {
+            rawDb.prepare('UPDATE branch_products SET price = ?, updated_at = datetime(\'now\') WHERE branch_id = ? AND product_id = ?')
+              .run(branchPrice, bp.branch_id, req.params.id);
+          } else {
+            rawDb.prepare(`
+              INSERT INTO branch_products (branch_id, product_id, price, stock, is_available)
+              VALUES (?, ?, ?, 100, 1)
+            `).run(bp.branch_id, req.params.id, branchPrice);
+          }
+        }
+      }
+
       res.json({ success: true, product });
     } catch (err) {
       sendError(res, err, 'COMPOSED_PRODUCT_UPDATE_FAILED');
@@ -162,6 +340,7 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
 
   const handleMenuList = (req, res) => {
     try {
+      setNoCacheHeaders(res);
       const menuType = req.query && req.query.menu_type ? String(req.query.menu_type).trim().toUpperCase() : null;
       const status = req.query && req.query.status ? String(req.query.status).trim().toUpperCase() : null;
       const menus = service.listMenus({
@@ -177,10 +356,32 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
 
   const handleMenuRead = (req, res) => {
     try {
+      setNoCacheHeaders(res);
       const menu = resolver.resolveMenu({
         brandId: req.brand_id,
         menuId: req.params.id
       });
+
+      if (menu && rawDb && rawDb.prepare) {
+        try {
+          const branchAdoptions = rawDb.prepare(`
+            SELECT 
+              b.id AS branch_id,
+              b.name AS branch_name,
+              b.address_text AS branch_address,
+              b.is_active AS is_branch_active,
+              bm.is_available,
+              bm.price_override,
+              CASE WHEN bm.menu_id IS NOT NULL THEN 1 ELSE 0 END AS is_adopted
+            FROM branches b
+            LEFT JOIN branch_menus bm ON bm.branch_id = b.id AND bm.menu_id = ?
+            WHERE b.brand_id = ? AND (b.is_archived = 0 OR b.is_archived IS NULL)
+            ORDER BY b.name ASC
+          `).all(req.params.id, req.brand_id);
+          menu.branch_adoptions = branchAdoptions;
+        } catch (_) {}
+      }
+
       res.json({ success: true, menu });
     } catch (err) {
       sendError(res, err, 'COMPOSED_MENU_READ_FAILED');
@@ -301,6 +502,25 @@ function registerAdminComposedMenuRoutes(router, deps = {}) {
         items,
         status: status
       });
+
+      if (Array.isArray(body.branch_prices) && rawDb && rawDb.prepare) {
+        for (const bp of body.branch_prices) {
+          if (!bp || !bp.branch_id) continue;
+          const rawPrice = bp.price !== undefined && bp.price !== null && bp.price !== '' ? Number(bp.price) : null;
+          const branchPrice = (rawPrice !== null && Number.isFinite(rawPrice) && rawPrice >= 0) ? rawPrice : null;
+          const existing = rawDb.prepare('SELECT branch_id FROM branch_menus WHERE branch_id = ? AND menu_id = ?').get(bp.branch_id, req.params.id);
+          if (existing) {
+            rawDb.prepare('UPDATE branch_menus SET price_override = ?, updated_at = datetime(\'now\') WHERE branch_id = ? AND menu_id = ?')
+              .run(branchPrice, bp.branch_id, req.params.id);
+          } else {
+            rawDb.prepare(`
+              INSERT INTO branch_menus (branch_id, menu_id, price_override, is_available)
+              VALUES (?, ?, ?, 1)
+            `).run(bp.branch_id, req.params.id, branchPrice);
+          }
+        }
+      }
+
       res.json({ success: true, menu });
     } catch (err) {
       sendError(res, err, 'COMPOSED_MENU_UPDATE_FAILED');

@@ -302,16 +302,25 @@ module.exports = function registerCustomerAuthRoutes(router, deps) {
     try {
       const origin = (req.headers.origin || '').toLowerCase();
       const host = (req.headers.host || '').split(':')[0].trim().toLowerCase();
+      const referer = (req.headers.referer || '').toLowerCase();
       const isProduction = process.env.NODE_ENV === 'production';
       const { credential, brand_id: brokerBrandId, return_to } = req.body || {};
 
       let isAllowedOrigin = origin.startsWith('https://xentra.cloud') ||
+        referer.startsWith('https://xentra.cloud') ||
         (!isProduction && (host === 'localhost' || host === '127.0.0.1'));
       if (!isAllowedOrigin && brokerBrandId) {
         try {
           const tenantBrand = db.prepare('SELECT custom_domain FROM brands WHERE id = ?').get(brokerBrandId);
-          if (tenantBrand && tenantBrand.custom_domain && origin.startsWith(`https://${tenantBrand.custom_domain.toLowerCase()}`)) {
-            isAllowedOrigin = true;
+          if (tenantBrand && tenantBrand.custom_domain) {
+            const domainLower = tenantBrand.custom_domain.toLowerCase();
+            if (
+              origin.startsWith(`https://${domainLower}`) ||
+              referer.startsWith(`https://${domainLower}`) ||
+              host === domainLower
+            ) {
+              isAllowedOrigin = true;
+            }
           }
         } catch (_) {}
       }

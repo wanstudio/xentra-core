@@ -143,6 +143,7 @@ class PromotionEngineService {
     brand_id,
     branch_id,
     customer_phone,
+    customer_id = null,
     promotions = []
   }) {
     if (!order_id || !Array.isArray(promotions) || promotions.length === 0) return;
@@ -159,7 +160,8 @@ class PromotionEngineService {
         orderId: order_id,
         brandId: brand_id,
         branchId: branch_id,
-        customerPhone: customer_phone,
+        customerId: p.customer_id || customer_id,
+        customerPhone: p.customer_phone || customer_phone,
         benefitAmount: amount
       });
     }
@@ -171,11 +173,12 @@ class PromotionEngineService {
   }
 
   static recordOrderRedemptions(order) {
-    if (!order || !order.customer_phone) return;
+    if (!order || !order.id) return;
     const { PaymentRepository } = require('../../../core/data/repositories');
     const paymentRepository = new PaymentRepository();
     const items = paymentRepository.findOrderItemsWithPromoMarker(order.id);
     const promotions = [];
+    const seenMemberPromotions = new Set();
     for (const it of items || []) {
       let promoId = null;
       const marker = '[PROMO:';
@@ -186,9 +189,13 @@ class PromotionEngineService {
         if (idEnd > idStart) promoId = it.note.slice(idStart, idEnd);
       } else if (String(it.product_id || '').startsWith('prm_')) promoId = it.product_id;
       if (!promoId) continue;
+      const customerPhone = String(it.promo_customer_phone || order.customer_phone || '').trim();
+      if (!customerPhone) continue;
+      const memberKey = `${promoId}:${customerPhone}`;
+      if (seenMemberPromotions.has(memberKey) || promotionRepository.hasOrderMemberRedemption({ orderId: order.id, promotionId: promoId, customerPhone })) continue;
       const promoRow = promotionRepository.findPromotion(promoId);
       if (!promoRow) continue;
-      const used = promotionRepository.countCustomerRedemptions({ promotionId: promoId, customerPhone: order.customer_phone });
+      const used = promotionRepository.countCustomerRedemptions({ promotionId: promoId, customerPhone });
       const maxLimit = Number(promoRow.max_redemptions_per_customer || 1);
       if (used >= maxLimit) throw new Error(`[PROMO_LIMIT_EXCEEDED_RACE] Batas klaim promo "${promoId}" (${maxLimit}x) telah digunakan oleh pesanan lain milik pelanggan.`);
       let benefitAmount = Number(it.unit_price || 0);
@@ -213,10 +220,16 @@ class PromotionEngineService {
           benefitAmount = reward ? Number(reward.v || 0) : 0;
         }
       }
-      promotions.push({ promo_id: promoId, benefit_amount: benefitAmount });
+      promotions.push({
+        promo_id: promoId,
+        benefit_amount: benefitAmount,
+        customer_phone: customerPhone,
+        customer_id: it.promo_customer_id || null
+      });
+      seenMemberPromotions.add(memberKey);
     }
     if (promotions.length) {
-      this.recordRedemptions({ order_id: order.id, brand_id: order.brand_id, branch_id: order.branch_id, customer_phone: order.customer_phone, promotions });
+      this.recordRedemptions({ order_id: order.id, brand_id: order.brand_id, branch_id: order.branch_id, promotions });
     }
   }
 }

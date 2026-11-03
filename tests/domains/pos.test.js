@@ -1370,3 +1370,24 @@ test('POS Split Reset — unpaid split returns to one full Check and paid split 
 
   DiningTableService.releaseHold({ branch_id: 'branch_pos', hold_reference_id: orderId, reason: 'cancelled' });
 });
+
+test('POS shared bill check initialization allocates original checkout separately from addition checks', () => {
+  const ts = Date.now();
+  const orderId = `ord_addition_alloc_${ts}`;
+  db.prepare(`INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, payment_status, status)
+    VALUES (?, ?, 'brand_pos', 'branch_pos', 'Dine Group', '6281234', 'dine_in', 'customer_app', 60000, 60000, 'midtrans', 'settlement', 'confirmed')`).run(orderId, `XN-ADDITIONAL-ALLOC-${ts}`);
+  db.prepare(`INSERT INTO order_items (id, order_id, product_id, product_name, unit_price, quantity, item_subtotal, subtotal, addition_batch_id)
+    VALUES (?, ?, 'prod_pos_1', 'Original Order', 40000, 1, 40000, 40000, NULL),
+           (?, ?, 'prod_pos_2', 'Additional Order', 20000, 1, 20000, 20000, 'batch_alloc_test')`).run(`item_base_${ts}`, orderId, `item_add_${ts}`, orderId);
+  db.prepare(`INSERT INTO order_payments (id, order_id, provider, payment_method, payment_status, amount, settled_at)
+    VALUES (?, ?, 'midtrans', 'midtrans', 'settlement', 40000, datetime('now'))`).run(`pay_base_${ts}`, orderId);
+  db.prepare(`INSERT INTO pos_order_checks (id, order_id, check_number, status, allocated_amount) VALUES (?, ?, 1, 'open', 20000)`).run(`check_add_${ts}`, orderId);
+  db.prepare(`INSERT INTO pos_order_check_items (id, check_id, order_item_id, quantity) VALUES (?, ?, ?, 1)`).run(`check_item_add_${ts}`, `check_add_${ts}`, `item_add_${ts}`);
+
+  const bill = PosOrderService.getOrderChecks({ order_id: orderId, branch_id: 'branch_pos' });
+  assert.equal(bill.checks.reduce((sum, check) => sum + Number(check.allocated_amount), 0), 60000);
+  assert.equal(bill.checks.reduce((sum, check) => sum + Number(check.paid_amount), 0), 40000);
+  const originalCheck = bill.checks.find(check => check.payments.some(payment => payment.provider === 'midtrans'));
+  assert.ok(originalCheck);
+  assert.deepEqual(originalCheck.items.map(item => item.order_item_id), [`item_base_${ts}`]);
+});

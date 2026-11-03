@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Simulasi Tata Kelola Multi-Cabang — Xentra</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: #0F172A;
+      color: #0F172A;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0;
+      margin: 0;
+      overflow-x: hidden;
+    }
+
+    /* Top Sticky Control Bar for Prototype Switcher */
+    .proto-navbar {
+      width: 100%;
+      background: #1E293B;
+      border-bottom: 1px solid #334155;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+    }
+
+    .proto-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .proto-title-row h1 {
+      font-size: 14px;
+      font-weight: 800;
+      color: #F8FAFC;
+      letter-spacing: -0.3px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .proto-badge {
+      background: #10B981;
+      color: #FFFFFF;
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Scenario Picker (Horizontal scrolling chips) */
+    .scenario-track {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .scenario-track::-webkit-scrollbar { display: none; }
+
+    .scenario-chip {
+      background: #334155;
+      color: #94A3B8;
+      border: 1px solid #475569;
+      padding: 7px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s ease;
+    }
+
+    .scenario-chip.active {
+      background: #38BDF8;
+      color: #0F172A;
+      border-color: #38BDF8;
+    }
+
+    /* Screen View Switcher: Owner vs Kasir */
+    .view-switcher-bar {
+      width: 100%;
+      background: #0B0F17;
+      padding: 6px;
+      border-radius: 10px;
+      display: flex;
+      gap: 4px;
+    }
+
+    .view-btn {
+      flex: 1;
+      padding: 8px 4px;
+      background: transparent;
+      border: none;
+      color: #94A3B8;
+      font-size: 12px;
+      font-weight: 700;
+      border-radius: 7px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .view-btn.active {
+      background: #1E293B;
+      color: #FFFFFF;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+
+    /* Main Stage */
+    .stage-container {
+      width: 100%;
+      max-width: 900px;
+      padding: 16px 12px 40px;
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    /* Phone Simulator Shell */
+    .phone-shell {
+      width: 100%;
+      max-width: 390px;
+      background: #FFFFFF;
+      border-radius: 24px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.35);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      border: 3px solid #334155;
+      min-height: 580px;
+      position: relative;
+    }
+
+    /* Role Header Banner */
+    .phone-role-banner {
+      padding: 8px 14px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .phone-role-banner.owner {
+      background: #0F172A;
+      color: #38BDF8;
+      border-bottom: 1px solid #1E293B;
+    }
+    .phone-role-banner.branch {
+      background: #064E3B;
+      color: #6EE7B7;
+      border-bottom: 1px solid #047857;
+    }
+
+    /* App Header */
+    .app-header {
+      background: #FFFFFF;
+      border-bottom: 1px solid #E2E8F0;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .app-header-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: #0F172A;
+      letter-spacing: -0.3px;
+    }
+
+    /* App Body */
+    .app-body {
+      flex: 1;
+      padding: 16px;
+      background: #F8FAFC;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+    }
+
+    /* UI Cards */
+    .card {
+      background: #FFFFFF;
+      border: 1px solid #E2E8F0;
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+
+    .card-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #64748B;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-bottom: 6px;
+    }
+
+    /* Input Field */
+    .field-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 8px;
+    }
+    .field-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #334155;
+    }
+    .price-input-box {
+      width: 100%;
+      height: 42px;
+      border: 1.5px solid #CBD5E1;
+      border-radius: 10px;
+      padding: 0 12px;
+      font-size: 15px;
+      font-weight: 800;
+      color: #0F172A;
+      background: #FFFFFF;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .price-input-box:focus {
+      border-color: #0284C7;
+    }
+
+    /* Quick Preset Chips */
+    .chip-group {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+    .chip-btn {
+      padding: 5px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      border-radius: 999px;
+      border: 1px solid #CBD5E1;
+      background: #F1F5F9;
+      color: #334155;
+      cursor: pointer;
+    }
+    .chip-btn:hover, .chip-btn:active {
+      background: #E2E8F0;
+    }
+
+    /* Toggle Switch */
+    .toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 0;
+    }
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+    }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #CBD5E1; transition: .2s; border-radius: 999px;
+    }
+    .slider:before {
+      position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px;
+      background-color: white; transition: .2s; border-radius: 50%;
+    }
+    input:checked + .slider { background-color: #10B981; }
+    input:checked + .slider:before { transform: translateX(20px); }
+
+    /* POS Catalog Items */
+    .pos-item-card {
+      display: flex;
+      gap: 12px;
+      padding: 12px;
+      background: #FFFFFF;
+      border: 1.5px solid #E2E8F0;
+      border-radius: 12px;
+      align-items: center;
+      transition: all 0.2s ease;
+    }
+    .pos-item-img {
+      width: 52px;
+      height: 52px;
+      border-radius: 10px;
+      object-fit: cover;
+      background: #FED7AA;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+    .pos-item-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .pos-item-name {
+      font-size: 13px;
+      font-weight: 800;
+      color: #0F172A;
+    }
+    .pos-item-price {
+      font-size: 14px;
+      font-weight: 800;
+      color: #0F172A;
+    }
+    .badge-lsp {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #EFF6FF;
+      color: #1D4ED8;
+      border: 1px solid #BFDBFE;
+      width: fit-content;
+      margin-top: 2px;
+    }
+
+    /* Radio Status Group */
+    .status-option {
+      padding: 10px 12px;
+      border: 1.5px solid #E2E8F0;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      margin-bottom: 6px;
+      background: #FFFFFF;
+    }
+    .status-option.selected {
+      border-color: #0284C7;
+      background: #F0F9FF;
+    }
+
+    /* Explanation Banner at Bottom */
+    .expl-banner {
+      width: 100%;
+      max-width: 900px;
+      margin-top: 12px;
+      padding: 14px 16px;
+      background: #1E293B;
+      border: 1px solid #334155;
+      border-radius: 14px;
+      color: #CBD5E1;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .expl-banner strong {
+      color: #38BDF8;
+    }
+
+    /* Responsive utilities */
+    @media (max-width: 768px) {
+      .desktop-only-btn { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 1. STICKY TOP CONTROLLER (Designed to fit 100% on mobile without horizontal break) -->
+  <header class="proto-navbar">
+    <div class="proto-title-row">
+      <h1>
+        <span>⚡ Xentra Governance</span>
+      </h1>
+      <span class="proto-badge">Simulasi Interaktif</span>
+    </div>
+
+    <!-- 3 Core Scenarios (Clean Chips) -->
+    <div class="scenario-track">
+      <button class="scenario-chip active" id="chip-sc-1" onclick="setScenario(1)">
+        <span>🏷️</span> 1. Harga Cabang (LSP)
+      </button>
+      <button class="scenario-chip" id="chip-sc-2" onclick="setScenario(2)">
+        <span>⚡</span> 2. Menu Habis (86)
+      </button>
+      <button class="scenario-chip" id="chip-sc-3" onclick="setScenario(3)">
+        <span>🛑</span> 3. Saklar Darurat Cabang
+      </button>
+    </div>
+
+    <!-- View Switcher (Owner vs Kasir vs Keduanya) -->
+    <div class="view-switcher-bar">
+      <button class="view-btn active" id="btn-view-owner" onclick="setViewMode('owner')">
+        <span>👑</span> Layar HP Owner
+      </button>
+      <button class="view-btn" id="btn-view-pos" onclick="setViewMode('pos')">
+        <span>🏪</span> Layar Kasir Cabang
+      </button>
+      <button class="view-btn desktop-only-btn" id="btn-view-both" onclick="setViewMode('both')">
+        <span>🖥️</span> Keduanya
+      </button>
+    </div>
+  </header>
+
+  <!-- 2. MAIN SIMULATOR STAGE -->
+  <main class="stage-container">
+
+    <!-- DEVICE 1: OWNER MOBILE APP -->
+    <section class="phone-shell" id="device-owner">
+      <div class="phone-role-banner owner">
+        <span>👑 HP OWNER (KONTROL PUSAT)</span>
+        <span style="font-size:10px;color:#94A3B8;">Live Sync</span>
+      </div>
+
+      <div class="app-header">
+        <span class="app-header-title" id="owner-app-title">Edit Menu: Ayam Bakar</span>
+        <span style="font-size:11px;font-weight:700;color:#0284C7;background:#E0F2FE;padding:2px 8px;border-radius:999px;">Master HQ</span>
+      </div>
+
+      <div class="app-body" id="owner-app-body">
+        <!-- Rendered via JS -->
+      </div>
+    </section>
+
+    <!-- DEVICE 2: POS KASIR CABANG -->
+    <section class="phone-shell" id="device-pos" style="display:none;">
+      <div class="phone-role-banner branch">
+        <span>🏪 POS KASIR (CABANG TEBET)</span>
+        <span style="font-size:10px;color:#A7F3D0;">Online</span>
+      </div>
+
+      <div class="app-header">
+        <span class="app-header-title" id="pos-app-title">Katalog Kasir</span>
+        <span style="font-size:11px;font-weight:700;color:#059669;background:#D1FAE5;padding:2px 8px;border-radius:999px;">Cabang Tebet</span>
+      </div>
+
+      <div class="app-body" id="pos-app-body">
+        <!-- Rendered via JS -->
+      </div>
+    </section>
+
+    <!-- EXPLANATION BANNER -->
+    <footer class="expl-banner" id="expl-banner">
+      <!-- Injected by script -->
+    </footer>
+
+  </main>
+
+  <script>
+    // State model
+    const state = {
+      scenario: 1,      // 1: LSP, 2: 86 Stock, 3: Saklar
+      viewMode: 'owner', // 'owner', 'pos', 'both'
+      masterPrice: 30000,
+      overrideEnabled: true,
+      branchMallPrice: 35000,
+      branchTebetPrice: 30000,
+      is86Tebet: false,
+      branchStatus: 'OPEN' // 'OPEN', 'PAUSE_ONLINE', 'FORCE_CLOSE'
+    };
+
+    function formatRp(num) {
+      return 'Rp ' + Number(num || 0).toLocaleString('id-ID');
+    }
+
+    function setViewMode(mode) {
+      state.viewMode = mode;
+      const devOwner = document.getElementById('device-owner');
+      const devPos = document.getElementById('device-pos');
+      const btnOwner = document.getElementById('btn-view-owner');
+      const btnPos = document.getElementById('btn-view-pos');
+      const btnBoth = document.getElementById('btn-view-both');
+
+      btnOwner.classList.remove('active');
+      btnPos.classList.remove('active');
+      btnBoth.classList.remove('active');
+
+      if (mode === 'owner') {
+        btnOwner.classList.add('active');
+        devOwner.style.display = 'flex';
+        devPos.style.display = 'none';
+      } else if (mode === 'pos') {
+        btnPos.classList.add('active');
+        devOwner.style.display = 'none';
+        devPos.style.display = 'flex';
+      } else {
+        btnBoth.classList.add('active');
+        devOwner.style.display = 'flex';
+        devPos.style.display = 'flex';
+      }
+    }
+
+    function setScenario(sc) {
+      state.scenario = sc;
+      document.querySelectorAll('.scenario-chip').forEach((c, idx) => {
+        c.classList.toggle('active', (idx + 1) === sc);
+      });
+      render();
+    }
+
+    function setMallPreset(markupPercent) {
+      state.branchMallPrice = Math.round(state.masterPrice * (1 + markupPercent / 100));
+      state.overrideEnabled = true;
+      render();
+    }
+
+    function toggleOverride() {
+      state.overrideEnabled = !state.overrideEnabled;
+      render();
+    }
+
+    function updateMallPrice(val) {
+      state.branchMallPrice = Number(val) || 0;
+      render();
+    }
+
+    function toggle86() {
+      state.is86Tebet = !state.is86Tebet;
+      render();
+    }
+
+    function setBranchStatus(status) {
+      state.branchStatus = status;
+      render();
+    }
+
+    function render() {
+      const ownerBody = document.getElementById('owner-app-body');
+      const posBody = document.getElementById('pos-app-body');
+      const ownerTitle = document.getElementById('owner-app-title');
+      const posTitle = document.getElementById('pos-app-title');
+      const banner = document.getElementById('expl-banner');
+
+      // ============================================
+      // SCENARIO 1: HARGA KHUSUS CABANG (LSP)
+      // ============================================
+      if (state.scenario === 1) {
+        ownerTitle.innerText = 'Edit Menu: Ayam Bakar Madu';
+        posTitle.innerText = 'Katalog Menu Kasir';
+
+        ownerBody.innerHTML = `
+          <div class="card">
+            <div class="card-label">Harga Master Pusat (Holding)</div>
+            <div style="font-size:18px;font-weight:800;color:#0F172A;">${formatRp(state.masterPrice)}</div>
+            <div style="font-size:11px;color:#64748B;margin-top:2px;">Berlaku sebagai harga default di seluruh cabang.</div>
+          </div>
+
+          <div class="card" style="border: 1.5px solid #0284C7;background:#F0F9FF;">
+            <div class="toggle-row">
+              <div>
+                <div style="font-size:13px;font-weight:800;color:#0369A1;">Atur Harga Khusus Cabang</div>
+                <div style="font-size:11px;color:#0284C7;">Cabang Mall Kelapa Gading</div>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" ${state.overrideEnabled ? 'checked' : ''} onchange="toggleOverride()">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            ${state.overrideEnabled ? `
+              <div class="field-wrap" style="margin-top:12px;">
+                <label class="field-label">Harga di Cabang Mall (Rp):</label>
+                <input type="number" class="price-input-box" value="${state.branchMallPrice}" oninput="updateMallPrice(this.value)">
+              </div>
+
+              <div class="chip-group">
+                <button class="chip-btn" onclick="setMallPreset(15)">+15% (Mall)</button>
+                <button class="chip-btn" onclick="setMallPreset(25)">+25% (Bandara)</button>
+                <button class="chip-btn" onclick="setMallPreset(0)">Sama dgn Pusat</button>
+              </div>
+
+              <div style="margin-top:10px;font-size:11px;color:#0369A1;background:#E0F2FE;padding:8px;border-radius:8px;">
+                💡 <strong>Dampak:</strong> Cabang Mall menjual <strong>${formatRp(state.branchMallPrice)}</strong>, sedangkan Cabang Tebet tetap <strong>${formatRp(state.branchTebetPrice)}</strong>.
+              </div>
+            ` : `
+              <div style="font-size:11px;color:#64748B;margin-top:8px;">Menggunakan harga master pusat (${formatRp(state.masterPrice)}).</div>
+            `}
+          </div>
+
+          <div style="text-align:center;margin-top:4px;">
+            <button onclick="setViewMode('pos')" style="background:#0F172A;color:#FFFFFF;border:none;border-radius:10px;padding:10px 16px;font-size:12px;font-weight:700;cursor:pointer;width:100%;">
+              Lihat Tampilan di Layar Kasir Cabang →
+            </button>
+          </div>
+        `;
+
+        const activeMallPrice = state.overrideEnabled ? state.branchMallPrice : state.masterPrice;
+
+        posBody.innerHTML = `
+          <div class="card" style="background:#ECFDF5;border-color:#A7F3D0;">
+            <div style="font-size:12px;font-weight:800;color:#065F46;">🏪 STATUS KATALOG CABANG MALL</div>
+            <div style="font-size:11px;color:#047857;margin-top:2px;">Kasir siap menerima pesanan dengan harga cabang terbaru.</div>
+          </div>
+
+          <div class="pos-item-card">
+            <div class="pos-item-img">🍗</div>
+            <div class="pos-item-info">
+              <span class="pos-item-name">Ayam Bakar Madu</span>
+              <span class="pos-item-price">${formatRp(activeMallPrice)}</span>
+              ${state.overrideEnabled ? `
+                <span class="badge-lsp">🏷️ Harga Khusus Cabang Mall</span>
+              ` : `
+                <span style="font-size:10px;color:#64748B;">Harga Standar Nasional</span>
+              `}
+            </div>
+            <button style="background:#059669;color:#FFFFFF;border:none;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;">+ Pesan</button>
+          </div>
+
+          <div class="pos-item-card" style="opacity:0.6;">
+            <div class="pos-item-img">🥤</div>
+            <div class="pos-item-info">
+              <span class="pos-item-name">Es Teh Manis</span>
+              <span class="pos-item-price">Rp 6.000</span>
+            </div>
+            <button style="background:#E2E8F0;color:#64748B;border:none;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;">+ Pesan</button>
+          </div>
+
+          <div style="text-align:center;margin-top:4px;">
+            <button onclick="setViewMode('owner')" style="background:#0F172A;color:#FFFFFF;border:none;border-radius:10px;padding:10px 16px;font-size:12px;font-weight:700;cursor:pointer;width:100%;">
+              ← Kembali ke Kontrol HP Owner
+            </button>
+          </div>
+        `;
+
+        banner.innerHTML = `
+          <strong>Konsep Inti LSP:</strong> Menu master tetap 1 data di sistem pusat. Owner bisa menentukan harga berbeda untuk cabang mall/ruko tanpa perlu menduplikasi menu. Laporan omzet holding tetap rapi terkonsolidasi.
+        `;
+      }
+
+      // ============================================
+      // SCENARIO 2: PROTOKOL 86 (MENU HABIS)
+      // ============================================
+      else if (state.scenario === 2) {
+        ownerTitle.innerText = 'Monitor Kesiapan Cabang';
+        posTitle.innerText = 'Katalog Menu Kasir';
+
+        ownerBody.innerHTML = `
+          <div class="card">
+            <div class="card-label">Status Menu di Cabang Tebet</div>
+            ${state.is86Tebet ? `
+              <div style="background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:10px;padding:12px;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="font-size:20px;">⚠️</span>
+                  <div>
+                    <div style="font-size:13px;font-weight:800;color:#991B1B;">1 Menu Sedang Habis (86)</div>
+                    <div style="font-size:11px;color:#B91C1C;">Ayam Bakar Madu ditandai habis oleh Kasir.</div>
+                  </div>
+                </div>
+                <button onclick="toggle86()" style="margin-top:10px;width:100%;background:#FFFFFF;border:1.5px solid #DC2626;color:#DC2626;padding:8px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;">
+                  Buka Kembali Menu dari Pusat
+                </button>
+              </div>
+            ` : `
+              <div style="background:#F0FDF4;border:1.5px solid #86EFAC;border-radius:10px;padding:12px;display:flex;align-items:center;gap:8px;">
+                <span style="font-size:20px;">🟢</span>
+                <div>
+                  <div style="font-size:13px;font-weight:800;color:#166534;">Semua Menu Siap Dijual</div>
+                  <div style="font-size:11px;color:#15803D;">Tidak ada menu yang diblokir oleh kasir cabang.</div>
+                </div>
+              </div>
+            `}
+          </div>
+
+          <div class="card">
+            <div class="card-label">Cabang Mall Kelapa Gading</div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:#166534;">
+              <span>🟢</span> Semua Menu Tersedia Normal
+            </div>
+          </div>
+
+          <div style="text-align:center;margin-top:4px;">
+            <button onclick="setViewMode('pos')" style="background:#0F172A;color:#FFFFFF;border:none;border-radius:10px;padding:10px 16px;font-size:12px;font-weight:700;cursor:pointer;width:100%;">
+              Buka Layar Kasir (Simulasikan Stok Habis) →
+            </button>
+          </div>
+        `;
+
+        posBody.innerHTML = `
+          <div class="card" style="background:#F8FAFC;">
+            <div style="font-size:12px;font-weight:700;color:#475569;">Pencet tombol 86 jika stok bahan baku di dapur habis:</div>
+          </div>
+
+          <div class="pos-item-card" style="${state.is86Tebet ? 'border-color:#FCA5A5;background:#FEF2F2;' : ''}">
+            <div class="pos-item-img">${state.is86Tebet ? '🚫' : '🍗'}</div>
+            <div class="pos-item-info">
+              <span class="pos-item-name">Ayam Bakar Madu</span>
+              <span class="pos-item-price">Rp 30.000</span>
+              <span style="font-size:11px;font-weight:700;color:${state.is86Tebet ? '#DC2626' : '#059669'};">
+                ${state.is86Tebet ? 'HABIS (86)' : 'TERSEDIA'}
+              </span>
+            </div>
+            <button onclick="toggle86()" style="background:${state.is86Tebet ? '#059669' : '#DC2626'};color:#FFFFFF;border:none;border-radius:8px;padding:8px 12px;font-size:11px;font-weight:800;cursor:pointer;">
+              ${state.is86Tebet ? 'Buka Menu' : 'Pencet 86'}
+            </button>
+          </div>
+
+          <div style="text-align:center;margin-top:4px;">
+            <button onclick="setViewMode('owner')" style="background:#0F172A;color:#FFFFFF;border:none;border-radius:10px;padding:10px 16px;font-size:12px;font-weight:700;cursor:pointer;width:100%;">
+              ← Lihat Sinyal di HP Owner
+            </button>
+          </div>
+        `;
+
+        banner.innerHTML = `
+          <strong>Konsep Inti Protokol 86:</strong> Kasir di lantai toko dapat mematikan sementara menu yang bahan bakunya habis secara instan agar tidak terjadi salah masak. Sinyal ini langsung muncul di HP Owner secara real-time tanpa perlu telepon kasir.
+        `;
+      }
+
+      // ============================================
+      // SCENARIO 3: SAKLAR DARURAT CABANG
+      // ============================================
+      else if (state.scenario === 3) {
+        ownerTitle.innerText = 'Saklar Operasional Cabang';
+        posTitle.innerText = 'Katalog POS Cabang Tebet';
+
+        ownerBody.innerHTML = `
+          <div class="card">
+            <div class="card-label">Pilih Status Operasional Cabang Tebet:</div>
+            
+            <div class="status-option ${state.branchStatus === 'OPEN' ? 'selected' : ''}" onclick="setBranchStatus('OPEN')">
+              <span style="font-size:18px;">🟢</span>
+              <div>
+                <div style="font-size:13px;font-weight:800;color:#0F172A;">Buka Normal</div>
+                <div style="font-size:11px;color:#64748B;">Menerima tamu makan di tempat & delivery online.</div>
+              </div>
+            </div>
+
+            <div class="status-option ${state.branchStatus === 'PAUSE_ONLINE' ? 'selected' : ''}" onclick="setBranchStatus('PAUSE_ONLINE')">
+              <span style="font-size:18px;">🟡</span>
+              <div>
+                <div style="font-size:13px;font-weight:800;color:#B45309;">Pause Order Online Saja</div>
+                <div style="font-size:11px;color:#92400E;">Dapur penuh/hujan badai. Makan di tempat (Dine-in) tetap buka!</div>
+              </div>
+            </div>
+
+            <div class="status-option ${state.branchStatus === 'FORCE_CLOSE' ? 'selected' : ''}" onclick="setBranchStatus('FORCE_CLOSE')">
+              <span style="font-size:18px;">🔴</span>
+              <div>
+                <div style="font-size:13px;font-weight:800;color:#991B1B;">Tutup Total Cabang</div>
+                <div style="font-size:11px;color:#B91C1C;">Kondisi darurat. Semua pesanan disetop.</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="text-align:center;margin-top:4px;">
+            <button onclick="setViewMode('pos')" style="background:#0F172A;color:#FFFFFF;border:none;border-radius:10px;padding:10px 16px;font-size:12px;font-weight:700;cursor:pointer;width:100%;">
+              Lihat Dampak di Layar Kasir →
+            </button>
+          </div>
+        `;
+
+        posBody.innerHTML = `
+          <div class="card" style="text-align:center;padding:24px 16px;">
+            ${state.branchStatus === 'OPEN' ? `
+              <div style="font-size:36px;margin-bottom:8px;">🟢</div>
+              <div style="font-size:15px;font-weight:800;color:#0F172A;">Cabang Buka Normal</div>
+              <div style="font-size:12px;color:#64748B;margin-top:4px;">Kasir melayani pesanan Dine-in, Takeaway, dan Online Delivery.</div>
+            ` : state.branchStatus === 'PAUSE_ONLINE' ? `
+              <div style="font-size:36px;margin-bottom:8px;">🟡</div>
+              <div style="font-size:15px;font-weight:800;color:#B45309;">Order Online Dijeda Sementara</div>
+              <div style="font-size:12px;color:#92400E;margin-top:4px;">
+                Dapur sedang fokus melayani tamu di tempat.<br>
+                <strong>Tamu Dine-in tetap bisa pesan seperti biasa.</strong>
+              </div>
+            ` : `
+              <div style="font-size:36px;margin-bottom:8px;">🔴</div>
+              <div style="font-size:15px;font-weight:800;color:#991B1B;">Cabang Tutup Total</div>
+              <div style="font-size:12px;color:#7F1D1D;margin-top:4px;">Seluruh sistem kasir dihentikan sementara atas instruksi Owner.</div>
+            `}
+          </div>
+
+          <div style="text-align:center;margin-top:4px;">
+            <button onclick="setViewMode('owner')" style="background:#0F172A;color:#FFFFFF;border:none;border-radius:10px;padding:10px 16px;font-size:12px;font-weight:700;cursor:pointer;width:100%;">
+              ← Kembali ke Saklar HP Owner
+            </button>
+          </div>
+        `;
+
+        banner.innerHTML = `
+          <strong>Konsep Saklar Darurat:</strong> Memisahkan antara "Tutup Total" dan "Pause Online Saja". Ketika dapur cabang overload atau kurir online membludak saat jam sibuk, resto tidak perlu tutup total—cukup pause keran pesanan online agar tamu fisik di restoran tetap terlayani dengan prima.
+        `;
+      }
+    }
+
+    // Auto-detect desktop screen to show both devices side-by-side if monitor is wide
+    if (window.innerWidth >= 820) {
+      setViewMode('both');
+    } else {
+      setViewMode('owner');
+    }
+
+    // Initial render
+    render();
+  </script>
+</body>
+</html>

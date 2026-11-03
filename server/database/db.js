@@ -896,6 +896,7 @@ function initSchema(targetDb) {
       is_archived INTEGER DEFAULT 0,
       timezone TEXT NOT NULL DEFAULT 'Asia/Jakarta',
       daily_petty_cash_limit REAL NOT NULL DEFAULT 500000,
+      operating_hours TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
@@ -2406,6 +2407,7 @@ function initSchema(targetDb) {
   try { targetDb.exec('ALTER TABLE branches ADD COLUMN daily_petty_cash_limit REAL NOT NULL DEFAULT 500000;'); } catch (e) {}
   // Branch Operational Emergency Guard: Pause online orders only without shutting down in-store dine-in.
   try { targetDb.exec('ALTER TABLE branches ADD COLUMN is_online_paused INTEGER NOT NULL DEFAULT 0;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE branches ADD COLUMN operating_hours TEXT;'); } catch (e) {}
 
   // Penanda akun customer yang sudah dihapus (dari sudut pandang tamu). Barisnya
   // SENGAJA tidak di-DELETE: catatan transaksi resto tetap merujuk padanya, dan

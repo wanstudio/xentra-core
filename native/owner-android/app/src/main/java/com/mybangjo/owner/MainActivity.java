@@ -11,6 +11,8 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.PowerManager;
 import android.provider.Settings;
 import android.view.View;
@@ -93,9 +95,163 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+    private Uri cameraCaptureUri = null;
+    private final ActivityResultLauncher<Uri> cameraLauncher =
+        registerForActivityResult(new ActivityResultContracts.TakePicture(), success -> {
+            if (filePathCallback != null) {
+                if (Boolean.TRUE.equals(success) && cameraCaptureUri != null) {
+                    filePathCallback.onReceiveValue(new Uri[]{ cameraCaptureUri });
+                } else {
+                    filePathCallback.onReceiveValue(null);
+                }
+                filePathCallback = null;
+            }
+        });
+
+    private final ActivityResultLauncher<String> cameraPermissionLauncher =
+        registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
+            if (Boolean.TRUE.equals(isGranted)) {
+                launchNativeCameraCapture();
+            } else {
+                if (!shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)) {
+                    showPermissionSettingsDialog(
+                        "Izin Kamera Dinonaktifkan",
+                        "Akses kamera telah dinonaktifkan di pengaturan perangkat. Silakan aktifkan izin kamera di Pengaturan Aplikasi agar dapat mengambil foto menu.",
+                        R.drawable.ic_camera_dialog
+                    );
+                } else {
+                    Toast.makeText(this, "Izin kamera diperlukan untuk mengambil foto menu.", Toast.LENGTH_SHORT).show();
+                    cancelPendingFileChooser();
+                }
+            }
+        });
+
+    private void launchNativeCameraCapture() {
+        try {
+            java.io.File photoFile = new java.io.File(getCacheDir(), "camera_" + System.currentTimeMillis() + ".jpg");
+            cameraCaptureUri = androidx.core.content.FileProvider.getUriForFile(
+                MainActivity.this,
+                getPackageName() + ".fileprovider",
+                photoFile
+            );
+            cameraLauncher.launch(cameraCaptureUri);
+        } catch (Exception e) {
+            e.printStackTrace();
+            Toast.makeText(this, "Gagal membuka kamera: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            cancelPendingFileChooser();
+        }
+    }
+
+    private void cancelPendingFileChooser() {
+        if (filePathCallback != null) {
+            filePathCallback.onReceiveValue(null);
+            filePathCallback = null;
+        }
+    }
+
+    private void showCameraPermissionBottomSheet() {
+        showCustomBottomSheetDialog(
+            "Izinkan Akses Kamera",
+            "Mybangjo Owner membutuhkan izin kamera untuk mengambil foto menu dan produk secara langsung dari perangkat Anda.",
+            "Izinkan Sekarang",
+            "Nanti Saja",
+            R.drawable.ic_camera_dialog,
+            () -> cameraPermissionLauncher.launch(Manifest.permission.CAMERA),
+            this::cancelPendingFileChooser
+        );
+    }
+
+    private void showPermissionSettingsDialog(String title, String message, int iconRes) {
+        showCustomBottomSheetDialog(
+            title,
+            message,
+            "Buka Pengaturan",
+            "Nanti Saja",
+            iconRes,
+            () -> {
+                cancelPendingFileChooser();
+                try {
+                    Intent intent = new Intent(
+                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:" + getPackageName())
+                    );
+                    startActivity(intent);
+                } catch (Exception e) {
+                    try {
+                        startActivity(new Intent(Settings.ACTION_SETTINGS));
+                    } catch (Exception ignored) {}
+                }
+            },
+            this::cancelPendingFileChooser
+        );
+    }
+
+    private void showCustomBottomSheetDialog(
+        String title,
+        String message,
+        String primaryText,
+        String secondaryText,
+        int iconRes,
+        Runnable onPrimary,
+        Runnable onSecondary
+    ) {
+        runOnUiThread(() -> {
+            try {
+                com.google.android.material.bottomsheet.BottomSheetDialog dialog =
+                    new com.google.android.material.bottomsheet.BottomSheetDialog(this);
+                View view = getLayoutInflater().inflate(R.layout.dialog_permission_bottom_sheet, null);
+                dialog.setContentView(view);
+
+                View bottomSheetContainer = dialog.findViewById(com.google.android.material.R.id.design_bottom_sheet);
+                if (bottomSheetContainer != null) {
+                    bottomSheetContainer.setBackgroundResource(android.R.color.transparent);
+                }
+
+                android.widget.ImageView iconView = view.findViewById(R.id.dialog_icon);
+                android.widget.TextView titleView = view.findViewById(R.id.dialog_title);
+                android.widget.TextView msgView = view.findViewById(R.id.dialog_message);
+                com.google.android.material.button.MaterialButton btnPrimary = view.findViewById(R.id.dialog_btn_primary);
+                com.google.android.material.button.MaterialButton btnSecondary = view.findViewById(R.id.dialog_btn_secondary);
+
+                if (iconView != null && iconRes != 0) iconView.setImageResource(iconRes);
+                if (titleView != null && title != null) titleView.setText(title);
+                if (msgView != null && message != null) msgView.setText(message);
+
+                if (btnPrimary != null) {
+                    if (primaryText != null) btnPrimary.setText(primaryText);
+                    btnPrimary.setOnClickListener(v -> {
+                        dialog.dismiss();
+                        if (onPrimary != null) onPrimary.run();
+                    });
+                }
+
+                if (btnSecondary != null) {
+                    if (secondaryText != null) {
+                        btnSecondary.setText(secondaryText);
+                        btnSecondary.setOnClickListener(v -> {
+                            dialog.dismiss();
+                            if (onSecondary != null) onSecondary.run();
+                        });
+                    } else {
+                        btnSecondary.setVisibility(View.GONE);
+                    }
+                }
+
+                dialog.setOnCancelListener(d -> {
+                    if (onSecondary != null) onSecondary.run();
+                });
+
+                dialog.show();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
+    }
+
     @Override
     @SuppressLint("SetJavaScriptEnabled")
     protected void onCreate(Bundle savedInstanceState) {
+        setTheme(R.style.AppTheme);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
@@ -104,6 +260,16 @@ public class MainActivity extends AppCompatActivity {
 
         webView = findViewById(R.id.webView);
         progressBar = findViewById(R.id.progressBar);
+        if (progressBar != null) {
+            progressBar.setAlpha(0f);
+            progressBar.setVisibility(View.GONE);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                android.content.res.ColorStateList transparent = android.content.res.ColorStateList.valueOf(Color.TRANSPARENT);
+                progressBar.setProgressTintList(transparent);
+                progressBar.setProgressBackgroundTintList(transparent);
+                progressBar.setIndeterminateTintList(transparent);
+            }
+        }
         swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout);
 
         setupSwipeRefresh();
@@ -143,6 +309,10 @@ public class MainActivity extends AppCompatActivity {
                 getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
             }
         });
+    }
+
+    public void hideNativeSplash() {
+        // Handled directly by Xentra Robot web splash overlay
     }
 
     public void updateStatusBar(String hexColor, boolean darkIcons) {
@@ -229,18 +399,23 @@ public class MainActivity extends AppCompatActivity {
             boolean alreadyAsked = prefs.getBoolean("overlay_prompt_shown", false);
             if (!alreadyAsked) {
                 prefs.edit().putBoolean("overlay_prompt_shown", true).apply();
-                new AlertDialog.Builder(this)
-                    .setTitle("🔔 Bola Melayang & Notifikasi Kasir")
-                    .setMessage("Aktifkan fitur tampil di atas aplikasi lain agar pesanan baru dan bola pintasan kasir tetap terlihat saat membuka aplikasi lain.")
-                    .setPositiveButton("Aktifkan", (dialog, which) -> {
-                        Intent intent = new Intent(
-                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                            Uri.parse("package:" + getPackageName())
-                        );
-                        startActivity(intent);
-                    })
-                    .setNegativeButton("Nanti", null)
-                    .show();
+                showCustomBottomSheetDialog(
+                    "Bola Melayang & Notifikasi Kasir",
+                    "Aktifkan fitur tampil di atas aplikasi lain agar pesanan kasir baru dan bola pintasan kasir tetap terlihat saat membuka aplikasi lain.",
+                    "Aktifkan Sekarang",
+                    "Nanti Saja",
+                    R.drawable.ic_bell_dialog,
+                    () -> {
+                        try {
+                            Intent intent = new Intent(
+                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                Uri.parse("package:" + getPackageName())
+                            );
+                            startActivity(intent);
+                        } catch (Exception ignored) {}
+                    },
+                    null
+                );
             }
         }
     }
@@ -253,10 +428,13 @@ public class MainActivity extends AppCompatActivity {
                 boolean alreadyAsked = prefs.getBoolean("battery_prompt_shown", false);
                 if (!alreadyAsked) {
                     prefs.edit().putBoolean("battery_prompt_shown", true).apply();
-                    new AlertDialog.Builder(this)
-                        .setTitle("🔋 Izin Berjalan di Latar Belakang")
-                        .setMessage("Agar pesanan kasir baru tetap terpantau dan sirene berbunyi, mohon izinkan aplikasi berjalan tanpa dibatasi penghemat baterai.")
-                        .setPositiveButton("Izinkan", (dialog, which) -> {
+                    showCustomBottomSheetDialog(
+                        "Izin Berjalan di Latar Belakang",
+                        "Agar pesanan kasir baru tetap terpantau dan sirene pesanan berbunyi, mohon izinkan aplikasi berjalan tanpa dibatasi penghemat baterai.",
+                        "Izinkan Sekarang",
+                        "Nanti Saja",
+                        R.drawable.ic_battery_dialog,
+                        () -> {
                             try {
                                 Intent intent = new Intent(
                                     Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
@@ -268,9 +446,9 @@ public class MainActivity extends AppCompatActivity {
                                     startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
                                 } catch (Exception ignored) {}
                             }
-                        })
-                        .setNegativeButton("Nanti", null)
-                        .show();
+                        },
+                        null
+                    );
                 }
             }
         }
@@ -309,8 +487,8 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
                 super.onPageStarted(view, url, favicon);
-                progressBar.setVisibility(View.VISIBLE);
-                progressBar.setProgress(10);
+                // Keep top progress bar hidden so SPA route transitions never flash a green bar above the topbar
+                progressBar.setVisibility(View.GONE);
             }
 
             @Override
@@ -318,6 +496,21 @@ public class MainActivity extends AppCompatActivity {
                 super.onPageFinished(view, url);
                 progressBar.setVisibility(View.GONE);
                 swipeRefreshLayout.setRefreshing(false);
+                view.evaluateJavascript(
+                    "window.IS_NATIVE_APP = true; window.__XENTRA_NATIVE_READY = true;" +
+                    "(function() {" +
+                    "  try {" +
+                    "    var token = localStorage.getItem('xentra_merchant_token');" +
+                    "    var user = null;" +
+                    "    try { user = JSON.parse(localStorage.getItem('xentra_merchant_user')); } catch(_){}" +
+                    "    var branchId = user ? (user.branch_id || user.branchId || '') : '';" +
+                    "    if (token && window.XentraOwnerBridge && typeof window.XentraOwnerBridge.syncAuth === 'function') {" +
+                    "      window.XentraOwnerBridge.syncAuth(token, branchId);" +
+                    "    }" +
+                    "  } catch(e) {}" +
+                    "})();",
+                    null
+                );
             }
 
             @Override
@@ -349,12 +542,8 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onProgressChanged(WebView view, int newProgress) {
-                if (newProgress < 100) {
-                    progressBar.setVisibility(View.VISIBLE);
-                    progressBar.setProgress(newProgress);
-                } else {
-                    progressBar.setVisibility(View.GONE);
-                }
+                // Keep native top progress bar permanently hidden to prevent green flicker on SPA transitions
+                progressBar.setVisibility(View.GONE);
             }
 
             @Override
@@ -363,6 +552,17 @@ public class MainActivity extends AppCompatActivity {
                     MainActivity.this.filePathCallback.onReceiveValue(null);
                 }
                 MainActivity.this.filePathCallback = filePathCallback;
+
+                boolean isCapture = fileChooserParams != null && fileChooserParams.isCaptureEnabled();
+                if (isCapture) {
+                    if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                        launchNativeCameraCapture();
+                    } else {
+                        showCameraPermissionBottomSheet();
+                    }
+                    return true;
+                }
+
                 fileChooserLauncher.launch("image/*");
                 return true;
             }
@@ -374,23 +574,25 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public boolean onJsAlert(WebView view, String url, String message, JsResult result) {
-                new AlertDialog.Builder(MainActivity.this)
+                new com.google.android.material.dialog.MaterialAlertDialogBuilder(MainActivity.this)
                     .setTitle("Kasir POS")
                     .setMessage(message)
                     .setPositiveButton("OK", (dialog, which) -> result.confirm())
-                    .setCancelable(false)
+                    .setOnCancelListener(dialog -> result.confirm())
+                    .setCancelable(true)
                     .show();
                 return true;
             }
 
             @Override
             public boolean onJsConfirm(WebView view, String url, String message, JsResult result) {
-                new AlertDialog.Builder(MainActivity.this)
+                new com.google.android.material.dialog.MaterialAlertDialogBuilder(MainActivity.this)
                     .setTitle("Konfirmasi")
                     .setMessage(message)
                     .setPositiveButton("Ya", (dialog, which) -> result.confirm())
                     .setNegativeButton("Batal", (dialog, which) -> result.cancel())
-                    .setCancelable(false)
+                    .setOnCancelListener(dialog -> result.cancel())
+                    .setCancelable(true)
                     .show();
                 return true;
             }
@@ -489,8 +691,35 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
-        if (webView != null && webView.canGoBack()) {
-            webView.goBack();
+        if (webView != null) {
+            webView.evaluateJavascript(
+                "(function() {" +
+                "  try {" +
+                "    if (window.XentraPresentation && typeof window.XentraPresentation.stackSize === 'function' && window.XentraPresentation.stackSize() > 0) {" +
+                "      window.XentraPresentation.closeTop();" +
+                "      return 'handled';" +
+                "    }" +
+                "    if (window.XentraNavigationController && typeof window.XentraNavigationController.getSnapshot === 'function') {" +
+                "      var snap = window.XentraNavigationController.getSnapshot();" +
+                "      if (snap && Array.isArray(snap.stack) && snap.stack.length > 1) {" +
+                "        window.XentraNavigationController.back();" +
+                "        return 'handled';" +
+                "      }" +
+                "    }" +
+                "  } catch(e) {}" +
+                "  return 'fallback';" +
+                "})()",
+                value -> {
+                    if (value != null && value.contains("handled")) {
+                        return;
+                    }
+                    if (webView.canGoBack()) {
+                        webView.goBack();
+                    } else {
+                        MainActivity.super.onBackPressed();
+                    }
+                }
+            );
         } else {
             super.onBackPressed();
         }

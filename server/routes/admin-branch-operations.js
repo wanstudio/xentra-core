@@ -15,6 +15,8 @@ module.exports = function registerAdminBranchOperationsRoutes(router, deps) {
 
 router.get('/admin/branches/:id/inventory', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
     if (req.user.role === 'branch_manager') {
       const assignedBranchId = req.user.branchId || req.user.branch_id;
       if (assignedBranchId && assignedBranchId !== req.params.id) {
@@ -31,6 +33,12 @@ router.get('/admin/branches/:id/inventory', requireAuth(['owner', 'brand_manager
       return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
     }
 
+    const stockLocations = db.prepare("SELECT id FROM stock_locations WHERE branch_id = ? AND location_type = 'BRANCH' AND is_active = 1 ORDER BY id").all(req.params.id);
+    if (stockLocations.length > 1) {
+      return res.status(409).json({ success: false, error: 'MULTIPLE_ACTIVE_STOCK_LOCATIONS', message: 'Cabang memiliki lebih dari satu lokasi stok aktif.' });
+    }
+    const stockLocationId = stockLocations.length ? stockLocations[0].id : null;
+
     const rows = db.prepare(`
       SELECT
         p.id AS product_id,
@@ -41,9 +49,15 @@ router.get('/admin/branches/:id/inventory', requireAuth(['owner', 'brand_manager
         CASE
           WHEN COALESCE(p.fulfillment_type, 'BY_STOCK') = 'BY_ORDER' THEN NULL
           WHEN p.sku IS NOT NULL AND trim(p.sku) <> ''
-            THEN COALESCE(psb.quantity, bpi.stock_qty, 0)
+            THEN CASE WHEN psb.product_id IS NOT NULL THEN psb.quantity WHEN bpi.product_id IS NOT NULL THEN bpi.stock_qty ELSE NULL END
           ELSE COALESCE(bp.stock, 0)
         END AS stock,
+        CASE
+          WHEN COALESCE(p.fulfillment_type, 'BY_STOCK') = 'BY_ORDER' THEN 1
+          WHEN p.sku IS NOT NULL AND trim(p.sku) <> '' THEN CASE WHEN psb.product_id IS NOT NULL OR bpi.product_id IS NOT NULL THEN 1 ELSE 0 END
+          WHEN bp.product_id IS NOT NULL THEN 1
+          ELSE 0
+        END AS has_stock_record,
         CASE
           WHEN p.sku IS NOT NULL AND trim(p.sku) <> ''
             THEN COALESCE(bpi.low_stock_threshold, 5)
@@ -51,7 +65,8 @@ router.get('/admin/branches/:id/inventory', requireAuth(['owner', 'brand_manager
         END AS low_stock_threshold,
         CASE
           WHEN COALESCE(p.fulfillment_type, 'BY_STOCK') = 'BY_ORDER' THEN 'by_order'
-          WHEN p.sku IS NOT NULL AND trim(p.sku) <> '' THEN 'canonical'
+          WHEN p.sku IS NOT NULL AND trim(p.sku) <> '' AND (psb.product_id IS NOT NULL OR bpi.product_id IS NOT NULL) THEN 'canonical'
+          WHEN p.sku IS NOT NULL AND trim(p.sku) <> '' THEN 'none'
           WHEN bp.product_id IS NOT NULL THEN 'legacy'
           ELSE 'none'
         END AS stock_source,
@@ -62,7 +77,7 @@ router.get('/admin/branches/:id/inventory', requireAuth(['owner', 'brand_manager
         END AS is_available
       FROM products p
       LEFT JOIN stock_locations sl
-        ON sl.branch_id = ? AND sl.is_active = 1
+        ON sl.id = ?
       LEFT JOIN product_stock_balances psb
         ON psb.product_id = p.id AND psb.stock_location_id = sl.id
       LEFT JOIN branch_product_inventory bpi
@@ -75,7 +90,7 @@ router.get('/admin/branches/:id/inventory', requireAuth(['owner', 'brand_manager
           OR bp.product_id IS NOT NULL
         )
       ORDER BY p.name ASC, p.id ASC
-    `).all(req.params.id, req.params.id, req.params.id, req.brand_id);
+    `).all(stockLocationId, req.params.id, req.params.id, req.brand_id);
 
     res.json({ success: true, branch_id: req.params.id, inventory: rows || [] });
   } catch (err) {
@@ -274,6 +289,8 @@ router.patch('/admin/branches/:id/inventory/:productId', requireAuth(['owner', '
 // base UOM, branch reorder policy (minimum & target quantity), and cost status.
 router.get('/admin/branches/:id/inventory/materials', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
     if (req.user.role === 'branch_manager') {
       const assignedBranchId = req.user.branchId || req.user.branch_id;
       if (assignedBranchId && assignedBranchId !== req.params.id) {
@@ -290,7 +307,11 @@ router.get('/admin/branches/:id/inventory/materials', requireAuth(['owner', 'bra
       return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
     }
 
-    const location = db.prepare("SELECT id FROM stock_locations WHERE branch_id = ? AND is_active = 1 LIMIT 1").get(req.params.id);
+    const locations = db.prepare("SELECT id FROM stock_locations WHERE branch_id = ? AND location_type = 'BRANCH' AND is_active = 1 ORDER BY id").all(req.params.id);
+    if (locations.length > 1) {
+      return res.status(409).json({ success: false, error: 'MULTIPLE_ACTIVE_STOCK_LOCATIONS', message: 'Cabang memiliki lebih dari satu lokasi stok aktif.' });
+    }
+    const location = locations[0] || null;
     if (!location) {
       return res.status(400).json({ success: false, error: 'Lokasi gudang persediaan cabang belum aktif.' });
     }
@@ -305,6 +326,7 @@ router.get('/admin/branches/:id/inventory/materials', requireAuth(['owner', 'bra
         u.name AS base_uom_name,
         u.code AS base_uom_code,
         COALESCE(msb.quantity_base, 0) AS current_stock,
+        CASE WHEN msb.material_id IS NOT NULL THEN 1 ELSE 0 END AS has_stock_record,
         COALESCE(msb.moving_average_unit_cost, 0) AS moving_average_unit_cost,
         msb.cost_availability_status,
         COALESCE(rp.minimum_quantity, 5) AS minimum_quantity,
@@ -344,7 +366,9 @@ router.get('/admin/branches/:id/inventory/materials', requireAuth(['owner', 'bra
       const effectiveThreshold = Math.max(min, worstUnitUsage * 2);
 
       let status = 'SAFE';
-      if (current <= 0) {
+      if (!r.has_stock_record) {
+        status = 'UNTRACKED';
+      } else if (current <= 0) {
         status = 'OUT_OF_STOCK';
       } else if (current <= effectiveThreshold) {
         status = 'LOW_STOCK';
@@ -358,6 +382,7 @@ router.get('/admin/branches/:id/inventory/materials', requireAuth(['owner', 'bra
         base_uom_name: r.base_uom_name,
         base_uom_code: r.base_uom_code,
         current_stock: current,
+        has_stock_record: Boolean(r.has_stock_record),
         moving_average_unit_cost: Number(r.moving_average_unit_cost),
         cost_availability_status: r.cost_availability_status || 'UNAVAILABLE',
         minimum_quantity: min,
@@ -399,7 +424,11 @@ router.post('/admin/branches/:id/inventory/materials/:materialId/adjust', requir
       return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
     }
 
-    const location = db.prepare("SELECT id FROM stock_locations WHERE branch_id = ? AND is_active = 1 LIMIT 1").get(req.params.id);
+    const activeLocations = db.prepare("SELECT id FROM stock_locations WHERE branch_id = ? AND location_type = 'BRANCH' AND is_active = 1 ORDER BY id").all(req.params.id);
+    if (activeLocations.length > 1) {
+      return res.status(409).json({ success: false, error: 'MULTIPLE_ACTIVE_STOCK_LOCATIONS', message: 'Cabang memiliki lebih dari satu lokasi stok aktif.' });
+    }
+    const location = activeLocations[0] || null;
     if (!location) {
       return res.status(400).json({ success: false, error: 'Lokasi gudang persediaan cabang belum aktif.' });
     }
@@ -518,7 +547,187 @@ router.post('/admin/branches/:id/inventory/materials/:materialId/adjust', requir
     });
   } catch (err) {
     console.error('[API Error POST /admin/branches/:id/inventory/materials/:materialId/adjust]:', err);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: 'INTERNAL_ERROR', message: err.message });
+  }
+});
+
+// POST /admin/branches/:id/inventory/waste
+// Records kitchen/bar waste event (burnt, dropped, expired, customer re-cook)
+router.post('/admin/branches/:id/inventory/waste', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
+  try {
+    const branchId = req.params.id;
+    const { item_type, item_id, quantity, reason_code, notes } = req.body;
+    if (req.user.role === 'branch_manager' || req.user.role === 'cashier') {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (assignedBranchId && assignedBranchId !== branchId) {
+        return res.status(403).json({ success: false, error: 'FORBIDDEN_BRANCH_SCOPE', message: 'Pengguna cabang hanya dapat mencatat waste di cabang yang ditugaskan.' });
+      }
+    }
+    const branch = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(branchId, req.brand_id);
+    if (!branch) return res.status(404).json({ success: false, error: 'BRANCH_NOT_FOUND' });
+    const actorId = req.user.userId || req.user.id || req.user.username || 'staff';
+
+    const { KitchenWasteService } = require('../../domains/inventory');
+    const result = KitchenWasteService.recordWaste({
+      branchId,
+      itemType: item_type || 'MATERIAL',
+      itemId: item_id,
+      quantity,
+      reasonCode: reason_code,
+      notes,
+      reportedBy: actorId
+    });
+
+    res.json({
+      success: true,
+      message: 'Catatan kerusakan/pembuangan dapur berhasil disimpan.',
+      data: result
+    });
+  } catch (err) {
+    console.error('[API Error POST /admin/branches/:id/inventory/waste]:', err);
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// GET /admin/branches/:id/inventory/waste
+// Lists kitchen waste logs for the branch
+router.get('/admin/branches/:id/inventory/waste', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
+  try {
+    const branchId = req.params.id;
+    const limit = Number(req.query.limit) || 50;
+
+    const { KitchenWasteService } = require('../../domains/inventory');
+    const logs = KitchenWasteService.getBranchWasteLogs({ branchId, limit });
+
+    res.json({
+      success: true,
+      branch_id: branchId,
+      logs
+    });
+  } catch (err) {
+    console.error('[API Error GET /admin/branches/:id/inventory/waste]:', err);
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// POST /admin/branches/:id/inventory/materials/:materialId/intake
+// Direct purchase intake using either Base UOM or Purchase UOM (Auto Multi-UOM conversion)
+router.post('/admin/branches/:id/inventory/materials/:materialId/intake', requireAuth(['owner', 'brand_manager', 'branch_manager', 'purchasing']), (req, res) => {
+  try {
+    const branch = db.prepare('SELECT id, organization_id FROM branches WHERE id = ?').get(req.params.id);
+    if (!branch) return res.status(404).json({ success: false, error: 'BRANCH_NOT_FOUND' });
+
+    const location = db.prepare('SELECT id FROM stock_locations WHERE branch_id = ? AND is_active = 1 LIMIT 1').get(branch.id);
+    if (!location) return res.status(400).json({ success: false, error: 'NO_ACTIVE_STOCK_LOCATION' });
+
+    const material = db.prepare(`
+      SELECT m.id, m.name, m.base_uom_id, m.purchase_uom_name, COALESCE(m.purchase_uom_ratio, 1) AS purchase_uom_ratio, bu.code AS base_uom_code
+      FROM materials m
+      JOIN uoms bu ON bu.id = m.base_uom_id
+      WHERE m.id = ? AND m.organization_id = ? AND m.status = 'ACTIVE'
+    `).get(req.params.materialId, branch.organization_id);
+
+    if (!material) return res.status(404).json({ success: false, error: 'MATERIAL_NOT_FOUND' });
+
+    const { quantity, use_purchase_uom = false, total_price, unit_price, notes } = req.body;
+    const inputQty = Number(quantity);
+    if (!Number.isFinite(inputQty) || inputQty <= 0) {
+      return res.status(400).json({ success: false, error: 'INVALID_QUANTITY', message: 'Kuantitas belanja harus > 0' });
+    }
+
+    // Multi-UOM conversion factor
+    const ratio = (use_purchase_uom && Number(material.purchase_uom_ratio) > 0) ? Number(material.purchase_uom_ratio) : 1;
+    const baseQuantity = Number((inputQty * ratio).toFixed(4));
+
+    // Pricing calculation
+    let calculatedUnitCost = 0;
+    if (total_price && Number(total_price) > 0) {
+      calculatedUnitCost = Number((Number(total_price) / baseQuantity).toFixed(4));
+    } else if (unit_price && Number(unit_price) > 0) {
+      calculatedUnitCost = use_purchase_uom ? Number((Number(unit_price) / ratio).toFixed(4)) : Number(unit_price);
+    }
+
+    const now = new Date().toISOString();
+    const actorId = req.user.userId || req.user.id || req.user.username || 'purchaser';
+
+    const balance = db.prepare(`
+      SELECT quantity_base, carrying_value, moving_average_unit_cost, valuation_version
+      FROM material_stock_balances
+      WHERE stock_location_id = ? AND material_id = ?
+    `).get(location.id, material.id);
+
+    const prevQty = balance ? Number(balance.quantity_base) : 0;
+    const prevCarrying = balance ? Number(balance.carrying_value) : 0;
+    const newQty = Number((prevQty + baseQuantity).toFixed(4));
+
+    // Moving average cost calculation
+    const intakeTotalCost = Number((baseQuantity * calculatedUnitCost).toFixed(4));
+    const newCarryingVal = Number((prevCarrying + intakeTotalCost).toFixed(4));
+    const newUnitCost = newQty > 0 ? Number((newCarryingVal / newQty).toFixed(4)) : calculatedUnitCost;
+
+    // Get monotonic valuation version
+    const maxMovVer = db.prepare(`
+      SELECT MAX(valuation_version) AS max_v
+      FROM material_stock_movements
+      WHERE stock_location_id = ? AND material_id = ?
+    `).get(location.id, material.id);
+    const newVer = ((maxMovVer && maxMovVer.max_v != null) ? Number(maxMovVer.max_v) : 0) + 1;
+
+    if (balance) {
+      db.prepare(`
+        UPDATE material_stock_balances
+        SET quantity_base = ?, carrying_value = ?, moving_average_unit_cost = ?,
+            cost_availability_status = 'AVAILABLE', valuation_version = ?, updated_at = ?
+        WHERE stock_location_id = ? AND material_id = ?
+      `).run(newQty, newCarryingVal, newUnitCost, newVer, now, location.id, material.id);
+    } else {
+      db.prepare(`
+        INSERT INTO material_stock_balances (
+          stock_location_id, material_id, quantity_base, carrying_value,
+          moving_average_unit_cost, cost_availability_status, valuation_version, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, 'AVAILABLE', ?, ?, ?)
+      `).run(location.id, material.id, newQty, newCarryingVal, newUnitCost, newVer, now, now);
+    }
+
+    const movId = 'msm_' + crypto.randomBytes(8).toString('hex');
+    const mutationId = 'intake_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex');
+    const intakeNote = use_purchase_uom
+      ? `Belanja Pasar: ${inputQty} ${material.purchase_uom_name || 'pack'} (x${ratio} ${material.base_uom_code}) ${notes || ''}`.trim()
+      : `Penerimaan Bahan Langsung: ${inputQty} ${material.base_uom_code} ${notes || ''}`.trim();
+
+    db.prepare(`
+      INSERT INTO material_stock_movements (
+        id, stock_location_id, material_id, movement_type, quantity_base,
+        previous_quantity, current_quantity, unit_cost, total_cost, currency_code,
+        valuation_method, cost_basis_type, source_type, source_reference,
+        posting_mutation_id, valuation_version, posting_timestamp, actor_id, notes, created_at
+      ) VALUES (?, ?, ?, 'PURCHASE_RECEIPT', ?, ?, ?, ?, ?, 'IDR', 'MOVING_AVERAGE', 'PURCHASE_RECEIPT', 'DIRECT_INTAKE', ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      movId, location.id, material.id, baseQuantity, prevQty, newQty,
+      calculatedUnitCost, intakeTotalCost, 'BRANCH_INTAKE_' + branch.id, mutationId,
+      newVer, now, actorId, intakeNote, now
+    );
+
+    res.json({
+      success: true,
+      message: 'Penerimaan belanja bahan berhasil dicatat dengan konversi satuan otomatis.',
+      data: {
+        material_id: material.id,
+        material_name: material.name,
+        input_quantity: inputQty,
+        input_unit: use_purchase_uom ? material.purchase_uom_name : material.base_uom_code,
+        conversion_ratio: ratio,
+        added_base_quantity: baseQuantity,
+        base_uom: material.base_uom_code,
+        previous_stock: prevQty,
+        current_stock: newQty,
+        unit_cost: newUnitCost,
+        total_cost: intakeTotalCost
+      }
+    });
+  } catch (err) {
+    console.error('[API Error POST /admin/branches/:id/inventory/materials/:materialId/intake]:', err);
+    res.status(400).json({ success: false, error: err.message });
   }
 });
 
@@ -542,7 +751,11 @@ router.put('/admin/branches/:id/inventory/materials/:materialId/reorder-policy',
       return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
     }
 
-    const location = db.prepare("SELECT id FROM stock_locations WHERE branch_id = ? AND is_active = 1 LIMIT 1").get(req.params.id);
+    const activeLocations = db.prepare("SELECT id FROM stock_locations WHERE branch_id = ? AND location_type = 'BRANCH' AND is_active = 1 ORDER BY id").all(req.params.id);
+    if (activeLocations.length > 1) {
+      return res.status(409).json({ success: false, error: 'MULTIPLE_ACTIVE_STOCK_LOCATIONS', message: 'Cabang memiliki lebih dari satu lokasi stok aktif.' });
+    }
+    const location = activeLocations[0] || null;
     if (!location) {
       return res.status(400).json({ success: false, error: 'Lokasi gudang persediaan cabang belum aktif.' });
     }
@@ -596,7 +809,11 @@ router.get('/admin/branches/:id/inventory/recipes', requireAuth(['owner', 'brand
       return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
     }
 
-    const location = db.prepare("SELECT id FROM stock_locations WHERE branch_id = ? AND is_active = 1 LIMIT 1").get(req.params.id);
+    const activeLocations = db.prepare("SELECT id FROM stock_locations WHERE branch_id = ? AND location_type = 'BRANCH' AND is_active = 1 ORDER BY id").all(req.params.id);
+    if (activeLocations.length > 1) {
+      return res.status(409).json({ success: false, error: 'MULTIPLE_ACTIVE_STOCK_LOCATIONS', message: 'Cabang memiliki lebih dari satu lokasi stok aktif.' });
+    }
+    const location = activeLocations[0] || null;
     const locationId = location ? location.id : null;
 
     const recipes = db.prepare(`
@@ -682,6 +899,8 @@ router.post('/admin/branches/:id/inventory/prepare', requireAuth(['owner', 'bran
 
     const productId = req.body && req.body.product_id;
     const portions = Number(req.body && req.body.portions);
+    const plannedPortions = Number(req.body && req.body.planned_portions);
+    const requestedPostingId = String(req.body && req.body.production_posting_id || '').trim();
     const notes = (req.body && req.body.notes) ? String(req.body.notes).trim() : '';
 
     if (!productId) {
@@ -690,20 +909,72 @@ router.post('/admin/branches/:id/inventory/prepare', requireAuth(['owner', 'bran
     if (!Number.isFinite(portions) || portions <= 0) {
       return res.status(400).json({ success: false, error: 'INVALID_PORTIONS', message: 'Jumlah porsi masak harus bilangan positif (> 0).' });
     }
+    if (!Number.isInteger(portions) || !Number.isInteger(plannedPortions) || plannedPortions <= 0) {
+      return res.status(400).json({ success: false, error: 'INVALID_PORTIONS', message: 'Target batch dan hasil aktual harus berupa bilangan porsi lebih dari 0.' });
+    }
+    if (requestedPostingId && (requestedPostingId.length > 120 || !/^[A-Za-z0-9_-]+$/.test(requestedPostingId))) {
+      return res.status(400).json({ success: false, error: 'PRODUCTION_POSTING_ID_INVALID', message: 'ID pencatatan batch tidak valid.' });
+    }
+    const postingId = requestedPostingId || ('prep_' + crypto.randomBytes(8).toString('hex'));
 
     // Resolve branch stock location (explicit if provided, else active default)
     let location = null;
     const requestedLocId = req.body && req.body.stock_location_id ? String(req.body.stock_location_id).trim() : null;
     if (requestedLocId) {
-      location = db.prepare("SELECT id FROM stock_locations WHERE id = ? AND branch_id = ? AND is_active = 1").get(requestedLocId, req.params.id);
+      location = db.prepare("SELECT id FROM stock_locations WHERE id = ? AND branch_id = ? AND location_type = 'BRANCH' AND is_active = 1").get(requestedLocId, req.params.id);
       if (!location) {
         return res.status(400).json({ success: false, error: 'STOCK_LOCATION_NOT_FOUND', message: 'Lokasi gudang persediaan cabang yang dipilih tidak aktif atau tidak terdaftar pada cabang ini.' });
       }
     } else {
-      location = db.prepare("SELECT id FROM stock_locations WHERE branch_id = ? AND is_active = 1 LIMIT 1").get(req.params.id);
+      const activeLocations = db.prepare("SELECT id FROM stock_locations WHERE branch_id = ? AND location_type = 'BRANCH' AND is_active = 1 ORDER BY id").all(req.params.id);
+      if (activeLocations.length > 1) {
+        return res.status(409).json({ success: false, error: 'MULTIPLE_ACTIVE_STOCK_LOCATIONS', message: 'Cabang memiliki lebih dari satu lokasi stok aktif.' });
+      }
+      location = activeLocations[0] || null;
     }
     if (!location) {
       return res.status(400).json({ success: false, error: 'STOCK_LOCATION_NOT_FOUND', message: 'Lokasi gudang persediaan cabang belum aktif.' });
+    }
+
+    const ProductionRepository = require('../../core/data/repositories/ProductionRepository');
+    const productionRepo = new ProductionRepository();
+    const existingBatch = productionRepo.findProductionBatchByPostingId(postingId);
+    if (existingBatch) {
+      const existingOutput = db.prepare('SELECT output_product_id FROM production_items WHERE id = ?').get(existingBatch.production_item_id);
+      if (
+        existingBatch.status !== 'COMPLETED' ||
+        !existingOutput || String(existingOutput.output_product_id) !== String(productId) ||
+        String(existingBatch.input_stock_location_id) !== String(location.id) ||
+        String(existingBatch.output_stock_location_id) !== String(location.id)
+      ) {
+        return res.status(409).json({ success: false, error: 'PRODUCTION_POSTING_IDENTITY_MISMATCH', message: 'ID pencatatan batch sudah digunakan untuk batch lain.' });
+      }
+
+      // Reconcile the legacy branch stock projection on retries without
+      // consuming Materials or posting location Product Stock a second time.
+      const replayQuantity = Number(existingBatch.actual_output_quantity);
+      const replayMovement = InventoryStockService.recordMovement({
+        branch_id: req.params.id,
+        product_id: productId,
+        movement_type: 'audit_adjustment',
+        quantity: replayQuantity,
+        mutation_id: postingId,
+        reference_id: existingBatch.id,
+        actor_id: req.user.userId || req.user.id || 'system',
+        actor_role: req.user.role || 'system',
+        notes: notes ? `[Catat Masak ${replayQuantity} Porsi] ${notes}` : `Catat Masak ${replayQuantity} Porsi dari Resep`
+      });
+      return res.json({
+        success: true,
+        idempotent: true,
+        batch_id: existingBatch.id,
+        posting_id: postingId,
+        planned_portions: Number(existingBatch.planned_output_quantity),
+        portions_prepared: replayQuantity,
+        product_id: productId,
+        current_stock: InventoryStockService.getStock(req.params.id, productId),
+        movement: replayMovement
+      });
     }
 
     // Resolve recipe for this product tied to this stock location
@@ -748,48 +1019,69 @@ router.post('/admin/branches/:id/inventory/prepare', requireAuth(['owner', 'bran
       return res.status(400).json({ success: false, error: 'RECIPE_COMPONENTS_EMPTY', message: 'Komponen bahan baku resep kosong.' });
     }
 
-    // Check material sufficiency
-    const yieldQty = Number(recipe.planned_yield_quantity) || 1;
-    const factor = portions / yieldQty;
-    const requiredMaterials = [];
+    // Actual usage comes from the kitchen completion screen. Recipe quantities
+    // remain the planned baseline and must not be silently posted as actuals.
+    const actualInputs = req.body && req.body.actual_consumptions;
+    if (!Array.isArray(actualInputs) || actualInputs.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'ACTUAL_CONSUMPTION_REQUIRED',
+        message: 'Pemakaian aktual bahan wajib dicatat sebelum batch diselesaikan.'
+      });
+    }
 
-    for (const comp of components) {
-      const precision = Math.min(6, Math.max(0, Number(comp.planned_precision != null ? comp.planned_precision : 6)));
-      const rawNeeded = Number(comp.planned_quantity) * factor;
-      let neededInPlanned;
-      if (Number(comp.planned_allows_fraction) !== 1) {
-        neededInPlanned = Math.ceil(rawNeeded);
-      } else {
-        const factorMultiplier = 10 ** precision;
-        neededInPlanned = Math.round((rawNeeded + Number.EPSILON) * factorMultiplier) / factorMultiplier;
+    const componentsById = new Map(components.map(component => [String(component.material_id), component]));
+    const requiredMaterials = [];
+    const seenMaterialIds = new Set();
+
+    for (const input of actualInputs) {
+      const materialId = String(input && input.material_id || '').trim();
+      const comp = componentsById.get(materialId);
+      const sourceUomId = String(input && input.source_uom_id || '').trim();
+      const actualQuantity = Number(input && input.actual_quantity);
+      if (!comp) {
+        return res.status(400).json({ success: false, error: 'ACTUAL_CONSUMPTION_NOT_IN_RECIPE', message: 'Bahan yang dicatat tidak termasuk dalam resep aktif.' });
       }
-      const neededInBase = Math.round((neededInPlanned * Number(comp.planned_cf) / Number(comp.base_cf) + Number.EPSILON) * 1e6) / 1e6;
+      if (seenMaterialIds.has(materialId)) {
+        return res.status(400).json({ success: false, error: 'ACTUAL_CONSUMPTION_DUPLICATE', message: 'Bahan yang sama tidak boleh dicatat dua kali.' });
+      }
+      seenMaterialIds.add(materialId);
+      if (sourceUomId !== String(comp.planned_uom_id)) {
+        return res.status(400).json({ success: false, error: 'ACTUAL_CONSUMPTION_UOM_INVALID', message: 'Satuan pemakaian harus mengikuti satuan resep.' });
+      }
+      if (!Number.isFinite(actualQuantity) || actualQuantity <= 0) {
+        return res.status(400).json({ success: false, error: 'INVALID_CONSUMPTION_QUANTITY', message: 'Pemakaian aktual bahan harus lebih dari 0. Hapus bahan yang tidak dipakai dari daftar.' });
+      }
+
+      const precision = Math.min(6, Math.max(0, Number(comp.planned_precision != null ? comp.planned_precision : 6)));
+      const factorMultiplier = 10 ** precision;
+      const actualInPlannedUom = Number((Math.round((actualQuantity + Number.EPSILON) * factorMultiplier) / factorMultiplier).toFixed(precision));
+      if (Number(comp.planned_allows_fraction) !== 1 && Math.abs(actualInPlannedUom - Math.round(actualInPlannedUom)) > 1e-9) {
+        return res.status(400).json({ success: false, error: 'INVALID_CONSUMPTION_QUANTITY', message: `Pemakaian aktual ${comp.material_name} harus berupa bilangan bulat ${comp.planned_uom_name}.` });
+      }
+      const neededInBase = Math.round((actualInPlannedUom * Number(comp.planned_cf) / Number(comp.base_cf) + Number.EPSILON) * 1e6) / 1e6;
       const currentStock = Number(comp.current_stock);
       if (currentStock + 1e-9 < neededInBase) {
         return res.status(400).json({
           success: false,
           error: 'INSUFFICIENT_MATERIAL_STOCK',
-          message: `Stok bahan baku "${comp.material_name}" tidak mencukupi (dibutuhkan: ${neededInPlanned.toFixed(2)} ${comp.planned_uom_name}, tersedia: ${(currentStock * Number(comp.base_cf) / Number(comp.planned_cf)).toFixed(2)} ${comp.planned_uom_name}).`,
+          message: `Stok bahan baku "${comp.material_name}" tidak mencukupi (pemakaian aktual: ${actualInPlannedUom.toFixed(precision)} ${comp.planned_uom_name}, tersedia: ${(currentStock * Number(comp.base_cf) / Number(comp.planned_cf)).toFixed(2)} ${comp.planned_uom_name}).`,
           material_id: comp.material_id,
-          needed: neededInPlanned,
+          needed: actualInPlannedUom,
           available: currentStock * Number(comp.base_cf) / Number(comp.planned_cf)
         });
       }
       requiredMaterials.push({
         material_id: comp.material_id,
-        source_uom_id: comp.planned_uom_id,
-        actual_quantity: neededInPlanned
+        source_uom_id: sourceUomId,
+        actual_quantity: actualInPlannedUom
       });
     }
 
     // Execute atomic consumption & output portion increase
     const { ProductionService } = require('../../domains/production');
-    const ProductionRepository = require('../../core/data/repositories/ProductionRepository');
     const InventoryRepository = require('../../core/data/repositories/InventoryRepository');
-    const productionRepo = new ProductionRepository();
     const inventoryRepo = new InventoryRepository();
-
-    const postingId = 'prep_' + crypto.randomBytes(8).toString('hex');
 
     // 1. Production batch execution
     const batch = ProductionService.createProductionBatch({
@@ -797,7 +1089,7 @@ router.post('/admin/branches/:id/inventory/prepare', requireAuth(['owner', 'bran
       productionStockLocationId: location.id,
       inputStockLocationId: location.id,
       outputStockLocationId: location.id,
-      plannedOutputQuantity: portions,
+      plannedOutputQuantity: plannedPortions,
       createdBy: req.user.id || req.user.userId || null,
       repository: productionRepo
     });
@@ -836,6 +1128,7 @@ router.post('/admin/branches/:id/inventory/prepare', requireAuth(['owner', 'bran
       batch_id: batch.id,
       posting_id: postingId,
       portions_prepared: portions,
+      planned_portions: plannedPortions,
       product_id: productId,
       current_stock: newStock,
       movement: addMovement,
@@ -1410,10 +1703,7 @@ router.post('/admin/branches/:id/purchasing/settle', requireAuth(['owner', 'bran
     }
 
     const location = db.prepare("SELECT id FROM stock_locations WHERE branch_id = ? AND is_active = 1 LIMIT 1").get(req.params.id);
-    if (!location) {
-      return res.status(400).json({ success: false, error: 'STOCK_LOCATION_NOT_FOUND', message: 'Lokasi gudang persediaan cabang belum aktif.' });
-    }
-
+    const locationId = location ? location.id : null;
     const cashAdvance = Number(req.body && req.body.cash_advance || 0); // Uang kasbon dari owner/kasir
     const items = req.body && req.body.items;
     const notes = (req.body && req.body.notes) ? String(req.body.notes).trim() : '';

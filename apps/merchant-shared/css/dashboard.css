@@ -457,11 +457,15 @@ strong, b, .x-strong {
   background: #fca5a5;
 }
 
-/* Tab Contents */
+/* Tab Contents
+   Outer .x-tab-content sections must NEVER apply transform or animation:
+   1. Any transform on an ancestor traps position:fixed children/portals.
+   2. Competing vertical fadeIn on outer sections clashes with directional horizontal slide transitions on inner page shells. */
 .x-tab-content {
   display: none;
   padding: 32px;
-  animation: fadeIn 0.25s ease forwards;
+  animation: none;
+  transform: none;
 }
 
 .x-tab-content.active {
@@ -2002,7 +2006,7 @@ input[type="file"].x-input,
   .x-dash-brand-info {
     display: block !important;
   }
-  .x-dash-nav {
+  body:not(.x-merchant-app) .x-dash-nav {
     display: flex !important;
     flex-direction: column !important;
     overflow-x: visible !important;
@@ -2010,17 +2014,17 @@ input[type="file"].x-input,
     gap: 2px !important;
   }
   /* Nav group labels */
-  .x-nav-group-label {
+  body:not(.x-merchant-app) .x-nav-group-label {
     display: block !important;
   }
-  .x-nav-item {
+  body:not(.x-merchant-app) .x-nav-item {
     padding: 10px 14px !important;
     white-space: normal !important;
     border-radius: 8px !important;
     font-size: 14px !important;
     flex-shrink: 0;
   }
-  .x-nav-item span {
+  body:not(.x-merchant-app) .x-nav-item span {
     display: inline-block !important;
   }
   .x-dash-footer {
@@ -4646,6 +4650,8 @@ body:not(.x-merchant-app) .x-mobile-operational-row,
     fill: currentColor !important;
     overflow: visible !important;
     display: block !important;
+    margin-top: 6px !important;
+    margin-bottom: 5px !important;
     transition: color .15s ease, fill .15s ease;
   }
 
@@ -4660,27 +4666,28 @@ body:not(.x-merchant-app) .x-mobile-operational-row,
 
   .x-merchant-mobile-nav-item.active,
   .x-merchant-app .x-merchant-mobile-nav-item.active {
-    color: #08a94f !important;
+    color: #00A637 !important;
     background: transparent !important;
   }
 
   .x-merchant-mobile-nav-item.active svg,
   .x-merchant-app .x-merchant-mobile-nav-item.active svg {
-    color: #08a94f !important; /* hanya icon yang berubah warna */
-    fill: #08a94f !important;
+    color: #00A637 !important; /* hanya icon yang berubah warna */
+    fill: #00A637 !important;
   }
 
   .x-merchant-mobile-nav-item.active::before,
   .x-merchant-app .x-merchant-mobile-nav-item.active::before {
     content: "" !important;
     position: absolute !important;
-    top: -8px !important;
+    top: 0 !important;
     left: 50% !important;
     transform: translateX(-50%) !important;
-    width: 48px !important;
+    width: 40px !important;
     height: 4px !important;
     border-radius: 0 0 4px 4px !important;
-    background: #08a94f !important;
+    background: #00A637 !important;
+    z-index: 10 !important;
   }
 
   .x-mobile-nav-badge,
@@ -4691,8 +4698,8 @@ body:not(.x-merchant-app) .x-mobile-operational-row,
   span.x-mobile-nav-badge,
   span#mobile-orders-count {
     position: absolute !important;
-    top: 0 !important;
-    right: calc(50% - 18px) !important;
+    top: 8px !important;
+    right: calc(50% - 20px) !important;
     min-width: 18px !important;
     height: 18px !important;
     padding: 0 5px !important;
@@ -4706,6 +4713,8 @@ body:not(.x-merchant-app) .x-mobile-operational-row,
     line-height: 1 !important;
     font-weight: 800 !important;
     box-sizing: border-box !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15) !important;
+    z-index: 20 !important;
   }
 
   .x-mobile-nav-badge[style*="display: none"],
@@ -4811,10 +4820,10 @@ body.x-mobile-account-open .x-merchant-mobile-nav { display: none !important; }
     background: #ffffff !important;
     border: 0 !important;
     border-top: 0 !important;
-    border-radius: 24px 24px 0 0 !important;
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08) !important;
+    border-radius: 20px 20px 0 0 !important;
+    box-shadow: 0px 0px 15px 0px rgba(0, 0, 0, 0.15) !important;
     backdrop-filter: none !important;
-    overflow: visible;
+    overflow: hidden !important;
   }
 
   body.x-hide-bottom-nav .x-owner-bottom-nav,
@@ -4887,15 +4896,16 @@ body.x-mobile-account-open .x-merchant-mobile-nav { display: none !important; }
   }
 
   .x-owner-nav-item > span:not(.x-mobile-nav-badge) {
-    font-size: 11px !important;
-    line-height: 1.1 !important;
+    font-family: 'Plus Jakarta Sans', sans-serif !important;
+    font-size: 12px !important;
+    line-height: 1.15 !important;
     font-weight: 700 !important;
-    color: #111111 !important; /* tulisan menu bottom tetap hitam */
+    color: #0F172A !important; /* text-slate-900 */
     white-space: nowrap !important;
   }
 
   .x-owner-nav-item.active {
-    color: #08a94f !important;
+    color: #16a34a !important;
     background: transparent !important;
   }
 
@@ -4903,8 +4913,8 @@ body.x-mobile-account-open .x-merchant-mobile-nav { display: none !important; }
   .x-owner-nav-item.active img,
   .x-owner-nav-item.active svg,
   .x-owner-nav-item.active image {
-    color: #08a94f !important;
-    fill: #08a94f !important;
+    color: #16a34a !important;
+    fill: #16a34a !important;
     filter: brightness(0) saturate(100%) invert(48%) sepia(97%) saturate(1451%) hue-rotate(116deg) brightness(92%) contrast(101%) !important;
   }
 
@@ -4912,17 +4922,17 @@ body.x-mobile-account-open .x-merchant-mobile-nav { display: none !important; }
   .x-owner-nav-item.active::before {
     content: "" !important;
     position: absolute !important;
-    top: -8px !important;
+    top: 0 !important;
     left: 50% !important;
     transform: translateX(-50%) !important;
-    width: 48px !important;
-    height: 4px !important;
+    width: 40px !important;
+    height: 3.5px !important;
     border-radius: 0 0 4px 4px !important;
-    background: #08a94f !important;
+    background: #16a34a !important;
   }
 
-  /* Topbar stays fixed on top with generous mobile padding */
-  .x-dash-topbar {
+  /* Topbar stays fixed on top with generous mobile padding (Owner mobile only) */
+  body:not(.x-merchant-app) .x-dash-topbar {
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
@@ -4946,12 +4956,12 @@ body.x-mobile-account-open .x-merchant-mobile-nav { display: none !important; }
   }
 
   /* Mobile Owner topbar: hide redundant desktop hamburger and overview title for generous whitespace */
-  .x-dash-topbar .x-topbar-left {
+  body:not(.x-merchant-app) .x-dash-topbar .x-topbar-left {
     display: none !important;
   }
 
   /* Right container spans full width: branch selector on left, icons on right */
-  .x-dash-topbar .x-topbar-right {
+  body:not(.x-merchant-app) .x-dash-topbar .x-topbar-right {
     width: 100% !important;
     display: flex !important;
     align-items: center !important;
@@ -4974,11 +4984,11 @@ body.x-mobile-account-open .x-merchant-mobile-nav { display: none !important; }
     flex-shrink: 1 !important;
   }
 
-  .x-dash-topbar #btn-messages {
+  body:not(.x-merchant-app) .x-dash-topbar #btn-messages {
     margin-left: auto !important;
   }
 
-  .x-dash-topbar #btn-notifications {
+  body:not(.x-merchant-app) .x-dash-topbar #btn-notifications {
     margin-left: 0 !important;
   }
 
@@ -7585,6 +7595,15 @@ body.x-mobile-account-open .x-merchant-mobile-nav { display: none !important; }
     display: block !important;
     filter: brightness(0) invert(1) !important;
   }
+  #product-list-view .x-filter-pills > div,
+  #product-list-view .x-filter-pills .x-filter-pills-group {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: auto !important;
+    min-width: 0 !important;
+    margin-bottom: 0 !important;
     flex: 0 0 auto !important;
     flex-wrap: nowrap !important;
   }
@@ -9359,7 +9378,12 @@ body:not(.x-merchant-app) .x-owner-mobile-page-sub {
   background-position: center;
   background-size: 24px 24px;
 }
-  margin-top: 14px;
+
+.x-master-menu-card-footer {
+  display: flex !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  margin-top: 14px !important;
 }
 
 .x-master-menu-filter-tabs {

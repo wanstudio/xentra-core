@@ -185,11 +185,14 @@
     tbody.innerHTML = redemptions.slice(0, 10).map(function (r) {
       var time = (r.redeemed_at || r.created_at || '').substring(0, 16).replace('T', ' ') || '—';
       var discountVal = Number(r.benefit_amount || r.discount_amount || r.discount_applied) || 0;
+      var orderCode = (typeof window.formatBMOrderCode === 'function')
+        ? window.formatBMOrderCode({ order_number: r.order_number, id: r.order_id })
+        : (r.order_number || r.order_id || '—');
       return '<tr>' +
-        '<td><strong>' + esc(r.order_number || r.order_id) + '</strong></td>' +
-        '<td><code>' + esc(r.promo_code || r.promotion_name || 'Promo') + '</code></td>' +
-        '<td><strong style="color:var(--accent-teal);">' + formatMoney(discountVal) + '</strong></td>' +
-        '<td style="font-size:12px; color:var(--text-muted);">' + time + '</td>' +
+        '<td data-label="Pesanan"><strong>' + esc(orderCode) + '</strong></td>' +
+        '<td data-label="Promo"><code>' + esc(r.promo_code || r.promotion_name || 'Promo') + '</code></td>' +
+        '<td data-label="Potongan"><strong style="color:var(--accent-teal);">' + formatMoney(discountVal) + '</strong></td>' +
+        '<td data-label="Waktu" style="font-size:12px; color:var(--text-muted);">' + time + '</td>' +
       '</tr>';
     }).join('');
   }

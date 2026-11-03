@@ -20,6 +20,20 @@
   var configured = false;
   var initialized = false;
   var suppressNextHashChange = false;
+  var memoryState = null;
+
+  function isNativeApkRuntime() {
+    try {
+      return !!(
+        (window.OwnerApp && typeof window.OwnerApp.isApk === 'function' && window.OwnerApp.isApk()) ||
+        window.XentraOwnerBridge ||
+        window.XentraNative ||
+        (window.navigator && window.navigator.userAgent && window.navigator.userAgent.indexOf('MybangjoOwner') !== -1)
+      );
+    } catch (_) {
+      return false;
+    }
+  }
 
   function canonicalize(route) {
     if (!route) return '';
@@ -70,7 +84,9 @@
   }
 
   function readState() {
-    var state = window.history && window.history.state;
+    var state = isNativeApkRuntime() && memoryState
+      ? memoryState
+      : (window.history && window.history.state ? window.history.state : memoryState);
     if (!state || state[STATE_KEY] !== STATE_VERSION) return null;
     if (!Array.isArray(state.stack) || state.stack.length === 0) return null;
     var normalizedStack = state.stack.map(canonicalize);
@@ -125,6 +141,23 @@
   function writeState(stack, mode) {
     var nextStack = stack.slice();
     var nextState = makeState(nextStack);
+    memoryState = nextState;
+
+    // Inside the Android APK WebView, changing the URL argument in history.pushState / replaceState
+    // triggers Chromium's URL-change notification and causes WebChromeClient.onProgressChanged(10..80..100)
+    // to flash the native green progressBar above the topbar in older installed APKs.
+    // By omitting the URL change inside APK mode (keeping the existing URL while still pushing/replacing
+    // history.state so hardware Back / webView.goBack() continues to work), we avoid the URL-change
+    // progress bar blip while preserving hardware Back!
+    if (isNativeApkRuntime()) {
+      if (mode === 'push') {
+        window.history.pushState(nextState, '');
+      } else {
+        window.history.replaceState(nextState, '');
+      }
+      return;
+    }
+
     var url = '#' + nextState.route;
 
     if (mode === 'push') {
@@ -219,16 +252,22 @@
     }
 
     // If target is already in our stack, pop the exact number of levels.
+    // Use replaceState + direct render instead of browser history traversal so
+    // Android WebView does not trigger a native WebChromeClient progress bar flicker.
     var existingIndex = stack.lastIndexOf(target);
     if (existingIndex >= 0 && existingIndex < stack.length - 1) {
-      window.history.go(existingIndex - (stack.length - 1));
+      var poppedStack = stack.slice(0, existingIndex + 1);
+      writeState(poppedStack, 'replace');
+      initialized = true;
+      render(target);
       return;
     }
 
-    // An ancestor route is a pop operation. Never replace the current browser
-    // entry with its parent: doing that leaves a duplicate entry behind.
+    // An ancestor route is a pop operation.
     if (isPrefix(targetChain, stack) && targetChain.length < stack.length) {
-      window.history.go(targetChain.length - stack.length);
+      writeState(targetChain, 'replace');
+      initialized = true;
+      render(target);
       return;
     }
 
@@ -267,7 +306,11 @@
 
     var stack = currentStack();
     if (stack.length > 1) {
-      window.history.back();
+      var nextStack = stack.slice(0, stack.length - 1);
+      var parentTarget = nextStack[nextStack.length - 1];
+      writeState(nextStack, 'replace');
+      initialized = true;
+      render(parentTarget);
       return;
     }
 
@@ -309,8 +352,12 @@
 
       window.addEventListener('popstate', function () {
         suppressNextHashChange = true;
-        var state = readState();
-        var route = state ? state.route : getRouteFromLocation();
+        var state = window.history && window.history.state;
+        if (state && state[STATE_KEY] === STATE_VERSION && Array.isArray(state.stack) && state.stack.length > 0) {
+          memoryState = state;
+        }
+        var resolved = readState();
+        var route = resolved ? resolved.route : getRouteFromLocation();
         initialized = true;
         render(route);
       });

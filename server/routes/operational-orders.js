@@ -74,9 +74,9 @@ router.patch('/kitchen/orders/:id/status', requireAuth(['owner', 'brand_manager'
     // dedicated recovery flow.
     const ROLE_ALLOWED_TARGET_STATUSES = {
       kitchen: ['preparing', 'ready'],
-      branch_manager: ['preparing', 'ready', 'out_for_delivery', 'completed', 'cancelled'],
-      brand_manager: ['preparing', 'ready', 'out_for_delivery', 'completed', 'cancelled'],
-      owner: ['preparing', 'ready', 'out_for_delivery', 'completed', 'cancelled']
+      branch_manager: ['preparing', 'ready', 'out_for_delivery', 'completed'],
+      brand_manager: ['preparing', 'ready', 'out_for_delivery', 'completed'],
+      owner: ['preparing', 'ready', 'out_for_delivery', 'completed']
     };
 
     const allowedTargetStatuses = ROLE_ALLOWED_TARGET_STATUSES[req.user.role] || [];
@@ -111,6 +111,44 @@ router.patch('/kitchen/orders/:id/status', requireAuth(['owner', 'brand_manager'
 
     if (!existingOrder) {
       return res.status(404).json({ success: false, error: 'Pesanan tidak ditemukan pada kewenangan cabang Anda.' });
+    }
+
+    // ROLE CONTRACT (docs/ORDER_LIFECYCLE_AND_ROLE_CONTRACT.md):
+    // - Delivery with an assigned registered driver: only the Driver App may
+    //   execute ready -> out_for_delivery -> completed.
+    // - Pickup: handover (ready -> completed) requires payment settled at POS.
+    // - Dine-in unpaid: serving does not complete the order; POS settlement /
+    //   table release completes it.
+    const guardOrder = db.prepare('SELECT order_type, status, grand_total FROM orders WHERE id = ?').get(req.params.id);
+    if (guardOrder) {
+      if (guardOrder.order_type === 'delivery' && ['out_for_delivery', 'completed'].includes(status)) {
+        const dlvGuard = db.prepare('SELECT driver_id FROM order_deliveries WHERE order_id = ?').get(req.params.id);
+        if (dlvGuard && dlvGuard.driver_id) {
+          return res.status(403).json({
+            success: false,
+            error: 'DRIVER_APP_ONLY',
+            message: 'Untuk pesanan Delivery, pengambilan dan penyelesaian pengantaran hanya dieksekusi oleh Kurir melalui Driver App.'
+          });
+        }
+      }
+      if (['pickup', 'dine_in'].includes(guardOrder.order_type) && status === 'completed' && guardOrder.status === 'ready') {
+        const paidRow = db.prepare(`SELECT MAX(
+            COALESCE((SELECT MAX(amount) FROM order_payments WHERE order_id = ? AND payment_status = 'settlement'), 0),
+            COALESCE((SELECT SUM(amount) FROM pos_check_payments WHERE order_id = ? AND payment_status = 'settlement'), 0)
+          ) AS paid`).get(req.params.id, req.params.id);
+        const hasPaymentRow = db.prepare('SELECT 1 FROM order_payments WHERE order_id = ?').get(req.params.id);
+        const unpaid = hasPaymentRow && Number(guardOrder.grand_total || 0) > 0 && Number(paidRow.paid || 0) + 0.000001 < Number(guardOrder.grand_total || 0);
+        if (unpaid) {
+          if (guardOrder.order_type === 'pickup') {
+            return res.status(400).json({ success: false, error: 'PAYMENT_REQUIRED', message: 'Pesanan Takeaway belum dibayar lunas di Kasir POS.' });
+          }
+          // Dine-in: record served, keep status 'ready' until POS settles.
+          const crypto = require('crypto');
+          db.prepare(`INSERT INTO order_status_logs (id, order_id, previous_status, new_status, actor_type, actor_id, note) VALUES (?, ?, 'ready', 'ready', ?, ?, ?)`)
+            .run('log_' + crypto.randomBytes(8).toString('hex'), req.params.id, actor_type, actor_id, '[SERVED_TO_TABLE] Disajikan ke meja — menunggu pembayaran di Kasir POS.');
+          return res.json({ success: true, served: true, previous_status: 'ready', new_status: 'ready', message: 'Disajikan ke meja. Pesanan selesai otomatis setelah dibayar di Kasir POS.' });
+        }
+      }
     }
 
     const result = OrderStateMachine.transition({
@@ -373,6 +411,19 @@ router.post('/orders/:id/branch-acceptance', requireAuth(['owner', 'brand_manage
       }
 
       if (decision === 'accept') {
+        // Online payment gate (Gojek/Grab): kitchen never starts before the
+        // customer's online payment is settled.
+        if (fullOrder.payment_method && fullOrder.payment_method !== 'cash' && fullOrder.order_type !== 'reservation') {
+          const payRow = db.prepare('SELECT payment_status FROM order_payments WHERE order_id = ?').get(fullOrder.id);
+          if (payRow && payRow.payment_status !== 'settlement') {
+            orderRepo.rollbackTransaction();
+            return res.status(400).json({
+              success: false,
+              status: 'PAYMENT_PENDING',
+              error: 'Pembayaran online pelanggan belum lunas. Pesanan baru dapat diterima setelah pembayaran selesai.'
+            });
+          }
+        }
         let sessionResult = null;
 
         // 1. If dine-in, validate table and activate dining session atomically
@@ -441,9 +492,11 @@ router.post('/orders/:id/branch-acceptance', requireAuth(['owner', 'brand_manage
         }
 
         const estimatedMinutes = Math.max(5, Math.min(180, Number(req.body && (req.body.prep_time_minutes || req.body.prepTimeMinutes || req.body.estimated_minutes || req.body.estimatedMinutes)) || 20));
-        const slotEnd = new Date(Date.now() + estimatedMinutes * 60 * 1000).toISOString();
-        db.prepare("UPDATE orders SET scheduled_slot_end = ?, updated_at = ? WHERE id = ?")
-          .run(slotEnd, new Date().toISOString(), order.id);
+        if (fullOrder.fulfillment_schedule_type !== 'scheduled') {
+          const slotEnd = new Date(Date.now() + estimatedMinutes * 60 * 1000).toISOString();
+          db.prepare("UPDATE orders SET scheduled_slot_end = ?, updated_at = ? WHERE id = ?")
+            .run(slotEnd, new Date().toISOString(), order.id);
+        }
 
         orderRepo.commitTransaction();
         return res.json({ success: true, decision, ...result });
@@ -617,6 +670,10 @@ router.post('/admin/orders/:id/assign-driver', requireAuth(['owner', 'brand_mana
 
     if (!['confirmed', 'preparing', 'ready'].includes(order.status)) {
       return res.status(400).json({ success: false, error: 'Driver hanya dapat ditugaskan saat pesanan berstatus confirmed, preparing, atau ready.' });
+    }
+
+    if (!driver_id) {
+      return res.status(400).json({ success: false, error: 'Kurir wajib dipilih dari daftar akun Driver aktif cabang (driver non-aplikasi tidak didukung).' });
     }
 
     let resolvedDriverName = driver_name ? String(driver_name).trim() : '';

@@ -447,11 +447,33 @@ class ComposedMenuService {
       ? current.description
       : (description === null || description === '' ? null : String(description).trim());
 
-    if (!finalDescription && nextMenuType === 'PACKAGE' && normalizedItems.length > 0) {
-      finalDescription = normalizedItems.map(it => {
-        const prod = repository.findProduct({ brandId, productId: it.productId });
-        return (it.quantity > 1 ? `${it.quantity}x ` : '') + (prod ? prod.name : '');
-      }).filter(Boolean).join(' + ');
+    const describeItems = (menuItems) => menuItems.map(item => {
+      const product = item.product_name
+        ? item
+        : repository.findProduct({ brandId, productId: item.productId });
+      const productName = product && (product.product_name || product.name);
+      return productName
+        ? (Number(item.quantity) > 1 ? `${item.quantity}x ` : '') + productName
+        : '';
+    }).filter(Boolean).join(' + ');
+
+    const previousGeneratedDescription = describeItems(currentItems.map(item => ({
+      product_name: item.product_name,
+      quantity: Number(item.quantity)
+    })));
+    const nextGeneratedDescription = describeItems(normalizedItems);
+    const descriptionWasGeneratedFromItems = Boolean(
+      current.description &&
+      previousGeneratedDescription &&
+      String(current.description).trim() === previousGeneratedDescription
+    );
+
+    if (
+      nextMenuType === 'PACKAGE' &&
+      normalizedItems.length > 0 &&
+      (!finalDescription || (description === undefined && descriptionWasGeneratedFromItems))
+    ) {
+      finalDescription = nextGeneratedDescription || finalDescription;
     }
 
     const fieldsToUpdate = {

@@ -95,6 +95,38 @@ router.get('/dine-in/qr/:token', (req, res) => {
   }
 });
 
+// Staff / POS opens a table cycle before its first customer order. The Dining
+// domain owns availability and the OCCUPIED + active-session transition.
+router.post('/dine-in/tables/:id/open-session', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
+  try {
+    const table = db.prepare(`
+      SELECT t.id, t.branch_id
+      FROM branch_tables t
+      JOIN branches b ON b.id = t.branch_id
+      WHERE t.id = ? AND t.is_active = 1 AND b.brand_id = ?
+    `).get(req.params.id, req.brand_id);
+    if (!table) return res.status(404).json({ success: false, error: 'MEJA_TIDAK_DITEMUKAN' });
+
+    if (['branch_manager', 'cashier'].includes(req.user.role)) {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (table.branch_id !== assignedBranchId) {
+        return res.status(403).json({ success: false, error: 'FORBIDDEN_BRANCH_SCOPE' });
+      }
+    }
+
+    const result = DiningTableService.openTableSession({
+      branch_id: table.branch_id,
+      table_id: table.id,
+      guest_count: req.body && req.body.guest_count,
+      actor_id: req.user.id || req.user.userId || null
+    });
+    return res.status(201).json({ success: true, session: result });
+  } catch (err) {
+    const status = String(err.message || '').includes('TABLE_NOT_AVAILABLE') ? 409 : 400;
+    return res.status(status).json({ success: false, error: err.message });
+  }
+});
+
 // Staff / Owner: Regenerate QR Token for a table
 // Staff: QR meja untuk dicetak / dibagikan / dikirim ke printer.
 //
@@ -211,15 +243,36 @@ router.post('/dine-in/tables/:id/release', requireAuth(['owner', 'brand_manager'
     }
 
     const stateRow = db.prepare('SELECT current_session_id, operational_state FROM branch_table_states WHERE table_id = ?').get(tableId);
+    const activeHoldOrder = db.prepare(`
+      SELECT o.id, o.order_number, o.status
+      FROM branch_table_holds h
+      LEFT JOIN pos_held_orders ph ON ph.id = h.hold_reference_id
+      JOIN orders o ON o.id = h.hold_reference_id OR o.id = ph.order_id
+      WHERE h.table_id = ? AND h.status = 'active'
+        AND (
+          o.status NOT IN ('cancelled', 'rejected', 'timeout', 'expired', 'fulfillment_exception', 'completed')
+          OR (o.status = 'completed' AND MAX(
+            COALESCE((SELECT MAX(p.amount) FROM order_payments p WHERE p.order_id = o.id AND p.payment_status = 'settlement'), 0),
+            COALESCE((SELECT SUM(cp.amount) FROM pos_check_payments cp WHERE cp.order_id = o.id AND cp.payment_status = 'settlement'), 0)
+          ) < o.grand_total - 0.000001)
+        )
+      LIMIT 1
+    `).get(tableId);
+    if (activeHoldOrder) {
+      return res.status(409).json({
+        success: false,
+        error: 'ACTIVE_ORDER_HOLD',
+        message: `Meja masih memiliki Order ${activeHoldOrder.order_number || activeHoldOrder.id} berstatus ${activeHoldOrder.status}. Batalkan atau selesaikan Order itu sebelum release meja.`
+      });
+    }
+
     const now = new Date().toISOString();
     const actorId = req.user.id || req.user.userId || 'cashier';
 
     if (stateRow && stateRow.current_session_id) {
-      try {
-        DiningTableService.completeDiningSession(stateRow.current_session_id, actorId);
-      } catch (err) {
-        db.prepare("UPDATE dining_sessions SET status = 'completed', closed_at = ?, updated_at = ? WHERE id = ?").run(now, now, stateRow.current_session_id);
-      }
+      // Never bypass Dining's unpaid/pending-order close guards. If the session
+      // cannot be closed, keep the table occupied and let staff resolve blockers.
+      DiningTableService.completeDiningSession(stateRow.current_session_id, actorId);
     }
 
     try {
@@ -318,8 +371,27 @@ router.post('/dine-in/tables/:id/transfer', requireAuth(['owner', 'brand_manager
   }
 });
 
+// POS Cashier: upcoming reservations (executor of guest arrival check-in).
+router.get('/pos/reservations', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
+  try {
+    const branchId = ['branch_manager', 'cashier'].includes(req.user.role)
+      ? (req.user.branchId || req.user.branch_id)
+      : req.query.branch_id;
+    if (!branchId) return res.status(400).json({ success: false, error: 'branch_id wajib.' });
+    const rows = db.prepare(`
+      SELECT id, order_number, customer_name, customer_phone, scheduled_slot_start, order_note, status, created_at
+      FROM orders
+      WHERE brand_id = ? AND branch_id = ? AND order_type = 'reservation' AND status = 'confirmed'
+      ORDER BY scheduled_slot_start ASC LIMIT 100
+    `).all(req.brand_id, branchId);
+    res.json({ success: true, reservations: rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Staff / POS: Reservation operational lifecycle
-router.post('/pos/reservations/:id/check-in', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+router.post('/pos/reservations/:id/check-in', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
   try {
     const reservation = db.prepare(
       "SELECT id, brand_id, branch_id, order_type FROM orders WHERE id = ? AND brand_id = ?"
@@ -332,7 +404,7 @@ router.post('/pos/reservations/:id/check-in', requireAuth(['owner', 'brand_manag
       return res.status(400).json({ success: false, error: 'NOT_A_RESERVATION' });
     }
 
-    if (req.user.role === 'branch_manager') {
+    if (['branch_manager', 'cashier'].includes(req.user.role)) {
       const assignedBranchId = req.user.branchId || req.user.branch_id;
       if (!assignedBranchId || reservation.branch_id !== assignedBranchId) {
         return res.status(403).json({
@@ -360,7 +432,7 @@ router.post('/pos/reservations/:id/check-in', requireAuth(['owner', 'brand_manag
   }
 });
 
-router.post('/pos/reservations/:id/no-show', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+router.post('/pos/reservations/:id/no-show', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
   try {
     const reservation = db.prepare(
       "SELECT id, brand_id, branch_id, order_type FROM orders WHERE id = ? AND brand_id = ?"
@@ -373,7 +445,7 @@ router.post('/pos/reservations/:id/no-show', requireAuth(['owner', 'brand_manage
       return res.status(400).json({ success: false, error: 'NOT_A_RESERVATION' });
     }
 
-    if (req.user.role === 'branch_manager') {
+    if (['branch_manager', 'cashier'].includes(req.user.role)) {
       const assignedBranchId = req.user.branchId || req.user.branch_id;
       if (!assignedBranchId || reservation.branch_id !== assignedBranchId) {
         return res.status(403).json({

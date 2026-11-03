@@ -6,14 +6,14 @@
   <title>Xentra Core — Portal Pemilik Resto & Dashboard</title>
   <!-- Shared merchant infrastructure — design tokens, toast, action-menu, crop editor -->
   <link rel="stylesheet" href="/merchant-shared/fonts/plus-jakarta-sans.css?v=1.0.0">
-  <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.5">
-  <link rel="stylesheet" href="/merchant-shared/css/presentation-shells.css?v=1.0.4">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.72">
+  <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.7">
+  <link rel="stylesheet" href="/merchant-shared/css/presentation-shells.css?v=1.0.5">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.73">
   <link rel="stylesheet" href="/merchant-shared/css/modules/marketing.css?v=1.0.0">
   <link rel="stylesheet" href="/merchant-shared/css/modules/stock.css?v=1.0.3">
   <link rel="stylesheet" href="/merchant-shared/css/modules/catalog.css?v=1.0.4">
   <link rel="stylesheet" href="/merchant-shared/css/ui-primitives.css?v=1.0.1">
-  <link rel="stylesheet" href="/owner/assets/bundles/menu-editor.css?v=1.0.56">
+  <link rel="stylesheet" href="/owner/assets/bundles/menu-editor.css?v=1.1.25">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#ffffff">
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
@@ -74,6 +74,28 @@
       });
 
       setTimeout(window.__xentraHideSplash, 3000);
+
+      window.showToast = function (msg) {
+        var t = document.getElementById('xentra-owner-toast');
+        if (!t) {
+          t = document.createElement('div');
+          t.id = 'xentra-owner-toast';
+          t.style.cssText = 'position:fixed;top:24px;left:50%;transform:translateX(-50%);z-index:99999999;background:#0F172A;color:#FFFFFF;padding:12px 22px;border-radius:9999px;font-size:13px;font-weight:700;font-family:\'Plus Jakarta Sans\',sans-serif;box-shadow:0 8px 24px rgba(0,0,0,0.3);pointer-events:none;transition:opacity 0.2s ease, transform 0.2s ease;opacity:0;display:none;white-space:nowrap;';
+          document.body.appendChild(t);
+        }
+        t.innerText = msg;
+        t.style.display = 'block';
+        setTimeout(function () {
+          t.style.opacity = '1';
+          t.style.transform = 'translateX(-50%) translateY(0)';
+        }, 10);
+        clearTimeout(t._timer);
+        t._timer = setTimeout(function () {
+          t.style.opacity = '0';
+          t.style.transform = 'translateX(-50%) translateY(-10px)';
+          setTimeout(function () { t.style.display = 'none'; }, 200);
+        }, 2500);
+      };
     })();
   </script>
 
@@ -1917,6 +1939,7 @@
 
       <section id="tab-catalog-products" class="x-tab-content" data-tab="catalog-products">
         <div id="modern-item-master-page-mount"></div>
+        <div id="modern-item-editor-page-mount" style="display:none;width:100%;"></div>
         <!-- 1. Product List View -->
         <div id="product-list-view" class="x-card-panel x-owner-child-page-shell">
           <!-- Kartu ini hanya memuat judul, deskripsi, dan CTA. Pencarian, kategori,
@@ -2179,59 +2202,7 @@
         <small id="prod-stock-note" class="text-muted" style="display:block;margin-top:6px;font-size:11px;color:#64748B;">item non-stock tetap bisa di pakai untuk membuat menu</small>
       </div>
 
-      <!-- 6. VARIAN CARD (RADIO-TOGGLE) -->
-      <div class="x-card x-item-editor-card" id="card-prod-variants" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
-        <h4 style="margin:0 0 14px 0;font-size:15px;font-weight:700;color:#0F172A;">Varian</h4>
-
-        <!-- Row 1: Kamu mengatur -->
-        <div id="row-prod-variant-merchant" class="x-variant-toggle-row" style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #F1F5F9;cursor:pointer;">
-          <div style="display:flex;align-items:center;gap:12px;flex:1;padding-right:16px;">
-            <div style="width:38px;height:38px;border-radius:10px;background:#4285F4;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5z"></path>
-                <path d="M9 16v5a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-5"></path>
-              </svg>
-            </div>
-            <div>
-              <div style="font-weight:700;font-size:14px;color:#0F172A;">Kamu mengatur</div>
-              <div style="font-size:11.5px;color:#64748B;margin-top:2px;line-height:1.35;">Tentukan varian pada menu yang kamu jual</div>
-            </div>
-          </div>
-          <label class="x-toggle x-toggle-variant-merchant" style="margin:0;">
-            <input type="checkbox" id="toggle-prod-variant-merchant" aria-label="Kamu mengatur varian">
-            <span class="x-toggle-slider"></span>
-          </label>
-        </div>
-
-        <!-- Row 2: Pelanggan memilih -->
-        <div id="row-prod-variant-customer" class="x-variant-toggle-row" style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;cursor:pointer;">
-          <div style="display:flex;align-items:center;gap:12px;flex:1;padding-right:16px;">
-            <div style="width:38px;height:38px;border-radius:10px;background:#EA4335;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
-                <circle cx="9" cy="7" r="4"></circle>
-                <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-              </svg>
-            </div>
-            <div>
-              <div style="font-weight:700;font-size:14px;color:#0F172A;">Pelanggan memilih</div>
-              <div style="font-size:11.5px;color:#64748B;margin-top:2px;line-height:1.35;">Buat varian buat pelangganmu agar bisa memilih</div>
-            </div>
-          </div>
-          <label class="x-toggle x-toggle-variant-customer" style="margin:0;">
-            <input type="checkbox" id="toggle-prod-variant-customer" aria-label="Pelanggan memilih varian">
-            <span class="x-toggle-slider"></span>
-          </label>
-        </div>
-
-        <!-- Sub-container: Variants checklist -->
-        <div id="container-prod-variant-options" style="display:none;margin-top:14px;padding-top:14px;border-top:1px dashed #E2E8F0;">
-          <div id="prod-variant-checklist-items" style="display:flex;flex-direction:column;gap:10px;"></div>
-        </div>
-      </div>
-
-      <!-- 7. CATATAN CARD -->
+      <!-- 6. CATATAN CARD -->
       <div class="x-card x-item-editor-card" style="background:#FFFFFF;border-radius:18px;border:1px solid #E2E8F0;padding:20px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
         <h4 style="margin:0 0 8px 0;font-size:15px;font-weight:700;color:#0F172A;">Catatan</h4>
         <textarea id="prod-desc" class="x-input" rows="3" placeholder="Catatan internal..." style="width:100%;border-radius:12px;border:1px solid #CBD5E1;padding:10px 14px;font-size:13px;box-sizing:border-box;"></textarea>
@@ -2320,6 +2291,8 @@
             <span class="text-muted" style="font-size:13px;">/</span>
             <span id="master-menu-editor-breadcrumb" style="font-weight:600;font-size:14px;">Tambah Menu</span>
           </div>
+
+          <div id="modern-menu-editor-mount" style="display:none;width:100%;"></div>
 
           <form id="form-master-menu" class="x-form x-product-editor-form" style="max-width:920px;margin:0 auto;width:100%;">
             <input type="hidden" id="master-menu-id" value="">
@@ -3039,7 +3012,9 @@
 
       <!-- TAB: BAHAN BAKU (Master Raw Materials - bahan baku.png) -->
       <section id="tab-materials" class="x-tab-content" data-tab="materials">
-        <div class="x-card-panel x-owner-child-page-shell">
+        <div id="modern-materials-page-mount" style="width:100%;"></div>
+        <div id="modern-material-editor-page-mount" style="display:none;width:100%;"></div>
+        <div id="legacy-materials-content" class="x-card-panel x-owner-child-page-shell" style="display:none;">
           <div class="x-card">
             <div class="x-panel-header-flex">
               <div class="x-owner-child-mobile-header">
@@ -4220,9 +4195,16 @@
                   </select>
                 </div>
                 <div>
-                  <label class="x-label" style="font-size:12px;font-weight:700;color:var(--text-main);margin-bottom:6px;display:block;">Persentase Komisi (%)</label>
-                  <input type="number" id="mkt-aff-rate" class="x-input" style="width:100%;" min="1" max="50" step="0.5" value="5">
-                  <small class="text-muted" style="font-size:11px;">Dihitung dari subtotal menu yang memenuhi syarat.</small>
+                  <label class="x-label" style="font-size:12px;font-weight:700;color:var(--text-main);margin-bottom:6px;display:block;">Skema Komisi</label>
+                  <select id="mkt-aff-comm-type" class="x-input" style="width:100%;" onchange="onAffiliateCommTypeChange(this.value)">
+                    <option value="FIXED_PER_ITEM">Nominal per Menu (Rekomendasi F&B: Rp / porsi)</option>
+                    <option value="PERCENTAGE">Persentase Subtotal Pesanan (%)</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="x-label" id="mkt-aff-rate-lbl" style="font-size:12px;font-weight:700;color:var(--text-main);margin-bottom:6px;display:block;">Besaran Komisi per Menu (Rp)</label>
+                  <input type="number" id="mkt-aff-rate" class="x-input" style="width:100%;" min="500" step="500" value="1000">
+                  <small class="text-muted" id="mkt-aff-rate-desc" style="font-size:11px;">Komisi tetap per porsi menu yang dipesan (standar: Rp 1.000).</small>
                 </div>
                 <div>
                   <label class="x-label" style="font-size:12px;font-weight:700;color:var(--text-main);margin-bottom:6px;display:block;">Minimal Penarikan (Rp)</label>
@@ -4233,6 +4215,17 @@
                   <label class="x-label" style="font-size:12px;font-weight:700;color:var(--text-main);margin-bottom:6px;display:block;">Masa Berlaku Cookie (Hari)</label>
                   <input type="number" id="mkt-aff-cookie-days" class="x-input" style="width:100%;" min="1" max="90" value="14">
                   <small class="text-muted" style="font-size:11px;">Durasi atribusi last-click dari link yang dibagikan.</small>
+                </div>
+              </div>
+
+              <!-- Setting Menu Hero / Story Promo -->
+              <div style="margin-top:16px;padding-top:16px;border-top:1px dashed var(--border-color, #e2e8f0);">
+                <label class="x-label" style="font-size:12px;font-weight:700;color:var(--text-main);margin-bottom:6px;display:block;">Menu Unggulan Kartu Story (Foto Utama Promosi)</label>
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                  <select id="mkt-aff-featured-product" class="x-input" style="flex:1;min-width:260px;max-width:480px;">
+                    <option value="">🍗 Otomatis / Default Resto (Ayam Tulang Lunak)</option>
+                  </select>
+                  <small class="text-muted" style="font-size:11px;flex-basis:100%;">Pilih menu katalog dengan foto terbaik yang otomatis muncul di poster Story &amp; QR Promo para mitra.</small>
                 </div>
               </div>
             </div>
@@ -4404,6 +4397,9 @@
               </button>
               <button type="button" class="settings-nav-btn" data-settings-section="channels/pos" onclick="switchSettingsSection('channels/pos', true)" style="display:none;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);border:none;background:transparent;color:#334155;font-size:13px;font-weight:600;cursor:pointer;text-align:left;width:100%;">
                 <span>🖥️</span><span>Point of Sale (POS)</span>
+              </button>
+              <button type="button" class="settings-nav-btn" data-settings-section="channels/kiosk" onclick="switchSettingsSection('channels/kiosk', true)" style="display:none;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);border:none;background:transparent;color:#334155;font-size:13px;font-weight:600;cursor:pointer;text-align:left;width:100%;">
+                <span>🖥️</span><span>Kiosk Terminal</span>
               </button>
               <button type="button" class="settings-nav-btn" data-settings-section="channels/delivery" onclick="switchSettingsSection('channels/delivery', true)" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);border:none;background:transparent;color:#334155;font-size:13px;font-weight:600;cursor:pointer;text-align:left;width:100%;">
                 <span>🛵</span><span>Ojol (GoFood, Grab, Shopee)</span>
@@ -7009,6 +7005,8 @@
   <!-- Dashboard JavaScript -->
   <!-- Shared merchant infrastructure (auth, toast, action-menu, crop editor) — must load first -->
   <script src="/merchant-shared/js/shared.js?v=1.0.2"></script>
+  <script src="/merchant-shared/js/audio-alerts.js?v=1.0.6"></script>
+  <script src="/merchant-shared/js/owner-order-alerts.js?v=1.0.0"></script>
   <script src="/merchant-shared/js/action-menu.js?v=1.0.1"></script>
   <script src="/merchant-shared/js/crop-editor.js?v=1.0.2"></script>
   <script src="/merchant-shared/js/catalog-client.js?v=1.0.1"></script>
@@ -7031,13 +7029,13 @@
   <script src="/merchant-dashboard/assets/js/modules/finance.js?v=1.1.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/marketing-banners.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/marketing.js?v=1.0.1"></script>
-  <script src="/owner/assets/bundles/menu-editor.js?v=1.0.56"></script>
-  <script src="/merchant-dashboard/assets/js/modules/master-menu.js?v=1.0.14"></script>
+  <script src="/owner/assets/bundles/menu-editor.js?v=1.1.54"></script>
+  <script src="/merchant-dashboard/assets/js/modules/master-menu.js?v=1.0.16"></script>
   <script src="/merchant-dashboard/assets/js/modules/settings.js?v=1.1.0"></script>
   <script src="/merchant-dashboard/assets/js/modules/brand.js?v=1.0.0"></script>
-  <script src="/merchant-dashboard/assets/js/modules/catalog-reference.js?v=1.0.7"></script>
-  <script src="/merchant-dashboard/assets/js/modules/catalog.js?v=1.0.3"></script>
-  <script src="/dashboard/assets/js/dashboard.js?v=3.2.6"></script>
-  <script src="/merchant-dashboard/assets/js/owner-master-menu-inline.js?v=1.0.2"></script>
+  <script src="/merchant-dashboard/assets/js/modules/catalog-reference.js?v=1.0.10"></script>
+  <script src="/merchant-dashboard/assets/js/modules/catalog.js?v=1.0.5"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=3.2.12"></script>
+  <script src="/merchant-dashboard/assets/js/owner-master-menu-inline.js?v=1.0.3"></script>
 </body>
 </html>  

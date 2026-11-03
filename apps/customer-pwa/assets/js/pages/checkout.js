@@ -68,6 +68,8 @@
     isSubmitting: false,
     isRedirectingToPayment: false,
     openBillLoaded: false,
+    activeDiningSessionId: null,
+    closedQrDiningSession: false,
     checkoutClientTransactionId: null,
     additionalClientTransactionId: null
   };
@@ -205,6 +207,32 @@
     var num = Math.floor(Number(n) || 0);
     var formatted = String(Math.abs(num)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     return (num < 0 ? '-' : '') + formatted;
+  }
+
+  // ── Focus & Smooth Highlight for Validation Feedback ──
+  function focusAndHighlight(elementOrId, message) {
+    if (message && UI && typeof UI.toast === 'function') {
+      UI.toast(message);
+    }
+    var el = typeof elementOrId === 'string' ? $(elementOrId) : elementOrId;
+    if (!el) return;
+    try {
+      if (typeof el.scrollIntoView === 'function') {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    } catch (_) {
+      try { el.scrollIntoView(); } catch (__) {}
+    }
+    if (el.classList && typeof el.classList.remove === 'function') {
+      el.classList.remove('x-card-highlight');
+      void el.offsetWidth;
+      el.classList.add('x-card-highlight');
+      setTimeout(function () {
+        if (el && el.classList && typeof el.classList.remove === 'function') {
+          el.classList.remove('x-card-highlight');
+        }
+      }, 2200);
+    }
   }
 
   // ── PWA Install Detection Logic ──
@@ -543,6 +571,59 @@
     return t.table_number || t.label || '-';
   }
 
+  function renderMyDiningSubmissions() {
+    var submissions = state.openBill && Array.isArray(state.openBill.my_submissions)
+      ? state.openBill.my_submissions
+      : [];
+    if (!submissions.length) {
+      return '<div style="font-size:12px;color:#64748b;padding:8px 0 2px;">Pesanan kamu akan muncul di sini setelah dikirim.</div>';
+    }
+
+    return submissions.map(function (submission) {
+      var status = String(submission.status || '').toLowerCase();
+      var statusLabel = status === 'pending_acceptance' || status === 'pending'
+        ? 'Menunggu konfirmasi resto'
+        : status === 'rejected'
+          ? 'Ditolak resto'
+          : status === 'cancelled'
+            ? 'Dibatalkan'
+          : status === 'ready'
+            ? 'Siap disajikan'
+            : status === 'preparing'
+              ? 'Sedang disiapkan'
+              : 'Diterima resto';
+      var statusColor = status === 'pending_acceptance' || status === 'pending'
+        ? '#b45309'
+        : status === 'rejected' || status === 'cancelled'
+          ? '#be123c'
+          : status === 'ready' || status === 'preparing'
+            ? '#0369a1'
+            : '#047857';
+      var rejectionReason = submission.rejection_reason
+        ? '<div style="margin-top:6px;padding:7px 9px;border-radius:8px;background:' + (status === 'cancelled' ? '#f1f5f9;color:#475569' : '#fff1f2;color:#9f1239') + ';font-size:10.5px;">' + (status === 'cancelled' ? 'Info pesanan: ' : 'Alasan resto: ') + UI.escape(submission.rejection_reason) + '</div>'
+        : '';
+      var items = Array.isArray(submission.items) ? submission.items : [];
+      return '<div style="padding:9px 0;border-top:1px solid #d1fae5;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;font-size:11px;">' +
+          '<b style="color:#334155;">Pesanan kamu</b><span style="color:' + statusColor + ';font-weight:700;text-align:right;">' + UI.escape(statusLabel) + '</span>' +
+        '</div>' +
+        items.map(function (item) {
+          var itemName = UI.escape(item.name || 'Item');
+          var qty = Number(item.quantity) || 0;
+          var note = item.note ? '<div style="font-size:10px;color:#64748b;">' + UI.escape(item.note) + '</div>' : '';
+          return '<div style="display:flex;justify-content:space-between;gap:8px;margin-top:5px;font-size:11px;color:#334155;">' +
+            '<div style="min-width:0;"><div>' + itemName + ' × ' + qty + '</div>' + note + '</div>' +
+            '<span style="white-space:nowrap;">' + fmtIDR(Number(item.subtotal) || 0) + '</span>' +
+          '</div>';
+        }).join('') +
+        '<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:11px;font-weight:700;color:#064e3b;">' +
+          '<span>Subtotal pesanan kamu</span><span>' + fmtIDR(Number(submission.total) || 0) + '</span>' +
+        '</div>' +
+        rejectionReason +
+      '</div>';
+    }).join('');
+  }
+
   // Scan QR meja: /join?meja=<token>. Mejanya sudah ditentukan oleh QR, jadi
   // konsumen tidak perlu memilih meja lagi; kalau di meja itu sudah ada bill
   // terbuka, billnya langsung dilanjutkan.
@@ -558,10 +639,17 @@
   // ── Scanner QR meja: modul bersama (core/table-qr.js) ──
   // checkout di-lazy-load, jadi scannernya dipindah ke core supaya Home juga bisa
   // memakainya. Di sini tinggal meneruskan hasil scan ke jalur klaim yang sama.
-  function openTableQrScanner() {
+  function openTableQrScanner(onSuccess) {
     var TableQr = window.Xentra && window.Xentra.TableQr;
     if (!TableQr) return;
-    TableQr.open(function (token) { claimTableFromQr(token); });
+    TableQr.open(function (token) {
+      var p = claimTableFromQr(token);
+      if (p && typeof p.then === 'function') {
+        p.then(function (res) {
+          if (typeof onSuccess === 'function') onSuccess(res);
+        });
+      }
+    });
   }
 
   function extractMejaToken(text) {
@@ -598,20 +686,36 @@
     return API.post('/customer/dining-session/claim', { qr_token: qrToken, branch_id: claimBranchId() }).then(function (res) {
       if (!res || res.success !== true) {
         // QR yang sudah dicabut/diganti tidak boleh diam-diam tidak terjadi apa-apa.
-        if (UI && UI.toast) UI.toast('QR meja ini sudah tidak berlaku. Minta petugas mencetak QR baru, atau pilih meja manual.');
+        if (UI && UI.toast) UI.toast('QR meja ini tidak berlaku atau sesi belum dibuka. Minta kasir membuka sesi meja dan scan QR yang tersedia.');
         if (!state.isSubmitting) renderLayout();
         return null;
       }
-      // Kontraknya: QR hanya memberi tahu mejanya. Tagihan tetap dibuka lewat
-      // identitas tamu sendiri (refreshOpenBill), bukan lewat QR.
       var table = (res && res.table) ? res.table : null;
+
+      if (!res.joined || !res.session) {
+        state.activeDiningSessionId = null;
+        state.openBill = null;
+        state.openBillLoaded = true;
+        state.fulfillment.table_ids = [];
+        state.fulfillment.tableNumber = '';
+        if (Store && Store.clearMyTable) Store.clearMyTable();
+        state.pendingJoinToken = null;
+        if (UI && UI.toast) UI.toast(res.message || 'Minta kasir membuka sesi meja sebelum memesan.');
+        if (!state.isSubmitting) renderLayout();
+        return res || null;
+      }
+      state.activeDiningSessionId = String(res.session.session_id || '');
+      state.openBill = res.session;
+      state.openBillLoaded = true;
+      state.closedQrDiningSession = false;
+      try { localStorage.removeItem('xentra_v2_pending_table_token'); } catch (_) {}
 
       // Meja dari QR mengunci pilihannya: satu meja, tidak bisa diganti.
       if (table && table.id) {
         switchFulfillmentEnvironment('dine_in');
         state.fulfillment.table_ids = [table.id];
         state.fulfillment.tableNumber = table.table_number || '';
-        if (Store.setMyTable) Store.setMyTable({ id: table.id, number: table.table_number || '' });
+        if (Store.setMyTable) Store.setMyTable({ id: table.id, number: table.table_number || '', hadOpenBill: true });
       }
       state.pendingJoinToken = null;
       if (!state.isSubmitting) renderLayout();
@@ -635,6 +739,8 @@
       var prev = state.openBill ? JSON.stringify(state.openBill) : 'null';
       var next = bill ? JSON.stringify(bill) : 'null';
       state.openBill = bill;
+      state.activeDiningSessionId = bill && bill.session_id ? String(bill.session_id) : null;
+      if (bill) state.closedQrDiningSession = false;
       if (bill && bill.branch_id) {
         currentBranchId = String(bill.branch_id);
       }
@@ -643,14 +749,25 @@
         var billTable = bill.tables[0];
         var bId = billTable.id;
         var bNum = billTable.table_number || billTable.label || '';
+        var selectedFulfillmentType = state.fulfillment.type;
         switchFulfillmentEnvironment('dine_in');
         state.fulfillment.table_ids = [bId];
         state.fulfillment.tableNumber = bNum;
         if (Store && Store.setMyTable) {
           Store.setMyTable({ id: bId, number: bNum, hadOpenBill: true });
         }
-        if (Store && Store.setOrderType) {
-          Store.setOrderType('dine_in');
+        if (selectedFulfillmentType && selectedFulfillmentType !== 'dine_in' && selectedFulfillmentType !== 'dinein') {
+          switchFulfillmentEnvironment(selectedFulfillmentType);
+        }
+      } else {
+        var staleTable = Store.getMyTable && Store.getMyTable();
+        if (staleTable && staleTable.hadOpenBill) {
+          state.closedQrDiningSession = true;
+          state.fulfillment.table_ids = [];
+          state.fulfillment.tableNumber = '';
+          state.activeDiningSessionId = null;
+          if (Store.clearMyTable) Store.clearMyTable();
+          if (UI && UI.toast) UI.toast('Sesi meja sebelumnya sudah ditutup. Scan QR meja yang aktif atau minta kasir membuka sesi baru.');
         }
       }
       // Jangan pernah render di tengah proses submit.
@@ -719,7 +836,6 @@
         switchFulfillmentEnvironment('dine_in');
         state.fulfillment.table_ids = [storedTable.id];
         state.fulfillment.tableNumber = storedTable.number || '';
-        if (Store.setOrderType) Store.setOrderType('dine_in');
       } else if (storedIsDineIn && storedTable && storedTable.id && !((state.fulfillment.table_ids || []).length)) {
         switchFulfillmentEnvironment('dine_in');
         state.fulfillment.table_ids = [storedTable.id];
@@ -1081,6 +1197,15 @@
       '<div class="xentra-checkout x-checkout-alt2">' +
       '  <div class="x-alt-header"><button type="button" id="x-back-empty" class="x-alt-back" aria-label="Kembali"><img src="/assets/icons/arrowback.svg" alt=""></button><span>Checkout Pesanan</span></div>' +
       '  <div id="x-promo-slot">' + getPromoBannerHtml([]) + '</div>' +
+      (state.openBill ? (
+        '  <div id="x-open-bill-empty" style="margin:10px 14px;padding:14px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:14px;text-align:left;">' +
+        '    <div style="font-size:11px;color:#047857;font-weight:800;">TAGIHAN MEJA ' + UI.escape(billTableLabel()) + '</div>' +
+        '    <div style="display:flex;justify-content:space-between;margin-top:7px;font-size:12px;color:#065f46;"><span>Total pesanan meja</span><b>' + fmtIDR(Number(state.openBill.total_bill) || 0) + '</b></div>' +
+        '    <div style="display:flex;justify-content:space-between;margin-top:3px;font-size:11px;color:#047857;"><span>Sisa tagihan meja</span><b>' + fmtIDR(Number(state.openBill.outstanding_total) || 0) + '</b></div>' +
+        '    <div style="margin-top:9px;padding-top:7px;border-top:1px solid #a7f3d0;font-size:11px;font-weight:800;color:#065f46;">PESANAN KAMU</div>' +
+        renderMyDiningSubmissions() +
+        '  </div>'
+      ) : '') +
       '  <div style="text-align:center;padding:56px 20px;">' +
       '    <div style="font-size:48px;margin-bottom:12px;">🛒</div>' +
       '    <div style="font-weight:800;font-size:18px;color:#111;margin-bottom:6px;">Keranjang Masih Kosong</div>' +
@@ -1100,6 +1225,7 @@
     var isReservation = fulType === 'reservation';
     var isDineIn = fulType === 'dinein' || fulType === 'dine_in';
     var isPickup = fulType === 'pickup';
+    var isAdditionalDineIn = isDineIn && !!getActiveDineInOrderId() && items.length > 0;
 
     var subtotal = items.reduce(function (s, i) { return s + Number(i.price || 0) * Number(i.quantity || 0); }, 0);
     var fee = isDelivery ? state.deliveryFee : 0;
@@ -1123,14 +1249,22 @@
       fulIcon = '/assets/icons/pick_up.png';
     } else if (isDineIn) {
       fulTitle = 'Makan di Tempat (Dine-in)';
-      fulSub = state.fulfillment.tableNumber ? ('Nomor Meja: ' + state.fulfillment.tableNumber) : 'Belum input nomor meja';
+      var myTable = (Store.getMyTable && Store.getMyTable()) || null;
+      var sessionTable = state.openBill && state.openBill.tables && state.openBill.tables[0];
+      var activeTableNumber = (myTable && myTable.hadOpenBill && myTable.number) ||
+        (sessionTable && (sessionTable.table_number || sessionTable.label)) ||
+        state.fulfillment.tableNumber;
+      fulSub = activeTableNumber
+        ? ((myTable && myTable.hadOpenBill) || sessionTable ? 'Meja ' + activeTableNumber + ' · Sesi aktif' : 'Nomor Meja: ' + activeTableNumber)
+        : 'Pilih tipe pesanan';
       fulIcon = '/assets/icons/dine_in.png';
     } else if (isReservation) {
       fulTitle = 'Reservasi Meja';
       var rDate = state.fulfillment.reservationDate || 'Pilih tanggal';
       var rTime = state.fulfillment.reservationTime || '12:00';
       var rGuests = state.fulfillment.guestCount || 2;
-      fulSub = rDate + ' • ' + rTime + ' (' + rGuests + ' Orang)';
+      var rTable = state.fulfillment.tableNumber ? ' · Meja ' + state.fulfillment.tableNumber : '';
+      fulSub = rDate + ' • ' + rTime + ' (' + rGuests + ' Orang)' + rTable;
       fulIcon = '/assets/icons/reservasi.png';
     }
 
@@ -1145,7 +1279,7 @@
       '  <div class="x-alt-header"><button type="button" id="x-checkout-back" class="x-alt-back" aria-label="Kembali"><img src="/assets/icons/arrowback.svg" alt=""></button><span>Checkout Bangjo</span></div>' +
 
       // 1.5 Closed Branch Warning Banner
-      '  <div id="x-checkout-closed-banner" style="display:' + (isCurrentBranchClosed() ? 'flex' : 'none') + ';margin:0 14px 10px;padding:12px 14px;background:#fff1f2;border:1px solid #fecdd3;border-radius:14px;align-items:center;gap:10px;color:#9f1239;">' +
+      '  <div id="x-checkout-closed-banner" style="display:' + (isCurrentBranchClosed() ? 'flex' : 'none') + ';margin:0 14px 10px;padding:12px 14px;background:#fff5f7;border:1px solid #fecdd3;border-radius:14px;align-items:center;gap:10px;color:#9f1239;">' +
       '    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#e11d48" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>' +
       '    <div style="display:flex;flex-direction:column;gap:2px;"><strong style="font-size:13px;font-weight:700;">Resto Sedang Tutup</strong><span style="font-size:11.5px;color:#be123c;">Cabang ini sedang tidak menerima pesanan baru saat ini.</span></div>' +
       '  </div>' +
@@ -1209,13 +1343,15 @@
       // 6. Card 5: Payment Summary & Methods Card (Hidden on Reservation)
       (!isReservation ? (
         '  <div class="x-card x-alt-summary-card" id="x-payment-summary-card" style="margin:0 14px 10px;padding:16px;border-radius:18px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.04);">' +
-        '    <div class="x-alt-summary-title" style="font-size:15px;font-weight:700;color:#111;margin-bottom:12px;">Ringkasan pembayaran</div>' +
+        '    <div class="x-alt-summary-title" style="font-size:15px;font-weight:700;color:#111;margin-bottom:12px;">' + (isAdditionalDineIn ? 'Ringkasan pesanan tambahan' : 'Ringkasan pembayaran') + '</div>' +
         '    <div class="x-alt-sum-row" style="display:flex;justify-content:space-between;font-size:13.5px;color:#666;padding:3px 0;"><span>Harga</span><span id="x-sum-subtotal" style="font-weight:600;color:#111;">' + fmtIDR(subtotal) + '</span></div>' +
         (isDelivery ? '<div class="x-alt-sum-row" style="display:flex;justify-content:space-between;font-size:13.5px;color:#666;padding:3px 0;"><span>Biaya Penanganan dan Pengiriman</span><span id="x-sum-delivery" style="font-weight:600;color:#111;">' + fmtIDR(fee) + '</span></div>' : '') +
         (discount > 0 ? '<div class="x-alt-sum-row x-alt-discount-row" style="display:flex;justify-content:space-between;font-size:13.5px;color:#ef4444;font-weight:700;padding:3px 0;"><span>Diskon</span><span id="x-sum-discount">-' + fmtIDR(discount) + '</span></div>' : '') +
         '    <div class="x-alt-sum-divider" style="height:1px;background:#f0f0f0;margin:12px 0 10px;"></div>' +
-        '    <div class="x-alt-sum-total" style="display:flex;align-items:baseline;justify-content:space-between;"><span style="font-size:15px;font-weight:700;color:#111;">Total pembayaran</span><div style="display:flex;align-items:baseline;gap:8px;">' + (oldTotal > grand ? '<s id="x-sum-oldtotal" style="color:#9ca3af;font-size:13px;text-decoration:line-through;">' + fmtIDR(oldTotal) + '</s>' : '') + '<b id="x-sum-total" style="font-size:18px;font-weight:800;color:#111;">' + fmtIDR(grand) + '</b></div></div>' +
-        '    <div class="x-alt-pay-methods" style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
+        '    <div class="x-alt-sum-total" style="display:flex;align-items:baseline;justify-content:space-between;"><span style="font-size:15px;font-weight:700;color:#111;">' + (isAdditionalDineIn ? 'Nilai pesanan' : 'Total pembayaran') + '</span><div style="display:flex;align-items:baseline;gap:8px;">' + (oldTotal > grand ? '<s id="x-sum-oldtotal" style="color:#9ca3af;font-size:13px;text-decoration:line-through;">' + fmtIDR(oldTotal) + '</s>' : '') + '<b id="x-sum-total" style="font-size:18px;font-weight:800;color:#111;">' + fmtIDR(grand) + '</b></div></div>' +
+        (isAdditionalDineIn
+          ? '<div style="margin-top:14px;padding:10px 12px;border-radius:10px;background:#fff7ed;color:#9a3412;font-size:12px;line-height:1.45;">Pesanan tambahan akan masuk ke tagihan meja setelah resto menerima. Pembayaran dilakukan melalui kasir dan bisa dipisah berdasarkan menu.</div>'
+          : ('    <div class="x-alt-pay-methods" style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
         '      <button type="button" class="x-alt-pay-opt ' + (state.paymentMethod === 'cash' ? 'is-active' : '') + '" id="x-opt-cash" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid ' + (state.paymentMethod === 'cash' ? 'var(--x-primary)' : '#e5e7eb') + ';border-radius:14px;background:' + (state.paymentMethod === 'cash' ? 'var(--x-primary-bg)' : '#fff') + ';cursor:pointer;text-align:left;font-family:inherit;">' +
         '        <img src="/assets/icons/cashblack.svg" alt="" style="width:24px;height:24px;object-fit:contain;flex-shrink:0;">' +
         '        <div style="display:flex;flex-direction:column;min-width:0;">' +
@@ -1230,15 +1366,21 @@
         '          <span style="font-size:11px;color:#777;">QRIS / E-Wallet</span>' +
         '        </div>' +
         '      </button>' +
-        '    </div>' +
+        '    </div>')) +
         (state.openBill ? (
           '    <div id="x-open-bill" style="margin-top:12px;padding:12px 14px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;">' +
           '      <div style="font-size:11.5px;color:#047857;font-weight:700;">TAGIHAN MEJA ' + UI.escape(billTableLabel()) + '</div>' +
           '      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:4px;">' +
-          '        <span style="font-size:12px;color:#065f46;">Total pesanan</span>' +
+          '        <span style="font-size:12px;color:#065f46;">Total pesanan meja</span>' +
           '        <b id="x-open-bill-total" style="font-size:14px;font-weight:800;color:#064e3b;">' + fmtIDR(Number(state.openBill.total_bill) || 0) + '</b>' +
           '      </div>' +
-          '      <div style="font-size:11px;color:#047857;margin-top:4px;">Pesanan tambahan otomatis masuk ke tagihan ini.</div>' +
+          '      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:3px;">' +
+          '        <span style="font-size:11px;color:#047857;">Sisa tagihan meja</span>' +
+          '        <b id="x-open-bill-outstanding" style="font-size:12px;font-weight:800;color:#064e3b;">' + fmtIDR(Number(state.openBill.outstanding_total) || 0) + '</b>' +
+          '      </div>' +
+          '      <div style="margin-top:8px;padding-top:7px;border-top:1px solid #a7f3d0;font-size:11px;font-weight:800;color:#065f46;">PESANAN KAMU</div>' +
+          renderMyDiningSubmissions() +
+          '      <div style="font-size:11px;color:#047857;margin-top:4px;">' + (isAdditionalDineIn ? 'Tagihan meja mencakup pesanan semua anggota. Pembayaran pesanan tambahan dilakukan lewat kasir setelah resto menerima, dan bisa dipisah per menu.' : 'Tagihan meja mencakup pesanan semua anggota. Pembayaran online di checkout hanya melunasi pesanan yang kamu kirim sekarang.') + '</div>' +
           '    </div>'
         ) : '') +
         (needsCashTendered() && state.cashTendered ? (
@@ -1255,10 +1397,26 @@
         '      <div style="display:flex;align-items:center;gap:4px;"><span>🔒</span><span>Transaksi aman dan terenkripsi</span></div>' +
         '    </div>' +
         '  </div>'
-      ) : '') +
+      ) : (
+        '  <div class="x-card x-alt-summary-card" id="x-reservation-summary-card" style="margin:0 14px 10px;padding:16px;border-radius:18px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.04);">' +
+        '    <div class="x-alt-summary-title" style="font-size:15px;font-weight:700;color:#111;margin-bottom:12px;">Ringkasan reservasi</div>' +
+        '    <div class="x-alt-sum-row" style="display:flex;justify-content:space-between;font-size:13.5px;color:#666;padding:3px 0;"><span>Tanggal &amp; Waktu</span><span style="font-weight:600;color:#111;">' + UI.escape((state.fulfillment.reservationDate || 'Besok') + ' • ' + (state.fulfillment.reservationTime || '12:00')) + '</span></div>' +
+        '    <div class="x-alt-sum-row" style="display:flex;justify-content:space-between;font-size:13.5px;color:#666;padding:3px 0;"><span>Jumlah Orang</span><span style="font-weight:600;color:#111;">' + (state.fulfillment.guestCount || 2) + ' Orang</span></div>' +
+        '    <div class="x-alt-sum-row" style="display:flex;justify-content:space-between;font-size:13.5px;color:#666;padding:3px 0;"><span>Pilihan Meja</span><span style="font-weight:600;color:#111;">' + (state.fulfillment.tableNumber ? ('Meja ' + UI.escape(state.fulfillment.tableNumber)) : 'Ditentukan resto') + '</span></div>' +
+        '    <div class="x-alt-sum-row" style="display:flex;justify-content:space-between;font-size:13.5px;color:#666;padding:3px 0;"><span>Nama Pemesan</span><span style="font-weight:600;color:#111;">' + UI.escape(state.fulfillment.reservationName || state.customer.name || '-') + '</span></div>' +
+        '    <div class="x-alt-sum-row" style="display:flex;justify-content:space-between;font-size:13.5px;color:#666;padding:3px 0;"><span>No. WhatsApp</span><span style="font-weight:600;color:#111;">' + UI.escape(state.fulfillment.reservationPhone || state.customer.phone || '-') + '</span></div>' +
+        (items.length > 0 ? ('    <div class="x-alt-sum-row" style="display:flex;justify-content:space-between;font-size:13.5px;color:#666;padding:3px 0;"><span>Subtotal Menu</span><span style="font-weight:600;color:#111;">' + fmtIDR(subtotal) + '</span></div>') : '') +
+        '    <div class="x-alt-sum-row" style="display:flex;justify-content:space-between;font-size:13.5px;color:#666;padding:3px 0;"><span>Biaya Booking</span><span style="font-weight:700;color:#16a34a;">Gratis</span></div>' +
+        '    <div class="x-alt-sum-divider" style="height:1px;background:#f0f0f0;margin:12px 0 10px;"></div>' +
+        '    <div class="x-alt-sum-total" style="display:flex;align-items:baseline;justify-content:space-between;"><span style="font-size:15px;font-weight:700;color:#111;">Total Pembayaran</span><div style="display:flex;align-items:baseline;gap:8px;"><b id="x-sum-total" style="font-size:18px;font-weight:800;color:#111;">' + (items.length > 0 && subtotal > 0 ? fmtIDR(subtotal) : 'Gratis') + '</b></div></div>' +
+        '    <div class="x-alt-trust" style="font-size:11.5px;color:#6b7280;text-align:center;margin-top:14px;display:flex;flex-direction:column;align-items:center;gap:3px;">' +
+        '      <div style="display:flex;align-items:center;gap:4px;"><span>🔒</span><span>Reservasi tersimpan aman</span></div>' +
+        '    </div>' +
+        '  </div>'
+      )) +
 
       // 7. Sticky Submit CTA Bar
-      (isReservation ? '' : ('  <div class="x-alt-cta-bar" style="position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;padding:12px 14px max(12px,env(safe-area-inset-bottom));background:#fff;box-shadow:0 -4px 18px rgba(0,0,0,.08);z-index:1000;"><button type="button" id="x-btn-submit-order" class="x-alt-submit-btn" style="width:100%;height:50px;border-radius:999px;border:0;background:var(--x-primary);color:var(--x-primary-text, #111);font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;">' + submitCtaLabel(isReservation) + '</button></div>')) +
+      '  <div class="x-alt-cta-bar" style="position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;padding:12px 14px max(12px,env(safe-area-inset-bottom));background:#fff;box-shadow:0 -4px 18px rgba(0,0,0,.08);z-index:1000;"><button type="button" id="x-btn-submit-order" class="x-alt-submit-btn" style="width:100%;height:50px;border-radius:999px;border:0;background:var(--x-primary);color:var(--x-primary-text, #111);font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;">' + (isAdditionalDineIn ? 'Kirim Pesanan Tambahan' : submitCtaLabel(isReservation)) + '</button></div>' +
 
       '</div>';
 
@@ -1355,7 +1513,7 @@
 
   function submitCtaLabel(isReservation) {
     if (isCurrentBranchClosed()) return 'Resto Sedang Tutup';
-    if (isReservation) return 'Reservasi';
+    if (isReservation) return 'Reservasi sekarang';
     if (isPayAtCashier()) return 'Bayar nanti di kasir';
     if (isOnlinePayment(state.paymentMethod)) return 'Bayar sekarang';
     return 'Pesan sekarang';
@@ -1392,7 +1550,14 @@
     var elDel = $('x-sum-delivery'); if (elDel) elDel.textContent = fmtIDR(fee);
     var elDisc = $('x-sum-discount'); if (elDisc) elDisc.textContent = '-' + fmtIDR(discount);
     var elOld = $('x-sum-oldtotal'); if (elOld) elOld.textContent = fmtIDR(oldTotal);
-    var elGrand = $('x-sum-total'); if (elGrand) elGrand.textContent = fmtIDR(grand);
+    var elGrand = $('x-sum-total');
+    if (elGrand) {
+      if (state.fulfillment.type === 'reservation' && subtotal <= 0) {
+        elGrand.textContent = 'Gratis';
+      } else {
+        elGrand.textContent = fmtIDR(grand);
+      }
+    }
     var elChange = $('x-sum-change'); if (elChange) elChange.textContent = fmtIDR(tenderChange());
   }
 
@@ -1853,7 +2018,7 @@
       }
       submit.onclick = function () {
         if (isCurrentBranchClosed()) {
-          if (UI && UI.toast) UI.toast('Maaf, resto sedang tutup sementara.');
+          focusAndHighlight('x-checkout-closed-banner', 'Maaf, resto sedang tutup sementara.');
           return;
         }
         executePrePaymentAndSubmit();
@@ -2036,9 +2201,7 @@
     // Initial committed values
     var committedType = state.fulfillment.type || 'delivery';
     if (committedType === 'dinein') committedType = 'dine_in';
-    if (hasActiveTableLock) {
-      committedType = 'dine_in';
-    } else if (!availabilityMap[committedType]) {
+    if (!availabilityMap[committedType]) {
       // Fallback to first available type
       if (isDeliveryAvail) committedType = 'delivery';
       else if (isPickupAvail) committedType = 'pickup';
@@ -2048,7 +2211,7 @@
 
     // Clone committed state into DRAFT
     var draft = {
-      type: hasActiveTableLock ? 'dine_in' : committedType,
+      type: committedType,
       scheduled: Boolean(state.fulfillment.scheduled),
       date: state.fulfillment.date || 'Hari ini',
       timeSlot: state.fulfillment.timeSlot || '16:00-16:30',
@@ -2064,8 +2227,13 @@
       reservationTime: state.fulfillment.reservationTime || '12:00',
       guestCount: state.fulfillment.guestCount || 2,
       reservationName: state.fulfillment.reservationName || '',
-      reservationPhone: state.fulfillment.reservationPhone || ''
+      reservationPhone: state.fulfillment.reservationPhone || '',
+      reservationPickTable: Boolean(state.fulfillment.type === 'reservation' && (state.fulfillment.tableNumber || (state.fulfillment.table_ids && state.fulfillment.table_ids.length > 0))),
+      tableId: (state.fulfillment.table_ids && state.fulfillment.table_ids[0]) || null
     };
+
+    var updateResTableBadge = null;
+    var updateResSummary = null;
 
     var WHEEL_ITEM_HEIGHT = 44;
 
@@ -2165,11 +2333,6 @@
         btn.onclick = function () {
           var chosen = btn.dataset.type;
           if (!availabilityMap[chosen]) return; // Guard: rejection on unavailable
-          var lockedTable = (Store.getMyTable && Store.getMyTable()) || null;
-          if (lockedTable && lockedTable.hadOpenBill && chosen !== 'dine_in') {
-            if (UI && UI.toast) UI.toast('Ingin pindah meja? Hubungi kasir.');
-            return;
-          }
           draft.type = chosen;
           // Switching away from the schedulable types (delivery/pickup) clears
           // scheduling; switching between delivery and pickup keeps it.
@@ -2251,6 +2414,55 @@
       // Initial scroll position
       container.scrollTop = currentIndex * WHEEL_ITEM_HEIGHT;
       updateVisual(currentIndex);
+    }
+
+    function fetchLayout(bid, targetCanvasSel) {
+      cancelPendingDineInFetch();
+      var requestId = ++dineInFetchId;
+      var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      dineInAbortCtrl = ctrl;
+
+      var sel = targetCanvasSel || (draft.type === 'reservation' ? '#x-res-floor-canvas' : '#x-dinein-floor-canvas');
+      var endpoint = bid ? ('/dine-in/layout?branch_id=' + encodeURIComponent(bid)) : '/dine-in/layout';
+      API.get(endpoint, { signal: ctrl ? ctrl.signal : undefined })
+        .then(function (res) {
+          if (requestId !== dineInFetchId) return;
+          if (ctrl === dineInAbortCtrl) dineInAbortCtrl = null;
+
+          if (res && res.success && res.layout) {
+            dineInLayoutData = res.layout;
+            if (res.layout.branch_id && (!state.matchedBranch || !state.matchedBranch.id)) {
+              state.matchedBranch = { id: res.layout.branch_id, name: 'Bangjo' };
+            }
+            renderFloorCanvas(sel);
+          } else {
+            var msg = (res && res.error) ? res.error : 'Gagal memuat denah meja. Silakan coba lagi.';
+            var canvasEl = schedContainer.querySelector(sel);
+            if (canvasEl) {
+              canvasEl.innerHTML =
+                '<div style="text-align:center;padding:20px;color:#ef4444;font-size:13px;">' + msg + '</div>';
+            }
+          }
+        })
+        .catch(function (err) {
+          if (requestId !== dineInFetchId) return;
+          if (ctrl === dineInAbortCtrl) dineInAbortCtrl = null;
+
+          var isAborted = (API && typeof API.isAbortError === 'function' && API.isAbortError(err)) ||
+            (err && (err.name === 'AbortError' || (typeof err.message === 'string' && /abort/i.test(err.message))));
+
+          if (isAborted) return;
+
+          console.warn('[Checkout] Load layout error:', err);
+          var errMsg = (err && (err.data && err.data.error)) ||
+            (err && err.message && !/signal is aborted|abort/i.test(err.message) ? err.message : '') ||
+            'Gagal memuat denah meja. Silakan coba lagi.';
+          var canvasEl = schedContainer.querySelector(sel);
+          if (canvasEl) {
+            canvasEl.innerHTML =
+              '<div style="text-align:center;padding:20px;color:#ef4444;font-size:13px;">' + errMsg + '</div>';
+          }
+        });
     }
 
     function renderScheduleSection() {
@@ -2467,6 +2679,27 @@
          '      <input type="tel" id="x-res-phone" class="x-loc-form-input" inputmode="numeric" autocomplete="tel" placeholder="" value="">' +
          '    </div>' +
          '    <div class="x-res-contact-hint" style="font-size:11.5px;color:#6b7280;margin:6px 0 14px;">Dipakai resto untuk mengonfirmasi reservasimu.</div>' +
+         '    <div class="x-res-table-section" style="margin:14px 0 16px;border-top:1px dashed #e5e7eb;padding-top:14px;">' +
+         '      <label class="x-loc-checkbox-label" id="x-label-res-pick-table" style="margin:0;cursor:pointer;display:flex;align-items:center;gap:10px;user-select:none;">' +
+         '        <div class="x-loc-custom-check' + (draft.reservationPickTable ? ' is-checked' : '') + '" id="x-box-res-pick-table">' +
+         '          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 6 4.5 9 10 3"/></svg>' +
+         '        </div>' +
+         '        <span style="font-weight:700;font-size:13.5px;color:#111827;">Pilih meja</span>' +
+         '      </label>' +
+         '      <div class="x-res-pick-table-hint" style="font-size:11.5px;color:#6b7280;margin:4px 0 0 30px;">' +
+         '        Centang jika ingin memilih letak atau nomor meja saat reservasi' +
+         '      </div>' +
+         '      <div id="x-res-table-selection-wrapper" style="display:' + (draft.reservationPickTable ? 'block' : 'none') + ';margin-top:14px;">' +
+         '        <div id="x-res-table-selected-badge" style="display:' + (draft.tableNumber ? 'flex' : 'none') + ';align-items:center;justify-content:space-between;padding:10px 14px;border-radius:12px;background:#ecfdf5;border:1px solid #a7f3d0;font-size:12.5px;color:#065f46;margin-bottom:12px;">' +
+         '          <span>Meja dipilih: <strong id="x-res-selected-table-label">' + (draft.tableNumber ? 'Meja ' + UI.escape(draft.tableNumber) : '-') + '</strong></span>' +
+         '          <button type="button" id="x-res-btn-clear-table" style="background:transparent;border:0;color:#059669;font-size:12px;font-weight:700;cursor:pointer;text-decoration:underline;">Batalkan</button>' +
+         '        </div>' +
+         '        <div class="x-dinein-header-title" style="font-size:13px;font-weight:700;color:#374151;margin-bottom:8px;">Pilih meja pada denah berikut:</div>' +
+         '        <div id="x-res-floor-canvas" class="x-floor-wrapper">' +
+         '          <div style="text-align:center;padding:30px;color:#9ca3af;font-size:13px;">Memuat denah meja…</div>' +
+         '        </div>' +
+         '      </div>' +
+         '    </div>' +
          '<div class="x-fulfillment-selected-summary" style="margin-bottom:0;">' +
          '  <span>Rincian reservasi kedatangan</span>' +
         '  <div id="x-res-summary-text"></div>' +
@@ -2516,13 +2749,13 @@
         resPhone.oninput = function () { draft.reservationPhone = resPhone.value; syncResConfirm(); };
       }
 
-      // "Reservasi" adalah tombol Konfirmasi milik sheet ini — bukan tombol kedua.
+      // "Konfirmasi" adalah tombol Konfirmasi milik sheet ini — bukan tombol submit pesanan.
       // Aktif hanya kalau syaratnya lengkap; matinya pun terlihat alasannya karena
       // field yang kurang ada tepat di atasnya.
       var sheetConfirm = document.getElementById('x-ful-btn-confirm');
       function syncResConfirm() {
         if (!sheetConfirm) return;
-        sheetConfirm.textContent = 'Reservasi';
+        sheetConfirm.textContent = 'Konfirmasi';
         var lengkap = !!((draft.reservationName || '').trim() && (draft.reservationPhone || '').trim());
         sheetConfirm.disabled = !lengkap;
         sheetConfirm.style.opacity = lengkap ? '1' : '0.5';
@@ -2595,14 +2828,19 @@
         var lbl = dateLabel(draft.reservationDate) || '';
         var long = longDate(draft.reservationDate);
         var jam = String(draft.reservationTime || '12:00').replace(':', '.');
+        var tablePart = (draft.reservationPickTable && draft.tableNumber)
+          ? '&nbsp;&nbsp;&nbsp;<b>·</b>&nbsp;&nbsp;&nbsp;Meja ' + UI.escape(draft.tableNumber)
+          : '';
         // Tanpa gaya sendiri: <strong> memberi baris utama 14px/700/hitam, dan teks
         // sesudahnya memakai gaya komponen (12px abu). Persis dua tingkat yang sudah
         // dipakai komponen ringkasan ini.
         sumText.innerHTML =
           '<strong>' + UI.escape(lbl) + (long ? ' (' + UI.escape(long) + ')' : '') + '</strong>' +
           'Pukul ' + UI.escape(jam) + ' ' + UI.escape(branchTzLabel()) +
-          '&nbsp;&nbsp;&nbsp;<b>·</b>&nbsp;&nbsp;&nbsp;(' + (draft.guestCount || 2) + ' orang)';
+          '&nbsp;&nbsp;&nbsp;<b>·</b>&nbsp;&nbsp;&nbsp;(' + (draft.guestCount || 2) + ' orang)' +
+          tablePart;
       }
+      updateResSummary = updateSummary;
 
       buildWheel(dateCol, dateItems, draft.reservationDate, function (it) {
         draft.reservationDate = it.value;
@@ -2669,129 +2907,122 @@
         }
       }
 
-      updateSummary();
-    }
-
-    function renderDineInFloorPlan() {
       var fb = getFulfillmentBranch();
       var curBranch = state.matchedBranch || (fb ? { id: fb.id, name: fb.name } : null) || (availableBranches && availableBranches[0]) || null;
       var branchId = curBranch ? curBranch.id : (currentBranchId || '');
 
-      schedContainer.innerHTML =
-        '<div class="x-fulfillment-divider"></div>' +
-        '<div class="x-dinein-container">' +
-        '  <!-- Guest count filtering temporarily hidden per user request -->' +
-        // Disembunyikan sementara: pilih meja sudah langsung menampilkan meja, jadi
-         // ajakan scan di sini tidak perlu. Ubah display menjadi flex untuk menyalakan lagi.
-         '  <div class="x-fulfillment-promo" id="x-dinein-scan-info" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;">' +
-         '    <span class="x-fulfillment-promo-icon">i</span>' +
-         '    <span style="flex:1 1 150px;min-width:0;">Scan QR di mejamu, pesananmu akan kami antarkan segera.</span>' +
-         '    <button type="button" id="x-btn-scan-table-qr" style="display:inline-flex;align-items:center;gap:6px;border-radius:12px;padding:8px 14px;background:#111111;color:#ffffff;border:0;font-size:12px;font-weight:800;font-family:inherit;cursor:pointer;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.10);">' +
-         '      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-         '        <path d="M4 9V6.5A2.5 2.5 0 0 1 6.5 4H9"></path>' +
-         '        <path d="M15 4h2.5A2.5 2.5 0 0 1 20 6.5V9"></path>' +
-         '        <path d="M20 15v2.5a2.5 2.5 0 0 1-2.5 2.5H15"></path>' +
-         '        <path d="M9 20H6.5A2.5 2.5 0 0 1 4 17.5V15"></path>' +
-         '        <path d="M4 12h16"></path>' +
-         '      </svg>' +
-         '      Scan QR' +
-         '    </button>' +
-         '  </div>' +
-         '  <div class="x-dinein-guest-row" style="display:none !important;">' +
-        '    <span class="x-dinein-guest-label">Jumlah Tamu</span>' +
-        '    <div class="x-dinein-guest-control">' +
-        '      <button type="button" class="x-dinein-guest-btn" id="x-btn-guest-minus">−</button>' +
-        '      <span class="x-dinein-guest-count" id="x-txt-guest-count">' + (draft.guestCount || 1) + '</span>' +
-        '      <button type="button" class="x-dinein-guest-btn" id="x-btn-guest-plus">+</button>' +
-        '    </div>' +
-        '  </div>' +
-        '  <div class="x-dinein-header-title">Pilih meja</div>' +
-        '  <div id="x-dinein-floor-canvas" class="x-floor-wrapper">' +
-        '    <div style="text-align:center;padding:30px;color:#9ca3af;font-size:13px;">Memuat tata letak meja…</div>' +
-        '  </div>' +
-        '</div>';
+      var pickTableLabel = schedContainer.querySelector('#x-label-res-pick-table');
+      var pickTableBox = schedContainer.querySelector('#x-box-res-pick-table');
+      var pickTableWrapper = schedContainer.querySelector('#x-res-table-selection-wrapper');
 
-      var scanQrBtn = schedContainer.querySelector('#x-btn-scan-table-qr');
-      if (scanQrBtn) scanQrBtn.onclick = function () { openTableQrScanner(); };
+      updateResTableBadge = function () {
+        var badge = schedContainer.querySelector('#x-res-table-selected-badge');
+        var label = schedContainer.querySelector('#x-res-selected-table-label');
+        if (!badge) return;
+        if (draft.tableNumber) {
+          if (label) label.textContent = 'Meja ' + draft.tableNumber;
+          badge.style.display = 'flex';
+        } else {
+          badge.style.display = 'none';
+        }
+      };
 
-      var minusBtn = schedContainer.querySelector('#x-btn-guest-minus');
-      var plusBtn = schedContainer.querySelector('#x-btn-guest-plus');
-      var countTxt = schedContainer.querySelector('#x-txt-guest-count');
-
-      if (minusBtn) {
-        minusBtn.onclick = function () {
-          if (draft.guestCount > 1) {
-            draft.guestCount--;
-            if (countTxt) countTxt.textContent = draft.guestCount;
-            autoRecommendTable();
+      if (pickTableLabel && pickTableBox) {
+        pickTableLabel.onclick = function (e) {
+          if (e) e.preventDefault();
+          var on = !pickTableBox.classList.contains('is-checked');
+          pickTableBox.classList.toggle('is-checked', on);
+          draft.reservationPickTable = on;
+          if (pickTableWrapper) {
+            pickTableWrapper.style.display = on ? 'block' : 'none';
+          }
+          if (on) {
+            updateResTableBadge();
+            fetchLayout(branchId, '#x-res-floor-canvas');
+          } else {
+            draft.tableNumber = '';
+            draft.tableId = null;
+            draft.selectedTableIds = [];
+            updateResTableBadge();
+            updateSummary();
           }
         };
       }
 
-      if (plusBtn) {
-        plusBtn.onclick = function () {
-          draft.guestCount++;
-          if (countTxt) countTxt.textContent = draft.guestCount;
-          autoRecommendTable();
+      var clearTableBtn = schedContainer.querySelector('#x-res-btn-clear-table');
+      if (clearTableBtn) {
+        clearTableBtn.onclick = function (e) {
+          if (e) { e.preventDefault(); e.stopPropagation(); }
+          draft.tableNumber = '';
+          draft.tableId = null;
+          draft.selectedTableIds = [];
+          updateResTableBadge();
+          renderFloorCanvas('#x-res-floor-canvas');
+          updateSummary();
         };
       }
 
-      function fetchLayout(bid) {
-        // Cancel any pending table fetch and increment request identity token
-        cancelPendingDineInFetch();
-        var requestId = ++dineInFetchId;
-        var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
-        dineInAbortCtrl = ctrl;
-
-        var endpoint = bid ? ('/dine-in/layout?branch_id=' + encodeURIComponent(bid)) : '/dine-in/layout';
-        API.get(endpoint, { signal: ctrl ? ctrl.signal : undefined })
-          .then(function (res) {
-            // Discard stale response if a newer request was dispatched
-            if (requestId !== dineInFetchId) return;
-            if (ctrl === dineInAbortCtrl) dineInAbortCtrl = null;
-
-            if (res && res.success && res.layout) {
-              dineInLayoutData = res.layout;
-              if (res.layout.branch_id && (!state.matchedBranch || !state.matchedBranch.id)) {
-                state.matchedBranch = { id: res.layout.branch_id, name: 'Bangjo' };
-              }
-              // Render layout immediately
-              renderFloorCanvas();
-            } else {
-              var msg = (res && res.error) ? res.error : 'Gagal memuat denah meja. Silakan coba lagi.';
-              var canvasEl = schedContainer.querySelector('#x-dinein-floor-canvas');
-              if (canvasEl) {
-                canvasEl.innerHTML =
-                  '<div style="text-align:center;padding:20px;color:#ef4444;font-size:13px;">' + msg + '</div>';
-              }
-            }
-          })
-          .catch(function (err) {
-            // Discard stale response or intentional aborts
-            if (requestId !== dineInFetchId) return;
-            if (ctrl === dineInAbortCtrl) dineInAbortCtrl = null;
-
-            var isAborted = (API && typeof API.isAbortError === 'function' && API.isAbortError(err)) ||
-              (err && (err.name === 'AbortError' || (typeof err.message === 'string' && /abort/i.test(err.message))));
-
-            if (isAborted) {
-              // Silently ignore expected aborts / cancellation without rendering red error
-              return;
-            }
-
-            console.warn('[Checkout] Load dine-in layout error:', err);
-            var errMsg = (err && (err.data && err.data.error)) ||
-              (err && err.message && !/signal is aborted|abort/i.test(err.message) ? err.message : '') ||
-              'Gagal memuat denah meja. Silakan coba lagi.';
-            var canvasEl = schedContainer.querySelector('#x-dinein-floor-canvas');
-            if (canvasEl) {
-              canvasEl.innerHTML =
-                '<div style="text-align:center;padding:20px;color:#ef4444;font-size:13px;">' + errMsg + '</div>';
-            }
-          });
+      if (draft.reservationPickTable) {
+        updateResTableBadge();
+        fetchLayout(branchId, '#x-res-floor-canvas');
       }
 
-      fetchLayout(branchId);
+      updateSummary();
+    }
+
+    function renderDineInFloorPlan() {
+      var myTable = (Store.getMyTable && Store.getMyTable()) || null;
+      var sessionTable = state.openBill && state.openBill.tables && state.openBill.tables[0];
+      var activeSessionTableNumber = (myTable && myTable.hadOpenBill && myTable.number) ||
+        (sessionTable && (sessionTable.table_number || sessionTable.label)) || '';
+      var hasLockedSessionTable = Boolean((myTable && myTable.hadOpenBill) || sessionTable);
+
+      schedContainer.innerHTML =
+        '<div class="x-fulfillment-divider"></div>' +
+        '<div class="x-dinein-container">' +
+        (hasLockedSessionTable
+          ? '  <section class="x-dinein-active-session" aria-live="polite" style="padding:16px;border:1px solid #a7f3d0;border-radius:14px;background:#ecfdf5;">' +
+            '    <div style="font-size:14px;font-weight:700;color:#065f46;">Sesi meja aktif</div>' +
+            '    <div style="font-size:18px;font-weight:800;color:#064e3b;margin-top:4px;">Meja ' + UI.escape(String(activeSessionTableNumber || '-')) + '</div>' +
+            '    <div style="font-size:12px;line-height:1.45;color:#047857;margin-top:5px;">Pesanan Dine-in akan masuk ke tagihan meja ini. Pilih jenis pesanan lain jika ingin pesan untuk kebutuhan berbeda.</div>' +
+            '  </section>'
+          : '  <div class="x-dinein-scan-card" style="padding:24px 16px;border:1px solid #e5e7eb;border-radius:16px;background:#f9fafb;text-align:center;margin-top:4px;">' +
+            '    <div style="width:52px;height:52px;border-radius:50%;background:#e0f2fe;color:#0284c7;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;">' +
+            '      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+            '        <path d="M4 9V6.5A2.5 2.5 0 0 1 6.5 4H9"></path>' +
+            '        <path d="M15 4h2.5A2.5 2.5 0 0 1 20 6.5V9"></path>' +
+            '        <path d="M20 15v2.5a2.5 2.5 0 0 1-2.5 2.5H15"></path>' +
+            '        <path d="M9 20H6.5A2.5 2.5 0 0 1 4 17.5V15"></path>' +
+            '        <path d="M4 12h16"></path>' +
+            '      </svg>' +
+            '    </div>' +
+            '    <div style="font-size:15px;font-weight:700;color:#111827;margin-bottom:6px;">Makan di Tempat (Dine-in)</div>' +
+            '    <p style="font-size:13px;line-height:1.5;color:#4b5563;margin:0 0 18px;">Silakan scan QR di mejamu untuk mengaktifkan sesi makan di tempat.</p>' +
+            '    <button type="button" id="x-btn-scan-table-qr" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 24px;border-radius:12px;background:#00a637;color:#ffffff;border:0;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;box-shadow:0 2px 8px rgba(0,166,55,0.25);">' +
+            '      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+            '        <path d="M4 9V6.5A2.5 2.5 0 0 1 6.5 4H9"></path>' +
+            '        <path d="M15 4h2.5A2.5 2.5 0 0 1 20 6.5V9"></path>' +
+            '        <path d="M20 15v2.5a2.5 2.5 0 0 1-2.5 2.5H15"></path>' +
+            '        <path d="M9 20H6.5A2.5 2.5 0 0 1 4 17.5V15"></path>' +
+            '        <path d="M4 12h16"></path>' +
+            '      </svg>' +
+            '      Scan QR Meja' +
+            '    </button>' +
+            '  </div>') +
+        '</div>';
+
+      if (hasLockedSessionTable) return;
+
+      var scanQrBtn = schedContainer.querySelector('#x-btn-scan-table-qr');
+      if (scanQrBtn) {
+        scanQrBtn.onclick = function () {
+          openTableQrScanner(function (res) {
+            if (res && res.success && res.joined) {
+              sh.close();
+            }
+          });
+        };
+      }
     }
 
     function computeSelectedTableNumbers(tableIds) {
@@ -2849,8 +3080,9 @@
       });
     }
 
-    function renderFloorCanvas() {
-      var canvasEl = schedContainer.querySelector('#x-dinein-floor-canvas');
+    function renderFloorCanvas(customCanvasSel) {
+      var sel = customCanvasSel || (draft.type === 'reservation' ? '#x-res-floor-canvas' : '#x-dinein-floor-canvas');
+      var canvasEl = schedContainer.querySelector(sel);
       if (!canvasEl || !dineInLayoutData) return;
 
       var tables = dineInLayoutData.tables || [];
@@ -2903,6 +3135,22 @@
           var tnum = card.dataset.tableNumber;
           var isSel = card.classList.contains('is-selected');
 
+          if (draft.type === 'reservation') {
+            if (isSel) {
+              draft.selectedTableIds = [];
+              draft.tableNumber = '';
+              draft.tableId = null;
+            } else {
+              draft.selectedTableIds = [tid];
+              draft.tableNumber = tnum;
+              draft.tableId = tid;
+            }
+            if (typeof updateResTableBadge === 'function') updateResTableBadge();
+            renderFloorCanvas(sel);
+            if (typeof updateResSummary === 'function') updateResSummary();
+            return;
+          }
+
           var lockedTable = (Store.getMyTable && Store.getMyTable()) || null;
           if (lockedTable && lockedTable.hadOpenBill && String(lockedTable.id) !== String(tid)) {
             if (UI && UI.toast) UI.toast('Ingin pindah meja? Hubungi kasir.');
@@ -2923,7 +3171,7 @@
             draft.selectedTableIds = [tid];
           }
           draft.tableNumber = computeSelectedTableNumbers(draft.selectedTableIds);
-          renderFloorCanvas();
+          renderFloorCanvas(sel);
         };
       });
     }
@@ -2932,7 +3180,9 @@
       var lockedTable = (Store.getMyTable && Store.getMyTable()) || null;
       var isMyLockedTable = Boolean(lockedTable && lockedTable.hadOpenBill && String(lockedTable.id) === String(t.id));
       var isSelected = (draft.selectedTableIds || []).indexOf(t.id) !== -1 || isMyLockedTable;
-      var isUnavailable = t.operational_state !== 'available' && !isMyLockedTable;
+      var isUnavailable = (draft.type === 'reservation')
+        ? (t.is_active === 0)
+        : (t.operational_state !== 'available' && !isMyLockedTable);
 
       var relY = (t.y != null ? t.y : 0) - (sectionBaseY || 0);
       if (relY < 0) relY = 0;
@@ -2989,30 +3239,19 @@
           return;
         }
 
-        if (draft.type === 'dine_in') {
-          if (!draft.selectedTableIds || draft.selectedTableIds.length === 0) {
-            if (UI && UI.toast) UI.toast('Silakan pilih nomor meja untuk makan di tempat (Dine-in).');
-            return;
-          }
-          // Tombol konfirmasi bukan sekadar menyimpan: ia yang MENGUNCI meja.
-          // Meja terkunci = tagihan, jadi tamu tidak boleh memindahkannya sendiri
-          // (menyimpang dari aturan yang sama di jalur scan QR). Memindahkan meja
-          // adalah wewenang kasir; tamu hanya bisa MELEPAS dengan memilih tipe
-          // pembelian lain di sheet ini.
-          // TERKUNCI = sudah ada tagihan di meja itu, bukan sekadar ada meja
-          // tersimpan. Sebelum memesan, tamu masih bebas berpindah meja; kalau
-          // tidak, memilih meja lain akan ditolak dan terasa seperti tombol mati.
-          var lockedTable = (Store.getMyTable && Store.getMyTable()) || null;
-          if (lockedTable && lockedTable.hadOpenBill && String(lockedTable.id) !== String(draft.selectedTableIds[0])) {
-            if (UI && UI.toast) UI.toast('Ingin pindah meja? Hubungi kasir.');
-            return;
-          }
-        }
+        var currentLockedTable = (Store.getMyTable && Store.getMyTable()) || null;
+        var currentSessionTable = state.openBill && state.openBill.tables && state.openBill.tables[0];
+        var hasLockedSessionTable = Boolean((currentLockedTable && currentLockedTable.hadOpenBill) || currentSessionTable);
+        var lockedSessionTableId = (currentLockedTable && currentLockedTable.hadOpenBill && currentLockedTable.id) || (currentSessionTable && currentSessionTable.id) || null;
+        var lockedSessionTableNumber = (currentLockedTable && currentLockedTable.hadOpenBill && currentLockedTable.number) || (currentSessionTable && (currentSessionTable.table_number || currentSessionTable.label)) || '';
 
-        var lockedTable = (Store.getMyTable && Store.getMyTable()) || null;
-        if (lockedTable && lockedTable.hadOpenBill && draft.type !== 'dine_in') {
-          if (UI && UI.toast) UI.toast('Ingin pindah meja? Hubungi kasir.');
-          return;
+        if (draft.type === 'dine_in') {
+          if (!hasLockedSessionTable) {
+            if (UI && UI.toast) UI.toast('Silakan scan QR di mejamu untuk makan di tempat.');
+            return;
+          }
+          draft.selectedTableIds = lockedSessionTableId ? [lockedSessionTableId] : draft.selectedTableIds;
+          draft.tableNumber = lockedSessionTableNumber || draft.tableNumber;
         }
 
         // Commit to state.fulfillment — tipe berganti lebih dulu supaya penulisan
@@ -3029,11 +3268,14 @@
           state.fulfillment.reservationTime = draft.reservationTime || '12:00';
           state.fulfillment.reservationName = (draft.reservationName || '').trim();
           state.fulfillment.reservationPhone = (draft.reservationPhone || '').trim();
-          // Reservasi dikirim dari tombol yang sama: draft sudah terkunci, jadi
-          // lanjut ke rincian pesanan (gate Google terbuka dulu kalau belum masuk).
-          // Ditunda sejenak supaya sheet sempat tertutup dan halaman sempat dirender.
-          setTimeout(function () { executePrePaymentAndSubmit(); }, 0);
           state.fulfillment.guestCount = draft.guestCount || 2;
+          if (draft.reservationPickTable && draft.tableNumber) {
+            state.fulfillment.tableNumber = draft.tableNumber;
+            state.fulfillment.table_ids = draft.selectedTableIds && draft.selectedTableIds.length ? draft.selectedTableIds : (draft.tableId ? [draft.tableId] : []);
+          } else {
+            state.fulfillment.tableNumber = '';
+            state.fulfillment.table_ids = [];
+          }
         } else if (draft.type === 'dine_in') {
           state.fulfillment.scheduled = false;
           var tNumStr = draft.tableNumber || computeSelectedTableNumbers(draft.selectedTableIds);
@@ -3406,7 +3648,7 @@
       '<div style="font-size:13px;color:#6b7280;margin-bottom:12px;">Masukkan nomor WhatsApp aktif Anda untuk masuk dan melanjutkan pesanan.</div>' +
       '<form id="x-otp-phone-form" action="javascript:void(0);" style="margin:0;padding:0;">' +
         '<div class="x-alt-sheet-label">Nama Lengkap</div>' +
-        '<input type="text" id="x-otp-input-name" class="x-alt-input" placeholder="Contoh: Budi Santoso" value="' + UI.escape(name) + '" enterkeyhint="next" autocomplete="name">' +
+        '<input type="text" id="x-otp-input-name" class="x-alt-input" placeholder="Masukkan nama lengkap Anda" value="' + UI.escape(name) + '" enterkeyhint="next" autocomplete="name">' +
         '<div class="x-alt-sheet-label" style="margin-top:10px;">Nomor WhatsApp</div>' +
         '<input type="tel" id="x-otp-input-phone" class="x-alt-input" placeholder="081234567890" value="' + UI.escape(phone) + '" enterkeyhint="go" autocomplete="tel">' +
         '<button type="submit" class="x-alt-submit-btn" id="x-otp-send-btn" style="margin-top:16px;">Kirim Kode OTP</button>' +
@@ -3868,11 +4110,11 @@
     state.fulfillment.reservationName = nm;
     state.fulfillment.reservationPhone = ph;
     if (!nm) {
-      if (UI && UI.toast) UI.toast('Isi nama pemesan dulu.');
+      focusAndHighlight('x-reservation-summary-card', 'Isi nama pemesan dulu.');
       return false;
     }
     if (!ph) {
-      if (UI && UI.toast) UI.toast('Isi nomor WhatsApp pemesan dulu.');
+      focusAndHighlight('x-reservation-summary-card', 'Isi nomor WhatsApp pemesan dulu.');
       return false;
     }
     return true;
@@ -4354,27 +4596,42 @@
     if (!state.openBill) return null;
     if (state.openBill.active_order_id) return String(state.openBill.active_order_id);
     var orders = Array.isArray(state.openBill.orders) ? state.openBill.orders : [];
+    var terminalStatuses = ['cancelled', 'rejected', 'timeout', 'expired', 'fulfillment_exception'];
     var active = orders.filter(function (o) {
-      return o && !o.is_cancelled && o.status !== 'cancelled';
+      return o && !o.is_cancelled && terminalStatuses.indexOf(String(o.status || '').toLowerCase()) === -1;
     });
     return active.length ? String(active[active.length - 1].id) : null;
   }
 
   function hasActiveDineInBill() {
-    return state.fulfillment.type === 'dine_in' && !!getActiveDineInOrderId();
+    var fulfillmentType = state.fulfillment.type;
+    return (fulfillmentType === 'dine_in' || fulfillmentType === 'dinein') && !!getActiveDineInOrderId();
   }
 
   function executePrePaymentAndSubmit() {
     if (state.isSubmitting) return;
 
     var fulType = state.fulfillment.type;
+    if (fulType === 'dine_in' && state.closedQrDiningSession) {
+      focusAndHighlight('x-card-fulfillment', 'Sesi meja sudah ditutup. Scan QR meja setelah kasir membuka sesi baru.');
+      return;
+    }
     var isReservation = fulType === 'reservation';
     var items = getCheckoutItems();
-    var isAdditionalDineIn = hasActiveDineInBill() && items.length > 0;
+    var isDineInCheckout = fulType === 'dine_in' || fulType === 'dinein';
+    var isAdditionalDineIn = isDineInCheckout && hasActiveDineInBill() && items.length > 0;
 
     if (!isReservation && !items.length) {
-      if (UI && UI.toast) UI.toast('Keranjang belanja kosong');
+      focusAndHighlight('x-items-card', 'Keranjang belanja kosong');
       return;
+    }
+
+    if (fulType === 'delivery') {
+      var addrStr = state.address && (state.address.formatted_address || state.address.address || '');
+      if (!addrStr || addrStr === 'Pilih alamat pengiriman') {
+        focusAndHighlight('x-card-address', 'Silakan tentukan alamat pengiriman terlebih dahulu.');
+        return;
+      }
     }
 
     // Reservasi: nama & nomor WhatsApp pemesan WAJIB, karena resto memakai nomor
@@ -4383,6 +4640,10 @@
     // ditekan tanpa penjelasan. Namanya boleh berbeda dari nama akun — reservasi
     // bisa untuk orang lain — jadi kontaknya dipakai sebagai kontak pesanan.
     if (state.fulfillment.type === 'reservation') {
+      if (!state.fulfillment.reservationDate) {
+        focusAndHighlight('x-reservation-summary-card', 'Silakan pilih tanggal reservasi terlebih dahulu.');
+        return;
+      }
       if (!validateReservationContact()) return;
       state.recipient = {
         type: 'other',
@@ -4391,11 +4652,12 @@
       };
     } else if (!state.paymentMethod) {
       if (!isAdditionalDineIn) {
-        if (UI && UI.toast) UI.toast('Silakan pilih metode pembayaran terlebih dahulu.');
+        focusAndHighlight('x-payment-summary-card', 'Silakan pilih metode pembayaran terlebih dahulu.');
         return;
       }
     } else if (needsCashTendered() && (!state.cashTendered || Number(state.cashTendered) <= 0)) {
       if (!isAdditionalDineIn) {
+        focusAndHighlight('x-payment-summary-card', 'Tentukan nominal uang tunai yang disiapkan.');
         openCashTenderSheet();
         return;
       }
@@ -4449,7 +4711,7 @@
       return;
     }
 
-    var isAdditionalDineIn = hasActiveDineInBill() && items.length > 0;
+    var isAdditionalDineIn = isDineInCheckout && hasActiveDineInBill() && items.length > 0;
     var fulBranch = getFulfillmentBranch();
     var branchId = (state.matchedBranch && state.matchedBranch.id) || (fulBranch && fulBranch.id) || (currentBranchId && currentBranchId !== '__unassigned__' ? currentBranchId : undefined);
 
@@ -4474,7 +4736,7 @@
     }
 
     if (isCurrentBranchClosed()) {
-      if (UI && UI.toast) UI.toast('Maaf, resto sedang tutup sementara. Tidak dapat melanjutkan pesanan.');
+      focusAndHighlight('x-checkout-closed-banner', 'Maaf, resto sedang tutup sementara. Tidak dapat melanjutkan pesanan.');
       return;
     }
 
@@ -4502,7 +4764,7 @@
       }
       if (btn) {
         btn.disabled = false;
-        btn.textContent = state.fulfillment.type === 'reservation' ? 'Konfirmasi Reservasi' : 'Pesan Sekarang';
+        btn.textContent = state.fulfillment.type === 'reservation' ? 'Reservasi sekarang' : 'Pesan Sekarang';
         btn.style.opacity = '1';
       }
       // Step 1: Clear stale session from Store and client state (keeps cart, address, fulfillment, paymentMethod intact)
@@ -4588,7 +4850,7 @@
       }
       if (btn) {
         btn.disabled = false;
-        btn.textContent = state.fulfillment.type === 'reservation' ? 'Konfirmasi Reservasi' : 'Pesan Sekarang';
+        btn.textContent = state.fulfillment.type === 'reservation' ? 'Reservasi sekarang' : 'Pesan Sekarang';
         btn.style.opacity = '1';
       }
       var msg = (errObj && (errObj.message || errObj.error)) || (verifyErr && verifyErr.message) || 'Gagal memverifikasi pesanan. Periksa koneksi lalu coba lagi.';
@@ -4746,8 +5008,8 @@
       if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
         window.Xentra.hideSplash();
       }
-      if (btn) btn.textContent = 'Konfirmasi Reservasi';
-      if (UI && UI.toast) UI.toast('Silakan pilih tanggal reservasi terlebih dahulu.');
+      if (btn) btn.textContent = 'Reservasi sekarang';
+      focusAndHighlight('x-reservation-summary-card', 'Silakan pilih tanggal reservasi terlebih dahulu.');
       return;
     }
 
@@ -4787,6 +5049,7 @@
       fulfillment: envPayload.fulfillment,
       table_number: envPayload.topLevel.table_number,
       table_ids: envPayload.topLevel.table_ids,
+      dining_session_id: state.fulfillment.type === 'dine_in' ? state.activeDiningSessionId : null,
       reservation_date: envPayload.topLevel.reservation_date,
       reservation_time: envPayload.topLevel.reservation_time,
       guest_count: envPayload.topLevel.guest_count,
@@ -4927,7 +5190,7 @@
       }
       if (btn) {
         btn.disabled = false;
-        btn.textContent = state.fulfillment.type === 'reservation' ? 'Konfirmasi Reservasi' : 'Pesan Sekarang';
+        btn.textContent = state.fulfillment.type === 'reservation' ? 'Reservasi sekarang' : 'Pesan Sekarang';
         btn.style.opacity = '1';
       }
 
@@ -4972,6 +5235,9 @@
         var oid = res.order_id || (res.order && res.order.id) || (res.order && res.order.order_id);
         var st = res.snap_token || (res.payment && res.payment.snap_token) || null;
         var rUrl = res.redirect_url || (res.payment && res.payment.redirect_url) || null;
+        if (res.batch_pending && UI && UI.toast) {
+          UI.toast('Pesanan masuk ke tagihan meja dan menunggu konfirmasi Merchant. Pembayaran tersedia setelah pesanan diproses.');
+        }
         onSuccess(oid, st, rUrl);
       } else {
         onFail(res);

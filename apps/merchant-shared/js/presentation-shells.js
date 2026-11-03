@@ -59,6 +59,14 @@
     return close(stack[stack.length - 1].id);
   }
 
+  function closeAll() {
+    while (stack.length) {
+      var topId = stack[stack.length - 1].id;
+      if (!close(topId)) break;
+    }
+    return true;
+  }
+
   /*
    * Bottom sheet: affordance tutup tinggal di casing, di atas surface.
    *
@@ -216,11 +224,18 @@
     }
   });
 
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('popstate', function () {
+      if (stack.length) closeAll();
+    });
+  }
+
   window.XentraPresentation = {
     open: open,
     confirm: confirm,
     close: close,
     closeTop: closeTop,
+    closeAll: closeAll,
     isOpen: function (id) { return !!getEntry(id); },
     stackSize: function () { return stack.length; }
   };

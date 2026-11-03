@@ -38,6 +38,7 @@ const ENVIRONMENTS = Object.freeze({
     phases: Object.freeze(['accepted', 'preparing', 'ready', 'completed']),
     transitions: Object.freeze({
       pending: Object.freeze(['confirmed', 'cancelled', 'rejected', 'timeout']),
+      active_table: Object.freeze(['confirmed', 'preparing', 'ready', 'completed', 'cancelled']),
       confirmed: Object.freeze(['preparing', 'cancelled']),
       preparing: Object.freeze(['ready', 'cancelled']),
       ready: Object.freeze(['completed', 'cancelled']),

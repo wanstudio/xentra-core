@@ -84,22 +84,20 @@
           }
           if (badgeEl) {
             badgeEl.className = "x-badge " + (isOpen ? "x-badge-success" : "x-badge-danger");
-            badgeEl.textContent = isOpen ? "RESTO BUKA" : "RESTO TUTUP";
+            badgeEl.textContent = isOpen ? "CABANG: BUKA" : "CABANG: TUTUP";
           }
           if (onlineBadgeEl) {
             onlineBadgeEl.className = "x-badge " + (isDeliveryActive ? "x-badge-info" : "x-badge-warning");
-            onlineBadgeEl.textContent = isDeliveryActive ? "ONLINE: AKTIF" : "ONLINE: JEDA";
+            onlineBadgeEl.textContent = isDeliveryActive ? "ONLINE: AKTIF" : "ONLINE: DIJEDA";
           }
           if (toggleBtn) {
-            toggleBtn.innerHTML = isOpen ? "<span>Tutup Sementara</span>" : "<span>Buka Resto</span>";
+            toggleBtn.innerHTML = "<span>" + (isOpen ? "Tutup Sementara" : "Buka Cabang") + "</span>";
             toggleBtn.className = isOpen ? "x-btn-secondary" : "x-btn-primary";
           }
 
           var onlineBtn = $("btn-bm-toggle-online-orders");
           if (onlineBtn) {
-            onlineBtn.innerHTML = isDeliveryActive
-              ? "<span>Pause Order Online</span>"
-              : "<span>Resume Order Online</span>";
+            onlineBtn.innerHTML = "<span>" + (isDeliveryActive ? "Pause Order Online" : "Resume Order Online") + "</span>";
             onlineBtn.className = isDeliveryActive ? "x-btn-secondary" : "x-btn-primary";
             onlineBtn.style.color = isDeliveryActive ? "var(--text-main)" : "#ffffff";
           }
@@ -262,13 +260,13 @@
       } else if (p.discount_type === 'fixed' && p.discount_value) {
         badgeText = 'Potongan ' + formatMoney(p.discount_value);
         // Solid Tag icon
-        iconSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/></svg>';
+        iconSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM6.5 8a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg>';
       } else if (p.code || p.promo_code) {
         badgeText = 'Kode Promo';
-        iconSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/></svg>';
+        iconSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM6.5 8a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg>';
       } else {
         badgeText = 'Promo Aktif';
-        iconSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/></svg>';
+        iconSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM6.5 8a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg>';
       }
 
       var promoCopy = '';
@@ -312,12 +310,18 @@
       window._bmOrdersState.orders = orders;
     }
 
-    var pendingList = orders.filter(function (o) { return o.status === "pending"; });
-    var actionableList = orders.filter(function (o) {
-      return o.status === "pending" || Number(o.pending_additions_count || 0) > 0;
-    });
+    var isAwaiting = typeof window.isBMOrderAwaitingPayment === 'function'
+      ? window.isBMOrderAwaitingPayment
+      : function () { return false; };
+
+    var pendingList = orders.filter(function (o) { return o.status === "pending" && !isAwaiting(o); });
     if (typeof updateMobileOrdersBadge === "function") {
-      updateMobileOrdersBadge(actionableList.length);
+      var mobileOrderCount = typeof window.countMobileInProcessOrders === 'function'
+        ? window.countMobileInProcessOrders(orders)
+        : orders.filter(function (o) {
+          return ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery'].indexOf(String(o.status || '')) !== -1 && !isAwaiting(o);
+        }).length;
+      updateMobileOrdersBadge(mobileOrderCount);
     }
     if (typeof checkAndNotifyNewPendingOrders === "function") {
       checkAndNotifyNewPendingOrders(orders);

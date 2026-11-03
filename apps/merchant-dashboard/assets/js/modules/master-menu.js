@@ -163,6 +163,28 @@
     if (list) list.style.display = 'none';
     if (editor) editor.style.display = 'block';
 
+    var modernCatMount = $('modern-categories-page-mount');
+    if (modernCatMount) {
+      modernCatMount.style.display = 'none';
+      if (typeof window.unmountCategoriesPage === 'function') {
+        window.unmountCategoriesPage(modernCatMount);
+      }
+    }
+    var modernCatEditorMount = $('modern-category-editor-page-mount');
+    if (modernCatEditorMount) {
+      modernCatEditorMount.style.display = 'none';
+      if (typeof window.unmountCategoryEditorPage === 'function') {
+        window.unmountCategoryEditorPage(modernCatEditorMount);
+      }
+    }
+    var modernItemMount = $('modern-item-master-page-mount');
+    if (modernItemMount) {
+      modernItemMount.style.display = 'none';
+      if (typeof window.unmountItemMasterPage === 'function') {
+        window.unmountItemMasterPage(modernItemMount);
+      }
+    }
+
     var mount = $('modern-menu-editor-mount');
     var legacyForm = $('form-master-menu');
     var legacyHeader = editor ? editor.querySelector('.x-product-editor-header') : null;

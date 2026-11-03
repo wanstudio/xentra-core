@@ -452,6 +452,8 @@
       justify-content: center;
       cursor: grab;
       user-select: none;
+      touch-action: none;
+      -webkit-user-select: none;
     }
     .slider-progress-fill {
       position: absolute;
@@ -461,8 +463,8 @@
       width: 0%;
       background: #0284C7;
       opacity: 0.25;
-      transition: width 0.05s ease;
       pointer-events: none;
+      will-change: width;
     }
     .slider-label {
       position: relative;
@@ -488,9 +490,12 @@
       font-size: 16px;
       font-weight: 800;
       z-index: 20;
-      transition: transform 0.05s ease;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+      will-change: transform;
+      touch-action: none;
+      cursor: grab;
     }
+    .slider-thumb:active { cursor: grabbing; }
     .slider-thumb.green { background: #10B981; color: #042F1E; }
     .slider-thumb.amber { background: #F59E0B; color: #042F1E; }
     .slider-thumb.red { background: #EF4444; color: #FFF; }
@@ -715,16 +720,28 @@
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
     }
     .qr-mock {
-      width: 160px;
-      height: 160px;
-      border: 5px solid #0F172A;
-      border-radius: 10px;
+      width: 176px;
+      height: 176px;
+      border: 3px solid #0F172A;
+      border-radius: 12px;
       display: grid;
       grid-template-columns: repeat(5, 1fr);
       grid-template-rows: repeat(5, 1fr);
       gap: 4px;
       padding: 6px;
       background: #FFF;
+    }
+    .qr-mock.qr-real-svg {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px;
+      overflow: hidden;
+    }
+    .qr-mock.qr-real-svg svg {
+      width: 100% !important;
+      height: 100% !important;
+      display: block;
     }
     .qr-pixel { background: #0F172A; border-radius: 2px; }
     .qr-pixel.white { background: #FFF; }
@@ -939,7 +956,26 @@
 
   </div>
 
+  <script src="/merchant-shared/js/qrcode.js?v=1.0.0"></script>
   <script>
+    function renderProtoQrHtml(payload) {
+      var dataStr = String(payload || 'xentra://delivery/settle?order_number=MB-8921&amount=65000');
+      if (typeof window !== 'undefined' && typeof window.qrcode === 'function') {
+        try {
+          var qr = window.qrcode(0, 'M');
+          qr.addData(dataStr);
+          qr.make();
+          return '<div class="qr-mock qr-real-svg" data-qr-payload="' + dataStr + '">' + qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true }) + '</div>';
+        } catch (e) {}
+      }
+      return '<div class="qr-mock">' +
+        '<div class="qr-pixel"></div><div class="qr-pixel"></div><div class="qr-pixel white"></div><div class="qr-pixel"></div><div class="qr-pixel"></div>' +
+        '<div class="qr-pixel"></div><div class="qr-pixel white"></div><div class="qr-pixel"></div><div class="qr-pixel white"></div><div class="qr-pixel"></div>' +
+        '<div class="qr-pixel white"></div><div class="qr-pixel"></div><div class="qr-pixel"></div><div class="qr-pixel"></div><div class="qr-pixel white"></div>' +
+        '<div class="qr-pixel"></div><div class="qr-pixel white"></div><div class="qr-pixel white"></div><div class="qr-pixel"></div><div class="qr-pixel"></div>' +
+        '<div class="qr-pixel"></div><div class="qr-pixel"></div><div class="qr-pixel white"></div><div class="qr-pixel"></div><div class="qr-pixel"></div>' +
+      '</div>';
+    }
     // SVG Icons
     var ICON_WHATSAPP = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#25D366;flex-shrink:0;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>`;
 
@@ -990,7 +1026,7 @@
       opsMessages: [
         { sender: 'cashier', name: 'Rani (Kasir)', text: 'Pak Agus, order #MB-8921 tolong minta dapur sambal bawangnya dipisah ya.', time: '12:30' },
         { sender: 'driver', name: 'Agus', text: 'Siap Bu Rani, sudah dikonfirmasi ke bagian packing dapur.', time: '12:32' },
-        { sender: 'cashier', name: 'Rani (Kasir)', text: 'Oke mantap, hati-hati di jalan ya Pak. Pelanggan info bayar uang 100rb, bawa kembalian dari kasir.', time: '12:33' }
+        { sender: 'cashier', name: 'Rani (Kasir)', text: 'Oke mantap, hati-hati di jalan. Pelanggan info bayar uang 100rb, bawa kembalian dari kasir.', time: '12:33' }
       ],
 
       historyList: [
@@ -1521,6 +1557,10 @@
             <span style="color:#10B981;font-size:12px;">●</span>
             <span>1.8 km (Est. 5 mnt)</span>
           </div>
+          <div style="position:absolute;top:10px;right:10px;display:flex;flex-direction:column;background:var(--bg-surface);border:1px solid var(--border-color);border-radius:8px;overflow:hidden;z-index:999;box-shadow:0 2px 8px rgba(0,0,0,0.3);">
+            <button type="button" onclick="zoomMap(1)" style="width:34px;height:32px;background:transparent;border:none;border-bottom:1px solid var(--border-color);color:var(--text-main);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;cursor:pointer;" title="Perbesar Peta">+</button>
+            <button type="button" onclick="zoomMap(-1)" style="width:34px;height:32px;background:transparent;border:none;color:var(--text-main);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;cursor:pointer;" title="Perkecil Peta">−</button>
+          </div>
           <button type="button" onclick="centerMap()" style="position:absolute;bottom:10px;right:10px;width:34px;height:34px;background:var(--bg-surface);border:1px solid var(--border-color);border-radius:8px;color:var(--text-main);display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;z-index:999;" title="Pusatkan Peta">
             ⌖
           </button>
@@ -1622,6 +1662,13 @@
     function centerMap() {
       if (window._leafMap && typeof L !== 'undefined') {
         window._leafMap.setView([-5.3612, 104.9780], 16);
+      }
+    }
+
+    function zoomMap(delta) {
+      if (window._leafMap) {
+        if (delta > 0) window._leafMap.zoomIn();
+        else window._leafMap.zoomOut();
       }
     }
 
@@ -1990,14 +2037,8 @@
           </div>
 
           <div class="qr-card">
-            <div style="font-size:11px;font-weight:800;color:#64748B;">KODE SETORAN KASIR: #KSR-8921</div>
-            <div class="qr-mock">
-              <div class="qr-pixel"></div><div class="qr-pixel"></div><div class="qr-pixel white"></div><div class="qr-pixel"></div><div class="qr-pixel"></div>
-              <div class="qr-pixel"></div><div class="qr-pixel white"></div><div class="qr-pixel"></div><div class="qr-pixel white"></div><div class="qr-pixel"></div>
-              <div class="qr-pixel white"></div><div class="qr-pixel"></div><div class="qr-pixel"></div><div class="qr-pixel"></div><div class="qr-pixel white"></div>
-              <div class="qr-pixel"></div><div class="qr-pixel white"></div><div class="qr-pixel white"></div><div class="qr-pixel"></div><div class="qr-pixel"></div>
-              <div class="qr-pixel"></div><div class="qr-pixel"></div><div class="qr-pixel white"></div><div class="qr-pixel"></div><div class="qr-pixel"></div>
-            </div>
+            <div style="font-size:11px;font-weight:800;color:#64748B;">KODE SETORAN KASIR: #KSR-MB-8921</div>
+            ${renderProtoQrHtml('xentra://delivery/settle?order_number=MB-8921&amount=' + state.codAmount)}
             <div style="font-size:12px;color:#0F172A;font-weight:700;">Order #MB-8921 • Kasir Rani</div>
           </div>
         `}
@@ -2333,14 +2374,8 @@
             </div>
 
             <div class="qr-card">
-              <div style="font-size:11px;font-weight:800;color:#64748B;">KODE SETORAN SHIFT: #KSR-BATCH-99</div>
-              <div class="qr-mock">
-                <div class="qr-pixel"></div><div class="qr-pixel"></div><div class="qr-pixel white"></div><div class="qr-pixel"></div><div class="qr-pixel"></div>
-                <div class="qr-pixel"></div><div class="qr-pixel white"></div><div class="qr-pixel"></div><div class="qr-pixel white"></div><div class="qr-pixel"></div>
-                <div class="qr-pixel white"></div><div class="qr-pixel"></div><div class="qr-pixel"></div><div class="qr-pixel"></div><div class="qr-pixel white"></div>
-                <div class="qr-pixel"></div><div class="qr-pixel white"></div><div class="qr-pixel white"></div><div class="qr-pixel"></div><div class="qr-pixel"></div>
-                <div class="qr-pixel"></div><div class="qr-pixel"></div><div class="qr-pixel white"></div><div class="qr-pixel"></div><div class="qr-pixel"></div>
-              </div>
+              <div style="font-size:11px;font-weight:800;color:#64748B;">KODE SETORAN SHIFT: #KSR-MB-8921</div>
+              ${renderProtoQrHtml('xentra://delivery/settle?order_number=MB-8921&amount=' + state.driverCashCustody)}
               <div style="font-size:12px;color:#0F172A;font-weight:700;">MyBangjo Cabang Pringsewu</div>
             </div>
 
@@ -2840,58 +2875,116 @@
     }
 
     // Slider Engine
+    var _protoSliderCleanup = null;
     function initSlider(trackId, thumbId, fillId, onComplete) {
-      setTimeout(function() {
-        var track = document.getElementById(trackId);
-        var thumb = document.getElementById(thumbId);
-        var fill = document.getElementById(fillId);
-        if (!track || !thumb || !fill) return;
+      if (typeof _protoSliderCleanup === 'function') {
+        try { _protoSliderCleanup(); } catch (_) {}
+        _protoSliderCleanup = null;
+      }
+      var track = document.getElementById(trackId);
+      var thumb = document.getElementById(thumbId);
+      var fill = document.getElementById(fillId);
+      if (!track || !thumb || !fill) return;
 
-        var isDragging = false;
-        var startX = 0;
-        var maxSlide = track.clientWidth - thumb.clientWidth - 8;
+      var isDragging = false;
+      var completed = false;
+      var startX = 0;
+      var currentDiff = 0;
+      var maxSlide = 0;
 
-        function startDrag(e) {
-          isDragging = true;
-          startX = (e.touches ? e.touches[0].clientX : e.clientX);
-          thumb.style.transition = 'none';
-          fill.style.transition = 'none';
+      function measureMaxSlide() {
+        var m = track.clientWidth - thumb.clientWidth - 8;
+        return m > 20 ? m : 220;
+      }
+
+      function getClientX(e) {
+        if (e.touches && e.touches.length) return e.touches[0].clientX;
+        if (e.changedTouches && e.changedTouches.length) return e.changedTouches[0].clientX;
+        return e.clientX;
+      }
+
+      function completeSlide() {
+        if (completed) return;
+        completed = true;
+        isDragging = false;
+        cleanupListeners();
+        maxSlide = measureMaxSlide();
+        thumb.style.transition = 'transform 0.12s cubic-bezier(0.2, 0.9, 0.3, 1)';
+        fill.style.transition = 'width 0.12s cubic-bezier(0.2, 0.9, 0.3, 1)';
+        thumb.style.transform = 'translate3d(' + maxSlide + 'px, 0, 0)';
+        fill.style.width = '100%';
+        onComplete();
+      }
+
+      function startDrag(e) {
+        if (completed) return;
+        maxSlide = measureMaxSlide();
+        isDragging = true;
+        currentDiff = 0;
+        startX = getClientX(e);
+        thumb.style.transition = 'none';
+        fill.style.transition = 'none';
+        if (e.cancelable && e.type === 'mousedown') {
+          e.preventDefault();
         }
+      }
 
-        function moveDrag(e) {
-          if (!isDragging) return;
-          var curX = (e.touches ? e.touches[0].clientX : e.clientX);
-          var diff = curX - startX;
-          if (diff < 0) diff = 0;
-          if (diff > maxSlide) diff = maxSlide;
-
-          thumb.style.transform = 'translateX(' + diff + 'px)';
-          fill.style.width = (diff + 24) + 'px';
-
-          if (diff >= maxSlide * 0.92) {
-            isDragging = false;
-            thumb.style.transform = 'translateX(' + maxSlide + 'px)';
-            fill.style.width = '100%';
-            onComplete();
-          }
+      function moveDrag(e) {
+        if (!isDragging || completed) return;
+        if (e.cancelable) {
+          e.preventDefault();
         }
+        var curX = getClientX(e);
+        var diff = curX - startX;
+        if (diff < 0) diff = 0;
+        if (diff > maxSlide) diff = maxSlide;
+        currentDiff = diff;
 
-        function stopDrag() {
-          if (!isDragging) return;
-          isDragging = false;
-          thumb.style.transition = 'transform 0.2s ease';
-          fill.style.transition = 'width 0.2s ease';
-          thumb.style.transform = 'translateX(0px)';
-          fill.style.width = '0%';
+        thumb.style.transform = 'translate3d(' + diff + 'px, 0, 0)';
+        fill.style.width = (diff + 24) + 'px';
+
+        if (diff >= maxSlide * 0.85) {
+          completeSlide();
         }
+      }
 
-        thumb.onmousedown = startDrag;
-        thumb.ontouchstart = startDrag;
-        window.onmousemove = moveDrag;
-        window.ontouchmove = moveDrag;
-        window.onmouseup = stopDrag;
-        window.ontouchend = stopDrag;
-      }, 50);
+      function stopDrag() {
+        if (!isDragging || completed) return;
+        isDragging = false;
+        if (currentDiff >= maxSlide * 0.78) {
+          completeSlide();
+          return;
+        }
+        currentDiff = 0;
+        thumb.style.transition = 'transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1)';
+        fill.style.transition = 'width 0.18s cubic-bezier(0.2, 0.8, 0.2, 1)';
+        thumb.style.transform = 'translate3d(0px, 0, 0)';
+        fill.style.width = '0%';
+      }
+
+      function cleanupListeners() {
+        thumb.removeEventListener('mousedown', startDrag);
+        thumb.removeEventListener('touchstart', startDrag);
+        track.removeEventListener('mousedown', startDrag);
+        track.removeEventListener('touchstart', startDrag);
+        window.removeEventListener('mousemove', moveDrag);
+        window.removeEventListener('touchmove', moveDrag);
+        window.removeEventListener('mouseup', stopDrag);
+        window.removeEventListener('touchend', stopDrag);
+        window.removeEventListener('touchcancel', stopDrag);
+      }
+
+      thumb.addEventListener('mousedown', startDrag);
+      thumb.addEventListener('touchstart', startDrag, { passive: true });
+      track.addEventListener('mousedown', startDrag);
+      track.addEventListener('touchstart', startDrag, { passive: true });
+      window.addEventListener('mousemove', moveDrag);
+      window.addEventListener('touchmove', moveDrag, { passive: false });
+      window.addEventListener('mouseup', stopDrag);
+      window.addEventListener('touchend', stopDrag);
+      window.addEventListener('touchcancel', stopDrag);
+
+      _protoSliderCleanup = cleanupListeners;
     }
 
     // Deep linking URL query parameters

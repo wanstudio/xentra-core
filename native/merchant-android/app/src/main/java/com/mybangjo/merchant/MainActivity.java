@@ -100,6 +100,16 @@ public class MainActivity extends AppCompatActivity {
 
         webView = findViewById(R.id.webView);
         progressBar = findViewById(R.id.progressBar);
+        if (progressBar != null) {
+            progressBar.setAlpha(0f);
+            progressBar.setVisibility(View.GONE);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                android.content.res.ColorStateList transparent = android.content.res.ColorStateList.valueOf(Color.TRANSPARENT);
+                progressBar.setProgressTintList(transparent);
+                progressBar.setProgressBackgroundTintList(transparent);
+                progressBar.setIndeterminateTintList(transparent);
+            }
+        }
         swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout);
 
         setupSwipeRefresh();
@@ -331,7 +341,7 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
-                progressBar.setVisibility(View.VISIBLE);
+                progressBar.setVisibility(View.GONE);
             }
 
             @Override
@@ -368,10 +378,7 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onProgressChanged(WebView view, int newProgress) {
-                progressBar.setProgress(newProgress);
-                if (newProgress >= 100) {
-                    progressBar.setVisibility(View.GONE);
-                }
+                progressBar.setVisibility(View.GONE);
             }
 
             @Override

@@ -23,11 +23,68 @@ function triggerHaptic(ms = 8) {
   } catch (_) {}
 }
 
+function ArrowLeftIcon({ className = "w-[22px] h-[19px]" }) {
+  // ci_arrow-left-sm.svg
+  return (
+    <svg data-icon="ci_arrow-left-sm.svg" width="22" height="19" viewBox="0 0 22 19" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+      <path d="M20.6244 9.99984H2.29102M9.62435 2.6665L2.29102 9.99984L9.62435 17.3332" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" stroke="#0F172A"/>
+    </svg>
+  );
+}
+
+function InfoCircleIcon({ className = "w-[25px] h-[25px]" }) {
+  // mage_information-circle-fill.svg
+  return (
+    <svg data-icon="mage_information-circle-fill.svg" width="25" height="25" viewBox="0 0 25 25" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+      <path d="M12.4994 1.82275C10.3876 1.82275 8.32332 2.44895 6.56748 3.62217C4.81165 4.79538 3.44314 6.46291 2.63502 8.41389C1.82689 10.3649 1.61545 12.5117 2.02743 14.5828C2.43941 16.654 3.4563 18.5565 4.94952 20.0497C6.44273 21.5429 8.34521 22.5598 10.4164 22.9718C12.4875 23.3837 14.6343 23.1723 16.5853 22.3642C18.5363 21.5561 20.2038 20.1875 21.377 18.4317C22.5502 16.6759 23.1764 14.6116 23.1764 12.4998C23.1737 9.66895 22.0479 6.95479 20.0461 4.95305C18.0444 2.9513 15.3302 1.82551 12.4994 1.82275ZM12.4994 6.70817C12.7742 6.71229 13.0363 6.82492 13.2285 7.02148C13.4207 7.21805 13.5274 7.48263 13.5254 7.75753C13.5233 8.03244 13.4127 8.29538 13.2175 8.48905C13.0224 8.68271 12.7586 8.79139 12.4837 8.79139C12.2088 8.79139 11.945 8.68271 11.7499 8.48905C11.5548 8.29538 11.4442 8.03244 11.4421 7.75753C11.44 7.48263 11.5467 7.21805 11.7389 7.02148C11.9311 6.82492 12.1932 6.71229 12.4681 6.70817H12.4994ZM13.541 17.9894C13.541 18.2657 13.4313 18.5306 13.2359 18.726C13.0406 18.9213 12.7756 19.0311 12.4994 19.0311C12.2231 19.0311 11.9581 18.9213 11.7628 18.726C11.5674 18.5306 11.4577 18.2657 11.4577 17.9894V11.3957C11.4577 11.1194 11.5674 10.8545 11.7628 10.6591C11.9581 10.4638 12.2231 10.354 12.4994 10.354C12.7756 10.354 13.0406 10.4638 13.2359 10.6591C13.4313 10.8545 13.541 11.1194 13.541 11.3957V17.9894Z" fill="#0F172A"/>
+    </svg>
+  );
+}
+
+function DragHandleIcon({ className = "w-[13px] h-[13px]" }) {
+  // gravity-ui_equal.svg
+  return (
+    <svg data-icon="gravity-ui_equal.svg" width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+      <path d="M10.9688 8.9375C11.1304 8.9375 11.2854 8.8733 11.3996 8.75902C11.5139 8.64474 11.5781 8.48974 11.5781 8.32812C11.5781 8.16651 11.5139 8.01151 11.3996 7.89723C11.2854 7.78295 11.1304 7.71875 10.9688 7.71875H2.03125C1.86963 7.71875 1.71464 7.78295 1.60036 7.89723C1.48608 8.01151 1.42188 8.16651 1.42188 8.32812C1.42188 8.48974 1.48608 8.64474 1.60036 8.75902C1.71464 8.8733 1.86963 8.9375 2.03125 8.9375H10.9688ZM10.9688 5.28125C11.1304 5.28125 11.2854 5.21705 11.3996 5.10277C11.5139 4.98849 11.5781 4.83349 11.5781 4.67188C11.5781 4.51026 11.5139 4.35526 11.3996 4.24098C11.2854 4.1267 11.1304 4.0625 10.9688 4.0625H2.03125C1.86963 4.0625 1.71464 4.1267 1.60036 4.24098C1.48608 4.35526 1.42188 4.51026 1.42188 4.67188C1.42188 4.83349 1.48608 4.98849 1.60036 5.10277C1.71464 5.21705 1.86963 5.28125 2.03125 5.28125H10.9688Z" fillRule="evenodd" clipRule="evenodd" fill="#303030"/>
+    </svg>
+  );
+}
+
 export default function CategoryMenuSortPage({ categoryId, onBack, onSaved }) {
-  const [category, setCategory] = useState(null);
-  const [menus, setMenus] = useState([]);
-  const [initialOrder, setInitialOrder] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [category, setCategory] = useState(() => {
+    if (typeof window !== 'undefined' && window.state && Array.isArray(window.state.categories)) {
+      return window.state.categories.find((c) => c && String(c.id) === String(categoryId)) || null;
+    }
+    return null;
+  });
+  const [menus, setMenus] = useState(() => {
+    if (typeof window !== 'undefined' && window._ownerMasterMenuState && Array.isArray(window._ownerMasterMenuState.menus)) {
+      return window._ownerMasterMenuState.menus
+        .filter((m) => {
+          if (!m) return false;
+          const cId = m.category_id || (m.category && m.category.id);
+          return String(cId || '') === String(categoryId || '');
+        })
+        .sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0));
+    }
+    return [];
+  });
+  const [initialOrder, setInitialOrder] = useState(() => {
+    if (typeof window !== 'undefined' && window._ownerMasterMenuState && Array.isArray(window._ownerMasterMenuState.menus)) {
+      return window._ownerMasterMenuState.menus
+        .filter((m) => {
+          if (!m) return false;
+          const cId = m.category_id || (m.category && m.category.id);
+          return String(cId || '') === String(categoryId || '');
+        })
+        .sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0))
+        .map((m) => String(m.id));
+    }
+    return [];
+  });
+  const [loading, setLoading] = useState(() => {
+    return !(typeof window !== 'undefined' && window._ownerMasterMenuState && Array.isArray(window._ownerMasterMenuState.menus) && window._ownerMasterMenuState.menus.length > 0);
+  });
   const [isSaving, setIsSaving] = useState(false);
 
   // Interactive Pointer / Touch Drag & FLIP State
@@ -50,9 +107,7 @@ export default function CategoryMenuSortPage({ categoryId, onBack, onSaved }) {
       : 'catalog/categories';
     if (typeof window.navigateTo === 'function') {
       window.navigateTo(targetRoute);
-      return;
     }
-    window.location.hash = `#${targetRoute}`;
   };
 
   useEffect(() => {
@@ -334,7 +389,13 @@ export default function CategoryMenuSortPage({ categoryId, onBack, onSaved }) {
 
   // Save reordered menus
   const handleSaveOrder = async () => {
-    if (!hasChanged || isSaving) return;
+    if (isSaving) return;
+    if (!hasChanged) {
+      if (typeof window !== 'undefined' && typeof window.showToast === 'function') {
+        window.showToast('ℹ️ Urutan menu belum diubah', 'info');
+      }
+      return;
+    }
     setIsSaving(true);
     try {
       const token = getAuthToken();
@@ -402,11 +463,7 @@ export default function CategoryMenuSortPage({ categoryId, onBack, onSaved }) {
           aria-label="Kembali ke Detail Kategori"
           className="w-9 h-9 flex items-center justify-center -ml-2 rounded-full text-slate-900 hover:bg-slate-100 active:scale-95 transition-all border-none bg-transparent cursor-pointer shrink-0"
         >
-          <img
-            src="/owner/assets/icons/ci_arrow-left-sm.svg"
-            alt="Kembali"
-            className="w-[22px] h-[19px] object-contain"
-          />
+          <ArrowLeftIcon />
         </button>
         <div className="flex flex-col justify-center items-start gap-1 min-w-0 flex-1">
           <h1 className="font-bold text-[#0F172A] text-lg tracking-[0] leading-[18px] m-0 truncate w-full text-left">
@@ -425,11 +482,7 @@ export default function CategoryMenuSortPage({ categoryId, onBack, onSaved }) {
       >
         {/* Instruction Header Row */}
         <div className="w-full flex items-center justify-start gap-2">
-          <img
-            src="/owner/assets/icons/mage_information-circle-fill.svg"
-            alt="Info"
-            className="w-[25px] h-[25px] object-contain shrink-0 block"
-          />
+          <InfoCircleIcon />
           <span className="text-[#94A3B8] text-[11px] font-bold leading-snug text-left">
             Tekan dan geser untuk mengatur urutan menu
           </span>
@@ -490,16 +543,31 @@ export default function CategoryMenuSortPage({ categoryId, onBack, onSaved }) {
                         src={imgUrl}
                         alt={titleText}
                         className="w-[71px] h-[71px] rounded-[10px] object-cover shrink-0 bg-slate-100 block"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          const fallbackNode = e.currentTarget.parentElement?.querySelector('.menu-sort-thumb-fallback');
+                          if (fallbackNode) fallbackNode.style.display = 'flex';
+                        }}
                       />
-                    ) : (
-                      <div className="w-[71px] h-[71px] rounded-[10px] bg-slate-100 flex items-center justify-center shrink-0 overflow-hidden">
-                        <img
-                          src="/owner/assets/icons/reicon_food-tray-filled.svg"
-                          alt=""
-                          className="w-7 h-7 opacity-30 object-contain"
+                    ) : null}
+                    <div
+                      className="menu-sort-thumb-fallback w-[71px] h-[71px] rounded-[10px] bg-slate-100 flex items-center justify-center shrink-0 overflow-hidden"
+                      style={{ display: imgUrl ? 'none' : 'flex' }}
+                    >
+                      <svg
+                        width="30"
+                        height="30"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="opacity-30 text-slate-500"
+                      >
+                        <path
+                          d="M2 17h20v2H2v-2zm1.15-4.05L4 7h16l.85 5.95A10.02 10.02 0 0112 15a10.02 10.02 0 01-8.85-2.05zM12 3a2 2 0 012 2c0 .74-.4 1.38-1 1.72V7h-2v-.28c-.6-.34-1-.98-1-1.72a2 2 0 012-2z"
+                          fill="currentColor"
                         />
-                      </div>
-                    )}
+                      </svg>
+                    </div>
 
                     <div className="flex-1 min-w-0 flex flex-col items-start gap-2 text-left">
                       <div className="w-full text-[#0F172A] text-base font-bold leading-snug break-words">
@@ -519,11 +587,7 @@ export default function CategoryMenuSortPage({ categoryId, onBack, onSaved }) {
                     className="w-7 h-7 -mr-1.5 flex items-center justify-center shrink-0 rounded-lg pointer-events-none"
                     title="Geser untuk mengatur urutan"
                   >
-                    <img
-                      src="/owner/assets/icons/gravity-ui_equal.svg"
-                      alt="Geser"
-                      className="w-[13px] h-[13px] object-contain pointer-events-none select-none block"
-                    />
+                    <DragHandleIcon />
                   </div>
                 </div>
               );
@@ -567,7 +631,7 @@ export default function CategoryMenuSortPage({ categoryId, onBack, onSaved }) {
           >
             <button
               type="button"
-              disabled={!hasChanged || isSaving}
+              disabled={isSaving}
               onClick={handleSaveOrder}
               style={{
                 width: '100%',
@@ -579,13 +643,13 @@ export default function CategoryMenuSortPage({ categoryId, onBack, onSaved }) {
                 color: hasChanged ? '#ffffff' : '#979797',
                 fontSize: '14px',
                 fontWeight: 700,
-                cursor: hasChanged && !isSaving ? 'pointer' : 'not-allowed',
+                cursor: isSaving ? 'not-allowed' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 transition: 'all 0.2s ease',
               }}
-              className={hasChanged && !isSaving ? 'active:scale-[0.98]' : ''}
+              className={hasChanged && !isSaving ? 'active:scale-[0.98]' : 'active:scale-[0.99]'}
             >
               {isSaving ? 'Menyimpan...' : 'Simpan'}
             </button>

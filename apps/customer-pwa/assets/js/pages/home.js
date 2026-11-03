@@ -19,7 +19,9 @@
   // ── State ──
   var categories = [];
   var products = [];
+  var allCatalogProducts = [];
   var activeCategory = null;
+  var searchQuery = '';
 
   // ── P2 Fast Branch Discovery state ──
   // Home is DISCOVERY only: it presents nearby branches and records the
@@ -288,7 +290,10 @@
    */
   var _homeReady = { catalog: false, banners: false };
   function checkHomeReady() {
-    if (_homeReady.catalog && _homeReady.banners) {
+    // The catalog is the usable core of Home. Do not keep the full-screen splash
+    // up while optional banner content is still loading; its carousel skeleton
+    // remains in place and renderBanners() fills it independently.
+    if (_homeReady.catalog) {
       if (typeof window.__xentraHideSplash === 'function') {
         window.__xentraHideSplash();
       }
@@ -1120,6 +1125,7 @@
   function clearCatalogForBranch(loading) {
     categories = [];
     products = [];
+    allCatalogProducts = [];
     activeCategory = null;
     catalogBranchId = null;
     ++productLoadSeq; // in-flight per-category loads must never mix branches
@@ -1146,6 +1152,9 @@
   function applyCatalog(data) {
     if (!data || !Array.isArray(data.categories) || !data.categories.length) return;
     categories = data.categories;
+    allCatalogProducts = Array.isArray(data.all_products)
+      ? data.all_products
+      : (Array.isArray(data.products) ? data.products : []);
 
     // Retain activeCategory if it still exists in the newly loaded categories
     var catExists = categories.some(function (c) { return String(c.id) === String(activeCategory); });
@@ -1168,6 +1177,25 @@
     // loaded branch menu. Use in-place update (no DOM rebuild) to preserve
     // horizontal scroll position in the branch carousel.
     if (branches.length > 1) updateBranchActiveState();
+
+    // Auto-open product detail when shared with ?menu=<id> parameter
+    try {
+      if (!window.__xentraSharedMenuOpened) {
+        var menuParam = new URLSearchParams(window.location.search).get('menu');
+        if (menuParam && Array.isArray(data.all_products || data.products)) {
+          var allList = data.all_products || data.products;
+          var matchedProduct = allList.find(function (p) {
+            return String(p.id) === String(menuParam) || String(p.menu_id) === String(menuParam);
+          });
+          if (matchedProduct) {
+            window.__xentraSharedMenuOpened = true;
+            setTimeout(function () {
+              openProductDetail(matchedProduct);
+            }, 300);
+          }
+        }
+      }
+    } catch (_) {}
   }
 
   function adaptCanonicalHomeCatalog(data) {
@@ -1213,6 +1241,7 @@
         name: menu.title || menu.package_name || 'Menu',
         menu_title: menu.title || menu.package_name || 'Menu',
         menu_subtitle: menu.subtitle || '',
+        category_name: (menu.category && menu.category.name) || (categoryRefs[0] && categoryRefs[0].name) || '',
         menu_indicator_level: menu.level && menu.level.value != null ? menu.level.value : null,
         price: Number(menu.price || 0),
         regular_price: Number(menu.price || 0),
@@ -1359,7 +1388,7 @@
       activeCategory = categories[0].id;
     }
 
-    categories.forEach(function (cat) {
+    categories.forEach(function (cat, index) {
       var btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'x-cat' + (String(cat.id) === String(activeCategory) ? ' active' : '');
@@ -1368,9 +1397,14 @@
       // M6: prefer canonical derivative via XentraMedia, fall back to legacy
       var catImg = (Media && Media.resolveCategoryImg(cat)) || cat.image_url || cat.image || cat.icon_url || '';
       var monogram = UI.escape(branchMonogram(cat.name));
+      // Category chips sit near the first menu viewport. Loading every image
+      // lazily can make the photos pop in after the labels; fetch the first row
+      // immediately and keep horizontally off-screen categories lazy.
+      var eagerCategoryImage = index < 4;
       var imgHtml = catImg
         ? '<img src="' + UI.escape(catImg) + '" alt="' + UI.escape(cat.name) + '"' +
-          ' width="92" height="92" loading="lazy" decoding="async"' +
+          ' width="92" height="92" loading="' + (eagerCategoryImage ? 'eager' : 'lazy') + '"' +
+          ' decoding="async"' +
           ' onerror="this.onerror=null;this.parentElement.innerHTML=\'<span class=\\\'x-cat-image-mono\\\'>' + monogram + '</span>\';">'
         : '<span class="x-cat-image-mono">' + monogram + '</span>';
 
@@ -1385,6 +1419,7 @@
         btn.classList.add('active');
         var targetLeft = btn.offsetLeft - (track.clientWidth - btn.clientWidth) / 2;
         track.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
+        clearSearchInput();
         loadProducts(activeCategory);
       };
 
@@ -1469,6 +1504,155 @@
     return false;
   }
 
+  function getAllBranchProducts() {
+    if (Array.isArray(allCatalogProducts) && allCatalogProducts.length) {
+      return allCatalogProducts;
+    }
+    var all = [];
+    var seen = {};
+    if (Array.isArray(categories) && categories.length) {
+      categories.forEach(function (cat) {
+        if (Array.isArray(cat.products)) {
+          cat.products.forEach(function (p) {
+            if (p && p.id != null && !seen[p.id]) {
+              seen[p.id] = true;
+              if (!p.category_name && cat.name) p.category_name = cat.name;
+              all.push(p);
+            }
+          });
+        }
+      });
+    }
+    if (all.length) return all;
+    return products || [];
+  }
+
+  function clearSearchInput() {
+    var searchInput = $('x-menu-search-input');
+    var searchClear = $('x-menu-search-clear');
+    if (searchInput && (searchInput.value || searchQuery)) {
+      searchInput.value = '';
+      searchQuery = '';
+      if (searchClear) searchClear.style.display = 'none';
+      lastProductsHtml = null;
+    }
+  }
+
+  function executeSearchAndScroll() {
+    var searchInput = $('x-menu-search-input');
+    if (searchInput) {
+      searchQuery = (searchInput.value || '').trim();
+      var searchClear = $('x-menu-search-clear');
+      if (searchClear) {
+        searchClear.style.display = searchQuery ? 'flex' : 'none';
+      }
+      // CRITICAL: Immediately dismiss / blur virtual keyboard on mobile devices
+      searchInput.blur();
+    }
+
+    lastProductsHtml = null;
+    renderProducts();
+
+    // Scroll smoothly to results (x-products) after keyboard dismissal animation
+    setTimeout(function () {
+      var productsEl = $('x-products');
+      if (productsEl) {
+        var rect = productsEl.getBoundingClientRect();
+        var currentScroll = window.pageYOffset || document.documentElement.scrollTop;
+        var targetY = Math.max(0, rect.top + currentScroll - 16);
+        window.scrollTo({
+          top: targetY,
+          behavior: 'smooth'
+        });
+      }
+    }, 120);
+  }
+
+  function normalizeSearchText(str) {
+    if (!str) return '';
+    return String(str)
+      .toLowerCase()
+      .replace(/[\+\-\,\.\(\)\/\_\:\;\"\'\!]/g, ' ')
+      .replace(/\bnegeri\b/g, 'negri')
+      .replace(/\bpedes\b/g, 'pedas')
+      .replace(/\bcabai\b/g, 'cabe')
+      .replace(/\beste?h\b/g, 'es teh')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function filterAndRankProducts(allList, query) {
+    var qNorm = normalizeSearchText(query);
+    if (!qNorm) return allList || [];
+
+    var tokens = qNorm.split(' ').filter(Boolean);
+    if (!tokens.length) return allList || [];
+
+    var matched = [];
+
+    (allList || []).forEach(function (p) {
+      var title = normalizeSearchText(p.menu_title || p.title || p.package_name || p.name || '');
+      var subtitle = normalizeSearchText(p.menu_subtitle || p.subtitle || '');
+      var desc = normalizeSearchText(p.description || '');
+      var detail = normalizeSearchText(Array.isArray(p.menu_detail) ? p.menu_detail.join(' ') : (p.menu_detail || ''));
+      var catName = normalizeSearchText(p.category_name || (p.category && p.category.name) || '');
+
+      var corpus = [title, subtitle, desc, detail, catName].filter(Boolean).join(' ');
+
+      // Every query token must appear in the searchable corpus
+      var matchesAll = tokens.every(function (tok) {
+        return corpus.indexOf(tok) !== -1;
+      });
+
+      if (!matchesAll) return;
+
+      var score = 0;
+
+      // Exact full title match
+      if (title === qNorm) {
+        score += 600;
+      } else if (title.indexOf(qNorm) !== -1) {
+        score += 350;
+      }
+
+      // All tokens present in title
+      var allInTitle = tokens.every(function (tok) {
+        return title.indexOf(tok) !== -1;
+      });
+      if (allInTitle) {
+        score += 200;
+      }
+
+      // Starts with first token
+      if (title.indexOf(tokens[0]) === 0) {
+        score += 50;
+      }
+
+      // Token match weights across fields
+      tokens.forEach(function (tok) {
+        if (title.indexOf(tok) !== -1) score += 40;
+        if (subtitle.indexOf(tok) !== -1) score += 25;
+        if (catName.indexOf(tok) !== -1) score += 20;
+        if (detail.indexOf(tok) !== -1) score += 15;
+        if (desc.indexOf(tok) !== -1) score += 10;
+      });
+
+      if (isProductUnavailable(p)) {
+        score -= 50;
+      }
+
+      matched.push({ product: p, score: score });
+    });
+
+    matched.sort(function (a, b) {
+      return b.score - a.score;
+    });
+
+    return matched.map(function (m) {
+      return m.product;
+    });
+  }
+
   function renderProducts() {
     var container = $('x-products');
     if (!container) return;
@@ -1483,7 +1667,31 @@
       renderMyTableState();
     }
 
-    if (!products.length) {
+    var listToRender = products;
+    if (searchQuery) {
+      var allProducts = getAllBranchProducts();
+      listToRender = filterAndRankProducts(allProducts, searchQuery);
+    }
+
+    if (!listToRender.length) {
+      if (searchQuery) {
+        container.innerHTML =
+          '<div class="x-search-no-results">' +
+          '  <div style="font-size:26px;margin-bottom:8px;">🔍</div>' +
+          '  <div>Tidak ada menu yang sesuai dengan "<strong>' + UI.escape(searchQuery) + '</strong>"</div>' +
+          '  <button type="button" class="x-search-reset-btn" id="x-search-reset-btn">Tampilkan Semua Menu</button>' +
+          '</div>';
+        var resetBtn = $('x-search-reset-btn');
+        if (resetBtn) {
+          resetBtn.onclick = function () {
+            clearSearchInput();
+            renderProducts();
+          };
+        }
+        lastProductsHtml = container.innerHTML;
+        return;
+      }
+
       // Skip the write when the empty state is already on screen.
       if (lastProductsHtml !== '') {
         container.innerHTML = '<div class="x-empty">Tidak ada menu di kategori ini.</div>';
@@ -1502,7 +1710,14 @@
     var branchScope = activeBranch ? String(activeBranch.id) : undefined;
     var html = '';
 
-    products.forEach(function (product) {
+    if (searchQuery) {
+      html += '<div class="x-search-results-info">' +
+        '<span>Hasil pencarian "<strong>' + UI.escape(searchQuery) + '</strong>"</span>' +
+        '<span class="x-search-results-count">' + listToRender.length + ' menu</span>' +
+        '</div>';
+    }
+
+    listToRender.forEach(function (product) {
       var item = Store.findCartItem(product.id, branchScope);
       var qty = item ? item.quantity : 0;
       var note = (item && item.note) || (typeof Store !== 'undefined' && Store.getNote ? Store.getNote(product.id, activeBranchId) : '') || '';
@@ -1861,7 +2076,7 @@
 
     var availabilityHtml = '';
     if (branchClosed) {
-      availabilityHtml = '<div style="background:#ffe4e6;color:#e11d48;padding:8px 12px;border-radius:10px;font-size:12px;font-weight:700;margin:8px 0;display:inline-flex;align-items:center;gap:6px;">⚠️ Resto Sedang Tutup Sementara</div>';
+      availabilityHtml = '<div style="background:#fff5f7;border:1px solid #fecdd3;color:#e11d48;padding:8px 12px;border-radius:10px;font-size:12px;font-weight:700;margin:8px 0;display:inline-flex;align-items:center;gap:6px;">⚠️ Resto Sedang Tutup Sementara</div>';
     } else if (unavailable) {
       availabilityHtml = '<div style="background:#fee2e2;color:#dc2626;padding:8px 12px;border-radius:10px;font-size:12px;font-weight:700;margin:8px 0;display:inline-flex;align-items:center;gap:6px;">⚠️ Stok Habis di Cabang Ini</div>';
     }
@@ -1912,7 +2127,7 @@
       '  </div>' +
       '  <div class="x-detail-footer">' +
       (branchClosed
-        ? '<button type="button" class="x-detail-add" disabled style="opacity:0.6;background:#ffe4e6;color:#e11d48;cursor:not-allowed;">Resto Tutup</button>'
+        ? '<button type="button" class="x-detail-add" disabled style="opacity:0.7;background:#fff5f7;border:1px solid #fecdd3;color:#e11d48;cursor:not-allowed;">Resto Tutup</button>'
         : (unavailable
           ? '<button type="button" class="x-detail-add" disabled style="opacity:0.6;background:#e5e7eb;color:#9ca3af;cursor:not-allowed;">Habis</button>'
           : '<button type="button" class="x-detail-add">Add to cart' + (scopedQty > 0 ? ' (' + scopedQty + ')' : '') + '</button>')) +
@@ -2021,17 +2236,17 @@
                 if (UI && UI.toast) UI.toast('Gagal membuat link rekomendasi.');
                 return;
               }
-              var shareData = {
-                title: menuTitle + ' - Rekomendasi Bangjo',
-                text: res.whatsapp_text || ('Cobain ' + menuTitle + ' di Bangjo: ' + res.share_url),
-                url: res.share_url
-              };
-              if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
-                navigator.share(shareData).catch(function () {});
-              } else {
-                var waUrl = 'https://api.whatsapp.com/send?text=' + encodeURIComponent(res.whatsapp_text || (menuTitle + ' ' + res.share_url));
-                window.open(waUrl, '_blank');
-              }
+              openCustomShareSheet({
+                product: product,
+                menuTitle: menuTitle,
+                price: price,
+                image: detailImgSrc,
+                brandName: (res.share_title && res.share_title.split('•')[1] ? res.share_title.split('•')[1].trim() : 'Bangjo'),
+                shareTitle: res.share_title || (menuTitle + ' • Bangjo'),
+                shareText: res.share_text || ('Cobain ' + menuTitle + ' di Bangjo, rasanya rekomen banget!'),
+                shareUrl: res.share_url,
+                whatsappText: res.whatsapp_text || (res.share_text + '\n' + res.share_url)
+              });
             })
             .catch(function (err) {
               var errMsg = (err && (err.message || err.error)) || '';
@@ -2044,6 +2259,158 @@
               }
               if (UI && UI.toast) UI.toast('Gagal membagikan menu: ' + errMsg);
             });
+        }
+
+        function openCustomShareSheet(params) {
+          var shareOverlay = document.createElement('div');
+          shareOverlay.className = 'x-overlay x-note-overlay x-share-modal-overlay';
+
+          var thumbHtml = params.image
+            ? '<img src="' + UI.escape(params.image) + '" alt="' + UI.escape(params.menuTitle) + '" class="x-share-preview-thumb" loading="eager">'
+            : '<div class="x-share-preview-thumb" style="display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:20px;">🍽️</div>';
+
+          shareOverlay.innerHTML =
+            '<div class="x-sheet x-note-sheet x-share-modal-sheet">' +
+            '  <div class="x-note-handle">' +
+            '    <svg width="30" height="4" viewBox="0 0 30 4" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 2H28" stroke-width="4" stroke-linecap="round" stroke="#979797"/></svg>' +
+            '  </div>' +
+            '  <div class="x-share-modal-header">' +
+            '    <h3 class="x-share-modal-title">Bagikan Menu</h3>' +
+            '    <button type="button" class="x-share-modal-close" aria-label="Tutup">' +
+            '      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 1l12 12M13 1L1 13"/></svg>' +
+            '    </button>' +
+            '  </div>' +
+            '  <div class="x-share-preview-card">' +
+            thumbHtml +
+            '    <div class="x-share-preview-meta">' +
+            '      <div class="x-share-preview-name">' + UI.escape(params.menuTitle) + '</div>' +
+            '      <div class="x-share-preview-price">' + UI.money(params.price) + '</div>' +
+            '      <div class="x-share-preview-brand">' + UI.escape(params.brandName) + '</div>' +
+            '    </div>' +
+            '  </div>' +
+            '  <div class="x-share-actions-grid">' +
+            '    <button type="button" class="x-share-action-item" id="x-share-action-wa">' +
+            '      <div class="x-share-icon-bubble is-whatsapp">' +
+            '        <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.771-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.694.072-2.115-.515-1.815-.75-2.989-2.588-3.08-2.709-.091-.121-.734-.977-.734-1.864 0-.887.464-1.323.63-1.503.166-.18.362-.225.483-.225.12 0 .241.002.347.007.112.005.263-.042.411.314.152.366.518 1.264.563 1.355.045.091.076.197.015.318-.061.121-.092.197-.182.302-.091.106-.192.237-.274.318-.091.091-.186.19-.08.372.106.182.471.777 1.01 1.258.694.619 1.28.811 1.462.902.182.091.288.076.394-.045.106-.121.454-.529.576-.71.121-.181.242-.151.408-.091.166.06 1.056.498 1.238.589.182.091.303.136.348.212.045.076.045.438-.099.843z"/></svg>' +
+            '      </div>' +
+            '      <span class="x-share-action-label">WhatsApp</span>' +
+            '    </button>' +
+            '    <button type="button" class="x-share-action-item" id="x-share-action-copy">' +
+            '      <div class="x-share-icon-bubble is-copy">' +
+            '        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>' +
+            '      </div>' +
+            '      <span class="x-share-action-label">Salin Link</span>' +
+            '    </button>' +
+            '    <button type="button" class="x-share-action-item" id="x-share-action-more">' +
+            '      <div class="x-share-icon-bubble is-more">' +
+            '        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>' +
+            '      </div>' +
+            '      <span class="x-share-action-label">Lainnya</span>' +
+            '    </button>' +
+            '  </div>' +
+            '</div>';
+
+          document.body.appendChild(shareOverlay);
+          void shareOverlay.offsetHeight;
+          requestAnimationFrame(function () {
+            shareOverlay.classList.add('open');
+          });
+
+          var shareClosing = false;
+          function closeShareSheet() {
+            if (shareClosing) return;
+            shareClosing = true;
+            shareOverlay.classList.remove('open');
+            setTimeout(function () {
+              if (shareOverlay.parentNode) shareOverlay.remove();
+            }, 300);
+          }
+
+          if (window.XentraNav && typeof window.XentraNav.pushClose === 'function') {
+            window.XentraNav.pushClose(closeShareSheet);
+          }
+
+          shareOverlay.addEventListener('click', function (ev) {
+            if (ev.target === shareOverlay) {
+              if (window.XentraNav && typeof window.XentraNav.close === 'function') {
+                window.XentraNav.close();
+              } else {
+                closeShareSheet();
+              }
+            }
+          });
+
+          var btnClose = shareOverlay.querySelector('.x-share-modal-close');
+          if (btnClose) {
+            btnClose.onclick = function () {
+              if (window.XentraNav && typeof window.XentraNav.close === 'function') {
+                window.XentraNav.close();
+              } else {
+                closeShareSheet();
+              }
+            };
+          }
+
+          // Direct WhatsApp
+          var btnWa = shareOverlay.querySelector('#x-share-action-wa');
+          if (btnWa) {
+            btnWa.onclick = function () {
+              var waUrl = 'https://api.whatsapp.com/send?text=' + encodeURIComponent(params.whatsappText);
+              window.open(waUrl, '_blank');
+              closeShareSheet();
+            };
+          }
+
+          // Copy Link to Clipboard
+          var btnCopy = shareOverlay.querySelector('#x-share-action-copy');
+          if (btnCopy) {
+            btnCopy.onclick = function () {
+              if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(params.shareUrl).then(function () {
+                  if (UI && UI.toast) UI.toast('Link rekomendasi berhasil disalin!');
+                }).catch(function () {
+                  fallbackCopyText(params.shareUrl);
+                });
+              } else {
+                fallbackCopyText(params.shareUrl);
+              }
+              closeShareSheet();
+            };
+          }
+
+          function fallbackCopyText(textToCopy) {
+            var ta = document.createElement('textarea');
+            ta.value = textToCopy;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            try {
+              document.execCommand('copy');
+              if (UI && UI.toast) UI.toast('Link rekomendasi berhasil disalin!');
+            } catch (_) {}
+            ta.remove();
+          }
+
+          // More: Native System Share Sheet (Chrome, Line, Telegram, etc.)
+          var btnMore = shareOverlay.querySelector('#x-share-action-more');
+          if (btnMore) {
+            btnMore.onclick = function () {
+              var nativeData = {
+                title: params.shareTitle,
+                text: params.shareText,
+                url: params.shareUrl
+              };
+              if (navigator.share && navigator.canShare && navigator.canShare(nativeData)) {
+                navigator.share(nativeData).catch(function () {});
+              } else {
+                // If native share unavailable, open WA fallback
+                var waFallbackUrl = 'https://api.whatsapp.com/send?text=' + encodeURIComponent(params.whatsappText);
+                window.open(waFallbackUrl, '_blank');
+              }
+              closeShareSheet();
+            };
+          }
         }
       };
     }
@@ -2068,9 +2435,6 @@
           window.XentraNav.close();
         } else {
           close();
-        }
-        if (UI && typeof UI.toast === 'function') {
-          UI.toast('Ditambahkan ke keranjang');
         }
       };
     }
@@ -2746,29 +3110,27 @@
         localStorage.setItem('xentra_v2_pending_table_token', token);
       } catch (_) {}
 
-      // Sudah punya meja: memindahkan meja bukan hak tamu. Sistem mengunci, dan
-      // kasir yang bisa memindahkan (reassign) atau menutup & membuka sesi baru.
-      // Sama seperti di checkout: terkunci berarti sudah ada tagihan di meja itu.
-      // Sebelum memesan, scan meja lain hanya berarti berpindah meja.
-      var current = (Store.getMyTable && Store.getMyTable()) || null;
-      if (current && current.hadOpenBill) {
-        showTableNotice({
-          tone: 'warn',
-          title: 'Ingin pindah meja? Hubungi kasir.',
-          body: 'Pesananmu sudah terikat ke meja ' + (current.number || '-') + '.',
-          actions: [{ label: 'Mengerti', onClick: closeTableNotice }]
-        });
-        if (typeof onDone === 'function') onDone(false);
-        return;
-      }
-
+      // Let the Dining authority decide whether this is an idempotent repeat
+      // scan of the current table or an unauthorized attempt to join another one.
       API.post('/customer/dining-session/claim', { qr_token: token, branch_id: myTableBranchId() }).then(function (res) {
         if (!res || res.success !== true || !res.table) {
-          showTableNotice({ tone: 'warn', title: 'QR meja tidak dikenali.', body: 'Coba lagi, atau minta bantuan petugas.', actions: [{ label: 'Mengerti', onClick: closeTableNotice }] });
+          showTableNotice({ tone: 'warn', title: 'QR meja tidak aktif.', body: 'Minta kasir membuka sesi meja atau memberikan QR meja yang berlaku.', actions: [{ label: 'Mengerti', onClick: closeTableNotice }] });
           if (typeof onDone === 'function') onDone(false);
           return;
         }
+        if (!res.joined || !res.session) {
+          showTableNotice({
+            tone: 'warn',
+            title: res.table_open ? 'Masuk atau daftar untuk bergabung.' : 'Minta kasir membuka meja ini.',
+            body: res.message || 'Kamu bisa bergabung setelah kasir membuka sesi meja.',
+            actions: [{ label: 'Mengerti', onClick: closeTableNotice }]
+          });
+          if (typeof onDone === 'function') onDone(false);
+          return;
+        }
+        try { localStorage.removeItem('xentra_v2_pending_table_token'); } catch (_) {}
         var table = { id: res.table.id, number: res.table.table_number || res.table.label || '' };
+        table.hadOpenBill = true;
         Store.setMyTable(table);
         // Scan meja berarti tamu makan di tempat: tipe pembeliannya ikut dipilih
         // dine-in. Ini juga yang membuat ikon meja + badge tampil (ikon mengikuti
@@ -2881,8 +3243,18 @@
             try {
               var pendingToken = localStorage.getItem('xentra_v2_pending_table_token');
               if (pendingToken) {
-                API.post('/customer/dining-session/claim', { qr_token: pendingToken, branch_id: myTableBranchId() }).then(function () {
-                  reconcileMyTable();
+                API.post('/customer/dining-session/claim', { qr_token: pendingToken, branch_id: myTableBranchId() }).then(function (joinResult) {
+                  // Consume the pre-login scan exactly once. If staff has not
+                  // opened the table yet, ask the customer to scan again later
+                  // instead of silently joining a future table cycle.
+                  try { localStorage.removeItem('xentra_v2_pending_table_token'); } catch (_) {}
+                  if (joinResult && joinResult.joined && joinResult.session) {
+                    reconcileMyTable();
+                  } else {
+                    if (Store.clearMyTable) Store.clearMyTable();
+                    renderMyTableState();
+                    if (UI && UI.toast) UI.toast(joinResult && joinResult.message || 'Meja belum dibuka. Scan ulang QR setelah kasir membuka sesi meja.');
+                  }
                 }).catch(function () {});
               } else {
                 reconcileMyTable();
@@ -2952,6 +3324,56 @@
       sheetCheckout.onclick = function () {
         openCheckoutFlow();
       };
+    }
+
+    // Product Search Input & Form (Under Clock & Date)
+    var searchInput = $('x-menu-search-input');
+    var searchClear = $('x-menu-search-clear');
+    var searchForm = $('x-menu-search-form');
+    var searchIconBtn = $('x-menu-search-icon-btn');
+
+    if (searchForm) {
+      searchForm.addEventListener('submit', function (e) {
+        if (e && e.preventDefault) e.preventDefault();
+        executeSearchAndScroll();
+      });
+    }
+
+    if (searchIconBtn) {
+      searchIconBtn.addEventListener('click', function (e) {
+        if (e && e.preventDefault) e.preventDefault();
+        executeSearchAndScroll();
+      });
+    }
+
+    if (searchInput) {
+      searchInput.addEventListener('input', function () {
+        searchQuery = (searchInput.value || '').trim();
+        if (searchClear) {
+          searchClear.style.display = searchQuery ? 'flex' : 'none';
+        }
+        lastProductsHtml = null;
+        renderProducts();
+      });
+
+      searchInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.keyCode === 13) {
+          if (e && e.preventDefault) e.preventDefault();
+          executeSearchAndScroll();
+        }
+      });
+    }
+
+    if (searchClear) {
+      searchClear.addEventListener('click', function () {
+        clearSearchInput();
+        if (searchInput) {
+          searchInput.value = '';
+          searchInput.focus();
+        }
+        lastProductsHtml = null;
+        renderProducts();
+      });
     }
 
     // Subscribe to store changes (2-Way Realtime Reactive Sync)

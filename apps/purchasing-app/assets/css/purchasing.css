@@ -875,6 +875,148 @@ body {
   box-shadow: 0 4px 12px rgba(5, 150, 105, 0.35);
 }
 
+/* Fullscreen Kalkulator (edge-to-edge width & height on phone) - disabled, using original layout instead */
+/*
+#purchasing-view-calc {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 200;
+  width: 100%;
+  max-width: 520px;
+  height: 100dvh;
+  margin: 0 auto;
+  padding: calc(env(safe-area-inset-top, 0px) + 10px) 12px calc(env(safe-area-inset-bottom, 0px) + 12px);
+  background: var(--bg-page);
+  box-sizing: border-box;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+}
+
+body.is-purchasing-calc-open {
+  overflow: hidden;
+}
+
+#purchasing-view-calc .purchasing-calc-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 2px;
+}
+
+#purchasing-view-calc .purchasing-calc-head-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+#purchasing-view-calc .purchasing-calc-head-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-main);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+#purchasing-view-calc .purchasing-calc-head-sub {
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+#purchasing-view-calc .purchasing-calc-close {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid var(--border-light);
+  background: #ffffff;
+  color: var(--text-main);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  transition: all 0.15s ease;
+}
+
+#purchasing-view-calc .purchasing-calc-close:active {
+  transform: scale(0.94);
+  background: #f1f5f9;
+}
+
+#purchasing-view-calc .purchasing-calc-card {
+  flex: 1;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  gap: 10px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+#purchasing-view-calc .purchasing-calc-display-box {
+  flex: 1 1 22%;
+  min-height: 96px;
+  max-height: 180px;
+  margin-bottom: 0;
+  border-radius: 14px;
+}
+
+#purchasing-view-calc .purchasing-calc-kembalian-box {
+  flex-shrink: 0;
+  margin-bottom: 0;
+}
+
+#purchasing-view-calc .purchasing-calc-keypad {
+  flex: 2 1 0;
+  min-height: 0;
+  grid-auto-rows: 1fr;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+#purchasing-view-calc .purchasing-key {
+  height: auto;
+  min-height: 44px;
+  border-radius: 14px;
+  font-size: clamp(18px, 5.2vw, 24px);
+}
+
+@media (max-height: 640px) {
+  #purchasing-view-calc {
+    gap: 8px;
+  }
+
+  #purchasing-view-calc .purchasing-calc-card {
+    gap: 8px;
+  }
+
+  #purchasing-view-calc .purchasing-calc-display-box {
+    min-height: 82px;
+    max-height: 120px;
+    padding: 12px 16px;
+  }
+
+  #purchasing-view-calc .purchasing-calc-display-result {
+    font-size: clamp(28px, 8vw, 36px);
+  }
+
+  #purchasing-view-calc .purchasing-key {
+    min-height: 40px;
+  }
+}
+*/
+
 /* Goods Receipt Modal Styles */
 .purchasing-receive-modal-card {
   max-width: 480px;

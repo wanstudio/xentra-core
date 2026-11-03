@@ -1535,6 +1535,7 @@
     }
 
     var podCardHtml = '';
+    var delStatus = (delivery && delivery.status) || '';
     var isDeliveredStatus = (status === 'completed' || delStatus === 'delivered');
     if (isDeliveredStatus && delivery && (delivery.pod_photo_url || delivery.pod_bypass_reason)) {
       podCardHtml =
@@ -1755,10 +1756,10 @@
       '  </div>' +
       '  <div style="padding:8px 12px;background:#ffffff;border-top:1px solid #e2e8f0;">' +
       '    <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:6px;-webkit-overflow-scrolling:touch;">' +
-      '      <button type="button" class="x-cust-chat-chip" data-text="Saya di lantai 2 ya Pak" style="font-size:11.5px;padding:5px 9px;white-space:nowrap;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;font-weight:600;color:#334155;cursor:pointer;">Lantai 2</button>' +
-      '      <button type="button" class="x-cust-chat-chip" data-text="Titip di pos satpam ya Pak" style="font-size:11.5px;padding:5px 9px;white-space:nowrap;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;font-weight:600;color:#334155;cursor:pointer;">Titip di satpam</button>' +
+      '      <button type="button" class="x-cust-chat-chip" data-text="Saya di lantai 2" style="font-size:11.5px;padding:5px 9px;white-space:nowrap;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;font-weight:600;color:#334155;cursor:pointer;">Lantai 2</button>' +
+      '      <button type="button" class="x-cust-chat-chip" data-text="Titip di pos satpam" style="font-size:11.5px;padding:5px 9px;white-space:nowrap;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;font-weight:600;color:#334155;cursor:pointer;">Titip di satpam</button>' +
       '      <button type="button" class="x-cust-chat-chip" data-text="Saya sudah di depan rumah" style="font-size:11.5px;padding:5px 9px;white-space:nowrap;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;font-weight:600;color:#334155;cursor:pointer;">Sudah di depan</button>' +
-      '      <button type="button" class="x-cust-chat-chip" data-text="Tolong ditaruh di atas pagar ya Pak" style="font-size:11.5px;padding:5px 9px;white-space:nowrap;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;font-weight:600;color:#334155;cursor:pointer;">Taruh di pagar</button>' +
+      '      <button type="button" class="x-cust-chat-chip" data-text="Tolong ditaruh di atas pagar" style="font-size:11.5px;padding:5px 9px;white-space:nowrap;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;font-weight:600;color:#334155;cursor:pointer;">Taruh di pagar</button>' +
       '    </div>' +
       '    <div style="display:flex;gap:8px;align-items:center;">' +
       '      <input type="text" id="x-cust-chat-input" placeholder="Tulis pesan ke kurir..." style="flex:1;padding:10px 14px;border:1.5px solid #cbd5e1;border-radius:20px;font-size:13px;outline:none;font-family:inherit;">' +
@@ -1801,9 +1802,15 @@
         var authorColor = isMe ? '#15803d' : '#64748b';
         var authorName = isMe ? 'Saya' : (m.sender_name || 'Kurir');
 
+        var imgHtml = m.image_url
+          ? '<div style="margin-bottom:6px;"><img src="' + UI.escape(m.image_url) + '" alt="Foto Lampiran" style="max-width:100%;max-height:180px;border-radius:10px;display:block;object-fit:cover;cursor:pointer;" onclick="window.open(this.src, \'_blank\')"></div>'
+          : '';
+        var bodyText = (m.body && m.body !== '📷 [Foto Lampiran]') ? '<div style="color:#0f172a;word-break:break-word;">' + UI.escape(m.body) + '</div>' : '';
+
         return '<div style="align-self:' + align + ';max-width:82%;background:' + bg + ';border:' + border + ';border-radius:' + rad + ';padding:9px 12px;font-size:13px;line-height:1.4;box-shadow:0 1px 3px rgba(0,0,0,0.04);">' +
           '<div style="font-size:10px;font-weight:800;color:' + authorColor + ';margin-bottom:2px;">' + UI.escape(authorName) + '</div>' +
-          '<div style="color:#0f172a;word-break:break-word;">' + UI.escape(m.body) + '</div>' +
+          imgHtml +
+          bodyText +
           (m.created_at ? '<div style="font-size:9.5px;color:#94a3b8;text-align:right;margin-top:3px;">' + formatTime(m.created_at) + '</div>' : '') +
           '</div>';
       }).join('');

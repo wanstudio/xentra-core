@@ -29,7 +29,7 @@
     delivery: { schedule: true, address: true, deliveryFee: true, table: false, reservation: false },
     pickup: { schedule: true, address: false, deliveryFee: false, table: false, reservation: false },
     dine_in: { schedule: false, address: false, deliveryFee: false, table: true, reservation: false },
-    reservation: { schedule: false, address: false, deliveryFee: false, table: false, reservation: true }
+    reservation: { schedule: false, address: false, deliveryFee: false, table: true, reservation: true }
   };
 
   /*

@@ -19,10 +19,9 @@ const RESERVATION_NO_SHOW_GRACE_MINUTES = 60;
 // scan hanya dapat "QR sudah tidak berlaku" — jauh lebih sering bikin rugi
 // daripada yang dicegah.
 //
-// Karena QR-nya permanen, QR ini TIDAK dijadikan kunci: /customer/dining-session/claim
-// hanya memberitahu MEJA-nya, tidak membuka tagihan. Melihat tagihan tetap
-// berdasarkan identitas tamu (nomor teleponnya sendiri), jadi QR yang pernah
-// difoto orang tidak bisa membuka tagihan tamu lain.
+// QR permanen menunjuk ke meja, lalu customer terautentikasi bergabung ke siklus
+// meja yang sedang dibuka staf. QR tidak membuka sesi yang sudah ditutup dan
+// tidak dapat membuka meja yang belum dibuka kasir.
 //
 // Nyalakan (true) hanya kalau resto sanggup mencetak ulang kartu QR setiap sesi
 // meja ditutup.
@@ -32,6 +31,96 @@ const orderRepository = new OrderRepository();
 const branchRepository = new BranchRepository();
 
 class DiningTableService {
+  /** Opens a staff-owned table cycle before any Commerce Order exists. */
+  static openTableSession({ branch_id, table_id, guest_count = 1, actor_id = null }) {
+    if (!branch_id || !table_id) throw new Error('[DiningTableService] branch_id dan table_id wajib diisi.');
+    const now = new Date().toISOString();
+    const sessionId = `sess_${crypto.randomBytes(8).toString('hex')}`;
+    repository.beginTransaction();
+    try {
+      const table = repository.findTableForBranch(table_id, branch_id);
+      if (!table || !table.is_active) throw new Error('[DiningTableService] BRANCH_TABLE_MISMATCH: Meja tidak ditemukan atau tidak aktif di cabang ini.');
+      if (table.operational_state !== 'available') {
+        throw new Error(`[DiningTableService] TABLE_NOT_AVAILABLE: Meja sedang berstatus ${table.operational_state}.`);
+      }
+      repository.createDiningSession({
+        sessionId,
+        branchId: branch_id,
+        customerName: 'Tamu Meja',
+        customerPhone: '',
+        guestCount: Math.max(1, Number(guest_count) || 1),
+        channel: 'pos_cashier',
+        openedAt: now,
+        updatedAt: now
+      });
+      repository.attachDiningSessionTable({
+        mappingId: `dst_${crypto.randomBytes(8).toString('hex')}`,
+        sessionId,
+        tableId: table_id,
+        attachedAt: now
+      });
+      repository.updateTableState({
+        tableId: table_id,
+        operationalState: 'occupied',
+        currentSessionId: sessionId,
+        notes: actor_id ? `Opened by staff ${actor_id}` : 'Opened by cashier',
+        updatedAt: now
+      });
+      repository.commitTransaction();
+      return { success: true, session_id: sessionId, branch_id, table_id, status: 'active', opened_at: now };
+    } catch (err) {
+      try { repository.rollbackTransaction(); } catch (_) {}
+      throw err;
+    }
+  }
+
+  /** A permanent table QR may join only the currently open cycle for that table. */
+  static joinActiveTableSession({ branch_id, table_id, customer_id, customer_phone = '' }) {
+    if (!branch_id || !table_id || !customer_id) {
+      throw new Error('[DiningTableService] branch_id, table_id, dan customer_id wajib diisi.');
+    }
+    const now = new Date().toISOString();
+    repository.beginTransaction();
+    try {
+      const table = repository.findTableForBranch(table_id, branch_id);
+      if (!table || !table.is_active) throw new Error('[DiningTableService] BRANCH_TABLE_MISMATCH: Meja tidak ditemukan atau tidak aktif di cabang ini.');
+      const existingMemberSession = repository.findActiveSessionByCustomerId(branch_id, customer_id);
+      if (existingMemberSession && existingMemberSession.id !== table.current_session_id) {
+        throw new Error('[DiningTableService] CUSTOMER_ACTIVE_SESSION_EXISTS: Anda sudah bergabung ke sesi meja aktif lain di cabang ini. Hubungi kasir jika perlu pindah meja.');
+      }
+      if (table.operational_state !== 'occupied' || !table.current_session_id) {
+        repository.rollbackTransaction();
+        return { success: true, joined: false, session: null };
+      }
+      const session = repository.findDiningSessionById(table.current_session_id);
+      const sessionTables = repository.findSessionTables(table.current_session_id).map(row => row.table_id);
+      if (!session || session.branch_id !== branch_id || !sessionTables.includes(table_id)) {
+        throw new Error('[DiningTableService] ACTIVE_TABLE_SESSION_NOT_FOUND: Meja tidak memiliki sesi dine-in aktif.');
+      }
+      if (existingMemberSession && existingMemberSession.id !== session.id) {
+        throw new Error('[DiningTableService] CUSTOMER_ACTIVE_SESSION_EXISTS: Anda sudah bergabung ke sesi meja aktif lain di cabang ini. Hubungi kasir jika perlu pindah meja.');
+      }
+      repository.addDiningSessionMember({ sessionId: session.id, customerId: customer_id, joinedAt: now });
+      repository.commitTransaction();
+      return { success: true, joined: true, session_id: session.id, branch_id, table_id };
+    } catch (err) {
+      try { repository.rollbackTransaction(); } catch (_) {}
+      throw err;
+    }
+  }
+
+  static isSessionMember(sessionId, customerId) {
+    return repository.isDiningSessionMember(sessionId, customerId);
+  }
+
+  static hasOpenTableSession(tableId) {
+    return Boolean(repository.findOpenSessionForTable(tableId));
+  }
+
+  static findActiveSessionByCustomerId(branchId, customerId) {
+    return repository.findActiveSessionByCustomerId(branchId, customerId);
+  }
+
   static initializeBranchLayout(branchId, templateId = 'template_01') {
     if (!branchId) throw new Error('[DiningTableService] branchId is required.');
 
@@ -110,14 +199,13 @@ class DiningTableService {
   /**
    * Resolve and validate the table/session context for a Commerce dine-in order.
    * Commerce owns Order placement; Dining owns table/session business invariants.
-   * This method intentionally preserves the pre-extraction response semantics so
-   * the migration remains behavior-preserving while the repository access moves
-   * behind the Dining boundary.
+   * Customer app dine-in is authorized only by active-session membership from
+   * the table QR. POS and other staff channels retain their operational paths.
    */
   static prepareDineInOrderContext({
     branch_id,
     order_channel = 'customer_app',
-    customer_phone = null,
+    customer_id = null,
     dining_session_id = null,
     table_number = null,
     table_id = null,
@@ -175,21 +263,15 @@ class DiningTableService {
       };
     }
 
-    const authenticatedCustomerPhone = customer_phone ? String(customer_phone).trim() : null;
-
-    // A customer may not keep multiple pending dine-in table contexts at once.
-    if (order_channel === 'customer_app' && authenticatedCustomerPhone) {
-      const existingHold = repository.findActiveHoldByCustomer(branch_id, authenticatedCustomerPhone);
-      if (existingHold) {
-        const isDifferentTable = resolvedTableIds.some(tid => tid !== existingHold.table_id);
-        if (isDifferentTable) {
-          return {
-            valid: false,
-            status: 'CUSTOMER_PENDING_HOLD_EXISTS',
-            errors: ['Anda sudah memiliki pesanan meja yang sedang menunggu konfirmasi pada meja lain di cabang ini. Batalkan pesanan sebelumnya jika ingin berpindah meja.']
-          };
-        }
-      }
+    // Customer app dine-in is only valid inside a cashier-opened cycle joined
+    // through the table QR. Do not let a client create a hold/session by
+    // selecting an available table or inherit an occupied session by phone.
+    if (order_channel === 'customer_app' && !effectiveDiningSessionId) {
+      return {
+        valid: false,
+        status: 'DINING_SESSION_REQUIRED',
+        errors: ['Scan QR meja setelah kasir membuka sesi meja untuk mulai memesan.']
+      };
     }
 
     if (effectiveDiningSessionId) {
@@ -215,11 +297,12 @@ class DiningTableService {
           errors: [`Sesi meja "${effectiveDiningSessionId}" sudah ditutup (${session.status}) dan tidak dapat digunakan kembali.`]
         };
       }
-      if (order_channel === 'customer_app' && session.customer_phone && authenticatedCustomerPhone && session.customer_phone !== authenticatedCustomerPhone) {
+      const authorizedMember = customer_id && repository.isDiningSessionMember(session.id, customer_id);
+      if (order_channel === 'customer_app' && !authorizedMember) {
         return {
           valid: false,
           status: 'UNAUTHORIZED_SESSION_ACCESS',
-          errors: ['Sesi meja ini milik pelanggan lain. Anda tidak dapat bergabung atau membuat pesanan pada sesi ini.']
+          errors: ['Customer belum bergabung ke sesi meja ini melalui QR aktif.']
         };
       }
 
@@ -233,38 +316,16 @@ class DiningTableService {
             errors: ['Meja yang dipesan tidak sesuai dengan meja pada sesi aktif ini.']
           };
         }
-      }
-    } else if (order_channel === 'customer_app' && authenticatedCustomerPhone) {
-      const existingSession = repository.findActiveSessionByCustomer(branch_id, authenticatedCustomerPhone);
-      if (existingSession) {
-        const sessionTableIds = repository.findSessionTables(existingSession.id).map(row => row.table_id);
-        if (resolvedTableIds.length > 0) {
-          const isSelfTransfer = resolvedTableIds.some(tid => !sessionTableIds.includes(tid));
-          if (isSelfTransfer) {
-            return {
-              valid: false,
-              status: 'CUSTOMER_TABLE_TRANSFER_FORBIDDEN',
-              errors: ['Anda sudah memiliki sesi aktif di meja lain pada cabang ini. Pelanggan tidak diizinkan memindahkan meja sendiri. Silakan hubungi kasir/staf untuk pindah meja.']
-            };
-          }
-        }
-        effectiveDiningSessionId = existingSession.id;
-      } else {
-        for (const tid of resolvedTableIds) {
-          const currentTable = repository.findCurrentSessionForTable(tid);
-          if (currentTable && currentTable.operational_state === 'occupied' && currentTable.current_session_id) {
-            const activeSession = repository.findDiningSessionById(currentTable.current_session_id);
-            if (activeSession && activeSession.status === 'active') {
-              if (activeSession.customer_phone && activeSession.customer_phone !== authenticatedCustomerPhone) {
-                return {
-                  valid: false,
-                  status: 'TABLE_ALREADY_OCCUPIED',
-                  errors: ['Meja sedang digunakan oleh pelanggan lain.']
-                };
-              }
-              effectiveDiningSessionId = activeSession.id;
-            }
-          }
+        const stateMismatch = resolvedTableIds.some(tid => {
+          const tableState = repository.findTableForBranch(tid, branch_id);
+          return !tableState || tableState.operational_state !== 'occupied' || tableState.current_session_id !== session.id;
+        });
+        if (stateMismatch) {
+          return {
+            valid: false,
+            status: 'TABLE_SESSION_MISMATCH',
+            errors: ['Meja tidak lagi terikat pada sesi dine-in aktif ini.']
+          };
         }
       }
     }
@@ -278,7 +339,19 @@ class DiningTableService {
   }
 
   /** Create a reservation using the existing Order record as the persistence model. */
-  static createReservation({ brand_id, branch_id, customer, order_channel = 'customer_app', selection_mode = null, reservation_date = null, reservation_time = '12:00', guest_count = null, notes = '' } = {}) {
+  static createReservation({
+    brand_id,
+    branch_id,
+    customer,
+    order_channel = 'customer_app',
+    selection_mode = null,
+    reservation_date = null,
+    reservation_time = '12:00',
+    guest_count = null,
+    notes = '',
+    table_number = null,
+    table_id = null
+  } = {}) {
     if (!reservation_date) return { success: false, status: 'VALIDATION_ERROR', errors: ['Tanggal reservasi wajib diisi untuk tipe pesanan reservation.'] };
     const reservationTime = String(reservation_time || '12:00').trim();
     const timeMatch = /^(\d{2}):(\d{2})$/.exec(reservationTime);
@@ -314,6 +387,24 @@ class DiningTableService {
       };
     }
 
+    // Resolve optional table selection if customer ticked "Pilih meja"
+    let resolvedTableNumber = null;
+    if (table_id) {
+      const tableRow = repository.findTableForBranch(table_id, branch_id);
+      if (!tableRow) {
+        return { success: false, status: 'TABLE_NOT_FOUND', errors: ['Meja yang dipilih tidak ditemukan di cabang ini.'] };
+      }
+      resolvedTableNumber = tableRow.table_number;
+    } else if (table_number) {
+      const tableRow = repository.findTableIdByNumberOrLabel(branch_id, String(table_number).trim());
+      if (!tableRow) {
+        return { success: false, status: 'TABLE_NOT_FOUND', errors: ['Meja yang dipilih tidak ditemukan di cabang ini.'] };
+      }
+      resolvedTableNumber = tableRow.table_number || String(table_number).trim();
+    }
+
+    const effectiveBrandId = brand_id || branchReservationSettings.brand_id || null;
+
     const orderId = `ord_${crypto.randomBytes(6).toString('hex')}`;
     const now = new Date().toISOString();
     const orderNumber = `RS-${Math.floor(100 + Math.random() * 900)}`;
@@ -331,13 +422,54 @@ class DiningTableService {
         orderRepository.rollbackTransaction();
         return { success: false, status: 'BRANCH_CAPACITY_FULL', errors: [`Kapasitas reservasi meja untuk cabang ini pada tanggal ${resDateStr} sudah penuh.`] };
       }
-      orderRepository.insertReservation({ id: orderId, orderNumber, brandId: brand_id, branchId: branch_id, customerId: customer?.id || customer?.customer_id || null, customerName: customer?.name || 'Tamu Reservasi', customerPhone: customer?.phone || '', orderChannel: order_channel, selectionMode: selection_mode || 'CUSTOMER_SELECTED', reservationDate: resDateStr, reservationTime, orderNote: notes ? `Reservasi (${parsedGuestCount} Tamu, Tgl: ${resDateStr}) | ${notes}` : `Reservasi (${parsedGuestCount} Tamu, Tgl: ${resDateStr})`, createdAt: now, updatedAt: now });
+      const noteParts = [`Reservasi (${parsedGuestCount} Tamu, Tgl: ${resDateStr})`];
+      if (resolvedTableNumber) noteParts.push(`Meja ${resolvedTableNumber}`);
+      if (notes) noteParts.push(notes);
+      const computedOrderNote = noteParts.join(' | ');
+
+      orderRepository.insertReservation({
+        id: orderId,
+        orderNumber,
+        brandId: effectiveBrandId,
+        branchId: branch_id,
+        customerId: customer?.id || customer?.customer_id || null,
+        customerName: customer?.name || 'Tamu Reservasi',
+        customerPhone: customer?.phone || '',
+        orderChannel: order_channel,
+        selectionMode: selection_mode || (resolvedTableNumber ? 'CUSTOMER_SELECTED' : 'UNASSIGNED'),
+        tableNumber: resolvedTableNumber,
+        reservationDate: resDateStr,
+        reservationTime,
+        orderNote: computedOrderNote,
+        createdAt: now,
+        updatedAt: now
+      });
       orderRepository.commitTransaction();
     } catch (err) {
       try { orderRepository.rollbackTransaction(); } catch (_) {}
       throw err;
     }
-    return { success: true, order_id: orderId, order_number: orderNumber, grand_total: 0, subtotal: 0, order: { id: orderId, order_number: orderNumber, order_type: 'reservation', reservation_date: resDateStr, reservation_time: reservationTime, guest_count: parsedGuestCount, customer_name: customer?.name, customer_phone: customer?.phone, subtotal: 0, grand_total: 0, items: [] } };
+    return {
+      success: true,
+      order_id: orderId,
+      order_number: orderNumber,
+      grand_total: 0,
+      subtotal: 0,
+      order: {
+        id: orderId,
+        order_number: orderNumber,
+        order_type: 'reservation',
+        table_number: resolvedTableNumber,
+        reservation_date: resDateStr,
+        reservation_time: reservationTime,
+        guest_count: parsedGuestCount,
+        customer_name: customer?.name,
+        customer_phone: customer?.phone,
+        subtotal: 0,
+        grand_total: 0,
+        items: []
+      }
+    };
   }
 
   /** Check in a reservation by converting the same Order record into an active dine-in order. */
@@ -831,13 +963,14 @@ class DiningTableService {
 
     const now = new Date().toISOString();
     const associatedTables = repository.findSessionTables(sessionId);
-    const acceptedStatuses = new Set(['confirmed', 'preparing', 'ready', 'out_for_delivery', 'completed']);
+    const acceptedStatuses = new Set(['active_table', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'completed']);
     const nonPayableTerminalStatuses = new Set(['cancelled', 'rejected', 'timeout', 'expired', 'fulfillment_exception']);
 
     const assertSessionClosable = () => {
       if (options.force) return;
       const sessionOrders = orderRepository.findDiningSessionOrdersWithPayment(sessionId);
       const blockers = sessionOrders.filter(order => {
+        if (Number(order.pending_addition_count || 0) > 0) return true;
         const status = String(order.status || '');
         if (nonPayableTerminalStatuses.has(status)) return false;
 
@@ -856,6 +989,9 @@ class DiningTableService {
       if (blockers.length > 0) {
         const order = blockers[0];
         const status = String(order.status || '');
+        if (Number(order.pending_addition_count || 0) > 0) {
+          throw new Error(`[DiningTableService] PENDING_ADDITIONS: Kiriman tambahan pada Order ${order.order_number || order.id} masih menunggu keputusan Merchant.`);
+        }
         if (!acceptedStatuses.has(status)) {
           throw new Error(`[DiningTableService] ORDER_NOT_ACCEPTED: Order ${order.order_number || order.id} belum diterima Merchant dan sesi belum dapat ditutup.`);
         }
@@ -876,6 +1012,17 @@ class DiningTableService {
       assertSessionClosable();
 
       repository.completeDiningSession({ sessionId, closedAt: now, updatedAt: now });
+      try {
+        const sessionOrders = orderRepository.findDiningSessionOrdersWithPayment(sessionId);
+        for (const so of sessionOrders) {
+          if (['active_table', 'ready'].includes(so.status)) {
+            const settled = Math.max(Number(so.order_payment_settled_amount || 0), Number(so.check_payment_settled_amount || 0));
+            if (Number(so.grand_total || 0) <= 0 || settled + 0.000001 >= Number(so.grand_total || 0)) {
+              orderRepository.db.execute("UPDATE orders SET status = 'completed', updated_at = ? WHERE id = ?", [now, so.id]);
+            }
+          }
+        }
+      } catch (_) {}
       for (const row of associatedTables) repository.updateTableState({ tableId: row.table_id, operationalState: 'available', currentSessionId: null, notes: 'Session completed', updatedAt: now });
       repository.commitTransaction();
     } catch (err) {

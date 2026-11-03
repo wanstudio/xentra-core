@@ -138,8 +138,12 @@
         actionsHtml = '<button type="button" class="x-btn-secondary" style="font-size:12px; padding:6px 12px; width:100%; color:#dc2626; border-color:#fecaca;" onclick="toggleBMTableBlocked(\'' + esc(t.id) + '\', true)">Blokir Meja</button>';
       } else if (st === 'occupied' && t.current_session_id) {
         actionsHtml = '<button type="button" class="x-btn-secondary" style="font-size:12px; padding:6px 12px; width:100%;" onclick="completeBMTableSession(\'' + esc(t.current_session_id) + '\')">Selesaikan Sesi Makan</button>';
+      } else if (st === 'held' || st === 'reserved') {
+        actionsHtml = '<button type="button" class="x-btn-secondary" style="font-size:12px; padding:6px 12px; width:100%; color:#d97706; border-color:#fde68a;" onclick="releaseBMTable(\'' + esc(t.id) + '\')">Kosongkan Meja (Hold/Reservasi)</button>';
+      } else if (st === 'occupied') {
+        actionsHtml = '<button type="button" class="x-btn-secondary" style="font-size:12px; padding:6px 12px; width:100%; color:#d97706; border-color:#fde68a;" onclick="releaseBMTable(\'' + esc(t.id) + '\')">Kosongkan Meja</button>';
       } else {
-        actionsHtml = '<button type="button" class="x-btn-secondary" style="font-size:12px; padding:6px 12px; width:100%;" disabled>Sedang Digunakan</button>';
+        actionsHtml = '<button type="button" class="x-btn-secondary" style="font-size:12px; padding:6px 12px; width:100%; color:#d97706; border-color:#fde68a;" onclick="releaseBMTable(\'' + esc(t.id) + '\')">Reset Meja (Tersedia)</button>';
       }
 
       var channelBadge = '';
@@ -189,7 +193,8 @@
       showBMTableQrOverlay(data);
     } catch (err) {
       console.warn('[BM Table QR Error]:', err);
-      if (typeof showToast === 'function') showToast(msg); else console.warn(msg);2
+      var errMsg = (err && err.message) || 'Kesalahan jaringan saat memuat QR meja.';
+      if (typeof showToast === 'function') showToast(errMsg); else console.warn(errMsg);
     }
   }
   window.openBMTableQr = openBMTableQr;
@@ -288,6 +293,27 @@
     }
   }
   window.completeBMTableSession = completeBMTableSession;
+
+  async function releaseBMTable(tableId) {
+    if (!confirm('Kosongkan meja ini dan kembalikan status menjadi Tersedia?')) return;
+    try {
+      var res = await adminFetch(API_BASE + '/dine-in/tables/' + encodeURIComponent(tableId) + '/release', {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        showToast('Meja berhasil dikosongkan dan siap digunakan.');
+        loadBMTables();
+      } else {
+        showToast('Gagal mengosongkan meja: ' + (data.error || 'Terjadi kesalahan'));
+        loadBMTables();
+      }
+    } catch (e) {
+      showToast('Kesalahan jaringan.');
+    }
+  }
+  window.releaseBMTable = releaseBMTable;
 
 
 })();

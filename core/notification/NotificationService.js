@@ -98,18 +98,23 @@ class NotificationService {
 
       // Dispatch background Web Push (reaches device when locked/closed)
       if (this.webPushService) {
+        const isDriverTarget = target_role === 'driver' || source_type === 'delivery' || (action_url && action_url.startsWith('/driver'));
+        const defaultIcon = isDriverTarget ? '/driver/assets/icons/icon-192.png' : '/merchant-app/assets/icons/icon-192.png';
+        const defaultUrl = isDriverTarget ? '/driver/' : '/merchant-app/#pesanan';
+        const tagPrefix = isDriverTarget ? 'driver-task-' : 'order-pending-';
         const pushPayload = {
           title: title,
           body: body,
-          icon: '/merchant-app/assets/icons/icon-192.png',
-          badge: '/merchant-app/assets/icons/icon-192.png',
-          tag: 'order-pending-' + (related_entity_id || notifId),
-          url: action_url || '/merchant-app/#pesanan',
+          icon: defaultIcon,
+          badge: defaultIcon,
+          tag: tagPrefix + (related_entity_id || notifId),
+          url: action_url || defaultUrl,
           data: {
             notificationId: notifId,
             orderId: related_entity_id,
             entityType: related_entity_type,
-            url: action_url || '/merchant-app/#pesanan'
+            targetRole: target_role || (isDriverTarget ? 'driver' : null),
+            url: action_url || defaultUrl
           }
         };
         this.webPushService.sendPushToUsers(recipientUserIds, pushPayload).catch(err => {

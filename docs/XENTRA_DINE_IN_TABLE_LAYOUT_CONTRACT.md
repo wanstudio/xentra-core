@@ -274,3 +274,35 @@ Customer-side Multi-Table Dine-in is explicitly **not** a feature for the curren
 ## 17. Planning Rule
 
 The 17 scenarios above are mandatory acceptance criteria for Dine-in implementation and automated test coverage. Any implementation that cannot be mapped to these scenarios/invariants, or conflicts with them, requires a new explicit business/architecture decision.
+
+## 18. Approved Addendum — Cashier-Opened QR Table Cycle (2026-10-30)
+
+This addendum records the approved dine-in flow for a physical table placard QR. Where the earlier sections describe a customer-started QR table selection, Merchant acceptance as the start of occupancy, or one customer as the session owner, this addendum supersedes those rules for the cashier-opened QR flow. The customer-started floor-plan flow remains a separate legacy entry path until retired by a later decision.
+
+### 18.1 Table cycle and QR
+
+- Authorized POS staff open one Dining Session for an available Branch Table before placing its QR placard for guests.
+- Opening the cycle changes the table to `OCCUPIED` and creates no Commerce Order by itself. It is not the 15-minute payment `HELD` state.
+- The permanent QR identifies the Branch and Table. A scan resolves the current active cycle; it does not create a session, release/convert a hold, or claim an available table.
+- A scan with no active cycle returns the customer to staff to have the table opened. Signup/login can then resume the QR join.
+- Staff explicitly closes/releases the session. A pending order timeout or payment completion does not itself close the table.
+
+### 18.2 Multiple customers and one shared bill
+
+- Multiple authenticated customer accounts may join the same active table cycle through its QR.
+- Membership is unique per `(Dining Session, Customer)` and repeat scans are idempotent.
+- Session membership, not the primary customer phone on the legacy session row, authorizes a member to view the shared bill and submit their own order batch.
+- The cycle has one canonical Commerce Order. The first customer order creates/binds it; simultaneous first orders must converge on that parent. Subsequent member submissions are attributed Order Addition batches.
+- Members may see shared totals and their own submitted items. They may not see another member’s contact information or payment credentials.
+- Merchant accepts/rejects each submitted order/batch. Rejection or timeout of one batch does not end the table cycle.
+
+### 18.3 Close and payment
+
+- Payment allocations update the canonical shared bill; amounts cannot be allocated above the remaining balance.
+- Payment settlement remains separate from Dining Session completion.
+- Dining’s existing close guards remain authoritative: unresolved pending/unaccepted orders or unpaid amounts prevent normal close. Staff must resolve them before release; a route must not bypass these guards with a direct status update.
+- No GPS, rotating QR, OTP, or physical-presence check is added for QR sharing. Staff may reject an invalid order or release a mistakenly opened empty table.
+
+### 18.4 Implementation decision record
+
+The implementation plan is [Dine-in Shared Table Session — Implementation Plan](decisions/dine-in-shared-table-session-implementation-plan-v1.md). The cashier-opened QR cycle is the target path for new QR orders; this does not silently change reservation semantics or non-dine-in checkout.

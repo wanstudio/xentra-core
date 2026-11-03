@@ -7,7 +7,6 @@
 'use strict';
 
 const PrePaymentVerificationGate = require('../../domains/commerce/services/PrePaymentVerificationGate');
-const { DiningTableService } = require('../../domains/dining');
 const OrderPlacementService = require('../../domains/commerce/services/OrderPlacementService');
 
 module.exports = function registerCheckoutRoutes(router, deps) {
@@ -295,6 +294,7 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
             BRANCH_NOT_FOUND: `Cabang "${branch_id}" tidak ditemukan pada brand ini.`,
             BRANCH_NOT_ACTIVE: `Cabang "${branch_id}" sedang nonaktif.`,
             BRANCH_CLOSED: `Cabang "${branch_id}" sedang tutup. Silakan pilih cabang lain.`,
+            BRANCH_ONLINE_PAUSED: `Pesanan online delivery di cabang ini sedang dijeda sementara karena antrean dapur padat. Silakan coba beberapa saat lagi atau pilih pesanan makan di tempat.`,
             FULFILLMENT_NOT_SUPPORTED: `Cabang "${branch_id}" tidak mendukung metode pemesanan ini. Silakan pilih metode lain.`
           };
           const reason = selectedElig.reasons && selectedElig.reasons[0];
@@ -437,10 +437,10 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       };
     }
 
-    // 3. Dine-in Table Validation and Concurrency Hold
+    // 3. Dine-in validation. Customer PWA orders must bind to a staff-opened,
+    // QR-joined session; this route never creates a table hold or session.
     let tableIdsToHold = [];
     if (order_type === 'dine_in') {
-      const { DiningTableService } = require('../../domains/dining');
       let reqTableIds = [];
       if (req.body.table_id) {
         reqTableIds.push(req.body.table_id);
@@ -453,29 +453,45 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
         if (tblRow) reqTableIds.push(tblRow.id);
       }
 
-      // Single-table enforcement for customer dine-in (Section 6 & Notion locked decision)
-      if (reqTableIds.length > 1) {
-        return res.status(400).json({
+      const requestedDiningSessionId = req.body.dining_session_id || req.body.sessionId || null;
+      if (!requestedDiningSessionId) {
+        return res.status(409).json({
           success: false,
-          status: 'SINGLE_TABLE_REQUIRED',
-          error: 'Pesanan dine-in customer hanya diperbolehkan untuk 1 meja.'
+          status: 'DINING_SESSION_REQUIRED',
+          error: 'Scan QR meja setelah kasir membuka sesi meja untuk mulai memesan.'
         });
       }
-
-      if (reqTableIds.length > 0) {
-        // Authoritatively check availability
-        const custPhone = (customer && customer.phone) || (customerSession && customerSession.phone) || null;
-        const availCheck = DiningTableService.validateTablesAvailable(branch.id, reqTableIds, custPhone);
-        if (!availCheck.valid) {
-          return res.status(400).json({
-            success: false,
-            status: 'TABLE_UNAVAILABLE',
-            error: availCheck.error,
-            unavailable_table_id: availCheck.unavailable_table_id
-          });
-        }
-        tableIdsToHold = reqTableIds;
+      const customerId = customerSession.customerId || customerSession.customer_id || null;
+      const joinedSession = db.prepare(`
+        SELECT ds.id
+        FROM dining_sessions ds
+        JOIN branches b ON b.id = ds.branch_id
+        WHERE ds.id = ? AND ds.branch_id = ? AND b.brand_id = ? AND ds.status = 'active'
+          AND EXISTS (
+            SELECT 1 FROM dining_session_members m
+            WHERE m.session_id = ds.id AND m.customer_id = ?
+          )
+      `).get(requestedDiningSessionId, branch.id, req.brand_id, customerId || '');
+      if (!joinedSession) {
+        return res.status(403).json({
+          success: false,
+          status: 'UNAUTHORIZED_SESSION_ACCESS',
+          error: 'Customer harus bergabung melalui QR ke sesi meja yang sedang aktif.'
+        });
       }
+      const sessionTables = db.prepare(`
+        SELECT t.id
+        FROM dining_session_tables dst
+        JOIN branch_tables t ON t.id = dst.table_id
+        JOIN branch_table_states s ON s.table_id = t.id
+        WHERE dst.session_id = ? AND t.branch_id = ? AND s.operational_state = 'occupied'
+          AND s.current_session_id = ?
+      `).all(requestedDiningSessionId, branch.id, requestedDiningSessionId).map(row => row.id);
+      if (sessionTables.length !== 1 || (reqTableIds.length > 0 && reqTableIds.some(id => !sessionTables.includes(id)))) {
+        return res.status(409).json({ success: false, status: 'TABLE_SESSION_MISMATCH', error: 'Meja tidak sesuai dengan sesi dine-in aktif.' });
+      }
+      reqTableIds = sessionTables;
+      tableIdsToHold = sessionTables;
     }
 
     // R-Recipient Identity Layer: resolve authoritative recipient snapshot.
@@ -542,6 +558,35 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
         correlation_id: `chk_${Date.now()}`
       }
     });
+
+    if (placementResult.status === 'DINING_SESSION_ORDER_EXISTS' && placementResult.existing_order) {
+      const { OrderAdditionService } = require('../../domains/commerce');
+      const existingOrder = placementResult.existing_order;
+      const batchResult = await OrderAdditionService.submit({
+        order_id: existingOrder.id,
+        brand_id: req.brand_id,
+        branch_id: branch.id,
+        items,
+        source_channel: 'customer_app',
+        created_by: customerSession.customerId || customerSession.customer_id || customer.phone,
+        client_transaction_id: req.body.client_transaction_id || req.body.clientTransactionId || `dinein_${crypto.randomBytes(12).toString('hex')}`,
+        customer: {
+          id: customerSession.customerId || customerSession.customer_id || null,
+          name: customer.name,
+          phone: customer.phone
+        }
+      });
+      return res.status(201).json({
+        success: true,
+        status: batchResult.status,
+        batch_pending: true,
+        order_id: existingOrder.id,
+        order_number: existingOrder.order_number,
+        grand_total: existingOrder.grand_total,
+        order_addition: batchResult.addition,
+        message: 'Pesanan masuk ke tagihan meja dan menunggu konfirmasi Merchant.'
+      });
+    }
 
     if (!placementResult.success) {
       const primaryError = (placementResult.errors && placementResult.errors[0]) || 'Gagal memproses pesanan.';
@@ -617,28 +662,6 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
           payment_method: null
         }
       });
-    }
-
-    // 4a. Dine-in Table Hold for Payment / Acceptance Stage (15-minute hold)
-    // Baseline Business Flow:
-    // Customer -> QR / Floor Plan -> 1 Table -> Order (Hold Table / Pending) -> Merchant Accept -> Active Dining Session
-    // A customer dine-in order does NOT immediately become an active dining session at checkout.
-    // Both Cash and Online hold the table pending merchant acceptance or payment.
-    // If the customer already has an active session, order is already linked to it.
-    if (order_type === 'dine_in' && tableIdsToHold.length > 0 && !order.dining_session_id) {
-      const { DiningTableService } = require('../../domains/dining');
-      try {
-        DiningTableService.holdTablesForPayment({
-          branch_id: branch.id,
-          table_id: tableIdsToHold[0],
-          table_ids: tableIdsToHold,
-          customer_phone: customer.phone,
-          hold_reference_id: orderId,
-          channel: 'customer_app'
-        });
-      } catch (tblHoldErr) {
-        console.warn('[Checkout Dine-In Table Hold Warning]:', tblHoldErr.message);
-      }
     }
 
     // 4. Payment Gateway Resolution (Midtrans Snap, DOKU Checkout, or Cash)
@@ -720,7 +743,10 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
     }
 
     // Trigger Notification for Merchant and Cashier
-    if (notificationService) {
+    // GoFood/GrabFood standard: Notify merchant immediately only for Cash/COD or Reservation.
+    // For online payments, merchant notification is deferred until payment settlement.
+    const isOnlinePayment = payment_method !== 'cash' && order_type !== 'reservation';
+    if (notificationService && !isOnlinePayment) {
       try {
         const displayCode = String(orderNumber || '').startsWith('#') ? orderNumber : ('#' + (orderNumber || orderId.slice(-3)));
         notificationService.createNotification({

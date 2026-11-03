@@ -33,6 +33,16 @@ public class XentraOwnerBridge {
     }
 
     @JavascriptInterface
+    public void hideNativeSplash() {
+        activity.hideNativeSplash();
+    }
+
+    @JavascriptInterface
+    public void onAppReady() {
+        activity.hideNativeSplash();
+    }
+
+    @JavascriptInterface
     public String getAppVersion() {
         return "1.1.0";
     }
@@ -86,6 +96,11 @@ public class XentraOwnerBridge {
     @JavascriptInterface
     public void syncAuth(String token, String branchId) {
         OrderMonitorService.saveAuthContext(activity, token, branchId);
+    }
+
+    @JavascriptInterface
+    public String getSavedToken() {
+        return OrderMonitorService.getSavedToken(activity);
     }
 
     @JavascriptInterface

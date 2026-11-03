@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Prototype: Alur Tambah Item & Resep Terpadu</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: #F1F5F9;
+      color: #0F172A;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 0;
+    }
+
+    /* Top Demo Bar */
+    .demo-bar {
+      width: 100%;
+      background: #0F172A;
+      color: #F8FAFC;
+      padding: 10px 16px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      z-index: 100;
+    }
+    .demo-badge {
+      background: #00A637;
+      color: #FFF;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .demo-btn-reset {
+      background: rgba(255,255,255,0.15);
+      color: #FFF;
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .demo-btn-reset:hover {
+      background: rgba(255,255,255,0.25);
+    }
+
+    /* Mobile Container Frame */
+    .app-frame {
+      width: 100%;
+      max-width: 440px;
+      background: #FFFFFF;
+      min-height: calc(100vh - 42px);
+      position: relative;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+      display: flex;
+      flex-direction: column;
+      padding-bottom: 90px;
+    }
+
+    /* Header */
+    .app-header {
+      position: sticky;
+      top: 0;
+      background: #FFFFFF;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 20px;
+      border-bottom: 1px solid #F1F5F9;
+    }
+    .back-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #F8FAFC;
+      border: none;
+      cursor: pointer;
+      color: #0F172A;
+      font-size: 18px;
+    }
+    .app-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: #0F172A;
+      flex: 1;
+    }
+
+    /* Content Area */
+    .page-content {
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* Cards */
+    .form-card {
+      background: #FFFFFF;
+      border: 1px solid #E2E8F0;
+      border-radius: 14px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: all 0.25s ease;
+    }
+    .card-label {
+      font-size: 14px;
+      font-weight: 700;
+      color: #0F172A;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .req-star {
+      color: #EF4444;
+    }
+
+    /* Text Input */
+    .input-box {
+      width: 100%;
+      height: 48px;
+      border: 1.5px solid #CBD5E1;
+      border-radius: 12px;
+      padding: 0 14px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #0F172A;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .input-box:focus {
+      border-color: #0F172A;
+    }
+    .input-box::placeholder {
+      color: #94A3B8;
+      font-weight: 400;
+    }
+
+    /* Disabled Gating State */
+    .gated-locked {
+      opacity: 0.45;
+      pointer-events: none;
+      position: relative;
+      filter: grayscale(0.2);
+    }
+    .gated-banner {
+      background: #EFF6FF;
+      border: 1px dashed #93C5FD;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 12px;
+      color: #1E40AF;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Stock Type Options */
+    .type-option {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 0;
+      cursor: pointer;
+      user-select: none;
+    }
+    .type-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .type-info {
+      flex: 1;
+      min-width: 0;
+      text-align: left;
+    }
+    .type-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: #0F172A;
+    }
+    .type-desc {
+      font-size: 12px;
+      color: #64748B;
+      margin-top: 2px;
+      line-height: 1.35;
+    }
+    .switch {
+      width: 44px;
+      height: 24px;
+      background: #CBD5E1;
+      border-radius: 999px;
+      position: relative;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      flex-shrink: 0;
+    }
+    .switch.active {
+      background: #00A637;
+    }
+    .switch-thumb {
+      width: 20px;
+      height: 20px;
+      background: #FFF;
+      border-radius: 50%;
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      transition: transform 0.2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .switch.active .switch-thumb {
+      transform: translateX(20px);
+    }
+
+    .divider {
+      height: 1px;
+      background: #F1F5F9;
+      width: 100%;
+      margin: 2px 0;
+    }
+
+    /* Cartoon Chef Cat Card */
+    .chef-cat-box {
+      background: linear-gradient(180deg, #F0FDF4 0%, #FFFFFF 100%);
+      border: 1.5px dashed #86EFAC;
+      border-radius: 16px;
+      padding: 24px 18px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 12px;
+      margin-top: 4px;
+    }
+    .cat-avatar {
+      width: 100px;
+      height: 100px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: gentle-bob 3s ease-in-out infinite;
+    }
+    @keyframes gentle-bob {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+    .cat-title {
+      font-size: 16px;
+      font-weight: 800;
+      color: #0F172A;
+    }
+    .cat-subtitle {
+      font-size: 12px;
+      color: #64748B;
+      line-height: 1.4;
+      max-width: 280px;
+    }
+    .btn-make-recipe {
+      background: #00A637;
+      color: #FFFFFF;
+      font-size: 14px;
+      font-weight: 700;
+      padding: 12px 24px;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 14px rgba(0, 166, 55, 0.25);
+      transition: transform 0.15s, background-color 0.15s;
+    }
+    .btn-make-recipe:hover {
+      background: #008f2f;
+      transform: translateY(-1px);
+    }
+
+    /* Recipe Configured State Card */
+    .recipe-summary-card {
+      background: #F8FAFC;
+      border: 1.5px solid #E2E8F0;
+      border-radius: 14px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .recipe-sum-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .recipe-sum-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: #0F172A;
+    }
+    .recipe-sum-yield {
+      font-size: 11px;
+      color: #64748B;
+      margin-top: 2px;
+    }
+    .recipe-sum-cost {
+      font-size: 17px;
+      font-weight: 800;
+      color: #00A637;
+      text-align: right;
+    }
+    .recipe-sum-cost-sub {
+      font-size: 11px;
+      color: #94A3B8;
+      text-align: right;
+    }
+    .recipe-ingredients-list {
+      font-size: 12px;
+      color: #475569;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 8px 12px;
+      background: #FFFFFF;
+      border-radius: 8px;
+      border: 1px solid #E2E8F0;
+    }
+    .btn-edit-recipe {
+      color: #1E40AF;
+      font-size: 12px;
+      font-weight: 700;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      align-self: flex-end;
+      text-decoration: underline;
+    }
+
+    /* Fixed Bottom Action Bar */
+    .bottom-bar {
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+      max-width: 440px;
+      background: #FFFFFF;
+      border-top: 1px solid #E2E8F0;
+      padding: 14px 20px;
+      display: flex;
+      gap: 12px;
+      z-index: 60;
+      box-shadow: 0 -4px 16px rgba(0,0,0,0.04);
+    }
+    .btn-submit {
+      width: 100%;
+      height: 48px;
+      background: #0F172A;
+      color: #FFFFFF;
+      font-size: 15px;
+      font-weight: 700;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background-color 0.2s;
+    }
+    .btn-submit:disabled {
+      background: #CBD5E1;
+      cursor: not-allowed;
+    }
+
+    /* Auto SKU Badge */
+    .sku-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      color: #00A637;
+      font-weight: 600;
+      background: #DCFCE7;
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+
+    /* ========================================================
+       PAGE 2: BUAT RESEP SCREEN
+       ======================================================== */
+    .recipe-page {
+      display: none;
+    }
+    .locked-recipe-name {
+      background: #F1F5F9;
+      border: 1px solid #CBD5E1;
+      border-radius: 12px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #334155;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .btn-add-mat {
+      background: #F0FDF4;
+      border: 1.5px dashed #00A637;
+      color: #00A637;
+      font-size: 14px;
+      font-weight: 700;
+      padding: 12px;
+      border-radius: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      transition: background-color 0.15s;
+    }
+    .btn-add-mat:hover {
+      background: #DCFCE7;
+    }
+
+    .material-item-row {
+      background: #FFFFFF;
+      border: 1px solid #E2E8F0;
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .mat-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .mat-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: #0F172A;
+    }
+    .mat-del-btn {
+      color: #EF4444;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+      padding: 2px 6px;
+    }
+    .mat-inputs {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .qty-input {
+      width: 80px;
+      height: 38px;
+      border: 1px solid #CBD5E1;
+      border-radius: 8px;
+      padding: 0 10px;
+      font-size: 13px;
+      font-weight: 700;
+      text-align: right;
+    }
+    .uom-select {
+      flex: 1;
+      height: 38px;
+      border: 1px solid #CBD5E1;
+      border-radius: 8px;
+      padding: 0 8px;
+      font-size: 13px;
+      font-weight: 600;
+      background: #FFF;
+      color: #0F172A;
+    }
+    .mat-subtotal {
+      font-size: 12px;
+      color: #64748B;
+      text-align: right;
+      font-weight: 600;
+    }
+
+    /* Bottom Sheet Modal */
+    .sheet-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 200;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      backdrop-filter: blur(2px);
+    }
+    .sheet-overlay.open {
+      display: flex;
+    }
+    .sheet-modal {
+      width: 100%;
+      max-width: 440px;
+      background: #FFFFFF;
+      border-radius: 20px 20px 0 0;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 -10px 40px rgba(0,0,0,0.2);
+      animation: slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes slide-up {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    .sheet-handle {
+      width: 40px;
+      height: 5px;
+      background: #E2E8F0;
+      border-radius: 999px;
+      margin: 12px auto 6px;
+    }
+    .sheet-header {
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #F1F5F9;
+    }
+    .sheet-title {
+      font-size: 16px;
+      font-weight: 800;
+      color: #0F172A;
+    }
+    .sheet-close {
+      background: transparent;
+      border: none;
+      font-size: 20px;
+      color: #94A3B8;
+      cursor: pointer;
+    }
+    .sheet-search-wrap {
+      padding: 12px 20px;
+      background: #F8FAFC;
+    }
+    .sheet-search {
+      width: 100%;
+      height: 42px;
+      border: 1px solid #CBD5E1;
+      border-radius: 10px;
+      padding: 0 12px;
+      font-size: 13px;
+      outline: none;
+      background: #FFF;
+    }
+    .sheet-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 20px 30px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .sheet-mat-item {
+      padding: 12px 14px;
+      border: 1px solid #E2E8F0;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .sheet-mat-item:hover {
+      background: #F8FAFC;
+      border-color: #00A637;
+    }
+    .sheet-mat-info {
+      text-align: left;
+    }
+    .sheet-mat-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #0F172A;
+    }
+    .sheet-mat-sub {
+      font-size: 11px;
+      color: #64748B;
+      margin-top: 2px;
+    }
+    .sheet-mat-price {
+      font-size: 12px;
+      font-weight: 700;
+      color: #00A637;
+    }
+
+    /* Success Modal */
+    .success-modal {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 300;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .success-card {
+      background: #FFF;
+      border-radius: 20px;
+      width: 100%;
+      max-width: 380px;
+      padding: 24px 20px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      animation: pop 0.25s ease-out;
+    }
+    @keyframes pop {
+      0% { transform: scale(0.9); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Demo Controller Bar -->
+  <div class="demo-bar">
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span class="demo-badge">PROTOTYPE FLOW</span>
+      <span>Alur Tambah Item + Buat Resep Terpadu (GoBiz Guided UX)</span>
+    </div>
+    <button class="demo-btn-reset" onclick="resetPrototype()">↺ Reset Alur</button>
+  </div>
+
+  <!-- Mobile Frame -->
+  <div class="app-frame" id="appFrame">
+
+    <!-- ========================================================
+         PAGE 1: TAMBAH ITEM
+         ======================================================== -->
+    <div id="pageTambahItem">
+      <!-- Header -->
+      <div class="app-header">
+        <button class="back-btn" onclick="alert('Navigasi kembali ke Katalog Item Master')">←</button>
+        <div class="app-title">Tambah Item</div>
+      </div>
+
+      <div class="page-content">
+        <!-- 1. Card Nama Item (Wajib) -->
+        <div class="form-card">
+          <label class="card-label">
+            Nama <span class="req-star">*</span>
+          </label>
+          <input
+            type="text"
+            id="inputItemName"
+            class="input-box"
+            placeholder="Contoh: Ayam Sambel Geprek"
+            oninput="handleNameInput(this.value)"
+            autocomplete="off"
+          />
+          <div style="font-size:11px; color:#64748B;">
+            Ketik nama item untuk membuka pengaturan stok & resep di bawah.
+          </div>
+        </div>
+
+        <!-- 2. Container Card Bawah (Di-lock jika nama kosong) -->
+        <div id="gatedSection" class="gated-locked">
+
+          <!-- Banner Notifikasi Kunci (hanya tampil kalau nama kosong) -->
+          <div id="gatedNotice" class="gated-banner" style="margin-bottom: 16px;">
+            <span>🔒</span>
+            <span>Ketik <strong>Nama Item</strong> di atas terlebih dahulu untuk melanjutkan.</span>
+          </div>
+
+          <!-- Card Tipe Stok -->
+          <div class="form-card" style="margin-bottom: 16px;">
+            <div class="card-label">Tipe Stok</div>
+
+            <!-- Option 1: Siap Jual (Default) -->
+            <div class="type-option" onclick="selectStockType('DIRECT')">
+              <div class="type-icon" style="background:#FEE2E2;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2">
+                  <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>
+                </svg>
+              </div>
+              <div class="type-info">
+                <div class="type-name">Siap Jual (Non-Resep)</div>
+                <div class="type-desc">Barang beli jadi tanpa proses masak (Air mineral, kerupuk, dll)</div>
+              </div>
+              <div class="switch" id="switchDirect">
+                <div class="switch-thumb"></div>
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- Option 2: Pakai Resep -->
+            <div class="type-option" onclick="selectStockType('COOKED')">
+              <div class="type-icon" style="background:#DBEAFE;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="2">
+                  <path d="M2 12h20"/><path d="M20 12v8H4v-8"/><path d="m4 8 16-4"/><path d="m4 4 16 4"/>
+                </svg>
+              </div>
+              <div class="type-info">
+                <div class="type-name">Pakai Resep</div>
+                <div class="type-desc">Dimasak dari bahan-bahan mentah seperti ayam ungkep, sambal, dll</div>
+              </div>
+              <div class="switch" id="switchCooked">
+                <div class="switch-thumb"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card Dynamic: Tergantung Tipe Stok -->
+
+          <!-- KONDISI A: Siap Jual -> Input Harga Modal Manual -->
+          <div id="cardDirectCost" class="form-card" style="margin-bottom: 16px;">
+            <label class="card-label">Harga Modal (Rp)/pcs</label>
+            <input type="text" id="inputDirectCost" class="input-box" placeholder="Contoh: 3.000" />
+            <div style="font-size:11px; color:#64748B;">Harga beli kulakan per pcs barang jadi.</div>
+          </div>
+
+          <!-- KONDISI B1: Pakai Resep tapi BELUM ada resep -> 1:1 Figma Spec Card -->
+          <div id="cardChefCat" class="form-card" style="display: none; margin-bottom: 16px; padding: 16px; border-radius: 14px; outline: 0.5px #D9D9D9 solid; outline-offset: -0.5px; border: none; background: #FFFFFF;">
+            <div style="width: 100%; display: flex; flex-direction: column; gap: 20px;">
+              <div style="display: flex; flex-direction: column; gap: 12px; align-self: stretch;">
+                <div style="color: #0F172A; font-size: 16px; font-weight: 700; line-height: 1.2;">
+                  Buat resepnya dulu yuk!
+                </div>
+                <img style="width: 100%; height: 189px; aspect-ratio: 321 / 189; border-radius: 20px; object-fit: cover; display: block;" src="/owner/assets/img/cat-chef-recipe.png" alt="Buat resepnya dulu yuk!" onerror="if(!this.dataset.retried){this.dataset.retried='1';this.src='/merchant-shared/img/cat-chef-recipe.png';}" />
+              </div>
+              <button type="button" onclick="openRecipePage()" style="width: 100%; padding: 13px 0; background: linear-gradient(0deg, #00A637 0%, #00A637 100%), white; border-radius: 20px; outline: 1px #00A637 solid; outline-offset: -1px; border: none; cursor: pointer; display: inline-flex; justify-content: center; align-items: center; box-shadow: 0 4px 14px rgba(0, 166, 55, 0.2);">
+                <span style="text-align: center; color: white; font-size: 13px; font-weight: 700;">Buat resep</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- KONDISI B2: Pakai Resep dan SUDAH ada resep tersimpan -->
+          <div id="cardRecipeDone" class="recipe-summary-card" style="display: none; margin-bottom: 16px;">
+            <div class="recipe-sum-header">
+              <div>
+                <div class="recipe-sum-title" id="sumRecipeName">Resep: Ayam Sambel Geprek</div>
+                <div class="recipe-sum-yield" id="sumRecipeYield">Hasil: 1 Porsi</div>
+              </div>
+              <div>
+                <div class="recipe-sum-cost" id="sumRecipeCost">Rp12.450</div>
+                <div class="recipe-sum-cost-sub">HPP per porsi</div>
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="recipe-ingredients-list" id="sumRecipeIngredients">
+              <!-- Dynamically populated -->
+            </div>
+
+            <button class="btn-edit-recipe" onclick="openRecipePage()">Ubah resep? ✎</button>
+          </div>
+
+          <!-- Card SKU & Kelola Stok -->
+          <div class="form-card" style="margin-bottom: 16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <div class="card-label">Kelola stok (SKU)</div>
+                <div style="font-size:11px; color:#64748B; margin-top:2px;">Catat stok fisik barang di outlet</div>
+              </div>
+              <div class="switch active" id="switchSku" onclick="toggleSkuSwitch()">
+                <div class="switch-thumb"></div>
+              </div>
+            </div>
+
+            <div id="skuInputWrap" style="margin-top: 8px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <span style="font-size:12px; font-weight:700; color:#475569;">Kode SKU</span>
+                <span class="sku-badge">✓ Auto-generated</span>
+              </div>
+              <input type="text" id="inputSku" class="input-box" placeholder="KODE-SKU-001" style="font-family:monospace; text-transform:uppercase;" />
+            </div>
+          </div>
+
+          <!-- Card Catatan -->
+          <div class="form-card">
+            <label class="card-label">Catatan</label>
+            <textarea id="inputNotes" class="input-box" style="height:80px; padding:10px 14px; font-weight:400; resize:none;" placeholder="Tambahkan catatan jika diperlukan..."></textarea>
+          </div>
+
+        </div> <!-- /gatedSection -->
+      </div> <!-- /page-content -->
+
+      <!-- Bottom Bar -->
+      <div class="bottom-bar">
+        <button id="btnSubmitItem" class="btn-submit" disabled onclick="submitFinalItem()">
+          Simpan Item Baru
+        </button>
+      </div>
+    </div>
+
+    <!-- ========================================================
+         PAGE 2: BUAT RESEP (1:1 FIGMA SPEC)
+         ======================================================== -->
+    <div id="pageBuatResep" class="recipe-page">
+      <div class="app-header">
+        <button class="back-btn" onclick="backToItemPage()">←</button>
+        <div class="app-title">Buat resep</div>
+      </div>
+
+      <div class="page-content">
+        <!-- 1. Card: Nama resep -->
+        <div class="form-card" style="padding: 16px; border-radius: 14px; outline: 0.5px #D9D9D9 solid; outline-offset: -0.5px; border: none; background: #FFFFFF; display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; box-sizing: border-box;">
+          <div style="color: #0F172A; font-size: 16px; font-weight: 700; text-align: left;">Nama resep</div>
+          <div style="padding: 17px; border-radius: 14px; outline: 1px #CBD5E1 solid; outline-offset: -1px; display: flex; justify-content: space-between; align-items: center; background: #FFFFFF; box-sizing: border-box;">
+            <span id="lockedRecipeTitle" style="color: #0F172A; font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Nama item</span>
+            <div style="width: 15px; height: 15px; position: relative; overflow: hidden; flex-shrink: 0;" title="Terkunci mengikuti nama item">
+              <img src="/owner/assets/icons/fxemoji_lock.svg" alt="Terkunci" style="width: 15px; height: 15px; display: block;" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" />
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: none;">
+                <path d="M11.0383 10.2276C10.6418 10.2276 10.3205 9.90622 10.3205 9.5098V5.33017C10.3205 3.92148 9.17442 2.77539 7.76571 2.77539C6.35703 2.77539 5.21094 3.92145 5.21094 5.33017V7.76113C5.21094 8.15755 4.88958 8.47891 4.49316 8.47891C4.09675 8.47891 3.77539 8.15755 3.77539 7.76113V5.33017C3.77539 3.12988 5.56543 1.33984 7.76571 1.33984C9.966 1.33984 11.756 3.12988 11.756 5.33017V9.5098C11.756 9.90622 11.4347 10.2276 11.0383 10.2276Z" fill="#B1B4B5"/>
+                <path d="M12.1329 14.5743H3.39844C2.58296 14.5743 1.92188 13.9132 1.92188 13.0977V8.04785C1.92188 7.23237 2.58296 6.57129 3.39844 6.57129H12.1329C12.9484 6.57129 13.6095 7.23237 13.6095 8.04785V13.0977C13.6095 13.9132 12.9484 14.5743 12.1329 14.5743Z" fill="#FFB636"/>
+                <path d="M3.20288 13.3837H3.12891C2.89591 13.3837 2.70703 13.1949 2.70703 12.9619V8.18262C2.70703 7.94962 2.89591 7.76074 3.12891 7.76074H3.20288C3.43588 7.76074 3.62476 7.94962 3.62476 8.18262V12.9619C3.62476 13.1949 3.43588 13.3837 3.20288 13.3837Z" fill="#FFD469"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Card: Hasil porsi -->
+        <div class="form-card" style="padding: 16px; border-radius: 14px; outline: 0.5px #D9D9D9 solid; outline-offset: -0.5px; border: none; background: #FFFFFF; margin-bottom: 16px; box-sizing: border-box;">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+            <div style="display: flex; flex-direction: column; gap: 6px; text-align: left; flex: 1;">
+              <div style="color: #0F172A; font-size: 16px; font-weight: 700; line-height: 20px;">Hasil porsi</div>
+              <div style="color: #94A3B8; font-size: 13px; font-weight: 500; line-height: 18px;">Berapa porsi yang dihasilkan oleh resep ini?</div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 15px; flex-shrink: 0;">
+              <div style="width: 101px; height: 52px; position: relative; overflow: hidden; border-radius: 14px; outline: 1px #CBD5E1 solid; outline-offset: -1px; background: #FFFFFF;">
+                <input type="number" id="inputYieldQty" value="1" min="1" oninput="calculateLiveCost()" style="width: 100%; height: 100%; border: none; outline: none; background: transparent; text-align: center; color: #0F172A; font-size: 13px; font-weight: 700;" />
+              </div>
+              <div style="color: #0F172A; font-size: 13px; font-weight: 700;">Porsi</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Card: Komponen bahan baku -->
+        <div class="form-card" style="padding: 16px; border-radius: 14px; outline: 0.5px #D9D9D9 solid; outline-offset: -0.5px; border: none; background: #FFFFFF; display: flex; flex-direction: column; gap: 16px; margin-bottom: 16px; box-sizing: border-box;">
+          <div style="display: flex; flex-direction: column; gap: 16px; width: 100%;">
+            <div style="padding: 2px 0; display: flex; justify-content: space-between; align-items: center;">
+              <div style="color: #0F172A; font-size: 16px; font-weight: 700; line-height: 16px;">Komponen bahan baku</div>
+              <div style="width: 70px; height: 30px; position: relative; background: #F2F2F2; border-radius: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <span id="badgeMatCount" style="text-align: center; color: #0F172A; font-size: 11px; font-weight: 700;">0 Bahan</span>
+              </div>
+            </div>
+
+            <!-- Empty state if no ingredients -->
+            <div id="emptyMatPrompt" style="padding: 16px; border-radius: 14px; outline: 0.5px #D9D9D9 solid; outline-offset: -0.5px; background: #FFFFFF; color: #94A3B8; font-size: 13px; font-weight: 500; text-align: left; box-sizing: border-box;">
+              Belum ada bahan dalam resep ini
+            </div>
+
+            <!-- Container baris bahan -->
+            <div id="recipeItemsContainer" style="display: flex; flex-direction: column; gap: 10px;">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <!-- Tombol Tambah bahan (Pure White Background) -->
+          <button type="button" class="btn-add-mat" onclick="openMaterialSheet()" style="width: 100%; padding: 13px 0; background-color: #FFFFFF; background: #FFFFFF; border-radius: 20px; outline: 1px #00A637 solid; outline-offset: -1px; border: none; cursor: pointer; display: flex; justify-content: center; align-items: center; box-sizing: border-box;">
+            <span style="text-align: center; color: #00A637; font-size: 13px; font-weight: 700;">Tambah bahan</span>
+          </button>
+        </div>
+
+        <!-- 4. Card: Estimasi HPP (Balanced 16px padding top & bottom) -->
+        <div class="form-card" style="padding: 16px; border-radius: 14px; outline: 0.5px #D9D9D9 solid; outline-offset: -0.5px; border: none; background: #FFFFFF; margin-bottom: 16px; box-sizing: border-box;">
+          <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 12px;">
+            <div style="display: flex; flex-direction: column; gap: 6px; text-align: left; flex: 1;">
+              <div style="color: #0F172A; font-size: 16px; font-weight: 700; line-height: 20px;">Estimasi HPP</div>
+              <div style="color: #94A3B8; font-size: 13px; font-weight: 500; line-height: 18px;">Akumulasi biaya bahan baku per porsi</div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px; text-align: right; align-items: flex-end; flex-shrink: 0;">
+              <div id="liveTotalHpp" style="color: #00A637; font-size: 16px; font-weight: 700; line-height: 20px;">Rp0</div>
+              <div style="color: #94A3B8; font-size: 11px; font-weight: 500; line-height: 14px;">per porsi</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Bar for Buat Resep -->
+      <div class="bottom-bar">
+        <button class="btn-submit" onclick="saveRecipeAndReturn()">
+          Simpan
+        </button>
+      </div>
+    </div>
+
+  </div> <!-- /appFrame -->
+
+  <!-- ========================================================
+       BOTTOM SHEET: PILIH MATERIAL BAHAN MENTAH
+       ======================================================== -->
+  <div class="sheet-overlay" id="sheetOverlay" onclick="closeSheetOnBackdrop(event)">
+    <div class="sheet-modal" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <div class="sheet-title">Pilih Bahan Mentah</div>
+        <button class="sheet-close" onclick="closeMaterialSheet()">✕</button>
+      </div>
+
+      <div class="sheet-search-wrap">
+        <input
+          type="text"
+          id="sheetSearchInput"
+          class="sheet-search"
+          placeholder="🔍 Cari bahan (misal: Ayam, Cabai, Bawang...)"
+          oninput="filterMaterials(this.value)"
+        />
+      </div>
+
+      <div class="sheet-list" id="sheetMaterialList">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================
+       MODAL SUKSES (SIMULASI PENYIMPANAN FINAL)
+       ======================================================== -->
+  <div class="success-modal" id="successModal">
+    <div class="success-card">
+      <div style="width:60px; height:60px; background:#DCFCE7; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:28px;">
+        🎉
+      </div>
+      <div style="font-size:18px; font-weight:800; color:#0F172A;">
+        Item & Resep Berhasil Disimpan!
+      </div>
+      <div id="successSummaryText" style="font-size:13px; color:#475569; line-height:1.4;">
+        Item <strong>Ayam Sambel Geprek</strong> telah tersimpan bersama formula resepnya.
+      </div>
+
+      <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:12px; width:100%; text-align:left; font-size:12px; font-family:monospace; color:#334155; max-height:140px; overflow-y:auto;" id="debugPayloadBox">
+        <!-- Payload JSON -->
+      </div>
+
+      <button class="btn-submit" style="height:44px; font-size:14px;" onclick="resetPrototype()">
+        Uji Alur Lagi dari Awal
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // ==========================================
+    // DATA MASTER MATERIAL (SIMULASI DATABASE)
+    // ==========================================
+    const MASTER_MATERIALS = [
+      { id: 'mat_ayam', name: 'Ayam Karkas Segar', baseUom: 'Gr', costPerBase: 35, displayPrice: 'Rp35.000 / Kg' },
+      { id: 'mat_cabai_setan', name: 'Cabai Rawit Merah (Setan)', baseUom: 'Gr', costPerBase: 50, displayPrice: 'Rp50.000 / Kg (Rp50/Gr)' },
+      { id: 'mat_bawang_merah', name: 'Bawang Merah Brebes', baseUom: 'Gr', costPerBase: 35, displayPrice: 'Rp35.000 / Kg (Rp35/Gr)' },
+      { id: 'mat_bawang_putih', name: 'Bawang Putih Kating', baseUom: 'Gr', costPerBase: 38, displayPrice: 'Rp38.000 / Kg (Rp38/Gr)' },
+      { id: 'mat_minyak', name: 'Minyak Goreng Sawit', baseUom: 'Ml', costPerBase: 16, displayPrice: 'Rp16.000 / Liter' },
+      { id: 'mat_garam', name: 'Garam Beryodium Halus', baseUom: 'Gr', costPerBase: 8, displayPrice: 'Rp8.000 / Kg' },
+      { id: 'mat_beras', name: 'Beras Pulen Super', baseUom: 'Gr', costPerBase: 14, displayPrice: 'Rp14.000 / Kg' },
+      { id: 'mat_teh', name: 'Teh Wangi Melati', baseUom: 'Gr', costPerBase: 25, displayPrice: 'Rp25.000 / Kg' },
+      { id: 'mat_gula', name: 'Gula Pasir Tebu', baseUom: 'Gr', costPerBase: 17.5, displayPrice: 'Rp17.500 / Kg' },
+      { id: 'mat_box', name: 'Paper Rice Box Kemasan', baseUom: 'Pcs', costPerBase: 850, displayPrice: 'Rp850 / Pcs' }
+    ];
+
+    // ==========================================
+    // PROTOTYPE STATE
+    // ==========================================
+    let state = {
+      itemName: '',
+      stockType: 'DIRECT', // 'DIRECT' or 'COOKED'
+      directCost: '',
+      hasRecipe: false,
+      recipe: {
+        yieldQty: 1,
+        components: [] // [{ materialId, name, quantity, uom, cost }]
+      },
+      manageStock: true,
+      sku: '',
+      notes: ''
+    };
+
+    function formatRupiah(num) {
+      return 'Rp' + (Math.round(num) || 0).toLocaleString('id-ID');
+    }
+
+    // ==========================================
+    // 1. PAGE TAMBAH ITEM LOGIC
+    // ==========================================
+
+    function handleNameInput(val) {
+      state.itemName = val.trim();
+      const hasName = state.itemName.length > 0;
+
+      const gatedSection = document.getElementById('gatedSection');
+      const gatedNotice = document.getElementById('gatedNotice');
+      const btnSubmit = document.getElementById('btnSubmitItem');
+      const labelItemNameForCat = document.getElementById('labelItemNameForCat');
+
+      if (hasName) {
+        gatedSection.classList.remove('gated-locked');
+        gatedNotice.style.display = 'none';
+        btnSubmit.disabled = false;
+        labelItemNameForCat.innerText = `"${state.itemName}"`;
+
+        // Auto-generate SKU if not manually altered
+        if (!state.sku || state.sku.startsWith('SKU-') || state.sku.includes('-001')) {
+          generateSkuFromName(state.itemName);
+        }
+      } else {
+        gatedSection.classList.add('gated-locked');
+        gatedNotice.style.display = 'flex';
+        btnSubmit.disabled = true;
+        labelItemNameForCat.innerText = 'item ini';
+      }
+    }
+
+    function generateSkuFromName(name) {
+      const words = name.trim().split(/\s+/).filter(Boolean);
+      let initials = '';
+      if (words.length === 1) {
+        initials = words[0].slice(0, 3).toUpperCase();
+      } else if (words.length === 2) {
+        initials = (words[0].slice(0, 2) + words[1].slice(0, 2)).toUpperCase();
+      } else {
+        initials = words.slice(0, 3).map(w => w[0]).join('').toUpperCase();
+      }
+      state.sku = `${initials}-001`;
+      document.getElementById('inputSku').value = state.sku;
+    }
+
+    function selectStockType(type) {
+      if (!state.itemName) return;
+      state.stockType = type;
+
+      const swDirect = document.getElementById('switchDirect');
+      const swCooked = document.getElementById('switchCooked');
+      const cardDirectCost = document.getElementById('cardDirectCost');
+      const cardChefCat = document.getElementById('cardChefCat');
+      const cardRecipeDone = document.getElementById('cardRecipeDone');
+
+      if (type === 'DIRECT') {
+        swDirect.classList.add('active');
+        swCooked.classList.remove('active');
+        cardDirectCost.style.display = 'flex';
+        cardChefCat.style.display = 'none';
+        cardRecipeDone.style.display = 'none';
+      } else {
+        swDirect.classList.remove('active');
+        swCooked.classList.add('active');
+        cardDirectCost.style.display = 'none';
+
+        if (state.hasRecipe && state.recipe.components.length > 0) {
+          cardChefCat.style.display = 'none';
+          cardRecipeDone.style.display = 'flex';
+        } else {
+          cardChefCat.style.display = 'flex';
+          cardRecipeDone.style.display = 'none';
+        }
+      }
+    }
+
+    function toggleSkuSwitch() {
+      state.manageStock = !state.manageStock;
+      const sw = document.getElementById('switchSku');
+      const wrap = document.getElementById('skuInputWrap');
+      if (state.manageStock) {
+        sw.classList.add('active');
+        wrap.style.display = 'block';
+      } else {
+        sw.classList.remove('active');
+        wrap.style.display = 'none';
+      }
+    }
+
+    // ==========================================
+    // 2. PAGE BUAT RESEP TRANSITION
+    // ==========================================
+
+    function openRecipePage() {
+      if (!state.itemName) return;
+      document.getElementById('pageTambahItem').style.display = 'none';
+      document.getElementById('pageBuatResep').style.display = 'block';
+      window.scrollTo(0, 0);
+
+      // Lock recipe name to item name
+      document.getElementById('lockedRecipeTitle').innerText = state.itemName;
+      document.getElementById('inputYieldQty').value = state.recipe.yieldQty || 1;
+
+      renderRecipeComponents();
+      calculateLiveCost();
+    }
+
+    function backToItemPage() {
+      document.getElementById('pageBuatResep').style.display = 'none';
+      document.getElementById('pageTambahItem').style.display = 'block';
+      window.scrollTo(0, 0);
+    }
+
+    function renderRecipeComponents() {
+      const container = document.getElementById('recipeItemsContainer');
+      const emptyPrompt = document.getElementById('emptyMatPrompt');
+      const badge = document.getElementById('badgeMatCount');
+
+      badge.innerText = `${state.recipe.components.length} Bahan`;
+
+      if (state.recipe.components.length === 0) {
+        container.innerHTML = '';
+        emptyPrompt.style.display = 'block';
+        return;
+      }
+
+      emptyPrompt.style.display = 'none';
+      container.innerHTML = state.recipe.components.map((comp, idx) => {
+        const lineTotal = (comp.quantity || 0) * comp.costPerBase;
+        return `
+          <div class="material-item-row">
+            <div class="mat-header">
+              <span class="mat-name">🍲 ${comp.name}</span>
+              <button class="mat-del-btn" title="Hapus bahan" onclick="removeComponent(${idx})">✕</button>
+            </div>
+            <div class="mat-inputs">
+              <input
+                type="number"
+                class="qty-input"
+                value="${comp.quantity}"
+                min="0.1"
+                step="any"
+                oninput="updateComponentQty(${idx}, this.value)"
+              />
+              <select class="uom-select" onchange="updateComponentUom(${idx}, this.value)">
+                <option value="${comp.baseUom}" selected>${comp.baseUom}</option>
+              </select>
+              <div class="mat-subtotal">${formatRupiah(lineTotal)}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function updateComponentQty(idx, val) {
+      const num = parseFloat(val) || 0;
+      state.recipe.components[idx].quantity = num;
+      calculateLiveCost();
+      // Update line subtotal
+      const lineTotal = num * state.recipe.components[idx].costPerBase;
+      const rows = document.querySelectorAll('.material-item-row');
+      if (rows[idx]) {
+        rows[idx].querySelector('.mat-subtotal').innerText = formatRupiah(lineTotal);
+      }
+    }
+
+    function updateComponentUom(idx, val) {
+      state.recipe.components[idx].uom = val;
+      calculateLiveCost();
+    }
+
+    function removeComponent(idx) {
+      state.recipe.components.splice(idx, 1);
+      renderRecipeComponents();
+      calculateLiveCost();
+    }
+
+    function calculateLiveCost() {
+      const yieldQty = parseFloat(document.getElementById('inputYieldQty').value) || 1;
+      state.recipe.yieldQty = yieldQty;
+
+      let totalBatchCost = 0;
+      state.recipe.components.forEach(c => {
+        totalBatchCost += (c.quantity || 0) * c.costPerBase;
+      });
+
+      const costPerPortion = yieldQty > 0 ? (totalBatchCost / yieldQty) : totalBatchCost;
+      state.recipe.calculatedHpp = costPerPortion;
+      document.getElementById('liveTotalHpp').innerText = formatRupiah(costPerPortion);
+    }
+
+    // ==========================================
+    // 3. BOTTOM SHEET MATERIAL PICKER
+    // ==========================================
+
+    function openMaterialSheet() {
+      document.getElementById('sheetOverlay').classList.add('open');
+      document.getElementById('sheetSearchInput').value = '';
+      filterMaterials('');
+    }
+
+    function closeMaterialSheet() {
+      document.getElementById('sheetOverlay').classList.remove('open');
+    }
+
+    function closeSheetOnBackdrop(e) {
+      if (e.target.id === 'sheetOverlay') {
+        closeMaterialSheet();
+      }
+    }
+
+    function filterMaterials(query) {
+      const q = query.trim().toLowerCase();
+      const list = document.getElementById('sheetMaterialList');
+
+      const filtered = MASTER_MATERIALS.filter(m => m.name.toLowerCase().includes(q));
+
+      if (filtered.length === 0) {
+        list.innerHTML = `
+          <div style="text-align:center; padding:30px 10px; color:#94A3B8; font-size:13px;">
+            Tidak ditemukan bahan "${query}".
+            <div style="margin-top:10px;">
+              <button class="btn-make-recipe" style="margin:0 auto; padding:8px 14px; font-size:12px;" onclick="addQuickCustomMaterial('${query}')">
+                + Tambah "${query}" Sebagai Bahan Baru
+              </button>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      list.innerHTML = filtered.map(m => `
+        <div class="sheet-mat-item" onclick="selectMaterial('${m.id}')">
+          <div class="sheet-mat-info">
+            <div class="sheet-mat-title">${m.name}</div>
+            <div class="sheet-mat-sub">Satuan dasar: ${m.baseUom}</div>
+          </div>
+          <div class="sheet-mat-price">${m.displayPrice}</div>
+        </div>
+      `).join('');
+    }
+
+    function selectMaterial(matId) {
+      const mat = MASTER_MATERIALS.find(m => m.id === matId);
+      if (!mat) return;
+
+      // Check if already in recipe
+      const exists = state.recipe.components.find(c => c.materialId === mat.id);
+      if (exists) {
+        alert(`Bahan "${mat.name}" sudah ada dalam daftar resep.`);
+        closeMaterialSheet();
+        return;
+      }
+
+      // Default quantity based on material
+      let defaultQty = 10;
+      if (mat.baseUom === 'Pcs') defaultQty = 1;
+      else if (mat.id === 'mat_ayam') defaultQty = 150; // 150 gr ayam per porsi
+
+      state.recipe.components.push({
+        materialId: mat.id,
+        name: mat.name,
+        quantity: defaultQty,
+        baseUom: mat.baseUom,
+        uom: mat.baseUom,
+        costPerBase: mat.costPerBase
+      });
+
+      closeMaterialSheet();
+      renderRecipeComponents();
+      calculateLiveCost();
+    }
+
+    function addQuickCustomMaterial(name) {
+      if (!name) return;
+      const newId = 'mat_custom_' + Date.now();
+      const newMat = {
+        id: newId,
+        name: name,
+        baseUom: 'Gr',
+        costPerBase: 25,
+        displayPrice: 'Rp25.000 / Kg (Estimasi)'
+      };
+      MASTER_MATERIALS.unshift(newMat);
+      selectMaterial(newId);
+    }
+
+    // ==========================================
+    // 4. SAVE RECIPE & RETURN TO TAMBAH ITEM
+    // ==========================================
+
+    function saveRecipeAndReturn() {
+      if (state.recipe.components.length === 0) {
+        alert('Tambahkan minimal 1 bahan baku untuk menyimpan formula resep.');
+        return;
+      }
+
+      state.hasRecipe = true;
+      backToItemPage();
+
+      // Update Card Recipe Done in Page 1
+      const cardChefCat = document.getElementById('cardChefCat');
+      const cardRecipeDone = document.getElementById('cardRecipeDone');
+
+      cardChefCat.style.display = 'none';
+      cardRecipeDone.style.display = 'flex';
+
+      document.getElementById('sumRecipeName').innerText = `Resep: ${state.itemName}`;
+      document.getElementById('sumRecipeYield').innerText = `Hasil: ${state.recipe.yieldQty} Porsi`;
+      document.getElementById('sumRecipeCost').innerText = formatRupiah(state.recipe.calculatedHpp);
+
+      const ingWrap = document.getElementById('sumRecipeIngredients');
+      ingWrap.innerHTML = state.recipe.components.slice(0, 3).map(c => `
+        <div>• ${c.name} (${c.quantity} ${c.uom})</div>
+      `).join('') + (state.recipe.components.length > 3 ? `<div style="color:#94A3B8; font-style:italic;">+ ${state.recipe.components.length - 3} bahan lainnya...</div>` : '');
+    }
+
+    // ==========================================
+    // 5. SUBMIT FINAL ITEM & PAYLOAD PREVIEW
+    // ==========================================
+
+    function submitFinalItem() {
+      state.notes = document.getElementById('inputNotes').value.trim();
+      state.sku = document.getElementById('inputSku').value.trim();
+
+      const payload = {
+        product: {
+          name: state.itemName,
+          inventory_type: state.stockType,
+          sku: state.manageStock ? state.sku : null,
+          cost_price: state.stockType === 'COOKED' ? Math.round(state.recipe.calculatedHpp) : (parseFloat(document.getElementById('inputDirectCost').value.replace(/\D/g, '')) || 0),
+          notes: state.notes
+        },
+        recipe: state.stockType === 'COOKED' && state.hasRecipe ? {
+          name: `Resep ${state.itemName}`,
+          planned_yield_quantity: state.recipe.yieldQty,
+          yield_uom_name: 'Porsi',
+          components: state.recipe.components.map(c => ({
+            material_id: c.materialId,
+            material_name: c.name,
+            planned_quantity: c.quantity,
+            uom_name: c.uom
+          }))
+        } : null
+      };
+
+      document.getElementById('successSummaryText').innerHTML = `
+        Item <strong>${state.itemName}</strong> bertipe <strong>${state.stockType}</strong> berhasil disiapkan.<br>
+        ${state.stockType === 'COOKED' ? `HPP terhitung otomatis: <strong style="color:#00A637;">${formatRupiah(state.recipe.calculatedHpp)}/porsi</strong>.` : ''}
+      `;
+      document.getElementById('debugPayloadBox').innerText = JSON.stringify(payload, null, 2);
+      document.getElementById('successModal').style.display = 'flex';
+    }
+
+    // ==========================================
+    // 6. RESET PROTOTYPE
+    // ==========================================
+
+    function resetPrototype() {
+      state = {
+        itemName: '',
+        stockType: 'DIRECT',
+        directCost: '',
+        hasRecipe: false,
+        recipe: {
+          yieldQty: 1,
+          components: []
+        },
+        manageStock: true,
+        sku: '',
+        notes: ''
+      };
+
+      document.getElementById('inputItemName').value = '';
+      document.getElementById('inputDirectCost').value = '';
+      document.getElementById('inputNotes').value = '';
+      document.getElementById('inputSku').value = '';
+      document.getElementById('successModal').style.display = 'none';
+
+      handleNameInput('');
+      selectStockType('DIRECT');
+      backToItemPage();
+    }
+
+    // Initialize default state on load
+    window.onload = function() {
+      handleNameInput('');
+      selectStockType('DIRECT');
+    };
+  </script>
+</body>
+</html>

@@ -13,7 +13,7 @@
  */
 
 var APP_CACHE_PREFIX = "xentra-merchant-";
-var APP_VERSION = "v1.4.25";
+var APP_VERSION = "v1.6.1";
 var FALLBACK_CACHE_NAME = "xentra-merchant-live";
 
 var STATIC_ASSETS = [
@@ -21,14 +21,16 @@ var STATIC_ASSETS = [
   "/merchant-app/manifest.json",
   "/merchant-app/assets/icons/icon-192.png",
   "/merchant-app/assets/icons/icon-512.png",
+  "/merchant-app/assets/icons/green-toggle.svg",
+  "/merchant-app/assets/icons/red-toggle.svg",
   "/merchant-shared/css/shared.css?v=1.0.1",
-  "/merchant-shared/css/dashboard.css?v=1.0.40",
-  "/merchant-app/assets/css/home.css?v=1.0.25",
-  "/merchant-shared/js/shared.js?v=1.0.1",
+  "/merchant-shared/css/dashboard.css?v=1.0.48",
+  "/merchant-app/assets/css/home.css?v=1.0.27",
+  "/merchant-shared/js/shared.js?v=1.0.3",
   "/merchant-shared/js/audio-alerts.js?v=1.0.6",
   "/merchant-shared/js/wake-lock.js?v=1.0.0",
   "/merchant-shared/js/web-push-client.js?v=1.0.0",
-  "/merchant-shared/js/thermal-printer.js?v=1.0.0",
+  "/merchant-shared/js/thermal-printer.js?v=1.0.1",
   "/merchant-shared/audio/ada-pesanan-baru.mp3",
   "/merchant-shared/js/action-menu.js?v=1.0.0",
   "/merchant-shared/js/crop-editor.js?v=1.0.2",
@@ -36,18 +38,19 @@ var STATIC_ASSETS = [
   "/assets/js/core/fulfillment-environments.js?v=1.0.1",
   "/merchant-app/assets/js/branch-catalog-ui.js?v=1.0.1",
   "/merchant-app/assets/js/context.js?v=1.0.1",
-  "/merchant-app/assets/js/menu.js?v=1.1.0",
-  "/merchant-app/assets/js/hari-ini.js?v=1.0.26",
+  "/merchant-app/assets/js/menu.js?v=1.1.4",
+  "/merchant-app/assets/js/hari-ini.js?v=1.0.27",
   "/merchant-app/assets/js/home.js?v=1.0.2",
   "/merchant-app/assets/js/jam-operasional.js?v=1.0.0",
-  "/merchant-app/assets/js/reports.js?v=1.0.0",
-  "/merchant-app/assets/js/tables.js?v=1.0.0",
-  "/merchant-app/assets/js/stock.js?v=1.2.1",
-  "/merchant-app/assets/js/purchasing.js?v=1.3.1",
-  "/merchant-app/assets/js/promotions.js?v=1.0.2",
-  "/merchant-app/assets/js/staff.js?v=1.0.0",
-  "/merchant-app/assets/js/orders.js?v=1.0.27",
-  "/merchant-app/assets/js/merchant-app.js?v=1.1.26"
+  "/merchant-app/assets/js/reports.js?v=1.0.2",
+  "/merchant-app/assets/js/tables.js?v=1.0.3",
+  "/merchant-app/assets/js/stock.js?v=1.2.6",
+  "/merchant-app/assets/js/purchasing.js?v=1.3.2",
+  "/merchant-app/assets/js/promotions.js?v=1.0.3",
+  "/merchant-app/assets/js/staff.js?v=1.0.2",
+  "/merchant-app/assets/js/orders.js?v=1.0.51",
+  "/merchant-shared/js/ops-chat.js?v=2.0.1",
+  "/merchant-app/assets/js/merchant-app.js?v=1.0.27"
 ];
 
 var _cacheNamePromise = null;
@@ -128,6 +131,29 @@ function staleWhileRevalidate(event) {
   });
 }
 
+// Network-First helper for fresh styles & scripts (prevents stale CSS/JS in WebViews and installed PWAs)
+function networkFirstAsset(event) {
+  return fetch(event.request, { cache: "no-cache" })
+    .then(function (response) {
+      if (response && response.status === 200) {
+        var copy = response.clone();
+        computeCacheName().then(function (cn) {
+          caches.open(cn).then(function (cache) {
+            cache.put(event.request, copy);
+          });
+        });
+      }
+      return response;
+    })
+    .catch(function () {
+      return computeCacheName().then(function (cn) {
+        return caches.open(cn).then(function (cache) {
+          return cache.match(event.request);
+        });
+      });
+    });
+}
+
 // 4. Network-First helper for navigation / shell
 function networkFirst(event) {
   return fetch(event.request)
@@ -175,13 +201,17 @@ self.addEventListener("fetch", function (event) {
     return;
   }
 
-  // Static shell styles, scripts, fonts, and icons: Stale-While-Revalidate
+  // Static shell styles, scripts, fonts, and icons: Fresh Network-First for CSS/JS, SWR for media/fonts
   if (
     url.pathname.startsWith("/merchant-shared/") ||
     url.pathname.startsWith("/merchant-app/assets/") ||
     url.pathname.startsWith("/assets/fonts/")
   ) {
-    event.respondWith(staleWhileRevalidate(event));
+    if (url.pathname.endsWith(".css") || url.pathname.endsWith(".js") || url.search.includes(".css") || url.search.includes(".js")) {
+      event.respondWith(networkFirstAsset(event));
+    } else {
+      event.respondWith(staleWhileRevalidate(event));
+    }
     return;
   }
 

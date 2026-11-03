@@ -53,6 +53,7 @@ const registerStorefrontRoutes = require('./storefront');
 const registerCatalogRoutes = require('./catalog');
 const registerPosRoutes = require('./pos');
 const registerDriverRoutes = require('./driver');
+const registerOpsMessageRoutes = require('./ops-messages');
 const registerMerchantAuthRoutes = require('./merchant-auth');
 const DeliveryDispatchService = require('../../domains/delivery/services/DeliveryDispatchService');
 const OrderStateMachine = require('../services/OrderStateMachine');
@@ -227,7 +228,11 @@ const TokenSessionStore = {
   revokedUserIds: new Set(),
   createSession(user, brand_id, ttlSeconds = 86400) {
     const token = 'xnt_auth_' + crypto.randomBytes(24).toString('hex');
-    const expiresAt = Date.now() + ttlSeconds * 1000;
+    // Owner and brand manager sessions persist for 30 days (2592000s) on mobile APK/PWA
+    const effectiveTtl = (user.role === 'owner' || user.role === 'brand_manager')
+      ? Math.max(ttlSeconds, 2592000)
+      : ttlSeconds;
+    const expiresAt = Date.now() + effectiveTtl * 1000;
     const sessionObj = {
       id: user.id,
       userId: user.id,
@@ -367,6 +372,18 @@ const TokenSessionStore = {
         }
         return null;
       }
+
+      // Sliding window auto-renewal: if less than 7 days left, extend by 30 days
+      if (cachedSession.expiresAt - Date.now() < 7 * 86400 * 1000) {
+        const extendedExpiresAt = Date.now() + 30 * 86400 * 1000;
+        cachedSession.expiresAt = extendedExpiresAt;
+        if (token.startsWith('xnt_auth_')) {
+          try { db.prepare('UPDATE user_sessions SET expires_at = ? WHERE token = ?').run(extendedExpiresAt, token); } catch (_) {}
+        } else if (token.startsWith('xnt_cust_')) {
+          try { db.prepare('UPDATE customer_sessions SET expires_at = ? WHERE token = ?').run(extendedExpiresAt, token); } catch (_) {}
+        }
+      }
+
       return cachedSession;
     }
 
@@ -394,6 +411,17 @@ const TokenSessionStore = {
           brand_id: row.brand_id,
           expiresAt: Number(row.expires_at)
         };
+        // Sliding window auto-renewal for active SQLite session if less than 7 days left
+        const now = Date.now();
+        const currentExpiresAt = Number(row.expires_at);
+        if (currentExpiresAt - now < 7 * 86400 * 1000) {
+          const extendedExpiresAt = now + 30 * 86400 * 1000;
+          try {
+            db.prepare('UPDATE user_sessions SET expires_at = ? WHERE token = ?').run(extendedExpiresAt, token);
+            if (hydrated) hydrated.expiresAt = extendedExpiresAt;
+          } catch (_) {}
+        }
+
         // Hydrate L1 memory cache
         this.sessions.set(token, hydrated);
         return hydrated;
@@ -432,6 +460,17 @@ const TokenSessionStore = {
             branch_id: row.branch_id,
             expiresAt: Number(row.expires_at)
           };
+        }
+
+        // Sliding window auto-renewal for active SQLite session if less than 7 days left
+        const now = Date.now();
+        const currentExpiresAt = Number(row.expires_at);
+        if (currentExpiresAt - now < 7 * 86400 * 1000) {
+          const extendedExpiresAt = now + 30 * 86400 * 1000;
+          try {
+            db.prepare('UPDATE user_sessions SET expires_at = ? WHERE token = ?').run(extendedExpiresAt, token);
+            if (hydrated) hydrated.expiresAt = extendedExpiresAt;
+          } catch (_) {}
         }
 
         // Hydrate L1 memory cache
@@ -825,6 +864,7 @@ registerCheckoutRoutes(router, {
 // Business onboarding and tenant claim routes are isolated in server/routes/onboarding.js.
 registerDriverRoutes(router, { db, requireAuth, DeliveryDispatchService, mediaService, notificationService });
 registerNotificationRoutes(router, { notificationService, requireAuth });
+registerOpsMessageRoutes(router, { db, requireAuth, notificationService, mediaService });
 
 registerOnboardingRoutes(router, {
   db,
@@ -957,7 +997,7 @@ registerMerchantAuthRoutes(router, {
 registerWorkforceRoutes(router, { db, requireAuth, TokenSessionStore });
 
 // Affiliate domain routes (Customer referral & Owner payout management)
-registerAffiliateRoutes(router, { requireCustomerAuth, requireAuth });
+registerAffiliateRoutes(router, { db, requireCustomerAuth, requireAuth });
 
 // P1 DATA SANITIZATION HELPER (SEC-02 & FINDING 10)
 function serializePublicBrand(brand) {

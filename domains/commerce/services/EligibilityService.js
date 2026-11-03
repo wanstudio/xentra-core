@@ -64,6 +64,7 @@ class EligibilityService {
     BRANCH_NOT_FOUND: 'BRANCH_NOT_FOUND',
     BRANCH_NOT_ACTIVE: 'BRANCH_NOT_ACTIVE',
     BRANCH_CLOSED: 'BRANCH_CLOSED',
+    BRANCH_ONLINE_PAUSED: 'BRANCH_ONLINE_PAUSED',
     FULFILLMENT_NOT_SUPPORTED: 'FULFILLMENT_NOT_SUPPORTED',
     PRODUCT_NOT_FOUND: 'PRODUCT_NOT_FOUND',
     PRODUCT_INACTIVE: 'PRODUCT_INACTIVE',
@@ -85,6 +86,13 @@ class EligibilityService {
     if (!branch) return { ok: false, reason: EligibilityService.REASONS.BRANCH_NOT_FOUND };
     if (branch.is_active !== 1) return { ok: false, reason: EligibilityService.REASONS.BRANCH_NOT_ACTIVE };
     if (branch.is_open_override !== 1) return { ok: false, reason: EligibilityService.REASONS.BRANCH_CLOSED };
+
+    // Graceful Drain / Pause Online Emergency Switch:
+    // Reject online delivery / pickup when online is paused by owner,
+    // but KEEP in-store dine-in and reservations active!
+    if (branch.is_online_paused === 1 && (order_type === 'delivery' || order_type === 'pickup')) {
+      return { ok: false, reason: EligibilityService.REASONS.BRANCH_ONLINE_PAUSED };
+    }
 
     if (order_type) {
       if (CAPABILITY_REPRESENTED[order_type]) {

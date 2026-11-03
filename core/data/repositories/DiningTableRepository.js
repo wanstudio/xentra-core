@@ -288,6 +288,44 @@ class DiningTableRepository {
     );
   }
 
+  findActiveSessionByCustomerId(branchId, customerId) {
+    if (!branchId || !customerId) return null;
+    return this.db.queryOne(`
+      SELECT ds.*
+      FROM dining_sessions ds
+      JOIN dining_session_members m ON m.session_id = ds.id AND m.customer_id = ?
+      WHERE ds.branch_id = ? AND ds.status = 'active'
+      ORDER BY ds.opened_at DESC LIMIT 1
+    `, [customerId, branchId]);
+  }
+
+  isDiningSessionMember(sessionId, customerId) {
+    if (!sessionId || !customerId) return false;
+    return Boolean(this.db.queryOne(
+      'SELECT 1 AS is_member FROM dining_session_members WHERE session_id = ? AND customer_id = ?',
+      [sessionId, customerId]
+    ));
+  }
+
+  addDiningSessionMember({ sessionId, customerId, joinedAt }) {
+    return this.db.execute(`
+      INSERT INTO dining_session_members (session_id, customer_id, joined_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(session_id, customer_id) DO NOTHING
+    `, [sessionId, customerId, joinedAt]);
+  }
+
+  findOpenSessionForTable(tableId) {
+    return this.db.queryOne(`
+      SELECT ds.id, ds.branch_id, ds.status, ds.opened_at
+      FROM branch_table_states s
+      JOIN dining_sessions ds ON ds.id = s.current_session_id AND ds.status = 'active'
+      JOIN dining_session_tables dst ON dst.session_id = ds.id AND dst.table_id = s.table_id
+      WHERE s.table_id = ? AND s.operational_state = 'occupied'
+      LIMIT 1
+    `, [tableId]);
+  }
+
   findSessionTables(sessionId) {
     return this.db.queryMany(
       'SELECT table_id FROM dining_session_tables WHERE session_id = ?',

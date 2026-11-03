@@ -50,6 +50,12 @@ export default function MenuItemCard({
   onOpenPickSheet,
   onOpenAturModal,
   onRemoveVariant,
+  onMoveItem,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+  isDragging = false,
+  productId,
 }) {
   const qty = Math.max(1, parseInt(item.quantity, 10) || 1);
 
@@ -74,42 +80,85 @@ export default function MenuItemCard({
 
   return (
     <div
+      data-menu-item-index={index}
+      data-menu-item-id={productId}
       style={{
-        boxShadow: 'inset 0 0 0 1px #D9D9D9',
         borderRadius: '15px',
         backgroundColor: '#FFFFFF',
+        opacity: isDragging ? 0.96 : 1,
+        position: isDragging ? 'relative' : undefined,
+        zIndex: isDragging ? 2 : undefined,
+        boxShadow: isDragging ? '0 10px 24px rgba(15, 23, 42, 0.16)' : 'inset 0 0 0 1px #D9D9D9',
+        transition: 'box-shadow 160ms ease, opacity 160ms ease',
       }}
       className="w-full p-4 flex flex-col gap-4 transition-all"
     >
       {/* 1. Main Row: Left (Title + Ganti item) | Middle (Stepper 75x40) | Right (Trash 40x40) */}
       <div className="flex items-center justify-between gap-3 w-full">
         {/* Left Column */}
-        <div
-          className="flex-1 min-w-0 cursor-pointer text-left flex flex-col items-start gap-[5px]"
-          onClick={() => onOpenPickSheet(index)}
-          title="Klik untuk ganti item"
-        >
-          <div className="text-[13px] font-bold text-[#0F172A] leading-snug break-words w-full">
-            {item.name || 'Pilih Item'}
-          </div>
-          <div className="text-[10px] text-[#1E5EB2] font-semibold inline-flex items-center gap-[5px]">
-            <span>Ganti item</span>
-            <svg
-              width="10"
-              height="10"
-              viewBox="0 0 10 10"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              className="shrink-0"
-            >
-              <path
-                d="M3.75 2.5L6.25 5L3.75 7.5"
-                stroke="#1E5EB2"
-                strokeWidth="1.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
+        <div className="flex-1 min-w-0 flex items-start gap-2">
+          <button
+            type="button"
+            aria-label={`Ubah urutan ${item.name || `item ${index + 1}`}. Gunakan panah atas atau bawah.`}
+            title="Seret untuk mengubah urutan"
+            onPointerDown={(event) => {
+              if (event.button !== undefined && event.button !== 0) return;
+              event.preventDefault();
+              event.currentTarget.setPointerCapture?.(event.pointerId);
+              onDragStart(index);
+            }}
+            onPointerMove={onDragMove}
+            onPointerUp={onDragEnd}
+            onPointerCancel={onDragEnd}
+            onLostPointerCapture={onDragEnd}
+            onKeyDown={(event) => {
+              if (event.key === 'ArrowUp' && index > 0) {
+                event.preventDefault();
+                onMoveItem(index, index - 1);
+              } else if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                onMoveItem(index, index + 1);
+              }
+            }}
+            style={{ touchAction: 'none' }}
+            className="w-8 h-9 shrink-0 inline-flex items-center justify-center rounded-lg border-none bg-transparent text-[#94A3B8] hover:bg-slate-100 active:bg-slate-200 cursor-grab active:cursor-grabbing p-0"
+          >
+            <svg width="18" height="22" viewBox="0 0 18 22" fill="currentColor" aria-hidden="true">
+              <circle cx="6" cy="5" r="1.5" />
+              <circle cx="12" cy="5" r="1.5" />
+              <circle cx="6" cy="11" r="1.5" />
+              <circle cx="12" cy="11" r="1.5" />
+              <circle cx="6" cy="17" r="1.5" />
+              <circle cx="12" cy="17" r="1.5" />
             </svg>
+          </button>
+          <div
+            className="flex-1 min-w-0 cursor-pointer text-left flex flex-col items-start gap-[5px]"
+            onClick={() => onOpenPickSheet(index)}
+            title="Klik untuk ganti item"
+          >
+            <div className="text-[13px] font-bold text-[#0F172A] leading-snug break-words w-full">
+              {item.name || 'Pilih Item'}
+            </div>
+            <div className="text-[10px] text-[#1E5EB2] font-semibold inline-flex items-center gap-[5px]">
+              <span>Ganti item</span>
+              <svg
+                width="10"
+                height="10"
+                viewBox="0 0 10 10"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                className="shrink-0"
+              >
+                <path
+                  d="M3.75 2.5L6.25 5L3.75 7.5"
+                  stroke="#1E5EB2"
+                  strokeWidth="1.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
           </div>
         </div>
 

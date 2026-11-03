@@ -24,7 +24,10 @@ function registerDriverRoutes(router, deps = {}) {
     return row ? row.name : null;
   }
 
-  function getTask(orderId, driverId, brandId, driverBranchId) {
+  function getTask(orderId, driverId, brandId, driverBranchId, options = {}) {
+    const statusFilter = options.includeFailed
+      ? "AND o.status NOT IN ('rejected', 'timeout') "
+      : "AND o.status NOT IN ('cancelled', 'rejected', 'timeout') ";
     const task = db.prepare(
       'SELECT ' +
       'd.id AS delivery_id, d.order_id, d.driver_id, d.driver_name, d.driver_phone, ' +
@@ -41,7 +44,7 @@ function registerDriverRoutes(router, deps = {}) {
       'JOIN orders o ON o.id = d.order_id ' +
       'LEFT JOIN branches b ON b.id = o.branch_id ' +
       'WHERE d.order_id = ? AND d.driver_id = ? AND o.brand_id = ? AND o.order_type = ? AND o.branch_id = ? ' +
-      "AND o.status NOT IN ('cancelled', 'rejected', 'timeout') " +
+      statusFilter +
       'LIMIT 1'
     ).get(orderId, driverId, brandId, 'delivery', driverBranchId);
 
@@ -320,7 +323,7 @@ function registerDriverRoutes(router, deps = {}) {
           mimeType: mime_type || 'image/jpeg',
           declaredFilename: original_filename || 'driver-avatar.jpg',
           assetType: 'avatar',
-          enforceAspectRatio: true
+          enforceAspectRatio: false
         });
 
         const asset = await mediaService.processMedia({
@@ -399,13 +402,13 @@ function registerDriverRoutes(router, deps = {}) {
         'FROM order_deliveries d ' +
         'JOIN orders o ON o.id = d.order_id ' +
         'WHERE d.driver_id = ? AND o.brand_id = ? AND o.branch_id = ? ' +
-        'AND d.status = ? ' +
+        'AND d.status IN (?, ?) ' +
         'ORDER BY datetime(d.updated_at) DESC, d.rowid DESC ' +
         'LIMIT 100'
-      ).all(driverId, req.brand_id, branchId, DeliveryModel.STATUS.DELIVERED);
+      ).all(driverId, req.brand_id, branchId, DeliveryModel.STATUS.DELIVERED, DeliveryModel.STATUS.FAILED);
 
       const deliveries = rows
-        .map(row => getTask(row.order_id, driverId, req.brand_id, branchId))
+        .map(row => getTask(row.order_id, driverId, req.brand_id, branchId, { includeFailed: true }))
         .filter(Boolean)
         .map(shapeTask);
 
@@ -487,7 +490,7 @@ function registerDriverRoutes(router, deps = {}) {
         actor_id: actorId(req)
       }, extra || {}));
 
-      const refreshed = getTask(req.params.orderId, actorId(req), req.brand_id, req.user.branchId || req.user.branch_id);
+      const refreshed = getTask(req.params.orderId, actorId(req), req.brand_id, req.user.branchId || req.user.branch_id, { includeFailed: targetStatus === DeliveryModel.STATUS.FAILED });
       res.json({ success: true, ...result, task: shapeTask(refreshed) });
     } catch (err) {
       const status = err.status || 409;
@@ -548,6 +551,30 @@ function registerDriverRoutes(router, deps = {}) {
         pod_photo_url: podPhotoUrl || null,
         pod_bypass_reason: podBypassReason || null,
         pod_note: podNote || null
+      }
+    );
+    try {
+      db.prepare("UPDATE driver_locations SET active_order_id = NULL WHERE driver_id = ? AND active_order_id = ?").run(actorId(req), req.params.orderId);
+    } catch (_) {}
+  });
+
+  router.post('/driver/tasks/:orderId/fail', driverAuth, (req, res) => {
+    const rawReason = req.body && (req.body.reason || req.body.notes || req.body.pod_note);
+    if (!rawReason || !String(rawReason).trim()) {
+      return res.status(400).json({
+        success: false,
+        code: 'DRIVER_FAILURE_REASON_REQUIRED',
+        error: 'Alasan kendala / gagal antar wajib dipilih atau diisi.'
+      });
+    }
+    const cleanReason = String(rawReason).trim();
+    executeDeliveryTransition(
+      req,
+      res,
+      DeliveryModel.STATUS.FAILED,
+      {
+        notes: cleanReason,
+        pod_note: cleanReason
       }
     );
     try {
@@ -668,8 +695,8 @@ function registerDriverRoutes(router, deps = {}) {
 
       // Check for incoming pending driver assignments needing alert
       const pendingTask = db.prepare(`
-        SELECT d.order_id, o.order_number, c.name AS customer_name,
-               d.destination_address, o.total_amount,
+        SELECT d.order_id, o.order_number, COALESCE(o.recipient_name, o.customer_name, c.display_name, 'Pelanggan') AS customer_name,
+               d.destination_address, COALESCE(o.grand_total, 0) AS total_amount,
                (SELECT COUNT(*) FROM order_items oi WHERE oi.order_id = o.id) AS item_count
         FROM order_deliveries d
         JOIN orders o ON o.id = d.order_id
@@ -677,6 +704,7 @@ function registerDriverRoutes(router, deps = {}) {
         WHERE d.driver_id = ? AND o.brand_id = ?
           AND d.status = ?
           AND d.driver_assignment_status = ?
+          AND o.status NOT IN ('cancelled', 'rejected', 'timeout')
         ORDER BY datetime(d.updated_at) DESC
         LIMIT 1
       `).get(driverId, brandId, DeliveryModel.STATUS.ASSIGNED, DeliveryModel.ASSIGNMENT_RESPONSES.PENDING);

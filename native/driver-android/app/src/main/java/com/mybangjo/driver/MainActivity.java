@@ -16,6 +16,7 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.GeolocationPermissions;
+import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -43,11 +44,85 @@ public class MainActivity extends AppCompatActivity {
     private static final String DEFAULT_URL = "https://driver.mybangjo.com";
     private static final int PERMISSION_REQ_LOCATION = 1001;
     private static final int PERMISSION_REQ_BACKGROUND = 1002;
+    public static volatile boolean isForeground = false;
 
     private WebView webView;
     private SwipeRefreshLayout swipeRefresh;
     private SharedPreferences prefs;
+    private ValueCallback<Uri[]> filePathCallback;
+    private Uri cameraCaptureUri = null;
+    private PermissionRequest pendingWebPermissionRequest = null;
     private GoogleSignInClient googleSignInClient;
+
+    private final ActivityResultLauncher<String> fileChooserLauncher =
+        registerForActivityResult(new ActivityResultContracts.GetMultipleContents(), uris -> {
+            if (filePathCallback != null) {
+                if (uris != null && !uris.isEmpty()) {
+                    Uri[] uriArray = uris.toArray(new Uri[0]);
+                    filePathCallback.onReceiveValue(uriArray);
+                } else {
+                    filePathCallback.onReceiveValue(null);
+                }
+                filePathCallback = null;
+            }
+        });
+
+    private final ActivityResultLauncher<Uri> cameraLauncher =
+        registerForActivityResult(new ActivityResultContracts.TakePicture(), success -> {
+            if (filePathCallback != null) {
+                if (Boolean.TRUE.equals(success) && cameraCaptureUri != null) {
+                    filePathCallback.onReceiveValue(new Uri[]{ cameraCaptureUri });
+                } else {
+                    filePathCallback.onReceiveValue(null);
+                }
+                filePathCallback = null;
+            }
+        });
+
+    private final ActivityResultLauncher<String> cameraPermissionLauncher =
+        registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
+            if (Boolean.TRUE.equals(isGranted)) {
+                if (pendingWebPermissionRequest != null) {
+                    try {
+                        pendingWebPermissionRequest.grant(pendingWebPermissionRequest.getResources());
+                    } catch (Exception ignored) {}
+                    pendingWebPermissionRequest = null;
+                } else if (filePathCallback != null) {
+                    launchNativeCameraCapture();
+                }
+            } else {
+                if (pendingWebPermissionRequest != null) {
+                    try {
+                        pendingWebPermissionRequest.deny();
+                    } catch (Exception ignored) {}
+                    pendingWebPermissionRequest = null;
+                }
+                cancelPendingFileChooser();
+                Toast.makeText(this, "Izin kamera diperlukan untuk mengambil foto.", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+    private void launchNativeCameraCapture() {
+        try {
+            java.io.File photoFile = new java.io.File(getCacheDir(), "driver_cam_" + System.currentTimeMillis() + ".jpg");
+            cameraCaptureUri = androidx.core.content.FileProvider.getUriForFile(
+                MainActivity.this,
+                getPackageName() + ".fileprovider",
+                photoFile
+            );
+            cameraLauncher.launch(cameraCaptureUri);
+        } catch (Exception e) {
+            Toast.makeText(this, "Gagal membuka kamera: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            cancelPendingFileChooser();
+        }
+    }
+
+    private void cancelPendingFileChooser() {
+        if (filePathCallback != null) {
+            filePathCallback.onReceiveValue(null);
+            filePathCallback = null;
+        }
+    }
     private final ActivityResultLauncher<Intent> googleSignInLauncher =
         registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
             if (result.getResultCode() == RESULT_OK && result.getData() != null) {
@@ -82,6 +157,15 @@ public class MainActivity extends AppCompatActivity {
         setupWebView();
         checkAndRequestPermissions();
         checkBatteryOptimization();
+        checkOverlayPermission();
+
+        // Auto-resume background task monitor if driver credentials exist (like Merchant OrderMonitorService)
+        String savedToken = prefs.getString("auth_token", null);
+        if (savedToken != null && !savedToken.trim().isEmpty()) {
+            DriverGpsService.startService(this);
+        }
+
+        handleIncomingIntent(getIntent());
     }
 
     private void setupAdaptiveStatusBar() {
@@ -118,6 +202,53 @@ public class MainActivity extends AppCompatActivity {
             public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
                 callback.invoke(origin, true, false);
             }
+
+            @Override
+            public void onPermissionRequest(PermissionRequest request) {
+                runOnUiThread(() -> {
+                    boolean needsCamera = false;
+                    for (String res : request.getResources()) {
+                        if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(res)) {
+                            needsCamera = true;
+                            break;
+                        }
+                    }
+                    if (needsCamera && ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                        pendingWebPermissionRequest = request;
+                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA);
+                    } else {
+                        try {
+                            request.grant(request.getResources());
+                        } catch (Exception ignored) {}
+                    }
+                });
+            }
+
+            @Override
+            public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
+                if (MainActivity.this.filePathCallback != null) {
+                    MainActivity.this.filePathCallback.onReceiveValue(null);
+                }
+                MainActivity.this.filePathCallback = filePathCallback;
+
+                boolean isCapture = fileChooserParams != null && fileChooserParams.isCaptureEnabled();
+                if (isCapture) {
+                    if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                        launchNativeCameraCapture();
+                    } else {
+                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA);
+                    }
+                    return true;
+                }
+
+                try {
+                    fileChooserLauncher.launch("image/*");
+                } catch (Exception e) {
+                    cancelPendingFileChooser();
+                    return false;
+                }
+                return true;
+            }
         });
 
         webView.setWebViewClient(new WebViewClient() {
@@ -150,7 +281,10 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        swipeRefresh.setOnRefreshListener(() -> webView.reload());
+        swipeRefresh.setOnRefreshListener(() -> {
+            webView.clearCache(true);
+            webView.reload();
+        });
 
         String targetUrl = getIntent() != null && getIntent().getData() != null
                 ? getIntent().getData().toString()
@@ -159,11 +293,20 @@ public class MainActivity extends AppCompatActivity {
         webView.loadUrl(targetUrl);
     }
 
+    public void clearWebViewCache() {
+        if (webView != null) {
+            webView.clearCache(true);
+            webView.reload();
+        }
+    }
+
     private void checkAndRequestPermissions() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+        boolean needLocation = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED;
+        boolean needCamera = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED;
+        if (needLocation || needCamera) {
             String[] permissions = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-                    ? new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.POST_NOTIFICATIONS}
-                    : new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION};
+                    ? new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.CAMERA, Manifest.permission.POST_NOTIFICATIONS}
+                    : new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.CAMERA};
             ActivityCompat.requestPermissions(this, permissions, PERMISSION_REQ_LOCATION);
         } else {
             checkBackgroundLocation();
@@ -187,6 +330,69 @@ public class MainActivity extends AppCompatActivity {
                     intent.setData(Uri.parse("package:" + getPackageName()));
                     startActivity(intent);
                 } catch (Exception ignored) {}
+            }
+        }
+    }
+
+    private void checkOverlayPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            boolean alreadyAsked = prefs.getBoolean("overlay_prompt_shown", false);
+            if (!alreadyAsked) {
+                prefs.edit().putBoolean("overlay_prompt_shown", true).apply();
+                new androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle("🛵 Floating Notifikasi Order")
+                    .setMessage("Aktifkan izin 'Tampilkan di atas aplikasi lain' agar kartu tugas baru dan shortcut dapat melayang saat Anda membuka Google Maps / Waze.")
+                    .setPositiveButton("Aktifkan Sekarang", (dialog, which) -> {
+                        try {
+                            Intent intent = new Intent(
+                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                Uri.parse("package:" + getPackageName())
+                            );
+                            startActivity(intent);
+                        } catch (Exception ignored) {}
+                    })
+                    .setNegativeButton("Nanti", null)
+                    .show();
+            }
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        isForeground = true;
+        OrderAlarmService.stop(this);
+        OrderOverlayService.hideOverlay(this);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        isForeground = false;
+        String savedToken = prefs.getString("auth_token", null);
+        if (savedToken != null && !savedToken.trim().isEmpty()) {
+            OrderOverlayService.showBall(this);
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleIncomingIntent(intent);
+    }
+
+    private void handleIncomingIntent(Intent intent) {
+        if (intent == null) return;
+        OrderAlarmService.stop(this);
+        OrderOverlayService.hideOverlay(this);
+
+        if (intent.getStringExtra("target_order_id") != null) {
+            String orderId = intent.getStringExtra("target_order_id");
+            boolean autoAccept = intent.getBooleanExtra("auto_accept", false);
+            if (webView != null && orderId != null) {
+                String js = "if (typeof window.onSelectTargetOrder === 'function') { window.onSelectTargetOrder('" + orderId + "', " + (autoAccept ? "true" : "false") + "); }";
+                webView.post(() -> webView.evaluateJavascript(js, null));
             }
         }
     }

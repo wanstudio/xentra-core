@@ -1022,10 +1022,20 @@
 
   function updateMenuCardBadges(){
     var menuCart=composer().getDisplayItems();
+    var allProducts = Array.isArray(state.menu && state.menu.products) ? state.menu.products : [];
     document.querySelectorAll('.pos-product[data-product-id]').forEach(function(card){
       var pid=card.dataset.productId;
+      var cardIdentity=card.dataset.identity || '';
+      if(!cardIdentity){
+        var p=allProducts.find(function(x){return String(x.id)===String(pid) || String(x.menu_id)===String(pid);});
+        cardIdentity = p && p.menu_id ? 'menu:' + String(p.menu_id) : (p ? 'product:' + String(p.id) : ('product:' + String(pid)));
+        card.dataset.identity = cardIdentity;
+      }
       var qty=menuCart.reduce(function(acc,item){
-        return String(item.product_id)===String(pid)?acc+(Number(item.quantity)||0):acc;
+        var matches = menuCartIdentity(item) === cardIdentity ||
+                      (item.menu_id && String(item.menu_id) === String(pid)) ||
+                      (item.product_id != null && String(item.product_id) === String(pid));
+        return matches ? acc+(Number(item.quantity)||0) : acc;
       },0);
       var badge=card.querySelector('.pos-product-cart-badge');
       var stepper=card.querySelector('.pos-card-stepper');
@@ -1034,20 +1044,46 @@
 
       if(qty>0){
         card.classList.add('in-cart');
-        if(badge) badge.textContent=qty;
-        else{
-          var b=document.createElement('span'); b.className='pos-product-cart-badge'; b.textContent=qty; card.appendChild(b);
+        if(badge){
+          badge.textContent=qty;
+          badge.classList.remove('pos-badge-pop');
+          void badge.offsetWidth;
+          badge.classList.add('pos-badge-pop');
+        }else{
+          var b=document.createElement('span');
+          b.className='pos-product-cart-badge pos-badge-pop';
+          b.textContent=qty;
+          card.appendChild(b);
         }
         if(stepper){
+          var wasHidden = stepper.classList.contains('hidden');
           stepper.classList.remove('hidden');
-          if(qtyVal) qtyVal.textContent=qty;
+          if(wasHidden){
+            stepper.classList.remove('pos-stepper-pop');
+            void stepper.offsetWidth;
+            stepper.classList.add('pos-stepper-pop');
+          }
+          if(qtyVal){
+            qtyVal.textContent=qty;
+            qtyVal.classList.remove('pos-val-bump');
+            void qtyVal.offsetWidth;
+            qtyVal.classList.add('pos-val-bump');
+          }
         }
         if(addBtn) addBtn.classList.add('hidden');
       }else{
         card.classList.remove('in-cart');
         if(badge) badge.remove();
         if(stepper) stepper.classList.add('hidden');
-        if(addBtn) addBtn.classList.remove('hidden');
+        if(addBtn){
+          var wasHidden = addBtn.classList.contains('hidden');
+          addBtn.classList.remove('hidden');
+          if(wasHidden){
+            addBtn.classList.remove('pos-btn-pop');
+            void addBtn.offsetWidth;
+            addBtn.classList.add('pos-btn-pop');
+          }
+        }
       }
     });
   }
@@ -1181,12 +1217,12 @@
       '<div class="pos-order-modal-grand"><span>'+ (additionMode?'Total Tambahan':'Total Tagihan') +'</span><strong>'+money(t)+'</strong></div></div>';
 
     // Footer:
-    // Takeaway (pickup): [ Tahan ] [ Hapus ] on one row, full-width [ Bayar Rp… ] below.
-    // Dine-In: [ Tahan ] [ Hapus ] on row 1, full-width [ Kirim Pesanan ] below (or [ Kirim Tambahan ] in addition mode).
+    // Takeaway (pickup): [ Hold Bill ] [ Hapus ] on one row, full-width [ Bayar Rp… ] below.
+    // Dine-In: [ Hold Bill ] [ Hapus ] on row 1, full-width [ Kirim Pesanan ] below (or [ Kirim Tambahan ] in addition mode).
     // Held list lives in Transaksi → Pesanan Ditahan (N), not here.
     html+='<div class="pos-order-modal-actions"><div class="pos-order-modal-action-row">';
     if(!additionMode){
-      html+='<button type="button" class="pos-btn ghost pos-order-modal-secondary-btn" id="pos-order-modal-hold"'+(locked?' disabled':'')+'>Tahan</button>';
+      html+='<button type="button" class="pos-btn ghost pos-order-modal-secondary-btn" id="pos-order-modal-hold"'+(locked?' disabled':'')+'>Hold Bill</button>';
       html+='<button type="button" class="pos-btn danger ghost pos-order-modal-secondary-btn" id="pos-order-modal-clear">Hapus</button>';
     } else {
       html+='<button type="button" class="pos-btn ghost pos-order-modal-secondary-btn" id="pos-order-modal-addition-cancel">Batal Tambahan</button>';
@@ -1748,7 +1784,7 @@
           '</button>'
         ) : '';
 
-        return '<div role="button" tabindex="0" class="pos-product '+(unavailable?'disabled ':'')+(orderLocked?'order-locked ':'')+(cartQty>0?'in-cart':'')+'" data-product-id="'+esc(p.id)+'" aria-disabled="'+(orderLocked?'true':'false')+'">'+
+        return '<div role="button" tabindex="0" class="pos-product '+(unavailable?'disabled ':'')+(orderLocked?'order-locked ':'')+(cartQty>0?'in-cart':'')+'" data-product-id="'+esc(p.id)+'" data-identity="'+esc(targetIdentity)+'" aria-disabled="'+(orderLocked?'true':'false')+'">'+
           (cartQty>0?'<span class="pos-product-cart-badge">'+cartQty+'</span>':'')+
           mediaHtml+
           '<div class="pos-product-body">'+
@@ -1859,6 +1895,7 @@
   }
 
   async function loadMenu(){
+    if(!state.branchId && state.user && state.user.branch_id) state.branchId = state.user.branch_id;
     if(!state.branchId)return;
     try{
       // Canonical Menu is the sole forward POS catalog source. A canonical
@@ -2665,6 +2702,14 @@
       '<div class="pos-form-row">' +
         '<label for="pos-cash-move-reason">Keterangan / Alasan (Wajib)</label>' +
         '<input id="pos-cash-move-reason" type="text" placeholder="' + (isCashIn ? 'Contoh: Tambah modal kembalian' : 'Contoh: Beli es batu / operasional') + '">' +
+        '<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">' +
+          (isCashIn
+            ? '<button type="button" class="pos-btn-quick-reason" data-qr-reason="Pengembalian Modal Kurir" style="font-size:11px;padding:4px 8px;border-radius:6px;background:#f1f5f9;border:1px solid #cbd5e1;cursor:pointer;font-weight:600;">🛵 Pengembalian Modal Kurir</button>' +
+              '<button type="button" class="pos-btn-quick-reason" data-qr-reason="Tambah Modal Kembalian Kasir" style="font-size:11px;padding:4px 8px;border-radius:6px;background:#f1f5f9;border:1px solid #cbd5e1;cursor:pointer;font-weight:600;">💵 Tambah Modal Kasir</button>'
+            : '<button type="button" class="pos-btn-quick-reason" data-qr-reason="Modal Kembalian Kurir" data-qr-amount="50000" style="font-size:11px;padding:4px 8px;border-radius:6px;background:#f1f5f9;border:1px solid #cbd5e1;cursor:pointer;font-weight:600;">🛵 Modal Kurir 50k</button>' +
+              '<button type="button" class="pos-btn-quick-reason" data-qr-reason="Modal Kembalian Kurir" data-qr-amount="100000" style="font-size:11px;padding:4px 8px;border-radius:6px;background:#f1f5f9;border:1px solid #cbd5e1;cursor:pointer;font-weight:600;">🛵 Modal Kurir 100k</button>' +
+              '<button type="button" class="pos-btn-quick-reason" data-qr-reason="Beli Es Batu / Operasional" style="font-size:11px;padding:4px 8px;border-radius:6px;background:#f1f5f9;border:1px solid #cbd5e1;cursor:pointer;font-weight:600;">🧊 Operasional</button>') +
+        '</div>' +
       '</div>' +
     '</div>';
 
@@ -2698,6 +2743,17 @@
 
     var reasonInput = $('pos-cash-move-reason');
     if (reasonInput) {
+      document.querySelectorAll('.pos-btn-quick-reason').forEach(function(btn){
+        btn.onclick = function(){
+          if (btn.dataset.qrReason) reasonInput.value = btn.dataset.qrReason;
+          if (amtInput && btn.dataset.qrAmount) {
+            amtInput.value = formatNominal(btn.dataset.qrAmount);
+          }
+          if (amtInput && !btn.dataset.qrAmount && (!amtInput.value || amtInput.value === '0')) {
+            amtInput.focus();
+          }
+        };
+      });
       bindModalEnter(reasonInput, function(){
         var btn = $('btn-pos-cash-move-submit');
         if (btn) btn.click();
@@ -3737,12 +3793,19 @@
       if(tendered<amount){toast('Uang diterima belum cukup.');return;}
       var submitBtn=this; submitBtn.disabled=true;
       try{
-        await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/'+encodeURIComponent(check.id)+'/pay',{
+        var res=await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/'+encodeURIComponent(check.id)+'/pay',{
           method:'POST',headers:headers(),
           body:JSON.stringify({amount:amount,payment_method:'cash',payer_name:$('pos-pay-payer').value.trim()||null,amount_tendered:tendered})
         });
         toast('Pembayaran tercatat.');
-        openCheckManager(orderId);
+        if(res && res.order_remaining != null && Number(res.order_remaining) <= 0){
+          hideModal();
+          showPaymentSuccess({ id: orderId, order_number: (res.payment && res.payment.order_number) || orderId, grand_total: (res.payment && res.payment.amount) || amount }, Number((res.payment && res.payment.change != null) ? res.payment.change : Math.max(0, tendered - amount)));
+          resetSale(); loadShift(); loadSales(); updateHeldCount();
+          if(state.view === 'meja') loadTables();
+        } else {
+          openCheckManager(orderId);
+        }
       }catch(e){submitBtn.disabled=false;toast(e.message);}
     };
   }
@@ -3822,6 +3885,7 @@
   }
 
   async function loadSales(){
+    if(!state.branchId && state.user && state.user.branch_id) state.branchId = state.user.branch_id;
     try{
       var d=await request('/pos/sales?branch_id='+encodeURIComponent(state.branchId),{headers:headers()});
       state.sales=d.sales||[]; renderSales();
@@ -3838,25 +3902,39 @@
     box.innerHTML=state.sales.map(function(s){
       var isOjol = s.order_channel === 'gofood' || s.order_channel === 'grabfood' || s.order_channel === 'shopeefood';
       var isCodPending = !isOjol && s.order_type === 'delivery' && s.payment_method === 'cash' && s.payment_status !== 'settlement' && s.payment_status !== 'paid';
-      var badgeCls = isOjol ? 'ok' : (isCodPending ? 'caution' : (s.payment_status === 'settlement' || s.payment_status === 'paid' ? 'ok' : 'pending'));
-      var badgeLabel = isOjol ? (s.order_channel === 'gofood' ? 'GOFOOD' : (s.order_channel === 'grabfood' ? 'GRABFOOD' : 'SHOPEE')) : (isCodPending ? (s.cod_cash_custody === 'driver' ? 'COD (Di Driver)' : 'COD Pending') : (s.payment_status === 'settlement' ? 'LUNAS' : (s.payment_status || 'paid').toUpperCase()));
+      var isPendingPayment = !isOjol && !isCodPending && s.payment_status !== 'settlement' && s.payment_status !== 'paid';
+      var badgeCls = isOjol ? 'ok' : (isCodPending ? 'caution' : (isPendingPayment ? 'caution' : (s.payment_status === 'settlement' || s.payment_status === 'paid' ? 'ok' : 'pending')));
+      var badgeLabel = isOjol ? (s.order_channel === 'gofood' ? 'GOFOOD' : (s.order_channel === 'grabfood' ? 'GRABFOOD' : 'SHOPEE')) : (isCodPending ? (s.cod_cash_custody === 'driver' ? 'COD (Di Driver)' : 'COD Pending') : (isPendingPayment ? 'BELUM BAYAR' : (s.payment_status === 'settlement' ? 'LUNAS' : (s.payment_status || 'paid').toUpperCase())));
       var codActionBtn = isCodPending ? '<button type="button" class="pos-btn small" data-cod-settle="'+esc(s.id)+'" style="margin-left:6px;">Setor COD</button>' : '';
+      var payActionBtn = isPendingPayment ? '<button type="button" class="pos-btn small primary" data-open-pay="'+esc(s.id)+'" style="margin-left:6px;">Bayar di Kasir</button>' : '';
       var oTypeDisplay = isOjol ? 'OJOL' : (s.order_type === 'pickup' ? 'TAKEAWAY' : (s.order_type === 'dine_in' ? 'DINE-IN' : (s.order_type || '').toUpperCase()));
-      return '<div class="pos-sale-row" data-sale-id="'+esc(s.id)+'">' +
+      return '<div class="pos-sale-row" data-sale-id="'+esc(s.id)+'" role="button" tabindex="0" title="Klik untuk rincian transaksi">' +
         '<div class="pos-sale-main"><strong>#'+esc(s.order_number||s.id)+'</strong><small>'+esc(s.created_at||'')+'</small></div>' +
         '<div>'+esc(oTypeDisplay)+'</div>' +
         '<div><span class="pos-badge '+badgeCls+'">'+esc(badgeLabel)+'</span></div>' +
         '<div class="pos-sale-total">'+money(s.grand_total)+'</div>' +
-        '<div style="display:flex;gap:6px;align-items:center;">' +
-          '<button type="button" class="pos-btn small ghost" data-sale-detail="'+esc(s.id)+'">Detail</button>' +
+        '<div class="pos-sale-actions" style="display:flex;gap:6px;align-items:center;">' +
           codActionBtn +
+          payActionBtn +
           '<button type="button" class="pos-btn small ghost" data-print="'+esc(s.id)+'">Struk</button>' +
         '</div>' +
       '</div>';
     }).join('');
+    box.querySelectorAll('.pos-sale-row').forEach(function(row){
+      row.onclick = function(e){
+        if(e.target.closest('button')) return;
+        openSaleDetailModal(row.dataset.saleId);
+      };
+      row.onkeydown = function(e){
+        if((e.key === 'Enter' || e.key === ' ') && !e.target.closest('button')){
+          e.preventDefault();
+          openSaleDetailModal(row.dataset.saleId);
+        }
+      };
+    });
     box.querySelectorAll('[data-print]').forEach(function(b){b.onclick=function(e){e.stopPropagation();printReceipt(b.dataset.print);};});
     box.querySelectorAll('[data-cod-settle]').forEach(function(b){b.onclick=function(e){e.stopPropagation();openCodSettlementModal(b.dataset.codSettle);};});
-    box.querySelectorAll('[data-sale-detail]').forEach(function(b){b.onclick=function(e){e.stopPropagation();openSaleDetailModal(b.dataset.saleDetail);};});
+    box.querySelectorAll('[data-open-pay]').forEach(function(b){b.onclick=function(e){e.stopPropagation();openDirectOrderPayModal(b.dataset.openPay);};});
   }
 
   async function openCodSettlementModal(orderId){
@@ -3909,7 +3987,7 @@
           hideModal();
           toast('Setoran COD berhasil diterima dan tercatat di kas shift.');
           await loadSales();
-          await loadCurrentShift();
+          await loadShift();
         }catch(e){
           btn.disabled = false;
           toast(e.message || 'Gagal menyelesaikan setoran COD.');
@@ -3917,6 +3995,234 @@
       };
     }catch(e){
       toast(e.message || 'Gagal memuat detail pesanan.');
+    }
+  }
+
+  async function openDirectOrderPayModal(orderId){
+    if(!orderId) return toast('Tagihan ini belum memiliki order.');
+    if(!state.shift) return toast('Buka shift kasir terlebih dahulu sebelum menerima pembayaran.');
+    if(state.shift.active_break) return toast('Akhiri istirahat sebelum melanjutkan transaksi.');
+
+    try{
+      var [orderRes, checksRes, additionsRes] = await Promise.all([
+        request('/pos/orders/' + encodeURIComponent(orderId), { headers: headers() }),
+        request('/pos/orders/' + encodeURIComponent(orderId) + '/checks', { headers: headers() }).catch(function(){ return { checks: [] }; }),
+        request('/pos/orders/' + encodeURIComponent(orderId) + '/additions', { headers: headers() }).catch(function(){ return { additions: [] }; })
+      ]);
+
+      var o = orderRes && orderRes.order;
+      if(!o) return toast('Pesanan tidak ditemukan.');
+      var items = (orderRes && orderRes.items) || [];
+      var checks = (checksRes && checksRes.checks) || [];
+      var additions = (additionsRes && additionsRes.additions) || [];
+
+      // If already split into multiple checks (>1), route directly to check manager
+      if(checks.length > 1){
+        return openCheckManager(orderId);
+      }
+
+      var grandTotal = Number(o.grand_total || 0);
+      var isAlreadySettled = o.payment_status === 'settlement' || o.payment_status === 'paid';
+      if(isAlreadySettled){
+        return toast('Pesanan ini sudah lunas.');
+      }
+
+      // Check pending additions
+      var pendingAdditions = additions.filter(function(a){ return a.status === 'pending_acceptance'; });
+      var pendingAdditionBanner = '';
+      if(pendingAdditions.length > 0){
+        pendingAdditionBanner = '<div class="pos-direct-pay-warning">' +
+          '⚠️ <strong>Perhatian:</strong> Ada <strong>' + pendingAdditions.length + ' pesanan tambahan</strong> yang belum dikonfirmasi dapur. Konfirmasi di Merchant App sebelum pelunasan, atau tagihan saat ini belum mencakup menu tambahan tersebut.' +
+        '</div>';
+      }
+
+      var typeTitle = (o.order_type === 'dine_in')
+        ? (o.table_number ? ('Meja ' + esc(o.table_number)) : 'Dine-In')
+        : (o.order_type === 'pickup' ? 'Takeaway' : (o.order_type === 'delivery' ? 'Delivery' : esc(o.order_type)));
+
+      var itemsSummary = items.map(function(it){
+        return (Number(it.quantity) || 1) + 'x ' + esc(it.product_name || it.name || 'Item');
+      }).join(', ');
+
+      function generateDenominations(val){
+        var list = [val];
+        var denoms = [10000, 20000, 50000, 100000, 200000, 500000];
+        denoms.forEach(function(d){
+          if(d > val && list.indexOf(d) === -1 && list.length < 5){
+            list.push(d);
+          }
+        });
+        var ceil50 = Math.ceil(val / 50000) * 50000;
+        if(ceil50 > val && list.indexOf(ceil50) === -1 && list.length < 5){
+          list.push(ceil50);
+        }
+        var ceil100 = Math.ceil(val / 100000) * 100000;
+        if(ceil100 > val && list.indexOf(ceil100) === -1 && list.length < 5){
+          list.push(ceil100);
+        }
+        return list.sort(function(a,b){ return a - b; });
+      }
+
+      var quickDenoms = generateDenominations(grandTotal);
+      var quickButtonsHtml = quickDenoms.map(function(d){
+        var isPas = d === grandTotal;
+        var label = isPas ? 'Uang Pas' : money(d);
+        var activeCls = isPas ? ' active' : '';
+        return '<button type="button" class="pos-btn-quick-cash' + activeCls + '" data-denom="' + d + '">' + esc(label) + '</button>';
+      }).join('');
+
+      var itemsListHtml = items.map(function(it){
+        var itPrice = (Number(it.unit_price) || 0) * (Number(it.quantity) || 1);
+        return '<div class="pos-direct-item-row">' +
+          '<div class="pos-direct-item-name"><strong>' + (it.quantity || 1) + 'x</strong> ' + esc(it.product_name || it.name || 'Item') + '</div>' +
+          '<div class="pos-direct-item-price">' + (itPrice > 0 ? money(itPrice) : '') + '</div>' +
+        '</div>';
+      }).join('');
+
+      var html = '<div class="pos-direct-pay-modal">' +
+        '<div class="pos-direct-pay-head">' +
+          '<div class="pos-direct-pay-title-wrap">' +
+            '<div class="pos-direct-pay-tag-row">' +
+              '<span class="pos-direct-pay-badge">Bayar ' + esc(typeTitle) + '</span>' +
+              '<span class="pos-direct-pay-orderno">#' + esc(o.order_number || o.id) + '</span>' +
+            '</div>' +
+            '<div class="pos-direct-pay-customer">' + esc(o.customer_name || 'Pelanggan') + (o.customer_phone ? (' · ' + esc(o.customer_phone)) : '') + '</div>' +
+          '</div>' +
+          '<button type="button" class="pos-modal-close-icon" id="pos-direct-close-x" aria-label="Tutup">' +
+            '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
+          '</button>' +
+        '</div>' +
+        '<div class="pos-direct-total-banner">' +
+          '<div class="pos-direct-total-label">Total Tagihan</div>' +
+          '<div class="pos-direct-total-amount">' + money(grandTotal) + '</div>' +
+        '</div>' +
+        pendingAdditionBanner +
+        (items.length ? ('<div class="pos-direct-items-box">' +
+          '<div class="pos-direct-items-header"><span>Rincian Menu</span><span class="pos-direct-items-count">' + items.length + ' menu</span></div>' +
+          '<div class="pos-direct-items-list">' + itemsListHtml + '</div>' +
+        '</div>') : '') +
+        '<div class="pos-form-row" style="margin-top:6px;margin-bottom:0;">' +
+          '<label class="pos-direct-input-label">Uang Diterima (Tunai)</label>' +
+          '<div class="pos-input-nominal-wrap">' +
+            '<span class="pos-direct-currency-prefix">Rp</span>' +
+            '<input type="text" id="pos-direct-tendered" class="pos-input-nominal" inputmode="numeric" autocomplete="off" value="' + formatNominal(grandTotal) + '">' +
+          '</div>' +
+          '<div class="pos-direct-denom-grid">' + quickButtonsHtml + '</div>' +
+        '</div>' +
+        '<div id="pos-direct-change" class="pos-change">' +
+          '<span>Kembalian</span><strong id="pos-direct-change-val">Rp 0</strong>' +
+        '</div>' +
+        '<div class="pos-direct-actions-row">' +
+          '<button type="button" class="pos-btn ghost" id="pos-direct-cancel-btn">Batal</button>' +
+          '<button type="button" class="pos-btn primary" id="pos-direct-submit-btn">Bayar</button>' +
+        '</div>' +
+        '<div class="pos-direct-split-wrap">' +
+          '<button type="button" class="pos-btn-split-link" id="pos-direct-split-btn">Pisah Tagihan (Split)</button>' +
+        '</div>' +
+      '</div>';
+
+      showModal(html);
+
+      var inputTendered = $('pos-direct-tendered');
+      var changeBox = $('pos-direct-change');
+      var submitBtn = $('pos-direct-submit-btn');
+
+      function updateChange(){
+        var val = parseNominal(inputTendered ? inputTendered.value : 0);
+        var diff = val - grandTotal;
+        document.querySelectorAll('.pos-direct-denom-grid .pos-btn-quick-cash').forEach(function(b){
+          b.classList.toggle('active', Number(b.dataset.denom || 0) === val);
+        });
+        if(diff >= 0){
+          if(changeBox) {
+            changeBox.className = 'pos-change';
+            changeBox.innerHTML = '<span>Kembalian</span><strong id="pos-direct-change-val">' + money(diff) + '</strong>';
+          }
+          if(submitBtn) submitBtn.disabled = false;
+        } else {
+          if(changeBox) {
+            changeBox.className = 'pos-change danger';
+            changeBox.innerHTML = '<span>Uang Kurang</span><strong id="pos-direct-change-val">' + money(Math.abs(diff)) + '</strong>';
+          }
+          if(submitBtn) submitBtn.disabled = true;
+        }
+      }
+
+      bindNominalInput(inputTendered, updateChange);
+      bindModalEnter(inputTendered, function(){
+        if(submitBtn && !submitBtn.disabled) submitBtn.click();
+      });
+
+      document.querySelectorAll('.pos-direct-denom-grid .pos-btn-quick-cash').forEach(function(btn){
+        btn.onclick = function(){
+          document.querySelectorAll('.pos-direct-denom-grid .pos-btn-quick-cash').forEach(function(b){ b.classList.remove('active'); });
+          btn.classList.add('active');
+          var d = Number(btn.dataset.denom || 0);
+          if(inputTendered){
+            inputTendered.value = formatNominal(d);
+            updateChange();
+          }
+        };
+      });
+
+      if($('pos-direct-close-x')) $('pos-direct-close-x').onclick = hideModal;
+      if($('pos-direct-cancel-btn')) $('pos-direct-cancel-btn').onclick = hideModal;
+
+      if($('pos-direct-split-btn')){
+        $('pos-direct-split-btn').onclick = function(){
+          openCheckManager(orderId);
+        };
+      }
+
+      if(submitBtn){
+        submitBtn.onclick = async function(){
+          var tendered = parseNominal(inputTendered ? inputTendered.value : 0);
+          if(tendered < grandTotal){
+            return toast('Uang yang diterima belum mencukupi total tagihan.');
+          }
+          submitBtn.disabled = true;
+          submitBtn.textContent = 'Memproses...';
+
+          try{
+            var res = await request('/pos/orders/' + encodeURIComponent(orderId) + '/settle-cash', {
+              method: 'POST',
+              headers: headers(),
+              body: JSON.stringify({
+                amount_tendered: Number(tendered),
+                shift_id: state.shift.id
+              })
+            });
+
+            if(res && res.success){
+              hideModal();
+              var changeAmt = Number((res.payment && res.payment.change != null) ? res.payment.change : Math.max(0, tendered - grandTotal));
+              showPaymentSuccess({
+                id: o.id,
+                order_number: (res.payment && res.payment.order_number) || o.order_number || o.id,
+                grand_total: grandTotal
+              }, changeAmt);
+
+              resetSale();
+              loadShift();
+              loadSales();
+              updateHeldCount();
+              if(state.view === 'meja') loadTables();
+              return;
+            }
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Bayar';
+            toast((res && res.error) || 'Gagal menyelesaikan pembayaran.');
+          } catch(err){
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Bayar';
+            toast(err.message || 'Gagal memproses pembayaran.');
+          }
+        };
+      }
+
+      updateChange();
+    } catch(e){
+      toast(e.message || 'Gagal memuat data pembayaran.');
     }
   }
 
@@ -3962,7 +4268,9 @@
             '<div style="width:70%;height:70%;border:3px solid #10b981;border-radius:14px;box-shadow:0 0 0 9999px rgba(15,23,42,.35);"></div>' +
           '</div>' +
         '</div>' +
-        '<div id="pos-qr-status" style="font-size:12px;color:#047857;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:8px 10px;margin-bottom:12px;display:none;"></div>' +
+        '<div id="pos-qr-status" style="font-size:12px;color:#047857;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:8px 10px;margin-bottom:12px;' + (!canScan ? 'display:block;' : 'display:none;') + '">' +
+          (!hasCamera ? 'Kamera tidak terdeteksi pada perangkat ini. Silakan gunakan input manual / barcode scanner USB/Bluetooth.' : (!hasDetector ? 'WebView perangkat belum mendukung scanner otomatis. Silakan input nomor pesanan / barcode scanner.' : '')) +
+        '</div>' +
         '<div style="text-align:left;margin-bottom:6px;font-size:12px;font-weight:700;color:#374151;">Input Manual / Barcode Scanner:</div>' +
         '<div style="display:flex;gap:6px;margin-bottom:12px;">' +
           '<input id="pos-qr-manual-input" type="text" placeholder="No. Pesanan / Scan Barcode" style="flex:1;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:13.5px;font-family:inherit;">' +
@@ -4058,49 +4366,227 @@
       var p = res.payment || {};
       var items = res.items || [];
       var isCodPending = o.order_type === 'delivery' && o.payment_method === 'cash' && p.payment_status !== 'settlement' && p.payment_status !== 'paid';
+      var isUnpaid = !isCodPending && p.payment_status !== 'settlement' && p.payment_status !== 'paid' && o.payment_status !== 'settlement' && o.payment_status !== 'paid';
 
+      var isOjol = o.order_channel === 'gofood' || o.order_channel === 'grabfood' || o.order_channel === 'shopeefood';
+      var oChannelName = isOjol
+        ? (o.order_channel === 'gofood' ? 'GoFood' : (o.order_channel === 'grabfood' ? 'GrabFood' : 'ShopeeFood'))
+        : (o.order_channel === 'online' ? 'Web Pesan Online' : 'POS Kasir');
+
+      var isPaid = p.payment_status === 'settlement' || p.payment_status === 'paid' || o.payment_status === 'settlement' || o.payment_status === 'paid';
+      var statusBadgeCls = isPaid ? 'ok' : ((isCodPending || isUnpaid) ? 'caution' : 'pending');
+      var statusBadgeLabel = isOjol
+        ? oChannelName.toUpperCase()
+        : (isCodPending
+            ? (d && d.cod_cash_custody === 'driver' ? 'COD (DI DRIVER)' : 'COD PENDING')
+            : (isUnpaid ? 'BELUM BAYAR' : (isPaid ? 'LUNAS' : (o.payment_status || 'PENDING').toUpperCase())));
+
+      // Service type label
+      var tableTxt = o.table_number ? ('Meja ' + o.table_number) : (o.table_id ? ('Meja ' + o.table_id) : 'Tanpa Meja');
+      var typeLabel = 'Takeaway';
+      if(o.order_type === 'dine_in'){
+        typeLabel = 'Dine-In (' + tableTxt + ')';
+      } else if(o.order_type === 'delivery'){
+        typeLabel = isOjol ? ('Ojol (' + oChannelName + ')') : 'Delivery Toko';
+      } else if(o.order_type === 'pickup'){
+        typeLabel = 'Takeaway / Bungkus';
+      }
+
+      // Customer display
+      var customerText = esc(o.customer_name || 'Pelanggan Walk-in');
+      if(o.customer_phone) customerText += ' <small style="color:var(--muted);font-weight:normal;">(' + esc(o.customer_phone) + ')</small>';
+
+      // Payment method label
+      var payMethodLabel = 'Tunai (Cash)';
+      var m = (p.payment_method || o.payment_method || '').toLowerCase();
+      if(m === 'qris') payMethodLabel = 'QRIS';
+      else if(m === 'transfer') payMethodLabel = 'Transfer Bank';
+      else if(m === 'card' || m === 'debit' || m === 'edc') payMethodLabel = 'Kartu Debit/Kredit';
+      else if(m === 'cod') payMethodLabel = 'Cash on Delivery (COD)';
+      else if(isOjol) payMethodLabel = 'Saldo Online Ojol';
+
+      var cashierName = o.cashier_name || (state.user && (state.user.name || state.user.full_name || state.user.username)) || 'Kasir';
+
+      // Items list
+      var itemsCount = items.reduce(function(acc, it){ return acc + (Number(it.quantity) || 1); }, 0);
       var itemsHtml = items.map(function(it){
-        return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--border,#e5e7eb);font-size:13px;">' +
-          '<div><strong>' + (it.quantity || 1) + 'x ' + esc(it.product_name || 'Item') + '</strong></div>' +
-          '<div>' + money(it.subtotal || it.total_price || 0) + '</div>' +
+        var qty = Number(it.quantity) || 1;
+        var unitPrice = Number(it.unit_price || it.price || 0);
+        var itemTotal = Number(it.item_subtotal || it.subtotal || it.total_price || (unitPrice * qty)) || 0;
+        var note = (it.notes || it.note || '').trim();
+        var optionsStr = '';
+        if (it.options_json) {
+          try {
+            var opts = typeof it.options_json === 'string' ? JSON.parse(it.options_json) : it.options_json;
+            if (Array.isArray(opts) && opts.length) {
+              optionsStr = opts.map(function(op){ return typeof op === 'string' ? op : (op.name || op.option_name || ''); }).filter(Boolean).join(', ');
+            }
+          } catch(e){}
+        }
+        return '<div class="pos-sale-item-row">' +
+          '<div class="pos-sale-item-col-qty"><span class="pos-sale-qty-pill">' + qty + 'x</span></div>' +
+          '<div class="pos-sale-item-col-info">' +
+            '<div class="pos-sale-item-name">' + esc(it.product_name || 'Item') + '</div>' +
+            (unitPrice > 0 ? '<div class="pos-sale-item-unit">@ ' + money(unitPrice) + '</div>' : '') +
+            (optionsStr ? '<div class="pos-sale-item-opt">' + esc(optionsStr) + '</div>' : '') +
+            (note ? '<div class="pos-sale-item-note">📝 ' + esc(note) + '</div>' : '') +
+          '</div>' +
+          '<div class="pos-sale-item-col-price">' + money(itemTotal) + '</div>' +
         '</div>';
       }).join('');
 
+      // Delivery info section
       var deliveryHtml = '';
       if(d){
-        deliveryHtml = '<div style="background:var(--bg-subtle,#f9fafb);padding:12px;border-radius:8px;margin-top:12px;font-size:13px;line-height:1.5;">' +
-          '<div style="font-weight:600;margin-bottom:6px;">Info Pengantaran & COD</div>' +
-          '<div>Kurir: <strong>' + esc(d.driver_name || '—') + (d.driver_phone ? ' (' + esc(d.driver_phone) + ')' : '') + '</strong></div>' +
-          '<div>Status Antar: <span class="pos-badge ok">' + esc((d.status || '').toUpperCase()) + '</span></div>' +
-          (o.payment_method === 'cash' ? '<div>Fisik Kas: <strong>' + (d.cod_cash_custody === 'driver' ? 'Dipegang Driver' : (d.cod_cash_custody === 'cashier' ? 'Sudah Disetor ke Kasir' : 'Menunggu')) + '</strong></div>' : '') +
+        var isDelivered = d.status === 'completed' || d.status === 'delivered';
+        var custodyText = d.cod_cash_custody === 'driver' ? 'Dipegang Driver' : (d.cod_cash_custody === 'cashier' ? 'Sudah Disetor ke Kasir' : 'Menunggu Serah Terima');
+        var custodyColor = d.cod_cash_custody === 'cashier' ? 'var(--ok, #166534)' : '#d97706';
+        deliveryHtml = '<div class="pos-sale-delivery-card">' +
+          '<div class="pos-sale-delivery-header">' +
+            '<div style="display:flex;align-items:center;gap:6px;">' +
+              '<span style="font-size:16px;">🛵</span>' +
+              '<strong>Info Pengantaran & Kurir</strong>' +
+            '</div>' +
+            '<span class="pos-badge ' + (isDelivered ? 'ok' : 'pending') + '">' + esc((d.status || '').toUpperCase()) + '</span>' +
+          '</div>' +
+          '<div class="pos-sale-delivery-grid">' +
+            '<div><span>Kurir:</span> <strong>' + esc(d.driver_name || '—') + (d.driver_phone ? ' (' + esc(d.driver_phone) + ')' : '') + '</strong></div>' +
+            (o.payment_method === 'cash' ? '<div><span>Fisik Kas COD:</span> <strong style="color:' + custodyColor + '">' + custodyText + '</strong></div>' : '') +
+          '</div>' +
         '</div>';
       }
 
-      var detailTypeDisplay = o.order_type === 'pickup' ? 'TAKEAWAY' : (o.order_type === 'dine_in' ? 'DINE-IN' : (o.order_type || '').toUpperCase());
-      var html = '<div class="pos-sale-detail-modal" style="padding:10px 0;">' +
-        '<div class="pos-simple-bill-head" style="margin-bottom:14px;">' +
-          '<div>' +
-            '<h3 style="margin:0 0 4px 0;">Transaksi #' + esc(o.order_number || o.id) + '</h3>' +
-            '<p style="margin:0;font-size:12px;color:var(--text-muted,#6b7280);">' + esc(o.created_at || '') + ' · ' + esc(detailTypeDisplay) + '</p>' +
+      // Financials
+      var subtotal = Number(o.subtotal || 0);
+      var discount = Number(o.discount || 0);
+      var tax = Number(o.tax || 0);
+      var deliveryFee = Number(o.delivery_fee || 0);
+      var grandTotal = Number(o.grand_total || 0);
+      var amountTendered = Number(o.amount_tendered || p.amount_tendered || 0);
+      var changeAmount = Number(o.change_amount || p.change_amount || 0);
+
+      var breakdownRows = '';
+      if(subtotal > 0 && subtotal !== grandTotal){
+        breakdownRows += '<div class="pos-sale-summary-row"><span>Subtotal Menu</span><span>' + money(subtotal) + '</span></div>';
+      }
+      if(discount > 0){
+        breakdownRows += '<div class="pos-sale-summary-row pos-sale-discount"><span>Diskon</span><span>- ' + money(discount) + '</span></div>';
+      }
+      if(tax > 0){
+        breakdownRows += '<div class="pos-sale-summary-row"><span>Pajak (PB1)</span><span>' + money(tax) + '</span></div>';
+      }
+      if(deliveryFee > 0){
+        breakdownRows += '<div class="pos-sale-summary-row"><span>Ongkos Kirim</span><span>' + money(deliveryFee) + '</span></div>';
+      }
+
+      var cashTenderHtml = '';
+      if(amountTendered > 0){
+        cashTenderHtml = '<div class="pos-sale-cash-tender-row">' +
+          '<div><span>Uang Diterima:</span> <strong>' + money(amountTendered) + '</strong></div>' +
+          '<div><span>Kembalian:</span> <strong style="color:var(--ok,#166534);">' + money(changeAmount) + '</strong></div>' +
+        '</div>';
+      }
+
+      var orderDateDisplay = o.created_at || '';
+      try {
+        var dt = new Date(o.created_at);
+        if(!isNaN(dt.getTime())){
+          orderDateDisplay = dt.toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' }) + ' ' +
+                             dt.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' });
+        }
+      } catch(_) {}
+
+      var html = '<div class="pos-sale-detail-modal">' +
+        // Header
+        '<div class="pos-sale-detail-head">' +
+          '<div class="pos-sale-detail-title-group">' +
+            '<div class="pos-sale-detail-icon-wrap">' +
+              '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>' +
+            '</div>' +
+            '<div>' +
+              '<div class="pos-sale-detail-number">Transaksi #' + esc(o.order_number || o.id) + '</div>' +
+              '<div class="pos-sale-detail-sub">' + esc(orderDateDisplay) + ' · ' + (isOjol ? 'Online' : 'POS Kasir') + '</div>' +
+            '</div>' +
           '</div>' +
-          '<div class="pos-simple-bill-total" style="font-size:18px;font-weight:700;">' + money(o.grand_total) + '</div>' +
+          '<div class="pos-sale-detail-head-right">' +
+            '<span class="pos-badge ' + statusBadgeCls + '">' + esc(statusBadgeLabel) + '</span>' +
+            '<button type="button" class="pos-modal-close-icon" id="pos-sale-detail-x" aria-label="Tutup">✕</button>' +
+          '</div>' +
         '</div>' +
-        '<div style="max-height:220px;overflow-y:auto;margin-bottom:12px;">' + itemsHtml + '</div>' +
+
+        // Meta 4-card Grid
+        '<div class="pos-sale-meta-grid">' +
+          '<div class="pos-sale-meta-item">' +
+            '<span class="pos-sale-meta-label">Layanan</span>' +
+            '<strong class="pos-sale-meta-val">' + esc(typeLabel) + '</strong>' +
+          '</div>' +
+          '<div class="pos-sale-meta-item">' +
+            '<span class="pos-sale-meta-label">Pelanggan</span>' +
+            '<strong class="pos-sale-meta-val">' + customerText + '</strong>' +
+          '</div>' +
+          '<div class="pos-sale-meta-item">' +
+            '<span class="pos-sale-meta-label">Metode Bayar</span>' +
+            '<strong class="pos-sale-meta-val">' + esc(payMethodLabel) + '</strong>' +
+          '</div>' +
+          '<div class="pos-sale-meta-item">' +
+            '<span class="pos-sale-meta-label">Kasir</span>' +
+            '<strong class="pos-sale-meta-val">' + esc(cashierName) + '</strong>' +
+          '</div>' +
+        '</div>' +
+
+        // Items Box
+        '<div class="pos-sale-items-box">' +
+          '<div class="pos-sale-items-head">' +
+            '<span>Rincian Pesanan</span>' +
+            '<small>' + itemsCount + ' item</small>' +
+          '</div>' +
+          '<div class="pos-sale-items-scroll">' + itemsHtml + '</div>' +
+        '</div>' +
+
+        // Delivery Card (if exists)
         deliveryHtml +
-        '<div class="pos-modal-actions" style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">' +
-          '<button type="button" class="pos-btn ghost" id="pos-sale-detail-close">Tutup</button>' +
-          (isCodPending ? '<button type="button" class="pos-btn primary" id="pos-sale-detail-settle">Terima Setoran COD</button>' : '') +
-          '<button type="button" class="pos-btn ghost" id="pos-sale-detail-print">Struk</button>' +
+
+        // Summary Box
+        '<div class="pos-sale-summary-box">' +
+          breakdownRows +
+          '<div class="pos-sale-grand-total-row">' +
+            '<div>' +
+              '<span class="pos-sale-grand-label">Total Transaksi</span>' +
+              '<div class="pos-sale-payment-method-tag">' + (statusBadgeCls === 'ok' ? 'Lunas via ' : 'Metode: ') + esc(payMethodLabel) + '</div>' +
+            '</div>' +
+            '<div class="pos-sale-grand-amount">' + money(grandTotal) + '</div>' +
+          '</div>' +
+          cashTenderHtml +
+        '</div>' +
+
+        // Modal Action Buttons
+        '<div class="pos-sale-detail-actions">' +
+          '<button type="button" class="pos-btn ghost pos-sale-btn-print" id="pos-sale-detail-print">' +
+            '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>' +
+            '<span>Cetak Struk</span>' +
+          '</button>' +
+          '<div class="pos-sale-detail-actions-right">' +
+            '<button type="button" class="pos-btn ghost" id="pos-sale-detail-close">Tutup</button>' +
+            (isCodPending ? '<button type="button" class="pos-btn primary" id="pos-sale-detail-settle">Terima Setoran COD</button>' : '') +
+            (isUnpaid ? '<button type="button" class="pos-btn primary" id="pos-sale-detail-pay">Bayar di Kasir</button>' : '') +
+          '</div>' +
         '</div>' +
       '</div>';
 
-      showModal(html);
+      showModal(html, 'pos-modal-sale-detail');
       $('pos-sale-detail-close').onclick = hideModal;
+      if($('pos-sale-detail-x')) $('pos-sale-detail-x').onclick = hideModal;
       $('pos-sale-detail-print').onclick = function(){ printReceipt(orderId); };
       if($('pos-sale-detail-settle')){
         $('pos-sale-detail-settle').onclick = function(){
           hideModal();
           openCodSettlementModal(orderId);
+        };
+      }
+      if($('pos-sale-detail-pay')){
+        $('pos-sale-detail-pay').onclick = function(){
+          hideModal();
+          openDirectOrderPayModal(orderId);
         };
       }
     }catch(e){
@@ -4420,7 +4906,289 @@
     });
   }
 
+  async function openReservationsModal(){
+    try {
+      var d = await request('/pos/reservations?branch_id=' + encodeURIComponent(state.branchId), { headers: headers() });
+      var reservations = d.reservations || [];
+
+      var layoutRes = await request('/dine-in/layout?branch_id=' + encodeURIComponent(state.branchId), { headers: headers() });
+      var allTables = (layoutRes.layout && layoutRes.layout.tables) || [];
+      var availableTables = allTables.filter(function(t){
+        return (t.operational_state || t.status || 'available') === 'available';
+      });
+
+      var rowsHtml = '';
+      if (!reservations.length) {
+        rowsHtml = '<div class="pos-empty">Tidak ada reservasi aktif.</div>';
+      } else {
+        rowsHtml = reservations.map(function(r){
+          var slotTime = r.scheduled_slot_start ? new Date(r.scheduled_slot_start).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : 'Hari Ini';
+          var slotDate = r.scheduled_slot_start ? new Date(r.scheduled_slot_start).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) : '';
+          var timeLabel = slotDate ? (slotDate + ', ' + slotTime) : slotTime;
+          return '<div class="pos-reservation-card">' +
+            '<div class="pos-res-card-top">' +
+              '<div>' +
+                '<div class="pos-res-guest-name">' + esc(r.customer_name || 'Tamu') + '</div>' +
+                '<div class="pos-res-meta">#' + esc(r.order_number || r.id) + ' • ' + esc(r.customer_phone || '-') + '</div>' +
+              '</div>' +
+              '<span class="pos-res-time-badge">' +
+                '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>' +
+                esc(timeLabel) +
+              '</span>' +
+            '</div>' +
+            (r.order_note ? '<div class="pos-res-note"><strong>Catatan:</strong> ' + esc(r.order_note) + '</div>' : '') +
+            '<div class="pos-res-actions">' +
+              '<button type="button" class="pos-btn small ghost danger" data-reservation-noshow="' + esc(r.id) + '">No-Show</button>' +
+              '<button type="button" class="pos-btn small primary" data-reservation-checkin="' + esc(r.id) + '">Check-In</button>' +
+            '</div>' +
+          '</div>';
+        }).join('');
+      }
+
+      var html = '<div class="pos-reservations-modal">' +
+        '<div class="pos-reservations-head">' +
+          '<div class="pos-reservations-head-left">' +
+            '<h3>Reservasi</h3>' +
+            '<span class="pos-reservations-badge">' + availableTables.length + ' Meja Siap</span>' +
+          '</div>' +
+          '<button type="button" class="pos-modal-close-icon" id="pos-reservations-x-close" aria-label="Tutup" title="Tutup">' +
+            '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
+          '</button>' +
+        '</div>' +
+        '<div class="pos-reservations-list">' + rowsHtml + '</div>' +
+        '<div class="pos-modal-actions">' +
+          '<button type="button" class="pos-btn ghost" id="pos-reservations-close">Tutup</button>' +
+        '</div>' +
+      '</div>';
+
+      showModal(html);
+      if ($('pos-reservations-close')) $('pos-reservations-close').onclick = hideModal;
+      if ($('pos-reservations-x-close')) $('pos-reservations-x-close').onclick = hideModal;
+
+      document.querySelectorAll('[data-reservation-noshow]').forEach(function(btn){
+        btn.onclick = async function(){
+          var resId = btn.dataset.reservationNoshow;
+          if (!confirm('Tandai reservasi ini sebagai No-Show?')) return;
+          try {
+            await request('/pos/reservations/' + encodeURIComponent(resId) + '/no-show', {
+              method: 'POST',
+              headers: headers(),
+              body: JSON.stringify({ reason: 'Pelanggan tidak hadir di outlet' })
+            });
+            toast('Reservasi ditandai No-Show.');
+            openReservationsModal();
+          } catch(err) {
+            toast(err.message || 'Gagal menandai No-Show.');
+          }
+        };
+      });
+
+      document.querySelectorAll('[data-reservation-checkin]').forEach(function(btn){
+        btn.onclick = function(){
+          var resId = btn.dataset.reservationCheckin;
+          var r = reservations.find(function(x){ return String(x.id) === String(resId); });
+          if (!availableTables.length) {
+            return toast('Tidak ada meja kosong (available) untuk check-in.');
+          }
+
+          var tableOptions = availableTables.map(function(t){
+            return '<option value="' + esc(t.table_number) + '">' + esc(t.label || ('Meja ' + t.table_number)) + ' (' + esc(String(t.capacity || 4)) + ' kursi)</option>';
+          }).join('');
+
+          var checkinHtml = '<div class="pos-reservations-modal">' +
+            '<div class="pos-reservations-head">' +
+              '<div class="pos-reservations-head-left">' +
+                '<h3>Pilih Meja Check-In</h3>' +
+              '</div>' +
+              '<button type="button" class="pos-modal-close-icon" id="pos-checkin-x-close" aria-label="Kembali" title="Kembali">' +
+                '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
+              '</button>' +
+            '</div>' +
+            '<div class="pos-checkin-guest-badge">' +
+              '<span>Tamu: <strong>' + esc(r ? r.customer_name : 'Pelanggan') + '</strong></span>' +
+              '<small>#' + esc(r ? (r.order_number || r.id) : '') + '</small>' +
+            '</div>' +
+            '<div class="pos-form-row">' +
+              '<label>Pilih Meja</label>' +
+              '<select id="pos-checkin-table-select" class="pos-input" style="font-size:14px;padding:9px 12px;border-radius:10px;">' + tableOptions + '</select>' +
+            '</div>' +
+            '<div class="pos-modal-actions">' +
+              '<button type="button" class="pos-btn ghost" id="pos-checkin-cancel">Batal</button>' +
+              '<button type="button" class="pos-btn primary" id="pos-checkin-submit">Check-In Meja</button>' +
+            '</div>' +
+          '</div>';
+
+          showModal(checkinHtml);
+          if ($('pos-checkin-cancel')) $('pos-checkin-cancel').onclick = openReservationsModal;
+          if ($('pos-checkin-x-close')) $('pos-checkin-x-close').onclick = openReservationsModal;
+          $('pos-checkin-submit').onclick = async function(){
+            var tableNum = $('pos-checkin-table-select').value;
+            if (!tableNum) return toast('Pilih meja terlebih dahulu.');
+            var sBtn = this; sBtn.disabled = true;
+            try {
+              await request('/pos/reservations/' + encodeURIComponent(resId) + '/check-in', {
+                method: 'POST',
+                headers: headers(),
+                body: JSON.stringify({ table_number: tableNum })
+              });
+              toast('✓ Tamu reservasi berhasil check-in ke Meja ' + tableNum + '!');
+              hideModal();
+              loadTables();
+            } catch(err) {
+              sBtn.disabled = false;
+              toast(err.message || 'Gagal check-in reservasi.');
+            }
+          };
+        };
+      });
+
+    } catch(err) {
+      toast(err.message || 'Gagal memuat daftar reservasi.');
+    }
+  }
+
+  async function updatePosNotificationBadge(){
+    try {
+      var d = await request('/notifications/unread-count', { headers: headers() });
+      var dot = $('pos-notif-badge-dot');
+      if (dot) {
+        var unread = Number(d && d.unread_count || 0);
+        dot.style.display = unread > 0 ? 'block' : 'none';
+        if (unread > 0) dot.setAttribute('title', unread + ' notifikasi baru');
+      }
+    } catch (_) {}
+  }
+
+  async function openPosNotificationsModal(){
+    var initialHtml = '<div class="pos-modal-notifications">' +
+      '<div class="pos-notif-head">' +
+        '<div class="pos-notif-head-title">' +
+          '<h3>Notifikasi</h3>' +
+          '<span class="pos-notif-badge-pill" id="pos-notif-modal-pill">...</span>' +
+        '</div>' +
+        '<button type="button" class="pos-modal-close-icon" id="pos-notif-x-close" aria-label="Tutup" title="Tutup">' +
+          '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
+        '</button>' +
+      '</div>' +
+      '<div class="pos-notif-toolbar">' +
+        '<span class="pos-notif-sub">Aktivitas pesanan, pengantaran, &amp; cabang</span>' +
+        '<button type="button" class="pos-btn-text-read" id="pos-notif-mark-all" style="display:none;">Tandai Semua Dibaca</button>' +
+      '</div>' +
+      '<div class="pos-notif-list" id="pos-notif-list-box">' +
+        '<div class="pos-empty">Memuat notifikasi...</div>' +
+      '</div>' +
+      '<div class="pos-modal-actions" style="margin-top:14px;">' +
+        '<button type="button" class="pos-btn ghost" id="pos-notif-close-btn" style="width:100%;">Tutup</button>' +
+      '</div>' +
+    '</div>';
+
+    showModal(initialHtml);
+    if ($('pos-notif-x-close')) $('pos-notif-x-close').onclick = hideModal;
+    if ($('pos-notif-close-btn')) $('pos-notif-close-btn').onclick = hideModal;
+
+    try {
+      var res = await request('/notifications?limit=30', { headers: headers() });
+      var notifications = (res && res.notifications) || [];
+      var unreadCount = Number(res && res.unread_count != null ? res.unread_count : notifications.filter(function(n){ return !n.read_at; }).length);
+
+      var pill = $('pos-notif-modal-pill');
+      if (pill) {
+        pill.textContent = unreadCount > 0 ? (unreadCount + ' Baru') : 'Semua Terbaca';
+        pill.className = 'pos-notif-badge-pill' + (unreadCount > 0 ? '' : ' empty');
+      }
+
+      var markAllBtn = $('pos-notif-mark-all');
+      if (markAllBtn) {
+        markAllBtn.style.display = unreadCount > 0 ? 'inline-block' : 'none';
+        markAllBtn.onclick = async function(){
+          markAllBtn.disabled = true;
+          markAllBtn.textContent = 'Menandai...';
+          try {
+            await request('/notifications/read-all', { method: 'POST', headers: headers() });
+            toast('Semua notifikasi telah ditandai dibaca.');
+            updatePosNotificationBadge();
+            openPosNotificationsModal();
+          } catch(err) {
+            markAllBtn.disabled = false;
+            markAllBtn.textContent = 'Tandai Semua Dibaca';
+            toast(err.message || 'Gagal menandai notifikasi dibaca.');
+          }
+        };
+      }
+
+      var listBox = $('pos-notif-list-box');
+      if (!listBox) return;
+
+      if (!notifications.length) {
+        listBox.innerHTML = '<div class="pos-empty pos-notif-empty">' +
+          '<div style="font-size:32px;margin-bottom:8px;">🔔</div>' +
+          '<strong>Belum ada notifikasi</strong>' +
+          '<p style="color:#64748b;font-size:12px;margin:4px 0 0;">Notifikasi pesanan, pengantaran, dan operasional akan muncul di sini.</p>' +
+        '</div>';
+        return;
+      }
+
+      function getNotifIcon(type) {
+        if (type === 'order') return '🛍️';
+        if (type === 'delivery') return '🛵';
+        if (type === 'payment') return '💵';
+        if (type === 'ops_message' || type === 'broadcast' || type === 'announcement') return '📢';
+        return '🔔';
+      }
+
+      function formatNotifTime(dateStr) {
+        if (!dateStr) return '';
+        var d = new Date(dateStr);
+        var time = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        var date = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+        return date + ', ' + time;
+      }
+
+      listBox.innerHTML = notifications.map(function(n){
+        var isUnread = !n.read_at;
+        return '<div class="pos-notif-card' + (isUnread ? ' unread' : '') + '" data-notif-id="' + esc(n.id) + '" data-action-url="' + esc(n.action_url || '') + '">' +
+          '<div class="pos-notif-icon-box">' + getNotifIcon(n.source_type) + '</div>' +
+          '<div class="pos-notif-body">' +
+            '<div class="pos-notif-row-head">' +
+              '<strong class="pos-notif-title">' + esc(n.title || 'Notifikasi') + '</strong>' +
+              (isUnread ? '<span class="pos-notif-dot"></span>' : '') +
+            '</div>' +
+            '<p class="pos-notif-desc">' + esc(n.body || '') + '</p>' +
+            '<span class="pos-notif-time">' + formatNotifTime(n.created_at) + '</span>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+
+      listBox.querySelectorAll('.pos-notif-card').forEach(function(card){
+        card.onclick = async function(){
+          var nId = card.dataset.notifId;
+          var actUrl = card.dataset.actionUrl || '';
+          if (card.classList.contains('unread')) {
+            card.classList.remove('unread');
+            var dot = card.querySelector('.pos-notif-dot');
+            if (dot) dot.remove();
+            try {
+              await request('/notifications/' + encodeURIComponent(nId) + '/read', { method: 'POST', headers: headers() });
+              updatePosNotificationBadge();
+            } catch (_) {}
+          }
+          if (actUrl) {
+            hideModal();
+            if (actUrl.includes('/pos/orders/') || actUrl.includes('/orders/')) {
+              setView('transaksi');
+            }
+          }
+        };
+      });
+
+    } catch (err) {
+      var box = $('pos-notif-list-box');
+      if (box) box.innerHTML = '<div class="pos-empty" style="color:#ef4444;">Gagal memuat notifikasi: ' + esc(err.message) + '</div>';
+    }
+  }
+
   async function loadTables(){
+    if(!state.branchId && state.user && state.user.branch_id) state.branchId = state.user.branch_id;
     try{
       var d=await request('/dine-in/layout?branch_id='+encodeURIComponent(state.branchId),{headers:headers()});
       var tables=(d.layout&&d.layout.tables)||[];
@@ -4457,6 +5225,31 @@
       if($('pos-table-stats')) $('pos-table-stats').textContent='0 meja';
       if($('pos-table-grid')) $('pos-table-grid').innerHTML='<div class="pos-empty">Layout meja tidak dapat dimuat.</div>';
     }
+  }
+
+  function attachRefreshAction(btnId, fn, successMsg) {
+    var btn = $(btnId);
+    if (!btn) return;
+    btn.onclick = async function (e) {
+      if (e && typeof e.preventDefault === 'function') e.preventDefault();
+      if (btn.classList.contains('is-spinning')) return;
+      btn.classList.add('is-spinning');
+      btn.setAttribute('disabled', 'disabled');
+      var start = Date.now();
+      try {
+        await fn();
+        var elapsed = Date.now() - start;
+        if (elapsed < 450) {
+          await new Promise(function (r) { setTimeout(r, 450 - elapsed); });
+        }
+        if (successMsg) toast(successMsg);
+      } catch (err) {
+        toast((err && err.message) || 'Gagal memuat ulang data.');
+      } finally {
+        btn.classList.remove('is-spinning');
+        btn.removeAttribute('disabled');
+      }
+    };
   }
 
   function bind(){
@@ -4510,7 +5303,7 @@
         searchInput.blur();
       }
     });
-    $('btn-pos-refresh-menu').onclick=loadMenu;
+    attachRefreshAction('btn-pos-refresh-menu', loadMenu, 'Katalog menu diperbarui');
     $('btn-pos-pay').onclick=function(){ if(composer().isAddition()) submitAdditionalOrder(); else openPayModal(); };
     if($('btn-pos-pay-many')) $('btn-pos-pay-many').onclick=openManyPaymentFromCart;
     if($('btn-pos-additional-order')) $('btn-pos-additional-order').onclick=enterAdditionalOrderMode;
@@ -4519,13 +5312,15 @@
     if($('tab-transaksi-sales')) $('tab-transaksi-sales').onclick=function(){switchTransaksiTab('sales');};
     if($('tab-transaksi-held')) $('tab-transaksi-held').onclick=function(){switchTransaksiTab('held');};
     $('btn-pos-select-table').onclick=function(){openTableSelector();};
-    $('btn-pos-load-sales').onclick=loadSales;
+    attachRefreshAction('btn-pos-load-sales', loadSales, 'Daftar transaksi diperbarui');
     if($('btn-pos-scan-driver')) $('btn-pos-scan-driver').onclick=openDriverQrScanModal;
     if($('btn-pos-scan-qr-top')) $('btn-pos-scan-qr-top').onclick=openDriverQrScanModal;
-    if($('btn-pos-refresh-tables')) $('btn-pos-refresh-tables').onclick=loadTables;
-    if($('btn-pos-refresh-shift')) $('btn-pos-refresh-shift').onclick=function(){ renderShift(); openShiftModal(); };
+    attachRefreshAction('btn-pos-refresh-tables', loadTables, 'Status meja diperbarui');
+    if($('btn-pos-reservations')) $('btn-pos-reservations').onclick=openReservationsModal;
+    attachRefreshAction('btn-pos-refresh-shift', async function(){ await loadShift(); renderShift(); }, 'Data shift diperbarui');
     $('btn-pos-shift-status').onclick=openShiftModal;
     $('btn-pos-close-shift-top').onclick=openCloseShiftModal;
+    if($('btn-pos-notif')) $('btn-pos-notif').onclick=openPosNotificationsModal;
     if($('pos-user-profile-btn')) $('pos-user-profile-btn').onclick=openCashierProfileModal;
     $('btn-pos-logout').onclick=function(){clearPosSessionAndReturnToPin();};
     bindPosStatus();
@@ -4591,6 +5386,8 @@
       await loadShift();
       await loadMenu();
       await updateHeldCount();
+      updatePosNotificationBadge().catch(function(){});
+      setInterval(updatePosNotificationBadge, 45000);
       loadSales().catch(function(){});
       loadTables().catch(function(){});
       setView('kasir');

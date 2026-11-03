@@ -1,9 +1,10 @@
-const { OrderRepository } = require('../../core/data/repositories');
+const { OrderRepository, OrderAdditionRepository } = require('../../core/data/repositories');
 const { isConsumingOrderStatus } = require('../../core/domain/OrderStatusContract');
 const FulfillmentEnvironmentService = require('../../domains/commerce/services/FulfillmentEnvironmentService');
 const crypto = require('crypto');
 
 const orderRepository = new OrderRepository();
+const orderAdditionRepository = new OrderAdditionRepository();
 
 class OrderStateMachine {
   // P1 SEPARATION OF CONCERNS: Operational transitions strictly exclude financial 'refunded'
@@ -22,6 +23,7 @@ class OrderStateMachine {
   // PAYMENT_FAILURE remain distinguishable.
   static VALID_TRANSITIONS = {
     pending: ['confirmed', 'cancelled', 'rejected', 'timeout'],
+    active_table: ['confirmed', 'preparing', 'ready', 'completed', 'cancelled'],
     confirmed: ['preparing', 'cancelled'],
     preparing: ['ready', 'cancelled'],
     ready: ['out_for_delivery', 'completed', 'cancelled'],
@@ -64,6 +66,13 @@ class OrderStateMachine {
         );
       }
 
+      if (order.order_type === 'dine_in' && target_status === 'completed') {
+        const pendingAdditions = orderAdditionRepository.countPendingByOrderId(order_id);
+        if (pendingAdditions > 0) {
+          throw new Error(`[PENDING_ADDITIONS]: Pesanan belum dapat diselesaikan karena ada ${pendingAdditions} kiriman Customer PWA yang menunggu keputusan Merchant.`);
+        }
+      }
+
       // Fulfillment Environment boundary: the same canonical Order statuses
       // may represent different operational meanings by purchase type. Never
       // allow a transition that belongs to another environment.
@@ -96,6 +105,16 @@ class OrderStateMachine {
 
       if (!updateResult || updateResult.changes === 0) {
         throw new Error(`Konflik konkurensi: Status pesanan "${order_id}" telah diubah oleh proses lain.`);
+      }
+
+      if (order.order_type === 'dine_in' && ['cancelled', 'rejected', 'timeout'].includes(target_status)) {
+        const now = new Date().toISOString();
+        orderAdditionRepository.cancelPendingForOrder({
+          orderId: order_id,
+          reason: `Kiriman dibatalkan karena Order utama ${target_status}.`,
+          cancelledAt: now,
+          updatedAt: now
+        });
       }
 
       const logId = 'log_' + crypto.randomBytes(8).toString('hex');
@@ -137,6 +156,34 @@ class OrderStateMachine {
           affiliateService.voidOrderCommission({ orderId: order_id });
         } catch (affErr) {
           console.warn('[Affiliate Order Void Warning]:', affErr.message);
+        }
+
+        if (['cancelled', 'rejected', 'timeout'].includes(target_status)) {
+          try {
+            const now = new Date().toISOString();
+            orderRepository.db.execute(
+              "UPDATE order_deliveries SET status = 'cancelled', updated_at = ? WHERE order_id = ? AND status != 'delivered'",
+              [now, order_id]
+            );
+            orderRepository.db.execute(
+              "UPDATE driver_locations SET active_order_id = NULL WHERE active_order_id = ?",
+              [order_id]
+            );
+            orderRepository.db.execute(
+              "UPDATE pos_held_orders SET status = 'cancelled', updated_at = ? WHERE order_id = ? AND status = 'held'",
+              [now, order_id]
+            );
+            if (order.order_type === 'dine_in') {
+              const { DiningTableService } = require('../../domains/dining');
+              DiningTableService.releaseHold({
+                branch_id: order.branch_id,
+                hold_reference_id: order_id,
+                reason: target_status
+              }, { dbTransactionProvided: true });
+            }
+          } catch (cleanupErr) {
+            console.warn('[OrderStateMachine Terminal Cleanup Warning]:', cleanupErr.message);
+          }
         }
       }
 

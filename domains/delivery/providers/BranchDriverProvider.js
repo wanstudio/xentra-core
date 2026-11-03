@@ -73,19 +73,23 @@ class BranchDriverProvider {
     try {
       const { NotificationService } = require('../../../core');
       const notifService = new NotificationService(orderRepository.db);
+      const custName = order.recipient_name || order.customer_name || 'Pelanggan';
+      const totalAmt = Number(order.grand_total || order.total_amount || 0);
+      const totalStr = totalAmt > 0 ? (' · Rp ' + totalAmt.toLocaleString('id-ID')) : '';
+      const payLabel = order.payment_method === 'cash' ? 'COD' : 'Non-Tunai (Lunas)';
       notifService.createNotification({
         brand_id: order.brand_id,
         branch_id: order.branch_id,
         source_type: 'delivery',
-        title: 'Tugas Delivery Baru!',
-        body: `Anda ditugaskan mengantar pesanan #${order.order_number}`,
+        title: `🛵 Tugas Antar Baru! #${order.order_number || order.id}`,
+        body: `${custName} · ${payLabel}${totalStr} · Ketuk untuk terima tugas`,
         priority: 'high',
         target_role: 'driver',
         target_user_id: driver_id || null,
         target_scope: 'branch',
         related_entity_type: 'delivery',
         related_entity_id: order_id,
-        action_url: `/driver/`
+        action_url: `/driver/?order_id=${encodeURIComponent(order_id)}`
       });
     } catch (_) {}
 

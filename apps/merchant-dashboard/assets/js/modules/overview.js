@@ -87,6 +87,9 @@
     } finally {
       if (occHero) occHero.style.opacity = '1';
       if (occCenter) occCenter.setAttribute('aria-busy', 'false');
+      if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
+        window.Xentra.hideSplash();
+      }
     }
   }
 

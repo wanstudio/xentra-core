@@ -55,8 +55,14 @@ button,input,select,textarea{font:inherit;font-family:inherit}.pos-shell{min-hei
   .pos-status:hover .pos-status-tooltip,.pos-status:focus-visible .pos-status-tooltip{display:block}
 }
 .pos-main{flex:1;padding:22px 28px 96px}.pos-view{display:none;max-width:1500px;margin:0 auto}.pos-view.active{display:block}.pos-sale-layout{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:20px;align-items:start}.pos-menu-pane,.pos-pane{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.03);box-sizing:border-box;padding:18px 20px;min-height:calc(100vh - 140px);display:flex;flex-direction:column}.pos-cart-pane{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.03);box-sizing:border-box;display:flex;flex-direction:column;position:sticky;top:92px;width:100%;height:calc(100vh - 184px);max-height:calc(100vh - 184px);overflow:hidden;z-index:10}.pos-pane-head{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);margin-bottom:16px;padding:0 0 14px 0;min-height:44px;box-sizing:border-box}.pos-cart-head{padding:14px 18px;display:flex;justify-content:space-between;align-items:center;gap:14px;border-bottom:1px solid var(--line);min-height:62px;box-sizing:border-box}.pos-title-wrap{display:flex;align-items:center;gap:10px;min-width:0}.pos-pane-head h1,.pos-cart-head h2{margin:0;font-size:19px;font-weight:800;letter-spacing:-0.02em;line-height:1.2;color:var(--ink)}.pos-menu-stats{font-size:11px;font-weight:700;color:var(--muted);background:#f1f5f9;padding:3px 9px;border-radius:999px;display:inline-flex;align-items:center;white-space:nowrap}.pos-pane-actions,.pos-cart-actions{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;min-width:0}.pos-btn{border:1px solid #d1d5db;background:#0f172a;color:#fff;border-radius:10px;padding:9px 14px;font-weight:700;cursor:pointer;transition:all .15s ease}.pos-btn.ghost{background:#fff;color:var(--ink);border-color:#e2e8f0}.pos-btn.ghost:hover{background:#f8fafc;border-color:#cbd5e1}.pos-btn.danger{color:var(--danger);border-color:#fecaca}.pos-btn.small{padding:6px 10px;font-size:12px;height:32px;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;flex:0 0 auto}
-.pos-btn-refresh{display:inline-flex;align-items:center;gap:6px;font-weight:700}
-.pos-btn-refresh svg{transition:transform .3s ease}
+.pos-btn-refresh{width:32px;height:32px;min-width:32px;padding:0!important;display:inline-flex;align-items:center;justify-content:center;border-radius:9px;flex:0 0 auto;cursor:pointer;transition:background .15s ease,border-color .15s ease,transform .1s ease}
+.pos-btn-refresh:hover:not(:disabled){background:#f1f5f9;border-color:#cbd5e1}
+.pos-btn-refresh:active:not(:disabled){transform:scale(0.92)}
+.pos-btn-refresh svg{width:15px;height:15px;display:block;stroke:#475569;transition:stroke .15s ease}
+.pos-btn-refresh:hover svg{stroke:#0f172a}
+@keyframes pos-spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+.pos-btn-refresh.is-spinning svg{animation:pos-spin .65s linear infinite;stroke:#0284c7!important}
+.pos-btn-refresh:disabled{opacity:.6;cursor:not-allowed}
 .pos-order-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:14px;padding:0 2px}
 .pos-order-type{display:flex;gap:4px;background:#f1f5f9;padding:3px;border-radius:10px}.pos-order-type button{min-height:36px;height:36px;padding:0 16px;box-sizing:border-box;border:0;background:transparent;border-radius:8px;cursor:pointer;font-weight:700;font-size:12.5px;color:#64748b;display:inline-flex;align-items:center;justify-content:center;transition:.15s ease}.pos-order-type button:hover{color:#0f172a}.pos-order-type button.active{background:#fff;color:#0f172a;box-shadow:0 1px 3px rgba(0,0,0,.08);font-weight:800}
 .pos-context-strip{margin:0;padding:0 12px;height:36px;box-sizing:border-box;border:1.5px solid rgba(239,68,68,.45);background:rgba(239,68,68,.12);border-radius:10px;display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px;transition:all .15s ease}
@@ -132,10 +138,36 @@ button,input,select,textarea{font:inherit;font-family:inherit}.pos-shell{min-hei
 .pos-product-price{font-size:14.5px;font-weight:800;color:#0f172a;letter-spacing:-0.02em}
 .pos-product-add-btn{width:28px;height:28px;border-radius:50%;background:#f1f5f9;border:1px solid #e2e8f0;color:#0f172a;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;transition:all .15s ease}
 .pos-product-add-btn:hover{background:#0f172a;color:#fff;border-color:#0f172a}
-.pos-card-stepper{display:inline-flex;align-items:center;gap:3px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:999px;padding:2px 4px}
+.pos-card-stepper{display:inline-flex;align-items:center;gap:3px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:999px;padding:2px 4px;transition:border-color .15s ease}
 .pos-card-qty-btn{width:24px;height:24px;border-radius:50%;border:1px solid #e2e8f0;background:#ffffff;color:#0f172a;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0;box-shadow:0 1px 2px rgba(0,0,0,.05);transition:all .15s ease}
 .pos-card-qty-btn:hover{background:#0f172a;color:#ffffff;border-color:#0f172a}
+.pos-card-qty-btn:active{transform:scale(.88)}
 .pos-card-qty-val{font-size:12px;font-weight:800;min-width:18px;text-align:center;color:#0f172a;line-height:1}
+
+/* Card Stepper & Action Animations */
+@keyframes posCardStepperPop{
+  0%{opacity:0;transform:scale(.65) translateY(2px)}
+  65%{transform:scale(1.08) translateY(-1px)}
+  100%{opacity:1;transform:scale(1) translateY(0)}
+}
+@keyframes posAddBtnPop{
+  0%{opacity:0;transform:scale(.6)}
+  100%{opacity:1;transform:scale(1)}
+}
+@keyframes posBadgePop{
+  0%{opacity:0;transform:scale(.4)}
+  70%{transform:scale(1.22)}
+  100%{opacity:1;transform:scale(1)}
+}
+@keyframes posValBump{
+  0%{transform:scale(1)}
+  40%{transform:scale(1.3)}
+  100%{transform:scale(1)}
+}
+.pos-card-stepper.pos-stepper-pop{animation:posCardStepperPop .24s cubic-bezier(.34,1.56,.64,1) forwards}
+.pos-product-add-btn.pos-btn-pop{animation:posAddBtnPop .18s cubic-bezier(.34,1.56,.64,1) forwards}
+.pos-product-cart-badge.pos-badge-pop{animation:posBadgePop .22s cubic-bezier(.34,1.56,.64,1) forwards}
+.pos-card-qty-val.pos-val-bump{display:inline-block;animation:posValBump .18s ease-out}
 .pos-cart-items{flex:1;overflow:auto;padding:10px 12px}.pos-cart-item{display:grid;grid-template-columns:1fr auto;gap:8px;padding:11px 4px;border-bottom:1px solid #f0f0f0}.pos-cart-item-name{font-size:13px;font-weight:800}.pos-cart-item-meta{font-size:11px;color:var(--muted);margin-top:3px}.pos-cart-item-actions{display:flex;align-items:center;gap:6px}.pos-qty{width:28px;height:28px;border:1px solid #cbd5e1;background:#fff;border-radius:50%;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;color:#0f172a;padding:0;transition:all .15s ease}.pos-qty:hover{background:#f1f5f9;border-color:#94a3b8}.pos-qty-value{min-width:24px;text-align:center;font-size:13px;font-weight:800;color:#0f172a}.pos-cart-footer{border-top:1px solid var(--line);padding:14px}
 .pos-note-row{margin-bottom:8px}
 .pos-note-row input{width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:10px;background:#f8fafc;font-size:12.5px;color:#0f172a;transition:all .15s ease}
@@ -151,7 +183,7 @@ button,input,select,textarea{font:inherit;font-family:inherit}.pos-shell{min-hei
 .pos-pay-split-btn{width:100%;border:1.5px solid #cbd5e1;background:#fff;color:#0f172a;padding:11px 13px;border-radius:11px;font-size:13.5px;font-weight:700;cursor:pointer;transition:all .15s ease;margin-top:8px}
 .pos-pay-split-btn:hover:not(:disabled){background:#f8fafc;border-color:#94a3b8}
 .pos-pay-split-btn:disabled{opacity:.35;cursor:not-allowed;border-color:#e2e8f0;color:#94a3b8}
-.pos-list{overflow:hidden;border:1px solid var(--line);border-radius:12px;background:#fff}.pos-sale-row{display:grid;grid-template-columns:1.1fr 1fr .8fr .7fr auto;gap:10px;padding:13px 15px;border-bottom:1px solid var(--line);align-items:center}.pos-sale-row:last-child{border-bottom:0}.pos-sale-main strong{font-size:13px}.pos-sale-main small{display:block;color:var(--muted);font-size:11px;margin-top:2px}.pos-sale-total{font-weight:800;text-align:right}.pos-badge{display:inline-flex;align-items:center;padding:5px 8px;border-radius:999px;font-size:10px;font-weight:800;background:#f3f4f6}.pos-badge.ok{background:#dcfce7;color:#166534}.pos-badge.pending{background:#fef3c7;color:#92400e}
+.pos-list{overflow:hidden;border:1px solid var(--line);border-radius:12px;background:#fff}.pos-sale-row{display:grid;grid-template-columns:1.1fr 1fr .8fr .7fr auto;gap:10px;padding:13px 15px;border-bottom:1px solid var(--line);align-items:center;cursor:pointer;transition:background .15s ease,box-shadow .15s ease;user-select:none}.pos-sale-row:hover{background:#f8fafc}.pos-sale-row:active{background:#f1f5f9}.pos-sale-row:last-child{border-bottom:0}.pos-sale-main strong{font-size:13px}.pos-sale-main small{display:block;color:var(--muted);font-size:11px;margin-top:2px}.pos-sale-total{font-weight:800;text-align:right}.pos-badge{display:inline-flex;align-items:center;padding:5px 8px;border-radius:999px;font-size:10px;font-weight:800;background:#f3f4f6}.pos-badge.ok{background:#dcfce7;color:#166534}.pos-badge.pending{background:#fef3c7;color:#92400e}
 .pos-table-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px}.pos-table-card{padding:14px 16px;background:#fff;border:1.5px solid var(--line);border-radius:12px;transition:all .15s ease;display:flex;flex-direction:column;justify-content:space-between}.pos-table-card.available{border-color:#bbf7d0}.pos-table-card.occupied{border-color:#bfdbfe}.pos-table-card.held{border-color:#fde68a}.pos-table-card.blocked{border-color:#fecaca;background:#fff7f7}.pos-table-card h3{margin:0;font-size:15px;font-weight:800}.pos-table-card p{margin:4px 0 10px;font-size:11.5px;color:var(--muted)}.pos-table-card button{width:100%}
 .pos-table-card-header{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:2px}
 .pos-table-title-group{display:flex;align-items:center;gap:6px;min-width:0}
@@ -452,8 +484,9 @@ button,input,select,textarea{font:inherit;font-family:inherit}.pos-shell{min-hei
   .pos-transaksi-toolbar{margin-bottom:12px!important}
   .pos-transaksi-tabs{display:flex!important;gap:4px!important;padding:3px!important;background:#e2e8f0!important;border-radius:10px!important;width:100%!important}
   .pos-tab-pill{flex:1!important;text-align:center!important;justify-content:center!important;padding:7px 4px!important;font-size:11.5px!important;border-radius:8px!important}
-  .pos-sale-row{grid-template-columns:1fr auto!important;padding:11px 12px!important;gap:8px!important}
+  .pos-sale-row{grid-template-columns:1fr auto!important;padding:12px 14px!important;gap:6px 10px!important}
   .pos-sale-row>div:nth-child(2),.pos-sale-row>div:nth-child(3){display:none!important}
+  .pos-sale-row .pos-sale-actions{grid-column:1 / -1;display:flex!important;justify-content:flex-end!important;gap:6px!important;margin-top:2px}
   .pos-held-row{grid-template-columns:1fr auto!important;padding:11px 12px!important;gap:8px!important}
 
   /* Tab Shift */
@@ -786,3 +819,161 @@ button,input,select,textarea{font:inherit;font-family:inherit}.pos-shell{min-hei
 .pos-btn-save-profile:hover{background:#1e293b}
 .pos-btn-logout-profile{width:100%;height:42px;background:#ffffff;color:#ef4444;border:1.5px solid #fee2e2;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;transition:all .15s}
 .pos-btn-logout-profile:hover{background:#fef2f2;border-color:#fca5a5}
+
+/* ==============================================================
+   POS RESERVATIONS MODAL (Daftar & Check-In Meja)
+   ============================================================== */
+.pos-reservations-modal{display:flex;flex-direction:column;gap:12px}
+.pos-reservations-head{display:flex;align-items:center;justify-content:space-between;padding-bottom:12px;border-bottom:1px solid #e2e8f0;margin-bottom:2px}
+.pos-reservations-head-left{display:flex;align-items:center;gap:10px}
+.pos-reservations-head h3{margin:0;font-size:18px;font-weight:800;color:#0f172a;letter-spacing:-0.01em}
+.pos-reservations-badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;background:#ecfdf5;color:#059669;border:1px solid #a7f3d0;white-space:nowrap}
+.pos-modal-close-icon{width:32px;height:32px;border-radius:9px;background:transparent;border:0;color:#64748b;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s ease;padding:0}
+.pos-modal-close-icon:hover{background:#f1f5f9;color:#0f172a}
+.pos-reservations-list{display:flex;flex-direction:column;gap:10px;max-height:380px;overflow-y:auto;padding-right:2px}
+.pos-reservation-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:10px;transition:border-color .15s ease,box-shadow .15s ease}
+.pos-reservation-card:hover{border-color:#cbd5e1;box-shadow:0 1px 4px rgba(0,0,0,0.03)}
+.pos-res-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.pos-res-guest-name{font-size:14.5px;font-weight:800;color:#0f172a;line-height:1.25}
+.pos-res-meta{font-size:11.5px;font-weight:600;color:#64748b;margin-top:3px;display:flex;align-items:center;gap:6px}
+.pos-res-time-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;padding:3px 9px;border-radius:8px;white-space:nowrap;flex-shrink:0}
+.pos-res-note{font-size:11.5px;color:#92400e;background:#fef3c7;border:1px solid #fde68a;padding:6px 10px;border-radius:8px;line-height:1.35}
+.pos-res-actions{display:flex;gap:8px;justify-content:flex-end;align-items:center}
+.pos-res-actions .pos-btn{height:32px;padding:0 14px;font-size:12px;font-weight:700;border-radius:8px}
+
+/* Step 2: Check-in Select Table Card */
+.pos-checkin-guest-badge{background:#f1f5f9;border:1px solid #e2e8f0;padding:10px 12px;border-radius:10px;font-size:13px;color:#475569;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.pos-checkin-guest-badge strong{color:#0f172a}
+.pos-checkin-guest-badge small{color:#64748b;font-weight:700}
+
+/* ==============================================================
+   POS DIRECT ORDER PAYMENT MODAL (Bayar di Kasir)
+   ============================================================== */
+.pos-direct-pay-modal{display:flex;flex-direction:column;gap:0}
+
+/* Header */
+.pos-direct-pay-head{display:flex;align-items:flex-start;justify-content:space-between;padding-bottom:12px;border-bottom:1px solid #f1f5f9;margin-bottom:12px}
+.pos-direct-pay-title-wrap{display:flex;flex-direction:column;gap:4px}
+.pos-direct-pay-tag-row{display:flex;align-items:center;gap:8px}
+.pos-direct-pay-badge{font-size:16px;font-weight:800;color:#0f172a;letter-spacing:-0.01em}
+.pos-direct-pay-orderno{font-size:12px;font-weight:700;color:#64748b;background:#f1f5f9;padding:2px 8px;border-radius:6px}
+.pos-direct-pay-customer{font-size:12.5px;color:#64748b;font-weight:500}
+
+/* Total Banner */
+.pos-direct-total-banner{display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,#f0fdf4 0%,#ecfdf5 100%);border:1.5px solid #a7f3d0;border-radius:12px;padding:12px 16px;margin-bottom:12px}
+.pos-direct-total-label{font-size:12px;font-weight:700;color:#065f46;text-transform:uppercase;letter-spacing:0.04em}
+.pos-direct-total-amount{font-size:22px;font-weight:800;color:#047857;letter-spacing:-0.02em}
+
+/* Warning Banner */
+.pos-direct-pay-warning{background:#fffbeb;border:1.5px solid #fde68a;color:#92400e;padding:10px 12px;border-radius:10px;font-size:12px;line-height:1.45;margin-bottom:12px;display:flex;align-items:flex-start;gap:8px}
+
+/* Items List */
+.pos-direct-items-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px 14px;margin-bottom:12px}
+.pos-direct-items-header{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;font-weight:700;color:#475569;margin-bottom:6px;padding-bottom:6px;border-bottom:1px dashed #e2e8f0}
+.pos-direct-items-count{font-size:11px;color:#94a3b8}
+.pos-direct-items-list{max-height:90px;overflow-y:auto;display:flex;flex-direction:column;gap:5px;padding-right:2px}
+.pos-direct-item-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#334155}
+.pos-direct-item-name strong{color:#0f172a;font-weight:700;margin-right:2px}
+.pos-direct-item-price{color:#64748b;font-weight:600;font-size:11.5px}
+
+/* Input & Currency Prefix */
+.pos-direct-input-label{display:block;font-size:12px;font-weight:700;margin-bottom:6px;color:#334155}
+.pos-direct-pay-modal .pos-input-nominal-wrap{position:relative;display:flex;align-items:center;border:1.5px solid #cbd5e1;border-radius:10px;background:#fff;transition:border-color .15s}
+.pos-direct-pay-modal .pos-input-nominal-wrap:focus-within{border-color:#0f172a;box-shadow:0 0 0 3px rgba(15,23,42,0.08)}
+.pos-direct-currency-prefix{display:inline-flex!important;padding-left:14px;padding-right:4px;font-size:15px;font-weight:800;color:#64748b;user-select:none}
+.pos-direct-pay-modal .pos-input-nominal{border:none!important;box-shadow:none!important;padding-left:4px!important;height:44px;font-size:17px!important;font-weight:800;color:#0f172a}
+
+/* Quick cash grid */
+.pos-direct-denom-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(70px,1fr));gap:6px;margin:8px 0 0}
+.pos-direct-denom-grid .pos-btn-quick-cash{height:36px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;border-radius:8px}
+
+/* Change Indicator */
+.pos-direct-pay-modal .pos-change{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-radius:10px;margin:10px 0 0;font-size:13.5px}
+
+/* Footer Buttons 50%-50% Full Width */
+.pos-direct-actions-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px;width:100%}
+.pos-direct-actions-row .pos-btn{width:100%;height:44px;font-size:14px;font-weight:700;border-radius:10px;display:flex;align-items:center;justify-content:center}
+.pos-direct-actions-row .pos-btn.ghost{border:1.5px solid #cbd5e1;color:#475569;background:#fff}
+.pos-direct-actions-row .pos-btn.ghost:hover{background:#f8fafc;color:#0f172a;border-color:#94a3b8}
+.pos-direct-actions-row .pos-btn.primary{background:#0f172a;color:#fff}
+.pos-direct-actions-row .pos-btn.primary:hover:not(:disabled){background:#1e293b}
+
+/* Split Bill Link below buttons, align right, with top spacing */
+.pos-direct-split-wrap{display:flex;justify-content:flex-end;margin-top:10px}
+.pos-btn-split-link{background:none;border:none;color:#64748b;font-size:12.5px;font-weight:600;cursor:pointer;padding:4px 0;transition:color .15s ease;text-decoration:underline;text-underline-offset:2px}
+.pos-btn-split-link:hover{color:#0f172a}
+
+/* POS Notifications Modal */
+.pos-modal-notifications .pos-modal-card{width:min(520px,100%);max-height:85vh;display:flex;flex-direction:column;padding:18px;border-radius:16px}
+.pos-notif-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-bottom:10px;border-bottom:1px solid #f1f5f9}
+.pos-notif-head-title{display:flex;align-items:center;gap:8px}
+.pos-notif-head-title h3{margin:0;font-size:17px;font-weight:800;color:#0f172a;letter-spacing:-0.01em}
+.pos-notif-badge-pill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:#ef4444;color:#fff}
+.pos-notif-badge-pill.empty{background:#f1f5f9;color:#64748b}
+.pos-notif-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-size:12px;color:#64748b}
+.pos-notif-sub{font-size:11.5px;color:#64748b;font-weight:500}
+.pos-btn-text-read{background:none;border:none;color:#0284c7;font-size:12px;font-weight:700;cursor:pointer;padding:2px 4px;transition:color .15s}
+.pos-btn-text-read:hover{color:#0369a1;text-decoration:underline}
+.pos-btn-text-read:disabled{color:#94a3b8;cursor:default;text-decoration:none}
+.pos-notif-list{display:flex;flex-direction:column;gap:8px;max-height:55vh;overflow-y:auto;padding-right:2px}
+.pos-notif-card{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;cursor:pointer;transition:all .15s ease}
+.pos-notif-card:hover{border-color:#cbd5e1;background:#f8fafc;transform:translateY(-1px)}
+.pos-notif-card.unread{background:#f0fdf4;border-color:#bbf7d0}
+.pos-notif-icon-box{width:36px;height:36px;border-radius:10px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.pos-notif-card.unread .pos-notif-icon-box{background:#dcfce7}
+.pos-notif-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.pos-notif-row-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.pos-notif-title{font-size:13px;font-weight:800;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pos-notif-dot{width:8px;height:8px;border-radius:50%;background:#16a34a;flex-shrink:0}
+.pos-notif-desc{margin:0;font-size:12px;color:#475569;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pos-notif-time{font-size:11px;color:#94a3b8;font-weight:600;margin-top:2px}
+.pos-notif-empty{padding:36px 16px;text-align:center}
+
+/* ==============================================================
+   TRANSACTION DETAIL MODAL REDESIGN
+   ============================================================== */
+.pos-modal-sale-detail .pos-modal-card{width:min(560px,100%);padding:20px 22px;border-radius:18px}
+.pos-sale-detail-modal{display:flex;flex-direction:column;gap:13px}
+.pos-sale-detail-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:12px;border-bottom:1px solid #f1f5f9}
+.pos-sale-detail-title-group{display:flex;align-items:center;gap:10px;min-width:0}
+.pos-sale-detail-icon-wrap{width:38px;height:38px;border-radius:10px;background:#f1f5f9;color:#0f172a;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.pos-sale-detail-number{font-size:16px;font-weight:800;color:#0f172a;line-height:1.25;letter-spacing:-0.01em}
+.pos-sale-detail-sub{font-size:12px;font-weight:500;color:#64748b;margin-top:2px}
+.pos-sale-detail-head-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.pos-sale-meta-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.pos-sale-meta-item{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;gap:2px}
+.pos-sale-meta-label{font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.03em}
+.pos-sale-meta-val{font-size:13px;font-weight:700;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pos-sale-items-box{background:#ffffff;border:1.5px solid #e2e8f0;border-radius:12px;overflow:hidden}
+.pos-sale-items-head{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:12px;font-weight:700;color:#334155}
+.pos-sale-items-head small{color:#64748b;font-weight:600}
+.pos-sale-items-scroll{max-height:200px;overflow-y:auto;padding:4px 12px}
+.pos-sale-item-row{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px dashed #e2e8f0}
+.pos-sale-item-row:last-child{border-bottom:none}
+.pos-sale-item-col-qty{flex-shrink:0;padding-top:1px}
+.pos-sale-qty-pill{display:inline-block;background:#f1f5f9;color:#0f172a;font-size:11.5px;font-weight:800;padding:2px 7px;border-radius:6px;min-width:28px;text-align:center}
+.pos-sale-item-col-info{flex:1;min-width:0}
+.pos-sale-item-name{font-size:13px;font-weight:700;color:#0f172a;line-height:1.3}
+.pos-sale-item-unit{font-size:11.5px;color:#64748b;font-weight:500;margin-top:1px}
+.pos-sale-item-opt{font-size:11.5px;color:#2563eb;font-weight:600;margin-top:2px}
+.pos-sale-item-note{font-size:11.5px;color:#92400e;background:#fef3c7;padding:2px 6px;border-radius:4px;margin-top:3px;display:inline-block}
+.pos-sale-item-col-price{flex-shrink:0;font-size:13px;font-weight:700;color:#0f172a;text-align:right;padding-top:1px}
+.pos-sale-delivery-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px 14px}
+.pos-sale-delivery-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.pos-sale-delivery-header strong{font-size:12.5px;color:#0f172a}
+.pos-sale-delivery-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;font-size:12px;color:#475569}
+.pos-sale-delivery-grid span{color:#64748b;margin-right:4px}
+.pos-sale-summary-box{background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:5px}
+.pos-sale-summary-row{display:flex;justify-content:space-between;font-size:12.5px;color:#64748b;font-weight:600}
+.pos-sale-summary-row.pos-sale-discount{color:#16a34a}
+.pos-sale-grand-total-row{display:flex;align-items:center;justify-content:space-between;padding-top:8px;margin-top:3px;border-top:1.5px dashed #cbd5e1}
+.pos-sale-grand-label{font-size:13.5px;font-weight:800;color:#0f172a}
+.pos-sale-payment-method-tag{font-size:11px;font-weight:600;color:#64748b;margin-top:1px}
+.pos-sale-grand-amount{font-size:19px;font-weight:900;color:#0f172a;letter-spacing:-0.02em}
+.pos-sale-cash-tender-row{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;margin-top:3px}
+.pos-sale-cash-tender-row span{color:#64748b;margin-right:4px}
+.pos-sale-detail-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:4px}
+.pos-sale-detail-actions-right{display:flex;align-items:center;gap:8px}
+.pos-sale-btn-print{display:inline-flex;align-items:center;gap:6px;font-weight:700}
+
+

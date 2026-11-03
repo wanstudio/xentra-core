@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_bottom_sheet_dialog"
+    android:orientation="vertical"
+    android:paddingStart="24dp"
+    android:paddingTop="16dp"
+    android:paddingEnd="24dp"
+    android:paddingBottom="24dp">
+
+    <!-- Handle Bar -->
+    <View
+        android:layout_width="40dp"
+        android:layout_height="5dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="20dp"
+        android:background="@drawable/bg_handle_bar" />
+
+    <!-- Icon Badge -->
+    <FrameLayout
+        android:id="@+id/dialog_icon_container"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/bg_icon_badge_green">
+
+        <ImageView
+            android:id="@+id/dialog_icon"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_gravity="center"
+            android:contentDescription="Icon"
+            android:src="@drawable/ic_camera_dialog" />
+    </FrameLayout>
+
+    <!-- Title -->
+    <TextView
+        android:id="@+id/dialog_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:gravity="center"
+        android:text="Izinkan Akses Kamera"
+        android:textColor="@color/black"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <!-- Message Description -->
+    <TextView
+        android:id="@+id/dialog_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp"
+        android:gravity="center"
+        android:lineSpacingExtra="4dp"
+        android:text="Mybangjo Owner membutuhkan izin kamera untuk mengambil foto menu dan produk secara langsung dari perangkat Anda."
+        android:textColor="@color/text_muted"
+        android:textSize="14sp" />
+
+    <!-- Primary Action Button (Brand Green #00A637) -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/dialog_btn_primary"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:layout_marginBottom="8dp"
+        android:backgroundTint="#00A637"
+        android:insetTop="0dp"
+        android:insetBottom="0dp"
+        android:text="Izinkan Sekarang"
+        android:textAllCaps="false"
+        android:textColor="@color/white"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        app:cornerRadius="12dp" />
+
+    <!-- Secondary Action Button (Dismiss / Nanti Saja) -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/dialog_btn_secondary"
+        style="@style/Widget.MaterialComponents.Button.TextButton"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:insetTop="0dp"
+        android:insetBottom="0dp"
+        android:text="Nanti Saja"
+        android:textAllCaps="false"
+        android:textColor="@color/text_muted"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+
+</LinearLayout>

@@ -33,8 +33,8 @@ export default function CategoriesPage({ onBack, onNavigate }) {
       }
 
       const [catRes, menuRes] = await Promise.all([
-        fetch('/api/v1/admin/categories', { headers }),
-        fetch('/api/v1/admin/menus', { headers }).catch(() => null)
+        fetch(`/api/v1/admin/categories?_t=${Date.now()}`, { headers, cache: 'no-store' }),
+        fetch(`/api/v1/admin/menus?_t=${Date.now()}`, { headers, cache: 'no-store' }).catch(() => null)
       ]);
 
       if (catRes.ok) {
@@ -79,6 +79,44 @@ export default function CategoriesPage({ onBack, onNavigate }) {
     }
     fetchCategoriesAndMenus();
 
+    // Reactive State Synchronizer (Modern Mobile Pattern)
+    const handleCategoriesUpdated = (event) => {
+      if (event && event.detail && typeof event.detail === 'object') {
+        const updatedCat = event.detail;
+        if (updatedCat._deleted) {
+          setCategories((prev) => prev.filter((c) => String(c.id) !== String(updatedCat.id)));
+          if (window.state && Array.isArray(window.state.categories)) {
+            window.state.categories = window.state.categories.filter((c) => String(c.id) !== String(updatedCat.id));
+          }
+        } else {
+          setCategories((prev) => {
+            const exists = prev.some((c) => String(c.id) === String(updatedCat.id));
+            return exists
+              ? prev.map((c) => (String(c.id) === String(updatedCat.id) ? { ...c, ...updatedCat } : c))
+              : [...prev, updatedCat];
+          });
+          if (window.state && Array.isArray(window.state.categories)) {
+            const exists = window.state.categories.some((c) => String(c.id) === String(updatedCat.id));
+            window.state.categories = exists
+              ? window.state.categories.map((c) => (String(c.id) === String(updatedCat.id) ? { ...c, ...updatedCat } : c))
+              : [...window.state.categories, updatedCat];
+          }
+        }
+      }
+      fetchCategoriesAndMenus();
+    };
+
+    const handleVisibilityOrResume = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        fetchCategoriesAndMenus();
+      }
+    };
+
+    window.addEventListener('categories-updated', handleCategoriesUpdated);
+    window.addEventListener('category-updated', handleCategoriesUpdated);
+    window.addEventListener('visibilitychange', handleVisibilityOrResume);
+    window.addEventListener('popstate', handleVisibilityOrResume);
+
     try {
       if (window.XentraNative && typeof window.XentraNative.setNavigationBarColor === 'function') {
         window.XentraNative.setNavigationBarColor('#ffffff', true);
@@ -91,6 +129,13 @@ export default function CategoriesPage({ onBack, onNavigate }) {
         window.XentraOwnerBridge.setStatusBarColor('#ffffff', true);
       }
     } catch (e) {}
+
+    return () => {
+      window.removeEventListener('categories-updated', handleCategoriesUpdated);
+      window.removeEventListener('category-updated', handleCategoriesUpdated);
+      window.removeEventListener('visibilitychange', handleVisibilityOrResume);
+      window.removeEventListener('popstate', handleVisibilityOrResume);
+    };
   }, []);
 
   const handleBack = () => {
@@ -109,28 +154,28 @@ export default function CategoriesPage({ onBack, onNavigate }) {
         return;
       }
     }
-    window.location.hash = '#business/catalog';
+    if (typeof window.navigateTo === 'function') {
+      window.navigateTo('business');
+    }
   };
 
   const handleAddCategory = () => {
+    setShowAddSheet(false);
     if (typeof onNavigate === 'function') {
       onNavigate('catalog/categories/new');
     } else if (typeof window.openNewCategory === 'function') {
       window.openNewCategory();
     } else if (typeof window.navigateTo === 'function') {
       window.navigateTo('catalog/categories/new');
-    } else {
-      window.location.hash = '#catalog/categories/new';
     }
   };
 
   const handleAddMenu = () => {
+    setShowAddSheet(false);
     if (typeof onNavigate === 'function') {
       onNavigate('catalog/master-menus/new');
     } else if (typeof window.navigateTo === 'function') {
       window.navigateTo('catalog/master-menus/new');
-    } else {
-      window.location.hash = '#catalog/master-menus/new';
     }
   };
 
@@ -139,8 +184,6 @@ export default function CategoriesPage({ onBack, onNavigate }) {
       onNavigate('catalog/categories/sort');
     } else if (typeof window.navigateTo === 'function') {
       window.navigateTo('catalog/categories/sort');
-    } else {
-      window.location.hash = '#catalog/categories/sort';
     }
   };
 
@@ -150,8 +193,6 @@ export default function CategoriesPage({ onBack, onNavigate }) {
       onNavigate(targetRoute);
     } else if (typeof window.navigateTo === 'function') {
       window.navigateTo(targetRoute);
-    } else {
-      window.location.hash = `#${targetRoute}`;
     }
   };
 
@@ -175,16 +216,29 @@ export default function CategoriesPage({ onBack, onNavigate }) {
 
     try {
       const token = getAuthToken();
-      const headers = { 'Accept': 'application/json' };
+      const headers = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const res = await fetch(`/api/v1/admin/categories/${encodeURIComponent(cat.id)}/status`, {
+      let res = await fetch(`/api/v1/admin/categories/${encodeURIComponent(cat.id)}/status`, {
         method: 'PATCH',
-        headers
+        headers,
+        body: JSON.stringify({ is_active: nextActive ? 1 : 0 })
       });
-      const data = await res.json();
+
+      if (res.status === 404) {
+        res = await fetch(`/api/v1/admin/categories/${encodeURIComponent(cat.id)}/toggle`, {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify({ is_active: nextActive ? 1 : 0 })
+        });
+      }
+
+      const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Gagal mengubah status kategori');
+        throw new Error(data.error || data.message || 'Gagal mengubah status kategori');
       }
 
       if (data.category) {
@@ -244,7 +298,7 @@ export default function CategoriesPage({ onBack, onNavigate }) {
       id="modern-categories-page-root"
       style={{
         boxSizing: 'border-box',
-        paddingBottom: '160px'
+        paddingBottom: '96px'
       }}
       className="w-full flex flex-col gap-4 max-w-lg md:mx-auto font-sans select-none"
     >
@@ -253,7 +307,7 @@ export default function CategoriesPage({ onBack, onNavigate }) {
         <button
           type="button"
           onClick={handleBack}
-          aria-label="Kembali ke Katalog & Menu"
+          aria-label="Kembali"
           className="w-9 h-9 flex items-center justify-center -ml-2 rounded-full text-slate-900 hover:bg-slate-100 active:scale-95 transition-all border-none bg-transparent cursor-pointer shrink-0"
         >
           <img

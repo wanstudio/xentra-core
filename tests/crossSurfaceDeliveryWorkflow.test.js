@@ -64,7 +64,7 @@ test('Cross-Surface Delivery Workflow: Auto-Dispatch, In-App Chat, POD Gatekeepe
   // Give Driver A an active task
   db.prepare(`
     INSERT INTO orders (id, brand_id, branch_id, order_number, order_type, customer_name, customer_phone, payment_method, payment_status, subtotal, grand_total, status)
-    VALUES (?, ?, ?, 'ORD-A-BUSY', 'delivery', 'Pak Budi', '08999', 'cash', 'pending', 50000, 50000, 'preparing')
+    VALUES (?, ?, ?, 'ORD-A-BUSY', 'delivery', 'Budi Hartono', '08999', 'cash', 'pending', 50000, 50000, 'preparing')
   `).run(order1Id, brandId, branchId);
 
   db.prepare(`
@@ -83,7 +83,7 @@ test('Cross-Surface Delivery Workflow: Auto-Dispatch, In-App Chat, POD Gatekeepe
     // Seed Order 2 (ready for delivery)
     db.prepare(`
       INSERT INTO orders (id, brand_id, branch_id, order_number, order_type, customer_name, customer_phone, payment_method, payment_status, subtotal, grand_total, status)
-      VALUES (?, ?, ?, 'ORD-AUTO-01', 'delivery', 'Bu Dewi', '087777777', 'cash', 'pending', 75000, 75000, 'ready')
+      VALUES (?, ?, ?, 'ORD-AUTO-01', 'delivery', 'Dewi Lestari', '087777777', 'cash', 'pending', 75000, 75000, 'ready')
     `).run(order2Id, brandId, branchId);
 
     db.prepare(`
@@ -185,7 +185,7 @@ test('Cross-Surface Delivery Workflow: Auto-Dispatch, In-App Chat, POD Gatekeepe
       actor_id: driverBId,
       cod_amount_tendered: 75000,
       pod_bypass_reason: bypassReason,
-      pod_note: 'Diterima oleh Pak Satpam pos depan'
+      pod_note: 'Diterima oleh petugas satpam pos depan'
     });
 
     assert.equal(result.success, true);
@@ -194,7 +194,7 @@ test('Cross-Surface Delivery Workflow: Auto-Dispatch, In-App Chat, POD Gatekeepe
     const deliveryRow = db.prepare('SELECT status, pod_bypass_reason, pod_note FROM order_deliveries WHERE order_id = ?').get(order2Id);
     assert.equal(deliveryRow.status, 'delivered');
     assert.equal(deliveryRow.pod_bypass_reason, bypassReason);
-    assert.equal(deliveryRow.pod_note, 'Diterima oleh Pak Satpam pos depan');
+    assert.equal(deliveryRow.pod_note, 'Diterima oleh petugas satpam pos depan');
   });
 
   await t.test('7. Owner COD Custody: Driver holds COD cash until cashier handover', () => {
@@ -241,6 +241,52 @@ test('Cross-Surface Delivery Workflow: Auto-Dispatch, In-App Chat, POD Gatekeepe
     assert.equal(bypassLogs.length, 1);
     assert.equal(bypassLogs[0].order_number, 'ORD-AUTO-01');
     assert.equal(bypassLogs[0].pod_bypass_reason, 'Pelanggan meminta tidak difoto (privasi)');
+  });
+
+  await t.test('8. Return to Store (RTS) Exception Flow: Driver reports issue, order cancelled, COD liability cleared', () => {
+    const order4Id = 'ord_rts_' + Math.random().toString(36).substring(2, 9);
+    db.prepare(`
+      INSERT INTO orders (id, brand_id, branch_id, order_number, order_type, customer_name, customer_phone, payment_method, payment_status, subtotal, grand_total, status)
+      VALUES (?, ?, ?, 'ORD-RTS-01', 'delivery', 'Eko Prasetyo', '085555555', 'cash', 'pending', 60000, 60000, 'ready')
+    `).run(order4Id, brandId, branchId);
+
+    db.prepare(`
+      INSERT INTO order_deliveries (id, order_id, driver_id, driver_name, driver_phone, status, driver_assignment_status)
+      VALUES (?, ?, ?, 'Driver B (Idle)', '0822222222', 'assigned', 'accepted')
+    `).run('dlv_' + order4Id, order4Id, driverBId);
+
+    // Driver picks up and starts delivery
+    DeliveryDispatchService.updateStatus({
+      order_id: order4Id,
+      status: DeliveryModel.STATUS.PICKED_UP,
+      actor_id: driverBId
+    });
+    DeliveryDispatchService.updateStatus({
+      order_id: order4Id,
+      status: DeliveryModel.STATUS.ON_DELIVERY,
+      actor_id: driverBId
+    });
+
+    // Driver reports delivery failed / customer unreachable
+    const failReason = 'Pelanggan Tidak Dapat Dihubungi (>10 Menit)';
+    const result = DeliveryDispatchService.updateStatus({
+      order_id: order4Id,
+      status: DeliveryModel.STATUS.FAILED,
+      actor_id: driverBId,
+      notes: failReason
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(result.status, 'failed');
+
+    const orderRow = db.prepare('SELECT status FROM orders WHERE id = ?').get(order4Id);
+    assert.equal(orderRow.status, 'cancelled', 'Order status harus cancelled saat gagal antar');
+
+    const deliveryRow = db.prepare('SELECT status, cod_collection_status, cod_cash_custody, pod_note FROM order_deliveries WHERE order_id = ?').get(order4Id);
+    assert.equal(deliveryRow.status, 'failed');
+    assert.equal(deliveryRow.cod_collection_status, 'cancelled');
+    assert.equal(deliveryRow.cod_cash_custody, 'none', 'Kewajiban kas COD kurir harus dibebaskan (none)');
+    assert.equal(deliveryRow.pod_note, failReason);
   });
 
   // Cleanup test data

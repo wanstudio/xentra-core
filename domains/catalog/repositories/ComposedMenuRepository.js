@@ -135,7 +135,7 @@ class ComposedMenuRepository {
       params.push(needle, needle);
     }
     const products = this.db.queryMany(
-      "SELECT p.id, p.brand_id, p.name, p.sku, p.cost_price, p.description, p.image_url, p.image, p.is_active, COALESCE(p.inventory_type, 'COOKED') AS inventory_type, p.options_config " +
+      "SELECT p.id, p.brand_id, p.name, p.sku, p.price, p.regular_price, p.cost_price, p.description, p.image_url, p.image, p.is_active, COALESCE(p.inventory_type, 'COOKED') AS inventory_type, p.options_config " +
       "FROM products p WHERE " + clauses.join(' AND ') +
       " ORDER BY p.name ASC, p.id ASC",
       params
@@ -167,6 +167,7 @@ class ComposedMenuRepository {
           const comps = this.db.queryMany(
             "SELECT rc.material_id, m.name AS material_name, rc.planned_quantity, rc.planned_uom_id, u.name AS uom_name, " +
             "u.conversion_factor AS planned_uom_factor, bu.conversion_factor AS base_uom_factor, " +
+            "m.base_uom_id, bu.name AS base_uom_name, u.category_id AS uom_category_id, " +
             "COALESCE(msb.moving_average_unit_cost, 0) AS unit_cost " +
             "FROM recipe_components rc " +
             "JOIN materials m ON m.id = rc.material_id " +

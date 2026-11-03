@@ -1,0 +1,4165 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Prototype Navigasi Merchant (Opsi A) — Xentra / MyBangjo</title>
+  <meta name="description" content="Interactive Prototype: Evaluasi Navigasi Mobile Merchant Opsi A (Beranda, Pesanan, Menu & Stok, Meja, Lainnya)">
+  <link rel="stylesheet" href="/merchant-shared/fonts/plus-jakarta-sans.css?v=2.0">
+  <style>
+    :root {
+      --primary: #08a94f;
+      --primary-dark: #06823c;
+      --primary-light: #e6f7ee;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --text-light: #94a3b8;
+      --bg-body: #f1f5f9;
+      --bg-card: #ffffff;
+      --border-color: #e2e8f0;
+      --danger: #ef4444;
+      --danger-light: #fee2e2;
+      --warning: #f59e0b;
+      --warning-light: #fef3c7;
+      --info: #3b82f6;
+      --info-light: #eff6ff;
+      --success: #10b981;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -2px rgba(0,0,0,0.04);
+      --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.05);
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 18px;
+      --radius-full: 9999px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      height: 100%;
+      width: 100%;
+      max-width: 100vw;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden !important;
+      position: relative;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg-body);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* TOP PROTOTYPE BAR (Desktop only / info ribbon) */
+    .proto-ribbon {
+      width: 100%;
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: 13px;
+      z-index: 1000;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      flex-shrink: 0;
+    }
+    .proto-ribbon-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 500;
+    }
+    .proto-badge {
+      background: #08a94f;
+      color: #fff;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .proto-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .proto-btn {
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #fff;
+      padding: 5px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .proto-btn:hover {
+      background: rgba(255,255,255,0.22);
+    }
+    .proto-btn.active {
+      background: #08a94f;
+      border-color: #08a94f;
+    }
+
+    /* EXPLANATION ACCORDION */
+    .proto-summary-banner {
+      width: 100%;
+      max-width: 440px;
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      padding: 10px 14px;
+      margin: 8px auto 0;
+      border-radius: var(--radius-md);
+      font-size: 12px;
+      color: #065f46;
+      line-height: 1.4;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      box-shadow: var(--shadow-sm);
+    }
+    .proto-summary-banner strong {
+      color: #047857;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* MOBILE DEVICE WRAPPER */
+    .device-shell {
+      width: 100%;
+      max-width: 430px;
+      height: calc(100dvh - 54px);
+      max-height: 880px;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+      border-radius: 36px;
+      margin: 4px auto 10px;
+      border: 6px solid #1e293b;
+      transition: max-width 0.3s ease, border 0.3s ease, border-radius 0.3s ease;
+    }
+
+    /* FULLSCREEN RESPONSIVE MODE */
+    body.is-fullscreen .device-shell {
+      max-width: 100%;
+      height: calc(100dvh - 44px);
+      max-height: 100dvh;
+      border: none;
+      border-radius: 0;
+      margin: 0;
+      box-shadow: none;
+    }
+
+    /* STATUS BAR & TOPBAR */
+    .x-app-topbar {
+      position: sticky;
+      top: 0;
+      background: #ffffff;
+      z-index: 100;
+      border-bottom: 1px solid var(--border-color);
+      flex-shrink: 0;
+    }
+    .x-status-bar {
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 18px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .x-topbar-row-1 {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 16px;
+      gap: 10px;
+    }
+    .x-branch-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #f8fafc;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-full);
+      padding: 4px 12px 4px 6px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #0f172a;
+      cursor: pointer;
+    }
+    .x-branch-logo {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #08a94f;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .x-topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .x-circle-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid var(--border-color);
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      position: relative;
+      color: #475569;
+      transition: background 0.15s ease;
+    }
+    .x-circle-btn:active {
+      background: #f1f5f9;
+    }
+    .x-badge-dot {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--danger);
+      border: 2px solid #fff;
+    }
+
+    /* OPERATIONAL ROW (Switch status Buka & Order Online) */
+    .x-operational-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 16px 10px;
+      gap: 12px;
+    }
+    .x-status-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      background: #f8fafc;
+      padding: 6px 12px;
+      border-radius: var(--radius-full);
+      border: 1px solid var(--border-color);
+      cursor: pointer;
+    }
+    .x-switch {
+      width: 36px;
+      height: 20px;
+      background: #cbd5e1;
+      border-radius: 10px;
+      position: relative;
+      transition: background 0.2s ease;
+    }
+    .x-switch::after {
+      content: "";
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      top: 2px;
+      left: 2px;
+      transition: transform 0.2s ease;
+    }
+    .x-switch.is-on {
+      background: #08a94f;
+    }
+    .x-switch.is-on::after {
+      transform: translateX(16px);
+    }
+
+    /* SCROLLABLE VIEW CONTAINER */
+    .x-view-container {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 90px;
+      position: relative;
+      background: #f8fafc;
+    }
+
+    /* VIEW SECTIONS */
+    .x-view-tab {
+      display: none;
+      padding: 16px;
+      animation: fadeIn 0.18s ease-in-out;
+    }
+    .x-view-tab.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* BOTTOM NAVIGATION BAR (Opsi A: 5 Tabs) */
+    .x-bottom-navbar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 68px;
+      background: #ffffff;
+      border-top: 1px solid var(--border-color);
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      z-index: 200;
+      box-shadow: 0 -4px 16px rgba(0,0,0,0.06);
+    }
+    .x-nav-tab-btn {
+      background: transparent;
+      border: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      cursor: pointer;
+      color: #64748b;
+      position: relative;
+      transition: color 0.15s ease;
+      font-family: inherit;
+    }
+    .x-nav-tab-btn svg {
+      width: 22px;
+      height: 22px;
+      fill: currentColor;
+      transition: transform 0.15s ease, fill 0.15s ease;
+    }
+    .x-nav-tab-btn span.tab-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: -0.2px;
+    }
+    .x-nav-tab-btn.active {
+      color: #08a94f;
+    }
+    .x-nav-tab-btn.active svg {
+      fill: #08a94f;
+      transform: translateY(-2px);
+    }
+    .x-nav-tab-btn.active::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 42px;
+      height: 3px;
+      border-radius: 0 0 3px 3px;
+      background: #08a94f;
+    }
+    .x-nav-badge {
+      position: absolute;
+      top: 6px;
+      right: calc(50% - 18px);
+      background: var(--danger);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 800;
+      min-width: 18px;
+      height: 18px;
+      border-radius: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 4px;
+      box-shadow: 0 2px 4px rgba(239, 68, 68, 0.4);
+    }
+
+    /* CARD STYLES */
+    .x-card {
+      background: #ffffff;
+      border-radius: var(--radius-md);
+      padding: 16px;
+      border: 1px solid var(--border-color);
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 14px;
+    }
+    .x-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .x-card-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .x-card-subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* KPI STATS CARDS */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .kpi-card {
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+    }
+    .kpi-card.highlight {
+      background: linear-gradient(135deg, #08a94f 0%, #059669 100%);
+      color: #ffffff;
+      border: none;
+    }
+    .kpi-card.highlight .kpi-label,
+    .kpi-card.highlight .kpi-sub {
+      color: rgba(255,255,255,0.85);
+    }
+    .kpi-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .kpi-val {
+      font-size: 20px;
+      font-weight: 800;
+      margin: 4px 0 2px;
+      color: inherit;
+    }
+    .kpi-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    /* SEGMENTED CONTROL (Pills switch) */
+    .segmented-control {
+      display: flex;
+      background: #e2e8f0;
+      border-radius: 10px;
+      padding: 3px;
+      margin-bottom: 14px;
+      gap: 2px;
+    }
+    .segment-btn {
+      flex: 1;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: transparent;
+      border: none;
+      font-size: 12px;
+      font-weight: 700;
+      color: #64748b;
+      cursor: pointer;
+      text-align: center;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+    .segment-btn.active {
+      background: #ffffff;
+      color: #0f172a;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+    }
+
+    /* HORIZONTAL CHIP FILTERS */
+    .chip-scroll {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+      margin-bottom: 12px;
+      scrollbar-width: none;
+    }
+    .chip-scroll::-webkit-scrollbar {
+      display: none;
+    }
+    .chip-btn {
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      color: #475569;
+      cursor: pointer;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+    .chip-btn.active {
+      background: #08a94f;
+      border-color: #08a94f;
+      color: #ffffff;
+    }
+
+    /* SEARCH INPUT */
+    .search-box {
+      position: relative;
+      margin-bottom: 12px;
+    }
+    .search-input {
+      width: 100%;
+      padding: 10px 14px 10px 38px;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      font-size: 13px;
+      font-family: inherit;
+      background: #ffffff;
+      outline: none;
+    }
+    .search-input:focus {
+      border-color: #08a94f;
+    }
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #94a3b8;
+      pointer-events: none;
+    }
+
+    /* ORDER CARD */
+    .order-card {
+      background: #ffffff;
+      border-radius: var(--radius-md);
+      padding: 14px;
+      border: 1px solid var(--border-color);
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 12px;
+      border-left: 4px solid #08a94f;
+    }
+    .order-card.is-new {
+      border-left-color: #ef4444;
+      background: #fffdfd;
+    }
+    .order-card.is-processing {
+      border-left-color: #3b82f6;
+    }
+    .order-card.is-ready {
+      border-left-color: #10b981;
+    }
+    .order-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .order-id {
+      font-size: 14px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+    .order-badge-type {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: #f1f5f9;
+      color: #475569;
+    }
+    .order-time {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .order-items {
+      font-size: 13px;
+      color: #334155;
+      line-height: 1.5;
+      padding: 8px 0;
+      border-top: 1px dashed var(--border-color);
+      border-bottom: 1px dashed var(--border-color);
+      margin: 8px 0;
+    }
+    .order-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px;
+    }
+    .order-price {
+      font-size: 14px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+    .order-actions {
+      display: flex;
+      gap: 6px;
+    }
+    .btn-action {
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s ease;
+    }
+    .btn-action.btn-primary {
+      background: #08a94f;
+      color: #ffffff;
+    }
+    .btn-action.btn-primary:active {
+      background: #06823c;
+    }
+    .btn-action.btn-secondary {
+      background: #f1f5f9;
+      color: #475569;
+    }
+    .btn-action.btn-danger {
+      background: #fee2e2;
+      color: #ef4444;
+    }
+
+    /* MENU ITEM LIST & PORTION COUNTERS */
+    .menu-item-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px;
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      margin-bottom: 8px;
+      gap: 10px;
+    }
+    .menu-item-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .menu-item-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: #0f172a;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .menu-item-price {
+      font-size: 12px;
+      color: #08a94f;
+      font-weight: 700;
+      margin-top: 2px;
+    }
+    .menu-item-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .portion-counter {
+      display: flex;
+      align-items: center;
+      background: #f1f5f9;
+      border-radius: 8px;
+      padding: 2px;
+    }
+    .btn-count {
+      width: 28px;
+      height: 28px;
+      border: none;
+      background: #ffffff;
+      border-radius: 6px;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #0f172a;
+      box-shadow: var(--shadow-sm);
+    }
+    .btn-count:active {
+      background: #e2e8f0;
+    }
+    .portion-val {
+      min-width: 34px;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+
+    /* TABLE MANAGEMENT GRID (MEJA DINE-IN) */
+    .table-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .table-card {
+      background: #ffffff;
+      border-radius: var(--radius-md);
+      padding: 14px;
+      border: 2px solid var(--border-color);
+      cursor: pointer;
+      position: relative;
+      transition: all 0.15s ease;
+    }
+    .table-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+    .table-card.status-occupied {
+      border-color: #3b82f6;
+      background: #f0f7ff;
+    }
+    .table-card.status-available {
+      border-color: #10b981;
+      background: #f0fdf4;
+    }
+    .table-card.status-held {
+      border-color: #f59e0b;
+      background: #fffbeb;
+    }
+    .table-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .table-number {
+      font-size: 16px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+    .table-status-pill {
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+    .status-available .table-status-pill {
+      background: #dcfce7;
+      color: #15803d;
+    }
+    .status-occupied .table-status-pill {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+    .status-held .table-status-pill {
+      background: #fef3c7;
+      color: #b45309;
+    }
+    .table-bill {
+      font-size: 14px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+    .table-meta {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* HUB MENU "LAINNYA" */
+    .hub-section-title {
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin: 16px 0 8px 4px;
+    }
+    .hub-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .hub-item-card {
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .hub-item-card:hover {
+      background: #f8fafc;
+      transform: translateX(3px);
+    }
+    .hub-icon-wrapper {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 20px;
+    }
+    .hub-copy {
+      flex: 1;
+      min-width: 0;
+    }
+    .hub-copy-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .hub-copy-desc {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 1px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .hub-tag {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: #f1f5f9;
+      color: #475569;
+      white-space: nowrap;
+    }
+    .hub-chevron {
+      color: #94a3b8;
+    }
+
+    /* SUBVIEW CONTAINER FOR "LAINNYA" PAGES */
+    .subview-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #ffffff;
+      z-index: 300;
+      display: none;
+      flex-direction: column;
+      animation: slideInRight 0.2s ease-out;
+    }
+    .subview-overlay.active {
+      display: flex;
+    }
+    @keyframes slideInRight {
+      from { transform: translateX(100%); }
+      to { transform: translateX(0); }
+    }
+    .subview-header {
+      min-height: 56px;
+      height: auto;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      padding: 10px 16px;
+      gap: 12px;
+      background: #ffffff;
+      flex-shrink: 0;
+    }
+    .btn-back {
+      border: none;
+      background: #f1f5f9;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: #0f172a;
+    }
+    .subview-title {
+      font-size: 16px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+    .subview-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      background: #f8fafc;
+    }
+
+    /* TOAST NOTIFICATION */
+    .x-toast {
+      position: absolute;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: #0f172a;
+      color: #ffffff;
+      padding: 10px 18px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+      z-index: 999;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.25s ease;
+      white-space: nowrap;
+    }
+    .x-toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* MODAL BOTTOM SHEET */
+    .modal-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(15,23,42,0.6);
+      backdrop-filter: blur(2px);
+      z-index: 500;
+      display: none;
+      align-items: flex-end;
+      animation: fadeIn 0.15s ease;
+    }
+    .modal-backdrop.open {
+      display: flex;
+    }
+    .modal-sheet {
+      width: 100%;
+      background: #ffffff;
+      border-radius: 24px 24px 0 0;
+      padding: 20px;
+      box-shadow: 0 -10px 25px rgba(0,0,0,0.15);
+      animation: slideUp 0.2s ease-out;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    .sheet-handle {
+      width: 40px;
+      height: 4px;
+      background: #cbd5e1;
+      border-radius: 2px;
+      margin: 0 auto 16px;
+    }
+
+    /* RECEIPT VERIFICATION & LIGHTBOX STYLES (MOBILE-FIRST SCALABLE) */
+    .receipt-card-row {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+      user-select: none;
+    }
+    .receipt-card-row:active {
+      background: #f8fafc;
+      border-color: #cbd5e1;
+      transform: scale(0.99);
+    }
+    .receipt-doc-thumb {
+      width: 44px;
+      height: 52px;
+      background: #ffffff;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .receipt-doc-thumb .doc-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+    }
+    .receipt-paper-sim {
+      background: #fffdf9;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 3px 12px rgba(0,0,0,0.04);
+      position: relative;
+    }
+    .receipt-stamp-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border: 2px solid #dc2626;
+      color: #dc2626;
+      font-weight: 800;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-radius: 6px;
+      transform: rotate(-5deg);
+      opacity: 0.9;
+    }
+
+    /* QC DECISION & STORAGE ROUTING STYLES */
+    .qc-toggle-btn {
+      flex: 1;
+      padding: 7px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      border-radius: 8px;
+      border: 1.5px solid #cbd5e1;
+      background: #ffffff;
+      color: #475569;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-align: center;
+      font-family: inherit;
+    }
+    .qc-toggle-btn.active.is-warning {
+      background: #fffbeb;
+      border-color: #f59e0b;
+      color: #b45309;
+      box-shadow: 0 1px 3px rgba(245,158,11,0.12);
+    }
+    .qc-toggle-btn.active.is-success {
+      background: #f0fdf4;
+      border-color: #10b981;
+      color: #15803d;
+      box-shadow: 0 1px 3px rgba(16,185,129,0.12);
+    }
+    .storage-tag {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      white-space: nowrap;
+    }
+    .storage-dry { background: #fef3c7; color: #92400e; }
+    .storage-cold { background: #e0f2fe; color: #0369a1; }
+    .storage-freeze { background: #f1f5f9; color: #334155; }
+
+    /* UNIVERSAL RECEIVING & QC CARD STYLES */
+    .universal-qc-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 12px;
+      transition: all 0.2s ease;
+    }
+    .universal-qc-card.has-variance {
+      border-color: #fde68a;
+      background: #fffdfa;
+    }
+    .qc-cat-chip {
+      font-size: 10.5px;
+      font-weight: 700;
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      color: #475569;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+    .qc-cat-chip:hover {
+      border-color: #94a3b8;
+    }
+    .qc-cat-chip.active {
+      background: #fef3c7;
+      border-color: #f59e0b;
+      color: #92400e;
+      box-shadow: 0 1px 2px rgba(245,158,11,0.15);
+    }
+    .qc-disp-btn {
+      flex: 1;
+      text-align: center;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      color: #475569;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+    .qc-disp-btn.active {
+      background: #eff6ff;
+      border-color: #3b82f6;
+      color: #1d4ed8;
+      box-shadow: 0 1px 2px rgba(59,130,246,0.15);
+    }
+    .qc-note-input {
+      width: 100%;
+      font-size: 11.5px;
+      padding: 7px 10px;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      color: #0f172a;
+      outline: none;
+      font-family: inherit;
+      box-sizing: border-box;
+      transition: border-color 0.15s ease;
+    }
+    .qc-note-input:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 2px rgba(59,130,246,0.15);
+    }
+    .qc-filter-tab {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid #cbd5e1;
+      background: #f8fafc;
+      color: #475569;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+    .qc-filter-tab.active {
+      background: #0f172a;
+      border-color: #0f172a;
+      color: #ffffff;
+    }
+
+    /* RESPONSIVE TWEAKS */
+    @media (max-width: 600px) {
+      .proto-ribbon {
+        display: none !important;
+      }
+      .proto-summary-banner {
+        display: none !important;
+      }
+      .device-shell {
+        max-width: 100% !important;
+        min-height: 100dvh !important;
+        height: 100dvh !important;
+        border: none !important;
+        border-radius: 0 !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+      }
+      .proto-controls {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TOP PROTO BAR (Control & Architecture Explainer) -->
+  <header class="proto-ribbon">
+    <div class="proto-ribbon-info">
+      <span class="proto-badge">Mobile-First</span>
+      <span><strong>Navigasi Merchant:</strong> Beranda • Pesanan • Menu &amp; Stok • Belanja • Lainnya</span>
+    </div>
+    <div class="proto-controls">
+      <button type="button" class="proto-btn" onclick="openVerifyPage()" style="background:#0284c7; color:#fff; font-weight:700;">⚖️ Uji QC Meja Sortir</button>
+      <button type="button" class="proto-btn" onclick="switchNavTab('menu-stok', 'portions')" style="background:#059669; color:#fff; font-weight:700;">⚡ HPP &amp; Margin Resep</button>
+      <button type="button" class="proto-btn" onclick="switchNavTab('menu-stok', 'catalog')" style="background:#4338ca; color:#fff; font-weight:700;">🏷️ Kebijakan Harga</button>
+      <button type="button" class="proto-btn active" id="btn-mode-phone" onclick="setDeviceMode('phone')">📱 Mode HP</button>
+      <button type="button" class="proto-btn" id="btn-mode-full" onclick="setDeviceMode('full')">💻 Layar Penuh</button>
+      <button type="button" class="proto-btn" onclick="toggleExplanation()">ℹ️ Alasan Desain</button>
+    </div>
+  </header>
+
+  <!-- COLLAPSIBLE EXPLANATION -->
+  <div id="proto-explanation" class="proto-summary-banner" style="display:none;">
+    <strong>🎯 Pertimbangan &amp; Keputusan Desain Mobile-First (Bebas Legacy Desktop):</strong>
+    <p>1. <strong>Meja Dikelola Kasir POS</strong>: Transaksi input pesanan tamu, geser meja, dan pembayaran adalah 100% domain Kasir. Fitur <em>Cetak QR Meja &amp; Blokir</em> dipindahkan ke menu <strong>Lainnya</strong>.</p>
+    <p>2. <strong>Operasional Belanja &amp; Mandat Staf di Bottom Bar</strong>: Hubungan kerja terbagi jelas antara Manager &amp; Staf Belanja. Manager <strong>menugaskan mandat</strong> (kasbon &amp; list bahan), staf belanja mengeksekusi di pasar via <em>Purchasing App</em>, lalu Manager <strong>memantau progres secara live serta memverifikasi fisik &amp; rekonsiliasi kasbon</strong> saat barang tiba.</p>
+    <p>3. <strong>Menu &amp; Stok Terpadu</strong>: Kontrol cepat sisa porsi siap saji (1-tap 86 habis) saat jam rush hour dan monitor sisa bahan mentah.</p>
+    <p>4. <strong>Ergonomi Jempol Mobile</strong>: Tombol aksi utama (Terima Pesanan, Beli Bahan, Atur Stok) diletakkan di zona jangkauan satu tangan.</p>
+    <p>5. <strong>Lainnya Jadi Hub Operasional</strong>: Meja &amp; QR, Laporan Omzet, Promosi, Jam Buka, Printer Bluetooth, dan Staf tersusun rapi.</p>
+  </div>
+
+  <!-- MAIN MOBILE SHELL -->
+  <main class="device-shell" id="device-shell">
+
+    <!-- STATUS BAR -->
+    <div class="x-status-bar">
+      <span>09:41</span>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <span>5G</span>
+        <svg width="16" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L12 22l7.03-4.39C20.26 16.07 21 14.12 21 12c0-4.97-4.03-9-9-9zm0 14c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
+        <svg width="16" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="5" width="18" height="14" rx="2"/><path d="M22 10v4"/></svg>
+      </div>
+    </div>
+
+    <!-- APP TOPBAR -->
+    <header class="x-app-topbar">
+      <div class="x-topbar-row-1">
+        <div class="x-branch-badge" onclick="showToast('🏪 Cabang aktif: MyBangjo Pringsewu')">
+          <div class="x-branch-logo">MB</div>
+          <span>MyBangjo Pringsewu ▾</span>
+        </div>
+        <div class="x-topbar-actions">
+          <button type="button" class="x-circle-btn" onclick="openSubview('subview-ops-chat')" title="Pesan Operasional">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <span class="x-badge-dot"></span>
+          </button>
+          <button type="button" class="x-circle-btn" onclick="showToast('🔔 2 Pesanan baru belum dikonfirmasi')" title="Notifikasi">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="x-operational-row">
+        <div class="x-status-control" onclick="toggleRestoOpen(this)">
+          <span class="x-switch is-on" id="switch-resto"></span>
+          <span id="label-resto">Resto Buka</span>
+        </div>
+        <div class="x-status-control" onclick="toggleOrderOnline(this)">
+          <span>Order Online:</span>
+          <span class="x-switch is-on" id="switch-online"></span>
+        </div>
+      </div>
+    </header>
+
+    <!-- VIEWS CONTAINER -->
+    <div class="x-view-container">
+
+      <!-- ========================================== -->
+      <!-- TAB 1: BERANDA                             -->
+      <!-- ========================================== -->
+      <section id="tab-beranda" class="x-view-tab active">
+        <!-- Date & Greeting -->
+        <div style="margin-bottom:14px;">
+          <p style="font-size:12px; color:var(--text-muted); font-weight:600;">Rabu, 28 Oktober 2026</p>
+          <h2 style="font-size:20px; font-weight:800; color:#0f172a; margin-top:2px;">Selamat Datang, Rian 👋</h2>
+        </div>
+
+        <!-- Sales KPI Card -->
+        <div class="x-card" style="background:linear-gradient(135deg, #08a94f 0%, #047857 100%); color:#ffffff; border:none;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div>
+              <p style="font-size:12px; font-weight:700; color:rgba(255,255,255,0.85); text-transform:uppercase;">Penjualan Hari Ini</p>
+              <h1 style="font-size:26px; font-weight:800; margin:4px 0 2px;">Rp 2.845.000</h1>
+            </div>
+            <span style="background:rgba(255,255,255,0.2); padding:3px 8px; border-radius:999px; font-size:11px; font-weight:700;">+18.4% vs Kemarin</span>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.2);">
+            <div>
+              <span style="font-size:11px; color:rgba(255,255,255,0.8);">Pesanan Selesai</span>
+              <p style="font-size:16px; font-weight:800;">34 Pesanan</p>
+            </div>
+            <div>
+              <span style="font-size:11px; color:rgba(255,255,255,0.8);">Rata-rata Order</span>
+              <p style="font-size:16px; font-weight:800;">Rp 83.600</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Operational Alert Banner -->
+        <div class="x-card" id="home-alert-materials-card" style="background:#fffbeb; border-color:#fde68a; display:flex; align-items:center; justify-content:space-between; padding:12px 14px;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="font-size:20px;">⚠️</span>
+            <div>
+              <strong style="font-size:13px; color:#92400e; display:block;" id="home-alert-materials-title">2 Bahan Baku Dapur Menipis</strong>
+              <span style="font-size:11px; color:#b45309;" id="home-alert-materials-desc">Beras Ramos (4.2kg) &amp; Telur Ayam (0.5kg)</span>
+            </div>
+          </div>
+          <button type="button" class="btn-action btn-primary" onclick="openVerifyPage()" style="padding:6px 12px; font-size:11px; font-weight:800; background:#d97706; border-color:#d97706;">Verifikasi QC ➜</button>
+        </div>
+
+        <!-- HIGHLIGHT: INTEGRASI HASIL AUDIT OPERASIONAL -->
+        <div class="x-card" style="background:#ffffff; border:1.5px solid #10b981; padding:13px; margin-bottom:12px; box-shadow:0 4px 14px rgba(16,185,129,0.1);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid #f1f5f9; padding-bottom:7px;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-size:16px;">🔄</span>
+              <strong style="font-size:13px; color:#0f172a;">Integrasi Hasil Audit Operasional</strong>
+            </div>
+            <span style="background:#dcfce7; color:#15803d; font-size:10px; font-weight:800; padding:2px 7px; border-radius:999px;">Terapan Baru</span>
+          </div>
+
+          <p style="font-size:11.5px; color:#475569; line-height:1.4; margin-bottom:10px;">
+            Hasil audit operasional (resep pusat BoM, harga pasar lokal cabang, kebijakan tier harga, dan meja sortir QC) aktif di navigasi ini:
+          </p>
+
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <!-- 1. QC Meja Sortir -->
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px; display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <strong style="font-size:11.5px; color:#0f172a; display:block;">⚖️ QC Meja Sortir: "Angka &amp; Catatan"</strong>
+                <span style="font-size:10.5px; color:#64748b;">Template universal tanpa birokrasi form retur/ERP</span>
+              </div>
+              <button type="button" class="btn-action btn-primary" onclick="openVerifyPage()" style="font-size:11px; padding:5px 9px; white-space:nowrap;">Buka QC ➜</button>
+            </div>
+
+            <!-- 2. HPP & Margin Dinamis -->
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px; display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <strong style="font-size:11.5px; color:#0f172a; display:block;">🔒 Resep Baku Pusat ➔ HPP Riil Cabang</strong>
+                <span style="font-size:10.5px; color:#64748b;">Ayam Geprek: HPP Rp 7.850 (Margin 56% 🟢)</span>
+              </div>
+              <button type="button" class="btn-action btn-secondary" onclick="switchNavTab('menu-stok', 'portions')" style="font-size:11px; padding:5px 9px; white-space:nowrap;">Cek HPP ➜</button>
+            </div>
+
+            <!-- 3. Kebijakan Harga Tier -->
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px; display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <strong style="font-size:11.5px; color:#0f172a; display:block;">🏷️ Kebijakan Harga Tier Pringsewu</strong>
+                <span style="font-size:10.5px; color:#64748b;">Mode Range Pusat: Rp 16.000 – Rp 22.000</span>
+              </div>
+              <button type="button" class="btn-action btn-secondary" onclick="switchNavTab('menu-stok', 'catalog')" style="font-size:11px; padding:5px 9px; white-space:nowrap;">Cek Tier ➜</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Order Pipeline Status Bar -->
+        <div class="x-card">
+          <div class="x-card-header">
+            <div>
+              <h3 class="x-card-title">Antrean Pesanan Aktif</h3>
+              <p class="x-card-subtitle">Status proses dapur cabang saat ini</p>
+            </div>
+            <button type="button" class="btn-action btn-secondary" onclick="switchNavTab('pesanan')">Buka Tab</button>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px;">
+            <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:10px; text-align:center;">
+              <span style="font-size:11px; font-weight:700; color:#b91c1c;">Pesanan Baru</span>
+              <p style="font-size:20px; font-weight:800; color:#ef4444; margin-top:2px;">3</p>
+            </div>
+            <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:10px; text-align:center;">
+              <span style="font-size:11px; font-weight:700; color:#1d4ed8;">Diproses</span>
+              <p style="font-size:20px; font-weight:800; color:#3b82f6; margin-top:2px;">2</p>
+            </div>
+            <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:10px; text-align:center;">
+              <span style="font-size:11px; font-weight:700; color:#15803d;">Siap Antar</span>
+              <p style="font-size:20px; font-weight:800; color:#10b981; margin-top:2px;">1</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Access Shortcuts -->
+        <h4 style="font-size:13px; font-weight:800; color:#0f172a; margin-bottom:10px;">Akses Cepat Resto</h4>
+        <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px;">
+          <button type="button" class="hub-item-card" onclick="switchNavTab('menu-stok', 'portions')" style="flex-direction:column; padding:12px 6px; text-align:center;">
+            <span style="font-size:22px;">⚡</span>
+            <span style="font-size:11px; font-weight:700; color:#0f172a; margin-top:4px;">Stok Porsi</span>
+          </button>
+          <button type="button" class="hub-item-card" onclick="switchNavTab('belanja')" style="flex-direction:column; padding:12px 6px; text-align:center;">
+            <span style="font-size:22px;">🛒</span>
+            <span style="font-size:11px; font-weight:700; color:#0f172a; margin-top:4px;">Belanja</span>
+          </button>
+          <button type="button" class="hub-item-card" onclick="openSubview('subview-laporan')" style="flex-direction:column; padding:12px 6px; text-align:center;">
+            <span style="font-size:22px;">📊</span>
+            <span style="font-size:11px; font-weight:700; color:#0f172a; margin-top:4px;">Laporan</span>
+          </button>
+          <button type="button" class="hub-item-card" onclick="openSubview('subview-printer')" style="flex-direction:column; padding:12px 6px; text-align:center;">
+            <span style="font-size:22px;">🖨️</span>
+            <span style="font-size:11px; font-weight:700; color:#0f172a; margin-top:4px;">Printer</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- TAB 2: PESANAN                             -->
+      <!-- ========================================== -->
+      <section id="tab-pesanan" class="x-view-tab">
+        <div style="margin-bottom:12px;">
+          <h2 style="font-size:20px; font-weight:800; color:#0f172a;">Antrean Pesanan</h2>
+          <p style="font-size:12px; color:var(--text-muted);">Kelola pesanan masuk dari Dine-In, Kasir, dan Order Online</p>
+        </div>
+
+        <!-- Segmented Filter Status -->
+        <div class="segmented-control" id="order-status-filter">
+          <button type="button" class="segment-btn active" onclick="filterOrderTab('new', this)">Masuk (3)</button>
+          <button type="button" class="segment-btn" onclick="filterOrderTab('processing', this)">Diproses (2)</button>
+          <button type="button" class="segment-btn" onclick="filterOrderTab('ready', this)">Siap (1)</button>
+          <button type="button" class="segment-btn" onclick="filterOrderTab('done', this)">Selesai (18)</button>
+        </div>
+
+        <!-- Orders List Container -->
+        <div id="orders-list">
+          <!-- Order Card 1 (Masuk) -->
+          <div class="order-card is-new" data-status="new" id="order-2041">
+            <div class="order-header">
+              <div>
+                <span class="order-id">#MB-2041</span>
+                <span class="order-badge-type" style="background:#fee2e2; color:#ef4444; font-weight:800;">DINE-IN MEJA 4</span>
+              </div>
+              <span class="order-time">3 mnt lalu</span>
+            </div>
+            <div class="order-items">
+              <div><strong>2x</strong> Paket Ayam Bakar Madu</div>
+              <div><strong>2x</strong> Es Jeruk Murni (Sedikit Es)</div>
+            </div>
+            <div class="order-footer">
+              <span class="order-price">Rp 76.000 <small style="font-weight:400; color:#64748b;">(QRIS Lunas)</small></span>
+              <div class="order-actions">
+                <button type="button" class="btn-action btn-danger" onclick="rejectOrder('order-2041')">Tolak</button>
+                <button type="button" class="btn-action btn-primary" onclick="acceptOrder('order-2041')">Terima ⚡</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Order Card 2 (Masuk) -->
+          <div class="order-card is-new" data-status="new" id="order-2042">
+            <div class="order-header">
+              <div>
+                <span class="order-id">#MB-2042</span>
+                <span class="order-badge-type" style="background:#e0e7ff; color:#4338ca;">PESAN ANTAR</span>
+              </div>
+              <span class="order-time">6 mnt lalu</span>
+            </div>
+            <div class="order-items">
+              <div><strong>1x</strong> Ayam Geprek Sambal Bawang (Lv 3)</div>
+              <div><strong>1x</strong> Es Teh Manis Jumbo</div>
+            </div>
+            <div class="order-footer">
+              <span class="order-price">Rp 32.000 <small style="font-weight:400; color:#64748b;">(COD / Tunai)</small></span>
+              <div class="order-actions">
+                <button type="button" class="btn-action btn-danger" onclick="rejectOrder('order-2042')">Tolak</button>
+                <button type="button" class="btn-action btn-primary" onclick="acceptOrder('order-2042')">Terima ⚡</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Order Card 3 (Diproses) -->
+          <div class="order-card is-processing" data-status="processing" style="display:none;" id="order-2039">
+            <div class="order-header">
+              <div>
+                <span class="order-id">#MB-2039</span>
+                <span class="order-badge-type" style="background:#dbeafe; color:#1e40af;">DINE-IN MEJA 2</span>
+              </div>
+              <span class="order-time">14 mnt lalu</span>
+            </div>
+            <div class="order-items">
+              <div><strong>3x</strong> Bebek Goreng Sambal Ijo</div>
+              <div><strong>3x</strong> Nasi Putih Hangat</div>
+              <div><strong>3x</strong> Es Teh Manis</div>
+            </div>
+            <div class="order-footer">
+              <span class="order-price">Rp 129.000</span>
+              <div class="order-actions">
+                <button type="button" class="btn-action btn-primary" onclick="markOrderReady('order-2039')">Pesanan Siap 🔔</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Order Card 4 (Siap) -->
+          <div class="order-card is-ready" data-status="ready" style="display:none;" id="order-2038">
+            <div class="order-header">
+              <div>
+                <span class="order-id">#MB-2038</span>
+                <span class="order-badge-type" style="background:#dcfce7; color:#15803d;">TAKEAWAY</span>
+              </div>
+              <span class="order-time">22 mnt lalu</span>
+            </div>
+            <div class="order-items">
+              <div><strong>2x</strong> Paket Hemat Geprek</div>
+            </div>
+            <div class="order-footer">
+              <span class="order-price">Rp 48.000</span>
+              <div class="order-actions">
+                <button type="button" class="btn-action btn-primary" onclick="completeOrder('order-2038')">Selesaikan / Serahkan</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- TAB 3: MENU & STOK (UNIFIED VIEW)         -->
+      <!-- ========================================== -->
+      <section id="tab-menu-stok" class="x-view-tab">
+        <div style="margin-bottom:12px;">
+          <h2 style="font-size:20px; font-weight:800; color:#0f172a;">Menu &amp; Stok</h2>
+          <p style="font-size:12px; color:var(--text-muted);">Pusat kendali katalog menu, ketersediaan porsi, &amp; inventaris dapur</p>
+        </div>
+
+        <!-- 3-Segment Switch for Unified Experience -->
+        <div class="segmented-control">
+          <button type="button" class="segment-btn active" id="seg-btn-portions" onclick="switchMenuStokSegment('portions')">⚡ Sisa Porsi</button>
+          <button type="button" class="segment-btn" id="seg-btn-catalog" onclick="switchMenuStokSegment('catalog')">📋 Katalog Menu</button>
+          <button type="button" class="segment-btn" id="seg-btn-materials" onclick="switchMenuStokSegment('materials')">📦 Bahan Baku</button>
+        </div>
+
+        <!-- SUB-SEGMENT 1: SISA PORSI (KETERSEDIAAN) -->
+        <div id="subseg-portions">
+          <div class="search-box">
+            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <input type="text" class="search-input" placeholder="Cari nama menu untuk atur porsi...">
+          </div>
+
+          <div class="chip-scroll">
+            <button type="button" class="chip-btn active">Semua</button>
+            <button type="button" class="chip-btn">Makanan</button>
+            <button type="button" class="chip-btn">Minuman</button>
+            <button type="button" class="chip-btn">Paket</button>
+          </div>
+
+          <!-- Bulk action helpers -->
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <span style="font-size:12px; font-weight:700; color:#64748b;">5 Menu Terdaftar</span>
+            <button type="button" class="btn-action btn-secondary" onclick="showToast('✅ Semua porsi harian berhasil di-reset!')" style="font-size:11px; padding:4px 8px;">Reset Porsi Harian</button>
+          </div>
+
+          <!-- Formula Resep Baku vs HPP Pasar Live Card -->
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; margin-bottom:12px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+            <div style="font-size:11.5px; color:#475569; line-height:1.4;">
+              <strong style="color:#0f172a; display:block;">🔒 Resep Baku Terkunci Owner (BoM Pusat)</strong>
+              HPP menu cabang dihitung otomatis dari harga belanja pasar basah lokal.
+            </div>
+            <span style="background:#dcfce7; color:#15803d; font-size:10.5px; font-weight:800; padding:3px 8px; border-radius:999px; white-space:nowrap;">Margin Sehat 🟢</span>
+          </div>
+
+          <!-- Items -->
+          <!-- Item 1: Ayam Geprek -->
+          <div class="menu-item-row" style="flex-direction:column; align-items:stretch; gap:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div class="menu-item-info">
+                <div class="menu-item-name">Ayam Geprek Sambal Bawang</div>
+                <div style="display:flex; align-items:center; gap:6px; margin-top:2px;">
+                  <span class="menu-item-price" style="font-size:14px; font-weight:800; color:#0f172a;">Rp 18.000</span>
+                  <span style="font-size:11px; color:#64748b;">• HPP: <strong>Rp 7.850</strong></span>
+                  <span style="font-size:10.5px; background:#dcfce7; color:#15803d; font-weight:800; padding:1px 6px; border-radius:4px;">56% Margin</span>
+                </div>
+              </div>
+              <div class="menu-item-controls">
+                <div class="portion-counter">
+                  <button type="button" class="btn-count" onclick="changePortion('p1', -1)">−</button>
+                  <span class="portion-val" id="p1">24</span>
+                  <button type="button" class="btn-count" onclick="changePortion('p1', 1)">+</button>
+                </div>
+                <div class="x-switch is-on" onclick="toggleItemAvailable(this, 'Ayam Geprek Sambal Bawang')" title="Tersedia"></div>
+              </div>
+            </div>
+            <div style="font-size:10.5px; color:#64748b; background:#f8fafc; padding:4px 8px; border-radius:6px; border:1px dashed #e2e8f0; display:flex; justify-content:space-between;">
+              <span>🔒 Resep Pusat: 120g Ayam + 15g Cabai + 150g Beras</span>
+              <span style="color:#059669; font-weight:700;">HPP Realtime Pasar</span>
+            </div>
+          </div>
+
+          <!-- Item 2: Ayam Bakar Madu -->
+          <div class="menu-item-row" style="flex-direction:column; align-items:stretch; gap:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div class="menu-item-info">
+                <div class="menu-item-name">Ayam Bakar Madu Spesial</div>
+                <div style="display:flex; align-items:center; gap:6px; margin-top:2px;">
+                  <span class="menu-item-price" style="font-size:14px; font-weight:800; color:#0f172a;">Rp 22.000</span>
+                  <span style="font-size:11px; color:#64748b;">• HPP: <strong>Rp 9.200</strong></span>
+                  <span style="font-size:10.5px; background:#dcfce7; color:#15803d; font-weight:800; padding:1px 6px; border-radius:4px;">58% Margin</span>
+                </div>
+              </div>
+              <div class="menu-item-controls">
+                <div class="portion-counter">
+                  <button type="button" class="btn-count" onclick="changePortion('p2', -1)">−</button>
+                  <span class="portion-val" id="p2">14</span>
+                  <button type="button" class="btn-count" onclick="changePortion('p2', 1)">+</button>
+                </div>
+                <div class="x-switch is-on" onclick="toggleItemAvailable(this, 'Ayam Bakar Madu')" title="Tersedia"></div>
+              </div>
+            </div>
+            <div style="font-size:10.5px; color:#64748b; background:#f8fafc; padding:4px 8px; border-radius:6px; border:1px dashed #e2e8f0; display:flex; justify-content:space-between;">
+              <span>🔒 Resep Pusat: 140g Ayam + Bumbu Madu + 150g Beras</span>
+              <span style="color:#059669; font-weight:700;">HPP Realtime Pasar</span>
+            </div>
+          </div>
+
+          <!-- Item 3: Telur Dadar Crispy (Terkait Belanjaan Telur Pasar) -->
+          <div class="menu-item-row" style="flex-direction:column; align-items:stretch; gap:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div class="menu-item-info">
+                <div class="menu-item-name">Telur Dadar Crispy Sambal Korek</div>
+                <div style="display:flex; align-items:center; gap:6px; margin-top:2px;">
+                  <span class="menu-item-price" style="font-size:14px; font-weight:800; color:#0f172a;">Rp 12.000</span>
+                  <span style="font-size:11px; color:#64748b;">• HPP: <strong>Rp 3.100</strong></span>
+                  <span style="font-size:10.5px; background:#dcfce7; color:#15803d; font-weight:800; padding:1px 6px; border-radius:4px;">74% Margin</span>
+                </div>
+              </div>
+              <div class="menu-item-controls">
+                <div class="portion-counter">
+                  <button type="button" class="btn-count" onclick="changePortion('p_telur', -1)">−</button>
+                  <span class="portion-val" id="p_telur">18</span>
+                  <button type="button" class="btn-count" onclick="changePortion('p_telur', 1)">+</button>
+                </div>
+                <div class="x-switch is-on" onclick="toggleItemAvailable(this, 'Telur Dadar Crispy')" title="Tersedia"></div>
+              </div>
+            </div>
+            <div style="font-size:10.5px; color:#64748b; background:#f8fafc; padding:4px 8px; border-radius:6px; border:1px dashed #e2e8f0; display:flex; justify-content:space-between;">
+              <span>🔒 Resep Pusat: 1 Butir Telur (60g) + 10g Cabai + 150g Beras</span>
+              <span style="color:#059669; font-weight:700;">HPP Realtime Pasar</span>
+            </div>
+          </div>
+
+          <!-- Item 4: Bebek Goreng -->
+          <div class="menu-item-row" style="opacity:0.65; background:#f8fafc;">
+            <div class="menu-item-info">
+              <div class="menu-item-name">Bebek Goreng Sambal Ijo <span style="background:#fee2e2; color:#ef4444; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:800;">HABIS</span></div>
+              <div class="menu-item-price">Rp 32.000 • HPP: Rp 16.500</div>
+            </div>
+            <div class="menu-item-controls">
+              <div class="portion-counter">
+                <button type="button" class="btn-count" onclick="changePortion('p3', -1)">−</button>
+                <span class="portion-val" id="p3">0</span>
+                <button type="button" class="btn-count" onclick="changePortion('p3', 1)">+</button>
+              </div>
+              <div class="x-switch" onclick="toggleItemAvailable(this, 'Bebek Goreng Sambal Ijo')" title="Habis"></div>
+            </div>
+          </div>
+
+          <!-- Item 5: Es Teh Manis -->
+          <div class="menu-item-row">
+            <div class="menu-item-info">
+              <div class="menu-item-name">Es Teh Manis Jumbo</div>
+              <div class="menu-item-price">Rp 6.000 • HPP: Rp 1.200</div>
+            </div>
+            <div class="menu-item-controls">
+              <div class="portion-counter">
+                <button type="button" class="btn-count" onclick="changePortion('p4', -5)">−</button>
+                <span class="portion-val" id="p4">85</span>
+                <button type="button" class="btn-count" onclick="changePortion('p4', 5)">+</button>
+              </div>
+              <div class="x-switch is-on" onclick="toggleItemAvailable(this, 'Es Teh Manis Jumbo')"></div>
+            </div>
+          </div>
+
+          <!-- Item 6: Jus Alpukat -->
+          <div class="menu-item-row">
+            <div class="menu-item-info">
+              <div class="menu-item-name">Jus Alpukat Kocok <span style="background:#fef3c7; color:#b45309; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:800;">MENIPIS</span></div>
+              <div class="menu-item-price">Rp 15.000 • HPP: Rp 5.800</div>
+            </div>
+            <div class="menu-item-controls">
+              <div class="portion-counter">
+                <button type="button" class="btn-count" onclick="changePortion('p5', -1)">−</button>
+                <span class="portion-val" id="p5">4</span>
+                <button type="button" class="btn-count" onclick="changePortion('p5', 1)">+</button>
+              </div>
+              <div class="x-switch is-on" onclick="toggleItemAvailable(this, 'Jus Alpukat Kocok')"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUB-SEGMENT 2: KATALOG MENU -->
+        <div id="subseg-catalog" style="display:none;">
+          <!-- Pricing Policy Governance Card -->
+          <div class="x-card" style="background:#eff6ff; border:1px solid #bfdbfe; padding:12px; margin-bottom:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+              <div>
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span style="font-size:14px;">🏷️</span>
+                  <strong style="font-size:13px; color:#1e40af;">Kebijakan Harga: Tier Pringsewu</strong>
+                </div>
+                <div style="font-size:11px; color:#3b82f6; margin-top:2px;">Otoritas Owner Pusat • Mode: <strong>Range (Rentang Bebas Terkendali)</strong></div>
+              </div>
+              <span style="font-size:10px; font-weight:800; color:#1d4ed8; background:#dbeafe; padding:3px 8px; border-radius:999px; white-space:nowrap;">Kepatuhan 100%</span>
+            </div>
+            <p style="font-size:11.5px; color:#1e3a8a; line-height:1.4; margin-bottom:8px;">
+              Manager Cabang berwenang mengatur harga jual selama berada di rentang tier untuk mengamankan margin saat harga komoditas pasar lokal berfluktuasi.
+            </p>
+            <div style="background:#ffffff; border-radius:6px; padding:6px 10px; border:1px solid #dbeafe; font-size:11px; display:flex; justify-content:space-between; color:#1e40af;">
+              <span>Rentang Kategori Ayam: <strong>Rp 16.000 – Rp 22.000</strong></span>
+              <span>Kategori Minuman: <strong>Rp 4.000 – Rp 18.000</strong></span>
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <span style="font-size:13px; font-weight:800; color:#0f172a;">Kategori &amp; Daftar Produk</span>
+            <button type="button" class="btn-action btn-primary" onclick="showToast('Fitur Tambah Menu (Perlu Approval Owner)')" style="font-size:12px;">+ Tambah Menu</button>
+          </div>
+
+          <div class="x-card" style="padding:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <strong style="font-size:14px; color:#0f172a;">🍗 Makanan Utama (4 Produk)</strong>
+              <span style="color:#08a94f; font-size:12px; font-weight:700;">Atur Urutan</span>
+            </div>
+            <p style="font-size:12px; color:#64748b; line-height:1.4;">Ayam Geprek, Ayam Bakar, Bebek Goreng, Telur Dadar. Batas rentang cabang aktif: Rp 16rb - Rp 22rb.</p>
+          </div>
+
+          <div class="x-card" style="padding:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <strong style="font-size:14px; color:#0f172a;">🥤 Minuman Segar (2 Produk)</strong>
+              <span style="color:#08a94f; font-size:12px; font-weight:700;">Atur Urutan</span>
+            </div>
+            <p style="font-size:12px; color:#64748b; line-height:1.4;">Es Teh Manis, Jus Alpukat Kocok. Batas rentang cabang aktif: Rp 4rb - Rp 18rb.</p>
+          </div>
+        </div>
+
+        <!-- SUB-SEGMENT 3: BAHAN BAKU DAPUR -->
+        <div id="subseg-materials" style="display:none;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <span style="font-size:13px; font-weight:800; color:#0f172a;">Stok Bahan Mentah Dapur</span>
+            <button type="button" class="btn-action btn-primary" onclick="switchNavTab('belanja'); openCreateMandateModal();" style="font-size:12px;">🛒 Tugaskan Belanja</button>
+          </div>
+
+          <!-- Item 1: Ayam Broiler -->
+          <div class="menu-item-row">
+            <div class="menu-item-info">
+              <div class="menu-item-name">Ayam Broiler Karkas 1kg</div>
+              <div class="menu-item-price" style="color:#64748b;">Sisa: <strong>18 Ekor</strong> • Buffer: 10 Ekor</div>
+              <div style="font-size:10.5px; color:#475569; margin-top:2px;">Beli Terakhir: <strong>Rp 34.000/Kg</strong> • Lapak Ayam Segar Berkah</div>
+            </div>
+            <span style="background:#dcfce7; color:#15803d; font-size:11px; padding:3px 8px; border-radius:999px; font-weight:800;">Aman</span>
+          </div>
+
+          <!-- Item 2: Beras Ramos (Target Live Update via QC Verifikasi) -->
+          <div class="menu-item-row" id="material-row-beras" style="background:#fffbeb; border-color:#fde68a;">
+            <div class="menu-item-info">
+              <div class="menu-item-name">Beras Ramos Premium</div>
+              <div class="menu-item-price" id="material-stock-beras" style="color:#b45309;">Sisa: <strong>4.2 Kg</strong> • Buffer: 10 Kg</div>
+              <div style="font-size:10.5px; color:#475569; margin-top:2px;">Beli Terakhir: <strong>Rp 8.800/Kg</strong> • Kios Beras Subur Makmur</div>
+            </div>
+            <span id="material-badge-beras" style="background:#fef3c7; color:#b45309; font-size:11px; padding:3px 8px; border-radius:999px; font-weight:800;">Menipis</span>
+          </div>
+
+          <!-- Item 3: Cabai Rawit Merah -->
+          <div class="menu-item-row" id="material-row-cabai" style="background:#fffbeb; border-color:#fde68a;">
+            <div class="menu-item-info">
+              <div class="menu-item-name">Cabai Rawit Merah</div>
+              <div class="menu-item-price" style="color:#b45309;">Sisa: <strong>1.5 Kg</strong> • Buffer: 3 Kg</div>
+              <div style="font-size:10.5px; color:#475569; margin-top:2px;">Beli Terakhir: <strong>Rp 45.000/Kg</strong> • Lapak Sayur Segar Bu Siti</div>
+            </div>
+            <span style="background:#fef3c7; color:#b45309; font-size:11px; padding:3px 8px; border-radius:999px; font-weight:800;">Menipis</span>
+          </div>
+
+          <!-- Item 4: Telur Ayam Ras Fresh (Target Live Update via QC Verifikasi) -->
+          <div class="menu-item-row" id="material-row-telur" style="background:#fffbeb; border-color:#fde68a;">
+            <div class="menu-item-info">
+              <div class="menu-item-name">Telur Ayam Ras Fresh</div>
+              <div class="menu-item-price" id="material-stock-telur" style="color:#b45309;">Sisa: <strong>0.5 Kg</strong> (~8 butir) • Buffer: 3 Kg</div>
+              <div style="font-size:10.5px; color:#475569; margin-top:2px;">Beli Terakhir: <strong>Rp 20.000/Kg</strong> • Lapak Telur Ayam Barokah</div>
+            </div>
+            <span id="material-badge-telur" style="background:#fef3c7; color:#b45309; font-size:11px; padding:3px 8px; border-radius:999px; font-weight:800;">Menipis</span>
+          </div>
+
+          <!-- Item 5: Minyak Goreng Sawit 2L -->
+          <div class="menu-item-row">
+            <div class="menu-item-info">
+              <div class="menu-item-name">Minyak Goreng Sawit 2L</div>
+              <div class="menu-item-price" style="color:#64748b;">Sisa: <strong>6 Pouch</strong> • Buffer: 4 Pouch</div>
+              <div style="font-size:10.5px; color:#475569; margin-top:2px;">Beli Terakhir: <strong>Rp 32.000/Pouch</strong> • Grosir Sembako Rejeki Baru</div>
+            </div>
+            <span style="background:#dcfce7; color:#15803d; font-size:11px; padding:3px 8px; border-radius:999px; font-weight:800;">Aman</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- TAB 4: TUGAS BELANJA (ONE LAYER ONE TASK)  -->
+      <!-- ========================================== -->
+      <section id="tab-belanja" class="x-view-tab">
+        <div style="margin-bottom:12px;">
+          <h2 style="font-size:20px; font-weight:800; color:#0f172a;">Tugas Belanja</h2>
+          <p style="font-size:12px; color:var(--text-muted);">Kelola mandat &amp; verifikasi serah terima belanja staf</p>
+        </div>
+
+        <!-- GoBiz Style Segmented Filter: Berlangsung vs Selesai -->
+        <div class="segmented-control" style="margin-bottom:14px;">
+          <button type="button" class="segment-btn active" id="btn-seg-belanja-active" onclick="switchBelanjaSegment('active')">
+            Berlangsung <span id="badge-count-belanja-active" style="background:#fee2e2; color:#ef4444; font-size:10px; font-weight:800; padding:1px 6px; border-radius:999px; margin-left:4px;">2</span>
+          </button>
+          <button type="button" class="segment-btn" id="btn-seg-belanja-done" onclick="switchBelanjaSegment('done')">
+            Selesai <span id="badge-count-belanja-done" style="background:#f1f5f9; color:#64748b; font-size:10px; font-weight:800; padding:1px 6px; border-radius:999px; margin-left:4px;">2</span>
+          </button>
+        </div>
+
+        <!-- LIST CONTAINER: BERLANGSUNG -->
+        <div id="belanja-list-active">
+          <!-- Card 1: Menunggu Verifikasi -->
+          <div class="x-card" id="card-verify-mandate" style="border-left:4px solid #f59e0b; padding:14px; margin-bottom:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+              <div>
+                <span style="font-size:10.5px; font-weight:800; color:#b45309; background:#fef3c7; padding:2px 6px; border-radius:4px;">#MND-082</span>
+                <h3 style="font-size:15px; font-weight:800; color:#0f172a; margin-top:4px;">Pasar Pringsewu</h3>
+                <div style="font-size:12px; color:#64748b; margin-top:2px;">Staf: <strong>Joko (Runner Dapur)</strong> • 2 Nota Kios Tiba</div>
+              </div>
+              <span style="font-size:11px; font-weight:800; color:#d97706; background:#fffbeb; border:1px solid #fde68a; padding:3px 8px; border-radius:999px;">
+                Perlu Verifikasi 📦
+              </span>
+            </div>
+
+            <div style="background:#f8fafc; border-radius:8px; padding:10px 12px; margin-bottom:12px; font-size:12px; display:flex; justify-content:space-between; border:1px solid #f1f5f9;">
+              <div>
+                <span style="color:#64748b; font-size:11px;">Bahan &amp; Nota:</span><br>
+                <strong style="color:#0f172a;">Beras &amp; Telur (2 Nota)</strong>
+              </div>
+              <div style="text-align:right;">
+                <span style="color:#64748b; font-size:11px;">Realisasi / Kasbon:</span><br>
+                <strong style="color:#0f172a;">Rp 320.000</strong> <span style="color:#94a3b8; font-size:11px;">/ Rp 350.000</span>
+              </div>
+            </div>
+
+            <button type="button" class="btn-action btn-primary" onclick="openVerifyPage()" style="width:100%; padding:11px; font-size:13px; font-weight:700;">
+              Verifikasi Belanjaan ➜
+            </button>
+          </div>
+
+          <!-- Card 2: Sedang Belanja -->
+          <div class="x-card" id="card-active-staff" style="border-left:4px solid #3b82f6; padding:14px; margin-bottom:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+              <div>
+                <span style="font-size:10.5px; font-weight:800; color:#1d4ed8; background:#eff6ff; padding:2px 6px; border-radius:4px;">#MND-083</span>
+                <h3 style="font-size:15px; font-weight:800; color:#0f172a; margin-top:4px;">Pasar Sayur Pagi</h3>
+                <div style="font-size:12px; color:#64748b; margin-top:2px;">Staf: <strong>Budi Santoso</strong> • Pagu Rp 150.000</div>
+              </div>
+              <span style="font-size:11px; font-weight:800; color:#2563eb; background:#eff6ff; border:1px solid #bfdbfe; padding:3px 8px; border-radius:999px;">
+                Sedang Belanja
+              </span>
+            </div>
+
+            <div style="background:#f8fafc; border-radius:8px; padding:10px 12px; margin-bottom:12px; border:1px solid #f1f5f9;">
+              <div style="display:flex; justify-content:space-between; font-size:11px; color:#64748b; margin-bottom:4px;">
+                <span>Cabai Rawit, Minyak Goreng, Bawang</span>
+                <strong style="color:#0f172a;">3/4 Bahan (75%)</strong>
+              </div>
+              <div style="width:100%; height:6px; background:#e2e8f0; border-radius:999px; overflow:hidden;">
+                <div style="width:75%; height:100%; background:#3b82f6; border-radius:999px;"></div>
+              </div>
+            </div>
+
+            <button type="button" class="btn-action btn-secondary" onclick="showToast('💬 Menghubungi WhatsApp Budi Santoso (+62 812-3456-7890)...')" style="width:100%; padding:10px; font-size:12px; display:flex; align-items:center; justify-content:center; gap:6px;">
+              <span>💬</span> Hubungi Staf via WA
+            </button>
+          </div>
+        </div>
+
+        <!-- LIST CONTAINER: SELESAI (DEFAULT HIDDEN) -->
+        <div id="belanja-list-done" style="display:none;">
+          <!-- Card Selesai 1 -->
+          <div class="x-card" style="border-left:4px solid #10b981; padding:14px; margin-bottom:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+              <div>
+                <span style="font-size:10.5px; font-weight:800; color:#15803d; background:#dcfce7; padding:2px 6px; border-radius:4px;">#MND-081</span>
+                <h3 style="font-size:14.5px; font-weight:800; color:#0f172a; margin-top:3px;">Kios Ayam Bu Siti</h3>
+                <div style="font-size:12px; color:#64748b; margin-top:1px;">Staf: Joko • Selesai 07:45 WIB</div>
+              </div>
+              <span style="font-size:11px; font-weight:800; color:#15803d; background:#f0fdf4; border:1px solid #bbf7d0; padding:3px 8px; border-radius:999px;">
+                Selesai
+              </span>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #f1f5f9; padding-top:8px; margin-top:8px;">
+              <span style="font-size:12px; color:#64748b;">15 Ekor Ayam Karkas</span>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <strong style="font-size:14px; color:#0f172a;">Rp 450.000</strong>
+                <button type="button" class="btn-action btn-secondary" onclick="openReceiptModal('MND-081', 'Kios Ayam Bu Siti', 450000, 'Joko (Runner Dapur)', '07:45 WIB')" style="font-size:11px; padding:4px 8px;">Lihat Nota</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card Selesai 2 -->
+          <div class="x-card" style="border-left:4px solid #10b981; padding:14px; margin-bottom:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+              <div>
+                <span style="font-size:10.5px; font-weight:800; color:#15803d; background:#dcfce7; padding:2px 6px; border-radius:4px;">#MND-080</span>
+                <h3 style="font-size:14.5px; font-weight:800; color:#0f172a; margin-top:3px;">Depot Es Kristal Abadi</h3>
+                <div style="font-size:12px; color:#64748b; margin-top:1px;">Staf: Budi • Selesai 07:10 WIB</div>
+              </div>
+              <span style="font-size:11px; font-weight:800; color:#15803d; background:#f0fdf4; border:1px solid #bbf7d0; padding:3px 8px; border-radius:999px;">
+                Selesai
+              </span>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #f1f5f9; padding-top:8px; margin-top:8px;">
+              <span style="font-size:12px; color:#64748b;">2 Karung Es Batu</span>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <strong style="font-size:14px; color:#0f172a;">Rp 40.000</strong>
+                <button type="button" class="btn-action btn-secondary" onclick="openReceiptModal('MND-080', 'Depot Es Kristal Abadi', 40000, 'Budi Santoso', '07:10 WIB')" style="font-size:11px; padding:4px 8px;">Lihat Nota</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sticky Floating Primary Action Button -->
+        <div style="position:sticky; bottom:8px; z-index:40; margin-top:16px;">
+          <button type="button" class="btn-action btn-primary" onclick="openCreateMandateModal()" style="width:100%; padding:14px; font-size:14px; font-weight:800; border-radius:12px; box-shadow:0 6px 18px rgba(8,169,79,0.35); display:flex; align-items:center; justify-content:center; gap:8px;">
+            <span style="font-size:18px;">➕</span>
+            <span>Buat Tugas Belanja</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- TAB 5: LAINNYA (CENTRAL OPERATIONS HUB)   -->
+      <!-- ========================================== -->
+      <section id="tab-lainnya" class="x-view-tab">
+        <!-- Store / User Profile Card -->
+        <div class="x-card" style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+          <div class="x-branch-logo" style="width:48px; height:48px; font-size:18px;">MB</div>
+          <div style="flex:1;">
+            <h3 style="font-size:16px; font-weight:800; color:#0f172a;">MyBangjo Pringsewu</h3>
+            <p style="font-size:12px; color:var(--text-muted);">Manager: Rian Kurniawan • Outlet ID: #PSW01</p>
+          </div>
+          <span style="background:#dcfce7; color:#15803d; font-size:11px; font-weight:800; padding:3px 8px; border-radius:999px;">Aktif</span>
+        </div>
+
+        <!-- Section 1: Promosi & Penjualan -->
+        <h4 class="hub-section-title">Promosi &amp; Keuangan</h4>
+        <div class="hub-grid">
+          <div class="hub-item-card" onclick="openSubview('subview-promo')">
+            <div class="hub-icon-wrapper" style="background:#fef2f2; color:#ef4444;">🏷️</div>
+            <div class="hub-copy">
+              <div class="hub-copy-title">Promosi &amp; Diskon Menu</div>
+              <div class="hub-copy-desc">Kelola voucher potongan harga dan promo aktif cabang</div>
+            </div>
+            <span class="hub-tag" style="background:#fee2e2; color:#ef4444;">2 Aktif</span>
+            <span class="hub-chevron">›</span>
+          </div>
+
+          <div class="hub-item-card" onclick="openSubview('subview-laporan')">
+            <div class="hub-icon-wrapper" style="background:#f0fdf4; color:#16a34a;">📊</div>
+            <div class="hub-copy">
+              <div class="hub-copy-title">Laporan &amp; Rekap Penjualan</div>
+              <div class="hub-copy-desc">Ringkasan omzet harian, mingguan, &amp; metode bayar</div>
+            </div>
+            <span class="hub-tag">Hari ini Rp 2.8jt</span>
+            <span class="hub-chevron">›</span>
+          </div>
+        </div>
+
+        <!-- Section 2: Operasional & Perangkat -->
+        <h4 class="hub-section-title">Operasional &amp; Perangkat</h4>
+        <div class="hub-grid">
+          <div class="hub-item-card" onclick="openSubview('subview-meja')">
+            <div class="hub-icon-wrapper" style="background:#e0f2fe; color:#0284c7;">🍽️</div>
+            <div class="hub-copy">
+              <div class="hub-copy-title">Denah Meja &amp; Cetak QR</div>
+              <div class="hub-copy-desc">Status meja dine-in, cetak stiker QR meja, &amp; blokir</div>
+            </div>
+            <span class="hub-tag">12 Meja</span>
+            <span class="hub-chevron">›</span>
+          </div>
+
+          <div class="hub-item-card" onclick="openSubview('subview-jam-buka')">
+            <div class="hub-icon-wrapper" style="background:#fffbeb; color:#d97706;">⏰</div>
+            <div class="hub-copy">
+              <div class="hub-copy-title">Jam Buka &amp; Jadwal Operasional</div>
+              <div class="hub-copy-desc">Atur waktu buka/tutup outlet harian &amp; hari libur</div>
+            </div>
+            <span class="hub-tag">09:00 - 22:00</span>
+            <span class="hub-chevron">›</span>
+          </div>
+
+          <div class="hub-item-card" onclick="openSubview('subview-printer')">
+            <div class="hub-icon-wrapper" style="background:#f3e8ff; color:#9333ea;">🖨️</div>
+            <div class="hub-copy">
+              <div class="hub-copy-title">Printer Bluetooth &amp; Cetak Struk</div>
+              <div class="hub-copy-desc">Sambungkan printer thermal kasir &amp; format struk</div>
+            </div>
+            <span class="hub-tag" style="background:#f0fdf4; color:#16a34a;">🟢 Terhubung</span>
+            <span class="hub-chevron">›</span>
+          </div>
+
+          <div class="hub-item-card" onclick="openSubview('subview-staf')">
+            <div class="hub-icon-wrapper" style="background:#f1f5f9; color:#475569;">👥</div>
+            <div class="hub-copy">
+              <div class="hub-copy-title">Kelola Akun Staf &amp; Kasir</div>
+              <div class="hub-copy-desc">Daftar kasir yang bertugas, atur PIN dan hak akses</div>
+            </div>
+            <span class="hub-tag">3 Kasir Aktif</span>
+            <span class="hub-chevron">›</span>
+          </div>
+        </div>
+
+        <!-- Section 3: Outlet & Bantuan -->
+        <h4 class="hub-section-title">Informasi &amp; Pengaturan</h4>
+        <div class="hub-grid">
+          <div class="hub-item-card" onclick="showToast('⚙️ Pengaturan profil resto dibuka')">
+            <div class="hub-icon-wrapper" style="background:#f8fafc; color:#64748b;">⚙️</div>
+            <div class="hub-copy">
+              <div class="hub-copy-title">Pengaturan Profil Cabang</div>
+              <div class="hub-copy-desc">Nama outlet, alamat, nomor telepon cabang, &amp; GPS</div>
+            </div>
+            <span class="hub-chevron">›</span>
+          </div>
+
+          <div class="hub-item-card" onclick="showToast('💬 Menghubungkan ke Customer Success Xentra...')">
+            <div class="hub-icon-wrapper" style="background:#e0f2fe; color:#0284c7;">❓</div>
+            <div class="hub-copy">
+              <div class="hub-copy-title">Pusat Bantuan &amp; Layanan CS</div>
+              <div class="hub-copy-desc">Hubungi tim technical support Xentra via WhatsApp</div>
+            </div>
+            <span class="hub-chevron">›</span>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- End x-view-container -->
+
+    <!-- ========================================== -->
+    <!-- SUBVIEW: PROMOSI (SLIDE IN)                -->
+    <!-- ========================================== -->
+    <div id="subview-promo" class="subview-overlay">
+      <div class="subview-header">
+        <button type="button" class="btn-back" onclick="closeSubview('subview-promo')">←</button>
+        <span class="subview-title">Promosi &amp; Diskon Aktif</span>
+      </div>
+      <div class="subview-body">
+        <div class="x-card" style="border-left:4px solid #ef4444;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <strong style="font-size:15px; color:#0f172a;">Diskon Gajian 20%</strong>
+            <span class="x-switch is-on" onclick="this.classList.toggle('is-on')"></span>
+          </div>
+          <p style="font-size:12px; color:#64748b; margin-top:4px;">Min. pembelian Rp 50.000 • Maks potongan Rp 20.000</p>
+          <div style="font-size:11px; color:#94a3b8; margin-top:8px;">Berlaku s/d 31 Okt 2026</div>
+        </div>
+
+        <div class="x-card" style="border-left:4px solid #08a94f;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <strong style="font-size:15px; color:#0f172a;">Gratis Es Teh Jumbo</strong>
+            <span class="x-switch is-on" onclick="this.classList.toggle('is-on')"></span>
+          </div>
+          <p style="font-size:12px; color:#64748b; margin-top:4px;">Setiap beli Paket Geprek Komplit</p>
+          <div style="font-size:11px; color:#94a3b8; margin-top:8px;">Berlaku setiap hari</div>
+        </div>
+
+        <button type="button" class="btn-action btn-primary" onclick="showToast('Buat promo baru')" style="width:100%; padding:12px; margin-top:10px;">+ Tambah Promo Baru</button>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- SUBVIEW: LAPORAN (SLIDE IN)                -->
+    <!-- ========================================== -->
+    <div id="subview-laporan" class="subview-overlay">
+      <div class="subview-header">
+        <button type="button" class="btn-back" onclick="closeSubview('subview-laporan')">←</button>
+        <span class="subview-title">Laporan Penjualan Cabang</span>
+      </div>
+      <div class="subview-body">
+        <div class="x-card">
+          <span style="font-size:11px; font-weight:700; color:#64748b;">TOTAL TRANSAKSI HARI INI</span>
+          <h2 style="font-size:24px; font-weight:800; color:#0f172a; margin:4px 0 10px;">Rp 2.845.000</h2>
+          <div style="display:flex; flex-direction:column; gap:8px; font-size:13px; border-top:1px solid #f1f5f9; padding-top:10px;">
+            <div style="display:flex; justify-content:space-between;">
+              <span style="color:#64748b;">Pembayaran QRIS:</span>
+              <strong>Rp 1.763.900 (62%)</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between;">
+              <span style="color:#64748b;">Tunai / Kasir:</span>
+              <strong>Rp 796.600 (28%)</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between;">
+              <span style="color:#64748b;">Transfer Bank:</span>
+              <strong>Rp 284.500 (10%)</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="x-card">
+          <strong style="font-size:14px; color:#0f172a;">Menu Terlaris Hari Ini:</strong>
+          <div style="margin-top:10px; display:flex; flex-direction:column; gap:8px; font-size:13px;">
+            <div style="display:flex; justify-content:space-between;">
+              <span>1. Ayam Geprek Sambal Bawang</span>
+              <strong>42 Porsi</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between;">
+              <span>2. Es Teh Manis Jumbo</span>
+              <strong>38 Gelas</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between;">
+              <span>3. Ayam Bakar Madu</span>
+              <strong>21 Porsi</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rekap Beban Susut & Waste Dapur -->
+        <div class="x-card" id="card-laporan-waste" style="border-left:4px solid #ef4444;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+            <div>
+              <span style="font-size:10.5px; font-weight:800; color:#b91c1c; background:#fee2e2; padding:2px 6px; border-radius:4px;">WASTE LOG DAPUR</span>
+              <h3 style="font-size:15px; font-weight:800; color:#0f172a; margin-top:3px;">Biaya Susut Bahan Baku</h3>
+            </div>
+            <strong style="font-size:16px; font-weight:800; color:#dc2626;" id="laporan-waste-total">Rp 10.000</strong>
+          </div>
+          <p style="font-size:11.5px; color:#64748b; line-height:1.4; margin-bottom:8px;">
+            Diposting otomatis dari meja sortir belanja pasar sebagai penyesuaian biaya operasional (HPP Variance):
+          </p>
+          <div id="laporan-waste-list" style="display:flex; flex-direction:column; gap:6px; font-size:12px; background:#f8fafc; padding:8px 10px; border-radius:8px; border:1px solid #e2e8f0;">
+            <div style="display:flex; justify-content:space-between;">
+              <span>• Telur Ayam Ras (0.5 Kg - Pecah di Jalan)</span>
+              <strong>Rp 10.000 (#MND-082)</strong>
+            </div>
+          </div>
+          <div style="margin-top:8px; font-size:11px; color:#475569; display:flex; justify-content:space-between; border-top:1px dashed #e2e8f0; padding-top:6px;">
+            <span>Rasio Susut Belanja: <strong style="color:#b45309;">3.1%</strong></span>
+            <span style="color:#15803d;">Ambang Toleransi: &lt; 3.0%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- SUBVIEW: BELANJA PASAR (SLIDE IN)          -->
+    <!-- ========================================== -->
+    <div id="subview-belanja" class="subview-overlay">
+      <div class="subview-header">
+        <button type="button" class="btn-back" onclick="closeSubview('subview-belanja')">←</button>
+        <span class="subview-title">Operasional Belanja &amp; Mandat</span>
+      </div>
+      <div class="subview-body">
+        <div class="x-card" style="background:#eff6ff; border-color:#bfdbfe;">
+          <span style="font-size:11px; font-weight:700; color:#1d4ed8;">AUDIT KASBON BELANJA DAPUR</span>
+          <h2 style="font-size:22px; font-weight:800; color:#1e40af; margin:4px 0;">Rp 500.000</h2>
+          <span style="font-size:12px; color:#3b82f6;">Pagu Kasir Shift Pagi • 2 Mandat Aktif</span>
+        </div>
+
+        <p style="font-size:12px; color:#64748b; margin:12px 0;">
+          Fitur belanja telah ditingkatkan ke tab utama bottom bar. Manager menugaskan mandat belanja ke staf dan memverifikasi nota saat staf tiba kembali di resto.
+        </p>
+
+        <button type="button" class="btn-action btn-primary" onclick="closeSubview('subview-belanja'); switchNavTab('belanja');" style="width:100%; padding:12px; font-size:13px;">
+          Buka Tab Operasional Belanja ➜
+        </button>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- SUBVIEW: JAM BUKA                          -->
+    <!-- ========================================== -->
+    <div id="subview-jam-buka" class="subview-overlay">
+      <div class="subview-header">
+        <button type="button" class="btn-back" onclick="closeSubview('subview-jam-buka')">←</button>
+        <span class="subview-title">Jam Operasional Outlet</span>
+      </div>
+      <div class="subview-body">
+        <div class="x-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #f1f5f9;">
+            <strong>Senin - Jumat</strong>
+            <span style="font-weight:700; color:#08a94f;">09:00 - 22:00</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #f1f5f9;">
+            <strong>Sabtu</strong>
+            <span style="font-weight:700; color:#08a94f;">09:00 - 23:00</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0;">
+            <strong>Minggu</strong>
+            <span style="font-weight:700; color:#08a94f;">09:00 - 23:00</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- SUBVIEW: PRINTER                           -->
+    <!-- ========================================== -->
+    <div id="subview-printer" class="subview-overlay">
+      <div class="subview-header">
+        <button type="button" class="btn-back" onclick="closeSubview('subview-printer')">←</button>
+        <span class="subview-title">Printer Bluetooth Struk</span>
+      </div>
+      <div class="subview-body">
+        <div class="x-card" style="border-left:4px solid #10b981;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <strong style="font-size:15px; color:#0f172a;">RPP02N-58MM Thermal</strong>
+              <p style="font-size:12px; color:#10b981; font-weight:700; margin-top:2px;">● Terhubung via Bluetooth</p>
+            </div>
+            <span style="font-size:11px; padding:3px 8px; border-radius:999px; background:#dcfce7; color:#15803d; font-weight:800;">58mm</span>
+          </div>
+        </div>
+
+        <button type="button" class="btn-action btn-primary" onclick="showToast('🖨️ Struk tes berhasil dikirim ke printer!')" style="width:100%; padding:12px; margin-top:10px;">Tes Cetak Struk Kasir</button>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- SUBVIEW: STAF                              -->
+    <!-- ========================================== -->
+    <div id="subview-staf" class="subview-overlay">
+      <div class="subview-header">
+        <button type="button" class="btn-back" onclick="closeSubview('subview-staf')">←</button>
+        <span class="subview-title">Kelola Kasir &amp; Staf</span>
+      </div>
+      <div class="subview-body">
+        <div class="menu-item-row">
+          <div>
+            <div class="menu-item-name">Agus Prasetyo</div>
+            <div class="menu-item-price" style="color:#64748b;">Kasir Pagi • PIN: ****</div>
+          </div>
+          <span style="background:#dcfce7; color:#15803d; font-size:11px; padding:3px 8px; border-radius:999px; font-weight:800;">Aktif</span>
+        </div>
+
+        <div class="menu-item-row">
+          <div>
+            <div class="menu-item-name">Dewi Lestari</div>
+            <div class="menu-item-price" style="color:#64748b;">Kasir Sore • PIN: ****</div>
+          </div>
+          <span style="background:#dcfce7; color:#15803d; font-size:11px; padding:3px 8px; border-radius:999px; font-weight:800;">Aktif</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- SUBVIEW: OPS CHAT                          -->
+    <!-- ========================================== -->
+    <div id="subview-ops-chat" class="subview-overlay">
+      <div class="subview-header">
+        <button type="button" class="btn-back" onclick="closeSubview('subview-ops-chat')">←</button>
+        <span class="subview-title">Pesan Operasional Cabang</span>
+      </div>
+      <div class="subview-body" style="display:flex; flex-direction:column; gap:10px;">
+        <div style="background:#ffffff; padding:12px; border-radius:12px; border:1px solid #e2e8f0;">
+          <div style="display:flex; justify-content:space-between; font-size:11px; color:#64748b; margin-bottom:4px;">
+            <strong>Owner (Pak Bambang)</strong>
+            <span>08:15 WIB</span>
+          </div>
+          <p style="font-size:13px; color:#0f172a;">"Pagi mas Rian, tolong pastikan stok ayam untuk makan siang dilebihkan ya karena ada pesanan rombongan."</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- SUBVIEW: DENAH MEJA & CETAK QR             -->
+    <!-- ========================================== -->
+    <div id="subview-meja" class="subview-overlay">
+      <div class="subview-header">
+        <button type="button" class="btn-back" onclick="closeSubview('subview-meja')">←</button>
+        <span class="subview-title">Denah Meja &amp; Cetak QR</span>
+      </div>
+      <div class="subview-body">
+        <div style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <h3 style="font-size:15px; font-weight:800; color:#0f172a;">Status Meja Dine-In</h3>
+            <p style="font-size:11px; color:#64748b;">Tamu scan QR meja untuk memesan mandiri via PWA</p>
+          </div>
+          <button type="button" class="btn-action btn-primary" onclick="showToast('🖨️ Mengirim stiker QR meja ke printer...')" style="font-size:11px; padding:6px 10px;">Cetak Semua QR</button>
+        </div>
+
+        <!-- Table KPI Counters -->
+        <div class="kpi-grid">
+          <div class="kpi-card" style="background:#f0fdf4; border-color:#bbf7d0;">
+            <span class="kpi-label" style="color:#15803d;">Tersedia (Kosong)</span>
+            <div class="kpi-val" style="color:#166534;" id="stat-table-avail">7 Meja</div>
+            <span class="kpi-sub" style="color:#15803d;">Siap digunakan tamu</span>
+          </div>
+          <div class="kpi-card" style="background:#eff6ff; border-color:#bfdbfe;">
+            <span class="kpi-label" style="color:#1d4ed8;">Terisi (Sedang Makan)</span>
+            <div class="kpi-val" style="color:#1e40af;" id="stat-table-occ">4 Meja</div>
+            <span class="kpi-sub" style="color:#1d4ed8;">3 PWA • 1 Kasir</span>
+          </div>
+        </div>
+
+        <!-- Filter Chips -->
+        <div class="chip-scroll">
+          <button type="button" class="chip-btn active" onclick="filterTables('all', this)">Semua Meja (12)</button>
+          <button type="button" class="chip-btn" onclick="filterTables('available', this)">Hanya Kosong (7)</button>
+          <button type="button" class="chip-btn" onclick="filterTables('occupied', this)">Hanya Terisi (4)</button>
+          <button type="button" class="chip-btn" onclick="filterTables('held', this)">Ditahan / Bill (1)</button>
+        </div>
+
+        <!-- Table Grid -->
+        <div class="table-grid" id="tables-container">
+          <!-- Meja 01 (Kosong) -->
+          <div class="table-card status-available" data-table-status="available" onclick="openTableModal('Meja 01', 'available', 0, 4, '')">
+            <div class="table-top">
+              <span class="table-number">Meja 01</span>
+              <span class="table-status-pill">Kosong</span>
+            </div>
+            <div class="table-bill">Rp 0</div>
+            <div class="table-meta">Kapasitas: 4 Orang</div>
+          </div>
+
+          <!-- Meja 02 (Terisi) -->
+          <div class="table-card status-occupied" data-table-status="occupied" onclick="openTableModal('Meja 02', 'occupied', 98000, 2, '32 mnt lalu (PWA QR)')">
+            <div class="table-top">
+              <span class="table-number">Meja 02</span>
+              <span class="table-status-pill">Terisi</span>
+            </div>
+            <div class="table-bill">Rp 98.000</div>
+            <div class="table-meta">2 Tamu • 32 mnt lalu</div>
+          </div>
+
+          <!-- Meja 03 (Kosong) -->
+          <div class="table-card status-available" data-table-status="available" onclick="openTableModal('Meja 03', 'available', 0, 4, '')">
+            <div class="table-top">
+              <span class="table-number">Meja 03</span>
+              <span class="table-status-pill">Kosong</span>
+            </div>
+            <div class="table-bill">Rp 0</div>
+            <div class="table-meta">Kapasitas: 4 Orang</div>
+          </div>
+
+          <!-- Meja 04 (Terisi) -->
+          <div class="table-card status-occupied" data-table-status="occupied" onclick="openTableModal('Meja 04', 'occupied', 215000, 6, '54 mnt lalu (Kasir)')">
+            <div class="table-top">
+              <span class="table-number">Meja 04</span>
+              <span class="table-status-pill">Terisi</span>
+            </div>
+            <div class="table-bill">Rp 215.000</div>
+            <div class="table-meta">6 Tamu • 54 mnt lalu</div>
+          </div>
+
+          <!-- Meja 05 (Ditahan / Minta Bill) -->
+          <div class="table-card status-held" data-table-status="held" onclick="openTableModal('Meja 05', 'held', 165000, 4, 'Minta Struk / Bayar')">
+            <div class="table-top">
+              <span class="table-number">Meja 05</span>
+              <span class="table-status-pill">Minta Bill</span>
+            </div>
+            <div class="table-bill">Rp 165.000</div>
+            <div class="table-meta">4 Tamu • Siap Bayar</div>
+          </div>
+
+          <!-- Meja 06 (Terisi) -->
+          <div class="table-card status-occupied" data-table-status="occupied" onclick="openTableModal('Meja 06', 'occupied', 45000, 2, '18 mnt lalu (PWA QR)')">
+            <div class="table-top">
+              <span class="table-number">Meja 06</span>
+              <span class="table-status-pill">Terisi</span>
+            </div>
+            <div class="table-bill">Rp 45.000</div>
+            <div class="table-meta">2 Tamu • 18 mnt lalu</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- SUBVIEW: VERIFIKASI SERAH TERIMA BELANJAAN -->
+    <!-- ========================================== -->
+    <div id="subview-verifikasi-mandate" class="subview-overlay" style="z-index:450;">
+      <div class="subview-header" style="box-shadow:0 1px 3px rgba(0,0,0,0.05); gap:10px;">
+        <button type="button" class="btn-back" onclick="closeVerifyPage()">←</button>
+        <div style="flex:1; min-width:0;">
+          <h2 class="subview-title" style="font-size:16px; margin:0; line-height:1.2;">Verifikasi Belanjaan #MND-082</h2>
+          <div style="font-size:11px; color:#64748b; margin-top:2px;">Staf: <strong>Joko (Runner Dapur)</strong> • Pasar Pringsewu</div>
+        </div>
+        <span style="font-size:11px; font-weight:800; color:#c2410c; background:#ffedd5; padding:4px 8px; border-radius:999px; white-space:nowrap;">
+          Perlu QC 📦
+        </span>
+      </div>
+
+      <div class="subview-body" style="padding-bottom:100px;">
+        <!-- Card 1: Bukti Nota Pasar (Vertical Scalable Layout - Anti Horiz Scroll) -->
+        <div class="x-card" style="margin-bottom:14px; padding:14px;">
+          <!-- Header Nota & Summary -->
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; border-bottom:1px solid #f1f5f9; padding-bottom:8px;">
+            <div>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:11px; font-weight:800; color:#2563eb; background:#eff6ff; padding:2px 7px; border-radius:4px; white-space:nowrap;">📷 NOTA PASAR</span>
+                <span id="label-nota-count" style="font-size:11px; font-weight:800; color:#1e40af; background:#dbeafe; padding:2px 7px; border-radius:4px; white-space:nowrap;">2 Nota</span>
+              </div>
+              <div style="font-size:11px; color:#64748b; margin-top:3px;">Ketuk baris untuk audit fisik &amp; stempel</div>
+            </div>
+            <div style="text-align:right; flex-shrink:0;">
+              <span style="font-size:10px; color:#64748b;">Total Belanja:</span><br>
+              <strong id="label-nota-total" style="font-size:14.5px; color:#0f172a; white-space:nowrap;">Rp 320.000</strong>
+            </div>
+          </div>
+
+          <!-- Vertical Feed Container (Scrolls naturally with thumb, 1 to 20+ receipts) -->
+          <div id="receipt-items-container" style="display:flex; flex-direction:column; gap:8px;">
+            <!-- Populated via renderReceiptList() -->
+          </div>
+
+          <!-- Scalability Proof / Demo Toggle -->
+          <div style="margin-top:10px; padding-top:10px; border-top:1px dashed #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:11px; color:#64748b;" id="nota-scaling-hint">Layout vertikal adaptif (Bebas geser horizontal)</span>
+            <button type="button" id="btn-toggle-demo-receipts" onclick="toggleMultiReceiptDemo()" style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; font-size:11px; font-weight:700; color:#2563eb; padding:5px 9px; cursor:pointer;">
+              ⚡ Uji Skenario 10 Nota Kios ▾
+            </button>
+          </div>
+        </div>
+
+        <!-- Card 2: Pemeriksaan Fisik & QC Timbangan (Dapur) -->
+        <div class="x-card" style="margin-bottom:14px; padding:14px;">
+          <!-- Header QC -->
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; border-bottom:1px solid #f1f5f9; padding-bottom:8px;">
+            <div>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:11px; font-weight:800; color:#0369a1; background:#e0f2fe; padding:2px 7px; border-radius:4px; white-space:nowrap;">📦 QC TIMBANGAN &amp; FISIK</span>
+                <span id="label-qc-summary" style="font-size:10.5px; color:#b45309; font-weight:800; background:#fef3c7; padding:2px 7px; border-radius:4px; white-space:nowrap;">Ada Selisih 0.5 Kg</span>
+              </div>
+              <div style="font-size:11px; color:#64748b; margin-top:3px;">Diperiksa bersama: <strong>Chef Slamet</strong> &amp; <strong>Joko (Runner)</strong></div>
+            </div>
+            <span style="font-size:10px; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; padding:2px 6px; border-radius:4px; white-space:nowrap;">Meja Sortir Dapur</span>
+          </div>
+
+          <!-- QC Items Container (Dynamically rendered via renderQcList()) -->
+          <div id="qc-items-container" style="display:flex; flex-direction:column; gap:10px;">
+            <!-- Populated via renderQcList() -->
+          </div>
+        </div>
+
+        <!-- Card 3: Rekonsiliasi Kasbon Kasir POS & Serah Uang Fisik -->
+        <div class="x-card" style="border:1.5px solid #a7f3d0; background:#f0fdf4; margin-bottom:14px; padding:14px;">
+          <!-- Header Rekonsiliasi -->
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; border-bottom:1px solid #bbf7d0; padding-bottom:8px;">
+            <div>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:11px; font-weight:800; color:#065f46; background:#d1fae5; padding:2px 7px; border-radius:4px; white-space:nowrap;">💰 REKONSILIASI KAS POS</span>
+                <span id="recon-status-badge" style="font-size:10.5px; font-weight:800; color:#047857; background:#dcfce7; padding:2px 7px; border-radius:4px; white-space:nowrap;">✓ Kas Seimbang</span>
+              </div>
+              <div style="font-size:11px; color:#047857; margin-top:3px;">Sumber Dana: <strong>Laci POS Shift Pagi (Kasir Siti)</strong></div>
+            </div>
+            <span style="font-size:10px; font-weight:700; color:#065f46; background:#ffffff; border:1px solid #a7f3d0; padding:2px 6px; border-radius:4px;">No Ref: #MND-082</span>
+          </div>
+
+          <!-- Formula Bar / Audit Grid -->
+          <div style="background:#ffffff; border-radius:10px; padding:12px; border:1px solid #bbf7d0; margin-bottom:10px;">
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; font-size:12px;">
+              <div style="text-align:left; border-right:1px solid #f1f5f9; padding-right:4px;">
+                <span style="color:#64748b; font-size:10.5px;">Kasbon Diberikan:</span><br>
+                <strong style="color:#0f172a; font-size:13.5px;" id="recon-cash-given">Rp 350.000</strong>
+              </div>
+              <div style="text-align:center; border-right:1px solid #f1f5f9; padding:0 4px;">
+                <span style="color:#64748b; font-size:10.5px;" id="recon-nota-title">Total Nota Sah:</span><br>
+                <strong style="color:#0f172a; font-size:13.5px;" id="recon-cash-spent">Rp 320.000</strong>
+              </div>
+              <div style="text-align:right; padding-left:4px;">
+                <span style="color:#047857; font-weight:700; font-size:10.5px;" id="recon-change-label">Sisa Kembali Fisik:</span><br>
+                <strong style="color:#047857; font-size:15px;" id="recon-cash-change">Rp 30.000</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dual Handover Checklist -->
+          <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px; background:#ffffff; border-radius:8px; padding:10px; border:1px solid #bbf7d0;">
+            <label style="display:flex; align-items:flex-start; gap:8px; font-size:11.5px; color:#065f46; cursor:pointer;">
+              <input type="checkbox" id="check-cash-received" checked style="accent-color:#08a94f; width:16px; height:16px; margin-top:1px;">
+              <span id="recon-checkbox-desc-1">Fisik uang <strong>Rp 30.000</strong> telah dihitung &amp; masuk kembali ke laci POS Kasir Siti.</span>
+            </label>
+            <label style="display:flex; align-items:flex-start; gap:8px; font-size:11.5px; color:#065f46; cursor:pointer;">
+              <input type="checkbox" id="check-runner-cleared" checked style="accent-color:#08a94f; width:16px; height:16px; margin-top:1px;">
+              <span id="recon-checkbox-desc-2">Runner Joko dinyatakan lunas dan bebas dari tanggungan kas operasional #MND-082.</span>
+            </label>
+          </div>
+
+          <!-- Real-world Edge Case Tester Toggle: Normal vs Talangan Runner -->
+          <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px dashed #a7f3d0; padding-top:8px;">
+            <span style="font-size:10.5px; color:#047857;">Uji skenario kasir pasar:</span>
+            <div style="display:flex; gap:4px;">
+              <button type="button" class="chip-btn active" id="btn-recon-mode-normal" onclick="setReconScenario('normal')" style="font-size:10px; padding:3px 8px;">
+                Normal (Sisa Rp 30rb)
+              </button>
+              <button type="button" class="chip-btn" id="btn-recon-mode-talangan" onclick="setReconScenario('talangan')" style="font-size:10px; padding:3px 8px;">
+                Talangan Joko (Rp 30rb)
+              </button>
+            </div>
+          </div>
+
+          <!-- Accounting Ledger Impact -->
+          <div id="recon-ledger-note" style="font-size:10.5px; color:#065f46; background:#ecfdf5; padding:8px 10px; border-radius:6px; margin-top:8px; line-height:1.4; border:1px solid #a7f3d0;">
+            ⚡ <strong>Jurnal Otomatis Sistem:</strong> Kasbon ditutup. Biaya belanja pasar <strong>Rp 320.000</strong> diposting ke Pembukuan Harian Shift Pagi, saldo laci POS seimbang tanpa selisih.
+          </div>
+        </div>
+
+        <!-- Catatan Tambahan Manager (Opsional) -->
+        <div class="x-card" style="padding:12px; margin-bottom:14px;">
+          <label style="font-size:12px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">Catatan Tambahan Verifikasi (Opsional):</label>
+          <input type="text" class="search-input" style="padding-left:12px; font-size:12px;" value="Barang diterima baik oleh Chef Dapur. Sisa telur retak dicatat susut." placeholder="Tulis catatan jika ada...">
+        </div>
+      </div>
+
+      <!-- Sticky Fixed Bottom Action Bar (Unshakable Ergonomics) -->
+      <div style="position:absolute; bottom:0; left:0; right:0; background:#ffffff; border-top:1px solid #e2e8f0; padding:12px 16px; box-shadow:0 -4px 12px rgba(0,0,0,0.06); display:flex; gap:10px; z-index:350;">
+        <button type="button" class="btn-action btn-secondary" onclick="closeVerifyPage()" style="padding:13px 18px; font-size:13px; font-weight:700;">
+          Kembali
+        </button>
+        <button type="button" class="btn-action btn-primary" onclick="submitVerifyMandate()" style="flex:1; padding:13px; font-size:13.5px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px;">
+          <span>✓</span> <strong>Setujui &amp; Masukkan ke Stok Dapur</strong>
+        </button>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- BOTTOM NAVBAR (MOBILE-FIRST 5 TABS)        -->
+    <!-- ========================================== -->
+    <nav class="x-bottom-navbar" id="main-bottom-nav">
+      <!-- 1. Beranda -->
+      <button type="button" class="x-nav-tab-btn active" data-tab="beranda" onclick="switchNavTab('beranda')">
+        <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+        <span class="tab-label">Beranda</span>
+      </button>
+
+      <!-- 2. Pesanan -->
+      <button type="button" class="x-nav-tab-btn" data-tab="pesanan" onclick="switchNavTab('pesanan')">
+        <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+        <span class="tab-label">Pesanan</span>
+        <span class="x-nav-badge" id="nav-badge-pesanan">3</span>
+      </button>
+
+      <!-- 3. Menu & Stok (UNIFIED) -->
+      <button type="button" class="x-nav-tab-btn" data-tab="menu-stok" onclick="switchNavTab('menu-stok')">
+        <svg viewBox="0 0 24 24"><path d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5v-9.03C11.34 12.84 13 11.12 13 9V2h-2v7zm5-3v8h2.5v8H21V2c-2.76 0-5 2.24-5 4z"/></svg>
+        <span class="tab-label">Menu &amp; Stok</span>
+      </button>
+
+      <!-- 4. Belanja Pasar (PENGADAAN HARIAN) -->
+      <button type="button" class="x-nav-tab-btn" data-tab="belanja" onclick="switchNavTab('belanja')">
+        <svg viewBox="0 0 24 24"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/></svg>
+        <span class="tab-label">Belanja</span>
+        <span class="x-nav-badge" id="nav-badge-belanja" style="background:#2563eb;">2</span>
+      </button>
+
+      <!-- 5. Lainnya (OPERATIONS HUB) -->
+      <button type="button" class="x-nav-tab-btn" data-tab="lainnya" onclick="switchNavTab('lainnya')">
+        <svg viewBox="0 0 24 24"><path d="M4 8h4V4H4v4zm6 12h4v-4h-4v4zm-6 0h4v-4H4v4zm0-6h4v-4H4v4zm6 0h4v-4h-4v4zm6-10v4h4V4h-4zm-6 4h4V4h-4v4zm6 6h4v-4h-4v4zm0 6h4v-4h-4v4z"/></svg>
+        <span class="tab-label">Lainnya</span>
+      </button>
+    </nav>
+
+    <!-- TOAST NOTIFICATION COMPONENT -->
+    <div id="app-toast" class="x-toast">Notifikasi</div>
+
+    <!-- MODAL DETAIL MEJA -->
+    <div id="modal-table" class="modal-backdrop" onclick="if(event.target===this) closeTableModal()">
+      <div class="modal-sheet">
+        <div class="sheet-handle"></div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <div>
+            <h3 style="font-size:18px; font-weight:800; color:#0f172a;" id="modal-table-title">Meja 02</h3>
+            <p style="font-size:12px; color:var(--text-muted);" id="modal-table-subtitle">Terisi • 32 mnt lalu</p>
+          </div>
+          <span class="order-badge-type" id="modal-table-status-badge" style="background:#dbeafe; color:#1e40af;">TERISI</span>
+        </div>
+
+        <div style="background:#f8fafc; border-radius:12px; padding:12px; margin-bottom:14px;">
+          <div style="font-size:12px; font-weight:700; color:#64748b; margin-bottom:6px;">PESANAN AKTIF MEJA INI:</div>
+          <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:4px;">
+            <span>2x Paket Ayam Bakar Madu</span>
+            <strong>Rp 44.000</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:4px;">
+            <span>2x Es Jeruk Peras</span>
+            <strong>Rp 16.000</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:13px; border-top:1px dashed #cbd5e1; padding-top:6px; margin-top:6px;">
+            <strong>Total Tagihan</strong>
+            <strong style="color:#08a94f; font-size:15px;" id="modal-table-total">Rp 60.000</strong>
+          </div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <button type="button" class="btn-action btn-primary" onclick="settleTable()" style="padding:12px; font-size:13px;">💳 Selesaikan &amp; Kosongkan Meja</button>
+          <div style="display:flex; gap:8px;">
+            <button type="button" class="btn-action btn-secondary" onclick="showToast('🖨️ Struk tagihan meja dicetak'); closeTableModal();" style="flex:1; padding:10px;">Cetak Bill</button>
+            <button type="button" class="btn-action btn-secondary" onclick="showToast('Fitur Pindah Meja'); closeTableModal();" style="flex:1; padding:10px;">Pindah Meja</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MODAL 1: TUGASKAN MANDAT BELANJA (MANAGER) -->
+    <!-- ========================================== -->
+    <div id="modal-create-mandate" class="modal-backdrop" onclick="if(event.target===this) closeCreateMandateModal()">
+      <div class="modal-sheet">
+        <div class="sheet-handle"></div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <div>
+            <h3 style="font-size:17px; font-weight:800; color:#0f172a;">Tugaskan Mandat Belanja Baru</h3>
+            <p style="font-size:12px; color:var(--text-muted);">Rilis daftar belanja &amp; batas kasbon ke HP Petugas Belanja</p>
+          </div>
+          <button type="button" onclick="closeCreateMandateModal()" style="background:#f1f5f9; border:none; width:30px; height:30px; border-radius:50%; font-size:16px; cursor:pointer;">✕</button>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <!-- Pilih Staf Pelaksana -->
+          <div>
+            <label style="font-size:12px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">Pilih Staf Lapangan (Runner Pasar):</label>
+            <select id="select-mandate-staff" class="search-input" style="padding-left:12px; font-weight:700; background:#fff; cursor:pointer;">
+              <option value="Budi Santoso">Budi Santoso — Runner Dapur (Siap di Outlet)</option>
+              <option value="Joko Prasetyo">Joko Prasetyo — Staff Logistik (Siap di Outlet)</option>
+              <option value="Doni Kusuma">Doni Kusuma — Cook Helper (Shift Pagi)</option>
+            </select>
+          </div>
+
+          <!-- Checklist Bahan yg Ditugaskan -->
+          <div>
+            <label style="font-size:12px; font-weight:700; color:#475569; display:block; margin-bottom:6px;">Bahan Baku yang Perlu Dibeli:</label>
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:8px 12px; display:flex; flex-direction:column; gap:8px;">
+              <label style="display:flex; align-items:center; justify-content:space-between; font-size:12.5px; cursor:pointer;">
+                <span style="display:flex; align-items:center; gap:8px;">
+                  <input type="checkbox" checked style="accent-color:#08a94f; width:16px; height:16px;">
+                  <strong>Cabai Rawit Merah (3 Kg)</strong>
+                </span>
+                <span style="color:#ef4444; font-weight:700; font-size:11.5px;">Est. Rp 120.000</span>
+              </label>
+              <label style="display:flex; align-items:center; justify-content:space-between; font-size:12.5px; cursor:pointer;">
+                <span style="display:flex; align-items:center; gap:8px;">
+                  <input type="checkbox" checked style="accent-color:#08a94f; width:16px; height:16px;">
+                  <strong>Minyak Goreng Jerigen (18 Liter)</strong>
+                </span>
+                <span style="color:#64748b; font-weight:700; font-size:11.5px;">Est. Rp 270.000</span>
+              </label>
+              <label style="display:flex; align-items:center; justify-content:space-between; font-size:12.5px; cursor:pointer;">
+                <span style="display:flex; align-items:center; gap:8px;">
+                  <input type="checkbox" style="accent-color:#08a94f; width:16px; height:16px;">
+                  <span>Bawang Merah Brebes (2 Kg)</span>
+                </span>
+                <span style="color:#64748b; font-size:11.5px;">Est. Rp 60.000</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Plafon Kasbon Kasir -->
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <label style="font-size:12px; font-weight:700; color:#475569;">Pagu Kasbon Kasir (Rp):</label>
+              <span style="font-size:11px; color:#2563eb; font-weight:700;">Ambil dari Laci Kasir Shift</span>
+            </div>
+            <input type="number" id="input-mandate-budget" class="search-input" style="padding-left:12px; font-size:16px; font-weight:800; color:#0f172a;" value="400000">
+            <span style="font-size:11px; color:#64748b; margin-top:3px; display:block;">Pagu uang tunai maksimal yang diserahkan ke staf sebelum berangkat.</span>
+          </div>
+
+          <!-- Catatan Pasar -->
+          <div>
+            <label style="font-size:12px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">Instruksi Khusus untuk Staf di Pasar:</label>
+            <textarea id="input-mandate-notes" class="search-input" style="padding:10px 12px; height:60px; resize:none; font-size:12px;" placeholder="Tulis pesan untuk staf...">Pilih cabai yang kering di kios Bu Siti. Minyak goreng ambil merk Tropical / Bimoli.</textarea>
+          </div>
+
+          <!-- CTA Rilis Mandat -->
+          <button type="button" class="btn-action btn-primary" onclick="submitCreateMandate()" style="padding:13px; font-size:13px; margin-top:6px; display:flex; align-items:center; justify-content:center; gap:6px;">
+            <span>🚀</span> <strong>Rilis Tugas ke HP Staf (Purchasing App)</strong>
+          </button>
+        </div>
+      </div>
+    </div>
+
+
+
+    <!-- ========================================== -->
+    <!-- MODAL 3: LIHAT ARSIP NOTA (VIEW RECEIPT LIGHTBOX) -->
+    <!-- ========================================== -->
+    <div id="modal-receipt-view" class="modal-backdrop" onclick="if(event.target===this) closeReceiptModal()">
+      <div class="modal-sheet" style="max-height:90vh; display:flex; flex-direction:column; padding:18px;">
+        <div class="sheet-handle"></div>
+        
+        <!-- Header Sheet -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <div>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span id="receipt-view-seq-badge" style="font-size:10.5px; font-weight:800; color:#2563eb; background:#eff6ff; padding:2px 7px; border-radius:4px;">Nota 1 dari 2</span>
+              <span style="font-size:10.5px; color:#15803d; background:#dcfce7; padding:2px 7px; border-radius:4px; font-weight:700;">✓ Asli Terlampir</span>
+            </div>
+            <h3 style="font-size:16px; font-weight:800; color:#0f172a; margin-top:3px;" id="receipt-view-vendor">Kios Beras Subur Makmur</h3>
+          </div>
+          <button type="button" onclick="closeReceiptModal()" style="background:#f1f5f9; border:none; width:32px; height:32px; border-radius:50%; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#64748b;">✕</button>
+        </div>
+
+        <!-- Scrollable Paper Receipt Simulation -->
+        <div style="flex:1; overflow-y:auto; padding-right:2px; margin-bottom:12px;">
+          <div class="receipt-paper-sim">
+            <!-- Header Struk -->
+            <div style="text-align:center; padding-bottom:10px; border-bottom:1px dashed #cbd5e1; margin-bottom:10px;">
+              <div style="font-size:24px; margin-bottom:2px;">🧾</div>
+              <strong style="font-size:13.5px; color:#0f172a; text-transform:uppercase; letter-spacing:0.5px;" id="receipt-paper-vendor">KIOS BERAS SUBUR MAKMUR</strong>
+              <div style="font-size:11px; color:#64748b; margin-top:2px;" id="receipt-paper-loc">Pasar Tradisional Pringsewu • Los A-12</div>
+              <div style="font-size:10.5px; color:#94a3b8; margin-top:2px;" id="receipt-paper-time">28 Okt 2026, 07:38 WIB • Nota Pembelian Tunai</div>
+            </div>
+
+            <!-- Line Items Table -->
+            <div style="margin-bottom:12px;">
+              <div style="font-size:10.5px; font-weight:700; color:#64748b; margin-bottom:6px; display:flex; justify-content:space-between; border-bottom:1px solid #f1f5f9; padding-bottom:4px;">
+                <span>BARANG / RINCIAN</span>
+                <span>JUMLAH (RP)</span>
+              </div>
+              <div id="receipt-paper-items-list" style="display:flex; flex-direction:column; gap:6px; font-size:12px;">
+                <!-- items injected via JS -->
+              </div>
+            </div>
+
+            <!-- Total Amount -->
+            <div style="border-top:1.5px dashed #cbd5e1; padding-top:8px; display:flex; justify-content:space-between; align-items:baseline; margin-bottom:12px;">
+              <span style="font-size:13px; font-weight:800; color:#0f172a;">TOTAL BAYAR</span>
+              <strong style="font-size:18px; font-weight:800; color:#08a94f;" id="receipt-view-amount">Rp 220.000</strong>
+            </div>
+
+            <!-- Stempel Cap Basah & Legalitas Pasar -->
+            <div style="display:flex; justify-content:space-between; align-items:flex-end; background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:10px; margin-top:8px;">
+              <div>
+                <span style="font-size:10px; color:#64748b; display:block;">Pemeriksaan Bukti Fisik:</span>
+                <strong style="font-size:11px; color:#0f172a;" id="receipt-paper-stamp">Cap Stempel Toko Sah &amp; TTD</strong>
+                <div style="font-size:10px; color:#64748b; margin-top:2px;" id="receipt-view-meta">Diunggah oleh: Joko (Runner Dapur)</div>
+              </div>
+              <div class="receipt-stamp-badge" id="receipt-stamp-graphic">
+                ★ LUNAS ★
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Paging Navigation (Carousel / Switcher) -->
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button type="button" class="btn-action btn-secondary" id="btn-receipt-prev" onclick="prevReceipt()" style="flex:1; padding:10px; font-size:12px; font-weight:700;">
+            ‹ Nota Sblmnya
+          </button>
+          <button type="button" class="btn-action btn-secondary" id="btn-receipt-next" onclick="nextReceipt()" style="flex:1; padding:10px; font-size:12px; font-weight:700;">
+            Nota Lanjut ›
+          </button>
+          <button type="button" class="btn-action btn-primary" onclick="closeReceiptModal()" style="padding:10px 18px; font-size:12px; font-weight:700;">
+            Tutup
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    // TOAST HELPER
+    var toastTimeout;
+    function showToast(msg) {
+      var t = document.getElementById('app-toast');
+      if (!t) return;
+      t.textContent = msg;
+      t.classList.add('show');
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(function () {
+        t.classList.remove('show');
+      }, 2400);
+    }
+
+    // TOP CONTROLS FOR PROTOTYPE
+    function setDeviceMode(mode) {
+      var bPhone = document.getElementById('btn-mode-phone');
+      var bFull = document.getElementById('btn-mode-full');
+      if (mode === 'full') {
+        document.body.classList.add('is-fullscreen');
+        if (bFull) bFull.classList.add('active');
+        if (bPhone) bPhone.classList.remove('active');
+      } else {
+        document.body.classList.remove('is-fullscreen');
+        if (bPhone) bPhone.classList.add('active');
+        if (bFull) bFull.classList.remove('active');
+      }
+    }
+
+    function toggleExplanation() {
+      var el = document.getElementById('proto-explanation');
+      if (!el) return;
+      el.style.display = (el.style.display === 'none' ? 'flex' : 'none');
+    }
+
+    // MAIN NAVIGATION TAB SWITCHER (5 TABS)
+    function switchNavTab(tabId, subparam) {
+      if (!tabId) tabId = 'beranda';
+      window.scrollTo(0, 0);
+      if (document.documentElement) document.documentElement.scrollLeft = 0;
+      if (document.body) document.body.scrollLeft = 0;
+
+      // Update hash in URL
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState(null, '', '#' + tabId);
+      }
+
+      // Close any open subviews
+      document.querySelectorAll('.subview-overlay').forEach(function(el) {
+        el.classList.remove('active');
+      });
+
+      // Update navbar buttons
+      document.querySelectorAll('.x-nav-tab-btn').forEach(function(btn) {
+        btn.classList.toggle('active', btn.dataset.tab === tabId);
+      });
+
+      // Update view tabs
+      document.querySelectorAll('.x-view-tab').forEach(function(section) {
+        section.classList.toggle('active', section.id === 'tab-' + tabId);
+      });
+
+      // Handle sub-parameter if opening Menu & Stok
+      if (tabId === 'menu-stok' && subparam) {
+        switchMenuStokSegment(subparam);
+      }
+    }
+
+    // Auto-boot from hash or query
+    window.addEventListener('DOMContentLoaded', function() {
+      var params = new URLSearchParams(window.location.search);
+      var initialTab = params.get('tab') || window.location.hash.replace('#', '') || 'beranda';
+      if (initialTab) {
+        switchNavTab(initialTab, params.get('seg'));
+      }
+      if (params.get('subview') === 'verifikasi' || window.location.hash === '#verifikasi') {
+        setTimeout(function() { 
+          openVerifyPage(); 
+          if (params.get('scroll') === 'qc') {
+            setTimeout(function() {
+              var el = document.getElementById('qc-items-container');
+              if (el) el.scrollIntoView({ behavior: 'instant', block: 'center' });
+            }, 100);
+          }
+        }, 150);
+      }
+      if (params.get('subview') === 'laporan' || window.location.hash === '#laporan') {
+        setTimeout(function() { openSubview('subview-laporan'); }, 150);
+      }
+      if (params.get('claim') === 'show') {
+        setTimeout(function() {
+          var cc = document.getElementById('vendor-claims-container');
+          if (cc) cc.style.display = 'block';
+        }, 150);
+      }
+      if (params.get('demo') === '10') {
+        setTimeout(function() { toggleMultiReceiptDemo(); }, 200);
+      }
+      if (params.get('action') === 'verify') {
+        setTimeout(function() { submitVerifyMandate(); }, 100);
+      }
+    });
+
+    window.addEventListener('hashchange', function() {
+      var h = window.location.hash.replace('#', '');
+      if (h === 'verifikasi') {
+        openVerifyPage();
+      } else if (h) {
+        switchNavTab(h);
+      }
+    });
+
+    // MENU & STOK SEGMENT SWITCHER
+    function switchMenuStokSegment(seg) {
+      var btnPortions = document.getElementById('seg-btn-portions');
+      var btnCatalog = document.getElementById('seg-btn-catalog');
+      var btnMaterials = document.getElementById('seg-btn-materials');
+
+      var subPortions = document.getElementById('subseg-portions');
+      var subCatalog = document.getElementById('subseg-catalog');
+      var subMaterials = document.getElementById('subseg-materials');
+
+      if (btnPortions) btnPortions.classList.toggle('active', seg === 'portions');
+      if (btnCatalog) btnCatalog.classList.toggle('active', seg === 'catalog');
+      if (btnMaterials) btnMaterials.classList.toggle('active', seg === 'materials');
+
+      if (subPortions) subPortions.style.display = (seg === 'portions' ? 'block' : 'none');
+      if (subCatalog) subCatalog.style.display = (seg === 'catalog' ? 'block' : 'none');
+      if (subMaterials) subMaterials.style.display = (seg === 'materials' ? 'block' : 'none');
+    }
+
+    // PORTION COUNTERS
+    function changePortion(id, delta) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      var cur = parseInt(el.textContent, 10) || 0;
+      var next = Math.max(0, cur + delta);
+      el.textContent = next;
+      showToast('Sisa porsi diupdate ke ' + next);
+    }
+
+    // TOGGLE AVAILABLE
+    function toggleItemAvailable(sw, itemName) {
+      sw.classList.toggle('is-on');
+      var isNowOn = sw.classList.contains('is-on');
+      showToast(itemName + (isNowOn ? ' diaktifkan (Tersedia)' : ' ditandai HABIS (86)'));
+    }
+
+    // RESTO & ONLINE SWITCHES
+    function toggleRestoOpen(ctrl) {
+      var sw = ctrl.querySelector('.x-switch');
+      var lbl = ctrl.querySelector('#label-resto');
+      sw.classList.toggle('is-on');
+      var isOn = sw.classList.contains('is-on');
+      lbl.textContent = isOn ? 'Resto Buka' : 'Resto Tutup';
+      showToast(isOn ? '🟢 Resto diatur Buka' : '🔴 Resto diatur Tutup');
+    }
+
+    function toggleOrderOnline(ctrl) {
+      var sw = ctrl.querySelector('.x-switch');
+      sw.classList.toggle('is-on');
+      var isOn = sw.classList.contains('is-on');
+      showToast(isOn ? '🟢 Penerimaan Order Online Aktif' : '⏸️ Order Online Ditutup Sementara');
+    }
+
+    // ORDERS TAB LOGIC
+    function filterOrderTab(status, btn) {
+      document.querySelectorAll('#order-status-filter .segment-btn').forEach(function(b) {
+        b.classList.remove('active');
+      });
+      btn.classList.add('active');
+
+      document.querySelectorAll('.order-card').forEach(function(card) {
+        if (status === 'all') {
+          card.style.display = 'block';
+        } else {
+          card.style.display = (card.dataset.status === status ? 'block' : 'none');
+        }
+      });
+    }
+
+    var orderCountBadge = 3;
+    function acceptOrder(cardId) {
+      var card = document.getElementById(cardId);
+      if (!card) return;
+      card.style.animation = 'fadeOut 0.2s forwards';
+      setTimeout(function () {
+        card.dataset.status = 'processing';
+        card.classList.remove('is-new');
+        card.classList.add('is-processing');
+        card.style.display = 'none';
+        orderCountBadge = Math.max(0, orderCountBadge - 1);
+        var b = document.getElementById('nav-badge-pesanan');
+        if (b) b.textContent = orderCountBadge;
+        showToast('✅ Pesanan diterima & diteruskan ke dapur!');
+      }, 200);
+    }
+
+    function rejectOrder(cardId) {
+      var card = document.getElementById(cardId);
+      if (!card) return;
+      card.remove();
+      orderCountBadge = Math.max(0, orderCountBadge - 1);
+      var b = document.getElementById('nav-badge-pesanan');
+      if (b) b.textContent = orderCountBadge;
+      showToast('❌ Pesanan ditolak');
+    }
+
+    function markOrderReady(cardId) {
+      var card = document.getElementById(cardId);
+      if (!card) return;
+      card.dataset.status = 'ready';
+      card.classList.remove('is-processing');
+      card.classList.add('is-ready');
+      card.style.display = 'none';
+      showToast('🔔 Pesanan siap disajikan / diambil customer!');
+    }
+
+    function completeOrder(cardId) {
+      var card = document.getElementById(cardId);
+      if (!card) return;
+      card.remove();
+      showToast('🎉 Pesanan selesai!');
+    }
+
+    // TABLE MODAL LOGIC
+    var activeTableTitle = '';
+    function openTableModal(name, status, bill, seats, meta) {
+      activeTableTitle = name;
+      var modal = document.getElementById('modal-table');
+      var tTitle = document.getElementById('modal-table-title');
+      var tSub = document.getElementById('modal-table-subtitle');
+      var tBadge = document.getElementById('modal-table-status-badge');
+      var tTotal = document.getElementById('modal-table-total');
+
+      if (tTitle) tTitle.textContent = name;
+      if (tSub) tSub.textContent = (status === 'available' ? 'Kapasitas ' + seats + ' Orang' : meta);
+      if (tTotal) tTotal.textContent = (bill > 0 ? 'Rp ' + bill.toLocaleString('id-ID') : 'Rp 0');
+
+      if (tBadge) {
+        if (status === 'available') {
+          tBadge.textContent = 'KOSONG';
+          tBadge.style.background = '#dcfce7';
+          tBadge.style.color = '#15803d';
+        } else if (status === 'held') {
+          tBadge.textContent = 'MINTA BILL';
+          tBadge.style.background = '#fef3c7';
+          tBadge.style.color = '#b45309';
+        } else {
+          tBadge.textContent = 'TERISI';
+          tBadge.style.background = '#dbeafe';
+          tBadge.style.color = '#1e40af';
+        }
+      }
+
+      if (modal) modal.classList.add('open');
+    }
+
+    function closeTableModal() {
+      var modal = document.getElementById('modal-table');
+      if (modal) modal.classList.remove('open');
+    }
+
+    function settleTable() {
+      closeTableModal();
+      showToast('💳 Tagihan ' + activeTableTitle + ' lunas. Meja sekarang kosong & siap.');
+      // Update table stat counter
+      var elAvail = document.getElementById('stat-table-avail');
+      var elOcc = document.getElementById('stat-table-occ');
+      if (elAvail) elAvail.textContent = '8 Meja';
+      if (elOcc) elOcc.textContent = '3 Meja';
+    }
+
+    function filterTables(filter, btn) {
+      document.querySelectorAll('#tab-meja .chip-btn').forEach(function(b) {
+        b.classList.remove('active');
+      });
+      btn.classList.add('active');
+
+      document.querySelectorAll('#tables-container .table-card').forEach(function(card) {
+        if (filter === 'all') {
+          card.style.display = 'block';
+        } else {
+          card.style.display = (card.dataset.tableStatus === filter ? 'block' : 'none');
+        }
+      });
+    }
+
+    // SUBVIEWS FOR "LAINNYA"
+    function openSubview(id) {
+      var v = document.getElementById(id);
+      if (v) v.classList.add('active');
+    }
+
+    function closeSubview(id) {
+      var v = document.getElementById(id);
+      if (v) v.classList.remove('active');
+    }
+
+    // ==========================================
+    // MANAGERIAL BELANJA & MANDAT INTERACTIONS (ONE LAYER ONE TASK)
+    // ==========================================
+    var activeTasksCount = 2;
+    var doneTasksCount = 2;
+
+    function switchBelanjaSegment(seg) {
+      var btnActive = document.getElementById('btn-seg-belanja-active');
+      var btnDone = document.getElementById('btn-seg-belanja-done');
+      var listActive = document.getElementById('belanja-list-active');
+      var listDone = document.getElementById('belanja-list-done');
+
+      if (btnActive) btnActive.classList.toggle('active', seg === 'active');
+      if (btnDone) btnDone.classList.toggle('active', seg === 'done');
+
+      if (listActive) listActive.style.display = (seg === 'active' ? 'block' : 'none');
+      if (listDone) listDone.style.display = (seg === 'done' ? 'block' : 'none');
+    }
+
+    function openCreateMandateModal() {
+      var m = document.getElementById('modal-create-mandate');
+      if (m) m.classList.add('open');
+    }
+
+    function closeCreateMandateModal() {
+      var m = document.getElementById('modal-create-mandate');
+      if (m) m.classList.remove('open');
+    }
+
+    function submitCreateMandate() {
+      var staff = (document.getElementById('select-mandate-staff') || {}).value || 'Budi Santoso';
+      var budget = parseInt((document.getElementById('input-mandate-budget') || {}).value, 10) || 400000;
+      closeCreateMandateModal();
+
+      activeTasksCount++;
+      var elBadgeActive = document.getElementById('badge-count-belanja-active');
+      if (elBadgeActive) elBadgeActive.textContent = activeTasksCount;
+      var navBadge = document.getElementById('nav-badge-belanja');
+      if (navBadge) navBadge.textContent = activeTasksCount;
+
+      switchBelanjaSegment('active');
+
+      var listActive = document.getElementById('belanja-list-active');
+      if (listActive) {
+        var card = document.createElement('div');
+        card.className = 'x-card';
+        card.style.cssText = 'border-left:4px solid #3b82f6; padding:14px; margin-bottom:12px; animation:fadeIn 0.3s ease;';
+        card.innerHTML =
+          '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">' +
+            '<div>' +
+              '<span style="font-size:10.5px; font-weight:800; color:#1d4ed8; background:#eff6ff; padding:2px 6px; border-radius:4px;">#MND-084</span>' +
+              '<h3 style="font-size:15px; font-weight:800; color:#0f172a; margin-top:4px;">Pasar Sayur Pagi</h3>' +
+              '<div style="font-size:12px; color:#64748b; margin-top:2px;">Staf: <strong>' + staff + '</strong> • Pagu Rp ' + budget.toLocaleString('id-ID') + '</div>' +
+            '</div>' +
+            '<span style="font-size:11px; font-weight:800; color:#2563eb; background:#eff6ff; border:1px solid #bfdbfe; padding:3px 8px; border-radius:999px;">' +
+              'Baru Dirilis 🚀' +
+            '</span>' +
+          '</div>' +
+          '<div style="background:#f8fafc; border-radius:8px; padding:10px 12px; margin-bottom:12px; border:1px solid #f1f5f9; font-size:12px; color:#64748b;">' +
+            'Tugas telah masuk ke HP staf via Purchasing App. Menunggu konfirmasi belanja.' +
+          '</div>' +
+          '<button type="button" class="btn-action btn-secondary" onclick="showToast(\'💬 Menghubungi WhatsApp staf...\')" style="width:100%; padding:10px; font-size:12px; display:flex; align-items:center; justify-content:center; gap:6px;">' +
+            '<span>💬</span> Hubungi Staf via WA' +
+          '</button>';
+        listActive.insertBefore(card, listActive.firstChild);
+      }
+
+      showToast('🚀 Mandat belanja #MND-084 berhasil dirilis ke HP ' + staff + '!');
+    }
+
+    function openVerifyPage() {
+      openSubview('subview-verifikasi-mandate');
+      renderReceiptList();
+      renderQcList();
+    }
+
+    function closeVerifyPage() {
+      closeSubview('subview-verifikasi-mandate');
+    }
+
+    function openVerifyModal() {
+      openVerifyPage();
+    }
+
+    function closeVerifyModal() {
+      closeVerifyPage();
+    }
+
+    function submitVerifyMandate() {
+      closeVerifyPage();
+
+      var cardVerify = document.getElementById('card-verify-mandate');
+      if (cardVerify) {
+        cardVerify.style.transition = 'all 0.3s ease';
+        cardVerify.style.opacity = '0';
+        cardVerify.style.transform = 'translateY(-10px)';
+        setTimeout(function () {
+          if (cardVerify && cardVerify.parentNode) cardVerify.parentNode.removeChild(cardVerify);
+        }, 300);
+      }
+
+      activeTasksCount = Math.max(0, activeTasksCount - 1);
+      doneTasksCount++;
+
+      var elBadgeActive = document.getElementById('badge-count-belanja-active');
+      if (elBadgeActive) elBadgeActive.textContent = activeTasksCount;
+      var elBadgeDone = document.getElementById('badge-count-belanja-done');
+      if (elBadgeDone) elBadgeDone.textContent = doneTasksCount;
+
+      var navBadge = document.getElementById('nav-badge-belanja');
+      if (navBadge) navBadge.textContent = activeTasksCount;
+
+      // Ringkasan Bahan Riil (Angka & Catatan yang Diverifikasi)
+      var items = getActiveQcItems();
+      var summaryRowsHtml = '';
+      var hasAnyDiff = false;
+
+      for (var k = 0; k < items.length; k++) {
+        var it = items[k];
+        var d = Math.round((it.qtyReceived - it.qtyBilled) * 1000) / 1000;
+        var hasD = Math.abs(d) >= 0.001;
+        if (hasD) hasAnyDiff = true;
+
+        summaryRowsHtml +=
+          '<div style="display:flex; justify-content:space-between; align-items:flex-start; font-size:12px; padding:3px 0; border-bottom:1px dashed #f1f5f9;">' +
+            '<div>' +
+              '<strong>' + it.name + '</strong>' +
+              (hasD && it.operatorNote ? '<div style="font-size:11px; color:#b45309; margin-top:1px;">Catatan: <em>"' + it.operatorNote + '"</em></div>' : '') +
+            '</div>' +
+            '<div style="text-align:right;">' +
+              '<span style="font-weight:800; color:' + (hasD ? '#b45309' : '#15803d') + ';">' +
+                it.qtyReceived.toFixed(it.precision) + ' ' + it.unit +
+              '</span>' +
+              (hasD ? '<span style="font-size:10.5px; color:#b45309; display:block;">(' + (d > 0 ? '+' : '') + d.toFixed(it.precision) + ' ' + it.unit + ')</span>' : '<span style="font-size:10.5px; color:#15803d; display:block;">✓ Cocok</span>') +
+            '</div>' +
+          '</div>';
+      }
+
+      var listDone = document.getElementById('belanja-list-done');
+      if (listDone) {
+        var row = document.createElement('div');
+        row.className = 'x-card';
+        row.style.cssText = 'border-left:4px solid #10b981; padding:14px; margin-bottom:12px; animation:fadeIn 0.3s ease;';
+        row.innerHTML =
+          '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">' +
+            '<div>' +
+              '<span style="font-size:10.5px; font-weight:800; color:#15803d; background:#dcfce7; padding:2px 6px; border-radius:4px;">#MND-082</span>' +
+              '<h3 style="font-size:14.5px; font-weight:800; color:#0f172a; margin-top:3px;">Pasar Pringsewu</h3>' +
+              '<div style="font-size:12px; color:#64748b; margin-top:1px;">Staf: Joko • Selesai diverifikasi</div>' +
+            '</div>' +
+            '<span style="font-size:11px; font-weight:800; color:#15803d; background:#f0fdf4; border:1px solid #bbf7d0; padding:3px 8px; border-radius:999px;">' +
+              'Selesai' +
+            '</span>' +
+          '</div>' +
+          '<div style="background:#f8fafc; border-radius:8px; padding:8px 10px; margin:8px 0; border:1px solid #e2e8f0; display:flex; flex-direction:column; gap:4px;">' +
+            summaryRowsHtml +
+          '</div>' +
+          '<div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #f1f5f9; padding-top:8px;">' +
+            '<span style="font-size:12px; color:#64748b;">Total Nota: <strong>Rp 320.000</strong></span>' +
+            '<button type="button" class="btn-action btn-secondary" onclick="openReceiptModal(\'MND-082\', \'Kios Beras Subur Makmur\', 320000, \'Joko (Runner Dapur)\', \'07:38 WIB\')" style="font-size:11px; padding:4px 8px;">Lihat Nota Pasar</button>' +
+          '</div>';
+        listDone.insertBefore(row, listDone.firstChild);
+      }
+
+      // 1. Live update DOM di Tab Menu & Stok -> Bahan Baku
+      var rowBeras = document.getElementById('material-row-beras');
+      var stockBeras = document.getElementById('material-stock-beras');
+      var badgeBeras = document.getElementById('material-badge-beras');
+      if (stockBeras) stockBeras.innerHTML = 'Sisa: <strong>29.2 Kg</strong> <span style="color:#15803d; font-size:10.5px; font-weight:700;">(+25 Kg Masuk)</span> • Buffer: 10 Kg';
+      if (badgeBeras) {
+        badgeBeras.textContent = 'Aman';
+        badgeBeras.style.background = '#dcfce7';
+        badgeBeras.style.color = '#15803d';
+      }
+      if (rowBeras) {
+        rowBeras.style.background = '#ffffff';
+        rowBeras.style.borderColor = '#e2e8f0';
+      }
+
+      var rowTelur = document.getElementById('material-row-telur');
+      var stockTelur = document.getElementById('material-stock-telur');
+      var badgeTelur = document.getElementById('material-badge-telur');
+      if (stockTelur) stockTelur.innerHTML = 'Sisa: <strong>5.0 Kg</strong> <span style="color:#15803d; font-size:10.5px; font-weight:700;">(+4.5 Kg Masuk)</span> • Buffer: 3 Kg';
+      if (badgeTelur) {
+        badgeTelur.textContent = 'Aman';
+        badgeTelur.style.background = '#dcfce7';
+        badgeTelur.style.color = '#15803d';
+      }
+      if (rowTelur) {
+        rowTelur.style.background = '#ffffff';
+        rowTelur.style.borderColor = '#e2e8f0';
+      }
+
+      // 2. Live update Alert Banner di Tab Beranda
+      var homeAlertTitle = document.getElementById('home-alert-materials-title');
+      var homeAlertDesc = document.getElementById('home-alert-materials-desc');
+      if (homeAlertTitle) homeAlertTitle.textContent = '1 Bahan Baku Dapur Menipis';
+      if (homeAlertDesc) homeAlertDesc.textContent = 'Cabai Rawit Merah (1.5kg)';
+
+      showToast('✅ Mandat #MND-082 selesai! 25kg Beras & 4.5kg Telur masuk stok dapur. HPP menu sinkron otomatis.');
+    }
+
+    function settleVendorClaimDemo() {
+      var claimContainer = document.getElementById('vendor-claims-container');
+      if (claimContainer) {
+        claimContainer.style.transition = 'all 0.3s ease';
+        claimContainer.style.opacity = '0';
+        claimContainer.style.transform = 'translateY(-10px)';
+        setTimeout(function() {
+          claimContainer.style.display = 'none';
+          claimContainer.style.opacity = '1';
+          claimContainer.style.transform = 'none';
+        }, 300);
+      }
+      showToast('✓ Piutang retur Rp 10.000 berhasil dilunasi (dipotongkan pada belanja baru kios)!');
+    }
+
+    // ==========================================
+    // NOTA PASAR DATA MODEL (SCALABLE MOBILE FEED)
+    // ==========================================
+    var defaultReceipts = [
+      {
+        id: 1,
+        vendor: "Kios Beras Subur Makmur",
+        loc: "Pasar Tradisional Pringsewu • Los Bahan Pokok Blok A-12",
+        itemsSummary: "1 Karung Beras Ramos 25kg • 07:38 WIB",
+        amount: 220000,
+        time: "07:38 WIB",
+        badge: "✓ Cap Toko Sah",
+        stampText: "★ LUNAS ★",
+        stampColor: "#dc2626",
+        stampNote: "Cap basah tinta ungu toko resmi",
+        staff: "Joko (Runner Dapur)",
+        lines: [
+          { name: "Beras Ramos Premium 25kg", qty: "1 Karung (25 Kg)", price: 220000 }
+        ]
+      },
+      {
+        id: 2,
+        vendor: "Lapak Telur Ayam Barokah",
+        loc: "Pasar Tradisional Pringsewu • Los Unggas No. 04",
+        itemsSummary: "5 Kg Telur Ayam Ras • 07:44 WIB",
+        amount: 100000,
+        time: "07:44 WIB",
+        badge: "✓ Nota Ditandatangani",
+        stampText: "★ TERBAYAR ★",
+        stampColor: "#2563eb",
+        stampNote: "Nota tulis tangan & paraf penjual",
+        staff: "Joko (Runner Dapur)",
+        lines: [
+          { name: "Telur Ayam Ras Fresh", qty: "5.0 Kg @ Rp 20.000", price: 100000 }
+        ]
+      }
+    ];
+
+    var multiReceiptsDemo = [
+      {
+        id: 1,
+        vendor: "Kios Beras Subur Makmur",
+        loc: "Pasar Pringsewu • Los A-12",
+        itemsSummary: "1 Karung Beras Ramos 25kg • 07:38 WIB",
+        amount: 220000,
+        time: "07:38 WIB",
+        badge: "✓ Cap Toko Sah",
+        stampText: "★ LUNAS ★",
+        stampColor: "#dc2626",
+        stampNote: "Cap basah tinta ungu toko resmi",
+        staff: "Joko (Runner Dapur)",
+        lines: [{ name: "Beras Ramos Premium 25kg", qty: "1 Karung (25 Kg)", price: 220000 }]
+      },
+      {
+        id: 2,
+        vendor: "Lapak Telur Ayam Barokah",
+        loc: "Pasar Pringsewu • Los Unggas No. 04",
+        itemsSummary: "5 Kg Telur Ayam Ras • 07:44 WIB",
+        amount: 100000,
+        time: "07:44 WIB",
+        badge: "✓ Nota Ditandatangani",
+        stampText: "★ TERBAYAR ★",
+        stampColor: "#2563eb",
+        stampNote: "Nota tulis tangan & paraf penjual",
+        staff: "Joko (Runner Dapur)",
+        lines: [{ name: "Telur Ayam Ras Fresh", qty: "5.0 Kg", price: 100000 }]
+      },
+      {
+        id: 3,
+        vendor: "Kios Cabai & Sayur Bu Siti",
+        loc: "Pasar Pringsewu • Blok C-08",
+        itemsSummary: "Cabai Rawit 2kg & Bawang 2kg • 07:50 WIB",
+        amount: 90000,
+        time: "07:50 WIB",
+        badge: "✓ Nota Sobek Kertas",
+        stampText: "★ LUNAS ★",
+        stampColor: "#dc2626",
+        stampNote: "Nota sobek pasar cap basah",
+        staff: "Joko (Runner Dapur)",
+        lines: [
+          { name: "Cabai Rawit Merah Segar", qty: "2.0 Kg", price: 50000 },
+          { name: "Bawang Merah Brebes", qty: "2.0 Kg", price: 40000 }
+        ]
+      },
+      {
+        id: 4,
+        vendor: "Lapak Ayam Potong Pak Haji",
+        loc: "Pasar Pringsewu • Los Daging B-02",
+        itemsSummary: "10 Ekor Ayam Broiler Potong 8 • 07:56 WIB",
+        amount: 380000,
+        time: "07:56 WIB",
+        badge: "✓ Cap Toko Halal",
+        stampText: "★ CAP BASAH ★",
+        stampColor: "#15803d",
+        stampNote: "Cap halal MUI los unggas",
+        staff: "Joko (Runner Dapur)",
+        lines: [{ name: "Ayam Broiler @ 1.2kg", qty: "10 Ekor", price: 380000 }]
+      },
+      {
+        id: 5,
+        vendor: "Kios Bumbu Giling Mak Inah",
+        loc: "Pasar Pringsewu • Blok Rempah A-03",
+        itemsSummary: "Bumbu Kuning 1kg & Rendang 1kg • 08:01 WIB",
+        amount: 45000,
+        time: "08:01 WIB",
+        badge: "✓ Nota Basah",
+        stampText: "★ TERIMA KASIH ★",
+        stampColor: "#b45309",
+        stampNote: "Kuitansi toko rempah",
+        staff: "Joko (Runner Dapur)",
+        lines: [
+          { name: "Bumbu Kuning Halus", qty: "1 Kg", price: 25000 },
+          { name: "Bumbu Merah Pedas", qty: "1 Kg", price: 20000 }
+        ]
+      },
+      {
+        id: 6,
+        vendor: "Toko Kelapa Parut Mas Doni",
+        loc: "Pasar Pringsewu • Los D-01",
+        itemsSummary: "15 Butir Kelapa Parut Segar • 08:05 WIB",
+        amount: 75000,
+        time: "08:05 WIB",
+        badge: "✓ Nota Toko",
+        stampText: "★ LUNAS ★",
+        stampColor: "#dc2626",
+        stampNote: "Nota tulis tangan",
+        staff: "Joko (Runner Dapur)",
+        lines: [{ name: "Kelapa Parut Peras Santan", qty: "15 Butir", price: 75000 }]
+      },
+      {
+        id: 7,
+        vendor: "Pabrik Tempe & Tahu Barokah",
+        loc: "Pasar Pringsewu • Los T-05",
+        itemsSummary: "20 Papan Tempe & 3 Ember Tahu • 08:10 WIB",
+        amount: 110000,
+        time: "08:10 WIB",
+        badge: "✓ Nota Stempel",
+        stampText: "★ LUNAS ★",
+        stampColor: "#2563eb",
+        stampNote: "Stempel basah distributor tahu",
+        staff: "Joko (Runner Dapur)",
+        lines: [
+          { name: "Tempe Daun Kedelai", qty: "20 Papan", price: 60000 },
+          { name: "Tahu Sutra Putih", qty: "3 Ember", price: 50000 }
+        ]
+      },
+      {
+        id: 8,
+        vendor: "Kios Plastik & Packaging Jaya",
+        loc: "Ruko Pasar R-11",
+        itemsSummary: "Thinwall 650ml & Cup Minuman • 08:15 WIB",
+        amount: 140000,
+        time: "08:15 WIB",
+        badge: "✓ Struk Kasir",
+        stampText: "★ STRUK MESIN ★",
+        stampColor: "#0f172a",
+        stampNote: "Struk thermal mesin kasir POS",
+        staff: "Joko (Runner Dapur)",
+        lines: [
+          { name: "Thinwall 650ml (Pack 25)", qty: "4 Pack", price: 80000 },
+          { name: "Cup PP 16oz + Sealer", qty: "2 Roll", price: 60000 }
+        ]
+      },
+      {
+        id: 9,
+        vendor: "Agen Minyak Goreng Curah",
+        loc: "Gudang Sembako G-03",
+        itemsSummary: "1 Dus Minyak Goreng 12L • 08:18 WIB",
+        amount: 180000,
+        time: "08:18 WIB",
+        badge: "✓ Nota Agen",
+        stampText: "★ LUNAS ★",
+        stampColor: "#dc2626",
+        stampNote: "Faktur agen resmi",
+        staff: "Joko (Runner Dapur)",
+        lines: [{ name: "Minyak Goreng Sawit 12L", qty: "1 Dus (12L)", price: 180000 }]
+      },
+      {
+        id: 10,
+        vendor: "Karcis Parkir & Bongkar Muat",
+        loc: "Pos Gerbang Masuk Pasar Pringsewu",
+        itemsSummary: "Retribusi Motor Tiga Roda & Kuli • 08:22 WIB",
+        amount: 15000,
+        time: "08:22 WIB",
+        badge: "✓ Karcis Resmi",
+        stampText: "★ RETRIBUSI ★",
+        stampColor: "#15803d",
+        stampNote: "Karcis retribusi pasar daerah",
+        staff: "Joko (Runner Dapur)",
+        lines: [
+          { name: "Karcis Masuk Roda Tiga", qty: "1 Unit", price: 10000 },
+          { name: "Uang Jasa Bongkar Muat", qty: "1 Rit", price: 5000 }
+        ]
+      }
+    ];
+
+    var receiptsData = defaultReceipts.slice();
+    var currentReceiptIndex = 0;
+    var isMultiDemo = false;
+
+    function renderReceiptList() {
+      var container = document.getElementById('receipt-items-container');
+      if (!container) return;
+      container.innerHTML = '';
+
+      var totalAmount = 0;
+      for (var i = 0; i < receiptsData.length; i++) {
+        var r = receiptsData[i];
+        totalAmount += r.amount;
+
+        var row = document.createElement('div');
+        row.className = 'receipt-card-row';
+        row.setAttribute('onclick', 'openReceiptByIndex(' + i + ')');
+
+        var seqStr = (i + 1 < 10 ? '0' : '') + (i + 1);
+        var barColor = (i % 3 === 0) ? '#2563eb' : (i % 3 === 1 ? '#d97706' : '#10b981');
+
+        row.innerHTML =
+          '<div class="receipt-doc-thumb">' +
+            '<span style="font-size:16px;">🧾</span>' +
+            '<span style="font-size:8px; font-weight:800; color:' + barColor + ';">#' + seqStr + '</span>' +
+            '<div class="doc-bar" style="background:' + barColor + ';"></div>' +
+          '</div>' +
+          '<div style="flex:1; min-width:0;">' +
+            '<div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">' +
+              '<div style="min-width:0; flex:1;">' +
+                '<strong style="font-size:13px; color:#0f172a; line-height:1.2; display:block;">' + r.vendor + '</strong>' +
+                '<div style="font-size:11px; color:#64748b; margin-top:2px;">' + r.itemsSummary + '</div>' +
+              '</div>' +
+              '<strong style="font-size:13.5px; color:#0f172a; flex-shrink:0; text-align:right;">Rp ' + r.amount.toLocaleString('id-ID') + '</strong>' +
+            '</div>' +
+            '<div style="display:flex; align-items:center; justify-content:space-between; margin-top:5px;">' +
+              '<span style="font-size:9.5px; font-weight:700; color:#15803d; background:#dcfce7; padding:1px 6px; border-radius:4px;">' + r.badge + '</span>' +
+              '<span style="font-size:11px; color:#2563eb; font-weight:700;">Lihat Foto 🔍</span>' +
+            '</div>' +
+          '</div>';
+        container.appendChild(row);
+      }
+
+      var countEl = document.getElementById('label-nota-count');
+      if (countEl) countEl.textContent = receiptsData.length + ' Nota';
+
+      var totalEl = document.getElementById('label-nota-total');
+      if (totalEl) totalEl.textContent = 'Rp ' + totalAmount.toLocaleString('id-ID');
+    }
+
+    function openReceiptByIndex(idx) {
+      if (idx < 0 || idx >= receiptsData.length) return;
+      currentReceiptIndex = idx;
+      var r = receiptsData[idx];
+
+      var m = document.getElementById('modal-receipt-view');
+      var seqBadge = document.getElementById('receipt-view-seq-badge');
+      var vendorTitle = document.getElementById('receipt-view-vendor');
+      var paperVendor = document.getElementById('receipt-paper-vendor');
+      var paperLoc = document.getElementById('receipt-paper-loc');
+      var paperTime = document.getElementById('receipt-paper-time');
+      var paperItems = document.getElementById('receipt-paper-items-list');
+      var totalAmount = document.getElementById('receipt-view-amount');
+      var paperStamp = document.getElementById('receipt-paper-stamp');
+      var stampGraphic = document.getElementById('receipt-stamp-graphic');
+      var metaEl = document.getElementById('receipt-view-meta');
+
+      if (seqBadge) seqBadge.textContent = 'Nota ' + (idx + 1) + ' dari ' + receiptsData.length;
+      if (vendorTitle) vendorTitle.textContent = r.vendor;
+      if (paperVendor) paperVendor.textContent = r.vendor.toUpperCase();
+      if (paperLoc) paperLoc.textContent = r.loc || 'Pasar Tradisional Pringsewu';
+      if (paperTime) paperTime.textContent = '28 Okt 2026, ' + r.time + ' • Nota Pembelian Tunai';
+
+      if (paperItems) {
+        paperItems.innerHTML = '';
+        var lines = r.lines || [{ name: r.itemsSummary, qty: '1 Paket', price: r.amount }];
+        for (var j = 0; j < lines.length; j++) {
+          var lineDiv = document.createElement('div');
+          lineDiv.style.cssText = 'display:flex; justify-content:space-between; align-items:baseline;';
+          lineDiv.innerHTML =
+            '<div>' +
+              '<strong>' + lines[j].name + '</strong>' +
+              '<div style="font-size:10.5px; color:#64748b;">' + lines[j].qty + '</div>' +
+            '</div>' +
+            '<strong>Rp ' + lines[j].price.toLocaleString('id-ID') + '</strong>';
+          paperItems.appendChild(lineDiv);
+        }
+      }
+
+      if (totalAmount) totalAmount.textContent = 'Rp ' + r.amount.toLocaleString('id-ID');
+      if (paperStamp) paperStamp.textContent = r.stampNote || 'Cap Stempel Toko Sah & TTD';
+      if (stampGraphic) {
+        stampGraphic.textContent = r.stampText || '★ LUNAS ★';
+        stampGraphic.style.borderColor = r.stampColor || '#dc2626';
+        stampGraphic.style.color = r.stampColor || '#dc2626';
+      }
+      if (metaEl) metaEl.textContent = 'Diunggah oleh: ' + (r.staff || 'Joko (Runner Dapur)');
+
+      var btnPrev = document.getElementById('btn-receipt-prev');
+      var btnNext = document.getElementById('btn-receipt-next');
+      if (btnPrev) btnPrev.disabled = (idx === 0);
+      if (btnNext) btnNext.disabled = (idx === receiptsData.length - 1);
+
+      if (m) m.classList.add('open');
+    }
+
+    function prevReceipt() {
+      if (currentReceiptIndex > 0) {
+        openReceiptByIndex(currentReceiptIndex - 1);
+      }
+    }
+
+    function nextReceipt() {
+      if (currentReceiptIndex < receiptsData.length - 1) {
+        openReceiptByIndex(currentReceiptIndex + 1);
+      }
+    }
+
+    // =========================================================================
+    // UNIVERSAL PHYSICAL RECEIVING & QC FRAMEWORK (KITCHEN DOCK / MEJA SORTIR)
+    // Standard normalized architecture for any inventory item & receiving condition.
+    // Zero bespoke object-specific hardcoding. Fully scalable ERP data taxonomy.
+    // =========================================================================
+
+    // DISCREPANCY TAXONOMY (Universal ERP standard across produce, poultry, dry goods, oil, packaging)
+    var QC_TAXONOMY = {
+      DAMAGED:   { key: 'DAMAGED',   label: '💥 Rusak Fisik',      desc: 'Pecah, robek, bocor, cacat saat transit' },
+      SHRINKAGE: { key: 'SHRINKAGE', label: '⚖️ Susut Alami / Es', desc: 'Tiris es, penguapan air, kalibrasi timbangan' },
+      REJECTED:  { key: 'REJECTED',  label: '❌ Kualitas Ditolak',  desc: 'Layu, busuk, bau, tidak sesuai standar grade' },
+      SHORT:     { key: 'SHORT',     label: '📦 Kurang Kirim',      desc: 'Ketinggalan di kios / salah hitung pedagang' }
+    };
+
+    // UNIVERSAL FINANCIAL DISPOSITION (Who pays for the variance)
+    var QC_DISPOSITION = {
+      WASTE:          { key: 'WASTE',          label: '🏠 Beban Susut Dapur',  target: 'Waste Log Resto (Biaya Operasional)' },
+      SUPPLIER_CLAIM: { key: 'SUPPLIER_CLAIM', label: '🧾 Klaim Retur Pedagang', target: 'Potong Nota Belanja Berikutnya' }
+    };
+
+    // Normalized Default Mandat #MND-082 (2 items)
+    var defaultQcItems = [
+      {
+        id: 'item_beras',
+        name: 'Beras Ramos Premium 25kg',
+        vendor: 'Kios Beras Subur Makmur',
+        storageZone: 'Gudang Kering',
+        storageClass: 'storage-dry',
+        unit: 'Kg',
+        step: 0.5,
+        precision: 1,
+        qtyBilled: 25.0,
+        qtyReceived: 25.0,
+        pricePerUnit: 8800,
+        discrepancyType: 'DAMAGED',
+        disposition: 'WASTE',
+        yieldInfo: '~165 porsi nasi',
+        operatorNote: 'Karung utuh segel pabrik, beras putih bersih'
+      },
+      {
+        id: 'item_telur',
+        name: 'Telur Ayam Ras Fresh',
+        vendor: 'Lapak Telur Ayam Barokah',
+        storageZone: 'Chiller Telur & Susu',
+        storageClass: 'storage-cold',
+        unit: 'Kg',
+        step: 0.1,
+        precision: 1,
+        qtyBilled: 5.0,
+        qtyReceived: 4.5,
+        pricePerUnit: 20000,
+        discrepancyType: 'DAMAGED',
+        disposition: 'WASTE',
+        yieldInfo: '~72 butir resep',
+        operatorNote: '8 butir retak kena guncangan jalan'
+      }
+    ];
+
+    // Normalized 10-Nota Demo Items
+    var multiQcItems = [
+      {
+        id: 'multi_beras',
+        name: 'Beras Ramos Premium 25kg',
+        vendor: 'Kios Beras Subur Makmur',
+        storageZone: 'Gudang Kering',
+        storageClass: 'storage-dry',
+        unit: 'Kg',
+        step: 0.5,
+        precision: 1,
+        qtyBilled: 25.0,
+        qtyReceived: 25.0,
+        pricePerUnit: 8800,
+        discrepancyType: 'DAMAGED',
+        disposition: 'WASTE',
+        yieldInfo: '~165 porsi nasi',
+        operatorNote: 'Karung utuh segel pabrik'
+      },
+      {
+        id: 'multi_telur',
+        name: 'Telur Ayam Ras Fresh',
+        vendor: 'Lapak Telur Ayam Barokah',
+        storageZone: 'Chiller Telur & Susu',
+        storageClass: 'storage-cold',
+        unit: 'Kg',
+        step: 0.1,
+        precision: 1,
+        qtyBilled: 5.0,
+        qtyReceived: 4.5,
+        pricePerUnit: 20000,
+        discrepancyType: 'DAMAGED',
+        disposition: 'WASTE',
+        yieldInfo: '~72 butir resep',
+        operatorNote: '8 butir retak kena guncangan jalan'
+      },
+      {
+        id: 'multi_ayam',
+        name: 'Ayam Broiler Segar Karkas',
+        vendor: 'Lapak Ayam Segar Berkah',
+        storageZone: 'Freezer Daging & Unggas',
+        storageClass: 'storage-freeze',
+        unit: 'Kg',
+        step: 0.1,
+        precision: 1,
+        qtyBilled: 12.0,
+        qtyReceived: 11.8,
+        pricePerUnit: 24000,
+        discrepancyType: 'SHRINKAGE',
+        disposition: 'WASTE',
+        yieldInfo: '~80 porsi ayam',
+        operatorNote: 'Susut tiris air es 0.2 kg (toleransi normal <2%)'
+      },
+      {
+        id: 'multi_minyak',
+        name: 'Minyak Goreng Sawit 12L',
+        vendor: 'Grosir Sembako Rejeki Baru',
+        storageZone: 'Gudang Kering',
+        storageClass: 'storage-dry',
+        unit: 'Liter',
+        step: 1.0,
+        precision: 0,
+        qtyBilled: 12.0,
+        qtyReceived: 12.0,
+        pricePerUnit: 18000,
+        discrepancyType: 'DAMAGED',
+        disposition: 'WASTE',
+        operatorNote: 'Dus karton tersegel pabrik'
+      },
+      {
+        id: 'multi_cabai',
+        name: 'Cabai Rawit Merah & Bawang',
+        vendor: 'Lapak Sayur Segar Bu Siti',
+        storageZone: 'Chiller Sayur & Bumbu',
+        storageClass: 'storage-cold',
+        unit: 'Kg',
+        step: 0.1,
+        precision: 1,
+        qtyBilled: 4.0,
+        qtyReceived: 4.0,
+        pricePerUnit: 25000,
+        discrepancyType: 'REJECTED',
+        disposition: 'WASTE',
+        operatorNote: 'Cabai kering segar tanpa busuk'
+      },
+      {
+        id: 'multi_kemasan',
+        name: 'Thinwall 650ml & Cup Minuman',
+        vendor: 'Toko Plastik & Kemasan Jaya',
+        storageZone: 'Gudang Kering',
+        storageClass: 'storage-dry',
+        unit: 'Pack',
+        step: 1.0,
+        precision: 0,
+        qtyBilled: 4.0,
+        qtyReceived: 4.0,
+        pricePerUnit: 35000,
+        discrepancyType: 'DAMAGED',
+        disposition: 'WASTE',
+        operatorNote: 'Higienis, kemasan tersegel'
+      },
+      {
+        id: 'multi_bumbu',
+        name: 'Bumbu Kuning & Rendang',
+        vendor: 'Lapak Bumbu Giling Mak Ijah',
+        storageZone: 'Chiller Sayur & Bumbu',
+        storageClass: 'storage-cold',
+        unit: 'Kg',
+        step: 0.1,
+        precision: 1,
+        qtyBilled: 2.0,
+        qtyReceived: 2.0,
+        pricePerUnit: 30000,
+        discrepancyType: 'DAMAGED',
+        disposition: 'WASTE',
+        operatorNote: 'Aroma segar gilingan subuh'
+      },
+      {
+        id: 'multi_sapi',
+        name: 'Daging Sapi Sandung Lamur',
+        vendor: 'Kios Daging Sapi Pak Haji Umar',
+        storageZone: 'Freezer Daging & Unggas',
+        storageClass: 'storage-freeze',
+        unit: 'Kg',
+        step: 0.1,
+        precision: 1,
+        qtyBilled: 3.0,
+        qtyReceived: 3.0,
+        pricePerUnit: 80000,
+        discrepancyType: 'SHORT',
+        disposition: 'SUPPLIER_CLAIM',
+        operatorNote: 'Daging segar warna merah cerah'
+      },
+      {
+        id: 'multi_kelapa',
+        name: 'Kelapa Parut Murni (Tanpa Air)',
+        vendor: 'Lapak Kelapa Parut Sumber Rasa',
+        storageZone: 'Chiller Sayur & Bumbu',
+        storageClass: 'storage-cold',
+        unit: 'Butir',
+        step: 1.0,
+        precision: 0,
+        qtyBilled: 15.0,
+        qtyReceived: 15.0,
+        pricePerUnit: 5000,
+        discrepancyType: 'REJECTED',
+        disposition: 'WASTE',
+        operatorNote: 'Kelapa tua manis, santan kental gurih'
+      },
+      {
+        id: 'multi_tahu',
+        name: 'Tempe Kedelai & Tahu Sutra',
+        vendor: 'Pabrik Tahu & Tempe Murni Asri',
+        storageZone: 'Chiller Sayur & Bumbu',
+        storageClass: 'storage-cold',
+        unit: 'Papan',
+        step: 1.0,
+        precision: 0,
+        qtyBilled: 20.0,
+        qtyReceived: 20.0,
+        pricePerUnit: 3500,
+        discrepancyType: 'DAMAGED',
+        disposition: 'WASTE',
+        operatorNote: 'Tekstur kenyal padat, air rendaman bening'
+      }
+    ];
+
+    var currentQcFilter = 'ALL'; // 'ALL', 'DIFF', 'DRY', 'COLD', 'FREEZE'
+
+    function getActiveQcItems() {
+      return isMultiDemo ? multiQcItems : defaultQcItems;
+    }
+
+    function findQcItem(id) {
+      var items = getActiveQcItems();
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].id === id) return items[i];
+      }
+      return null;
+    }
+
+    function setUniversalQty(id, val) {
+      var item = findQcItem(id);
+      if (!item) return;
+      var num = parseFloat(val);
+      if (isNaN(num) || num < 0) num = 0;
+      var factor = Math.pow(10, item.precision);
+      item.qtyReceived = Math.round(num * factor) / factor;
+      renderQcList();
+
+      var diff = Math.round((item.qtyReceived - item.qtyBilled) * 1000) / 1000;
+      if (Math.abs(diff) < 0.001) {
+        showToast('✓ ' + item.name + ': Sesuai penuh nota (' + item.qtyReceived.toFixed(item.precision) + ' ' + item.unit + ')');
+      } else if (diff < 0) {
+        showToast('⚠️ ' + item.name + ': Selisih ' + diff.toFixed(item.precision) + ' ' + item.unit + ' dicatat');
+      } else {
+        showToast('+ ' + item.name + ': Lebih +' + diff.toFixed(item.precision) + ' ' + item.unit);
+      }
+    }
+
+    function adjustUniversalQty(id, delta) {
+      var item = findQcItem(id);
+      if (!item) return;
+      var next = item.qtyReceived + delta;
+      setUniversalQty(id, next);
+    }
+
+    function resetUniversalQty(id) {
+      var item = findQcItem(id);
+      if (!item) return;
+      setUniversalQty(id, item.qtyBilled);
+    }
+
+    function setUniversalCategory(id, catKey) {
+      var item = findQcItem(id);
+      if (!item) return;
+      item.discrepancyType = catKey;
+      renderQcList();
+      showToast('🏷️ Klasifikasi: ' + (QC_TAXONOMY[catKey] ? QC_TAXONOMY[catKey].label : catKey));
+    }
+
+    function setUniversalDisposition(id, dispKey) {
+      var item = findQcItem(id);
+      if (!item) return;
+      item.disposition = dispKey;
+      renderQcList();
+      showToast('💼 Alokasi: ' + (QC_DISPOSITION[dispKey] ? QC_DISPOSITION[dispKey].label : dispKey));
+    }
+
+    function updateUniversalNote(id, noteVal) {
+      var item = findQcItem(id);
+      if (!item) return;
+      item.operatorNote = noteVal;
+    }
+
+    function setQcFilter(filter) {
+      currentQcFilter = filter;
+      renderQcList();
+    }
+
+    // LEAN UNIVERSAL CARD RENDERER (FOKUS: ANGKA & CATATAN)
+    function renderUniversalQcCard(item, idx) {
+      var diff = Math.round((item.qtyReceived - item.qtyBilled) * 1000) / 1000;
+      var hasDiff = Math.abs(diff) >= 0.001;
+      var isNegative = diff < -0.0001;
+      var isPositive = diff > 0.0001;
+
+      // Status Badge
+      var statusBadgeHtml = '';
+      if (!hasDiff) {
+        statusBadgeHtml = '<span style="font-size:10.5px; font-weight:800; color:#15803d; background:#dcfce7; padding:3px 8px; border-radius:6px; white-space:nowrap;">✓ Sesuai Nota</span>';
+      } else if (isNegative) {
+        statusBadgeHtml = '<span style="font-size:10.5px; font-weight:800; color:#b45309; background:#fef3c7; padding:3px 8px; border-radius:6px; white-space:nowrap;">⚠️ Selisih: ' + diff.toFixed(item.precision) + ' ' + item.unit + '</span>';
+      } else {
+        statusBadgeHtml = '<span style="font-size:10.5px; font-weight:800; color:#2563eb; background:#eff6ff; padding:3px 8px; border-radius:6px; white-space:nowrap;">+ Lebih: +' + diff.toFixed(item.precision) + ' ' + item.unit + '</span>';
+      }
+
+      var notePlaceholder = hasDiff
+        ? 'Tulis alasan selisih (cth: 8 butir retak di jalan, tiris es)...'
+        : 'Catatan kondisi fisik (opsional)...';
+
+      return (
+        '<div class="universal-qc-card ' + (hasDiff ? 'has-variance' : '') + '">' +
+          // Header Card
+          '<div style="display:flex; justify-content:space-between; align-items:flex-start;">' +
+            '<div style="flex:1; padding-right:8px;">' +
+              '<div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">' +
+                '<strong style="font-size:13.5px; color:#0f172a;">' + item.name + '</strong>' +
+                '<span class="storage-tag ' + item.storageClass + '">📍 ' + item.storageZone + '</span>' +
+              '</div>' +
+              '<div style="font-size:11.5px; color:#64748b; margin-top:2px;">' +
+                'Nota: <strong>' + item.qtyBilled.toFixed(item.precision) + ' ' + item.unit + '</strong> • ' + item.vendor +
+              '</div>' +
+            '</div>' +
+            statusBadgeHtml +
+          '</div>' +
+
+          // 1. ANGKA (Timbangan Meja Sortir Dapur)
+          '<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px; margin-top:8px;">' +
+            '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">' +
+              '<span style="font-size:11px; font-weight:700; color:#334155;">⚖️ Diterima Fisik (Ditimbang):</span>' +
+              '<button type="button" onclick="resetUniversalQty(\'' + item.id + '\')" style="background:transparent; border:none; font-size:10.5px; font-weight:700; color:#2563eb; cursor:pointer; text-decoration:underline; padding:0;">' +
+                'Samakan Nota (' + item.qtyBilled.toFixed(item.precision) + ' ' + item.unit + ')' +
+              '</button>' +
+            '</div>' +
+
+            '<div style="display:flex; align-items:center; gap:8px;">' +
+              '<button type="button" onclick="adjustUniversalQty(\'' + item.id + '\', -' + item.step + ')" style="width:36px; height:36px; border-radius:8px; border:1.5px solid #cbd5e1; background:#ffffff; font-size:18px; font-weight:800; cursor:pointer; color:#0f172a; display:flex; align-items:center; justify-content:center;">−</button>' +
+              '<div style="flex:1; position:relative;">' +
+                '<input type="number" step="' + item.step + '" value="' + item.qtyReceived.toFixed(item.precision) + '" onchange="setUniversalQty(\'' + item.id + '\', this.value)" style="width:100%; text-align:center; font-size:16px; font-weight:800; color:#0f172a; padding:6px 36px 6px 10px; border-radius:8px; border:1.5px solid ' + (hasDiff ? '#f59e0b' : '#10b981') + '; outline:none; font-family:inherit; background:#ffffff; box-sizing:border-box;">' +
+                '<span style="position:absolute; right:10px; top:50%; transform:translateY(-50%); font-size:12px; font-weight:700; color:#64748b;">' + item.unit + '</span>' +
+              '</div>' +
+              '<button type="button" onclick="adjustUniversalQty(\'' + item.id + '\', ' + item.step + ')" style="width:36px; height:36px; border-radius:8px; border:1.5px solid #cbd5e1; background:#ffffff; font-size:18px; font-weight:800; cursor:pointer; color:#0f172a; display:flex; align-items:center; justify-content:center;">+</button>' +
+            '</div>' +
+          '</div>' +
+
+          // 2. CATATAN MEJA SORTIR
+          '<div style="margin-top:8px;">' +
+            '<input type="text" class="qc-note-input" value="' + (item.operatorNote ? item.operatorNote.replace(/"/g, '&quot;') : '') + '" oninput="updateUniversalNote(\'' + item.id + '\', this.value)" placeholder="' + notePlaceholder + '" style="' + (hasDiff ? 'border-color:#fde68a; background:#fffbeb;' : '') + '">' +
+          '</div>' +
+
+          // Konfirmasi Stok Masuk & Estimasi Hasil Dapur
+          '<div style="margin-top:7px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px; font-size:11px;">' +
+            '<div style="color:' + (hasDiff ? '#b45309' : '#15803d') + '; display:flex; align-items:center; gap:4px;">' +
+              '<span>' + (hasDiff ? '⚠️' : '✓') + '</span> ' +
+              '<span>Masuk stok ' + item.storageZone + ': <strong>' + item.qtyReceived.toFixed(item.precision) + ' ' + item.unit + '</strong></span>' +
+            '</div>' +
+            (item.yieldInfo ? '<span style="background:#f1f5f9; color:#475569; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:700;">🥣 ' + item.yieldInfo + '</span>' : '') +
+          '</div>' +
+        '</div>'
+      );
+    }
+
+    function renderQcList() {
+      var container = document.getElementById('qc-items-container');
+      if (!container) return;
+      container.innerHTML = '';
+
+      var items = getActiveQcItems();
+
+      // Filter handling for multi-item mode
+      var filterHtml = '';
+      if (isMultiDemo) {
+        var diffCount = 0;
+        for (var c = 0; c < items.length; c++) {
+          if (Math.abs(items[c].qtyReceived - items[c].qtyBilled) >= 0.001) diffCount++;
+        }
+
+        filterHtml =
+          '<div style="display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; margin-bottom:4px;">' +
+            '<button type="button" class="qc-filter-tab ' + (currentQcFilter === 'ALL' ? 'active' : '') + '" onclick="setQcFilter(\'ALL\')">Semua (10)</button>' +
+            '<button type="button" class="qc-filter-tab ' + (currentQcFilter === 'DIFF' ? 'active' : '') + '" onclick="setQcFilter(\'DIFF\')">⚠️ Selisih (' + diffCount + ')</button>' +
+            '<button type="button" class="qc-filter-tab ' + (currentQcFilter === 'DRY' ? 'active' : '') + '" onclick="setQcFilter(\'DRY\')">📦 Kering</button>' +
+            '<button type="button" class="qc-filter-tab ' + (currentQcFilter === 'COLD' ? 'active' : '') + '" onclick="setQcFilter(\'COLD\')">❄️ Chiller</button>' +
+            '<button type="button" class="qc-filter-tab ' + (currentQcFilter === 'FREEZE' ? 'active' : '') + '" onclick="setQcFilter(\'FREEZE\')">🍗 Freezer</button>' +
+          '</div>';
+      }
+
+      var filtered = items.filter(function (it) {
+        if (!isMultiDemo) return true;
+        if (currentQcFilter === 'DIFF') return Math.abs(it.qtyReceived - it.qtyBilled) >= 0.001;
+        if (currentQcFilter === 'DRY') return it.storageClass === 'storage-dry';
+        if (currentQcFilter === 'COLD') return it.storageClass === 'storage-cold';
+        if (currentQcFilter === 'FREEZE') return it.storageClass === 'storage-freeze';
+        return true;
+      });
+
+      var cardsHtml = '';
+      for (var i = 0; i < filtered.length; i++) {
+        cardsHtml += renderUniversalQcCard(filtered[i], i);
+      }
+
+      container.innerHTML = filterHtml + cardsHtml;
+
+      // Update Card 2 Header Summary Badge (#label-qc-summary)
+      var totalDiffItems = 0;
+      var totalDiffKg = 0;
+      for (var j = 0; j < items.length; j++) {
+        var d = Math.round((items[j].qtyReceived - items[j].qtyBilled) * 1000) / 1000;
+        if (Math.abs(d) >= 0.001) {
+          totalDiffItems++;
+          if (items[j].unit === 'Kg') totalDiffKg += d;
+        }
+      }
+
+      var summaryEl = document.getElementById('label-qc-summary');
+      if (summaryEl) {
+        if (totalDiffItems > 0) {
+          summaryEl.textContent = totalDiffItems + ' Item Ada Selisih' + (totalDiffKg < 0 ? ' (' + totalDiffKg.toFixed(1) + ' Kg)' : '');
+          summaryEl.style.color = '#b45309';
+          summaryEl.style.background = '#fef3c7';
+        } else {
+          summaryEl.textContent = '✓ 100% Lolos QC (' + items.length + ' Bahan)';
+          summaryEl.style.color = '#15803d';
+          summaryEl.style.background = '#dcfce7';
+        }
+      }
+    }
+
+    // Backward compatibility bridges
+    function adjustQcTelurWeight(delta) { adjustUniversalQty('item_telur', delta); }
+    function setQcTelurWeight(val) { setUniversalQty('item_telur', val); }
+    function setQcTelurMode(mode) { setUniversalQty('item_telur', mode === 'full' ? 5.0 : 4.5); }
+    function toggleQcTelur(val) { setQcTelurMode(val); }
+
+    // REKONSILIASI LOGIC & EDGE CASES (NORMAL vs TALANGAN RUNNER)
+    var currentReconScenario = 'normal'; // 'normal' or 'talangan'
+
+    function setReconScenario(scenario) {
+      currentReconScenario = scenario;
+      var btnNormal = document.getElementById('btn-recon-mode-normal');
+      var btnTalangan = document.getElementById('btn-recon-mode-talangan');
+      var reconGiven = document.getElementById('recon-cash-given');
+      var reconSpent = document.getElementById('recon-cash-spent');
+      var reconChange = document.getElementById('recon-cash-change');
+      var reconChangeLabel = document.getElementById('recon-change-label');
+      var reconStatusBadge = document.getElementById('recon-status-badge');
+      var reconDesc1 = document.getElementById('recon-checkbox-desc-1');
+      var reconLedger = document.getElementById('recon-ledger-note');
+
+      if (scenario === 'talangan') {
+        if (btnTalangan) btnTalangan.classList.add('active');
+        if (btnNormal) btnNormal.classList.remove('active');
+
+        if (reconGiven) reconGiven.textContent = 'Rp 350.000';
+        if (reconSpent) reconSpent.textContent = 'Rp 380.000';
+        if (reconChange) {
+          reconChange.textContent = '-Rp 30.000';
+          reconChange.style.color = '#dc2626';
+        }
+        if (reconChangeLabel) reconChangeLabel.textContent = 'Kasir Harus Ganti:';
+        if (reconStatusBadge) {
+          reconStatusBadge.textContent = '⚠️ Reimburse Talangan';
+          reconStatusBadge.style.background = '#fee2e2';
+          reconStatusBadge.style.color = '#b91c1c';
+        }
+        if (reconDesc1) {
+          reconDesc1.innerHTML = 'Kasir Siti telah menyerahkan uang <strong>Rp 30.000</strong> dari laci POS ke Joko untuk mengganti uang talangan pribadinya.';
+        }
+        if (reconLedger) {
+          reconLedger.innerHTML = '⚠️ <strong>Jurnal Otomatis Sistem:</strong> Pengeluaran belanja pasar <strong>Rp 380.000</strong> dicatat. Kasir mengeluarkan Rp 30.000 dari laci POS sebagai penggantian talangan runner Joko.';
+        }
+        showToast('⚠️ Skenario Talangan: Harga naik, Kasir Siti reimburse Rp 30.000 ke Joko.');
+      } else {
+        if (btnNormal) btnNormal.classList.add('active');
+        if (btnTalangan) btnTalangan.classList.remove('active');
+
+        if (reconGiven) reconGiven.textContent = isMultiDemo ? 'Rp 1.400.000' : 'Rp 350.000';
+        if (reconSpent) reconSpent.textContent = isMultiDemo ? 'Rp 1.355.000' : 'Rp 320.000';
+        if (reconChange) {
+          reconChange.textContent = isMultiDemo ? 'Rp 45.000' : 'Rp 30.000';
+          reconChange.style.color = '#047857';
+        }
+        if (reconChangeLabel) reconChangeLabel.textContent = 'Sisa Kembali Fisik:';
+        if (reconStatusBadge) {
+          reconStatusBadge.textContent = '✓ Kas Seimbang';
+          reconStatusBadge.style.background = '#dcfce7';
+          reconStatusBadge.style.color = '#047857';
+        }
+        if (reconDesc1) {
+          reconDesc1.innerHTML = isMultiDemo
+            ? 'Fisik uang sisa kasbon <strong>Rp 45.000</strong> telah dihitung &amp; masuk kembali ke laci POS Kasir Siti.'
+            : 'Fisik uang sisa kasbon <strong>Rp 30.000</strong> telah dihitung &amp; masuk kembali ke laci POS Kasir Siti.';
+        }
+        if (reconLedger) {
+          reconLedger.innerHTML = isMultiDemo
+            ? '⚡ <strong>Jurnal Otomatis Sistem:</strong> Kasbon ditutup. Biaya belanja pasar <strong>Rp 1.355.000</strong> diposting ke Pembukuan Harian Shift Pagi, saldo laci POS seimbang tanpa selisih.'
+            : '⚡ <strong>Jurnal Otomatis Sistem:</strong> Kasbon ditutup. Biaya belanja pasar <strong>Rp 320.000</strong> diposting ke Pembukuan Harian Shift Pagi, saldo laci POS seimbang tanpa selisih.';
+        }
+        showToast('✓ Skenario Normal: Sisa uang kasbon kembali utuh ke laci kasir.');
+      }
+    }
+
+    function toggleMultiReceiptDemo() {
+      isMultiDemo = !isMultiDemo;
+      var btn = document.getElementById('btn-toggle-demo-receipts');
+      var hint = document.getElementById('nota-scaling-hint');
+
+      if (isMultiDemo) {
+        receiptsData = multiReceiptsDemo.slice();
+        if (btn) btn.textContent = '↩ Kembali ke 2 Nota Default';
+        if (hint) hint.textContent = '10 nota pasar tersusun vertikal rapi tanpa geser horizontal';
+        setReconScenario('normal');
+        showToast('⚡ 10 Nota Kios Dimuat (Gulir Vertikal)');
+      } else {
+        receiptsData = defaultReceipts.slice();
+        if (btn) btn.textContent = '⚡ Uji Skenario 10 Nota Kios ▾';
+        if (hint) hint.textContent = 'Layout vertikal adaptif (Bebas geser horizontal)';
+        setReconScenario('normal');
+        showToast('↩ Kembali ke 2 Nota Default (#MND-082)');
+      }
+
+      renderReceiptList();
+      renderQcList();
+    }
+
+    function openReceiptModal(num, vendor, amount, staff, time) {
+      // Find or build ad-hoc receipt
+      var foundIdx = -1;
+      for (var k = 0; k < receiptsData.length; k++) {
+        if (receiptsData[k].vendor === vendor) {
+          foundIdx = k;
+          break;
+        }
+      }
+      if (foundIdx >= 0) {
+        openReceiptByIndex(foundIdx);
+      } else {
+        // Create transient receipt view
+        var adHoc = {
+          vendor: vendor,
+          loc: 'Pasar Tradisional Pringsewu',
+          itemsSummary: 'Daftar Belanja Mandat #' + num,
+          amount: amount,
+          time: time,
+          badge: '✓ Nota Terverifikasi',
+          stampText: '★ TERVERIFIKASI ★',
+          stampColor: '#15803d',
+          stampNote: 'Arsip nota digital terverifikasi',
+          staff: staff,
+          lines: [{ name: 'Belanja Bahan Dapur Cabang', qty: 'Mandat #' + num, price: amount }]
+        };
+        receiptsData.push(adHoc);
+        openReceiptByIndex(receiptsData.length - 1);
+      }
+    }
+
+    function closeReceiptModal() {
+      var m = document.getElementById('modal-receipt-view');
+      if (m) m.classList.remove('open');
+    }
+
+    // Edge Case 1: Multi-Nota Switcher (Kept for backwards compatibility)
+    function switchReceiptTab(idx) {
+      if (idx === 1) {
+        openReceiptByIndex(0);
+      } else {
+        openReceiptByIndex(1);
+      }
+    }
+
+    // INITIALIZATION
+    document.addEventListener('DOMContentLoaded', function () {
+      renderReceiptList();
+      renderQcList();
+      setReconScenario('normal');
+    });
+    // In case DOM is already ready:
+    renderReceiptList();
+    renderQcList();
+    setReconScenario('normal');
+  </script>
+</body>
+</html>

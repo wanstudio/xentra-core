@@ -31,6 +31,8 @@ router.get('/pos/delivery/lookup-by-qr', requireAuth(['cashier', 'branch_manager
     } else if (rawCode.includes('order_number=')) {
       const match = rawCode.match(/order_number=([^&]+)/);
       if (match) cleanCode = decodeURIComponent(match[1]);
+    } else {
+      cleanCode = rawCode.replace(/^#?(?:KSR-)?#?/i, '').trim();
     }
 
     let query = `
@@ -95,7 +97,7 @@ router.post('/pos/orders/:id/cod-handover', requireAuth(['cashier']), (req, res)
     const orderId = req.params.id;
     const cashierId = req.user ? (req.user.id || req.user.userId) : null;
     const userBranchId = req.user ? (req.user.branch_id || req.user.branchId) : null;
-    const receivedAmount = Number(req.body && req.body.received_amount);
+    const receivedAmount = Number(req.body && (req.body.received_amount != null ? req.body.received_amount : req.body.amount_handed_over));
 
     if (!cashierId || !userBranchId) {
       return res.status(403).json({
@@ -462,6 +464,7 @@ router.get('/pos/sales', requireAuth(['cashier']), (req, res) => {
       WHERE o.brand_id = ? AND o.branch_id = ? AND (
         o.order_channel = 'pos_cashier'
         OR (o.order_type = 'delivery' AND o.payment_method = 'cash')
+        OR (o.order_type IN ('dine_in', 'pickup') AND o.status NOT IN ('pending', 'cancelled', 'rejected', 'timeout'))
         OR o.order_channel IN ('gofood', 'grabfood', 'shopeefood')
       )
       ORDER BY o.created_at DESC
@@ -876,8 +879,8 @@ router.get('/pos/orders/:id/receipt', requireAuth(['cashier']), (req, res) => {
   try {
     const branchId = req.user.branch_id || req.user.branchId;
     const order = db.prepare(
-      'SELECT * FROM orders WHERE id = ? AND brand_id = ? AND branch_id = ? AND order_channel = ?'
-    ).get(req.params.id, req.brand_id, branchId, 'pos_cashier');
+      'SELECT * FROM orders WHERE id = ? AND brand_id = ? AND branch_id = ?'
+    ).get(req.params.id, req.brand_id, branchId);
     if (!order) return res.status(404).json({ success: false, error: 'Transaksi POS tidak ditemukan.' });
 
     const itemRows = db.prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY rowid ASC').all(order.id);

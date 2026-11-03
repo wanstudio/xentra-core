@@ -5,12 +5,14 @@ const { events } = require('../../../core');
 const { OrderRepository, PosBillRepository, OrderAdditionRepository } = require('../../../core/data/repositories');
 const PrePaymentVerificationGate = require('./PrePaymentVerificationGate');
 const OrderPlacementService = require('./OrderPlacementService');
+const CustomerRepository = require('../../../core/data/repositories/CustomerRepository');
 
 const orderRepository = new OrderRepository();
 const additionRepository = new OrderAdditionRepository();
 const posBillRepository = new PosBillRepository();
+const customerRepository = new CustomerRepository();
 
-const ALLOWED_PARENT_STATUSES = ['pending', 'confirmed', 'preparing', 'ready'];
+const ALLOWED_PARENT_STATUSES = ['pending', 'active_table', 'confirmed', 'preparing', 'ready', 'completed'];
 
 class OrderAdditionService {
   static _loadParent({ order_id, brand_id, branch_id, allowInactiveRead = false }) {
@@ -30,10 +32,19 @@ class OrderAdditionService {
     if (!order.dining_session_id) {
       throw new Error('[OrderAdditionService] Dining Session aktif tidak ditemukan.');
     }
+    if (!allowInactiveRead) {
+      const session = orderRepository.db.queryOne(
+        'SELECT id, status FROM dining_sessions WHERE id = ?',
+        [order.dining_session_id]
+      );
+      if (!session || session.status !== 'active') {
+        throw new Error('[OrderAdditionService] Dining Session sudah ditutup dan tidak menerima kiriman baru.');
+      }
+    }
     return order;
   }
 
-  static _verifiedItems({ brand_id, branch_id, order, items }) {
+  static _verifiedItems({ brand_id, branch_id, order, items, customer = null }) {
     if (!Array.isArray(items) || !items.length) {
       throw new Error('[OrderAdditionService] Minimal satu item tambahan harus dipilih.');
     }
@@ -42,7 +53,7 @@ class OrderAdditionService {
       branch_id,
       brand_id,
       items,
-      customer: { name: order.customer_name || 'Tamu', phone: order.customer_phone || '' },
+      customer: customer || { name: order.customer_name || 'Tamu', phone: order.customer_phone || '' },
       is_pwa_installed: false
     });
 
@@ -55,14 +66,25 @@ class OrderAdditionService {
   static listForOrder({ order_id, brand_id, branch_id }) {
     const order = this._loadParent({ order_id, brand_id, branch_id, allowInactiveRead: true });
     const items = orderRepository.findItems(order_id);
-    const additions = additionRepository.findByOrderId(order_id).map(addition => ({
-      ...addition,
-      items: JSON.parse(addition.items_payload || '[]')
-    }));
+    const additions = additionRepository.findByOrderId(order_id).map(addition => {
+      const submitter = addition.created_by ? customerRepository.findById(addition.created_by) : null;
+      let additionItems = [];
+      try { additionItems = JSON.parse(addition.items_payload || '[]'); } catch (_) {}
+      return {
+        id: addition.id,
+        sequence_no: addition.sequence_no,
+        status: addition.status,
+        rejection_reason: addition.rejection_reason || '',
+        subtotal: Number(addition.subtotal) || 0,
+        created_at: addition.created_at,
+        created_by_name: submitter && submitter.display_name ? submitter.display_name : 'Pelanggan aplikasi',
+        items: additionItems
+      };
+    });
     return { order, items, additions };
   }
 
-  static async submit({ order_id, brand_id, branch_id, items, source_channel = 'pos_cashier', created_by = null, client_transaction_id = null }) {
+  static async submit({ order_id, brand_id, branch_id, items, source_channel = 'pos_cashier', created_by = null, client_transaction_id = null, customer = null }) {
     const order = this._loadParent({ order_id, brand_id, branch_id });
     const existing = additionRepository.findByClientTransactionId(order.id, client_transaction_id);
     if (existing) {
@@ -75,7 +97,7 @@ class OrderAdditionService {
       };
     }
 
-    const verifiedItems = this._verifiedItems({ brand_id, branch_id, order, items });
+    const verifiedItems = this._verifiedItems({ brand_id, branch_id, order, items, customer });
     const subtotal = verifiedItems.reduce((sum, item) => sum + Number(item.subtotal || 0), 0);
     const now = new Date().toISOString();
     const additionId = 'add_' + crypto.randomBytes(8).toString('hex');
@@ -104,6 +126,7 @@ class OrderAdditionService {
         sequenceNo,
         sourceChannel: source_channel,
         createdBy: created_by,
+        createdByPhone: customer && customer.phone,
         clientTransactionId: client_transaction_id,
         itemsPayload: JSON.stringify(verifiedItems),
         subtotal,
@@ -172,7 +195,16 @@ class OrderAdditionService {
     }
 
     const rawItems = JSON.parse(addition.items_payload || '[]');
-    const verifiedItems = this._verifiedItems({ brand_id, branch_id, order, items: rawItems });
+    const submitter = addition.created_by ? customerRepository.findById(addition.created_by) : null;
+    const submitterPhone = addition.created_by_phone || (submitter && submitter.phone) || '';
+    const verificationCustomer = submitter
+      ? { id: submitter.id, name: submitter.display_name || 'Tamu', phone: submitterPhone }
+      : (submitterPhone
+          ? { id: null, name: 'Tamu', phone: submitterPhone }
+          : addition.source_channel === 'customer_app'
+            ? { id: null, name: 'Tamu', phone: '' }
+            : { id: null, name: order.customer_name || 'Tamu', phone: order.customer_phone || '' });
+    const verifiedItems = this._verifiedItems({ brand_id, branch_id, order, items: rawItems, customer: verificationCustomer });
     const additionSubtotal = verifiedItems.reduce((sum, item) => sum + Number(item.subtotal || 0), 0);
     const now = new Date().toISOString();
 
@@ -260,6 +292,37 @@ class OrderAdditionService {
       if (!marked || marked.changes === 0) {
         throw new Error('[OrderAdditionService] Additional Order gagal di-commit karena status berubah bersamaan.');
       }
+
+      // If parent dine_in order was already in active_table, ready, or completed,
+      // re-enter kitchen preparation ('preparing') and mark payment_status = 'pending'
+      // so the kitchen prepares the newly added items and POS sees the unpaid remainder.
+      if (['active_table', 'ready', 'completed'].includes(lockedOrder.status)) {
+        try {
+          orderRepository.db.execute(
+            "UPDATE orders SET status = 'preparing', payment_status = 'pending', updated_at = ? WHERE id = ?",
+            [now, lockedOrder.id]
+          );
+          orderRepository.insertStatusLog({
+            logId: 'log_' + crypto.randomBytes(8).toString('hex'),
+            orderId: lockedOrder.id,
+            previousStatus: lockedOrder.status,
+            newStatus: 'preparing',
+            actorType: 'branch_actor',
+            actorId: actor_id || 'merchant_acceptance',
+            note: `[ADDITION_ACCEPTED] Pesanan tambahan #${addition.sequence_no} diterima — kembali ke antrean masak dapur.`
+          });
+        } catch (_) {}
+      } else {
+        try {
+          orderRepository.db.execute(
+            "UPDATE orders SET payment_status = 'pending', updated_at = ? WHERE id = ?",
+            [now, lockedOrder.id]
+          );
+        } catch (_) {}
+      }
+
+      const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
+      PromotionEngineService.recordOrderRedemptions(lockedOrder);
 
       orderRepository.commitTransaction();
 

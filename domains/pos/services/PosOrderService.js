@@ -188,7 +188,7 @@ class PosOrderService {
     if (!order || String(order.branch_id) !== String(branch_id) || String(order.brand_id) !== String(brand_id)) throw new Error('[PosOrderService] Canonical Order untuk Hold Bill tidak ditemukan.');
     if (order.status !== 'pending' || order.order_channel !== 'pos_cashier') throw new Error('[PosOrderService] Hold Bill tidak dapat diedit karena pesanan sudah diproses Merchant.');
     const checks = posBillRepository.findChecks(order.id);
-    for (const check of checks) if (check.status !== 'open' || posBillRepository.findCheckPaidAmount(check.id) > 0) throw new Error('[PosOrderService] Hold Bill tidak dapat diedit setelah pembayaran dimulai.');
+    for (const check of checks) if (check.status !== 'open' || posBillRepository.findCheckPaidAmount(check.id) > 0 || posBillRepository.findPendingCheckIntentAmount(check.id) > 0) throw new Error('[PosOrderService] Hold Bill tidak dapat diedit setelah pembayaran dimulai.');
     if (checks.length > 1) throw new Error('[PosOrderService] Batalkan pembagian tagihan terlebih dahulu sebelum mengubah isi Hold Bill.');
     const PrePaymentVerificationGate = require('../../commerce/services/PrePaymentVerificationGate');
     const verification = PrePaymentVerificationGate.verify({ branch_id, brand_id, items, customer: { name: customer_name || 'Tamu', phone: customer_phone || '' } });
@@ -245,26 +245,61 @@ class PosOrderService {
 
     let checks = posBillRepository.findChecks(order_id);
 
-    // Lazily initialize Check #1 with all current order items.
-    if (!checks.length) {
+    // Lazily add any unallocated portion of this canonical bill. Dine-in
+    // additions may already have checks, while the original checkout amount
+    // still needs its own allocation under the same Order.
+    if (!checks.length || posBillRepository.findTotalCheckAllocation(order_id) + 0.000001 < Number(order.grand_total || 0)) {
       const orderItems = posBillRepository.findOrderItems(order_id);
       if (!orderItems.length) {
         throw new Error('[PosOrderService] Order tidak memiliki item yang dapat dibagi.');
       }
 
       const now = new Date().toISOString();
-      const checkId = `check_${crypto.randomBytes(8).toString('hex')}`;
       posBillRepository.beginTransaction();
       try {
-        posBillRepository.createCheck({ id: checkId, orderId: order_id, checkNumber: 1, allocatedAmount: Number(order.grand_total), now });
-        for (const item of orderItems) {
-          posBillRepository.upsertCheckItem({
-            id: `check_item_${crypto.randomBytes(8).toString('hex')}`,
+        const lockedChecks = posBillRepository.findChecks(order_id);
+        const allocated = posBillRepository.findTotalCheckAllocation(order_id);
+        const uncovered = Math.max(0, Number(order.grand_total || 0) - allocated);
+        let checkId = null;
+        if (uncovered > 0.000001) {
+          const checkNumber = lockedChecks.length
+            ? lockedChecks.reduce((max, row) => Math.max(max, Number(row.check_number) || 0), 0) + 1
+            : 1;
+          checkId = `check_${crypto.randomBytes(8).toString('hex')}`;
+          posBillRepository.createCheck({ id: checkId, orderId: order_id, checkNumber, allocatedAmount: uncovered, now });
+          const assignedItemIds = new Set();
+          for (const existingCheck of lockedChecks) {
+            for (const assigned of posBillRepository.findCheckItems(existingCheck.id)) assignedItemIds.add(String(assigned.order_item_id));
+          }
+          const itemsForCheck = lockedChecks.length
+            ? orderItems.filter(item => !item.addition_batch_id && !assignedItemIds.has(String(item.id)))
+            : orderItems;
+          for (const item of itemsForCheck) {
+            posBillRepository.upsertCheckItem({ id: `check_item_${crypto.randomBytes(8).toString('hex')}`, checkId, orderItemId: item.id, quantity: Number(item.quantity), now });
+          }
+        }
+        const existingOrderPayment = paymentRepository.findPaymentByOrderId(order_id);
+        const originalPaidAmount = existingOrderPayment && existingOrderPayment.payment_status === 'settlement'
+          && existingOrderPayment.provider !== 'multiple'
+          && !posBillRepository.hasSeededOrderPayment(order_id, existingOrderPayment.id)
+          ? Math.min(Number(existingOrderPayment.amount || 0), uncovered)
+          : 0;
+        if (checkId && originalPaidAmount > 0) {
+          const settledAt = existingOrderPayment.settled_at || now;
+          posBillRepository.createCheckPayment({
+            id: `checkpay_seed_${crypto.randomBytes(8).toString('hex')}`,
             checkId,
-            orderItemId: item.id,
-            quantity: Number(item.quantity),
+            orderId: order_id,
+            paymentMethod: existingOrderPayment.payment_method || existingOrderPayment.provider,
+            provider: existingOrderPayment.provider,
+            amount: originalPaidAmount,
+            payerName: null,
+            actorId: null,
+            rawPayment: JSON.stringify({ source: 'existing_order_payment', payment_id: existingOrderPayment.id }),
+            settledAt,
             now
           });
+          if (originalPaidAmount >= uncovered) posBillRepository.setCheckStatus(checkId, 'paid', now);
         }
         posBillRepository.commit();
       } catch (err) {
@@ -279,8 +314,10 @@ class PosOrderService {
       checks: checks.map(check => ({
         ...check,
         paid_amount: posBillRepository.findCheckPaidAmount(check.id),
-        remaining_amount: Math.max(0, Number(check.allocated_amount || 0) - posBillRepository.findCheckPaidAmount(check.id)),
+        pending_payment_amount: posBillRepository.findPendingCheckIntentAmount(check.id),
+        remaining_amount: Math.max(0, Number(check.allocated_amount || 0) - posBillRepository.findCheckPaidAmount(check.id) - posBillRepository.findPendingCheckIntentAmount(check.id)),
         payments: posBillRepository.findCheckPayments(check.id),
+        payment_intents: posBillRepository.findCheckPaymentIntents(check.id),
         items: posBillRepository.findCheckItems(check.id)
       }))
     };
@@ -297,6 +334,7 @@ class PosOrderService {
     const source = current.checks.find(c => String(c.id) === String(source_check_id));
     if (!source || source.status !== 'open') throw new Error('[PosOrderService] Check sumber tidak ditemukan atau sudah tidak OPEN.');
     const paid = posBillRepository.findCheckPaidAmount(source.id);
+    if (posBillRepository.findPendingCheckIntentAmount(source.id) > 0) throw new Error('[PosOrderService] Check tidak dapat diubah selama pembayaran online sedang diproses.');
     const remaining = Number(source.allocated_amount || 0) - paid;
     if (value >= remaining) throw new Error('[PosOrderService] Nominal split harus lebih kecil dari sisa Check sumber.');
     const nextNumber = current.checks.reduce((max, c) => Math.max(max, Number(c.check_number) || 0), 0) + 1;
@@ -306,6 +344,7 @@ class PosOrderService {
     try {
       const locked = posBillRepository.findCheck(source.id);
       const lockedPaid = posBillRepository.findCheckPaidAmount(source.id);
+      if (posBillRepository.findPendingCheckIntentAmount(source.id) > 0) throw new Error('[PosOrderService] Check tidak dapat diubah selama pembayaran online sedang diproses.');
       const lockedRemaining = Number(locked.allocated_amount || 0) - lockedPaid;
       if (value >= lockedRemaining) throw new Error('[PosOrderService] Nominal split melebihi sisa Check sumber.');
       posBillRepository.updateCheckAmount(source.id, Number(locked.allocated_amount) - value, now);
@@ -323,6 +362,7 @@ class PosOrderService {
     const source = current.checks.find(c => String(c.id) === String(source_check_id));
     if (!source || source.status !== 'open') throw new Error('[PosOrderService] Check sumber tidak ditemukan atau sudah tidak OPEN.');
     const paid = posBillRepository.findCheckPaidAmount(source.id);
+    if (posBillRepository.findPendingCheckIntentAmount(source.id) > 0) throw new Error('[PosOrderService] Check tidak dapat dibagi selama pembayaran online sedang diproses.');
     if (paid > 0) throw new Error('[PosOrderService] Check yang sudah menerima pembayaran tidak dapat dibagi rata.');
     const total = Number(source.allocated_amount || 0);
     if (total <= 0) throw new Error('[PosOrderService] Check tidak memiliki saldo untuk dibagi.');
@@ -352,12 +392,14 @@ class PosOrderService {
     if (!Number.isFinite(value) || value <= 0) throw new Error('[PosOrderService] Nominal pembayaran harus lebih dari 0.');
     const allowed = ['cash', 'qris_static', 'midtrans', 'doku'];
     if (!allowed.includes(payment_method)) throw new Error('[PosOrderService] Metode pembayaran tidak valid.');
+    if (payment_method !== 'cash') throw new Error('[PosOrderService] Pembayaran online harus dimulai sebagai payment intent agar callback gateway yang mengesahkan settlement.');
     const order = posBillRepository.findOrder(order_id);
     if (!order || String(order.branch_id) !== String(branch_id)) throw new Error('[PosOrderService] Order tidak ditemukan atau bukan milik cabang kasir.');
     const check = posBillRepository.findCheck(check_id);
     if (!check || String(check.order_id) !== String(order_id) || check.status !== 'open') throw new Error('[PosOrderService] Check tidak ditemukan atau sudah ditutup.');
     const checkPaid = posBillRepository.findCheckPaidAmount(check_id);
-    const checkRemaining = Math.max(0, Number(check.allocated_amount || 0) - checkPaid);
+    const pendingIntentAmount = posBillRepository.findPendingCheckIntentAmount(check_id);
+    const checkRemaining = Math.max(0, Number(check.allocated_amount || 0) - checkPaid - pendingIntentAmount);
     // POS currency is stored in whole rupiah. Allow only a tiny floating-point
     // tolerance so persisted decimal arithmetic cannot reject an exact payment.
     if (value > checkRemaining + 0.000001) {
@@ -385,7 +427,8 @@ class PosOrderService {
       }
       const lockedCheck = posBillRepository.findCheck(check_id);
       const lockedPaid = posBillRepository.findCheckPaidAmount(check_id);
-      const lockedRemaining = Math.max(0, Number(lockedCheck.allocated_amount || 0) - lockedPaid);
+      const lockedPending = posBillRepository.findPendingCheckIntentAmount(check_id);
+      const lockedRemaining = Math.max(0, Number(lockedCheck.allocated_amount || 0) - lockedPaid - lockedPending);
       if (value > lockedRemaining + 0.000001) {
         throw new Error('[PosOrderService] Pembayaran melebihi sisa Check. Sisa Check: Rp ' + lockedRemaining.toLocaleString('id-ID') + ', pembayaran: Rp ' + value.toLocaleString('id-ID') + '.');
       }
@@ -405,26 +448,44 @@ class PosOrderService {
       const allCash = afterChecks.checks.every(check =>
         (check.payments || []).every(payment => payment.payment_method === 'cash')
       );
-      if (!allCash) {
-        throw new Error('[PosOrderService] Settlement akhir split payment non-Cash belum didukung. Selesaikan dengan pembayaran Cash untuk transaksi ini.');
+      if (allCash) {
+        const { CashSettlementService } = require('../../payment');
+        CashSettlementService.settleCashPayment({
+          order_id,
+          amount: orderGrandTotal,
+          // Per-payment tendered/change already lives in pos_check_payments.
+          amount_tendered: orderGrandTotal,
+          cashier_id: actor_id,
+          shift_id,
+          skip_shift_increment: true
+        });
+      } else {
+        const settledAt = new Date().toISOString();
+        paymentRepository.settleOrderFromCheckPayments({
+          orderId: order_id,
+          amount: orderGrandTotal,
+          settledAt,
+          rawPayment: JSON.stringify({ source: 'pos_check_allocations', paid_amount: orderPaidAfter }),
+          updatedAt: settledAt
+        });
       }
-      const { CashSettlementService } = require('../../payment');
-      CashSettlementService.settleCashPayment({
-        order_id,
-        amount: orderGrandTotal,
-        // Per-payment tendered/change already lives in pos_check_payments.
-        // Use the canonical amount here only to finalize order_payments without
-        // double-counting the cash drawer.
-        amount_tendered: orderGrandTotal,
-        cashier_id: actor_id,
-        shift_id,
-        skip_shift_increment: true
-      });
     }
 
     const updated = PosOrderService.getOrderChecks({ order_id, branch_id });
     const updatedCheck = updated.checks.find(c => c.id === check_id);
     return { success: true, payment: { id: paymentId, check_id, order_id, amount: value, payment_method, payer_name, payment_status: 'settlement', amount_tendered: amount_tendered == null ? null : Number(amount_tendered), change: payment_method === 'cash' ? Math.max(0, Number(amount_tendered) - value) : 0 }, check: updatedCheck, order_remaining: Number(order.grand_total) - posBillRepository.findOrderPaidAmount(order_id) };
+  }
+
+  static async createCheckPaymentIntent({ order_id, branch_id, check_id, amount, payer_name = null }) {
+    const value = Number(amount);
+    if (!Number.isFinite(value) || value <= 0) throw new Error('[PosOrderService] Nominal pembayaran online harus lebih dari 0.');
+    const order = posBillRepository.findOrder(order_id);
+    if (!order || String(order.branch_id) !== String(branch_id)) throw new Error('[PosOrderService] Order tidak ditemukan atau bukan milik cabang kasir.');
+    if (!['active_table', 'confirmed', 'ready', 'preparing', 'completed'].includes(order.status)) throw new Error('[PosOrderService] Order harus diterima cabang sebelum check dapat dibayar.');
+    const check = posBillRepository.findCheck(check_id);
+    if (!check || check.order_id !== order_id || check.status !== 'open') throw new Error('[PosOrderService] Check tidak ditemukan atau sudah ditutup.');
+    const { PaymentGatewayService } = require('../../payment');
+    return PaymentGatewayService.createCheckPaymentTransaction({ order, check, amount: value, payer_name });
   }
 
   /**
@@ -440,7 +501,7 @@ class PosOrderService {
     const source = current.checks.find(c => String(c.id) === String(source_check_id));
     if (!source) throw new Error('[PosOrderService] Check sumber tidak ditemukan.');
     if (source.status !== 'open') throw new Error('[PosOrderService] Check sumber sudah tidak OPEN.');
-    if (posBillRepository.findCheckPaidAmount(source.id) > 0) throw new Error('[PosOrderService] Check yang sudah menerima pembayaran tidak dapat di-split.');
+    if (posBillRepository.findCheckPaidAmount(source.id) > 0 || posBillRepository.findPendingCheckIntentAmount(source.id) > 0) throw new Error('[PosOrderService] Check yang sudah dibayar atau sedang diproses pembayarannya tidak dapat di-split.');
 
     // The check allocation is authoritative. Aggregate duplicate payload rows,
     // then validate against the current persisted allocation instead of trusting
@@ -550,6 +611,7 @@ class PosOrderService {
     if (posBillRepository.findCheckPaidAmount(target.id) > 0) {
       throw new Error('[PosOrderService] Check tujuan yang sudah menerima pembayaran tidak dapat menerima hasil merge.');
     }
+    if (posBillRepository.findPendingCheckIntentAmount(target.id) > 0 || posBillRepository.findPendingCheckIntentAmount(source.id) > 0) throw new Error('[PosOrderService] Check dengan pembayaran online aktif tidak dapat digabung.');
     if (posBillRepository.findCheckPaidAmount(source.id) > 0) {
       throw new Error('[PosOrderService] Check sumber yang sudah menerima pembayaran tidak dapat digabung.');
     }
@@ -604,7 +666,7 @@ class PosOrderService {
     if (!target) throw new Error('[PosOrderService] Check utama (#1) tidak ditemukan.');
 
     for (const check of checks) {
-      if (check.status !== 'open' || Number(check.paid_amount || 0) > 0) {
+      if (check.status !== 'open' || Number(check.paid_amount || 0) > 0 || Number(check.pending_payment_amount || 0) > 0) {
         throw new Error('[PosOrderService] Pembagian tidak dapat dibatalkan karena sudah ada pembayaran.');
       }
     }

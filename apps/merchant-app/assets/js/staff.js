@@ -89,7 +89,7 @@
         : (u.role === 'purchasing' ? '<span class="x-badge x-badge-success">PETUGAS BELANJA</span>' : '<span class="x-badge x-badge-info">' + esc(u.role).toUpperCase() + '</span>'));
 
       var statusToggle = '' +
-        '<label class="x-toggle' + (isActive ? ' x-toggle-on' : '') + '" style="margin:0 auto;display:inline-block;vertical-align:middle;">' +
+        '<label class="x-toggle' + (isActive ? ' x-toggle-on' : '') + '" style="margin:0 0 0 auto;display:inline-block;vertical-align:middle;">' +
           '<input type="checkbox" ' + (isActive ? 'checked ' : '') + (isMe ? 'disabled ' : '') +
             'onchange="toggleBMStaffStatus(\'' + u.id + '\', \'' + esc(u.full_name) + '\', this)">' +
           '<span class="x-toggle-slider"></span>' +
@@ -105,21 +105,42 @@
       }
 
       return '<tr>' +
-        '<td><strong>' + esc(u.full_name) + '</strong></td>' +
-        '<td><code style="font-size:12px;background:#f1f5f9;padding:2px 6px;border-radius:4px;">' + esc(u.username) + '</code></td>' +
-        '<td>' + roleBadge + '</td>' +
-        '<td style="color:var(--text-muted);">' + esc(u.email || '—') + '</td>' +
-        '<td class="text-center" style="vertical-align:middle;text-align:center;">' + statusToggle + '</td>' +
-        '<td class="text-right" style="white-space:nowrap;vertical-align:middle;">' + actions + '</td>' +
+        '<td data-label="Nama"><strong>' + esc(u.full_name) + '</strong></td>' +
+        '<td data-label="Username"><code style="font-size:12px;background:#f1f5f9;padding:2px 6px;border-radius:4px;">' + esc(u.username) + '</code></td>' +
+        '<td data-label="Role">' + roleBadge + '</td>' +
+        '<td data-label="Email" class="bm-staff-email-col" style="color:var(--text-muted);">' + esc(u.email || '—') + '</td>' +
+        '<td data-label="Status Aktif" class="text-right" style="vertical-align:middle;text-align:right;justify-content:space-between;">' + statusToggle + '</td>' +
+        '<td data-label="Aksi" class="text-right" style="white-space:nowrap;vertical-align:middle;justify-content:space-between;">' + actions + '</td>' +
       '</tr>';
     }).join('');
   }
 
+  function updateAddStaffSaveButtonState() {
+    var btn = $('btn-bm-submit-cashier');
+    if (!btn) return;
+    var fullName = ($('bm-cashier-fullname') ? $('bm-cashier-fullname').value : '').trim();
+    var username = ($('bm-cashier-username') ? $('bm-cashier-username').value : '').trim();
+    var password = ($('bm-cashier-password') ? $('bm-cashier-password').value : '').trim();
+    var isValid = fullName.length > 0 && username.length >= 3 && password.length >= 8;
+    if (isValid) {
+      btn.classList.add('has-changed');
+    } else {
+      btn.classList.remove('has-changed');
+    }
+  }
+  window.updateAddStaffSaveButtonState = updateAddStaffSaveButtonState;
+
   function openBMAddCashierModal() {
     var modal = $('modal-bm-add-cashier');
-    if (modal) {
-      var form = $('form-bm-add-cashier');
-      if (form) form.reset();
+    var form = $('form-bm-add-cashier');
+    if (form) form.reset();
+    updateAddStaffSaveButtonState();
+    if (typeof navigateTo === 'function') {
+      navigateTo('add-staff');
+      if (window.XentraDropdown && typeof window.XentraDropdown.refresh === 'function') {
+        setTimeout(function () { window.XentraDropdown.refresh(); }, 50);
+      }
+    } else if (modal) {
       modal.style.display = 'flex';
     }
   }
@@ -128,6 +149,9 @@
   function closeBMAddCashierModal() {
     var modal = $('modal-bm-add-cashier');
     if (modal) modal.style.display = 'none';
+    if (typeof navigateBackFromSubpage === 'function') {
+      navigateBackFromSubpage();
+    }
   }
   window.closeBMAddCashierModal = closeBMAddCashierModal;
 
@@ -170,9 +194,13 @@
       });
       var data = await res.json();
       if (res.ok && data.success) {
-        var roleLabel = role === 'purchasing' ? 'Petugas Belanja' : 'Kasir';
+        var roleLabel = role === 'purchasing' ? 'Petugas Belanja' : (role === 'kitchen' ? 'Staf Dapur' : 'Kasir');
         showToast('Akun ' + roleLabel + ' ' + username + ' berhasil ditambahkan.');
-        closeBMAddCashierModal();
+        if (typeof navigateTo === 'function') {
+          navigateTo('staff');
+        } else {
+          closeBMAddCashierModal();
+        }
         loadBMStaff();
       } else {
         showToast('Gagal menambahkan kasir: ' + (data.error || data.message || 'Terjadi kesalahan'));

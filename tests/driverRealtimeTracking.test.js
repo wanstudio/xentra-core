@@ -120,3 +120,54 @@ test('DRIVER-REALTIME-05: Database operations on driver_locations and driver_loc
   // Cleanup test log
   db.prepare('DELETE FROM driver_location_logs WHERE id = ?').run(logId);
 });
+
+test('DRIVER-REALTIME-06: Driver location ping returns pending_assignment for background alerts', () => {
+  const src = read('server/routes/driver.js');
+  assert.match(src, /pending_assignment:\s*pendingTask\s*\?/);
+  assert.match(src, /destination_address/);
+  assert.match(src, /customer_name/);
+  assert.match(src, /DeliveryModel\.STATUS\.ASSIGNED/);
+  assert.match(src, /DeliveryModel\.ASSIGNMENT_RESPONSES\.PENDING/);
+});
+
+test('DRIVER-REALTIME-07: Native Driver Android APK integrates OrderOverlayService floating card and XentraDriverBridge', () => {
+  const overlaySrc = read('native/driver-android/app/src/main/java/com/mybangjo/driver/OrderOverlayService.java');
+  const bridgeSrc = read('native/driver-android/app/src/main/java/com/mybangjo/driver/XentraDriverBridge.java');
+  const gpsSrc = read('native/driver-android/app/src/main/java/com/mybangjo/driver/DriverGpsService.java');
+  const mainSrc = read('native/driver-android/app/src/main/java/com/mybangjo/driver/MainActivity.java');
+
+  // Overlay Service supports floating card and assistive ball
+  assert.match(overlaySrc, /showOrderCard/);
+  assert.match(overlaySrc, /showBall/);
+  assert.match(overlaySrc, /hideOverlay/);
+  assert.match(overlaySrc, /Tugas Delivery Baru!/);
+  assert.match(overlaySrc, /BUKA & TERIMA/);
+
+  // Bridge supports overlay controls and alarms
+  assert.match(bridgeSrc, /hasOverlayPermission/);
+  assert.match(bridgeSrc, /requestOverlayPermission/);
+  assert.match(bridgeSrc, /showOrderCard/);
+  assert.match(bridgeSrc, /playOrderAlarm/);
+  assert.match(bridgeSrc, /stopOrderAlarm/);
+
+  // Driver GPS background service triggers floating card & alarm on pending task
+  assert.match(gpsSrc, /pending_assignment/);
+  assert.match(gpsSrc, /handleIncomingPendingTask/);
+  assert.match(gpsSrc, /OrderAlarmService\.start/);
+  assert.match(gpsSrc, /OrderOverlayService\.showOrderCard/);
+  assert.match(gpsSrc, /sendHeadsUpNotification/);
+
+  // MainActivity requests overlay permission
+  assert.match(mainSrc, /checkOverlayPermission/);
+  assert.match(mainSrc, /ACTION_MANAGE_OVERLAY_PERMISSION/);
+  assert.match(mainSrc, /onNewIntent/);
+});
+
+test('DRIVER-REALTIME-08: Driver App PWA integrates native overlay card and alarm triggers', () => {
+  const ui = read('apps/driver-app/assets/js/driver-app.js');
+  assert.match(ui, /nativeBridge\.showOrderCard/);
+  assert.match(ui, /nativeBridge\.playOrderAlarm/);
+  assert.match(ui, /nativeBridge\.stopOrderAlarm/);
+  assert.match(ui, /window\.onSelectTargetOrder/);
+  assert.match(ui, /btn-driver-overlay-perm/);
+});

@@ -52,6 +52,7 @@ public class MainActivity extends AppCompatActivity {
     private ProgressBar progressBar;
     private SwipeRefreshLayout swipeRefreshLayout;
     private ValueCallback<Uri[]> filePathCallback;
+    private PermissionRequest pendingWebPermissionRequest;
     private GoogleSignInClient googleSignInClient;
     private final ActivityResultLauncher<Intent> googleSignInLauncher =
         registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
@@ -80,6 +81,26 @@ public class MainActivity extends AppCompatActivity {
             // Permissions handled gracefully
         });
 
+    private final ActivityResultLauncher<String> cameraPermissionLauncher =
+        registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
+            if (Boolean.TRUE.equals(isGranted)) {
+                if (pendingWebPermissionRequest != null) {
+                    try {
+                        pendingWebPermissionRequest.grant(pendingWebPermissionRequest.getResources());
+                    } catch (Exception ignored) {}
+                    pendingWebPermissionRequest = null;
+                }
+            } else {
+                if (pendingWebPermissionRequest != null) {
+                    try {
+                        pendingWebPermissionRequest.deny();
+                    } catch (Exception ignored) {}
+                    pendingWebPermissionRequest = null;
+                }
+                Toast.makeText(this, "Izin kamera diperlukan untuk memindai barcode / QR kurir.", Toast.LENGTH_SHORT).show();
+            }
+        });
+
     private final ActivityResultLauncher<String> fileChooserLauncher =
         registerForActivityResult(new ActivityResultContracts.GetMultipleContents(), uris -> {
             if (filePathCallback != null) {
@@ -104,6 +125,16 @@ public class MainActivity extends AppCompatActivity {
 
         webView = findViewById(R.id.webView);
         progressBar = findViewById(R.id.progressBar);
+        if (progressBar != null) {
+            progressBar.setAlpha(0f);
+            progressBar.setVisibility(View.GONE);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                android.content.res.ColorStateList transparent = android.content.res.ColorStateList.valueOf(Color.TRANSPARENT);
+                progressBar.setProgressTintList(transparent);
+                progressBar.setProgressBackgroundTintList(transparent);
+                progressBar.setIndeterminateTintList(transparent);
+            }
+        }
         swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout);
 
         setupSwipeRefresh();
@@ -307,8 +338,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
                 super.onPageStarted(view, url, favicon);
-                progressBar.setVisibility(View.VISIBLE);
-                progressBar.setProgress(10);
+                progressBar.setVisibility(View.GONE);
             }
 
             @Override
@@ -347,12 +377,7 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onProgressChanged(WebView view, int newProgress) {
-                if (newProgress < 100) {
-                    progressBar.setVisibility(View.VISIBLE);
-                    progressBar.setProgress(newProgress);
-                } else {
-                    progressBar.setVisibility(View.GONE);
-                }
+                progressBar.setVisibility(View.GONE);
             }
 
             @Override
@@ -367,7 +392,23 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onPermissionRequest(PermissionRequest request) {
-                request.grant(request.getResources());
+                runOnUiThread(() -> {
+                    boolean needsCamera = false;
+                    for (String res : request.getResources()) {
+                        if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(res)) {
+                            needsCamera = true;
+                            break;
+                        }
+                    }
+                    if (needsCamera && ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                        pendingWebPermissionRequest = request;
+                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA);
+                    } else {
+                        try {
+                            request.grant(request.getResources());
+                        } catch (Exception ignored) {}
+                    }
+                });
             }
 
             @Override
@@ -397,6 +438,9 @@ public class MainActivity extends AppCompatActivity {
 
     private void requestNecessaryPermissions() {
         List<String> perms = new ArrayList<>();
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            perms.add(Manifest.permission.CAMERA);
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 perms.add(Manifest.permission.POST_NOTIFICATIONS);

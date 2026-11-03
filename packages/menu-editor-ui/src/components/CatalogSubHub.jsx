@@ -25,9 +25,6 @@ const catalogItems = [
 
 export default function CatalogSubHub({ onBack, onNavigate }) {
   const handleBack = () => {
-    if (typeof onBack === 'function') {
-      onBack();
-    }
     if (window.XentraNavigationController && typeof window.XentraNavigationController.back === 'function') {
       const snap = window.XentraNavigationController.getSnapshot ? window.XentraNavigationController.getSnapshot() : null;
       if (snap && snap.stack && snap.stack.length > 1) {
@@ -35,14 +32,21 @@ export default function CatalogSubHub({ onBack, onNavigate }) {
         return;
       }
     }
-    window.location.hash = '#business';
+    if (typeof onBack === 'function') {
+      onBack();
+      return;
+    }
+    if (typeof window.navigateTo === 'function') {
+      window.navigateTo('business');
+      return;
+    }
   };
 
   const handleItemClick = (item) => {
     if (typeof onNavigate === 'function') {
       onNavigate(item.route, item.id);
-    } else {
-      window.location.hash = item.route;
+    } else if (typeof window.navigateTo === 'function') {
+      window.navigateTo(String(item.route || '').replace(/^#\/?/, ''));
     }
   };
 

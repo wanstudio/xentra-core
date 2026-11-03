@@ -247,6 +247,7 @@ class InventorySalePostingService {
         postingReference: reference,
         postingMutationId: mutationId,
         postingTimestamp: timestamp,
+        currencyCode: 'IDR',
         sourceType,
         repository
       });

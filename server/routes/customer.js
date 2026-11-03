@@ -86,15 +86,78 @@ router.patch('/customer/profile/phone', requireCustomerAuth(), (req, res) => {
 });
 
 // 5.3 Addresses (Protected by Customer Session - Brand scoped data)
-// ── Customer: bill meja yang masih terbuka (dine-in) ────────────────────────
-// Satu meja = satu bill (dining_sessions). Ini pintu untuk KONSUMEN:
-//   - GET  /customer/dining-session         → bill miliknya sendiri
-//   - POST /customer/dining-session/claim   → bill terbuka di meja dari QR (ganti HP)
-// Tanpa ini, konsumen yang me-refresh halaman kehilangan jejak billnya.
-// Pencocokan bill milik sendiri memakai kontrak yang sama dengan endpoint
-// customer lain: kesamaan persis pada req.customer.phone (tidak ada normalisasi
-// karangan sendiri, supaya bill orang lain tidak mungkin ikut terbaca).
-function buildOpenBill(sessionId, brandId) {
+// ── Customer: current member's open dine-in session ─────────────────────────
+// Membership, not the session's primary contact phone, authorizes shared-table access.
+function buildMySubmissions(sessionId, customerId) {
+  const ownOrders = db.prepare(`
+    SELECT id, order_number, customer_id, status, created_at, grand_total
+    FROM orders
+    WHERE dining_session_id = ?
+    ORDER BY created_at
+  `).all(sessionId).filter((order) =>
+    customerId && String(order.customer_id || '') === String(customerId)
+  );
+  const submissions = [];
+
+  for (const order of ownOrders) {
+    const items = db.prepare(`
+      SELECT product_name, quantity, item_subtotal, subtotal, note
+      FROM order_items
+      WHERE order_id = ? AND addition_batch_id IS NULL
+      ORDER BY created_at, id
+    `).all(order.id).map((item) => ({
+      name: item.product_name || 'Item',
+      quantity: Number(item.quantity) || 0,
+      subtotal: Number(item.item_subtotal ?? item.subtotal) || 0,
+      note: item.note || ''
+    }));
+    if (items.length) {
+      submissions.push({
+        id: order.id,
+        order_number: order.order_number,
+        status: order.status,
+        created_at: order.created_at,
+        total: items.reduce((sum, item) => sum + item.subtotal, 0),
+        items
+      });
+    }
+  }
+
+  const batches = db.prepare(`
+    SELECT b.id, b.order_id, b.sequence_no, b.created_by, b.items_payload, b.subtotal,
+           b.status, b.rejection_reason, b.created_at, o.order_number
+    FROM order_addition_batches b
+    JOIN orders o ON o.id = b.order_id
+    WHERE b.dining_session_id = ?
+    ORDER BY b.sequence_no, b.created_at
+  `).all(sessionId).filter((batch) =>
+    customerId && String(batch.created_by || '') === String(customerId)
+  );
+
+  for (const batch of batches) {
+    let rawItems = [];
+    try { rawItems = JSON.parse(batch.items_payload || '[]'); } catch (_) {}
+    const items = rawItems.map((item) => ({
+      name: item.name || item.product_name || 'Item',
+      quantity: Number(item.quantity) || 0,
+      subtotal: Number(item.subtotal ?? item.item_subtotal) || 0,
+      note: item.note || item.notes || ''
+    }));
+    submissions.push({
+      id: batch.id,
+      order_number: batch.order_number,
+      status: batch.status,
+      rejection_reason: batch.rejection_reason || '',
+      created_at: batch.created_at,
+      total: Number(batch.subtotal) || items.reduce((sum, item) => sum + item.subtotal, 0),
+      items
+    });
+  }
+
+  return submissions.sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')));
+}
+
+function buildOpenBill(sessionId, brandId, customerId = null) {
   const session = db.prepare(`
     SELECT ds.id, ds.branch_id, ds.opened_at, ds.customer_name
     FROM dining_sessions ds
@@ -112,21 +175,36 @@ function buildOpenBill(sessionId, brandId) {
   `).all(session.id);
 
   const orders = db.prepare(`
-    SELECT id, order_number, order_type, status, payment_status, grand_total, created_at
-    FROM orders
-    WHERE dining_session_id = ?
-    ORDER BY created_at
+    SELECT o.id, o.order_number, o.order_type, o.status, o.payment_status, o.grand_total, o.created_at,
+      COALESCE(p.payment_status, 'pending') AS gateway_payment_status,
+      COALESCE(p.amount, 0) AS gateway_paid_amount
+    FROM orders o
+    LEFT JOIN order_payments p ON p.order_id = o.id
+    WHERE o.dining_session_id = ?
+    ORDER BY o.created_at
   `).all(session.id);
 
   let totalBill = 0;
   let outstanding = 0;
+  const nonBillableStatuses = new Set(['cancelled', 'rejected', 'timeout', 'expired', 'fulfillment_exception']);
   const billOrders = orders.map((o) => {
     const amount = Number(o.grand_total) || 0;
-    const isSettled = o.payment_status === 'settlement' || o.payment_status === 'paid';
-    const isCancelled = o.status === 'cancelled';
-    if (!isCancelled) {
+    const isExcluded = nonBillableStatuses.has(o.status);
+    const checkPayments = db.prepare(`
+      SELECT COALESCE(SUM(amount), 0) AS paid_amount
+      FROM pos_check_payments
+      WHERE order_id = ? AND payment_status = 'settlement'
+    `).get(o.id);
+    const ledgerPaid = Number(checkPayments && checkPayments.paid_amount) || 0;
+    const gatewayPaid = o.gateway_payment_status === 'settlement' || o.gateway_payment_status === 'paid'
+      ? Number(o.gateway_paid_amount) || 0
+      : 0;
+    const paidAmount = Math.min(amount, ledgerPaid > 0 ? ledgerPaid : gatewayPaid);
+    const remaining = Math.max(0, amount - paidAmount);
+    const isSettled = isExcluded || remaining <= 0;
+    if (!isExcluded) {
       totalBill += amount;
-      if (!isSettled) outstanding += amount;
+      outstanding += remaining;
     }
     return {
       id: o.id,
@@ -135,40 +213,47 @@ function buildOpenBill(sessionId, brandId) {
       status: o.status,
       payment_status: o.payment_status,
       grand_total: amount,
+      paid_amount: paidAmount,
+      outstanding_amount: isExcluded ? 0 : remaining,
       is_settled: isSettled,
       created_at: o.created_at
     };
   });
 
-  const activeOrders = billOrders.filter((o) => !o.is_cancelled);
+  const activeOrders = billOrders.filter((o) => !nonBillableStatuses.has(o.status));
   return {
     session_id: session.id,
     branch_id: session.branch_id,
     opened_at: session.opened_at,
-    customer_name: session.customer_name,
     tables: tables.map((t) => ({ id: t.id, table_number: t.table_number, label: t.label })),
     orders: billOrders,
     active_order_id: activeOrders.length ? activeOrders[activeOrders.length - 1].id : null,
     total_bill: totalBill,
-    outstanding_total: outstanding
+    outstanding_total: outstanding,
+    my_submissions: buildMySubmissions(session.id, customerId)
   };
 }
 
 router.get('/customer/dining-session', requireCustomerAuth(), (req, res) => {
   try {
     const customerPhone = req.customer.phone;
-    if (!customerPhone) return res.json({ success: true, session: null });
+    const customerId = req.customer.customerId || req.customer.customer_id;
+    if (!customerId) return res.json({ success: true, session: null });
 
     const row = db.prepare(`
       SELECT ds.id
       FROM dining_sessions ds
       JOIN branches b ON b.id = ds.branch_id
-      WHERE ds.status = 'active' AND b.brand_id = ? AND ds.customer_phone = ?
+      WHERE ds.status = 'active' AND b.brand_id = ?
+        AND EXISTS (
+          SELECT 1 FROM dining_session_members m
+          WHERE m.session_id = ds.id AND m.customer_id = ?
+        )
       ORDER BY ds.opened_at DESC
       LIMIT 1
-    `).get(req.brand_id, customerPhone);
+    `).get(req.brand_id, customerId);
 
-    return res.json({ success: true, session: row ? buildOpenBill(row.id, req.brand_id) : null });
+    return res.json({ success: true, session: row ? buildOpenBill(row.id, req.brand_id, customerId) : null });
   } catch (err) {
     return res.status(400).json({ success: false, error: err.message });
   }
@@ -177,6 +262,7 @@ router.get('/customer/dining-session', requireCustomerAuth(), (req, res) => {
 router.post('/customer/dining-session/additions', requireCustomerAuth(), async (req, res) => {
   try {
     const customerPhone = req.customer.phone;
+    const customerId = req.customer.customerId || req.customer.customer_id;
     const { order_id, items = [] } = req.body || {};
     if (!customerPhone) return res.status(400).json({ success: false, error: 'Identitas customer belum memiliki nomor WhatsApp.' });
     if (!order_id) return res.status(400).json({ success: false, error: 'order_id wajib diisi.' });
@@ -189,10 +275,10 @@ router.post('/customer/dining-session/additions', requireCustomerAuth(), async (
       WHERE o.id = ?
         AND o.order_type = 'dine_in'
         AND ds.status = 'active'
-        AND ds.customer_phone = ?
+        AND EXISTS (SELECT 1 FROM dining_session_members m WHERE m.session_id = ds.id AND m.customer_id = ?)
         AND b.brand_id = ?
       LIMIT 1
-    `).get(order_id, customerPhone, req.brand_id);
+    `).get(order_id, customerId || '', req.brand_id);
 
     if (!owner) {
       return res.status(403).json({
@@ -209,7 +295,8 @@ router.post('/customer/dining-session/additions', requireCustomerAuth(), async (
       branch_id: owner.branch_id,
       items,
       source_channel: 'customer_app',
-      created_by: req.customer.customerId || req.customer.customer_id || customerPhone
+      created_by: customerId || customerPhone,
+      customer: { id: customerId || null, name: req.customer.name || '', phone: customerPhone }
     });
 
     return res.status(201).json(result);
@@ -234,46 +321,19 @@ router.post('/customer/dining-session/additions', requireCustomerAuth(), async (
 
 router.post('/customer/dining-session/claim', optionalCustomerAuth(), (req, res) => {
   try {
-    const { qr_token, branch_id } = req.body || {};
+    const { qr_token } = req.body || {};
     if (!qr_token) {
       return res.status(400).json({ success: false, error: 'qr_token wajib diisi.' });
     }
 
     const raw = String(qr_token).trim();
-    let tableRow = null;
-
-    // Kode manusiawi: "meja7", "Meja 7", atau "7" saja. Nomor meja hanya unik per
-    // CABANG (tiga cabang satu brand boleh sama-sama punya Meja 7), jadi cabangnya
-    // wajib disebut — tanpa itu kita tidak boleh menebak, karena bisa nyasar ke
-    // meja nomor sama di cabang lain.
-    const alias = /^(?:meja\s*)?(\d{1,4})$/i.exec(raw);
-    if (alias) {
-      if (!branch_id) {
-        return res.status(400).json({
-          success: false,
-          error: 'BRANCH_REQUIRED',
-          message: 'Cabang belum dipilih, jadi kode meja belum bisa dipakai.'
-        });
-      }
-      tableRow = db.prepare(`
-        SELECT id, table_number, label, branch_id FROM branch_tables
-        WHERE branch_id = ? AND (table_number = ? OR lower(replace(label, ' ', '')) = ?)
-      `).get(branch_id, alias[1], 'meja' + alias[1]);
-      if (!tableRow) {
-        return res.status(404).json({
-          success: false,
-          error: 'MEJA_TIDAK_DITEMUKAN',
-          message: 'Meja itu tidak ada di cabang ini.'
-        });
-      }
-    } else {
-      const table = DiningTableService.resolveFromQr(raw);
-      if (!table) {
-        return res.status(404).json({ success: false, error: 'QR Meja tidak valid atau telah dicabut.' });
-      }
-      const tableId = table.id || table.table_id;
-      tableRow = db.prepare('SELECT id, table_number, label, branch_id FROM branch_tables WHERE id = ?').get(tableId) || { id: tableId };
+    const resolvedTable = DiningTableService.resolveFromQr(raw);
+    if (!resolvedTable) {
+      return res.status(404).json({ success: false, error: 'QR Meja tidak valid atau telah dicabut.' });
     }
+    const resolvedTableId = resolvedTable.id || resolvedTable.table_id;
+    const tableRow = db.prepare('SELECT id, table_number, label, branch_id FROM branch_tables WHERE id = ?').get(resolvedTableId);
+    if (!tableRow) return res.status(404).json({ success: false, error: 'MEJA_TIDAK_DITEMUKAN' });
 
     // Meja harus benar-benar milik brand ini.
     const brandOfBranch = db.prepare('SELECT brand_id FROM branches WHERE id = ?').get(tableRow.branch_id);
@@ -283,85 +343,23 @@ router.post('/customer/dining-session/claim', optionalCustomerAuth(), (req, res)
 
     const tableId = tableRow.id;
 
-    // If the table currently has an active occupied session that has no customer phone
-    // (e.g. opened anonymously at the POS cashier without asking the customer for their phone),
-    // and the customer claiming the physical QR is authenticated with a phone number,
-    // bind the customer's phone to the active session so they can view and manage their open bill!
-    const custPhone = req.customer && req.customer.phone ? String(req.customer.phone).trim() : '';
-
-    // If table currently has an active hold from a POS cashier dine-in order,
-    // activate the cashier's held order into an operational dining session immediately.
-    try {
-      const activeHold = db.prepare(`
-        SELECT h.hold_reference_id, h.id as hold_id
-        FROM branch_table_holds h
-        WHERE h.table_id = ? AND h.status = 'active'
-      `).get(tableId);
-
-      if (activeHold) {
-        let heldOrder = db.prepare(`
-          SELECT id, branch_id, customer_name, customer_phone, order_channel, order_type
-          FROM orders
-          WHERE id = ? AND order_type = 'dine_in'
-        `).get(activeHold.hold_reference_id);
-
-        if (!heldOrder) {
-          const held = db.prepare('SELECT order_id FROM pos_held_orders WHERE id = ?').get(activeHold.hold_reference_id);
-          if (held && held.order_id) {
-            heldOrder = db.prepare(`
-              SELECT id, branch_id, customer_name, customer_phone, order_channel, order_type
-              FROM orders
-              WHERE id = ? AND order_type = 'dine_in'
-            `).get(held.order_id);
-          }
-        }
-
-        if (heldOrder && heldOrder.order_channel === 'pos_cashier') {
-          const { DiningTableService } = require('../../domains/dining');
-          DiningTableService.createOrAttachDiningSession({
-            branch_id: heldOrder.branch_id,
-            table_ids: [tableId],
-            order_id: heldOrder.id,
-            customer_name: (req.customer && req.customer.name) || heldOrder.customer_name || 'Tamu Dine-In',
-            customer_phone: custPhone || heldOrder.customer_phone || '',
-            guest_count: heldOrder.guest_count || 1,
-            hold_reference_id: heldOrder.id,
-            channel: 'pos_cashier'
-          });
-        }
-      }
-    } catch (activateErr) {
-      console.warn('[customer/claim] Error activating held cashier order into session:', activateErr.message);
+    // A scan only joins a session opened by staff. It never converts a payment
+    // hold or claims an available table. Unauthenticated scans remain locators;
+    // signup/login returns to this route and performs the actual membership join.
+    let joinedSession = null;
+    const customerId = req.customer && (req.customer.customerId || req.customer.customer_id);
+    const tableOpen = DiningTableService.hasOpenTableSession(tableId);
+    if (req.customer && !customerId) {
+      return res.status(403).json({ success: false, error: 'CUSTOMER_ID_REQUIRED', message: 'Akun customer belum siap untuk bergabung ke sesi meja.' });
     }
-
-    if (custPhone) {
-      const activeSessionRow = db.prepare(`
-        SELECT s.current_session_id, ds.customer_phone
-        FROM branch_table_states s
-        JOIN dining_sessions ds ON ds.id = s.current_session_id
-        WHERE s.table_id = ? AND s.operational_state = 'occupied' AND ds.status = 'active'
-      `).get(tableId);
-
-      if (activeSessionRow && (!activeSessionRow.customer_phone || activeSessionRow.customer_phone === '')) {
-        const now = new Date().toISOString();
-        db.prepare(`
-          UPDATE dining_sessions
-          SET customer_phone = ?,
-              customer_name = CASE WHEN customer_name IS NULL OR customer_name = '' OR customer_name = 'Tamu Dine-In' THEN ? ELSE customer_name END,
-              updated_at = ?
-          WHERE id = ?
-        `).run(custPhone, req.customer.name || 'Tamu Dine-In', now, activeSessionRow.current_session_id);
-
-        try {
-          db.prepare(`
-            UPDATE orders
-            SET customer_phone = ?,
-                customer_name = CASE WHEN customer_name IS NULL OR customer_name = '' OR customer_name = 'Tamu' OR customer_name = 'Tamu Meja' THEN ? ELSE customer_name END,
-                updated_at = ?
-            WHERE dining_session_id = ? AND (customer_phone IS NULL OR customer_phone = '')
-          `).run(custPhone, req.customer.name || 'Tamu Dine-In', now, activeSessionRow.current_session_id);
-        } catch (_) {}
-      }
+    if (customerId) {
+      const joinResult = DiningTableService.joinActiveTableSession({
+        branch_id: tableRow.branch_id,
+        table_id: tableId,
+        customer_id: customerId,
+        customer_phone: req.customer.phone || ''
+      });
+      if (joinResult.joined) joinedSession = buildOpenBill(joinResult.session_id, req.brand_id, customerId);
     }
 
     // Mejanya selalu dikembalikan, walau belum ada billnya: konsumen yang scan QR
@@ -372,12 +370,20 @@ router.post('/customer/dining-session/claim', optionalCustomerAuth(), (req, res)
       label: tableRow.label || null
     };
 
-    // SENGAJA hanya mejanya, tanpa isi tagihan. QR meja ditempel permanen di meja,
-    // jadi QR itu bukan rahasia dan tidak boleh jadi kunci: kalau QR ini bisa
-    // membuka tagihan, siapa pun yang pernah memfotonya bisa membaca tagihan tamu
-    // berikutnya. Melihat tagihan tetap lewat identitas tamu sendiri
-    // (GET /customer/dining-session).
-    return res.json({ success: true, session: null, via: 'qr', table_id: tableId, table: tableInfo });
+    return res.json({
+      success: true,
+      session: joinedSession,
+      joined: Boolean(joinedSession),
+      table_open: tableOpen,
+      via: 'qr',
+      table_id: tableId,
+      table: tableInfo,
+      message: joinedSession
+        ? undefined
+        : (tableOpen
+          ? 'Meja sudah dibuka kasir. Masuk atau daftar akun untuk bergabung dan memesan.'
+          : 'Meja belum dibuka kasir. Minta petugas membuka sesi meja terlebih dahulu.')
+    });
   } catch (err) {
     return res.status(400).json({ success: false, error: err.message });
   }

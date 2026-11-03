@@ -32,10 +32,45 @@ class AffiliateService {
     if (!prog) {
       prog = this.repo.upsertProgram({ brandId });
     }
-    return prog;
+
+    let featuredProduct = null;
+    if (prog && prog.featured_product_id) {
+      // 1. Look up in menus table first (restaurant dishes created by owner)
+      const menuRow = this.repo.db.queryOne(
+        "SELECT m.id, COALESCE(m.package_name, mt.name, m.id) AS name, m.selling_price AS price, m.image_url, m.image, m.description, m.category_id, c.name AS category_name " +
+        "FROM menus m " +
+        "LEFT JOIN menu_titles mt ON mt.id = m.title_id AND mt.brand_id = m.brand_id " +
+        "LEFT JOIN categories c ON c.id = m.category_id AND c.brand_id = m.brand_id " +
+        "WHERE m.id = ? AND m.brand_id = ?",
+        [prog.featured_product_id, brandId]
+      );
+      if (menuRow) {
+        featuredProduct = {
+          id: menuRow.id,
+          name: menuRow.name,
+          price: Number(menuRow.price || 0),
+          image_url: menuRow.image_url || menuRow.image || null,
+          image: menuRow.image || menuRow.image_url || null,
+          description: menuRow.description || '',
+          category_id: menuRow.category_id,
+          category_name: menuRow.category_name
+        };
+      } else {
+        // 2. Fallback to products table (Item Master) for backward compatibility
+        featuredProduct = this.repo.db.queryOne(
+          "SELECT id, name, price, image_url, description FROM products WHERE id = ? AND brand_id = ?",
+          [prog.featured_product_id, brandId]
+        );
+      }
+    }
+
+    return {
+      ...prog,
+      featured_product: featuredProduct
+    };
   }
 
-  async updateProgram({ brandId, commissionType, commissionRate, commissionPerItem, cookieDays, minPayoutAmount, isActive }) {
+  async updateProgram({ brandId, commissionType, commissionRate, commissionPerItem, cookieDays, minPayoutAmount, isActive, featuredProductId }) {
     this.ensureSchema();
     if (!brandId) throw new Error('BRAND_ID_REQUIRED');
     return this.repo.upsertProgram({
@@ -45,7 +80,8 @@ class AffiliateService {
       commissionPerItem: commissionPerItem != null ? Number(commissionPerItem) : (commissionRate != null ? Number(commissionRate) : undefined),
       cookieDays: cookieDays != null ? parseInt(cookieDays, 10) : undefined,
       minPayoutAmount: minPayoutAmount != null ? Number(minPayoutAmount) : undefined,
-      isActive: isActive != null ? (isActive ? 1 : 0) : undefined
+      isActive: isActive != null ? (isActive ? 1 : 0) : undefined,
+      featuredProductId: featuredProductId !== undefined ? featuredProductId : undefined
     });
   }
 
@@ -74,6 +110,63 @@ class AffiliateService {
     }
 
     return profile;
+  }
+
+  async activateInstantPartner({ brandId, customerId, customerName = null, customerPhone = null }) {
+    this.ensureSchema();
+    if (!brandId) throw new Error('BRAND_ID_REQUIRED');
+    if (!customerId) throw new Error('CUSTOMER_ID_REQUIRED');
+
+    let profile = this.repo.findProfileByCustomer({ brandId, customerId });
+    if (!profile) {
+      profile = await this.getOrCreateProfile({ brandId, customerId, customerName, customerPhone });
+    } else if (profile.status !== 'ACTIVE') {
+      profile = this.repo.activateProfile(profile.id);
+    }
+    return profile;
+  }
+
+  async getPublicProgramInfo({ brandId }) {
+    this.ensureSchema();
+    if (!brandId) throw new Error('BRAND_ID_REQUIRED');
+    const program = await this.getProgram({ brandId });
+    const paidList = this.repo.listRecentPaidPayouts({ brandId, limit: 6 });
+
+    let recentPayouts = [];
+    if (paidList && paidList.length > 0) {
+      recentPayouts = paidList.map(p => {
+        const rawName = p.customer_name || 'Foodie Partner';
+        const masked = rawName.length > 2
+          ? rawName.charAt(0) + '*** ' + (rawName.split(' ')[1] ? rawName.split(' ')[1].charAt(0) + '.' : '')
+          : rawName;
+        return {
+          name: masked.trim(),
+          amount: p.amount,
+          method: p.bank_name || 'Transfer',
+          time_ago: 'Baru saja'
+        };
+      });
+    } else {
+      recentPayouts = [
+        { name: 'Dimas S.', amount: 45000, method: 'GoPay', time_ago: 'Baru saja' },
+        { name: 'Rina P.', amount: 62000, method: 'BCA', time_ago: '1 jam lalu' },
+        { name: 'Fajar K.', amount: 38000, method: 'DANA', time_ago: '3 jam lalu' },
+        { name: 'Siti M.', amount: 80000, method: 'Mandiri', time_ago: '5 jam lalu' }
+      ];
+    }
+
+    return {
+      brand_id: brandId,
+      is_active: Boolean(program.is_active),
+      commission_type: program.commission_type || 'FIXED_PER_ITEM',
+      commission_rate: program.commission_rate,
+      commission_per_item: program.commission_per_item || program.commission_rate || 1000,
+      cookie_days: program.cookie_days || 14,
+      min_payout_amount: program.min_payout_amount || 50000,
+      featured_product_id: program.featured_product_id || null,
+      featured_product: program.featured_product || null,
+      recent_payouts: recentPayouts
+    };
   }
 
   async updateBankDetails({ brandId, customerId, bankName, accountNumber, accountHolder }) {
@@ -413,14 +506,24 @@ class AffiliateService {
     const stats = this.repo.getStats(profile.id);
     const payouts = this.repo.listPayoutsByProfile(profile.id);
 
+    const totalEarned = Number((stats && stats.profile && stats.profile.total_earnings) || 0);
+    let tier = { name: 'Foodie Pemula', level: 1, icon: '🥉', badge: '🥉 Foodie Pemula', next_tier: 'Foodie Star', target: 100000, progress: Math.min(100, Math.round((totalEarned / 100000) * 100)) };
+    if (totalEarned >= 500000) {
+      tier = { name: 'Sultan Bangjo', level: 3, icon: '👑', badge: '👑 Sultan Bangjo', next_tier: null, target: 500000, progress: 100 };
+    } else if (totalEarned >= 100000) {
+      tier = { name: 'Foodie Star', level: 2, icon: '⭐', badge: '⭐ Foodie Star', next_tier: 'Sultan Bangjo', target: 500000, progress: Math.min(100, Math.round(((totalEarned - 100000) / 400000) * 100)) };
+    }
+
     return {
       ...stats,
+      tier,
       program: {
         commission_type: program.commission_type || 'FIXED_PER_ITEM',
         commission_rate: program.commission_rate,
         commission_per_item: program.commission_per_item || program.commission_rate || 1000,
         min_payout_amount: program.min_payout_amount,
-        cookie_days: program.cookie_days
+        cookie_days: program.cookie_days,
+        featured_product: program.featured_product || null
       },
       payouts: payouts || []
     };

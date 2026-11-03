@@ -1,8 +1,11 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import MenuItemCard from './MenuItemCard';
 import PickItemSheet from './PickItemSheet';
 import AturItemModal from './AturItemModal';
+import AddCategoryBottomSheet from './AddCategoryBottomSheet';
+import PhotoPickerBottomSheet from './PhotoPickerBottomSheet';
+import DeleteConfirmationModal from './DeleteConfirmationModal';
 
 function getAuthToken(fallbackToken) {
   if (fallbackToken) return fallbackToken;
@@ -99,19 +102,62 @@ export default function MenuEditor({
   });
   const [title, setTitle] = useState('');
   const [menuItems, setMenuItems] = useState([]);
+  const [draggedItemIndex, setDraggedItemIndex] = useState(null);
+  const draggedItemIndexRef = useRef(null);
+  const pendingMenuItemFlipRef = useRef(null);
   const [pricingType, setPricingType] = useState('FIXED'); // FIXED | RANGE
   const [priceFixed, setPriceFixed] = useState(0);
   const [priceMin, setPriceMin] = useState(0);
   const [priceMax, setPriceMax] = useState(0);
   const [isActive, setIsActive] = useState(true);
+  const [branchPrices, setBranchPrices] = useState([]);
+  const [showBranchPricing, setShowBranchPricing] = useState(false);
 
   // Sheets and Modals
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
+  const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
+  const [isPhotoSheetOpen, setIsPhotoSheetOpen] = useState(false);
   const categoryDropdownRef = useRef(null);
   const [isPickSheetOpen, setIsPickSheetOpen] = useState(false);
   const [pickItemTargetIndex, setPickItemTargetIndex] = useState(null); // null means adding new item
   const [isAturModalOpen, setIsAturModalOpen] = useState(false);
   const [aturTargetIndex, setAturTargetIndex] = useState(null);
+
+  useEffect(() => {
+    const closeOpenSheets = () => {
+      setIsPickSheetOpen(false);
+      setIsAturModalOpen(false);
+      setIsPhotoSheetOpen(false);
+      setShowDeleteModal(false);
+      setIsCategoryDropdownOpen(false);
+    };
+    window.addEventListener('popstate', closeOpenSheets);
+    window.addEventListener('hashchange', closeOpenSheets);
+    return () => {
+      window.removeEventListener('popstate', closeOpenSheets);
+      window.removeEventListener('hashchange', closeOpenSheets);
+    };
+  }, []);
+
+  // Lock body scroll and close on Escape key when Delete Modal is active
+  useEffect(() => {
+    if (!showDeleteModal) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && !isDeleting) {
+        e.preventDefault();
+        setShowDeleteModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showDeleteModal, isDeleting]);
 
   const authToken = getAuthToken(token);
 
@@ -307,6 +353,33 @@ export default function MenuEditor({
                 })
               );
             }
+
+            if (Array.isArray(m.branch_adoptions)) {
+              setBranchPrices(
+                m.branch_adoptions.map((b) => ({
+                  branch_id: b.branch_id,
+                  branch_name: b.branch_name,
+                  price: b.price_override != null ? Number(b.price_override).toLocaleString('id-ID') : '',
+                  is_override: b.price_override != null && b.price_override !== '',
+                }))
+              );
+            }
+          }
+        }
+
+        const bRes = await authFetch(`${apiBase}/admin/branches`).catch(() => null);
+        if (bRes && bRes.ok) {
+          const bData = await bRes.json().catch(() => null);
+          if (bData && Array.isArray(bData.branches) && isMounted) {
+            setBranchPrices((prev) => {
+              if (prev && prev.length > 0) return prev;
+              return bData.branches.map((b) => ({
+                branch_id: b.id,
+                branch_name: b.name,
+                price: '',
+                is_override: false,
+              }));
+            });
           }
         }
       } catch (err) {
@@ -368,8 +441,8 @@ export default function MenuEditor({
       window.navigateTo(fallbackRoute);
       return;
     }
-    if (typeof window !== 'undefined') {
-      window.location.hash = `#${fallbackRoute}`;
+    if (typeof window !== 'undefined' && window.history && typeof window.history.pushState === 'function') {
+      window.history.pushState({ xentraRoute: fallbackRoute }, '', `#${fallbackRoute}`);
     }
   };
 
@@ -462,6 +535,95 @@ export default function MenuEditor({
     setMenuItems((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const handleMoveItem = (fromIndex, toIndex) => {
+    if (
+      fromIndex < 0 ||
+      fromIndex >= menuItems.length ||
+      toIndex < 0 ||
+      toIndex >= menuItems.length ||
+      fromIndex === toIndex
+    ) return;
+
+    const root = document.getElementById('modern-menu-editor-root');
+    const firstPositions = new Map();
+    root?.querySelectorAll('[data-menu-item-id]').forEach((card) => {
+      firstPositions.set(card.getAttribute('data-menu-item-id'), card.getBoundingClientRect().top);
+    });
+    pendingMenuItemFlipRef.current = firstPositions;
+
+    const next = [...menuItems];
+    const [movedItem] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, movedItem);
+    setMenuItems(next);
+  };
+
+  useLayoutEffect(() => {
+    const firstPositions = pendingMenuItemFlipRef.current;
+    if (!firstPositions) return;
+    pendingMenuItemFlipRef.current = null;
+
+    const root = document.getElementById('modern-menu-editor-root');
+    const cards = root ? Array.from(root.querySelectorAll('[data-menu-item-id]')) : [];
+    cards.forEach((card) => {
+      card.style.transition = 'none';
+      card.style.transform = '';
+    });
+
+    const movedCards = [];
+    cards.forEach((card) => {
+      const itemId = card.getAttribute('data-menu-item-id');
+      const firstTop = firstPositions.get(itemId);
+      if (firstTop === undefined) return;
+      const deltaY = firstTop - card.getBoundingClientRect().top;
+      if (Math.abs(deltaY) < 1) return;
+      card.style.transform = `translateY(${deltaY}px)`;
+      movedCards.push(card);
+    });
+
+    if (!movedCards.length) return;
+    movedCards.forEach((card) => card.getBoundingClientRect());
+    requestAnimationFrame(() => {
+      movedCards.forEach((card) => {
+        card.style.transition = 'transform 240ms cubic-bezier(0.22, 1, 0.36, 1)';
+        card.style.transform = 'translateY(0)';
+        const cleanup = () => {
+          card.style.transition = '';
+          card.style.transform = '';
+          card.removeEventListener('transitionend', cleanup);
+        };
+        card.addEventListener('transitionend', cleanup);
+      });
+    });
+  }, [menuItems]);
+
+  const handleItemDragStart = (index) => {
+    draggedItemIndexRef.current = index;
+    setDraggedItemIndex(index);
+  };
+
+  const handleItemDragMove = (event) => {
+    const fromIndex = draggedItemIndexRef.current;
+    if (fromIndex === null) return;
+    const root = event.currentTarget.closest('#modern-menu-editor-root');
+    if (!root) return;
+    const otherCards = Array.from(root.querySelectorAll('[data-menu-item-index]'))
+      .filter((card) => Number(card.getAttribute('data-menu-item-index')) !== fromIndex);
+    const insertionIndex = otherCards.findIndex((card) => {
+      const rect = card.getBoundingClientRect();
+      return event.clientY < rect.top + rect.height / 2;
+    });
+    const toIndex = insertionIndex < 0 ? otherCards.length : insertionIndex;
+    if (!Number.isInteger(toIndex) || toIndex === fromIndex) return;
+    handleMoveItem(fromIndex, toIndex);
+    draggedItemIndexRef.current = toIndex;
+    setDraggedItemIndex(toIndex);
+  };
+
+  const handleItemDragEnd = () => {
+    draggedItemIndexRef.current = null;
+    setDraggedItemIndex(null);
+  };
+
   const handleRemoveVariant = (itemIndex, variantIndex) => {
     const updated = [...menuItems];
     const targetItem = updated[itemIndex];
@@ -497,26 +659,33 @@ export default function MenuEditor({
     }
   };
 
-  // Add Category Inline
-  const handleAddCategoryQuick = () => {
-    const name = prompt('Masukkan nama kategori baru:');
-    if (name && name.trim()) {
-      authFetch(`${apiBase}/admin/categories`, {
-        method: 'POST',
-        body: JSON.stringify({ name: name.trim(), is_active: 1 }),
-      })
-        .then((r) => r.json())
-        .then((res) => {
-          if (res && res.success && res.category) {
-            setCategories((prev) => [...prev, res.category]);
-            setCategoryId(String(res.category.id));
-            if (typeof window !== 'undefined' && window.state && Array.isArray(window.state.categories)) {
-              window.state.categories.push(res.category);
-            }
-          }
-        })
-        .catch(() => {});
+  // Add Category Inline Bottom Sheet
+  const handleAddCategoryQuick = (e) => {
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+      e.stopPropagation();
     }
+    setIsCategoryDropdownOpen(false);
+    setIsAddCategoryOpen(true);
+  };
+
+  const handleCategoryCreated = (newCategory) => {
+    if (newCategory && newCategory.id) {
+      setCategories((prev) => {
+        const exists = prev.some((c) => String(c.id) === String(newCategory.id));
+        return exists ? prev : [...prev, newCategory];
+      });
+      setCategoryId(String(newCategory.id));
+      setFallbackCategoryName(newCategory.name ? String(newCategory.name) : '');
+      setIsCategoryDropdownOpen(false);
+      if (typeof window !== 'undefined' && window.state && Array.isArray(window.state.categories)) {
+        const cached = window.state.categories;
+        if (!cached.some((c) => c && String(c.id) === String(newCategory.id))) {
+          cached.push(newCategory);
+        }
+      }
+    }
+    setIsAddCategoryOpen(false);
   };
 
   // 3. Save Menu
@@ -570,6 +739,10 @@ export default function MenuEditor({
           name: it.name,
           quantity: Number(it.quantity) || 1,
           options_config: it.options_config,
+        })),
+        branch_prices: branchPrices.map((bp) => ({
+          branch_id: bp.branch_id,
+          price: bp.is_override && bp.price ? Number(String(bp.price).replace(/\D/g, '')) : null
         })),
       };
 
@@ -715,7 +888,7 @@ export default function MenuEditor({
       id="modern-menu-editor-root"
       style={{
         boxSizing: 'border-box',
-        paddingBottom: '150px',
+        paddingBottom: '96px',
       }}
       className="w-full flex flex-col gap-4 max-w-lg md:mx-auto font-sans select-none"
     >
@@ -796,38 +969,34 @@ export default function MenuEditor({
               </div>
             </div>
 
-            <label
+            <button
+              type="button"
+              id="btn-modern-menu-photo-pick"
+              onClick={(e) => {
+                if (e) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }
+                setIsPhotoSheetOpen(true);
+              }}
               style={{
                 height: '40px',
                 borderRadius: '20px',
                 boxShadow: 'inset 0 0 0 1px #00A637',
                 backgroundColor: '#FFFFFF',
               }}
-              className="w-full flex items-center justify-center gap-2 cursor-pointer transition-all hover:bg-emerald-50/40 active:scale-[0.99]"
+              className="w-full flex items-center justify-center gap-2 cursor-pointer transition-all hover:bg-emerald-50/40 active:scale-[0.99] border-none"
             >
-              <svg
-                width="13"
-                height="11"
-                viewBox="0 0 13 11"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                className="shrink-0"
-              >
-                <path
-                  d="M11.375 2.0625H9.63625L8.62875 0.9625C8.52666 0.850592 8.40174 0.761139 8.26237 0.699961C8.123 0.638782 7.97241 0.607279 7.82 0.6075H5.18C4.86583 0.6075 4.56875 0.7395 4.37125 0.9625L3.36375 2.0625H1.625C1.02771 2.0625 0.541667 2.52513 0.541667 3.09375V9.28125C0.541667 9.84987 1.02771 10.3125 1.625 10.3125H11.375C11.9723 10.3125 12.4583 9.84987 12.4583 9.28125V3.09375C12.4583 2.52513 11.9723 2.0625 11.375 2.0625ZM6.5 8.59375C4.99958 8.59375 3.79167 7.43875 3.79167 6.01562C3.79167 4.5925 4.99958 3.4375 6.5 3.4375C8.00042 3.4375 9.20833 4.5925 9.20833 6.01562C9.20833 7.43875 8.00042 8.59375 6.5 8.59375Z"
-                  fill="#00A637"
-                />
-              </svg>
-              <span className="text-[11px] font-bold text-[#00A637] leading-none">
+              <img
+                src="/owner/assets/icons/ant-design_camera-outlined.svg"
+                alt=""
+                style={{ width: '15px', height: '13px' }}
+                className="object-contain shrink-0"
+              />
+              <span className="text-[13px] font-bold text-[#00A637] leading-none">
                 {imagePreview ? 'Ganti foto' : 'Pilih foto'}
               </span>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="hidden"
-                onChange={handlePhotoSelect}
-              />
-            </label>
+            </button>
           </div>
 
           {/* CARD 2: KATEGORI */}
@@ -954,6 +1123,8 @@ export default function MenuEditor({
 
               <button
                 type="button"
+                id="modern-btn-quick-add-category"
+                data-testid="btn-quick-add-category"
                 onClick={handleAddCategoryQuick}
                 aria-label="Tambah Kategori Baru"
                 style={{
@@ -1019,14 +1190,20 @@ export default function MenuEditor({
                 <div className="w-full flex flex-col gap-3">
                   {menuItems.map((item, idx) => (
                     <MenuItemCard
-                      key={`${item.product_id}-${idx}`}
+                      key={String(item.product_id)}
                       item={item}
+                      productId={String(item.product_id)}
                       index={idx}
+                      isDragging={draggedItemIndex === idx}
                       onQtyChange={handleQtyChange}
                       onRemoveItem={handleRemoveItem}
                       onOpenPickSheet={handleOpenPickSheet}
                       onOpenAturModal={handleOpenAturModal}
                       onRemoveVariant={handleRemoveVariant}
+                      onMoveItem={handleMoveItem}
+                      onDragStart={handleItemDragStart}
+                      onDragMove={handleItemDragMove}
+                      onDragEnd={handleItemDragEnd}
                     />
                   ))}
                 </div>
@@ -1187,6 +1364,86 @@ export default function MenuEditor({
             )}
           </div>
 
+          {/* CARD 6B: HARGA KHUSUS CABANG (LSP) */}
+          <div className="w-full p-4 bg-white rounded-[12px] hub-inset-stroke flex flex-col items-start gap-3">
+            <div
+              className="w-full flex items-center justify-between cursor-pointer select-none"
+              onClick={() => setShowBranchPricing((prev) => !prev)}
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-[15px] font-bold text-[#303030]">
+                  Harga Khusus Cabang (LSP)
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                  Opsional
+                </span>
+              </div>
+              <svg
+                className={`w-4 h-4 text-slate-400 transition-transform ${showBranchPricing ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+
+            <p className="w-full text-[13px] font-medium text-[#94A3B8] leading-snug m-0 text-left">
+              Atur harga jual khusus untuk cabang tertentu (misal: bandara atau mall). Cabang lain otomatis memakai harga master di atas.
+            </p>
+
+            {showBranchPricing && (
+              <div className="w-full flex flex-col gap-3 pt-2 border-t border-slate-100">
+                {branchPrices.length === 0 ? (
+                  <div className="text-xs text-slate-400 py-2">Memuat cabang...</div>
+                ) : (
+                  branchPrices.map((bp, bIdx) => (
+                    <div key={bp.branch_id} className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200/80 flex flex-col gap-2 text-left">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-800">{bp.branch_name}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = [...branchPrices];
+                            next[bIdx].is_override = !next[bIdx].is_override;
+                            if (!next[bIdx].is_override) next[bIdx].price = '';
+                            setBranchPrices(next);
+                          }}
+                          className={`px-2 py-0.5 rounded-md text-[11px] font-bold cursor-pointer transition-all border ${
+                            bp.is_override
+                              ? 'bg-emerald-600 text-white border-emerald-600'
+                              : 'bg-white text-slate-500 border-slate-300'
+                          }`}
+                        >
+                          {bp.is_override ? 'Harga Khusus' : 'Ikuti Master'}
+                        </button>
+                      </div>
+                      {bp.is_override && (
+                        <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-300">
+                          <span className="text-xs font-bold text-slate-400">Rp</span>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="30.000"
+                            value={bp.price}
+                            onChange={(e) => {
+                              const raw = e.target.value.replace(/\D/g, '');
+                              const val = raw ? Number(raw).toLocaleString('id-ID') : '';
+                              const next = [...branchPrices];
+                              next[bIdx].price = val;
+                              setBranchPrices(next);
+                            }}
+                            className="w-full text-xs font-bold text-slate-900 border-none outline-none bg-transparent"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
           {/* CARD 7: PREVIEW */}
           <div className="w-full p-4 bg-white rounded-[12px] hub-inset-stroke flex flex-col items-start gap-4">
             <h4 className="w-full text-[16px] font-bold text-[#303030] leading-none m-0 text-left">
@@ -1311,197 +1568,15 @@ export default function MenuEditor({
         </div>
       )}
 
-      {/* Custom Delete Menu Confirmation Modal rendered outside body via React Portal */}
-      {showDeleteModal && typeof document !== 'undefined' && createPortal(
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="delete-menu-modal-title"
-          onClick={() => {
-            if (!isDeleting) setShowDeleteModal(false);
-          }}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(15, 23, 42, 0.35)',
-            zIndex: 300,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px',
-            boxSizing: 'border-box',
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: '100%',
-              maxWidth: '353px',
-              minHeight: '170px',
-              paddingLeft: '17px',
-              paddingRight: '17px',
-              paddingTop: '18px',
-              paddingBottom: '18px',
-              backgroundColor: '#FFFFFF',
-              boxShadow: '0px 2px 10px rgba(0, 0, 0, 0.20)',
-              borderRadius: '16px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'flex-start',
-              alignItems: 'flex-start',
-              gap: '17px',
-              boxSizing: 'border-box',
-            }}
-          >
-            <div
-              id="delete-menu-modal-title"
-              style={{
-                color: '#0F172A',
-                fontSize: '18px',
-                fontWeight: 700,
-                lineHeight: '18px',
-              }}
-            >
-              Hapus menu
-            </div>
-
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'flex-start',
-                gap: '12px',
-                width: '100%',
-              }}
-            >
-              <div
-                style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '10px',
-                  boxShadow: 'inset 0 0 0 1px rgba(250, 62, 62, 0.30)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <svg
-                  width="17"
-                  height="17"
-                  viewBox="0 0 17 17"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M2.125 4.25H3.54167H14.875"
-                    stroke="#FA3E3E"
-                    strokeWidth="1.25"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M5.66666 4.25008V2.83341C5.66666 2.45769 5.81591 2.09736 6.08159 1.83168C6.34727 1.566 6.7076 1.41675 7.08332 1.41675H9.91666C10.2924 1.41675 10.6527 1.566 10.9184 1.83168C11.1841 2.09736 11.3333 2.45769 11.3333 2.83341V4.25008M13.4583 4.25008V14.1667C13.4583 14.5425 13.3091 14.9028 13.0434 15.1685C12.7777 15.4342 12.4174 15.5834 12.0417 15.5834H4.95832C4.5826 15.5834 4.22227 15.4342 3.95659 15.1685C3.69091 14.9028 3.54166 14.5425 3.54166 14.1667V4.25008H13.4583Z"
-                    stroke="#FA3E3E"
-                    strokeWidth="1.25"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M7.08334 7.79175V12.0417"
-                    stroke="#FA3E3E"
-                    strokeWidth="1.25"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M9.91666 7.79175V12.0417"
-                    stroke="#FA3E3E"
-                    strokeWidth="1.25"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
-
-              <div
-                style={{
-                  color: '#737373',
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  lineHeight: '1.35',
-                  textAlign: 'left',
-                  wordBreak: 'break-word',
-                }}
-              >
-                <div>Hapus menu “{title || 'ini'}”?</div>
-                <div>Tindakan ini tidak dapat dibatalkan.</div>
-              </div>
-            </div>
-
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'flex-start',
-                gap: '10px',
-                width: '100%',
-              }}
-            >
-              <button
-                type="button"
-                disabled={isDeleting}
-                onClick={() => setShowDeleteModal(false)}
-                style={{
-                  flex: '1 1 0',
-                  height: '40px',
-                  borderRadius: '10px',
-                  backgroundColor: '#F3F6FD',
-                  boxShadow: 'inset 0 0 0 1px #D9D9D9',
-                  border: 'none',
-                  outline: 'none',
-                  color: '#979797',
-                  fontSize: '14px',
-                  fontWeight: 700,
-                  cursor: isDeleting ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-                className="active:scale-[0.98] transition-transform"
-              >
-                Batal
-              </button>
-
-              <button
-                type="button"
-                disabled={isDeleting}
-                onClick={handleConfirmDelete}
-                style={{
-                  flex: '1 1 0',
-                  height: '40px',
-                  borderRadius: '10px',
-                  backgroundColor: 'rgba(250, 62, 62, 0.10)',
-                  boxShadow: 'inset 0 0 0 1px #FA3E3E',
-                  border: 'none',
-                  outline: 'none',
-                  color: '#FA3E3E',
-                  fontSize: '14px',
-                  fontWeight: 700,
-                  cursor: isDeleting ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-                className="active:scale-[0.98] transition-transform"
-              >
-                {isDeleting ? 'Menghapus...' : 'Hapus'}
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+      {/* Standard Confirmation Modal for Delete Menu */}
+      <DeleteConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleConfirmDelete}
+        isDeleting={isDeleting}
+        title="Hapus Menu?"
+        description={`Menu "${title || 'ini'}" akan dihapus permanen. Aksi ini tidak dapat dibatalkan.`}
+      />
 
       {/* Fixed Bottom Action Bar rendered outside body via React Portal */}
       {typeof document !== 'undefined' && createPortal(
@@ -1574,6 +1649,29 @@ export default function MenuEditor({
         onClose={() => setIsAturModalOpen(false)}
         item={aturTargetIndex !== null ? menuItems[aturTargetIndex] : null}
         onSaveConfig={handleSaveVariantConfig}
+      />
+
+      <AddCategoryBottomSheet
+        isOpen={isAddCategoryOpen}
+        onClose={() => setIsAddCategoryOpen(false)}
+        onCreated={handleCategoryCreated}
+        apiBase={apiBase}
+        authToken={authToken}
+      />
+
+      <PhotoPickerBottomSheet
+        isOpen={isPhotoSheetOpen}
+        onClose={() => setIsPhotoSheetOpen(false)}
+        recentPhotoUrl={imagePreview}
+        onPhotoSelected={(file) => {
+          setImageFile(file);
+          setImageRemoved(false);
+          const reader = new FileReader();
+          reader.onload = (re) => {
+            setImagePreview(re.target?.result || '');
+          };
+          reader.readAsDataURL(file);
+        }}
       />
     </div>
   );

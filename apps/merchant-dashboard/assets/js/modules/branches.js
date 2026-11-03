@@ -256,7 +256,11 @@
         ? ('branches/' + _activeBranchDetailId)
         : ('branches/' + _activeBranchDetailId + '/' + _activeBranchDetailSubtab);
       if (window.location.hash !== '#' + targetHash) {
-        window.location.hash = targetHash;
+        if (window.history && typeof window.history.replaceState === 'function') {
+          window.history.replaceState({ xentraRoute: targetHash }, '', '#' + targetHash);
+        } else {
+          navigateTo(targetHash, { history: 'replace' });
+        }
       }
     }
   }
