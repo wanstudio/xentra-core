@@ -3208,32 +3208,53 @@
   }
 
   async function printReceipt(orderId){
+    var nativeBridge = window.XentraPos || window.XentraNative;
+    var useNativePrinter = !!(nativeBridge && typeof nativeBridge.printReceipt === 'function');
+    var printWindow = null;
+    // Open the browser print surface while the click still has user activation.
+    // Opening it after awaiting the receipt API is blocked by Chrome/WebView.
+    if(!useNativePrinter){
+      printWindow=window.open('','_blank','width=420,height=700');
+      if(!printWindow)return toast('Jendela cetak diblokir. Izinkan popup untuk POS, lalu tekan Cetak Struk lagi.');
+      printWindow.document.write('<!doctype html><title>Menyiapkan struk…</title><p style="font:14px sans-serif">Menyiapkan struk untuk dicetak…</p>');
+      printWindow.document.close();
+    }
     try{
       var d=await request('/pos/orders/'+encodeURIComponent(orderId)+'/receipt',{headers:headers()});
       var raw = d && d.receipt && d.receipt.raw_content ? d.receipt.raw_content : '';
-
-      var nativeBridge = window.XentraPos || window.XentraNative;
-      if (nativeBridge && typeof nativeBridge.printReceipt === 'function') {
+      if(!raw)throw new Error('Data struk kosong. Coba muat ulang transaksi.');
+      if(useNativePrinter){
         var printed = false;
         try {
           if (typeof nativeBridge.isPrinterConnected === 'function' && !nativeBridge.isPrinterConnected()) {
             var savedMac = localStorage.getItem('xentra_pos_printer_mac');
+            if(!savedMac && typeof nativeBridge.getPairedPrinters === 'function'){
+              var paired=[];
+              try{paired=JSON.parse(nativeBridge.getPairedPrinters()||'[]');}catch(_){}
+              if(paired.length===1)savedMac=paired[0].address||paired[0].mac||'';
+            }
             if (savedMac && typeof nativeBridge.connectPrinter === 'function') {
-              nativeBridge.connectPrinter(savedMac);
+              if(nativeBridge.connectPrinter(savedMac))localStorage.setItem('xentra_pos_printer_mac',savedMac);
             }
           }
-          printed = nativeBridge.printReceipt(raw);
+          printed = (!nativeBridge.isPrinterConnected || nativeBridge.isPrinterConnected()) && nativeBridge.printReceipt(raw);
         } catch (_) {}
         if (printed) {
           toast('Struk berhasil dicetak');
           return;
         }
+        throw new Error('Printer belum terhubung atau gagal mencetak. Buka Transaksi → Printer, hubungkan printer, lalu coba lagi.');
       }
 
-      var w=window.open('','_blank','width=420,height=700'); if(!w)throw new Error('Popup diblokir browser.');
-      w.document.write('<!doctype html><html><head><title>Struk Xentra</title><style>body{font-family:monospace;width:300px;margin:20px auto;font-size:12px}pre{white-space:pre-wrap;line-height:1.35}</style></head><body><pre>'+esc(raw)+'</pre></body></html>');
-      w.document.close(); w.focus(); w.print();
-    }catch(e){toast(e.message);}
+      printWindow.document.open();
+      printWindow.document.write('<!doctype html><html><head><title>Struk Xentra</title><style>@page{size:80mm auto;margin:3mm}body{font-family:monospace;width:72mm;margin:0 auto;font-size:12px}pre{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.35}</style></head><body><pre>'+esc(raw)+'</pre></body></html>');
+      printWindow.document.close(); printWindow.focus();
+      printWindow.onafterprint=function(){try{printWindow.close();}catch(_){}};
+      printWindow.print();
+    }catch(e){
+      if(printWindow&&!printWindow.closed)printWindow.close();
+      toast(e.message);
+    }
   }
 
   function openPosPrinterSettings(){
