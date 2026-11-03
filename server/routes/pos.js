@@ -462,10 +462,12 @@ router.get('/pos/sales', requireAuth(['cashier']), (req, res) => {
       FROM orders o
       LEFT JOIN order_payments p ON p.order_id = o.id
       LEFT JOIN order_deliveries d ON d.order_id = o.id
-      WHERE o.brand_id = ? AND o.branch_id = ? AND (
+      WHERE o.brand_id = ? AND o.branch_id = ?
+        AND o.status NOT IN ('cancelled', 'rejected', 'timeout', 'expired', 'fulfillment_exception')
+        AND (
         o.order_channel = 'pos_cashier'
         OR (o.order_type = 'delivery' AND o.payment_method = 'cash')
-        OR (o.order_type IN ('dine_in', 'pickup') AND o.status NOT IN ('pending', 'cancelled', 'rejected', 'timeout'))
+        OR (o.order_type IN ('dine_in', 'pickup') AND o.status <> 'pending')
         OR o.order_channel IN ('gofood', 'grabfood', 'shopeefood')
       )
       ORDER BY o.created_at DESC

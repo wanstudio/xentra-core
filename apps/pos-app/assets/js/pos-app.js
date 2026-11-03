@@ -4059,7 +4059,7 @@
       var ps = (s.payment_status || '').toLowerCase();
       var isPaid = !ps || ps === 'paid' || ps === 'settled' || ps === 'settlement';
       var st = (s.status || '').toLowerCase();
-      var isNotCancelled = st !== 'cancelled' && st !== 'rejected' && st !== 'void';
+      var isNotCancelled = !['cancelled','rejected','timeout','expired','fulfillment_exception','void'].includes(st);
       return t >= startTime && isPaid && isNotCancelled;
     }).length;
     badge.textContent = count + ' Transaksi';
@@ -4082,11 +4082,14 @@
     if(!state.sales.length){box.innerHTML='<div class="pos-empty">Belum ada transaksi POS.</div>';return;}
     box.innerHTML=state.sales.map(function(s){
       var isOjol = s.order_channel === 'gofood' || s.order_channel === 'grabfood' || s.order_channel === 'shopeefood';
+      var orderStatus = String(s.status || '').toLowerCase();
+      var isTerminalOrder = ['cancelled','rejected','timeout','expired','fulfillment_exception'].includes(orderStatus);
       var isCodPending = !isOjol && s.order_type === 'delivery' && s.payment_method === 'cash' && s.payment_status !== 'settlement' && s.payment_status !== 'paid';
-      var isPendingPayment = !isOjol && !isCodPending && s.payment_status !== 'settlement' && s.payment_status !== 'paid';
+      var isPendingPayment = !isTerminalOrder && !isOjol && !isCodPending && s.payment_status !== 'settlement' && s.payment_status !== 'paid';
       var badgeCls = isOjol ? 'ok' : (isCodPending ? 'caution' : (isPendingPayment ? 'caution' : (s.payment_status === 'settlement' || s.payment_status === 'paid' ? 'ok' : 'pending')));
-      var badgeLabel = isOjol ? (s.order_channel === 'gofood' ? 'GOFOOD' : (s.order_channel === 'grabfood' ? 'GRABFOOD' : 'SHOPEE')) : (isCodPending ? (s.cod_cash_custody === 'driver' ? 'COD (Di Driver)' : 'COD Pending') : (isPendingPayment ? 'BELUM BAYAR' : (s.payment_status === 'settlement' ? 'LUNAS' : (s.payment_status || 'paid').toUpperCase())));
-      var codActionBtn = isCodPending ? '<button type="button" class="pos-btn small" data-cod-settle="'+esc(s.id)+'" style="margin-left:6px;">Setor COD</button>' : '';
+      var terminalLabels = {timeout:'KEDALUWARSA',expired:'KEDALUWARSA',cancelled:'DIBATALKAN',rejected:'DITOLAK',fulfillment_exception:'GAGAL DIPROSES'};
+      var badgeLabel = isTerminalOrder ? (terminalLabels[orderStatus] || 'TIDAK AKTIF') : (isOjol ? (s.order_channel === 'gofood' ? 'GOFOOD' : (s.order_channel === 'grabfood' ? 'GRABFOOD' : 'SHOPEE')) : (isCodPending ? (s.cod_cash_custody === 'driver' ? 'COD (Di Driver)' : 'COD Pending') : (isPendingPayment ? 'BELUM BAYAR' : (s.payment_status === 'settlement' ? 'LUNAS' : (s.payment_status || 'paid').toUpperCase()))));
+      var codActionBtn = isCodPending && !isTerminalOrder ? '<button type="button" class="pos-btn small" data-cod-settle="'+esc(s.id)+'" style="margin-left:6px;">Setor COD</button>' : '';
       var payActionBtn = isPendingPayment ? '<button type="button" class="pos-btn small primary" data-open-pay="'+esc(s.id)+'" style="margin-left:6px;">Bayar di Kasir</button>' : '';
       var oTypeDisplay = isOjol ? 'OJOL' : (s.order_type === 'pickup' ? 'TAKEAWAY' : (s.order_type === 'dine_in' ? 'DINE-IN' : (s.order_type || '').toUpperCase()));
       return '<div class="pos-sale-row" data-sale-id="'+esc(s.id)+'" role="button" tabindex="0" title="Klik untuk rincian transaksi">' +
