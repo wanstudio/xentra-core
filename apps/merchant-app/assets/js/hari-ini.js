@@ -313,11 +313,12 @@
     }
 
     var pendingList = orders.filter(function (o) { return o.status === "pending"; });
-    var actionableList = orders.filter(function (o) {
-      return o.status === "pending" || Number(o.pending_additions_count || 0) > 0;
-    });
     if (typeof updateMobileOrdersBadge === "function") {
-      updateMobileOrdersBadge(actionableList.length);
+      updateMobileOrdersBadge(typeof window.countMobileInProcessOrders === 'function'
+        ? window.countMobileInProcessOrders(orders)
+        : orders.filter(function (o) {
+          return ['pending', 'confirmed', 'preparing', 'ready'].indexOf(String(o.status || '')) !== -1;
+        }).length);
     }
     if (typeof checkAndNotifyNewPendingOrders === "function") {
       checkAndNotifyNewPendingOrders(orders);

@@ -1137,6 +1137,26 @@
       'Item';
   }
 
+  // Keep every bottom-nav badge writer aligned with the Pesanan > Dalam proses tab.
+  function getMobileInProcessOrders(orders, nowMs) {
+    var currentTime = typeof nowMs === 'number' ? nowMs : Date.now();
+    var startOfToday = getWibStartOfTodayMs();
+    return (Array.isArray(orders) ? orders : []).filter(function (ord) {
+      var status = String(ord.status || '');
+      if (['pending', 'confirmed', 'preparing', 'ready'].indexOf(status) === -1) return false;
+      var createdAt = getOrderCreationMs(ord);
+      if (createdAt && createdAt < startOfToday) return false;
+      if (ord.order_type === 'reservation' && status === 'confirmed') {
+        var scheduledAt = getBMReservationScheduleMs(ord);
+        if (!isNaN(scheduledAt) && scheduledAt > currentTime) return false;
+      }
+      return true;
+    });
+  }
+  window.countMobileInProcessOrders = function (orders) {
+    return getMobileInProcessOrders(orders).length;
+  };
+
   function renderBMOrdersFeed() {
     var container = $('bm-orders-cards-container');
     if (!container) return;
@@ -1158,19 +1178,7 @@
     var nowMs = Date.now();
     var startOfTodayWibMs = getWibStartOfTodayMs();
 
-    var inProcessOrders = all.filter(function (ord) {
-      var st = String(ord.status || '');
-      if (['pending', 'confirmed', 'preparing', 'ready'].indexOf(st) !== -1) {
-        var cMs = getOrderCreationMs(ord);
-        if (cMs && cMs < startOfTodayWibMs) return false; // Belongs to previous day reports
-        if (ord.order_type === 'reservation' && st === 'confirmed') {
-          var ms = getBMReservationScheduleMs(ord);
-          if (!isNaN(ms) && ms > nowMs) return false; // Belongs to scheduled
-        }
-        return true;
-      }
-      return false;
-    });
+    var inProcessOrders = getMobileInProcessOrders(all, nowMs);
 
     var scheduledOrders = all.filter(function (ord) {
       var st = String(ord.status || '');

@@ -712,14 +712,16 @@
     var branchId = user ? (user.branch_id || user.branchId) : null;
     if (!branchId) return;
     try {
-      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/orders?status=pending', {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/orders?status=all', {
         headers: getAuthHeaders()
       });
       var data = await res.json();
       if (data && data.success && Array.isArray(data.orders)) {
-        var count = data.orders.filter(function (o) {
-          return o.status === 'pending' || Number(o.pending_additions_count || 0) > 0;
-        }).length;
+        var count = typeof window.countMobileInProcessOrders === 'function'
+          ? window.countMobileInProcessOrders(data.orders)
+          : data.orders.filter(function (o) {
+            return ['pending', 'confirmed', 'preparing', 'ready'].indexOf(String(o.status || '')) !== -1;
+          }).length;
         updateMobileOrdersBadge(count);
         if (typeof checkAndNotifyNewPendingOrders === 'function') {
           checkAndNotifyNewPendingOrders(data.orders);
