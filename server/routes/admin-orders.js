@@ -6,6 +6,39 @@
  */
 module.exports = function registerAdminOrderRoutes(router, deps) {
   const { db, requireAuth, AcceptanceTimeoutService } = deps;
+  const { ReceiptDocumentService } = require('../../domains/pos');
+
+  // Canonical receipt documents shared with the POS cashier.
+  router.get('/orders/:id/receipt', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+    try {
+      const order = db.prepare(`
+        SELECT o.*, b.name AS branch_name, b.address_text AS branch_address,
+               b.phone AS branch_phone
+        FROM orders o
+        LEFT JOIN branches b ON b.id = o.branch_id
+        WHERE o.id = ? AND o.brand_id = ?
+      `).get(req.params.id, req.brand_id);
+      if (!order) return res.status(404).json({ success: false, error: 'Pesanan tidak ditemukan.' });
+
+      if (req.user.role === 'branch_manager') {
+        const assignedBranchId = req.user.branchId || req.user.branch_id;
+        if (assignedBranchId && assignedBranchId !== order.branch_id) {
+          return res.status(403).json({ success: false, error: 'FORBIDDEN_BRANCH_SCOPE', message: 'Pesanan berada di luar cabang yang ditugaskan.' });
+        }
+      }
+
+      const receipt = ReceiptDocumentService.buildOrderDocument({
+        db,
+        order,
+        branch_name: order.branch_name || 'Xentra Resto',
+        type: req.query.type === 'kitchen' ? 'kitchen' : 'customer'
+      });
+      res.json({ success: true, receipt });
+    } catch (err) {
+      console.error('[API Error GET /orders/:id/receipt]:', err);
+      res.status(500).json({ success: false, error: 'Struk tidak dapat dibuat.' });
+    }
+  });
 
 router.get('/admin/branches/:id/orders', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
@@ -227,7 +260,7 @@ router.get('/admin/orders', requireAuth(['owner', 'brand_manager', 'branch_manag
 });
 
 // 15.1 Admin Single Order Detail
-router.get('/admin/orders/:id', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  router.get('/admin/orders/:id', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
     const order = db.prepare(`
       SELECT o.*, b.name as branch_name,

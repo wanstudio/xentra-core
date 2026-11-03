@@ -3079,12 +3079,12 @@
     updateChange();
   }
 
-  function showPaymentSuccess(order,change){
+  function showPaymentSuccess(order,change,paymentMethod){
     if (window.XentraAudio && typeof window.XentraAudio.paymentReceived === 'function') {
       window.XentraAudio.paymentReceived({ text: 'Pembayaran diterima!' });
     }
     var nativeBridge = window.XentraPos || window.XentraNative;
-    if (nativeBridge && typeof nativeBridge.openCashDrawer === 'function') {
+    if (paymentMethod === 'cash' && nativeBridge && typeof nativeBridge.openCashDrawer === 'function') {
       try { nativeBridge.openCashDrawer(); } catch (_) {}
     }
     showModal('<h3>Pembayaran Berhasil</h3><p>Sale '+esc(order.order_number||order.id||'')+' selesai.</p><div class="pos-payment-total">'+money(order.grand_total||total())+'</div>'+(change!=null?'<div class="pos-change">Kembalian: '+money(change)+'</div>':'')+'<div class="pos-modal-actions"><button class="pos-btn ghost" id="pos-sale-close">Selesai</button><button class="pos-btn" id="pos-sale-print">Cetak Struk</button></div>');
@@ -3136,7 +3136,7 @@
         var existing=await request('/pos/orders/'+encodeURIComponent(orderId)+'/settle-cash',{method:'POST',headers:headers(),body:JSON.stringify({amount_tendered:Number(amountTendered),shift_id:state.shift.id})});
         if(existing&&existing.success){
           hideModal();
-          showPaymentSuccess({id:orderId,order_number:existing.order_number||orderId,grand_total:existing.grand_total||total()},Number(existing.change||0));
+          showPaymentSuccess({id:orderId,order_number:existing.order_number||orderId,grand_total:existing.grand_total||total()},Number(existing.change||0),'cash');
           resetSale();loadShift();loadSales();updateHeldCount();
           return;
         }
@@ -3183,7 +3183,7 @@
         }
       }
       d=await request('/pos/sales',{method:'POST',headers:headers(),body:JSON.stringify(payload)});
-      if(paymentMode==='cash'||d.status==='SETTLED'){hideModal();showPaymentSuccess(d.order||{},Number((d.order||{}).change||0));loadShift();loadSales();}
+      if(paymentMode==='cash'||d.status==='SETTLED'){hideModal();showPaymentSuccess(d.order||{},Number((d.order||{}).change||0),paymentMode==='cash'?'cash':null);loadShift();loadSales();}
       else if(paymentMode==='payment_gateway'){hideModal();showGatewayPending(d);}
       else if(paymentMode==='qris_static'){hideModal();showStaticQrisPending(d);}
     }catch(e){
@@ -3234,6 +3234,44 @@
       w.document.write('<!doctype html><html><head><title>Struk Xentra</title><style>body{font-family:monospace;width:300px;margin:20px auto;font-size:12px}pre{white-space:pre-wrap;line-height:1.35}</style></head><body><pre>'+esc(raw)+'</pre></body></html>');
       w.document.close(); w.focus(); w.print();
     }catch(e){toast(e.message);}
+  }
+
+  function openPosPrinterSettings(){
+    var bridge = window.XentraPos || window.XentraNative;
+    if(!bridge || typeof bridge.getPairedPrinters !== 'function'){
+      showModal('<h3>Printer Struk</h3><p>POS web menggunakan dialog cetak perangkat. Untuk printer Bluetooth langsung, buka POS dari aplikasi Android dan pasangkan printer di pengaturan Bluetooth Android.</p><div class="pos-modal-actions"><button class="pos-btn" id="pos-printer-settings-close">Tutup</button></div>');
+      $('pos-printer-settings-close').onclick=hideModal;
+      return;
+    }
+    var printers=[];
+    try{ printers=JSON.parse(bridge.getPairedPrinters()||'[]'); }catch(_){ printers=[]; }
+    var saved=localStorage.getItem('xentra_pos_printer_mac')||'';
+    var options=printers.map(function(p){
+      var address=p.address||p.mac||'';
+      return '<option value="'+esc(address)+'" '+(address===saved?'selected':'')+'>'+esc((p.name||'Printer Bluetooth')+' · '+address)+'</option>';
+    }).join('');
+    if(!options) options='<option value="">Tidak ada printer paired di Android</option>';
+    showModal('<h3>Printer Struk</h3><p>Pilih printer Bluetooth yang sudah dipasangkan di Android.</p><label for="pos-printer-select">Printer paired</label><select id="pos-printer-select" class="pos-input">'+options+'</select><div class="pos-modal-actions"><button class="pos-btn ghost" id="pos-printer-test">Tes Cetak</button><button class="pos-btn" id="pos-printer-connect">Hubungkan</button></div>');
+    $('pos-printer-connect').onclick=function(){
+      var mac=$('pos-printer-select').value;
+      if(!mac)return toast('Pilih printer Bluetooth terlebih dahulu.');
+      try{
+        if(bridge.connectPrinter(mac)){
+          localStorage.setItem('xentra_pos_printer_mac',mac);
+          toast('Printer terhubung.');
+        }else toast('Koneksi printer gagal. Pastikan printer menyala dan sudah paired.');
+      }catch(e){toast('Koneksi printer gagal: '+e.message);}
+    };
+    $('pos-printer-test').onclick=function(){
+      var mac=$('pos-printer-select').value;
+      if(!mac)return toast('Pilih printer Bluetooth terlebih dahulu.');
+      try{
+        if(!bridge.isPrinterConnected()&&!bridge.connectPrinter(mac))return toast('Printer belum terhubung.');
+        localStorage.setItem('xentra_pos_printer_mac',mac);
+        var ok=bridge.printReceipt('XENTRA POS\nTES CETAK PRINTER\nJika tulisan terbaca, printer siap.\n\n\n');
+        toast(ok?'Tes cetak dikirim ke printer.':'Printer menolak tes cetak.');
+      }catch(e){toast('Tes cetak gagal: '+e.message);}
+    };
   }
 
   async function openManyPaymentFromCart(){
@@ -3800,7 +3838,7 @@
         toast('Pembayaran tercatat.');
         if(res && res.order_remaining != null && Number(res.order_remaining) <= 0){
           hideModal();
-          showPaymentSuccess({ id: orderId, order_number: (res.payment && res.payment.order_number) || orderId, grand_total: (res.payment && res.payment.amount) || amount }, Number((res.payment && res.payment.change != null) ? res.payment.change : Math.max(0, tendered - amount)));
+          showPaymentSuccess({ id: orderId, order_number: (res.payment && res.payment.order_number) || orderId, grand_total: (res.payment && res.payment.amount) || amount }, Number((res.payment && res.payment.change != null) ? res.payment.change : Math.max(0, tendered - amount)), 'cash');
           resetSale(); loadShift(); loadSales(); updateHeldCount();
           if(state.view === 'meja') loadTables();
         } else {
@@ -4200,7 +4238,7 @@
                 id: o.id,
                 order_number: (res.payment && res.payment.order_number) || o.order_number || o.id,
                 grand_total: grandTotal
-              }, changeAmt);
+              }, changeAmt, 'cash');
 
               resetSale();
               loadShift();
@@ -5313,6 +5351,7 @@
     if($('tab-transaksi-held')) $('tab-transaksi-held').onclick=function(){switchTransaksiTab('held');};
     $('btn-pos-select-table').onclick=function(){openTableSelector();};
     attachRefreshAction('btn-pos-load-sales', loadSales, 'Daftar transaksi diperbarui');
+    if($('btn-pos-printer')) $('btn-pos-printer').onclick=openPosPrinterSettings;
     if($('btn-pos-scan-driver')) $('btn-pos-scan-driver').onclick=openDriverQrScanModal;
     if($('btn-pos-scan-qr-top')) $('btn-pos-scan-qr-top').onclick=openDriverQrScanModal;
     attachRefreshAction('btn-pos-refresh-tables', loadTables, 'Status meja diperbarui');

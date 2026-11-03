@@ -8,6 +8,7 @@ const PosShiftService = require('./services/PosShiftService');
 const PosOrderService = require('./services/PosOrderService');
 const PosPaymentGroupService = require('./services/PosPaymentGroupService');
 const PosHardwareRouter = require('./services/PosHardwareRouter');
+const ReceiptDocumentService = require('./services/ReceiptDocumentService');
 const OfflineReconciliationService = require('./services/OfflineReconciliationService');
 
 const POS_IDENTITY = {
@@ -72,6 +73,7 @@ module.exports = {
   PosOrderService,
   PosPaymentGroupService,
   PosHardwareRouter,
+  ReceiptDocumentService,
   OfflineReconciliationService,
   // @deprecated compatibility exports; use require('../../domains/dining') instead.
   DiningTableService,

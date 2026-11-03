@@ -71,18 +71,18 @@
       }
     },
 
-    printText: function (text) {
+    printText: function (text, existingPrintWindow) {
       if (!this.isNative()) {
         try {
-          var printWin = window.open('', '_blank', 'width=360,height=520');
+          var printWin = existingPrintWindow || window.open('', '_blank', 'width=360,height=520');
           if (printWin) {
             printWin.document.write('<!DOCTYPE html><html><head><title>Cetak Struk</title><style>body{font-family:monospace;font-size:12px;white-space:pre;margin:12px;line-height:1.3;}</style></head><body>' +
               String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') +
               '</body></html>');
             printWin.document.close();
             printWin.focus();
+            printWin.onafterprint = function () { try { printWin.close(); } catch (_) {} };
             printWin.print();
-            printWin.close();
             return true;
           }
         } catch (_) {}

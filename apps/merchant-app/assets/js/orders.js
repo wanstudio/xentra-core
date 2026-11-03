@@ -461,11 +461,7 @@
           window.XentraAudio.stopOrderAlert();
         }
         if (window.XentraPrinter && window.XentraPrinter.isNative() && window.XentraPrinter.isAutoPrintEnabled()) {
-          var matchedOrd = findBMOrderById(orderId);
-          var u = getStoredUser();
-          if (matchedOrd) {
-            window.XentraPrinter.printOrder(matchedOrd, { name: (u && u.brand_name) || 'Mybangjo Resto', branch: u && u.branch_name });
-          }
+          await printBMReceipt(orderId, 'kitchen', { silent: true });
         }
         var acceptedOrd = findBMOrderById(orderId);
         showToast("Pesanan " + formatBMOrderCode(acceptedOrd || orderId) + " berhasil diterima.");
@@ -2825,29 +2821,39 @@
   }
   window.noShowBMReservation = noShowBMReservation;
 
-  function printBMReceipt(orderId, receiptType) {
-    var ord = (_bmOrdersState.currentDetailOrder && String(_bmOrdersState.currentDetailOrder.id) === String(orderId))
-      ? _bmOrdersState.currentDetailOrder
-      : findBMOrderById(orderId);
-    if (!ord) {
-      showToast('Data pesanan tidak ditemukan untuk dicetak.');
-      return;
+  async function printBMReceipt(orderId, receiptType, options) {
+    options = options || {};
+    var kind = receiptType === 'kitchen' ? 'kitchen' : 'customer';
+    var printWindow = null;
+    if ((!window.XentraPrinter || !window.XentraPrinter.isNative()) && !options.silent) {
+      printWindow = window.open('', '_blank', 'width=360,height=520');
+      if (!printWindow) return showToast('Popup cetak diblokir browser. Izinkan popup untuk mencetak.');
+      printWindow.document.write('<!doctype html><title>Menyiapkan cetakan…</title><p style="font:14px sans-serif">Menyiapkan cetakan…</p>');
+      printWindow.document.close();
     }
-    var u = getStoredUser();
-    var brandName = (u && u.brand_name) || 'Mybangjo Resto';
-    var branchName = (u && u.branch_name) || '';
-    var storeInfo = { name: brandName, branch: branchName };
-
-    if (window.XentraPrinter) {
-      if (receiptType === 'kitchen') {
-        window.XentraPrinter.printKitchenTicket(ord, storeInfo);
-        showToast('Tiket dapur dikirim ke printer.');
-      } else {
-        window.XentraPrinter.printOrder(ord, storeInfo);
-        showToast('Struk kasir dikirim ke printer.');
+    try {
+      var response = await adminFetch(API_BASE + '/orders/' + encodeURIComponent(orderId) + '/receipt?type=' + kind, {
+        headers: getAuthHeaders()
+      });
+      var data = await response.json();
+      if (!response.ok || !data.success || !data.receipt || !data.receipt.raw_content) {
+        throw new Error(data.error || 'Dokumen cetak tidak tersedia.');
       }
-    } else {
-      window.print();
+      var printed = window.XentraPrinter
+        ? window.XentraPrinter.printText(data.receipt.raw_content, printWindow)
+        : false;
+      if (!window.XentraPrinter && printWindow) {
+        printWindow.document.body.innerHTML = '<pre style="font:12px/1.35 monospace;white-space:pre-wrap;margin:16px">' + esc(data.receipt.raw_content) + '</pre>';
+        printWindow.focus(); printWindow.print();
+        printed = true;
+      }
+      if (!printed) throw new Error('Printer tidak menerima dokumen. Periksa koneksi printer.');
+      if (!options.silent) showToast(kind === 'kitchen' ? 'Tiket dapur dikirim ke printer.' : 'Struk pelanggan dikirim ke printer.');
+      return true;
+    } catch (error) {
+      if (printWindow && !printWindow.closed) printWindow.close();
+      if (!options.silent) showToast('Cetak gagal: ' + error.message);
+      return false;
     }
   }
   window.printBMReceipt = printBMReceipt;

@@ -12,6 +12,7 @@ module.exports = function registerPosRoutes(router, deps) {
   } = deps;
   const PaymentGatewayService = require('../../domains/payment/services/PaymentGatewayService');
   const { PosOrderService, PosPaymentGroupService } = require('../../domains/pos');
+  const { ReceiptDocumentService } = require('../../domains/pos');
   const { OrderAdditionService } = require('../../domains/commerce');
 
 router.get('/pos/delivery/lookup-by-qr', requireAuth(['cashier', 'branch_manager', 'owner', 'brand_manager']), (req, res) => {
@@ -883,37 +884,12 @@ router.get('/pos/orders/:id/receipt', requireAuth(['cashier']), (req, res) => {
     ).get(req.params.id, req.brand_id, branchId);
     if (!order) return res.status(404).json({ success: false, error: 'Transaksi POS tidak ditemukan.' });
 
-    const itemRows = db.prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY rowid ASC').all(order.id);
-    const items = itemRows.map((it) => {
-      let optionText = '';
-      if (it.modifiers_snapshot) {
-        try {
-          const options = JSON.parse(it.modifiers_snapshot);
-          if (Array.isArray(options) && options.length) {
-            optionText = options.map((o) => o.group_name ? o.group_name + ': ' + o.option_name : o.option_name).join(' · ');
-          }
-        } catch (_) {}
-      }
-      const note = [optionText ? 'Opsi: ' + optionText : '', it.note || ''].filter(Boolean).join(' | ');
-      return {
-        name: it.product_name || it.name || it.product_id,
-        quantity: Number(it.quantity || 1),
-        unit_price: Number(it.unit_price || it.price || 0),
-        subtotal: Number(it.item_subtotal || it.subtotal || 0),
-        note
-      };
-    });
-
-    const { PosHardwareRouter } = require('../../domains/pos');
-    const receipt = PosHardwareRouter.buildCustomerReceipt({
-      branch_name: req.brand && (req.brand.name || req.brand.brand_name) ? (req.brand.name || req.brand.brand_name) : 'Xentra Resto',
-      order: {
-        ...order,
-        items,
-        amount_tendered: order.amount_tendered,
-        change: order.change,
-        payment_method: order.payment_method
-      },
+    const branch = db.prepare('SELECT name, address_text, phone FROM branches WHERE id = ? AND brand_id = ?').get(branchId, req.brand_id);
+    const receipt = ReceiptDocumentService.buildOrderDocument({
+      db,
+      order: { ...order, branch_address: branch && branch.address_text, branch_phone: branch && branch.phone },
+      branch_name: (branch && branch.name) || (req.brand && (req.brand.name || req.brand.brand_name)) || 'Xentra Resto',
+      type: req.query.type === 'kitchen' ? 'kitchen' : 'customer',
       open_cash_drawer: false
     });
 
