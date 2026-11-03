@@ -27,6 +27,57 @@
   color: var(--x-home-text);
 }
 
+/* Delivery progress in merchant order detail */
+.bm-detail-status-badge.is-in-delivery {
+  text-transform: none !important;
+  font-size: 13px !important;
+  padding: 8px 12px !important;
+}
+.bm-detail-nav-status-wrap[style*="display: none"] { display: none !important; }
+.bm-delivery-progress-card {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  width: 100% !important;
+  min-height: 76px !important;
+  padding: 14px 16px !important;
+  box-sizing: border-box !important;
+  color: #1d4ed8 !important;
+  background: #eff6ff !important;
+  border: 1px solid #bfdbfe !important;
+  border-radius: 16px !important;
+}
+.bm-delivery-vehicle-icon {
+  display: grid !important;
+  place-items: center !important;
+  width: 44px !important;
+  height: 44px !important;
+  flex: 0 0 44px !important;
+  border-radius: 13px !important;
+  background: #fff !important;
+  font-size: 25px !important;
+  line-height: 1 !important;
+}
+.bm-delivery-progress-copy {
+  display: flex !important;
+  flex: 1 1 auto !important;
+  flex-direction: column !important;
+  min-width: 0 !important;
+  gap: 3px !important;
+}
+.bm-delivery-progress-copy strong {
+  color: #1e3a8a !important;
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  line-height: 1.25 !important;
+}
+.bm-delivery-progress-copy small {
+  color: #475569 !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  line-height: 1.25 !important;
+}
+
 .x-home-greeting {
   padding: 4px 2px 14px;
 }
@@ -3717,4 +3768,3 @@ body.is-subpage-view .x-tab-content.active::after,
 #sheet-notifications .x-modal-card * {
   box-sizing: border-box;
 }
-

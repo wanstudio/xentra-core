@@ -1008,6 +1008,14 @@
   }
   window.formatBMOrderFullDateTime = formatBMOrderFullDateTime;
 
+  function getBMDriverVehicle(vehicleType) {
+    var type = String(vehicleType || '').trim().toLowerCase();
+    if (type === 'car') return { icon: '🚗', label: 'Mobil' };
+    if (type === 'bicycle') return { icon: '🚲', label: 'Sepeda' };
+    if (type === 'motorcycle' || type === 'motorbike' || type === 'motor') return { icon: '🏍️', label: 'Motor' };
+    return { icon: '🚚', label: 'Kurir' };
+  }
+
   function getBMOrderProjection(ord) {
     var type = getBMOrderType(ord);
     var status = String((ord && ord.status) || '');
@@ -2079,12 +2087,17 @@
       var ordType = getBMOrderType(ord);
       var typeLabel = ordType === 'dine_in' ? 'Dine-in' : (ordType === 'pickup' ? 'Pickup' : (ordType === 'delivery' ? 'Delivery' : 'Reservasi'));
       if ($('bm-detail-order-number')) $('bm-detail-order-number').textContent = formatBMOrderCode(ord);
+      var isDeliveryInTransit = ordType === 'delivery' && ord.status === 'out_for_delivery';
+      var driverVehicle = getBMDriverVehicle(ord.delivery && ord.delivery.driver_vehicle_type);
       if ($('bm-detail-status-badge')) {
         var detailStatusLabel = FulfillmentEnv && typeof FulfillmentEnv.getStatusLabel === 'function'
           ? FulfillmentEnv.getStatusLabel(ordType, ord.status)
           : String(ord.status || '').replace(/_/g, ' ');
+        if (isDeliveryInTransit) detailStatusLabel = 'Sedang diantar kurir';
         $('bm-detail-status-badge').textContent = detailStatusLabel;
-        $('bm-detail-status-badge').className = 'x-badge ' + (['completed', 'ready'].indexOf(ord.status) !== -1 ? 'x-badge-success' : (['rejected', 'cancelled', 'timeout', 'fulfillment_exception'].indexOf(ord.status) !== -1 ? 'x-badge-danger' : 'x-badge-warning'));
+        $('bm-detail-status-badge').className = 'x-badge bm-detail-status-badge ' + (isDeliveryInTransit ? 'x-badge-info is-in-delivery' : (['completed', 'ready'].indexOf(ord.status) !== -1 ? 'x-badge-success' : (['rejected', 'cancelled', 'timeout', 'fulfillment_exception'].indexOf(ord.status) !== -1 ? 'x-badge-danger' : 'x-badge-warning')));
+        var statusWrap = document.querySelector('.bm-detail-nav-status-wrap');
+        if (statusWrap) statusWrap.style.display = isDeliveryInTransit ? 'none' : '';
       }
       if ($('bm-detail-cust-name')) $('bm-detail-cust-name').textContent = ord.customer_name || 'Pelanggan';
       if ($('bm-detail-cust-phone')) $('bm-detail-cust-phone').textContent = ord.customer_phone || '—';
@@ -2306,7 +2319,10 @@
         } else if (ord.status === 'out_for_delivery') {
           topActions.style.display = 'flex';
           topActions.innerHTML =
-            '<div style="width:100%; text-align:center; padding:10px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; font-size:13px; font-weight:700; color:#1d4ed8;">🚚 Sedang Diantar Kurir</div>';
+            '<div class="bm-delivery-progress-card" role="status" aria-live="polite">' +
+              '<span class="bm-delivery-vehicle-icon" aria-hidden="true">' + driverVehicle.icon + '</span>' +
+              '<span class="bm-delivery-progress-copy"><strong>Sedang diantar kurir</strong><small>' + esc(ord.delivery && ord.delivery.driver_name || ord.driver_name || 'Driver') + (ord.delivery && ord.delivery.driver_vehicle_type ? ' · ' + driverVehicle.label : '') + '</small></span>' +
+            '</div>';
         } else if (ord.status === 'rejected') {
           topActions.style.display = 'flex';
           topActions.innerHTML =

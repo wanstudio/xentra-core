@@ -23,7 +23,7 @@ var STATIC_ASSETS = [
   "/merchant-app/assets/icons/icon-512.png",
   "/merchant-shared/css/shared.css?v=1.0.1",
   "/merchant-shared/css/dashboard.css?v=1.0.40",
-  "/merchant-app/assets/css/home.css?v=1.0.25",
+  "/merchant-app/assets/css/home.css?v=1.0.26",
   "/merchant-shared/js/shared.js?v=1.0.1",
   "/merchant-shared/js/audio-alerts.js?v=1.0.6",
   "/merchant-shared/js/wake-lock.js?v=1.0.0",
@@ -46,7 +46,7 @@ var STATIC_ASSETS = [
   "/merchant-app/assets/js/purchasing.js?v=1.3.1",
   "/merchant-app/assets/js/promotions.js?v=1.0.2",
   "/merchant-app/assets/js/staff.js?v=1.0.0",
-  "/merchant-app/assets/js/orders.js?v=1.0.28",
+  "/merchant-app/assets/js/orders.js?v=1.0.29",
   "/merchant-app/assets/js/merchant-app.js?v=1.1.27"
 ];
 

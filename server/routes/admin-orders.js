@@ -241,7 +241,12 @@ router.get('/admin/orders/:id', requireAuth(['owner', 'brand_manager', 'branch_m
     }
 
     const items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(order.id);
-    const delivery = db.prepare('SELECT * FROM order_deliveries WHERE order_id = ?').get(order.id);
+    const delivery = db.prepare(`
+      SELECT od.*, u.vehicle_type AS driver_vehicle_type
+      FROM order_deliveries od
+      LEFT JOIN users u ON u.id = od.driver_id
+      WHERE od.order_id = ?
+    `).get(order.id);
     const payment = db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(order.id);
     const logs = db.prepare('SELECT previous_status, new_status, note, created_at FROM order_status_logs WHERE order_id = ? ORDER BY created_at ASC').all(order.id);
     const additions = db.prepare('SELECT * FROM order_addition_batches WHERE order_id = ? ORDER BY sequence_no ASC, created_at ASC').all(order.id).map((addition) => ({
