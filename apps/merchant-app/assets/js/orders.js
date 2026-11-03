@@ -1299,9 +1299,9 @@
 
   function getBMDriverVehicle(vehicleType) {
     var type = String(vehicleType || '').trim().toLowerCase();
-    if (type === 'car') return { icon: '🚗', label: 'Mobil' };
-    if (type === 'bicycle') return { icon: '🚲', label: 'Sepeda' };
-    if (type === 'motorcycle' || type === 'motorbike' || type === 'motor') return { icon: '🏍️', label: 'Motor' };
+    if (type === 'car' || type === 'mobil') return { icon: '🚗', label: 'Mobil' };
+    if (type === 'bicycle' || type === 'sepeda') return { icon: '🚲', label: 'Sepeda' };
+    if (type === 'motorcycle' || type === 'motorbike' || type === 'motor' || type === 'sepeda motor') return { icon: '🏍️', label: 'Motor' };
     return { icon: '🚚', label: 'Kurir' };
   }
 
