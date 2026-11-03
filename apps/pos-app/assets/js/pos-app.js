@@ -854,23 +854,48 @@
   }
 
   function confirmCashierLogout(onCancel){
-    showModal(
-      '<h3>Keluar dari POS?</h3>' +
-      '<p>Sesi kasir di perangkat ini akan diakhiri. Anda perlu masuk kembali untuk menggunakan POS.</p>' +
-      '<div class="pos-modal-actions">' +
-        '<button type="button" class="pos-btn ghost" id="pos-logout-cancel">Tidak</button>' +
-        '<button type="button" class="pos-btn" id="pos-logout-confirm">Ya, keluar</button>' +
-      '</div>',
-      'pos-modal-logout-confirm'
-    );
-    $('pos-logout-cancel').onclick=function(){
-      hideModal();
+    // The shared POS modal is also closed by unrelated flows. Keep this
+    // confirmation in its own overlay so background updates cannot dismiss it.
+    var overlay=document.createElement('div');
+    overlay.className='pos-modal pos-modal-logout-confirm';
+    overlay.setAttribute('role','presentation');
+    overlay.style.zIndex='200';
+    overlay.innerHTML=
+      '<div class="pos-modal-card" role="dialog" aria-modal="true" aria-labelledby="pos-logout-title">' +
+        '<h3 id="pos-logout-title">Keluar dari POS?</h3>' +
+        '<p>Sesi kasir di perangkat ini akan diakhiri. Anda perlu masuk kembali untuk menggunakan POS.</p>' +
+        '<div class="pos-modal-actions">' +
+          '<button type="button" class="pos-btn ghost" id="pos-logout-cancel">Tidak</button>' +
+          '<button type="button" class="pos-btn" id="pos-logout-confirm">Ya, keluar</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+
+    function closeConfirmation(){
+      document.removeEventListener('keydown',onKeyDown,true);
+      overlay.remove();
+    }
+    function cancelLogout(){
+      closeConfirmation();
       if(typeof onCancel==='function') onCancel();
-    };
-    $('pos-logout-confirm').onclick=function(){
-      hideModal();
+    }
+    function onKeyDown(event){
+      if(event.key==='Escape'){
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        cancelLogout();
+      }
+    }
+    document.addEventListener('keydown',onKeyDown,true);
+    overlay.addEventListener('click',function(event){
+      if(event.target===overlay) event.preventDefault();
+    });
+    overlay.querySelector('#pos-logout-cancel').onclick=cancelLogout;
+    overlay.querySelector('#pos-logout-confirm').onclick=function(){
+      closeConfirmation();
       clearPosSessionAndReturnToPin();
     };
+    overlay.querySelector('#pos-logout-cancel').focus();
   }
 
   async function onlinePinLogin(pin) {
@@ -5485,7 +5510,6 @@
       // Profile & settings contains device setup controls; on touch screens an
       // edge tap/scroll can land on the backdrop. Require an explicit close.
       if(this.classList.contains('pos-modal-profile-settings'))return;
-      if(this.classList.contains('pos-modal-logout-confirm'))return;
       hideModal();
     };
     if($('pos-mcart-trigger-order')){
