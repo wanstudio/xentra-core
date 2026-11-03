@@ -20,8 +20,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.1">
-  <link rel="stylesheet" href="/pos/assets/css/pos.css?v=1.0.23">
-  <!-- cache-compat: /merchant-shared/css/shared.css?v=1.0.1 /pos/assets/css/pos.css?v=1.0.15 /pos/assets/js/TransactionComposer.js?v=1.0.11 /pos/assets/js/PosOfflineStore.js?v=1.0.0 /pos/assets/js/pos-app.js?v=1.0.35 -->
+  <link rel="stylesheet" href="/pos/assets/css/pos.css?v=1.0.24">
+  <!-- cache-compat: /merchant-shared/css/shared.css?v=1.0.1 /pos/assets/css/pos.css?v=1.0.24 /pos/assets/js/TransactionComposer.js?v=1.0.11 /pos/assets/js/PosOfflineStore.js?v=1.0.0 /pos/assets/js/pos-app.js?v=1.0.36 -->
 </head>
 <body>
   <script>
@@ -191,7 +191,7 @@
             </svg>
             <span class="pos-tool-badge-dot" id="pos-notif-badge-dot" style="display:none;"></span>
           </button>
-          <button type="button" class="pos-user-pill pos-icon-tool-btn pos-user-tool-btn" id="pos-user-profile-btn" title="Profil Kasir">
+          <button type="button" class="pos-user-pill pos-icon-tool-btn pos-user-tool-btn" id="pos-user-profile-btn" title="Profil & Setting" aria-label="Profil & Setting">
             <span class="pos-user-icon">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
@@ -308,7 +308,6 @@
               <span class="pos-menu-stats" id="pos-transaksi-stats">0 Transaksi</span>
             </div>
             <div class="pos-pane-actions" style="display:flex;gap:8px;align-items:center;">
-              <button type="button" class="pos-btn ghost small" id="btn-pos-printer" title="Atur printer struk">Printer</button>
               <button type="button" class="pos-btn small" id="btn-pos-scan-driver" title="Scan QR Kurir / Terima Setoran COD" style="background:#059669;color:#ffffff;display:inline-flex;align-items:center;gap:6px;border:none;">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                   <rect x="3" y="3" width="7" height="7"></rect>
@@ -540,11 +539,11 @@
   </div>
 
   <script src="/merchant-shared/js/crop-editor.js?v=1.0.2"></script>
-  <script src="/merchant-shared/js/audio-alerts.js?v=1.0.0"></script>
+  <script src="/merchant-shared/js/audio-alerts.js?v=1.0.1"></script>
   <script src="/merchant-shared/js/ops-chat.js?v=2.0.0"></script>
   <script src="/pos/assets/js/TransactionComposer.js?v=1.0.11"></script>
   <script src="/pos/assets/js/PosOfflineStore.js?v=1.0.0"></script>
-  <script src="/pos/assets/js/pos-app.js?v=1.0.35"></script>
+  <script src="/pos/assets/js/pos-app.js?v=1.0.36"></script>
 
   <!-- POS PWA Engine -->
   <script>

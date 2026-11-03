@@ -1992,11 +1992,17 @@
 
     var html = '<div class="pos-modal-head-row">' +
       '<div class="pos-modal-head-title">' +
-        '<h3>Profil &amp; Identitas Kasir</h3>' +
-        '<p>Kelola identitas dan keamanan operasional kasir</p>' +
+        '<h3>Profil &amp; Setting</h3>' +
+        '<p>Kelola identitas kasir, perangkat cetak, dan suara POS</p>' +
       '</div>' +
       '<button type="button" class="pos-modal-close-icon" id="btn-close-profile-modal" title="Tutup" aria-label="Tutup">✕</button>' +
     '</div>' +
+    '<div class="pos-settings-tabs" role="tablist" aria-label="Profil dan pengaturan POS">' +
+      '<button type="button" class="active" id="pos-settings-tab-profile" role="tab" aria-selected="true">Profil &amp; Identitas</button>' +
+      '<button type="button" id="pos-settings-tab-devices" role="tab" aria-selected="false">Printer &amp; Suara</button>' +
+    '</div>' +
+    '<div class="pos-settings-scroll">' +
+    '<section id="pos-settings-profile-panel" class="pos-settings-panel">' +
     '<div class="pos-profile-card">' +
       '<div class="pos-profile-avatar" id="pos-profile-avatar-btn" title="Klik untuk ubah foto profil">' +
         avatarImgHtml +
@@ -2037,9 +2043,33 @@
     '<div class="pos-profile-actions">' +
       '<button type="button" class="pos-btn-save-profile" id="btn-save-cashier-profile">Simpan Perubahan</button>' +
       '<button type="button" class="pos-btn-logout-profile" id="btn-profile-logout">Keluar dari Kasir</button>' +
+    '</div>' +
+    '</section>' +
+    '<section id="pos-settings-devices-panel" class="pos-settings-panel" style="display:none;">' +
+      '<div class="pos-settings-card">' +
+      '<div class="pos-settings-card-head"><span class="pos-settings-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/><path d="M18 12h.01"/></svg></span><div><h4>Printer struk</h4><p>Hubungkan printer kasir dan pastikan hasil cetak terbaca.</p></div></div>' +
+        '<div class="pos-settings-status" id="pos-settings-printer-status">Memeriksa printer…</div>' +
+        '<div id="pos-settings-printer-native">' +
+          '<label class="pos-settings-label" for="pos-settings-printer-select">Printer Bluetooth yang sudah dipasangkan</label>' +
+          '<select id="pos-settings-printer-select" class="pos-settings-select"></select>' +
+          '<div class="pos-settings-actions"><button type="button" class="pos-btn ghost" id="pos-settings-printer-test">Tes cetak</button><button type="button" class="pos-btn" id="pos-settings-printer-connect">Hubungkan</button></div>' +
+        '</div>' +
+        '<div id="pos-settings-printer-browser" style="display:none;"><p class="pos-settings-note">POS browser akan membuka dialog cetak perangkat. Pasang printer di pengaturan cetak Android/komputer, lalu pilih printer saat dialog muncul.</p><button type="button" class="pos-btn ghost" id="pos-settings-browser-print-test">Tes dialog cetak</button></div>' +
+      '</div>' +
+      '<div class="pos-settings-card">' +
+      '<div class="pos-settings-card-head"><span class="pos-settings-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M10 21h4"/></svg></span><div><h4>Suara kasir</h4><p>Atur bunyi konfirmasi pembayaran pada perangkat ini.</p></div></div>' +
+        '<label class="pos-settings-toggle"><span><strong>Bunyi konfirmasi pembayaran</strong><small>Berbunyi setelah pembayaran berhasil tercatat.</small></span><input type="checkbox" id="pos-settings-sound-enabled"></label>' +
+        '<label class="pos-settings-label" for="pos-settings-sound-volume">Volume bunyi</label>' +
+        '<div class="pos-settings-volume"><input id="pos-settings-sound-volume" type="range" min="0" max="100" step="5"><strong id="pos-settings-sound-volume-value">75%</strong></div>' +
+        '<button type="button" class="pos-btn ghost" id="pos-settings-sound-test">Tes suara</button>' +
+        '<p class="pos-settings-note">Volume utama juga mengikuti tombol volume perangkat Android.</p>' +
+      '</div>' +
+    '</section>' +
     '</div>';
 
-    showModal(html);
+    showModal(html, 'pos-modal-profile-settings');
+    bindPosSettingsTabs();
+    bindPosDeviceSettings();
 
     if ($('btn-close-profile-modal')) {
       $('btn-close-profile-modal').onclick = hideModal;
@@ -3079,9 +3109,18 @@
     updateChange();
   }
 
+  function getPosSoundSettings(){
+    var settings={enabled:true,volume:75};
+    try{settings=Object.assign(settings,JSON.parse(localStorage.getItem('xentra_pos_sound_settings')||'{}'));}catch(_){}
+    settings.enabled=settings.enabled!==false;
+    settings.volume=Math.max(0,Math.min(100,Number(settings.volume)||0));
+    return settings;
+  }
+
   function showPaymentSuccess(order,change,paymentMethod){
     if (window.XentraAudio && typeof window.XentraAudio.paymentReceived === 'function') {
-      window.XentraAudio.paymentReceived({ text: 'Pembayaran diterima!' });
+      var soundSettings=getPosSoundSettings();
+      window.XentraAudio.paymentReceived({ text: 'Pembayaran diterima!', enabled:soundSettings.enabled, volume:soundSettings.volume });
     }
     var nativeBridge = window.XentraPos || window.XentraNative;
     if (paymentMethod === 'cash' && nativeBridge && typeof nativeBridge.openCashDrawer === 'function') {
@@ -3243,7 +3282,7 @@
           toast('Struk berhasil dicetak');
           return;
         }
-        throw new Error('Printer belum terhubung atau gagal mencetak. Buka Transaksi → Printer, hubungkan printer, lalu coba lagi.');
+        throw new Error('Printer belum terhubung atau gagal mencetak. Buka Profil & Setting → Printer & Suara, hubungkan printer, lalu coba lagi.');
       }
 
       printWindow.document.open();
@@ -3257,41 +3296,80 @@
     }
   }
 
-  function openPosPrinterSettings(){
-    var bridge = window.XentraPos || window.XentraNative;
-    if(!bridge || typeof bridge.getPairedPrinters !== 'function'){
-      showModal('<h3>Printer Struk</h3><p>POS web menggunakan dialog cetak perangkat. Untuk printer Bluetooth langsung, buka POS dari aplikasi Android dan pasangkan printer di pengaturan Bluetooth Android.</p><div class="pos-modal-actions"><button class="pos-btn" id="pos-printer-settings-close">Tutup</button></div>');
-      $('pos-printer-settings-close').onclick=hideModal;
-      return;
+  function bindPosSettingsTabs(){
+    var profileTab=$('pos-settings-tab-profile'), devicesTab=$('pos-settings-tab-devices');
+    var profilePanel=$('pos-settings-profile-panel'), devicesPanel=$('pos-settings-devices-panel');
+    function selectTab(devices){
+      profileTab.classList.toggle('active',!devices); devicesTab.classList.toggle('active',devices);
+      profileTab.setAttribute('aria-selected',String(!devices)); devicesTab.setAttribute('aria-selected',String(devices));
+      profilePanel.style.display=devices?'none':'block'; devicesPanel.style.display=devices?'block':'none';
     }
-    var printers=[];
-    try{ printers=JSON.parse(bridge.getPairedPrinters()||'[]'); }catch(_){ printers=[]; }
-    var saved=localStorage.getItem('xentra_pos_printer_mac')||'';
-    var options=printers.map(function(p){
-      var address=p.address||p.mac||'';
-      return '<option value="'+esc(address)+'" '+(address===saved?'selected':'')+'>'+esc((p.name||'Printer Bluetooth')+' · '+address)+'</option>';
-    }).join('');
-    if(!options) options='<option value="">Tidak ada printer paired di Android</option>';
-    showModal('<h3>Printer Struk</h3><p>Pilih printer Bluetooth yang sudah dipasangkan di Android.</p><label for="pos-printer-select">Printer paired</label><select id="pos-printer-select" class="pos-input">'+options+'</select><div class="pos-modal-actions"><button class="pos-btn ghost" id="pos-printer-test">Tes Cetak</button><button class="pos-btn" id="pos-printer-connect">Hubungkan</button></div>');
-    $('pos-printer-connect').onclick=function(){
-      var mac=$('pos-printer-select').value;
-      if(!mac)return toast('Pilih printer Bluetooth terlebih dahulu.');
-      try{
-        if(bridge.connectPrinter(mac)){
-          localStorage.setItem('xentra_pos_printer_mac',mac);
-          toast('Printer terhubung.');
-        }else toast('Koneksi printer gagal. Pastikan printer menyala dan sudah paired.');
-      }catch(e){toast('Koneksi printer gagal: '+e.message);}
-    };
-    $('pos-printer-test').onclick=function(){
-      var mac=$('pos-printer-select').value;
-      if(!mac)return toast('Pilih printer Bluetooth terlebih dahulu.');
-      try{
-        if(!bridge.isPrinterConnected()&&!bridge.connectPrinter(mac))return toast('Printer belum terhubung.');
-        localStorage.setItem('xentra_pos_printer_mac',mac);
-        var ok=bridge.printReceipt('XENTRA POS\nTES CETAK PRINTER\nJika tulisan terbaca, printer siap.\n\n\n');
-        toast(ok?'Tes cetak dikirim ke printer.':'Printer menolak tes cetak.');
-      }catch(e){toast('Tes cetak gagal: '+e.message);}
+    profileTab.onclick=function(){selectTab(false);};
+    devicesTab.onclick=function(){selectTab(true);};
+  }
+
+  function bindPosDeviceSettings(){
+    var bridge=window.XentraPos||window.XentraNative;
+    var nativeReady=!!(bridge&&typeof bridge.getPairedPrinters==='function'&&typeof bridge.printReceipt==='function');
+    var nativePanel=$('pos-settings-printer-native'), browserPanel=$('pos-settings-printer-browser');
+    var printerStatus=$('pos-settings-printer-status');
+    if(nativeReady){
+      var printers=[];
+      try{printers=JSON.parse(bridge.getPairedPrinters()||'[]');}catch(_){}
+      var saved=localStorage.getItem('xentra_pos_printer_mac')||'';
+      var select=$('pos-settings-printer-select');
+      select.innerHTML=printers.length?printers.map(function(p){
+        var address=p.address||p.mac||'';
+        return '<option value="'+esc(address)+'" '+(address===saved?'selected':'')+'>'+esc((p.name||'Printer Bluetooth')+' · '+address)+'</option>';
+      }).join(''):'<option value="">Tidak ada printer paired di Android</option>';
+      var connected=false;
+      try{connected=bridge.isPrinterConnected();}catch(_){}
+      printerStatus.textContent=connected?'Terhubung ke printer':'Belum terhubung';
+      printerStatus.classList.toggle('connected',connected);
+      $('pos-settings-printer-connect').onclick=function(){
+        var mac=select.value;
+        if(!mac)return toast('Pasangkan printer Bluetooth di pengaturan Android terlebih dahulu.');
+        try{
+          if(bridge.connectPrinter(mac)){
+            localStorage.setItem('xentra_pos_printer_mac',mac);
+            printerStatus.textContent='Terhubung ke '+(select.options[select.selectedIndex].text.split(' · ')[0]);
+            printerStatus.classList.add('connected'); toast('Printer berhasil dihubungkan.');
+          }else toast('Koneksi gagal. Pastikan printer menyala dan sudah dipasangkan.');
+        }catch(e){toast('Koneksi printer gagal: '+e.message);}
+      };
+      $('pos-settings-printer-test').onclick=function(){
+        var mac=select.value;
+        try{
+          if(!bridge.isPrinterConnected()&&(!mac||!bridge.connectPrinter(mac)))return toast('Hubungkan printer terlebih dahulu.');
+          if(mac)localStorage.setItem('xentra_pos_printer_mac',mac);
+          toast(bridge.printReceipt('XENTRA POS\nTES CETAK STRUK\nPrinter siap digunakan.\n\n\n')?'Tes cetak dikirim ke printer.':'Printer gagal mencetak.');
+        }catch(e){toast('Tes cetak gagal: '+e.message);}
+      };
+    }else{
+      nativePanel.style.display='none'; browserPanel.style.display='block';
+      printerStatus.textContent='Cetak melalui dialog printer perangkat';
+      $('pos-settings-browser-print-test').onclick=function(){
+        var w=window.open('','_blank','width=420,height=700');
+        if(!w)return toast('Popup diblokir. Izinkan popup untuk POS.');
+        w.document.write('<!doctype html><html><head><title>Tes Cetak Xentra</title><style>@page{size:80mm auto;margin:3mm}body{font:12px monospace;width:72mm;margin:0 auto}</style></head><body><pre>XENTRA POS\nTES CETAK STRUK\nPilih printer pada dialog cetak.\n\n\n</pre></body></html>');
+        w.document.close();w.focus();w.onafterprint=function(){try{w.close();}catch(_){}};w.print();
+      };
+    }
+
+    var sound=getPosSoundSettings(), enabled=$('pos-settings-sound-enabled'), volume=$('pos-settings-sound-volume'), volumeValue=$('pos-settings-sound-volume-value');
+    enabled.checked=sound.enabled!==false; volume.value=String(sound.volume); volumeValue.textContent=String(sound.volume)+'%';
+    function saveSound(){
+      var next={enabled:enabled.checked,volume:Number(volume.value)};
+      try{localStorage.setItem('xentra_pos_sound_settings',JSON.stringify(next));}catch(_){}
+      volumeValue.textContent=next.volume+'%';
+    }
+    enabled.onchange=saveSound;
+    volume.oninput=saveSound;
+    $('pos-settings-sound-test').onclick=function(){
+      saveSound();
+      if(!enabled.checked)return toast('Aktifkan bunyi kasir untuk mencoba suara.');
+      if(window.XentraAudio&&typeof window.XentraAudio.testAlertSound==='function')window.XentraAudio.testAlertSound('bell',Number(volume.value));
+      else toast('Fitur suara belum tersedia di perangkat ini.');
     };
   }
 
@@ -5372,7 +5450,6 @@
     if($('tab-transaksi-held')) $('tab-transaksi-held').onclick=function(){switchTransaksiTab('held');};
     $('btn-pos-select-table').onclick=function(){openTableSelector();};
     attachRefreshAction('btn-pos-load-sales', loadSales, 'Daftar transaksi diperbarui');
-    if($('btn-pos-printer')) $('btn-pos-printer').onclick=openPosPrinterSettings;
     if($('btn-pos-scan-driver')) $('btn-pos-scan-driver').onclick=openDriverQrScanModal;
     if($('btn-pos-scan-qr-top')) $('btn-pos-scan-qr-top').onclick=openDriverQrScanModal;
     attachRefreshAction('btn-pos-refresh-tables', loadTables, 'Status meja diperbarui');

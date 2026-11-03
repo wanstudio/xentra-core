@@ -13,12 +13,12 @@ var STATIC_ASSETS = [
   "/pos/manifest.json",
   "/pos/assets/icons/icon-192.png",
   "/pos/assets/icons/icon-512.png",
-  "/pos/assets/css/pos.css?v=1.0.23",
+  "/pos/assets/css/pos.css?v=1.0.24",
   "/merchant-shared/js/ops-chat.js?v=2.0.0",
-  "/merchant-shared/js/audio-alerts.js?v=1.0.0",
+  "/merchant-shared/js/audio-alerts.js?v=1.0.1",
   "/pos/assets/js/TransactionComposer.js?v=1.0.11",
   "/pos/assets/js/PosOfflineStore.js?v=1.0.0",
-  "/pos/assets/js/pos-app.js?v=1.0.35"
+  "/pos/assets/js/pos-app.js?v=1.0.36"
 ];
 
 var _cacheNamePromise = null;

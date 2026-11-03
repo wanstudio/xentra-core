@@ -123,7 +123,7 @@
   /**
    * Play an Indonesian voice prompt using Web Speech API (fallback)
    */
-  function speakIndonesian(text) {
+  function speakIndonesian(text, volume) {
     if (!('speechSynthesis' in window) || !text) return;
     try {
       window.speechSynthesis.cancel();
@@ -131,7 +131,7 @@
       utter.lang = 'id-ID';
       utter.rate = 1.05;
       utter.pitch = 1.1;
-      utter.volume = 1.0;
+      utter.volume = Math.max(0, Math.min(1, volume == null ? 1.0 : Number(volume)));
 
       var voices = window.speechSynthesis.getVoices();
       var idVoice = voices.find(function (v) {
@@ -393,10 +393,12 @@
     // 3. Pembayaran Berhasil / Kas Masuk (POS / Kasir) — Double Ding Cash Register
     paymentReceived: function (options) {
       options = options || {};
-      playChime([987.77, 1318.51], 0.15, 'triangle'); // B5, E6
+      if (options.enabled === false) return;
+      var volume = Math.max(0, Math.min(1, Number(options.volume == null ? 75 : options.volume) / 100));
+      playChime([987.77, 1318.51], 0.15, 'triangle', 0.5 * volume); // B5, E6
       if (options.voice !== false) {
         setTimeout(function () {
-          speakIndonesian(options.text || 'Pembayaran berhasil diterima!');
+          speakIndonesian(options.text || 'Pembayaran berhasil diterima!', volume);
         }, 350);
       }
     },
