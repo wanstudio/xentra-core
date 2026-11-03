@@ -853,6 +853,26 @@
     window.location.replace('/pos/');
   }
 
+  function confirmCashierLogout(onCancel){
+    showModal(
+      '<h3>Keluar dari POS?</h3>' +
+      '<p>Sesi kasir di perangkat ini akan diakhiri. Anda perlu masuk kembali untuk menggunakan POS.</p>' +
+      '<div class="pos-modal-actions">' +
+        '<button type="button" class="pos-btn ghost" id="pos-logout-cancel">Tidak</button>' +
+        '<button type="button" class="pos-btn" id="pos-logout-confirm">Ya, keluar</button>' +
+      '</div>',
+      'pos-modal-logout-confirm'
+    );
+    $('pos-logout-cancel').onclick=function(){
+      hideModal();
+      if(typeof onCancel==='function') onCancel();
+    };
+    $('pos-logout-confirm').onclick=function(){
+      hideModal();
+      clearPosSessionAndReturnToPin();
+    };
+  }
+
   async function onlinePinLogin(pin) {
     var branchId=state.branchId || localStorage.getItem('xentra_pos_branch_id') || null;
     var terminalId=state.terminalId || localStorage.getItem('xentra_pos_terminal_id') || null;
@@ -2077,8 +2097,7 @@
 
     if ($('btn-profile-logout')) {
       $('btn-profile-logout').onclick = function () {
-        hideModal();
-        clearPosSessionAndReturnToPin();
+        confirmCashierLogout(openCashierProfileModal);
       };
     }
 
@@ -5459,13 +5478,14 @@
     $('btn-pos-close-shift-top').onclick=openCloseShiftModal;
     if($('btn-pos-notif')) $('btn-pos-notif').onclick=openPosNotificationsModal;
     if($('pos-user-profile-btn')) $('pos-user-profile-btn').onclick=openCashierProfileModal;
-    $('btn-pos-logout').onclick=function(){clearPosSessionAndReturnToPin();};
+    $('btn-pos-logout').onclick=function(){confirmCashierLogout();};
     bindPosStatus();
     $('pos-modal').onclick=function(e){
       if(e.target!==this)return;
       // Profile & settings contains device setup controls; on touch screens an
       // edge tap/scroll can land on the backdrop. Require an explicit close.
       if(this.classList.contains('pos-modal-profile-settings'))return;
+      if(this.classList.contains('pos-modal-logout-confirm'))return;
       hideModal();
     };
     if($('pos-mcart-trigger-order')){
